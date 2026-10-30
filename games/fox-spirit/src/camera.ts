@@ -278,22 +278,52 @@ export function createFollowCamera(opts: {
     cam.y += lift * t;
   }
 
-  // World meshes are material/spatial buckets. Raycaster's per-mesh bounds reject distant
-  // buckets before triangle tests; avoid traversing particles, the hero or effects every tick.
-  const scenery: THREE.Mesh[] = [];
+  // Rendering uses 64m material buckets. Split their triangle indices into small
+  // query-only chunks: otherwise three short rays still visit an entire bucket's
+  // triangles. Positions are shared; these meshes never enter the render scene.
+  const scenery: { source: THREE.Mesh; probe: THREE.Mesh }[] = [];
   opts.scenery?.updateWorldMatrix(true, true);
   opts.scenery?.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh || mesh.userData.isOccluder) return;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    // Foliage has its own near-lens fade. Treating those cards as walls would
-    // pump the boom in every patch of reeds; only opaque scenery should compress it.
-    if (materials.some((m) => (m as THREE.MeshStandardMaterial).isMeshStandardMaterial
+    // Foliage has its own near-lens fade; reeds must not pump the solid boom.
+    const solid = materials.some((m) => (m as THREE.MeshStandardMaterial).isMeshStandardMaterial
       && m.depthWrite && m.alphaTest === 0 && !m.userData.foliage
       && !/canopy|leaf|leaves|reed|grass|litter|sail|glow/i.test(m.name)
-      && (!m.transparent || m.opacity > 0.9))) {
-      mesh.geometry.computeBoundingBox();
-      scenery.push(mesh);
+      && (!m.transparent || m.opacity > 0.9));
+    if (!solid) return;
+    const geometry = mesh.geometry;
+    const position = geometry.getAttribute('position');
+    if (!position) return;
+    if (position.count < 3000 || Array.isArray(mesh.material) || (mesh as THREE.InstancedMesh).isInstancedMesh || (mesh as THREE.SkinnedMesh).isSkinnedMesh) {
+      geometry.computeBoundingBox();
+      scenery.push({ source: mesh, probe: mesh });
+      return;
+    }
+    const chunks = new Map<string, { indices: number[]; bounds: THREE.Box3 }>();
+    const vertices = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+    const index = geometry.index;
+    const end = Math.min(index?.count ?? position.count, geometry.drawRange.start + geometry.drawRange.count);
+    for (let i = geometry.drawRange.start; i + 2 < end; i += 3) {
+      const ids = [index ? index.getX(i) : i, index ? index.getX(i + 1) : i + 1, index ? index.getX(i + 2) : i + 2];
+      for (let j = 0; j < 3; j++) vertices[j]!.fromBufferAttribute(position, ids[j]!);
+      const [a, b, c] = vertices as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+      const key = `${Math.floor((a.x + b.x + c.x) / 24)},${Math.floor((a.y + b.y + c.y) / 24)},${Math.floor((a.z + b.z + c.z) / 24)}`;
+      let chunk = chunks.get(key);
+      if (!chunk) chunks.set(key, chunk = { indices: [], bounds: new THREE.Box3() });
+      chunk.indices.push(...ids);
+      for (const vertex of vertices) chunk.bounds.expandByPoint(vertex);
+    }
+    for (const chunk of chunks.values()) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', position);
+      g.setIndex(chunk.indices);
+      g.boundingBox = chunk.bounds;
+      g.boundingSphere = chunk.bounds.getBoundingSphere(new THREE.Sphere());
+      const probe = new THREE.Mesh(g, mesh.material);
+      probe.matrixWorld.copy(mesh.matrixWorld);
+      scenery.push({ source: mesh, probe });
     }
   });
   const sight = new THREE.Raycaster();
@@ -317,14 +347,14 @@ export function createFollowCamera(opts: {
       sightOrigin.copy(focus).addScaledVector(sightSide, side);
       sight.set(sightOrigin, sightDir);
       sight.far = nearest;
-      for (const mesh of scenery) {
+      for (const { source: mesh, probe } of scenery) {
         if (!mesh.visible) continue;
         // Parent visibility matters (e.g. a restored bridge replaces its dormant scenery).
         let parent = mesh.parent;
         while (parent && parent.visible) parent = parent.parent;
         if (parent) continue;
         sightHits.length = 0;
-        mesh.raycast(sight, sightHits);
+        probe.raycast(sight, sightHits);
         for (const hit of sightHits) {
           if (hit.distance < nearest) {
             nearest = hit.distance;

@@ -1,6 +1,7 @@
 /** CPU-only camera math checks. No browser, canvas, WebGL or render. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createFollowCamera } from '../../games/fox-spirit/src/camera';
 import type { CameraFrame } from '../../games/fox-spirit/src/camera';
 
@@ -73,6 +74,22 @@ for (let i = 0; i < 300; i++) {
   diagonal.update(1 / 60, d);
 }
 assert(Math.abs(diagonal.getYaw() - initialYaw) < 0.01, 'Diagonal steering must stay stable');
+
+// Chunked merged geometry must retain exactly the same near-post hit, including
+// when its source is transformed and distant triangles share the render bucket.
+const densePost = post.geometry.clone().toNonIndexed();
+densePost.translate(post.position.x, post.position.y, post.position.z);
+const shell = new THREE.SphereGeometry(40, 64, 48).toNonIndexed();
+const merged = mergeGeometries([shell, densePost]);
+assert(merged);
+const chunkWorld = new THREE.Group();
+chunkWorld.position.set(12, 3, -8);
+chunkWorld.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial()));
+const chunkCam = createFollowCamera({ scenery: chunkWorld });
+const chunkFrame = frame();
+chunkFrame.target.copy(chunkWorld.position);
+tick(chunkCam, chunkFrame);
+assert(Math.abs(chunkCam.camera.position.distanceTo(chunkFrame.target) - contracted) < 0.001, 'Chunking must preserve a transformed merged post hit');
 
 // Existing foliage fade owns leaf/reed cards: they must not pump the solid boom.
 const foliageWorld = new THREE.Group();
