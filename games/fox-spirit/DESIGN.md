@@ -89,7 +89,7 @@ are the evidence. Staged resets are explicitly recorded; route remains unassiste
 
 ## Sprint 2 Shade encounter
 The Keeping caught a woodland animal mid-stride. Its enlarged, vertically drawn
-Quaternius CC0 deer silhouette floats in a warm ink wash, wavering without a walk
+Quaternius CC0 antlered stag silhouette floats in a warm ink wash, wavering without a walk
 cycle. SW1's authored loop is the first playable encounter. A 3 m drain suppresses
 weak temporary supply; fresh dash strokes and permanent restoration still win.
 Contact costs one of three wisps, grants one second of grace and pushes the fox
@@ -114,3 +114,8 @@ The review must disclose that limitation and exclude staged teleport transitions
 The explicit `shade` GPU shot stages the fox near the first live Shade, then records
 patrol, real contact/knockback and a real dash through it. Resets are labelled staged;
 no health or freed flags are forced. Preserve per-second __game/state and key frames.
+
+Driver 12:05 correction: use the licensed antlered stag with long legs and an
+authored lowered-head pose over mid-stride legs. The creature is drifting ink,
+with a dark ground wash that communicates its 3 m drain. Smaller maple leaves
+warm within 0.8 s, settle as colored litter, and fade after a quiet hold.

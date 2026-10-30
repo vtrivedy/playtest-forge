@@ -66,9 +66,10 @@ Same Quaternius file already mirrored at `assets/hero/source/fox_quaternius_raw.
 Free downloads work headless with `scene_uuid` and no API key. Realistic / paid animal rigs require `preferences.addons['blenderkit'].preferences.api_key` — **needs Vivek login; do not create accounts**.
 
 ## Shade memory animal (Sprint 2)
-`animals/quaternius_deer.glb` — **Deer by Quaternius**, Ultimate Animated Animals,
+`animals/quaternius_stag.glb` — **Stag by Quaternius**, Ultimate Animated Animals,
 **CC0 1.0**. Pack: https://quaternius.com/packs/ultimateanimatedanimals.html
-Download mirror: https://poly.pizza/m/T6Cs7tmMHJ (retrieved 2026-10-30).
-Binary: https://static.poly.pizza/4b6c2a41-43c7-404c-ae37-e8c4645ff93b.glb
-The encounter bakes Gallop at 32%, lowers the neck slightly, and draws a tall
-warm ink silhouette. Original falling leaf geometry is generated in code.
+Download mirror: https://poly.pizza/m/tQdzbZ1Cmw (retrieved 2026-10-30).
+Binary: https://static.poly.pizza/a9c69fbc-bf7c-4585-9a49-a82e0be1ac6b.glb
+The encounter bakes Walk at 32%, borrows its authored head-low neck pose, and
+renders a tall wavering ink silhouette with its original antlers. Falling maple
+leaf geometry is original code.

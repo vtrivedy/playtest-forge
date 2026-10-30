@@ -1177,6 +1177,40 @@ async function boot() {
       fox.rotation.y += d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
     }
 
+    shadeContact.update(dt, (dx, dz) => {
+      const beforeX = fox.position.x, beforeZ = fox.position.z;
+      const fy = fox.position.y - foxActor.feetOffset;
+      const safe = (x: number, z: number) => {
+        if (col.blocked(x, z, fy)) return false;
+        // A hit on safe ground must not add an unavoidable >6 m drop to its wisp cost.
+        if (shadeKnockbackFloor !== null && col.groundAt(x, z, fy + 0.2).y < shadeKnockbackFloor) return false;
+        return true;
+      };
+      if (safe(fox.position.x + dx, fox.position.z)) fox.position.x += dx;
+      if (safe(fox.position.x, fox.position.z + dz)) fox.position.z += dz;
+      return Math.hypot(fox.position.x - beforeX, fox.position.z - beforeZ);
+    });
+    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
+      if (e.type === 'freed') {
+        shadeContact.frees++;
+        hitstop = 0.08;
+        cam.shake(0.12);
+        audio.play('bridge');
+        hud.setPrompt('The Keeping loosens. A memory returns.');
+        hud.hidePromptSoon(3);
+      } else if (shadeContact.hit(fox.position, e.pos, shades.tun.knockback, shades.tun.invulnerability)) {
+        shadeKnockbackFloor = grounded ? fox.position.y - foxActor.feetOffset - 6 : null;
+        vel.y = Math.max(vel.y, 4.2);
+        grounded = false;
+        cam.shake(0.2);
+        foxActor.pulse(0.4);
+        audio.play('hazard');
+        hud.setPrompt(`${shadeContact.wisps} ember wisps · Dash through the ink to free it`);
+        hud.hidePromptSoon(3);
+        if (shadeContact.wisps === 0) { respawn(); deaths++; }
+      }
+    }
+
     locoIn.vel.copy(vel);
     locoIn.grounded = grounded;
     locoIn.gliding = gliding;
@@ -1212,39 +1246,6 @@ async function boot() {
       colorField.glows.push({ x: h.base.x, z: h.base.z, radius: 4.2, strength: h.reactor.heat * 0.8 });
       // keep leaves riding a burning column, near the fox only (shared leaf pool)
       if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
-    }
-    shadeContact.update(dt, (dx, dz) => {
-      const beforeX = fox.position.x, beforeZ = fox.position.z;
-      const fy = fox.position.y - foxActor.feetOffset;
-      const safe = (x: number, z: number) => {
-        if (col.blocked(x, z, fy)) return false;
-        // A hit on safe ground must not add an unavoidable >6 m drop to its wisp cost.
-        if (shadeKnockbackFloor !== null && col.groundAt(x, z, fy + 0.2).y < shadeKnockbackFloor) return false;
-        return true;
-      };
-      if (safe(fox.position.x + dx, fox.position.z)) fox.position.x += dx;
-      if (safe(fox.position.x, fox.position.z + dz)) fox.position.z += dz;
-      return Math.hypot(fox.position.x - beforeX, fox.position.z - beforeZ);
-    });
-    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
-      if (e.type === 'freed') {
-        shadeContact.frees++;
-        hitstop = 0.08;
-        cam.shake(0.12);
-        audio.play('bridge');
-        hud.setPrompt('The Keeping loosens. A memory returns.');
-        hud.hidePromptSoon(3);
-      } else if (shadeContact.hit(fox.position, e.pos, shades.tun.knockback, shades.tun.invulnerability)) {
-        shadeKnockbackFloor = grounded ? fox.position.y - foxActor.feetOffset - 6 : null;
-        vel.y = Math.max(vel.y, 4.2);
-        grounded = false;
-        cam.shake(0.2);
-        foxActor.pulse(0.4);
-        audio.play('hazard');
-        hud.setPrompt(`${shadeContact.wisps} ember wisps · Dash through the ink to free it`);
-        hud.hidePromptSoon(3);
-        if (shadeContact.wisps === 0) { respawn(); deaths++; }
-      }
     }
     for (const i of inlets.update(dt, (q) => { const h = updrafts.hearths.find((x) => x.spot.id === q.source); return !!h && heatFeeds(h, q.pos, updrafts.tun.radius); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;

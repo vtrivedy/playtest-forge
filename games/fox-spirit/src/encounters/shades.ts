@@ -36,7 +36,7 @@ type ShadeActor = {
 
 /** Bake the licensed library animal in one authored gallop pose. No live skeleton or hero code. */
 async function animalGeometry(): Promise<THREE.BufferGeometry> {
-  const gltf = await new GLTFLoader().loadAsync('/assets/library/animals/quaternius_deer.glb');
+  const gltf = await new GLTFLoader().loadAsync('/assets/library/animals/quaternius_stag.glb');
   const mixer = new THREE.AnimationMixer(gltf.scene);
   const headLow = gltf.animations.find(c => c.name === 'Idle_Headlow')!;
   const lowAction = mixer.clipAction(headLow).play();
@@ -46,7 +46,7 @@ async function animalGeometry(): Promise<THREE.BufferGeometry> {
     return { bone, q: bone.quaternion.clone() };
   });
   lowAction.stop();
-  const clip = gltf.animations.find(c => c.name === 'Gallop')!;
+  const clip = gltf.animations.find(c => c.name === 'Walk')!;
   mixer.clipAction(clip).play();
   mixer.setTime(clip.duration * 0.32);
   // Keep the authored mid-stride legs, but borrow the animal's own lowered-head pose.
@@ -76,8 +76,8 @@ async function animalGeometry(): Promise<THREE.BufferGeometry> {
   const centre = box.getCenter(new THREE.Vector3());
   g.translate(-centre.x, -box.min.y, -centre.z);
   // An elongated ink memory: a tall narrow animal, still recognisably mid-stride.
-  const scale = 2.5 / size.y;
-  g.scale(scale * 0.72, scale, scale * 0.72);
+  const scale = 3.1 / size.y;
+  g.scale(scale * 0.82, scale, scale * 0.82);
   g.computeVertexNormals();
   g.computeBoundingBox();
   mixer.stopAllAction();
@@ -120,10 +120,11 @@ function inkMaterial(): THREE.ShaderMaterial {
       ${NOISE}
       void main() {
         float n = n3(vP * 4.0 + vec3(0.0, -uTime * 0.9, uSeed));
-        // legs dissolve into smoke near the ground; freeing eats the whole body
-        float cut = mix(0.0, 0.62, 1.0 - smoothstep(0.05, 0.7, vY)) + (1.0 - uPresence) * 1.1;
-        if (n < cut) discard;
         float rim = pow(1.0 - abs(dot(vN, vV)), 2.2);
+        // feet and silhouette bleed into the wash; freeing eats the whole body
+        float cut = mix(0.0, 0.62, 1.0 - smoothstep(0.05, 0.7, vY)) + (1.0 - uPresence) * 1.1;
+        cut += smoothstep(0.45, 0.95, rim) * 0.24;
+        if (n < cut) discard;
         // pressed ink: near-black umber core, a thin paper-pale rim like dried wash at the edge
         vec3 core = vec3(0.0015, 0.0009, 0.0005);
         vec3 edge = vec3(0.045, 0.022, 0.009);
