@@ -62,7 +62,7 @@ export function createFollowCamera(opts: {
       const extra = Math.max(0, frame.pullBack ?? pull);
       // World-relative chase with a slight lateral bias so the fox reads as a
       // slender quadruped (profile of legs/snout/tail) instead of a pure rear blob.
-      const side = distance * 0.38;
+      const side = distance * 0.32;
       desired.set(
         target.x + side,
         target.y + height + extra * 0.28,

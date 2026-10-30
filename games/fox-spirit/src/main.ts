@@ -111,10 +111,10 @@ async function boot() {
   })();
 
   const cam = createFollowCamera({
-    fov: 46,
-    distance: 2.85,
-    height: 1.05,
-    lookAtHeight: 0.55,
+    fov: 48,
+    distance: 2.7,
+    height: 1.2,
+    lookAtHeight: 0.5,
     yAt: world.yAt,
   });
   cam.resize(innerWidth, innerHeight);
@@ -233,6 +233,7 @@ async function boot() {
       hasClips: boolean;
       runTurntable: (opts?: { anim?: string; fx?: boolean }) => void;
       stopTurntable: () => void;
+      poseHero: (opts?: { anim?: string; fx?: boolean }) => void;
     };
   };
   win.__gameHooks = {
@@ -276,6 +277,31 @@ async function boot() {
     },
     stopTurntable() {
       turntableMode = false;
+    },
+    poseHero(opts) {
+      // Open path south of shrine — clear of trees for anatomy judgment
+      const x = 1.2;
+      const z = 8;
+      const gy = world.yAt(x, z);
+      foxActor.group.position.set(x, gy + foxActor.feetOffset, z);
+      foxActor.group.rotation.y = Math.PI * 0.72; // 3/4 toward south-east cam
+      vel.set(0, 0, 0);
+      const anim = (opts?.anim as import('./fox').FoxAnimState) || 'run';
+      foxActor.setAnim(anim);
+      // Advance a few mixer frames so run pose isn't T-pose
+      for (let i = 0; i < 8; i++) foxActor.update(1 / 30, i / 30, false);
+      if (opts?.fx === false) {
+        fxEnabled = false;
+        post.bloom.strength = 0;
+        wisps.points.visible = false;
+        emberTrail.points.visible = false;
+      }
+      // Hard-snap cam to readable 3/4 (bypass spring)
+      const fx = foxActor.group.position;
+      cam.camera.position.set(fx.x + 1.6, fx.y + 1.15, fx.z + 2.6);
+      cam.camera.lookAt(fx.x, fx.y + 0.45, fx.z);
+      contactShadow.position.set(fx.x, gy + 0.03, fx.z);
+      (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.78;
     },
   };
 

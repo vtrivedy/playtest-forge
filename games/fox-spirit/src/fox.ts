@@ -180,7 +180,7 @@ export async function createFox(): Promise<FoxActor> {
     const box0 = new THREE.Box3().setFromObject(root);
     const size0 = new THREE.Vector3();
     box0.getSize(size0);
-    const targetHeight = 1.05; // ~keyart fox at gameplay scale
+    const targetHeight = 1.25; // ~keyart fox at gameplay scale
     const s = targetHeight / Math.max(size0.y, 0.001);
     root.scale.setScalar(s);
 

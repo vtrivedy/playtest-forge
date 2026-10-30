@@ -163,6 +163,19 @@ try {
   await play(page);
   await page.screenshot({ path: path.join(outDir, 'shot-mid.png') });
 
+  // Hero anatomy money shot — open path, run clip, FX off
+  await page.evaluate(() => {
+    const h = (window as unknown as {
+      __gameHooks?: { poseHero?: (o: { anim: string; fx: boolean }) => void };
+    }).__gameHooks;
+    h?.poseHero?.({ anim: 'run', fx: false });
+  });
+  await page.waitForTimeout(450);
+  await page.screenshot({ path: path.join(outDir, 'shot-hero.png') });
+  await page.evaluate(() => {
+    (window as unknown as { __gameHooks?: { setFxEnabled?: (on: boolean) => void } }).__gameHooks?.setFxEnabled?.(true);
+  });
+
   // SwiftShader under ColorField+post is ~5–8× slow; ensure shrine money shot
   if (scriptName === 'shrine') {
     await page.evaluate(() => {
