@@ -1,3 +1,4 @@
+import { loadRubbleKit } from './russetRubble';
 import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
@@ -40,6 +41,9 @@ import type { InletSpot } from './chem/inlet';
 import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 import type { RootSpot } from './chem/growth';
+import { waterSpots } from './chem/water';
+import type { ShadeSpot } from './encounters/shades';
+export type { ShadeSpot } from './encounters/shades';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -50,7 +54,6 @@ import type { RootSpot } from './chem/growth';
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
 /** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
-export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
 
 export type SeedwellState = {
@@ -240,6 +243,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   group.name = 'russetvale';
   scene.add(group);
   const r = rng(20261030);
+  const waterVisuals: ReturnType<typeof createStylizedWater>[] = [];
 
   const terrainY = (x: number, z: number) => (insideIsland(x, z) ? groundRaw(x, z) : -1000);
   const col = new CollisionWorld(terrainY);
@@ -279,7 +283,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
-  const nature = await loadNatureKit();
+  const [nature, rubble] = await Promise.all([loadNatureKit(), loadRubbleKit()]);
   // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
   // yaw picked to keep foliage out of the route's jump arcs
   const TREE_HUES: Array<[THREE.Color, THREE.Color]> = [
@@ -387,30 +391,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // A · Arrival Meadow
   W(0, 0, 90, { label: 'portal' });
   W(0, 0, 80, { label: 'cp-meadow' });
-  W(6, 0, 70);
-  W(22, 0, 58);
-  W(42, 0, 46);
-  W(54, 0, 40, { label: 'cp-marsh' });
-  // C · Reedmarsh — boardwalk, hummock, ghost-ink stones, SW2 island
-  W(56.65, 0.3, 36.3, { ground: false, label: 'wash:marsh-mouth' });
-  W(60.0, -0.05, 34.05, { ground: false });
-  W(62.034, -0.05, 32.736, { ground: false });
-  W(64.5, 0.3, 31.4, { ground: false });
-  W(68.5, 0.4, 28.2, { ground: false, act: 'jump' });
-  W(73.5, 0.25, 25, { ground: false, act: 'jump' });
-  W(77.5, 0.25, 22.5, { ground: false, act: 'jump' });
-  W(81.5, 0.25, 20, { ground: false, act: 'jump' });
-  W(85.5, 0.25, 17.5, { ground: false, act: 'jump' });
-  W(89.4, 1.2, 15.6, { ground: false });
-  W(92.4, 2.0, 12.6, { ground: false });
-  W(95, 2, 10, { ground: false, label: 'SW2' });
-  // after SW2 the ink dries — walk out west across the basin floor
-  W(90, 2, 9, { ground: false });
-  W(86.6, -1.9, 12.2, { ground: false });
-  W(62, -1.9, 22, { ground: false });
-  W(44, 0, 26);
-  W(20, 0, 40);
-  W(-10, 0, 52);
+  W(4.5, groundRaw(4.5, 74.2), 74.2, { label: 'lift:H-a', act: 'glide' });
+  W(13, groundRaw(13, 75.5) + 5, 75.5, { ground: false, act: 'glide', label: 'meadow-vista' });
+  W(21, 0, 64);
+  W(-10, 0, 64);
   W(-34, 0, 56);
   // B · Windmill Rise
   WS(-7, 0, 0, { ground: true });
@@ -420,13 +404,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(10.5, 2.6, 6);
   WS(14.5, 2.4, 6);
   WS(17.2, 6.5, 6, { label: 'cp-mills' });
-  WS(20.4, -1, 6, { act: 'jump' });
-  WS(23, -1, 7.5, { act: 'jump' });
-  WS(25.5, -1, 9.0, { act: 'jump' });
-  WS(29.5, -1, 10);
+  WS(24.2, 9.7, 6, { act: 'dash', label: 'hearth-brush' });
+  WS(27.2, 9.7, 6, { act: 'glide', label: 'lift:H0' });
+  WS(29.5, 8.5, 10);
   WS(36.5, -1.2, 10);
   WS(36.5, -8.8, 14);
-  WS(35.7, -4, 14);
+  WS(36.4, -4, 14);
   WS(38.8, 2.5, 14);
   WS(39.7, 2.5, 14, { act: 'glide', label: 'wind-gap' });
   WS(62.3, 0.6, 14);
@@ -439,7 +422,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-112, 20, -24, { ground: false, label: 'SW1' });
   // dash H2 through the Kiln Shade's drain (the stroke punches through), then glide on east
   W(-111.4, 20, -23.0, { ground: false, act: 'dash', label: 'kiln-dash' });
-  W(-110.5, 20, -22.1, { ground: false });
+  W(-110.5, 20, -22.1, { ground: false, label: 'SW1-feed' });
   // glide off SW1 east, over the terraces' north shoulder, into Amberwood
   W(-108, 20, -25, { ground: false, act: 'glide' });
   W(-72, 0, -26, { ground: false });
@@ -735,6 +718,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // R6 lateral flight on k5 (18 → 22)
   flightT(66, 9.8, 18, 66, 0.4, 22, 2.4, 7);
 
+  // R6 ends at s66, two metres before the y22 terrace starts at s68.
+  // A matching stone apron joins them; without it the fox drops back to y18
+  // and the next terrace becomes a four-metre wall.
+  {
+    const p = sp(67, 0.1);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 3, d: 4, yaw: T_YAW, top: 22, bottom: 21.4, tag: 'r6-landing' }));
+    slab({ x: p.x, z: p.z, w: 3, d: 4, yaw: T_YAW, top: 22, bottom: 21.4, rough: 0.3, seed: 76, topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
+  }
+
   // windmills (towers static, blades animated)
   type Mill = { hub: THREE.Group; pos: THREE.Vector3; spin: number };
   const mills: Mill[] = [];
@@ -906,7 +898,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   };
   // Marsh Mouth water washes the missing six metres of boardwalk into a shallow stone crossing.
-  plankWalk({ x: 55.2, z: 37.5 }, { x: 57, z: 36 }, 0.3, 2.0);
+  // A stable apron beside the frozen spill gives a running fox room to stop
+  // while the front washes the channel. The remaining five metres still need water.
+  plankWalk({ x: 54.6, z: 38.0 }, { x: 57.7, z: 35.546 }, 0.3, 2.8);
   plankWalk({ x: 62.034, z: 32.736 }, { x: 66, z: 30.5 }, 0.3, 2.0);
 
   /** Marsh tussock: a low peat mound with a flat walkable crown that slumps into the ink. */
@@ -1156,6 +1150,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   {
     const len = CREEK.x1 - CREEK.x0 + CREEK.taper;
     const w = createStylizedWater(scene, { size: 6, y: CREEK.bed + 0.18, colorDeep: 0x2e2a22, colorShallow: 0x6a5c46 });
+    waterVisuals.push(w);
     w.mesh.scale.set(len / 6, 1, 0.62);
     w.mesh.position.set((CREEK.x0 + CREEK.x1) / 2, CREEK.bed + 0.18, (CREEK.zS + CREEK.zN) / 2);
     (w.material.uniforms.uSky!.value as THREE.Color).set(0x5a4e40);
@@ -1786,12 +1781,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
   {
-    const channel = new THREE.CatmullRomCurve3([[100, 6, 18], [104, 5.2, 22.7627], [94, 4, 23.7627], [92, 3.2, 17], [95, 2.3, 10]].map(p => new THREE.Vector3(...p as [number, number, number])), false, 'centripetal');
+    const channel = new THREE.CatmullRomCurve3(waterSpots.find(s => s.id === 'reed-falls')!.path, false, 'centripetal');
     const patrol: ShadeSpot['patrol'] = [];
     for (const side of [1, -1]) for (let j = 0; j <= 8; j++) {
       const t = 0.25 + (side === 1 ? j : 8 - j) / 8 * 0.2;
       const p = channel.getPoint(t), tangent = channel.getTangent(t);
-      p.x += tangent.z * 0.12 * side; p.z -= tangent.x * 0.12 * side;
+      p.x += tangent.z * 0.52 * side; p.z -= tangent.x * 0.52 * side;
       patrol.push([p.x, p.y, p.z]);
     }
     shadeSpots.push({ id: 'shade-flume', patrol });
@@ -1804,15 +1799,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const patrol: ShadeSpot['patrol'] = [];
     for(const side of [1,-1]) for(let j=0;j<=8;j++) {
       const f=(side===1?j:8-j)/8;
-      patrol.push([x0+(x1-x0)*f,y0+(y1-y0)*f,z+side*.22]);
+      patrol.push([x0+(x1-x0)*f,y0+(y1-y0)*f,z+side*.52]);
     }
     shadeSpots.push({id,patrol});
   }
   // Restored-edge encounters awaken once; permanent elements remain immune.
   for(const [id,afterLatch,cx,cy,cz,rx,rz] of [
-    ['shade-edge-kiln','SW1',-112,20,-27,1.5,.3],
-    ['shade-edge-reeds','SW2',95,6,18,1.2,.5],
-    ['shade-edge-maple','SW3',-8,12,-60,1.5,.5],
+    ['shade-edge-kiln','SW1',-112,20,-27,1.5,.8],
+    ['shade-edge-reeds','SW2',95,6,18,1.2,.8],
+    ['shade-edge-maple','SW3',-8,12,-60,1.5,.8],
   ] as const) {
     const patrol: ShadeSpot['patrol']=[];
     for(let j=0;j<16;j++){const a=j/16*Math.PI*2;patrol.push([cx+Math.cos(a)*rx,cy,cz+Math.sin(a)*rz]);}
@@ -1865,6 +1860,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // Wen's pond
   const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x393c30, colorShallow: 0x827657 });
+  waterVisuals.push(pond);
   pond.mesh.position.set(POND.x, POND.water, POND.z);
   pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
   (pond.material.uniforms.uSky!.value as THREE.Color).set(0xb5a17a);
@@ -2226,6 +2222,18 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   }
 
+  // CC0 scanned fragments sit inside existing masonry footprints; route landings stay clear.
+  for (let i = 0; i < 9; i++) {
+    const a = i * 2.39996;
+    const x = -30 + Math.cos(a) * (1.05 + (i % 2) * 0.4);
+    const z = 60.4 + Math.sin(a) * 1.55;
+    rubble.place(bk('rock', x, z), x, 3.18, z, 0.7 + (i % 3) * 0.18, 420 + i, 0.48);
+  }
+  for (const [x, y, z, seed] of [[55.6, -0.1, 35.3, 440], [95, -1.9, 20, 441], [105, -1.9, 20, 442]] as const) {
+    rubble.place(bk('rock', x, z), x, y, z, 1.05, seed, 1.4);
+  }
+  rubble.dispose();
+
   // ==================================================================== merge buckets
   let verts = 0;
   const perMat: Record<string, number> = {};
@@ -2310,6 +2318,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
+      for (const water of waterVisuals) water.update(t);
       const ev: RealmEvent[] = [];
       // checkpoints
       for (let i = 0; i < checkpoints.length; i++) {

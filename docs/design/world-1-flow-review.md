@@ -68,3 +68,18 @@ No controller values, animation clips or renderer settings were changed for this
 ## Segmented follow-up, captured from later main
 
 The first segmented run was interrupted by Modal after completing the mill segment. Its checkout was `d836741` (the retry moved again; do not call this the original baseline). Retained mill video/state: `levels-sol/flow/flow-mills-staged-start.*`. Starting at `cp-mills`, real movement advances to waypoint 44 `(-95,22,0.4)` with **zero deaths and zero assists**, then stalls with feet at y18. The inspected frame shows the fox below a stair/rock overhang, visible only through the occlusion cutout. This is a second concrete blocker: the terrace transition's collision/route does not match the intended stair ascent. It is not evidence that the eventual wind-gap challenge was attempted. The Kiln segment is incomplete and is not counted as a verified traversal.
+
+## Completed four-region GPU follow-up — main 5a75be0
+
+Run `5a75be0299993b204d9868035f3d09f42b1c79c7-flow-20261030-140442-fefdab7352`, A10G / 1080p60. All regional video traces and PNGs retained in `levels-sol/flow-v4/`; every saved scene frame inspected via the labeled contact sheet, with original blocker frames available. Starts are explicitly staged, subsequent movement is unassisted. Total capture 540 s wall time; that is rendering time, not player pacing.
+
+| Segment | Actual simulated result | Verdict |
+|---|---|---|
+| Mills, from cp-mills | 12.03 s; waypoint 36 `(-75.3,14,28.7)` stalls with feet y11.53; 0 deaths/assists | FAIL: stair is still a blocker on updated locomotion, at an earlier transition than the older run |
+| Kiln, from SW1 | 15 s; SW1 latches from heat; fox glides onward toward Amberwood, reaches waypoint 53; 0 deaths/assists | APPROVED only for the heat-fed latch / departure segment; not proof of natural arrival from mills |
+| Canopy, from cp-amber | 12.85 s; waypoint 55 `(5.9,0,-7.4)` stalls with feet y−3.38 in creek gorge; 0 deaths/assists | FAIL: pre-growth route treats the gorge as ground and does not solve the knot |
+| Hill, from cp-arena | 13.72 s; full switchback route reaches Wellspring and triggers flood; 0 deaths/assists, all 3 Seedwells unlit | APPROVED for traversal; FAIL for progression meaning: a staged arena start can still win by proximity, without the proposed combined-element solve |
+
+Concrete visual failures: the canopy trace puts the lens into the trunk/leaf geometry while the bot waits in the gorge; the Kiln departure end frame is occluded by foreground leaves; at the hill's last stair the fox is elongated up the slope, requiring the locomotion stream's landing/slope review. The summit staged-start completion is deliberately not called a full realm clear. Its clean 14-second ascent is useful evidence that the final hill geography can carry a real puzzle once the proximity win is removed.
+
+These findings strengthen the same priority order: repair authored traversal and update the bot to perform the new element solves before expanding the object count. Growth itself now ships on later main, but an old route walking into its gorge is not a growth playtest.

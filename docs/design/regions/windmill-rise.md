@@ -79,3 +79,11 @@ wonder/challenge: meadow 2 → H0 5 → terrace recovery 3 → wind gap 6
 - [ ] Record jump/air/dash metrics; no skating verdict without locomotion review.
 - [x] Design contains no orb threshold; permanent restore adds a traversal verb.
 - [ ] Review actual GPU images against soft animated realism, fix named failures, capture again.
+
+## R6 transition repair (driver flow review13:36)
+R6 reaches y22 at constant s66, while the y22 terrace begins s68. A fox running toward the next waypoint falls into that two-metre seam and meets a four-metre wall. Add a y22 stone apron covering s65..69, t−1.4..1.6, with matching collider and cap. Its lower edge meets the ramp only after ramp height≥21.48, within0.6m auto-step. Preserve all movement tunables. Verify from cp-mills through R6 and the kiln launch via live input, zero assists.
+
+## Critical-path order repair (driver14:10)
+The realm route must follow its authored recommendation: opening H-a → Windmill Rise → SW1 → Creek Root / heartwood → summit. Reedmarsh is an optional branch tested independently, not a prerequisite detour that blocks the first minute. H0 becomes the direct heat transfer on the way up: dash beside the brazier at t9.7, then hold-jump in its column and exit to y10. Old stump geometry remains an optional route. The seven-second H0 duration pocket remains unimplemented. Rendered route paving follows this new order.
+
+R4 live route repair: regional5b0e647 reaches upper14m landing then targets s35.7, outside the shortened terrace (s≥36), and drops. Keep the turn at s36.4,t−4, inside the slab and clear of the relocated mill. This fixes route data rather than widening the gap geometry again.

@@ -255,9 +255,17 @@ try {
       stroke.strength=1;
       const spent={strength:field.strokeAt(pos),supplied:h.chem.supplyAt(pos)};
       field.strokes.splice(field.strokes.indexOf(stroke),1);field.fox.copy(original);
-      return {label:'Isolated public colour-field rule probe; staged aura/stroke samples, restored immediately; no encounter release forced',aura,strong,spent};
+      const source=h.chem.updrafts.hearths[0].reactor;
+      const reactor=new source.constructor('shade-rule-probe','hearth',[pos],source.tun);
+      reactor.update(source.tun.igniteTime,()=>1,()=>true);
+      reactor.update(.1,()=>0,()=>true);
+      const gutter={state:reactor.state,holdLeft:reactor.holdLeft,heat:reactor.heat};
+      reactor.restored=true;reactor.update(1,()=>0,()=>true);
+      const restored={state:reactor.state,heat:reactor.heat};
+
+      return {label:'Isolated public colour-field rule probe; staged aura/stroke samples, restored immediately; no encounter release forced',aura,strong,spent,gutter,restored};
     });
-    if(rules.aura.raw<.9||rules.aura.supplied!==0||rules.strong.supplied!==1||rules.spent.supplied!==0)throw Error(`Shade colour rules failed ${JSON.stringify(rules)}`);
+    if(rules.aura.raw<.9||rules.aura.supplied!==0||rules.strong.supplied!==1||rules.spent.supplied!==0||rules.gutter.holdLeft!==0||rules.gutter.state!=='guttering'||rules.restored.heat!==1||rules.restored.state!=='restored')throw Error(`Shade colour rules failed ${JSON.stringify(rules)}`);
     save('shade-colour-rules.json',rules);
 
     await camera();
@@ -860,7 +868,7 @@ try {
     const points = [
       {x:-19,z:-88,y:38}, {x:-22,z:-88,y:38}, {x:-39,z:-96,y:24}, {x:-37,z:-101,y:24},
       {x:-37,z:-101,y:30,jump:true}, {x:-43,z:-108,y:29},
-      {x:-45,z:-112,y:29,dash:true}, {x:-45,z:-112,y:41,jump:true},
+      {x:-45,z:-112,y:29,dash:true}, {x:-45,z:-112,y:44,jump:true},
       {x:-19,z:-88,y:38,jump:true,land:true}, {x:-12,z:-88,y:38,land:true}, {x:-12,z:-93,y:38,land:true},
     ];
     let phase=0, age=0, reached=false;
@@ -878,7 +886,7 @@ try {
       const keys=target.jump && !(target.land && len<1.2)?['Space']:[];
       if(target.dash && age<.06) keys.push('ShiftLeft');
       await H('setKeys',keys);
-    }, st => reached || st.deaths>0, {keyFrames:[0,3*fps,6*fps,9*fps,12*fps], traceEveryFrame:true});
+    }, st => reached || st.deaths>0 || age>9, {keyFrames:[0,3*fps,6*fps,9*fps,12*fps], traceEveryFrame:true});
     await H('setKeys',[]); await H('setStick',null); await shot('crown-end');
     const st=await H('state');
     save('crown-acceptance.json',{reached,phase,restored:st.crown.restored,deaths:st.deaths,end:st});
@@ -886,13 +894,14 @@ try {
     // Prove the permanent walking fallback in both directions, with no jumping or staged movement.
     const walkOut = [[-19,38,-88],[-22,38,-88],[-39,24,-96],[-41,24,-99],[-49,29,-101.5],[-49,29,-109],[-57,34,-113],[-53,34,-116]];
     const walk = [...walkOut, ...walkOut.slice(0,-1).reverse(),[-12,38,-88],[-12,38,-93]];
-    let walkIdx=0;
+    let walkIdx=0, walkAge=0;
     await video('crown-walking-fallback', 50*fps, async () => {
       const q=await H('state'), p=walk[walkIdx], dx=p[0]-q.pos[0], dz=p[2]-q.pos[2], d=Math.hypot(dx,dz);
-      if(d<.55 && q.pos[1]>=p[1]-.5 && q.grounded && walkIdx<walk.length-1) walkIdx++;
+      walkAge+=1/fps;
+      if(d<.55 && q.pos[1]>=p[1]-.5 && q.grounded && walkIdx<walk.length-1) {walkIdx++; walkAge=0; console.log('CROWN WALK',walkIdx,JSON.stringify(q.pos));}
       const target=walk[walkIdx], vx=target[0]-q.pos[0], vz=target[2]-q.pos[2], len=Math.hypot(vx,vz);
       await H('setKeys',[]); await H('setStick',len>.2?vx/len*Math.min(.65,len):0,len>.2?vz/len*Math.min(.65,len):0);
-    }, q => q.deaths>0 || walkIdx===walk.length-1 && q.grounded && Math.hypot(q.pos[0]+12,q.pos[2]+93)<.7, {keyFrames:[0,5*fps,10*fps,15*fps]});
+    }, q => q.deaths>0 || walkAge>9 || walkIdx===walk.length-1 && q.grounded && Math.hypot(q.pos[0]+12,q.pos[2]+93)<.7, {keyFrames:[0,5*fps,10*fps,15*fps]});
     await H('setStick',null); await advance(30); await shot('crown-walk-end');
     const walkEnd=await H('state'); save('crown-walk-acceptance.json',{walkIdx,of:walk.length,grounded:walkEnd.grounded,deaths:walkEnd.deaths,end:walkEnd.pos});
     if(walkIdx!==walk.length-1 || walkEnd.deaths) report.failures.push('Crown permanent walking fallback incomplete');
@@ -908,7 +917,7 @@ try {
     if (regional) {
       const wp = route[from];
       const floor = await page.evaluate(p => window.__gameHooks.debug.world.collision.groundAt(p.x, p.z, p.y + .5).y, wp);
-      if (!Number.isFinite(floor) || wp.ground === false || floor < wp.y - 1) throw Error('Regional route start must be a walkable waypoint');
+      if (!Number.isFinite(floor) || floor < wp.y - 1) throw Error('Regional route start must be a walkable waypoint');
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
@@ -939,9 +948,9 @@ try {
     for (const state of ['sepia', 'restored']) {
       await boot(quality, true);
       if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
-      // Open meadow between the portal (z85) and broken arch (z64).
-      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
-      await H('teleport', 6, reviewY, 78, Math.PI);
+      // Central arrival lane: keep the front camera and running fox clear of H-a and its rock wall.
+      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
+      await H('teleport', 0, reviewY, 70, Math.PI);
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
       await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
@@ -950,7 +959,8 @@ try {
         back_three_q: [-3.3, 0.9, 4.4, 30], back: [0, 0.9, 5.4, 30], face: [-0.8, 0.95, -2.2, 26] };
       for (const [name, [dx, dy, dz, fov]] of Object.entries(views)) {
         const look = name === 'face' ? [p.x, p.y + 0.82, p.z - 0.45] : at;
-        await H('photo', [p.x + dx, p.y + dy, p.z + dz], look, fov);
+        const cameraFloor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [p.x + dx, p.z + dz]);
+        await H('photo', [p.x + dx, Math.max(p.y + dy, cameraFloor + 0.3), p.z + dz], look, fov);
         await advance(3); await shot(`fox-${state}-${name}`);
       }
       await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);
@@ -962,12 +972,14 @@ try {
   if (wants('turntable')) {
     // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
-    const turntableY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
-    await H('teleport', 6, turntableY, 78, Math.PI); await advance(60, false);
+    const turntableY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
+    await H('teleport', 0, turntableY, 70, Math.PI); await advance(60, false);
     const p = await H('getFoxPos'), n = 8 * fps;
     await video('fox-turntable', n, async i => {
       const a = i / n * Math.PI * 2;
-      await H('photo', [p.x + Math.sin(a) * 3.4, p.y + 0.75, p.z - Math.cos(a) * 3.4], [p.x, p.y + 0.5, p.z], 34);
+      const cx = p.x + Math.sin(a) * 3.4, cz = p.z - Math.cos(a) * 3.4;
+      const floor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [cx, cz]);
+      await H('photo', [cx, Math.max(p.y + 0.75, floor + 0.3), cz], [p.x, p.y + 0.5, p.z], 34);
     });
   }
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }

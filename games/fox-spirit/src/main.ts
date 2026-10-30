@@ -561,6 +561,7 @@ async function boot() {
     /** route act 'dash': press dash toward the next waypoint on the next step */
     dashQueued: false,
     phase: 'run' as 'run' | 'air',
+    liftReady: false,
     pressT: 0,
     stuckT: 0,
     bestD: Infinity,
@@ -980,7 +981,8 @@ async function boot() {
       if (auto.act === 'glide') auto.space = auto.pressT < 0.12 || vel.y > 0 || d > 0.9;
       if (onGround && auto.pressT > 0.1) auto.phase = 'run';
     }
-    if (d < 0.9 && wp.y - (pos.y - foxActor.feetOffset) < 1.0 && (onGround || auto.phase === 'run')) {
+    const reach = wp.label === 'channel' || wp.label?.startsWith('wash:') || wp.label?.startsWith('lift:') ? 0.28 : 0.9;
+    if (d < reach && wp.y - (pos.y - foxActor.feetOffset) < 1.0 && (onGround || auto.phase === 'run')) {
       auto.idx += 1;
       auto.stuckT = 0;
       auto.bestD = Infinity;
@@ -989,6 +991,7 @@ async function boot() {
         return;
       }
       if (wp.act && onGround) {
+        auto.liftReady = false;
         auto.act = wp.act;
         auto.phase = 'air';
         auto.pressT = 0;
@@ -999,10 +1002,12 @@ async function boot() {
     // steer (in air: brake once over the target; wait at the bridge head until the roots finish growing)
     const prevLabel = route[auto.idx - 1]?.label;
     // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
-    const waitSeedwell = (prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit;
+    const waitSeedwell = ((prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit) || (prevLabel === 'SW1-feed' && !world.seedwells[0]!.lit);
     // Let the visible front cross the six-metre bed before stepping off the dry boardwalk.
     const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
-    const waitBridge = waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
+    if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= wp.y + 0.5) auto.liftReady = true;
+    const waitLift = !!prevLabel?.startsWith('lift:') && !auto.liftReady;
+    const waitBridge = waitLift || waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
