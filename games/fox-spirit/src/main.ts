@@ -225,7 +225,7 @@ async function boot() {
   reach.init(renderer);
   colorField.groundAt = (x, z) => col.highestAt(x, z);
   // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
-  const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75 };
+  const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75, 'rv-terrain': 0.62, 'rv-ground': 0.62 };
   for (const m of world.materials) {
     m.userData.cfRestoredChroma = RESTORED_CHROMA[m.name] ?? 1;
     colorField.patchMaterial(m);
@@ -312,6 +312,11 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
+    folder.add(params,'headLead',0,.5,.01);
+    folder.add(params,'headFrequency',1,6,.1);
+    folder.add(params,'headDamping',.4,1.5,.05);
+    folder.add(params,'headStabilize',0,1,.05);
+    folder.add(params,'tailLoad',0,.4,.01);
     folder.add(params,'brakeSquat',0,.08,.002);
     folder.add(params,'brakePitch',0,.2,.005);
     folder.add(params,'landSquash',0,.2,.005);
@@ -745,6 +750,18 @@ async function boot() {
     },
     photo(pos: [number, number, number], look: [number, number, number], fov = 50) {
       photo = { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look), fov };
+    },
+    /** Read-only review-camera clearance, including scenery without gameplay colliders. */
+    photoBlocker(pos: [number, number, number], look: [number, number, number]) {
+      const origin = new THREE.Vector3(...look), delta = new THREE.Vector3(...pos).sub(origin);
+      const ray = new THREE.Raycaster(origin, delta.clone().normalize(), 0.15, delta.length() + 0.25);
+      world.group.updateWorldMatrix(true, true);
+      let hit = ray.intersectObject(world.group, true).find((h) => h.object.visible);
+      if (!hit) {
+        ray.set(new THREE.Vector3(...pos), delta.clone().normalize().negate());
+        hit = ray.intersectObject(world.group, true).find((h) => h.object.visible);
+      }
+      return hit ? { distance: hit.distance, name: hit.object.name, point: hit.point.toArray() } : null;
     },
     photoOff() {
       photo = null;
@@ -1266,6 +1283,14 @@ async function boot() {
       }
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
+      if(grounded && wish.lengthSq()>.001) {
+        const targetYaw=Math.atan2(wish.x,wish.z);
+        const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
+        fox.rotation.y+=THREE.MathUtils.clamp(error,-4.5*dt,4.5*dt);
+        // Brake through a reversal; forward drive returns as the body points into the input.
+        const drive=Math.max(0,Math.cos(error));
+        desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
+      }
       cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
       vel.x = cur.x;
       vel.z = cur.z;
@@ -1289,7 +1314,7 @@ async function boot() {
     }
 
     const faceShrine = restore.inputLocked && wish.lengthSq() <= 0.01;
-    if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
+    if ((!grounded || faceShrine) && (wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
       const yaw = faceShrine ? restore.faceYaw : Math.hypot(vel.x, vel.z) > .6 ? Math.atan2(vel.x, vel.z) : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
@@ -1371,7 +1396,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
@@ -1421,7 +1446,7 @@ async function boot() {
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
-    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn);
+    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn, dashing, shades.drains(new THREE.Vector3(187,30,-118)));
     crown.update(dt, (p, r) => {
       autumnFX.swirl(p, 40, 1.6);
       audio.play('shrine');
@@ -1435,6 +1460,7 @@ async function boot() {
     }
 
     if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
+    if (reach.submergedAt(fox.position, fox.position.y - foxActor.feetOffset)) handleEvents([{type:'hazard',kind:'ink'}]);
     restore.update(dt);
     zone = world.zoneAt(fox.position.x, fox.position.z);
 

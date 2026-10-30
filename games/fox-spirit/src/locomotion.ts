@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { FOX_RIG } from './foxRig';
 
 export type MotionInput = {
-  brake?: number; speed: number; grounded: boolean; yaw: number; verticalSpeed: number;
+  lookYaw?: number; brake?: number; speed: number; grounded: boolean; yaw: number; verticalSpeed: number;
   groundAt: (x: number, z: number, ceiling: number) => number;
 };
 import GAITS from '../../../assets/hero/spirit_fox.loco.json';
@@ -24,7 +24,7 @@ class Spring {
 /** Authored pose is evaluated first; contact correction only moves a two-bone chain. */
 export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
-    brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -37,6 +37,9 @@ export class AuthoredLocomotion {
   reset() {
     this.beforeMixer();
     for (const foot of this.feet) foot.planted=false;
+    this.nodSpring.value=0;this.nodSpring.velocity=0;
+    this.tailLoadSpring.value=0;this.tailLoadSpring.velocity=0;
+    this.lookSpring.value=0;this.lookSpring.velocity=0;
     this.brake=0;
     this.landSpring.value=0;this.landSpring.velocity=0;this.wasGrounded=true;this.previousVerticalSpeed=0;
     this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
@@ -63,6 +66,12 @@ export class AuthoredLocomotion {
   private armScale = 1;
   private rootPosition: THREE.Vector3;
   private terrainOffset=0;
+  private spines:THREE.Object3D[]=[];
+  private necks:THREE.Object3D[]=[];
+  private head?:THREE.Object3D;
+  private lookSpring=new Spring();
+  private nodSpring=new Spring();
+  private tailLoadSpring=new Spring();
   private spine?: THREE.Object3D;
   private tailBone?: THREE.Object3D;
   private overlays: { bone: THREE.Object3D; rotation: THREE.Quaternion }[] = [];
@@ -74,6 +83,9 @@ export class AuthoredLocomotion {
     this.armScale = arm ? arm.getWorldScale(v()).x : root.getWorldScale(v()).x;
     this.yaw=group.rotation.y;
     this.spine = root.getObjectByName(FOX_RIG.pelvis);
+    this.spines=FOX_RIG.spine.map(n=>root.getObjectByName(n)).filter((b):b is THREE.Object3D=>!!b);
+    this.necks=FOX_RIG.neck.map(n=>root.getObjectByName(n)).filter((b):b is THREE.Object3D=>!!b);
+    this.head=root.getObjectByName(FOX_RIG.head);
     this.tailBone = root.getObjectByName(FOX_RIG.tail[0]);
     this.tails=FOX_RIG.tail.map(name=>root.getObjectByName(name)).filter((b): b is THREE.Object3D=>!!b);
     const floor = new THREE.Box3().setFromObject(root).min.y;
@@ -200,6 +212,25 @@ export class AuthoredLocomotion {
     this.terrainOffset=THREE.MathUtils.damp(this.terrainOffset,terrainTarget,25,dt);
     this.root.position.y+=this.terrainOffset+landOffset-this.brake*this.params.brakeSquat;
     overlay(this.spine,new THREE.Vector3(1,0,0),-this.brake*this.params.brakePitch);
+    const lookDelta=this.input.lookYaw===undefined ? 0 : Math.atan2(Math.sin(this.input.lookYaw-this.input.yaw),Math.cos(this.input.lookYaw-this.input.yaw));
+    const look=this.lookSpring.step(THREE.MathUtils.clamp(lookDelta*this.params.headLead+this.turn*.04,-.32,.32),dt,this.params.headFrequency,this.params.headDamping);
+    const worldOverlay=(bone:THREE.Object3D|undefined,worldAxis:THREE.Vector3,angle:number)=>{
+      if(!bone)return;
+      bone.updateWorldMatrix(true,false);
+      const localAxis=worldAxis.applyQuaternion(bone.getWorldQuaternion(q()).invert());
+      overlay(bone,localAxis,angle);
+    };
+    const bend=THREE.MathUtils.clamp(this.turn*.035,-.14,.14);
+    for(let i=0;i<this.spines.length;i++)worldOverlay(this.spines[i],new THREE.Vector3(0,1,0),bend/this.spines.length);
+    for(const neck of this.necks)worldOverlay(neck,new THREE.Vector3(0,1,0),look*.22);
+    worldOverlay(this.head,new THREE.Vector3(0,1,0),look*.34);
+    const right=new THREE.Vector3(Math.cos(this.input.yaw),0,-Math.sin(this.input.yaw));
+    for(const neck of this.necks)worldOverlay(neck,right.clone(),.10);
+    worldOverlay(this.head,right.clone(),-.10*this.necks.length);
+    const nod=this.nodSpring.step(-landOffset*2-this.brake*.10+(this.input.grounded ? Math.sin(this.phase*Math.PI*(this.metrics.gait==='run' ? 2 : 4))*(this.metrics.gait==='run' ? .22 : .06) : THREE.MathUtils.clamp(-this.input.verticalSpeed*.012,-.1,.1)),dt,6,.7);
+    worldOverlay(this.head,right,-this.pitch*this.params.headStabilize+nod);
+    const tailLoad=this.tailLoadSpring.step(this.params.tailLoad+this.input.speed*.005-landOffset*3+this.brake*.10+(this.input.grounded ? 0 : THREE.MathUtils.clamp(this.input.verticalSpeed*.015,-.1,.15)),dt,2.8,.8);
+    overlay(this.tailBone,new THREE.Vector3(1,0,0),tailLoad);
     let tailTarget=THREE.MathUtils.clamp(-this.turn*this.params.tailLag,-.25,.25);
     for(let i=0;i<this.tails.length;i++) {
       const bone=this.tails[i]; const spring=this.tailSprings[i];
@@ -207,7 +238,7 @@ export class AuthoredLocomotion {
       overlay(bone,new THREE.Vector3(0,0,1),angle*(i===0 ? 1 : .35));
       tailTarget=angle*.9;
     }
-    if(active==='idle' || active==='skid') overlay(this.tailBone,new THREE.Vector3(1,0,0),-.20);
+
     this.root.updateWorldMatrix(true,true);
     if(this.tailBone && this.input.grounded) {
       const base=this.tailBone.getWorldPosition(v()); let lift=0;

@@ -106,3 +106,8 @@ Used as checkpoint lantern supports, with the realm's weathered stone material.
 CC0 `rock_moss_set_01` source. Rebuild with `python3 tools/prepare-world-rubble.py`.
 Six scanned silhouettes retain 15,309 triangles total (from 63,127); source scans
 remain in the reusable library. Runtime placements batch into existing buckets.
+Ground-level ruin pass uses `Bricks085` (ambientCG, CC0, source table above)
+for the metre-scaled stone value/relief layer, replacing uniform fine rock grain
+with readable eroded masonry. Source color is reduced to value before restyling.
+The Quaternius column also replaces Seedwell glyph supports within their existing
+envelopes. No new gameplay geometry or collision is introduced.
