@@ -78,7 +78,6 @@ export class Hearth {
   readonly ash: THREE.MeshStandardMaterial;
   readonly embers: THREE.ShaderMaterial;
   readonly glow: THREE.ShaderMaterial;
-  readonly ribbons: THREE.ShaderMaterial;
   readonly smoke: THREE.MeshBasicMaterial;
   readonly flame: THREE.ShaderMaterial;
   readonly light: THREE.PointLight;
@@ -127,26 +126,26 @@ export class Hearth {
     flame.frustumCulled = false;
     this.group.add(flame);
 
-    // column: rising embers + lifted leaves, and a faint warm haze cylinder
+    // Rising embers and lifted leaves; separate feathered warm-air body (no shell).
     this.embers = shared.embers.clone();
     const pts = new THREE.Points(shared.emberGeo, this.embers);
     pts.position.y = BED_Y;
     pts.frustumCulled = false;
     this.group.add(pts);
+    // Rust leaves keep their body color; only the ember points add light.
+    const leafMaterial = this.embers.clone();
+    leafMaterial.uniforms = this.embers.uniforms;
+    leafMaterial.blending = THREE.NormalBlending;
+    const leaves = new THREE.Points(shared.leafGeo, leafMaterial);
+    leaves.position.y = BED_Y;
+    leaves.frustumCulled = false;
+    this.group.add(leaves);
     this.glow = shared.glow.clone();
     const haze = new THREE.Mesh(shared.glowGeo, this.glow);
     haze.position.y = BED_Y;
     haze.frustumCulled = false;
     haze.renderOrder = 2;
     this.group.add(haze);
-
-    // spiral heat ribbons: the shape of the rising air, readable from across the meadow
-    this.ribbons = shared.ribbons.clone();
-    const rib = new THREE.Mesh(shared.ribbonGeo, this.ribbons);
-    rib.position.y = BED_Y;
-    rib.frustumCulled = false;
-    rib.renderOrder = 3;
-    this.group.add(rib);
 
     this.light = new THREE.PointLight(0xff8a3a, 0, 16, 1.6);
     this.light.position.y = BED_Y + 1.2;
@@ -179,8 +178,6 @@ export class Hearth {
     this.embers.uniforms.uRadius!.value = tun.radius;
     this.glow.uniforms.uHeight!.value = this.height;
     this.glow.uniforms.uRadius!.value = tun.radius * 0.85;
-    this.ribbons.uniforms.uHeight!.value = this.height;
-    this.ribbons.uniforms.uRadius!.value = tun.radius;
   }
 
   update(dt: number, t: number, supplyAt: SupplyFn, debugOn: boolean, drainedAt?: (p: THREE.Vector3) => boolean): void {
@@ -194,8 +191,6 @@ export class Hearth {
     this.embers.uniforms.uHeat!.value = Math.min(1.4, vis * 1.1 + this.flare * 0.7);
     this.glow.uniforms.uTime!.value = t;
     this.glow.uniforms.uHeat!.value = Math.min(1.35, vis * 1.15 + this.flare * 0.65);
-    this.ribbons.uniforms.uTime!.value = t;
-    this.ribbons.uniforms.uHeat!.value = vis + this.flare * 0.5;
     this.flame.uniforms.uTime!.value = t;
     this.flame.uniforms.uHeat!.value = Math.min(1.4, vis + this.flare * 0.8);
     this.ash.emissiveIntensity = 0.04 + vis * 2.6 + this.flare * 2;
@@ -240,13 +235,12 @@ type HearthShared = {
   smoke: THREE.MeshBasicMaterial;
   embers: THREE.ShaderMaterial;
   glow: THREE.ShaderMaterial;
-  ribbons: THREE.ShaderMaterial;
-  ribbonGeo: THREE.BufferGeometry;
   flame: THREE.ShaderMaterial;
   bedGeo: THREE.BufferGeometry;
   smokeGeo: THREE.BufferGeometry;
   flameGeo: THREE.BufferGeometry;
   emberGeo: THREE.BufferGeometry;
+  leafGeo: THREE.BufferGeometry;
   glowGeo: THREE.BufferGeometry;
   probeGeo: THREE.BufferGeometry;
 };
@@ -338,11 +332,10 @@ function createShared(): HearthShared {
   const smoke = new THREE.MeshBasicMaterial({ color: 0xb9ad9c, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, fog: true });
 
   // rising embers + a few lifted leaves, animated entirely in the vertex shader
-  const N_EMBER = 420;
-  const N_LEAF = 40;
-  const N_HAZE = 70;
+  const N_EMBER = 220;
+  const N_LEAF = 36;
   const emberGeo = new THREE.BufferGeometry();
-  const N_ALL = N_EMBER + N_LEAF + N_HAZE;
+  const N_ALL = N_EMBER + N_LEAF;
   const seeds = new Float32Array(N_ALL * 4);
   let s = 11;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
@@ -350,11 +343,16 @@ function createShared(): HearthShared {
     seeds[i * 4] = rnd();
     seeds[i * 4 + 1] = rnd();
     seeds[i * 4 + 2] = rnd();
-    seeds[i * 4 + 3] = i < N_EMBER ? 0 : i < N_EMBER + N_LEAF ? 1 : 2;
+    seeds[i * 4 + 3] = i < N_EMBER ? 0 : 1;
   }
   emberGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N_ALL * 3), 3));
   emberGeo.setAttribute('seed', new THREE.BufferAttribute(seeds, 4));
   emberGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 5, 0), 12);
+  const leafGeo = new THREE.BufferGeometry();
+  leafGeo.setAttribute('position', emberGeo.getAttribute('position'));
+  leafGeo.setAttribute('seed', emberGeo.getAttribute('seed'));
+  leafGeo.setDrawRange(N_EMBER, N_LEAF);
+  emberGeo.setDrawRange(0, N_EMBER);
   const embers = new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 2.2 }, uScale: { value: 640 } },
     vertexShader: /* glsl */ `
@@ -366,13 +364,12 @@ function createShared(): HearthShared {
       varying float vSpin;
       void main() {
         float leaf = seed.w > 0.5 && seed.w < 1.5 ? 1.0 : 0.0;
-        float haze = seed.w > 1.5 ? 1.0 : 0.0;
-        float speed = haze > 0.5 ? mix(1.4, 2.2, seed.y) : leaf > 0.5 ? mix(2.2, 3.4, seed.y) : mix(3.6, 6.8, seed.y);
+        float speed = leaf > 0.5 ? mix(2.2, 3.4, seed.y) : mix(3.6, 6.8, seed.y);
         float ph = fract(seed.x + uTime * speed / uHeight);
-        float y = ph * uHeight * (leaf > 0.5 ? 0.85 : haze > 0.5 ? 0.7 : 1.0);
+        float y = ph * uHeight * (leaf > 0.5 ? 0.95 : 1.0);
         float turn = uTime * (leaf > 0.5 ? 1.1 : 1.6 + seed.y) + ph * 5.0;
         float a = seed.z * 6.2832 + turn;
-        float r = uRadius * (leaf > 0.5 ? 0.35 + 0.45 * seed.y : haze > 0.5 ? 0.15 + 0.35 * seed.y : 0.08 + 0.7 * sqrt(seed.y)) * (0.55 + 0.45 * ph);
+        float r = uRadius * (leaf > 0.5 ? 0.35 + 0.45 * seed.y : 0.08 + 0.7 * sqrt(seed.y)) * (0.55 + 0.45 * ph);
         vec3 p = vec3(cos(a) * r, y, sin(a) * r);
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_Position = projectionMatrix * mv;
@@ -380,10 +377,10 @@ function createShared(): HearthShared {
         // a cold column shows nothing; heat thins the stream rather than dimming it all evenly
         float alive = step(seed.y * 0.85, uHeat);
         vA = fade * alive * min(1.0, uHeat * 1.4);
-        vLeaf = leaf + haze * 2.0;
+        vLeaf = leaf;
         vHot = 1.0 - ph;
         vSpin = seed.z * 6.2832 + uTime * (1.5 + seed.y * 2.0);
-        float size = haze > 0.5 ? mix(1.2, 2.2, seed.x) * (0.7 + ph) : leaf > 0.5 ? mix(0.22, 0.38, seed.x) : mix(0.08, 0.18, seed.x) * (1.3 - ph * 0.5);
+        float size = leaf > 0.5 ? mix(0.22, 0.38, seed.x) : mix(0.08, 0.18, seed.x) * (1.3 - ph * 0.5);
         gl_PointSize = size * uScale / max(0.5, -mv.z);
       }`,
     fragmentShader: /* glsl */ `
@@ -393,12 +390,7 @@ function createShared(): HearthShared {
       varying float vSpin;
       void main() {
         vec2 q = gl_PointCoord - 0.5;
-        if (vLeaf > 1.5) {
-          // soft heat body: big dim warm puffs that give the column volume at distance
-          float d = length(q);
-          float g = exp(-d * d * 9.0);
-          gl_FragColor = vec4(vec3(1.0, 0.4, 0.1) * g * vA * 0.6 * vHot, g * vA * 0.5);
-        } else if (vLeaf > 0.5) {
+        if (vLeaf > 0.5) {
           // turning maple-ish leaf: rotated lens with a notch, warm rust lit from below
           float c = cos(vSpin), s = sin(vSpin);
           vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
@@ -410,7 +402,7 @@ function createShared(): HearthShared {
           gl_FragColor = vec4(pow(col, vec3(2.2)), vA * 0.95); // authored in sRGB
         } else {
           float d = length(q);
-          float core = exp(-d * d * 38.0);
+          float core = exp(-d * d * 38.0) * (1.0 - smoothstep(0.32, 0.5, d));
           if (core < 0.02) discard;
           vec3 hot = vec3(1.0, 0.42, 0.1);
           vec3 cool = vec3(0.75, 0.12, 0.02);
@@ -423,45 +415,65 @@ function createShared(): HearthShared {
     blending: THREE.AdditiveBlending,
   });
 
-  // warm haze: an open cylinder that is densest through its middle and vanishes at the silhouette
-  // (no rim, no stripes: a lit glass tube is exactly the look this must never have), wavering like heat
-  const glowGeo = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true);
-  glowGeo.translate(0, 0.5, 0);
+  // Warm air is a collection of soft moving parcels, never a continuous tube.
+  // Seeded quad centers travel in world space; billboard only their soft footprint.
+  const glowGeo = (() => {
+    const positions: number[] = [], uvs: number[] = [], seeds: number[] = [];
+    for (let i = 0; i < 28; i++) {
+      const seed = [rnd(), rnd(), rnd(), rnd()];
+      for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) {
+        positions.push(x!, y!, 0);
+        uvs.push(x! * 0.5 + 0.5, y! * 0.5 + 0.5);
+        seeds.push(...seed);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setAttribute('seed', new THREE.Float32BufferAttribute(seeds, 4));
+    return geo;
+  })();
   const glow = new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 1.9 } },
     vertexShader: /* glsl */ `
-      uniform float uHeight, uRadius;
-      varying float vY;
-      varying vec3 vN;
-      varying vec3 vV;
-      varying float vAng;
+      attribute vec4 seed;
+      uniform float uTime, uHeight, uRadius;
+      varying vec2 vUv;
+      varying float vLife, vSeed;
       void main() {
-        vec3 p = vec3(position.x * uRadius * (0.7 + 0.3 * position.y), position.y * uHeight, position.z * uRadius * (0.7 + 0.3 * position.y));
-        vY = position.y;
-        vAng = atan(position.z, position.x);
-        vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        vN = normalize(normalMatrix * normal);
-        vV = normalize(-mv.xyz);
+        float life = fract(seed.x + uTime * mix(1.5, 2.7, seed.y) / uHeight);
+        float a = seed.z * 6.2832 + life * 2.1 + uTime * 0.18;
+        float r = uRadius * sqrt(seed.w) * (0.18 + life * 0.55);
+        vec3 center = vec3(cos(a) * r, life * uHeight, sin(a) * r);
+        center.x += sin(life * 7.0 + uTime * 0.7 + seed.z * 9.0) * life * 0.28;
+        vec4 mv = modelViewMatrix * vec4(center, 1.0);
+        float size = mix(0.7, 1.25, seed.y) * (0.65 + life * 0.7);
+        mv.xy += position.xy * vec2(size, size * 1.5);
         gl_Position = projectionMatrix * mv;
+        vUv = uv;
+        vLife = life;
+        vSeed = seed.z * 17.0;
       }`,
     fragmentShader: /* glsl */ `
       uniform float uTime, uHeat;
-      varying float vY;
-      varying vec3 vN;
-      varying vec3 vV;
-      varying float vAng;
+      varying vec2 vUv;
+      varying float vLife, vSeed;
       void main() {
-        float facing = pow(abs(dot(vN, vV)), 2.2);
-        float shimmer = 0.75 + 0.25 * sin(vY * 13.0 - uTime * 3.1 + sin(vAng * 2.0 + uTime * 0.7) * 2.0);
-        float ends = smoothstep(0.0, 0.14, vY) * pow(1.0 - vY, 1.6);
-        float a = uHeat * facing * ends * shimmer * 0.22;
-        gl_FragColor = vec4(vec3(1.0, 0.5, 0.18) * a, a);
+        vec2 q = (vUv - 0.5) * 2.0;
+        // Wavering interior with a guaranteed zero-alpha border on all four edges.
+        float warp = sin(q.y * 5.0 - uTime * 1.9 + vSeed) * 0.12;
+        float d = length(vec2(q.x + warp * (1.0 - abs(q.x)), q.y));
+        float feather = 1.0 - smoothstep(0.1, 1.0, d);
+        float folds = 0.65 + 0.35 * sin(q.y * 7.0 - uTime * 2.4 + vSeed + q.x * 3.0);
+        float life = smoothstep(0.0, 0.16, vLife) * (1.0 - smoothstep(0.55, 1.0, vLife));
+        float alpha = min(1.0, uHeat) * life * feather * feather * folds * 0.12;
+        // Body is alpha-composited russet air; ember cores provide the glow separately.
+        gl_FragColor = vec4(vec3(0.56, 0.24, 0.075), alpha);
         #include <colorspace_fragment>
       }`,
     transparent: true,
     depthWrite: false,
-    side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
   });
 
   // flame tongues: crossed quads with an animated teardrop
@@ -536,76 +548,7 @@ function createShared(): HearthShared {
     blending: THREE.AdditiveBlending,
   });
 
-  // three helical bands (unit height/radius; scaled in the shader) with scrolling dashes of warm air
-  const ribbonGeo = (() => {
-    const pos: number[] = [];
-    const uv: number[] = [];
-    const idx: number[] = [];
-    const N = 72;
-    let base = 0;
-    for (let b = 0; b < 3; b++) {
-      const ph = (b / 3) * Math.PI * 2;
-      for (let i = 0; i <= N; i++) {
-        const u = i / N;
-        const a = ph + u * Math.PI * 2 * 1.6;
-        const r = 0.45 + 0.3 * u;
-        for (const e of [-1, 1]) {
-          pos.push(Math.cos(a) * r, u + e * 0.05, Math.sin(a) * r);
-          uv.push(u, e * 0.5 + 0.5 + b * 7.31);
-        }
-        if (i < N) {
-          const k = base + i * 2;
-          idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
-        }
-      }
-      base += (N + 1) * 2;
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    g.setIndex(idx);
-    return g;
-  })();
-  const ribbons = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 2.2 } },
-    vertexShader: /* glsl */ `
-      uniform float uHeight, uRadius, uTime;
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        vec3 p = vec3(position.x * uRadius, position.y * uHeight, position.z * uRadius);
-        // the bands breathe and twist slowly so the column never looks like a static prop
-        float tw = uTime * 0.6;
-        float c = cos(tw), s = sin(tw);
-        p.xz = mat2(c, -s, s, c) * p.xz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-      }`,
-    fragmentShader: /* glsl */ `
-      uniform float uTime, uHeat;
-      varying vec2 vUv;
-      void main() {
-        float u = vUv.x;
-        float band = fract(vUv.y);
-        // soft feathered band, broken into drifting wisps (never a solid ribbon)
-        float edge = pow(1.0 - abs(band - 0.5) * 2.0, 1.8);
-        float seed = floor(vUv.y);
-        float w1 = sin(u * 17.0 - uTime * 4.6 + seed) * 0.5 + 0.5;
-        float w2 = sin(u * 7.0 - uTime * 2.1 + seed * 2.3) * 0.5 + 0.5;
-        float dash = smoothstep(0.35, 0.95, w1 * w2 * 1.6);
-        float ends = smoothstep(0.0, 0.1, u) * (1.0 - smoothstep(0.55, 1.0, u));
-        float a = uHeat * edge * dash * ends * 0.16;
-        gl_FragColor = vec4(vec3(1.0, 0.42, 0.12) * a * 0.9, a);
-        #include <colorspace_fragment>
-      }`,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending,
-  });
-
   return {
-    ribbons,
-    ribbonGeo,
     ash,
     smoke,
     embers,
@@ -615,6 +558,7 @@ function createShared(): HearthShared {
     smokeGeo,
     flameGeo,
     emberGeo,
+    leafGeo,
     glowGeo,
     probeGeo: new THREE.SphereGeometry(0.12, 8, 6),
   };

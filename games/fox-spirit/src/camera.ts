@@ -101,11 +101,13 @@ const wrap = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
 export function createFollowCamera(opts: {
   /** Walkable surface the boom must stay above; refY = height the camera is working at */
   surfaceAt?: (x: number, z: number, refY: number) => number;
+  /** Static world geometry, including decorative posts without gameplay colliders. */
+  scenery?: THREE.Object3D;
   params?: Partial<CameraTunables>;
 } = {}): FollowCamera {
   const params: CameraTunables = {
     distance: 3.8,
-    height: 1.5,
+    height: 1.25,
     lookHeight: 0.62,
     airDistance: 4.8,
     glideDistance: 6.4,
@@ -116,9 +118,9 @@ export function createFollowCamera(opts: {
     lookAhead: 1.6,
     recenterRate: 1.25,
     recenterDelay: 1.2,
-    sideBias: 0.55,
-    jumpTrack: 0.85,
-    landingBias: 0.42,
+    sideBias: 0.34,
+    jumpTrack: 0.8,
+    landingBias: 0.24,
     clearance: 0.55,
     shake: 1,
     ...opts.params,
@@ -148,6 +150,9 @@ export function createFollowCamera(opts: {
   let liftNow = 0;
   let boomT = 1;
   let boomLift = 0;
+  let sceneryT = 1;
+  let sceneryLimit = 1;
+  let sceneryName = '';
   const landAt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   /** Where the fox / predicted landing sit on screen (NDC) — framing metrics for the harness */
@@ -155,7 +160,7 @@ export function createFollowCamera(opts: {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
     internals: () =>
-      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)}`,
+      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} blocker=${sceneryName}`,
   };
   let shotW = 0;
   /** Active authored path (restore cinematic) */
@@ -249,7 +254,9 @@ export function createFollowCamera(opts: {
       // a raise at boom fraction t needs need/t at the camera end to clear it
       if (need > 0) lift = Math.max(lift, need / t);
     }
-    const maxLift = 3;
+    // Step over gentle grades; tall columns should shorten the boom, not turn
+    // the chase view into a steep overhead shot that hides the fox's legs.
+    const maxLift = 0.9;
     if (lift < maxLift) {
       boom.lift = lift;
       return boom;
@@ -273,32 +280,123 @@ export function createFollowCamera(opts: {
     cam.y += lift * t;
   }
 
+  // Rendering uses 64m material buckets. Split their triangle indices into small
+  // query-only chunks: otherwise three short rays still visit an entire bucket's
+  // triangles. Positions are shared; these meshes never enter the render scene.
+  const scenery: { source: THREE.Mesh; probe: THREE.Mesh }[] = [];
+  opts.scenery?.updateWorldMatrix(true, true);
+  opts.scenery?.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || mesh.userData.isOccluder) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    // Foliage has its own near-lens fade; reeds must not pump the solid boom.
+    const solid = materials.some((m) => (m as THREE.MeshStandardMaterial).isMeshStandardMaterial
+      && m.depthWrite && m.alphaTest === 0 && !m.userData.foliage
+      && !/canopy|leaf|leaves|reed|grass|litter|sail|glow/i.test(m.name)
+      && (!m.transparent || m.opacity > 0.9));
+    if (!solid) return;
+    const geometry = mesh.geometry;
+    const position = geometry.getAttribute('position');
+    if (!position) return;
+    if (position.count < 3000 || Array.isArray(mesh.material) || (mesh as THREE.InstancedMesh).isInstancedMesh || (mesh as THREE.SkinnedMesh).isSkinnedMesh) {
+      geometry.computeBoundingBox();
+      scenery.push({ source: mesh, probe: mesh });
+      return;
+    }
+    const chunks = new Map<string, { indices: number[]; bounds: THREE.Box3 }>();
+    const vertices = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+    const index = geometry.index;
+    const end = Math.min(index?.count ?? position.count, geometry.drawRange.start + geometry.drawRange.count);
+    for (let i = geometry.drawRange.start; i + 2 < end; i += 3) {
+      const ids = [index ? index.getX(i) : i, index ? index.getX(i + 1) : i + 1, index ? index.getX(i + 2) : i + 2];
+      for (let j = 0; j < 3; j++) vertices[j]!.fromBufferAttribute(position, ids[j]!);
+      const [a, b, c] = vertices as [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+      const key = `${Math.floor((a.x + b.x + c.x) / 24)},${Math.floor((a.y + b.y + c.y) / 24)},${Math.floor((a.z + b.z + c.z) / 24)}`;
+      let chunk = chunks.get(key);
+      if (!chunk) chunks.set(key, chunk = { indices: [], bounds: new THREE.Box3() });
+      chunk.indices.push(...ids);
+      for (const vertex of vertices) chunk.bounds.expandByPoint(vertex);
+    }
+    for (const chunk of chunks.values()) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', position);
+      g.setIndex(chunk.indices);
+      g.boundingBox = chunk.bounds;
+      g.boundingSphere = chunk.bounds.getBoundingSphere(new THREE.Sphere());
+      const probe = new THREE.Mesh(g, mesh.material);
+      probe.matrixWorld.copy(mesh.matrixWorld);
+      scenery.push({ source: mesh, probe });
+    }
+  });
+  const sight = new THREE.Raycaster();
+  const sightDir = new THREE.Vector3();
+  const sightSide = new THREE.Vector3();
+  const sightOrigin = new THREE.Vector3();
+  const sightHits: THREE.Intersection[] = [];
+  const safeLens = new THREE.Vector3();
+
+  /** A narrow three-ray boom catches posts at the edge of the lens as well as its centre. */
+  function sceneryFraction(focus: THREE.Vector3, lens: THREE.Vector3) {
+    sightDir.subVectors(lens, focus);
+    const length = sightDir.length();
+    sceneryName = '';
+    if (length < 0.6 || !scenery.length) return 1;
+    sightDir.multiplyScalar(1 / length);
+    sightSide.set(sightDir.z, 0, -sightDir.x).normalize().multiplyScalar(0.18);
+    let nearest = length + 0.45;
+    sight.near = 0.45; // ignore the fox's footing and surfaces immediately under its chest
+    for (const side of [0, -1, 1]) {
+      sightOrigin.copy(focus).addScaledVector(sightSide, side);
+      sight.set(sightOrigin, sightDir);
+      sight.far = nearest;
+      for (const { source: mesh, probe } of scenery) {
+        if (!mesh.visible) continue;
+        // Parent visibility matters (e.g. a restored bridge replaces its dormant scenery).
+        let parent = mesh.parent;
+        while (parent && parent.visible) parent = parent.parent;
+        if (parent) continue;
+        sightHits.length = 0;
+        probe.raycast(sight, sightHits);
+        for (const hit of sightHits) {
+          if (hit.distance < nearest) {
+            nearest = hit.distance;
+            sceneryName = mesh.name || (Array.isArray(mesh.material) ? mesh.material[0]?.name : mesh.material.name) || 'world';
+            sight.far = nearest;
+          }
+        }
+      }
+    }
+    // Begin contracting before a wall reaches the near plane. This reserve lets the
+    // damping absorb thin posts instead of changing the lens position at contact.
+    return THREE.MathUtils.clamp((nearest - 0.45) / length, 0.12, 1);
+  }
+
   /**
    * Hard framing guard: keep the fox (chest/feet) inside a safe angular window from the lens.
    * Ground-locked framing + a boom pulled in against a wall can otherwise lose the fox off the top.
    */
-  function guardFraming(p: THREE.Vector3) {
+  function guardFraming(p: THREE.Vector3, lens: THREE.Vector3, lookAt = look) {
     const halfV = THREE.MathUtils.degToRad(camera.fov * 0.5);
-    const dh = Math.max(0.5, Math.hypot(look.x - rig.x, look.z - rig.z));
-    const fh = Math.max(0.3, Math.hypot(p.x - rig.x, p.z - rig.z));
-    const lookA = Math.atan2(look.y - rig.y, dh);
-    const top = Math.atan2(p.y + 0.95 - rig.y, fh);
-    const feet = Math.atan2(p.y - rig.y, fh);
+    const dh = Math.max(0.5, Math.hypot(lookAt.x - lens.x, lookAt.z - lens.z));
+    const fh = Math.max(0.3, Math.hypot(p.x - lens.x, p.z - lens.z));
+    const lookA = Math.atan2(lookAt.y - lens.y, dh);
+    const top = Math.atan2(p.y + 1.25 - lens.y, fh);
+    const feet = Math.atan2(p.y - lens.y, fh);
     const up = halfV * 0.6;
     const down = halfV * 0.78;
     let a = lookA;
     if (top - a > up) a = top - up;
     if (a - feet > down) a = feet + down;
-    if (a !== lookA) look.y = rig.y + Math.tan(a) * dh;
+    if (a !== lookA) lookAt.y = lens.y + Math.tan(a) * dh;
     // horizontal: fox within 70 % of the half-width
     const halfH = Math.atan(Math.tan(halfV) * camera.aspect) * 0.7;
-    const yawLook = Math.atan2(look.x - rig.x, look.z - rig.z);
-    const yawFox = Math.atan2(p.x - rig.x, p.z - rig.z);
+    const yawLook = Math.atan2(lookAt.x - lens.x, lookAt.z - lens.z);
+    const yawFox = Math.atan2(p.x - lens.x, p.z - lens.z);
     const off = wrap(yawFox - yawLook);
     if (Math.abs(off) > halfH) {
       const ny = yawLook + (off - Math.sign(off) * halfH);
-      look.x = rig.x + Math.sin(ny) * dh;
-      look.z = rig.z + Math.cos(ny) * dh;
+      lookAt.x = lens.x + Math.sin(ny) * dh;
+      lookAt.z = lens.z + Math.cos(ny) * dh;
     }
   }
 
@@ -384,6 +482,7 @@ export function createFollowCamera(opts: {
     },
     update(dtIn, f) {
       const dt = Number.isFinite(dtIn) ? Math.max(0, Math.min(dtIn, 0.1)) : 0;
+      const firstFrame = !initialized;
       const p = f.target;
       const speed = Math.hypot(f.vel.x, f.vel.z);
       manualT += dt;
@@ -396,7 +495,7 @@ export function createFollowCamera(opts: {
       if (f.grounded) groundLock = p.y;
       else if (f.gliding || p.y < groundLock - 1.2) groundLock = Math.min(groundLock, p.y + 0.6);
       const goalY = f.grounded ? p.y : groundLock + Math.max(0, p.y - groundLock) * params.jumpTrack + Math.min(0, p.y - groundLock);
-      focusY = THREE.MathUtils.damp(focusY, goalY, f.grounded ? 9 : 12, dt);
+      focusY = THREE.MathUtils.damp(focusY, goalY, f.grounded ? 9 : 8, dt);
 
       // ---- auto-recentre behind the run direction (never while backpedalling toward the lens)
       if (speed > 1 && manualT > params.recenterDelay && !f.dashing) {
@@ -423,7 +522,6 @@ export function createFollowCamera(opts: {
       let goalDist = f.gliding
         ? params.glideDistance
         : THREE.MathUtils.lerp(params.distance, params.airDistance, airW);
-      goalDist+=params.distance*.15*THREE.MathUtils.smoothstep(speed,4,9);
       let dropLift = 0;
       // ---- look target: fox + look-ahead; airborne, slide toward the predicted landing so it stays in frame
       const hasLanding = !!f.landing && !f.grounded;
@@ -434,11 +532,12 @@ export function createFollowCamera(opts: {
       if (landW > 0.001) {
         const spread = Math.hypot(landAt.x - p.x, landAt.z - p.z);
         const drop = Math.max(0, p.y - landAt.y);
-        const w = params.landingBias * Math.min(1, spread / 5) * landW;
+        const descending = THREE.MathUtils.smoothstep(-f.vel.y, 0, 4);
+        const w = params.landingBias * Math.min(1, spread / 5) * landW * descending;
         aim.x += (landAt.x - aim.x) * w;
         aim.z += (landAt.z - aim.z) * w;
         // drops: tilt toward the landing height and raise the lens so the ground you'll hit is visible
-        aim.y += (Math.max(landAt.y, focusY - 10) - focusY) * Math.min(0.7, 0.15 + drop * 0.07) * landW;
+        aim.y += (Math.max(landAt.y, focusY - 10) - focusY) * Math.min(0.7, 0.15 + drop * 0.07) * landW * descending;
         dropLift = Math.min(3.5, drop * 0.3) * landW;
         goalDist += Math.min(2, Math.max(0, spread - 4) * 0.2 + drop * 0.1) * landW;
       }
@@ -474,15 +573,16 @@ export function createFollowCamera(opts: {
         look.y = THREE.MathUtils.damp(look.y, aim.y, 7, dt);
         look.z = THREE.MathUtils.damp(look.z, aim.z, 7, dt);
       }
-      guardFraming(p);
-      // hard floor at the lens itself (springs can overshoot into slopes)
-      if (opts.surfaceAt) {
-        const floor = opts.surfaceAt(rig.x, rig.z, rig.y + 1.5);
-        if (Number.isFinite(floor) && rig.y < floor + params.clearance) {
-          rig.y = floor + params.clearance;
-          posVel.y = Math.max(0, posVel.y);
-        }
-      }
+      // Test the spring's actual pose, not just its destination. Otherwise a turn's
+      // interpolated arc can pass straight through a pillar even with a safe goal.
+      boomFocus.set(p.x, p.y + params.lookHeight, p.z);
+      sceneryLimit = sceneryFraction(boomFocus, rig);
+      if (firstFrame) sceneryT = sceneryLimit;
+      else sceneryT = THREE.MathUtils.damp(sceneryT, sceneryLimit, sceneryLimit < sceneryT ? 24 : 2.2, dt);
+      safeLens.lerpVectors(boomFocus, rig, sceneryT);
+      // Keep the spring independent of compression: release returns along the same
+      // boom smoothly, rather than feeding a new collision impulse into its velocity.
+      guardFraming(p, safeLens);
 
       // ---- landing dip (spring back), FOV
       dipVel += (-dip * 160 - dipVel * 18) * dt;
@@ -524,7 +624,7 @@ export function createFollowCamera(opts: {
           shotW = x * x * (3 - 2 * x) * shotStill;
         }
       }
-      const outPos = tmp.copy(rig);
+      const outPos = tmp.copy(safeLens);
       const outLook = new THREE.Vector3().copy(look);
       let outFov = fovNow + fovKick;
       if (shotW > 0 && shot) {
@@ -571,6 +671,9 @@ export function createFollowCamera(opts: {
         if (Number.isFinite(floor) && outPos.y < floor + params.clearance * 0.8) outPos.y = floor + params.clearance * 0.8;
       }
 
+      // The final floor guarantee can raise the lens after compression / landing dip.
+      // Guard the actual rendered pose too; authored cinematics keep their own composition.
+      if (shotW === 0) guardFraming(p, outPos, outLook);
       camera.position.copy(outPos);
       camera.lookAt(outLook);
       // ---- trauma shake: small rotational wobble, squared falloff

@@ -25,6 +25,7 @@ if modal.is_local():
     image = image.add_local_file(ROOT / 'tools/windgap-capture.mjs', '/opt/browser/windgap-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/marshmouth-capture.mjs', '/opt/browser/marshmouth-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/reed-capture.mjs', '/opt/browser/reed-capture.mjs')
+    image = image.add_local_file(ROOT / 'tools/reed-entry-capture.mjs', '/opt/browser/reed-entry-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/reed-aftermath-capture.mjs', '/opt/browser/reed-aftermath-capture.mjs')
 
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
@@ -127,8 +128,8 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'reed', 'crown', 'flow', 'showcase', 'reach', 'reachview', 'feel'}:
-        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, water, shade, turntable, updraft, wind, growth, levels, windgap, marshmouth, crown, flow, showcase, reach, reachview or comma-separated')
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'reed', 'crown', 'flow', 'showcase', 'reach', 'reachview', 'reachsafe', 'feel'}:
+        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, water, shade, turntable, updraft, wind, growth, levels, windgap, marshmouth, crown, flow, showcase, reach, reachview, reachsafe or comma-separated')
     if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
         raise ValueError('Gait requires --fps 60')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:40]}-{shots.replace(",", "_")}-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:10]}'

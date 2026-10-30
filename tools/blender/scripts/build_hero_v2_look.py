@@ -29,7 +29,10 @@ for v in bm.verts:
     limb_coat = max(fore_coat, hind_coat * 0.75) * smooth(0.18, 0.5, co.z)
     v.co += Vector((n.x, n.y, 0)) * 0.055 * limb_coat
     neck = wsum(w, "Neck1", "Neck2") + 0.7 * w.get("Neck3", 0) + 0.55 * w.get("Torso3", 0)
-    push = 0.09 * neck
+    co.x *= 1 + 0.16 * min(1, neck)
+    angle = math.atan2(n.x, -n.y)
+    ruff_volume = 0.11 * min(1, neck) * max(0, -n.y) * (0.8 + 0.2 * math.cos(angle * 5))
+    push = 0.09 * neck + ruff_volume
     if n.y < 0 or n.z < 0:  # chest bib bulges forward / down: a deep keel of a chest, not a barrel
         push += 0.05 * neck * max(-n.y, -n.z, 0)
     chest = wsum(w, "Torso3", "Neck1") + 0.5 * w.get("Torso2", 0)
@@ -38,7 +41,7 @@ for v in bm.verts:
     hw = w.get("Head", 0)
     # Taper the lower cheek plane into the throat; a broad jaw made the cream read as a collar.
     jaw_taper = smooth(head_c.z + 0.06, head_c.z - 0.32, co.z) * hw
-    co.x *= 1 - 0.14 * jaw_taper
+    co.x *= 1 - 0.07 * jaw_taper
     if hw > 0.3 and n.z < -0.3 and co.y > head_c.y - 0.12:
         push += 0.045 * hw * -n.z  # full throat under the jaw (no shadow shelf between cheeks and bib)
     belly = wsum(w, "Torso", "Torso2")
@@ -82,7 +85,7 @@ for pg in paw_groups:
     group_index = next(i for i,name in gname.items() if name == pg)
     for toe in range(4):
         made = bmesh.ops.create_uvsphere(bm, u_segments=8, v_segments=6, radius=1.0)["verts"]
-        origin = Vector((centre.x + (toe-1.5)*0.047, front, GROUND+0.063))
+        origin = Vector((centre.x + (toe-1.5)*0.047, front, min(v.co.z for v in root_vs)+0.045))
         for v in made:
             v.co = origin + Vector((v.co.x*0.039, v.co.y*0.085, v.co.z*0.053))
             v[dl][group_index] = 1.0
@@ -104,30 +107,7 @@ if cut_edges:
     caps = bmesh.ops.holes_fill(bm, edges=cut_edges, sides=0)["faces"]
     for face in caps: face.smooth = True
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
-# Five broad throat/cheek tufts, rooted in the surface and tapered downward into a soft ruff.
-bm.normal_update()
-ruff_verts = []
-candidates = [v for v in bm.verts if sum(x for k,x in v[dl].items() if gname[k] in ("Neck1","Neck2","Neck3","Torso3")) > 0.35 and v.normal.y < -0.2]
-for x,z in [(-.22,2.12),(.22,2.12),(-.2,1.88),(.2,1.88),(0,1.8)]:
-    if not candidates: break
-    root = min(candidates, key=lambda v:(v.co-Vector((x,-1.04,z))).length_squared)
-    weights0 = dict(root[dl]); base = root.co-root.normal*.055
-    drift = Vector((.075 if x>0 else -.075 if x<0 else 0,-.04,-.27))
-    rings0=[]
-    for step in range(5):
-        t=step/4; radius0=[.075,.105,.085,.047,.006][step]
-        ring=[]
-        for k in range(8):
-            angle=k/8*2*math.pi
-            v=bm.verts.new(base+drift*t+Vector((math.cos(angle)*radius0,math.sin(angle)*radius0*.55,0)))
-            for group,weight in weights0.items():v[dl][group]=weight
-            ring.append(v);ruff_verts.append(v)
-        rings0.append(ring)
-    for step in range(4):
-        for k in range(8):
-            face=bm.faces.new((rings0[step][k],rings0[step][(k+1)%8],rings0[step+1][(k+1)%8],rings0[step+1][k]));face.smooth=True
-    for ring in [rings0[0][::-1],rings0[-1]]:bm.faces.new(ring)
-bm.verts.index_update(); RUFF_IDS={v.index for v in ruff_verts}
+# Ruff volume belongs to the continuous coat; detached pendant-like tufts were rejected.
 bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
 bm.to_mesh(me); bm.free(); me.update()
 
@@ -173,9 +153,9 @@ for v in me.vertices:
             k = (1 - smooth(line - 0.12, line + 0.12, co.z)) * (1 - smooth(0.0, 0.6, n.z))
             k *= 1 - smooth(head_c.y - 0.04, head_c.y + 0.22, co.y)
         elif co.y < CHEST_Y:
-            half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
+            half = 0.10 + 0.21 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
             k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
-            k *= smooth(0.25, -0.4, n.y)  # throat faces forward; never paint a cream nape stripe
+            k *= smooth(-0.68, -1.0, co.y)  # broad front/sides of ruff; keep the nape rust
         else:
             k = 0.0
         c = mix(c, PAL["cream"], k)
@@ -199,14 +179,13 @@ for v in me.vertices:
         if n.y > -0.1: c = mix(c, PAL["earback"], min(1, ear) * (0.7 + 0.3 * tipt))
         else: c = mix(c, PAL["earin"], min(1, ear) * 0.75 * (1 - tipt)); c = mix(c, PAL["earback"], tipt * 0.7)
     # eye liner ring + amber eyes with slit pupils
-    d, _, _ = ekd.find(co)
+    _, _, d = ekd.find(co)
     if v.index in eye_vs:
         e = eyeL if co.x > 0 else eyeR
         dyx = abs((co - e).xy.length) / 0.07
         c = mix(PAL["amber"], PAL["pupil"], 1 - smooth(0.12, 0.35, dyx))
     elif d < 0.12: c = mix(c, PAL["liner"], 1 - smooth(0.03, 0.12, d))  # strong dark lid rim: watchful, not round
     if v.index in nose_vs: c = PAL["nose"]
-    if v.index in RUFF_IDS: c = mix(c, PAL["cream"], 0.88)
     cols.append(c)
     # shell-fur length (model units; fox ~3.3 tall): long ruff/cheeks, short face/lower legs, none on paws/eyes
     neck = wsum(w, "Neck1", "Neck2", "Neck3", "Torso3")
@@ -229,7 +208,7 @@ for e in me.edges:
 for it in range(7):  # soft painted transitions (bib / saddle / socks blend, no cutout edges)
     new = []
     for i, c in enumerate(cols):
-        if i in eye_vs or i in nose_vs or not adj[i]: new.append(c); continue
+        if i in eye_vs or i in nose_vs or ekd.find(me.vertices[i].co)[2] < 0.09 or not adj[i]: new.append(c); continue
         s = [cols[j] for j in adj[i]]
         new.append(tuple((c[k] * 2 + sum(x[k] for x in s) / len(s)) / 3 for k in range(3)))
     cols = new
@@ -273,8 +252,8 @@ def streak(scale):
 body_s = streak((65, 7, 65)); leg_s = streak((65, 65, 8))
 sm = node("ShaderNodeMix", data_type="FLOAT"); L_.new(mask.outputs["Color"], sm.inputs["Factor"])
 L_.new(body_s.outputs["Fac"], sm.inputs[2]); L_.new(leg_s.outputs["Fac"], sm.inputs[3])
-cr = node("ShaderNodeValToRGB"); cr.color_ramp.elements[0].position = 0.3; cr.color_ramp.elements[0].color = (0.8, 0.76, 0.72, 1)
-cr.color_ramp.elements[1].position = 0.7; cr.color_ramp.elements[1].color = (1.08, 1.05, 1.0, 1)
+cr = node("ShaderNodeValToRGB"); cr.color_ramp.elements[0].position = 0.3; cr.color_ramp.elements[0].color = (0.95, 0.94, 0.93, 1)
+cr.color_ramp.elements[1].position = 0.7; cr.color_ramp.elements[1].color = (1.02, 1.015, 1.0, 1)
 L_.new(sm.outputs[0], cr.inputs["Fac"])
 big = node("ShaderNodeTexNoise"); big.inputs["Scale"].default_value = 2.5
 bigr = node("ShaderNodeMapRange"); bigr.inputs["To Min"].default_value = 0.9; bigr.inputs["To Max"].default_value = 1.08
@@ -291,7 +270,7 @@ m2 = node("ShaderNodeVectorMath", operation="SCALE"); L_.new(m1.outputs[2], m2.i
 m3 = node("ShaderNodeVectorMath", operation="SCALE"); L_.new(m2.outputs[0], m3.inputs[0]); L_.new(aom.outputs[0], m3.inputs["Scale"])
 emis = node("ShaderNodeEmission"); L_.new(m3.outputs[0], emis.inputs["Color"])
 bsdf = node("ShaderNodeBsdfPrincipled")
-bump = node("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.2; bump.inputs["Distance"].default_value = 0.02
+bump = node("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.05; bump.inputs["Distance"].default_value = 0.02
 L_.new(sm.outputs[0], bump.inputs["Height"]); L_.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
 L_.new(emis.outputs[0], out.inputs["Surface"])
 tex = node("ShaderNodeTexImage", image=img_c); N_.active = tex
@@ -403,21 +382,6 @@ fox.data.color_attributes.remove(fox.data.color_attributes["Glow"])
 tail_c, tcore_c = load("tail_col.png"), load("tail_core.png")
 # tail core: alpha-clipped so the fur ends in flame-tongue shapes (the flame cards take over from there)
 M_TAIL = pbr("FoxTailFur", tail_c, None, rough=0.9, spec=0.15)
-cards_c = load("cards_col.png")
-tf_c, tf_e = load("tail_flame.png"), load("tail_flame_emit.png")
-# fur-to-flame locks over the plume's outer half: unlit burnt-orange strands at the root, glowing only where
-# they have turned to flame (separate emission map); "wisp" name -> game keeps them soft-emissive
-M_TFLAME = pbr("SpiritWispTailFlame", tf_c, None, emit_img=tf_e, emit_str=1.0, rough=0.85, alpha_mode="BLEND", spec=0.1)
-M_TFLAME.use_backface_culling = False
-M_TUFT = pbr("FoxFurCards", cards_c, None, rough=0.9, alpha_mode="MASK", spec=0.15)
-# spirit FX: names contain "wisp" so the game's tuneMaterials keeps them soft-emissive (not the fur branch)
-fx_c, glow_c, tglow_c = load("spirit_fx.png"), load("fox_glow.png"), load("tail_glow.png")
-M_FX = pbr("SpiritWispFX", fx_c, None, emit_img=fx_c, emit_str=1.4, rough=0.6, alpha_mode="BLEND", spec=0.0)
-M_GLOW = pbr("SpiritWispGlow", glow_c, None, emit_img=glow_c, emit_str=0.5, rough=0.8, alpha_mode="BLEND", spec=0.0)
-M_TGLOW = pbr("SpiritWispTailGlow", tglow_c, None, emit_img=tglow_c, emit_str=1.1, rough=0.8, alpha_mode="BLEND", spec=0.0)
-for m_ in (M_FX, M_GLOW, M_TGLOW): m_.use_backface_culling = False
-SHELL_CLIPS = (0.2, 0.38, 0.55)
-M_SHELL = [pbr(f"FoxFurShell{k + 1}", fur_sh, None, rough=0.9, alpha_mode="MASK", spec=0.15, clip=c_) for k, c_ in enumerate(SHELL_CLIPS)]
 TAIL_CLIPS = (0.18, 0.32, 0.46, 0.6)
 M_TSHELL = [pbr(f"FoxTailFurShell{k + 1}", tail_c, None, rough=0.9, alpha_mode="MASK", spec=0.15, clip=c_) for k, c_ in enumerate(TAIL_CLIPS)]
 
@@ -456,7 +420,8 @@ for i, v in enumerate(me.vertices):
     if throat[i] > 0.4: base = Vector((0, 0.25, -1))  # throat fur hangs down over the crease
     t = base - n * base.dot(n)
     flows.append(t.normalized() if t.length > 1e-4 else Vector())
-fur_shell = shells(fox, furlen, flows, M_SHELL, "SpiritFox_FurShell")
+# The matte painted coat and modeled ruff carry body fur; layered body masks produced pale crust.
+# Tail shells remain for the brush silhouette.
 
 
 # ---------------------------------------------------------------- 6. flame-plume tail: fur root third -> translucent flame
@@ -588,22 +553,7 @@ for v, s_ in zip(tme.vertices, vs_):
     t = tan - v.normal * tan.dot(v.normal); tflow.append(t.normalized() if t.length > 1e-4 else Vector())
 tail_shell = shells(tail, tlen, tflow, M_TSHELL, "SpiritFox_TailShell")
 
-# ---------------------------------------------------------------- 6b. spirit inner glow: thin emissive shells UNDER the fur shells
-def glow_shell(src, lengths, keep, frac, mat, name):
-    o = src.copy(); o.data = src.data.copy(); o.name = name; sc.collection.objects.link(o)
-    o.modifiers.clear(); md = o.modifiers.new("Armature", "ARMATURE"); md.object = arm; o.parent = arm
-    bm_ = bmesh.new(); bm_.from_mesh(o.data); bm_.verts.ensure_lookup_table(); bm_.normal_update()
-    kill_ = [f for f in bm_.faces if max(keep[v.index] for v in f.verts) < 0.03]
-    for v in bm_.verts: v.co = v.co + v.normal * (lengths[v.index] * frac + 0.006)
-    bmesh.ops.delete(bm_, geom=kill_, context="FACES")
-    bm_.to_mesh(o.data); bm_.free()
-    o.data.materials.clear(); o.data.materials.append(mat)
-    for p in o.data.polygons: p.material_index = 0
-    return o
-glow_body = glow_shell(fox, furlen, glow, 0.3, M_GLOW, "SpiritFox_Glow")
-glow_tail = glow_shell(tail, tlen, [smooth(0.45, 0.6, s_) for s_ in vs_], 0.3, M_TGLOW, "SpiritFox_TailGlow")
-
 # Spirit wisps and embers are generated at animated surface anchors by foxLook.ts.
-for o in (fur_shell, tail_shell, glow_body, glow_tail):
+for o in (tail_shell,):
     o.parent = arm
-print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, fur_shell, tail_shell, glow_body, glow_tail]})
+print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, tail_shell]})
