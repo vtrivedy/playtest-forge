@@ -78,7 +78,7 @@ let maxColumnPositionStep = 0;
 const previous = crossing.camera.position.clone();
 for (let i = 0; i < 180; i++) {
   crossingFrame.vel.x = 4;
-  crossingFrame.target.x = -3 + i / 30;
+  crossingFrame.target.x = -3 + i * crossingFrame.vel.x / 60;
   crossing.update(1 / 60, crossingFrame);
   maxColumnVerticalStep = Math.max(maxColumnVerticalStep, Math.abs(crossing.camera.position.y - previous.y));
   maxColumnPositionStep = Math.max(maxColumnPositionStep, crossing.camera.position.distanceTo(previous));
