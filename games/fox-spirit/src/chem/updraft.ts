@@ -191,9 +191,9 @@ export class Hearth {
     const gutter = this.reactor.state === 'guttering' ? 0.55 + 0.45 * Math.sin(t * 31) * Math.sin(t * 17.3) : 1;
     const vis = h * gutter;
     this.embers.uniforms.uTime!.value = t;
-    this.embers.uniforms.uHeat!.value = vis + this.flare * 0.6;
+    this.embers.uniforms.uHeat!.value = Math.min(1.4, vis * 1.1 + this.flare * 0.7);
     this.glow.uniforms.uTime!.value = t;
-    this.glow.uniforms.uHeat!.value = vis + this.flare * 0.5;
+    this.glow.uniforms.uHeat!.value = Math.min(1.35, vis * 1.15 + this.flare * 0.65);
     this.ribbons.uniforms.uTime!.value = t;
     this.ribbons.uniforms.uHeat!.value = vis + this.flare * 0.5;
     this.flame.uniforms.uTime!.value = t;
@@ -338,9 +338,9 @@ function createShared(): HearthShared {
   const smoke = new THREE.MeshBasicMaterial({ color: 0xb9ad9c, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, fog: true });
 
   // rising embers + a few lifted leaves, animated entirely in the vertex shader
-  const N_EMBER = 300;
-  const N_LEAF = 26;
-  const N_HAZE = 34;
+  const N_EMBER = 420;
+  const N_LEAF = 40;
+  const N_HAZE = 70;
   const emberGeo = new THREE.BufferGeometry();
   const N_ALL = N_EMBER + N_LEAF + N_HAZE;
   const seeds = new Float32Array(N_ALL * 4);
@@ -356,7 +356,7 @@ function createShared(): HearthShared {
   emberGeo.setAttribute('seed', new THREE.BufferAttribute(seeds, 4));
   emberGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 5, 0), 12);
   const embers = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 2.2 }, uScale: { value: 520 } },
+    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 2.2 }, uScale: { value: 640 } },
     vertexShader: /* glsl */ `
       attribute vec4 seed;
       uniform float uTime, uHeat, uHeight, uRadius, uScale;
@@ -383,7 +383,7 @@ function createShared(): HearthShared {
         vLeaf = leaf + haze * 2.0;
         vHot = 1.0 - ph;
         vSpin = seed.z * 6.2832 + uTime * (1.5 + seed.y * 2.0);
-        float size = haze > 0.5 ? mix(0.9, 1.6, seed.x) * (0.6 + ph) : leaf > 0.5 ? mix(0.18, 0.3, seed.x) : mix(0.06, 0.13, seed.x) * (1.25 - ph * 0.6);
+        float size = haze > 0.5 ? mix(1.2, 2.2, seed.x) * (0.7 + ph) : leaf > 0.5 ? mix(0.22, 0.38, seed.x) : mix(0.08, 0.18, seed.x) * (1.3 - ph * 0.5);
         gl_PointSize = size * uScale / max(0.5, -mv.z);
       }`,
     fragmentShader: /* glsl */ `
@@ -397,7 +397,7 @@ function createShared(): HearthShared {
           // soft heat body: big dim warm puffs that give the column volume at distance
           float d = length(q);
           float g = exp(-d * d * 9.0);
-          gl_FragColor = vec4(vec3(1.0, 0.45, 0.12) * g * vA * 0.32 * vHot, g * vA * 0.32);
+          gl_FragColor = vec4(vec3(1.0, 0.42, 0.1) * g * vA * 0.58 * vHot, g * vA * 0.55);
         } else if (vLeaf > 0.5) {
           // turning maple-ish leaf: rotated lens with a notch, warm rust lit from below
           float c = cos(vSpin), s = sin(vSpin);
@@ -451,8 +451,8 @@ function createShared(): HearthShared {
       void main() {
         float rim = 1.0 - abs(dot(vN, vV));
         float band = 0.6 + 0.4 * sin(vAng * 3.0 + vY * 9.0 - uTime * 4.0);
-        float a = uHeat * pow(1.0 - vY, 1.3) * (0.3 + rim * 0.7) * band * 0.34;
-        gl_FragColor = vec4(vec3(1.0, 0.55, 0.2) * a, a);
+        float a = uHeat * pow(1.0 - vY, 1.15) * (0.35 + rim * 0.85) * band * 0.82;
+        gl_FragColor = vec4(vec3(1.0, 0.48, 0.14) * a * 1.35, a);
         #include <colorspace_fragment>
       }`,
     transparent: true,
