@@ -1031,12 +1031,39 @@ async function boot() {
   }
   const feetPos = new THREE.Vector3();
   const heroNdc = new THREE.Vector3();
+  let drawFrame = 0;
+  if (quality.shadowEvery > 1) renderer.shadowMap.autoUpdate = false;
+
+  /** Adaptive resolution: weak GPUs drop pixel ratio (down to quality.minScale) instead of frames. */
+  const res = { scale: 1, ema: 16, t: 0, last: performance.now() };
+  function adaptResolution() {
+    const now = performance.now();
+    const ms = now - res.last;
+    res.last = now;
+    if (quality.minScale >= 1 || ms > 1000) return; // tab was hidden
+    res.ema += (ms - res.ema) * 0.05;
+    res.t += ms / 1000;
+    if (res.t < 2.5) return;
+    let next = res.scale;
+    if (res.ema > 40) next = Math.max(quality.minScale, res.scale - 0.1);
+    else if (res.ema < 22) next = Math.min(1, res.scale + 0.1);
+    if (Math.abs(next - res.scale) < 1e-3) return;
+    res.scale = next;
+    res.t = 0;
+    const pr = Math.min(devicePixelRatio, quality.pixelRatio) * res.scale;
+    renderer.setPixelRatio(pr);
+    forge.setSize(innerWidth, innerHeight);
+    post.composer.setPixelRatio(pr);
+    post.setSize(innerWidth, innerHeight);
+  }
 
   /** Visual-only work: particles, colour mask, shadows, photo override, post. */
   function draw() {
     const dt = Math.min(visualDt, 0.1);
     visualDt = 0;
     const fox = foxActor.group;
+    if (quality.shadowEvery > 1) renderer.shadowMap.needsUpdate = drawFrame % quality.shadowEvery === 0;
+    drawFrame++;
     colorField.renderMask(dt);
     for (const m of world.materials) colorField.syncMaterial(m);
 
@@ -1169,6 +1196,7 @@ async function boot() {
     }
     step(rawDt);
     draw();
+    adaptResolution();
     requestAnimationFrame(tick);
   }
 

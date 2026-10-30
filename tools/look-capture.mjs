@@ -34,9 +34,10 @@ try {
 // fox feet + optional staged photo [pos, look, fov]; gameplay shots use the follow camera
 const SHOTS = {
   establish: { fox: [0, 0, 80], yaw: Math.PI, photo: [[-60, 46, 120], [10, 14, -40], 52] },
-  hill: { fox: [6.4, 22.4, -74.5], yaw: Math.PI },
+  hill: { fox: [-2, 38, -84], yaw: Math.PI, photo: [[30, 44, -52], [-4, 36, -88], 50] },
   marsh: { fox: [69, 0.4, 28.2], yaw: Math.PI },
-  shrine: { fox: [0, 38, -80], yaw: Math.PI },
+  shrine: { fox: [0, 38, -84], yaw: Math.PI },
+  meadow: { fox: [6, 0, 70], yaw: Math.PI },
 };
 
 const browser = await chromium.launch({
@@ -81,7 +82,7 @@ for (const state of states) {
   }
   for (const name of names) {
     await stage(name);
-    if (name === 'marsh' || name === 'hill') report.perf[`${state}-${name}`] = await H('perf', 4);
+    if (name === 'marsh' || name === 'meadow') report.perf[`${state}-${name}`] = await H('perf', 4);
     await page.screenshot({ path: `${out}/${state}-${name}.png` });
     const st = await H('state');
     report.shots[`${state}-${name}`] = { pos: st.pos, camera: st.camera.pos, restored: st.restored, fx: st.fx, game: await page.evaluate(() => window.__game) };

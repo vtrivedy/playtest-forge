@@ -23,12 +23,16 @@ export type QualitySettings = {
   particleScale: number;
   /** Camera far plane (fog hides the cut on lower tiers) */
   far: number;
+  /** Re-render the shadow map every N frames (1 = every frame) */
+  shadowEvery: number;
+  /** Adaptive resolution floor as a fraction of pixelRatio (1 = never drop) */
+  minScale: number;
 };
 
 const TIERS: Record<QualityTier, Omit<QualitySettings, 'tier' | 'reason' | 'gpu'>> = {
-  high: { pixelRatio: 2, shadows: true, shadowMapSize: 2048, softShadows: true, bloom: true, smaa: true, gtao: false, particleScale: 1, far: 900 },
-  med: { pixelRatio: 1, shadows: true, shadowMapSize: 1024, softShadows: false, bloom: true, smaa: true, gtao: false, particleScale: 0.75, far: 700 },
-  low: { pixelRatio: 0.5, shadows: true, shadowMapSize: 1024, softShadows: false, bloom: false, smaa: false, gtao: false, particleScale: 0.5, far: 520 },
+  high: { pixelRatio: 2, shadows: true, shadowMapSize: 2048, softShadows: true, bloom: true, smaa: true, gtao: true, particleScale: 1, far: 900, shadowEvery: 1, minScale: 0.5 },
+  med: { pixelRatio: 1, shadows: true, shadowMapSize: 1024, softShadows: false, bloom: true, smaa: true, gtao: false, particleScale: 0.75, far: 700, shadowEvery: 1, minScale: 0.6 },
+  low: { pixelRatio: 0.5, shadows: true, shadowMapSize: 1024, softShadows: false, bloom: false, smaa: false, gtao: false, particleScale: 0.5, far: 520, shadowEvery: 2, minScale: 1 },
 };
 
 const SOFTWARE = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/i;
