@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 const out = '/workspace/siyu/playtest-forge-artifacts/audio';
 await fs.mkdir(out, { recursive: true });
+await fs.rm(path.join(out, 'review.json'), { force: true });
 const server = spawn('npx', ['vite', '--config', 'games/fox-spirit/vite.config.ts', '--host', '127.0.0.1', '--port', '5183'], { stdio: 'ignore', detached: true });
 let browser;
 try {
@@ -11,17 +12,18 @@ try {
   browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
+  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto('http://127.0.0.1:5183', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.__gameHooks?.state);
   const before = await page.evaluate(() => window.__gameHooks.state());
   if (before.audio.state !== 'locked') throw Error('Audio unlocked before gesture');
   await page.evaluate(root => { window.__audioRoot = root; }, process.cwd().replace(/^\//, ''));
   const report = [];
-  for (const name of ['footstep-leaf', 'footstep-stone', 'land', 'jump', 'dash', 'ember', 'ember-streak', 'shrine', 'bird', 'cricket', 'glide', 'ambience-sepia', 'ambience-restored', 'ambience-crossfade']) {
+  for (const name of ['footstep-leaf', 'footstep-stone', 'footstep-wood', 'land', 'jump', 'dash', 'ember', 'ember-streak', 'shrine', 'bird', 'cricket', 'bridge', 'checkpoint', 'hazard', 'respawn', 'fire', 'glide', 'ambience-sepia', 'ambience-restored', 'ambience-crossfade']) {
     const rendered = await page.evaluate(async name => {
       const modulePath = new URL('./src/audio/synthesis.ts', location.origin + '/@fs/' + window.__audioRoot + '/').pathname;
       const { cue, noiseBuffer, ambience, breath } = await import(modulePath);
-      const duration = name.startsWith('ambience') ? 14 : name === 'shrine' ? 9 : 3;
+      const duration = name.startsWith('ambience') ? 14 : name === 'shrine' ? 9 : name === 'bridge' ? 4 : 3;
       const ctx = new OfflineAudioContext(1, duration * 24000, 24000), master = ctx.createGain(), limiter = ctx.createDynamicsCompressor();
       master.gain.value = 0.55; limiter.threshold.value = -18; limiter.knee.value = 12; limiter.ratio.value = 3;
       limiter.attack.value = 0.008; limiter.release.value = 0.25; master.connect(limiter).connect(ctx.destination);
@@ -29,12 +31,11 @@ try {
       if (name.startsWith('ambience')) {
         const p = ambience(ctx, master, noise, false), w = ambience(ctx, master, noise, true);
         if (name === 'ambience-crossfade') {
-          p.gain.setValueAtTime(1, 0); p.gain.linearRampToValueAtTime(0, 10);
-          w.gain.setValueAtTime(0, 0); w.gain.linearRampToValueAtTime(1, 10);
+          for (let i = 0; i <= 100; i++) { p.gain.setValueAtTime(Math.cos(i / 100 * Math.PI / 2), i / 10); w.gain.setValueAtTime(Math.sin(i / 100 * Math.PI / 2), i / 10); }
         } else (name.endsWith('sepia') ? p : w).gain.setValueAtTime(1, 0);
         if (!name.endsWith('sepia')) { cue(ctx, master, noise, 'bird', 7); cue(ctx, master, noise, 'cricket', 11); breath(ctx, master, noise, 4, 1.5, 2100, 0.018, 700, 0.25); }
       } else if (name === 'glide') breath(ctx, master, noise, 0.1, 2.6, 1500, 0.075, 1500, 0.2);
-      else cue(ctx, master, noise, name.startsWith('footstep') ? 'footstep' : name.startsWith('ember') ? 'ember' : name, 0.1, { stone: name.endsWith('stone'), streak: name.endsWith('streak') ? 6 : 0 });
+      else cue(ctx, master, noise, name.startsWith('footstep') ? 'footstep' : name.startsWith('ember') ? 'ember' : name, 0.1, { surface: name.startsWith('footstep') ? name.slice(9) : undefined, streak: name.endsWith('streak') ? 6 : 0 });
       const buffer = await ctx.startRendering(), data = buffer.getChannelData(0);
       let peak = 0, sum = 0; const bytes = new Uint8Array(data.length * 2), view = new DataView(bytes.buffer);
       for (let i = 0; i < data.length; i++) { peak = Math.max(peak, Math.abs(data[i])); sum += data[i] * data[i]; view.setInt16(i * 2, Math.round(Math.max(-1, Math.min(1, data[i])) * 32767), true); }
@@ -64,11 +65,31 @@ try {
   }
   await page.screenshot({ path: path.join(out, 'audio-traversal.png') });
   const traversal = await page.evaluate(() => ({ game: window.__game, state: window.__gameHooks.state() }));
+  // STAGED coverage: fixed simulation steps exercise airborne and surface states on slow GPUs.
+  const stagedCoverage = await page.evaluate(() => {
+    const h = window.__gameHooks; h.setManual(true); h.setKeys([]);
+    h.teleport(6, 14, 60, Math.PI); h.setKeys(['Space', 'KeyW']); h.advance(45, 1 / 60, false);
+    const glide = h.state();
+    h.setKeys([]); h.teleport(-112, 20, -24, Math.PI); h.advance(5, 1 / 60, false);
+    h.setKeys(['KeyW']); h.advance(20, 1 / 60, false);
+    const stone = h.state();
+    h.setKeys([]); h.teleport(-18, 0.35, 70, Math.PI); h.advance(3, 1 / 60, false);
+    h.setKeys(['KeyW']); h.advance(25, 1 / 60, false);
+    const wood = h.state();
+    h.setKeys([]); h.setManual(false);
+    return { label: 'STAGED fixed-clock surface and glide coverage; not an earned traversal', glide, stone, wood };
+  });
+  if (!stagedCoverage.glide.audio.counts.glide) throw Error('Glide never exercised');
+  if (!stagedCoverage.stone.audio.surfaceCounts.stone) throw Error('Stone steps never exercised');
+  await page.waitForTimeout(800);
   await page.evaluate(() => { window.__gameHooks.teleportToShrine(); window.__gameHooks.forceRestore(); });
   await page.waitForTimeout(8000);
   await page.screenshot({ path: path.join(out, 'audio-restoration.png') });
   const restored = await page.evaluate(() => ({ game: window.__game, state: window.__gameHooks.state() }));
+  if (restored.state.audio.counts.shrine < 1 || restored.state.audio.warmGain <= restored.state.audio.pressedGain) throw Error('Restoration did not crossfade the live beds');
+  const jump = report.find(r => r.name === 'jump'), step = report.find(r => r.name === 'footstep-leaf');
+  if (jump.peak < step.peak * 0.6) throw Error('Jump lost beneath footsteps');
   if (errors.length) throw Error(errors.join('\n'));
-  await fs.writeFile(path.join(out, 'review.json'), JSON.stringify({ report, before, unlocked, muted, traversal, restored, pageErrors: errors }, null, 2));
+  await fs.writeFile(path.join(out, 'review.json'), JSON.stringify({ report, before, unlocked, muted, traversal, stagedCoverage, restored, pageErrors: errors }, null, 2));
   console.log(JSON.stringify({ rendered: report.length, pageErrors: errors, traversal: traversal.state.audio, restored: restored.state.audio }));
 } finally { await browser?.close(); try { process.kill(-server.pid, 'SIGTERM'); } catch {} }
