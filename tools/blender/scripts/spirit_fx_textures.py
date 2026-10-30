@@ -18,7 +18,8 @@ rnd = random.Random(23)
 S = 1024
 atlas = np.zeros((S, S, 4), np.float32)
 
-EMBER = np.array([(0.0, 168, 52, 14), (0.3, 222, 96, 24), (0.6, 244, 148, 44), (0.85, 252, 196, 104), (1.0, 252, 226, 168)], np.float32)
+# amber-rust, deep at the edges, only a small pale-gold core (concept flame is ember-warm, not yellow fire)
+EMBER = np.array([(0.0, 122, 46, 18), (0.3, 176, 80, 30), (0.6, 212, 120, 50), (0.85, 234, 164, 86), (1.0, 244, 206, 146)], np.float32)
 def ramp(x):
     x = np.clip(x, 0, 1); out = np.zeros(x.shape + (3,), np.float32)
     for c in range(3): out[..., c] = np.interp(x, EMBER[:, 0], EMBER[:, c + 1])
@@ -54,13 +55,15 @@ def tongue(w, h, seed, curl, tongues=5, amax=0.85):
     streak = 0.55 + 0.45 * np.sin((u * 7 + n1 * 5 + t * 3) * math.pi) * 0.5 + 0.45 * (n2 - 0.5)
     dens = dens * np.clip(streak + 0.5, 0.45, 1.15)
     base = sstep(0.0, 0.22, t)                # melt into the fur at the base
-    a = np.clip(dens * 1.5, 0, 1) * base * amax
-    a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(2.2)), np.float32) / 255
-    col = ramp(0.18 + 0.45 * dens + 0.45 * heat - 0.25 * t)
+    erode = vnoise(w, h, 10, 14, seed + 2)                 # smoky, eaten edges toward the tip
+    dens = dens * np.clip(1.2 - t * 0.45 - (1 - dens) * erode * 0.7, 0, 1)
+    a = np.clip(dens * 1.35, 0, 1) * base * amax
+    a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(4.0)), np.float32) / 255
+    col = ramp(0.12 + 0.42 * dens + 0.3 * heat ** 1.5 - 0.22 * t)
     return col, a
 
 for i in range(4):
-    rgb, a = tongue(256, 512, 101 + i, curl=(-0.55, 0.45, -0.25, 0.6)[i], tongues=(5, 4, 6, 4)[i])
+    rgb, a = tongue(256, 512, 101 + i, curl=(-0.55, 0.45, -0.25, 0.6)[i], tongues=(5, 4, 6, 4)[i], amax=0.72)
     put(i * 256, 0, rgb, a)
 
 def ribbon(w, h, seed, side):
@@ -119,9 +122,48 @@ TW, TH = 64, 512
 yy, xx = np.mgrid[0:TH, 0:TW].astype(np.float32)
 v = 1 - yy / (TH - 1)
 ph = np.array([rnd.uniform(0, 6.3) for _ in range(TW)], np.float32)[None, :]
-base = np.clip((v - 0.3) / 0.3, 0, 1) ** 1.5
+base = np.clip((v - 0.48) / 0.3, 0, 1) ** 1.5  # only where the fur has turned to flame
 fl = (0.55 + 0.45 * np.sin(ph + v * 23 + np.sin(xx * 0.7) * 2)) * (0.7 + 0.3 * np.sin(xx * 2 * math.pi / TW * 5 + v * 9))
 aa = base * np.clip(fl, 0, None)
 tg = np.concatenate([ramp(0.25 + 0.55 * v * aa), np.clip(aa * 0.7, 0, 0.6)[..., None]], axis=2)
 Image.fromarray((tg * 255).astype(np.uint8), "RGBA").filter(ImageFilter.GaussianBlur(1.2)).save(f"{OUT}/tail_glow.png", optimize=True)
+
+# --- tail_flame 1024x512 RGBA (+ tail_flame_emit RGB): 4 fur-to-flame locks, 256x512, base = bottom edge.
+# The plume's outer ~45%: dense burnt-orange strands at the root (unlit, matches the tail fur) that thin out,
+# warm to amber and break up into soft flame tongues toward the tip. Emission only where it has become flame.
+from PIL import ImageDraw
+FUR = np.array([196, 104, 42], np.float32) / 255
+def furflame(w, h, seed, f0, curl):
+    rg = random.Random(seed)
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    t = 1 - yy / (h - 1); u = xx / (w - 1) * 2 - 1
+    sm = Image.new("L", (w, h), 0); d = ImageDraw.Draw(sm)
+    for k in range(150):                                       # strands: lock envelope, tapering, gathering at the tip
+        uu = rg.uniform(-1, 1); L = (0.5 + 0.45 * rg.random()) * (1 - 0.35 * abs(uu)); wd = rg.uniform(1.5, 3.5)
+        pts = []
+        for i in range(24):
+            tt = i / 23 * L
+            x = w / 2 + uu * w * 0.36 * (1 - 0.5 * tt) + curl * w * 0.25 * tt ** 2 + 3 * math.sin(tt * 7 + k)
+            pts.append((x, h - 1 - tt * h))
+        for (x0_, y0_), (x1_, y1_), i in zip(pts, pts[1:], range(23)):
+            d.line([(x0_, y0_), (x1_, y1_)], fill=int(255 * rg.uniform(0.6, 1.0) * (1 - i / 23) ** 0.5), width=max(1, round(wd * (1 - i / 23))))
+    fur = np.asarray(sm.filter(ImageFilter.GaussianBlur(0.9)), np.float32) / 255
+    fur = np.clip(fur * 1.6, 0, 1) * (1 - np.clip(np.abs(u) - 0.55, 0, 1) * 2.2)
+    trgb, ta = tongue(w, h, seed + 50, curl, tongues=6, amax=0.75)
+    k = sstep(f0, f0 + 0.32, t)                                # 0 fur .. 1 flame
+    a = np.maximum(fur * (1 - k) * 0.95, ta * (0.35 + 0.65 * k)) * sstep(0.0, 0.08, t)
+    n = vnoise(w, h, 6, 12, seed + 7)[..., None]
+    furc = FUR[None, None, :] * (0.82 + 0.3 * n) * (0.9 + 0.2 * fur[..., None])
+    col = furc * (1 - k[..., None]) + trgb * k[..., None]
+    emit = col * np.clip(k * 1.15 - 0.1, 0, 1)[..., None]
+    return col, a, emit
+TF = np.zeros((512, 1024, 4), np.float32); TE = np.zeros((512, 1024, 3), np.float32)
+for i in range(4):
+    c_, a_, e_ = furflame(256, 512, 501 + i, (0.22, 0.32, 0.27, 0.38)[i], (-0.5, 0.4, -0.3, 0.55)[i])
+    TF[:, i * 256:(i + 1) * 256, :3] = c_; TF[:, i * 256:(i + 1) * 256, 3] = np.clip(a_, 0, 1); TE[:, i * 256:(i + 1) * 256] = e_
+img = Image.fromarray((np.clip(TF, 0, 1) * 255).astype(np.uint8), "RGBA")
+rgb = img.convert("RGB"); al = img.split()[3]
+fill = Image.composite(rgb, rgb.filter(ImageFilter.MaxFilter(9)), al.point(lambda v: 255 if v > 8 else 0))
+fill.putalpha(al); fill.save(f"{OUT}/tail_flame.png", optimize=True)
+Image.fromarray((np.clip(TE, 0, 1) * 255).astype(np.uint8), "RGB").save(f"{OUT}/tail_flame_emit.png", optimize=True)
 print("spirit fx textures ok")

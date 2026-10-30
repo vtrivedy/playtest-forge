@@ -56,11 +56,11 @@ def rot_world(name, axis, deg):
 def scl(name, sx=1.0, sy=1.0, sz=1.0):
     P[name].scale = (sx, sy, sz); upd()
 
-# neck up, head held level (calm, alert carriage like the turnaround)
-rot_world("Neck1", "X", -22)
-rot_world("Neck2", "X", -12)
+# neck up, head held level and proud (calm, alert carriage like the turnaround)
+rot_world("Neck1", "X", -27)
+rot_world("Neck2", "X", -15)
 rot_world("Neck3", "X", -6)
-rot_world("Head", "X", 34)
+rot_world("Head", "X", 42)
 scl("Head", 1.12, 1.08, 1.12)
 # tall ears, more upright
 for s in ("L", "R"):
@@ -68,20 +68,20 @@ for s in ("L", "R"):
     rot_world(f"Ear1.{s}", "Y", -14 * sign)
     rot_world(f"Ear1.{s}", "X", 6)
     scl(f"Ear1.{s}", 1.2, 1.62, 1.2)  # big fox ears (turnaround: ears ~= head length)
-# slender, slightly longer legs
+# sturdy legs (concept: solid umber-socked legs, not spindly): thicker, no extra length
 for s in ("L", "R"):
-    scl(f"FrontUpperLeg.{s}", 0.93, 1.07, 0.93)
-    scl(f"BackUpperLeg.{s}", 0.88, 1.07, 0.88)
+    scl(f"FrontUpperLeg.{s}", 1.3, 0.97, 1.3)
+    scl(f"BackUpperLeg.{s}", 1.22, 0.97, 1.22)
 # tail: droop from the rump, then sweep back/up (bushy plume rebuilt later)
-rot_world("Tail1", "X", -36)
-scl("Tail1", 1.32, 1.32, 1.32)
-rot_world("Tail3", "X", 2)
-rot_world("Tail5", "X", 14)
-rot_world("Tail7", "X", 30)
+rot_world("Tail1", "X", -40)
+scl("Tail1", 1.58, 1.58, 1.58)  # long brush (concept tail ~ body length; outer ~45% dissolves into flame)
+rot_world("Tail3", "X", 8)
+rot_world("Tail5", "X", 22)
+rot_world("Tail7", "X", 40)
 # slight sweep to the fox's right (concept back view): from the chase cam the plume curls off the rump
 # instead of stacking straight toward the camera
-rot_world("Tail3", "Z", 5)
-rot_world("Tail6", "Z", 7)
+rot_world("Tail3", "Z", 9)
+rot_world("Tail6", "Z", 13)
 
 bpy.ops.object.mode_set(mode="OBJECT")
 # bake posed shape into mesh, then make it the rest pose
