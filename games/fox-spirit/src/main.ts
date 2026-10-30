@@ -867,7 +867,7 @@ async function boot() {
           cam.land(impact);
           landT = 0.1 + 0.28 * impact;
           if (impact > 0.75) cam.shake(0.18 * impact);
-          audio.play('land', { strength: impact });
+          audio.play('land', { strength: impact, stone: /^(terrace|stair|mill|sw1-spire|ghost|arena|pillar|row|shrine-plinth)/.test(probe.collider?.tag ?? '') });
         }
         jumpedThisAir = false;
       }
@@ -1051,7 +1051,7 @@ async function boot() {
       const distance = Math.hypot(fox.position.x - region.center.x, fox.position.z - region.center.z);
       audioRestore = Math.max(audioRestore, THREE.MathUtils.smoothstep(region.radius - distance, -3, 3));
     }
-    audio.update(dt, speed > 1.2, grounded, gliding, audioRestore, probe.collider != null && groundBounce <= 1, speed);
+    audio.update(dt, speed > 1.2, grounded, gliding, audioRestore, /^(terrace|stair|mill|sw1-spire|ghost|arena|pillar|row|shrine-plinth)/.test(probe.collider?.tag ?? ''), speed);
   }
   const feetPos = new THREE.Vector3();
   const heroNdc = new THREE.Vector3();
