@@ -708,15 +708,29 @@ try {
   }
   if (wants('route')) {
     await boot(quality, true);
-    save('route-waypoints.json', await H('route'));
-    await H('autopilot', true, 0, { assist: false });
+    const route = await H('route');
+    save('route-waypoints.json', route);
+    const from = Number(arg('route-from', '0')), requestedTo = Number(arg('route-to', '-1'));
+    const regional = from > 0 || requestedTo >= 0, to = requestedTo < 0 ? route.length : requestedTo;
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from >= to || to > route.length) throw Error('Invalid route waypoint interval');
+    if (regional) {
+      const wp = route[from];
+      const floor = await page.evaluate(p => window.__gameHooks.debug.world.collision.groundAt(p.x, p.z, p.y + .5).y, wp);
+      if (!Number.isFinite(floor) || Math.abs(floor - wp.y) > .65) throw Error('Regional route start must be a walkable waypoint');
+      await H('teleport', wp.x, floor, wp.z, Math.PI);
+      await advance(3, false);
+    }
+    save('route-plan.json', { from, to, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : 'Full unassisted restoration route' });
+    await H('autopilot', true, from, { assist: false });
     let restoredAt;
-    const state = await video('route-unassisted', Number(arg('route-seconds', '360')) * fps, async () => {}, (st, i) => {
+    const name = regional ? `route-segment-staged-${from}-${to}` : 'route-unassisted';
+    const state = await video(name, Number(arg('route-seconds', '360')) * fps, async () => {}, (st, i) => {
+      if (regional) return st.auto.idx >= to || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     });
-    await shot('route-end');
-    if (!state.restored || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}`);
+    await H('autopilot', false); await shot('route-end');
+    if ((regional ? state.auto.idx < to : !state.restored) || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
