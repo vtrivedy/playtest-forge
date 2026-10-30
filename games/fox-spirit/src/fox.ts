@@ -15,8 +15,8 @@ function proceduralFox(): FoxActor {
   const group = new THREE.Group();
   const bodyMat = new THREE.MeshStandardMaterial({
     color: 0xc45a1a,
-    emissive: 0x5a2008,
-    emissiveIntensity: 0.18,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
     roughness: 0.55,
   });
   const bellyMat = new THREE.MeshStandardMaterial({ color: 0xf0e2cc, roughness: 0.65 });
@@ -80,8 +80,8 @@ function proceduralFox(): FoxActor {
     body, belly, head, snout, earL, earR, emberL, emberR,
     legFL, legFR, legBL, legBR, tail, tailFlame, tip,
   );
-  const foxLight = new THREE.PointLight(0xff6622, 0.7, 7);
-  foxLight.position.set(-0.3, 0.35, 0);
+  const foxLight = new THREE.PointLight(0xff6622, 0.22, 3.2);
+  foxLight.position.set(-0.85, 0.45, 0);
   group.add(foxLight);
 
   return {
@@ -115,12 +115,23 @@ export async function createFox(): Promise<FoxActor> {
       if ((c as THREE.Mesh).isMesh) {
         c.castShadow = true;
         c.receiveShadow = true;
-        const m = (c as THREE.Mesh).material;
-        if (m && !Array.isArray(m)) {
-          const mat = m as THREE.MeshStandardMaterial;
-          // Keep fox saturated — do not ColorField-patch
-          if (mat.color && mat.color.getHex() > 0x888888) {
-            // nudge toward burnt orange if too pale
+        const mats = (c as THREE.Mesh).material;
+        const list = Array.isArray(mats) ? mats : mats ? [mats] : [];
+        for (const raw of list) {
+          const mat = raw as THREE.MeshStandardMaterial;
+          if (!mat || !mat.isMeshStandardMaterial) continue;
+          const n = (mat.name || '').toLowerCase();
+          // Emission only on ember tips / wisps — body stays lit by scene, not bloom-orb
+          if (n.includes('ember') || n.includes('wisp') || n.includes('flame') || n.includes('tip')) {
+            mat.emissive = mat.emissive ?? new THREE.Color(0xff3a00);
+            mat.emissiveIntensity = 0.55;
+            mat.toneMapped = true;
+          } else if (n.includes('eye')) {
+            mat.emissiveIntensity = Math.min(mat.emissiveIntensity ?? 0.3, 0.35);
+          } else {
+            // strip accidental body emission so silhouette reads under bloom
+            if (mat.emissive) mat.emissive.setHex(0x000000);
+            mat.emissiveIntensity = 0;
           }
         }
       }
@@ -138,8 +149,9 @@ export async function createFox(): Promise<FoxActor> {
     root.position.y -= box.min.y; // feet on origin
     const group = new THREE.Group();
     group.add(root);
-    const foxLight = new THREE.PointLight(0xff6622, 0.35, 5);
-    foxLight.position.set(0, 0.4, -0.2);
+    // Soft tip glow only — never wrap the whole body in bloom
+    const foxLight = new THREE.PointLight(0xff6622, 0.18, 2.8);
+    foxLight.position.set(-0.55, 0.55, 0); // near tail tip
     group.add(foxLight);
     const feetOffset = 0.02;
     return {

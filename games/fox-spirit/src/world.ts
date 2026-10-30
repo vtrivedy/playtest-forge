@@ -11,7 +11,7 @@ export type World = {
   spawnPos: THREE.Vector3;
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   setGrassSat: (s: number) => void;
-  update: (dt: number, t: number) => void;
+  update: (dt: number, t: number, foxPos?: THREE.Vector3) => void;
 };
 
 /** Soft radial bowl + terraces + path trench — key-art floating island. */
@@ -206,10 +206,12 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Wind grass (golden) — sync uSat from ColorField in main
   const grass = createWindGrass(scene, {
-    count: 650,
-    radius: 24,
-    color: 0xc9a84a,
-    monoColor: 0x9a8060,
+    count: 2800,
+    radius: 26,
+    color: 0xa86a28,       // rust root (restored)
+    tipColor: 0xe8b84a,    // gold tip
+    monoColor: 0x6e5c48,   // desaturated sepia root
+    tipMono: 0x9a8868,     // warm parchment tip
     ySampler: (x, z) => {
       const h = yAt(x, z);
       return h > 0.3 && h < 5 ? h : -10;
@@ -465,8 +467,8 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
       const u = (grass.mesh.material as THREE.ShaderMaterial).uniforms;
       if (u?.uSat) u.uSat.value = s;
     },
-    update(_dt, t) {
-      grass.update(t);
+    update(_dt, t, foxPos) {
+      grass.update(t, foxPos);
       if (shrineOrb) {
         shrineOrb.rotation.y = t * 0.9;
         shrineOrb.position.y = (shrineOrb.userData.baseY as number | undefined) ?? shrineOrb.position.y;

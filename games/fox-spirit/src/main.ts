@@ -81,10 +81,10 @@ async function boot() {
   for (const m of world.materials) colorField.patchMaterial(m);
 
   const post = createPostStack(renderer, scene, cam.camera, {
-    bloomStrength: 0.38,
-    bloomThreshold: 0.82,
-    vignette: 0.32,
-    grain: 0.07,
+    bloomStrength: 0.22,
+    bloomThreshold: 0.9,
+    vignette: 0.34,
+    grain: 0.06,
     enableGTAO: false,
   });
 
@@ -366,7 +366,7 @@ async function boot() {
       hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
     }
     restore.update(dt);
-    world.update(dt, elapsed);
+    world.update(dt, elapsed, fox.position);
 
     cam.update(dt, fox.position, fox.rotation.y, { lookAhead: grounded ? 1.4 : 0.6 });
     audio.update(dt, speed > 1.2, grounded, gliding);
