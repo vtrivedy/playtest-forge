@@ -74,3 +74,7 @@ then run `python3 tools/review-capture.py s2-levels --shots route,stills --route
 --route-to M --route-seconds 45`. The video is named `route-segment-staged-N-M.mp4`;
 its trace and `route-plan.json` state the staging. Reaching M is regional completion,
 not a realm win. Failed runs retain commit/config identity in `run.json`.
+A nonzero Modal client exit can follow a completed durable capture. The helper
+recovers that case only when the fetched commit/shot match, `run.json` explicitly
+says success, and `report.json` has no failures/errors. It records the raw client
+exit and transport warning. Gameplay failures stay nonzero.
