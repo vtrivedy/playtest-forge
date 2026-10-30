@@ -332,6 +332,30 @@ try {
     await advance(0);
     await shot('shade-after-free');
     save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    const edge = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-edge-kiln'));
+    if(edge && !edge.freed){
+      const setup=await page.evaluate(([x,y,z])=>{
+        const col=window.__gameHooks.debug.world.collision;
+        for(let k=0;k<128;k++){
+          const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+          for(let r=-2;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+          if(safe)return{pos:[x+dx*2.7,y,z+dz*2.7],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
+        }throw Error('No safe restored-edge dash runway');
+      },edge.pos);
+      const before=await page.evaluate(()=>window.__gameHooks.shades.state());
+      await H('teleport',...setup.pos,setup.yaw);
+      const [x,y,z]=edge.pos;
+      await H('photo',[x-6,y+3.2,z-4],[x,y+1.2,z],48);
+      await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
+      await video('shade-edge-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,{traceEveryFrame:true,keyFrames:[0,5,12,24,36,48,75,119]});
+      const after=await page.evaluate(()=>window.__gameHooks.shades.state());
+      if(after.frees!==before.frees+1||after.hits!==before.hits||!after.actors.find(a=>a.id==='shade-edge-kiln')?.freed)throw Error(`Restored-edge dash failed ${JSON.stringify(after)}`);
+      await advance(180,false);await advance(0);await shot('shade-edge-litter');
+      await advance(600,false);await advance(0);await shot('shade-edge-empty');
+      const end=await page.evaluate(()=>window.__gameHooks.shades.state());
+      if(end.actors.find(a=>a.id==='shade-edge-kiln').leaves!==0)throw Error('Edge dissolve did not end empty');
+      save('shade-edge-acceptance.json',{label:'Real SW1 latch -> timed ceremony end -> real controller dash through activated edge Shade; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
+    }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
     const live = await page.evaluate(() => {
