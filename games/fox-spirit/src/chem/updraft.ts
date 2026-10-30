@@ -524,9 +524,10 @@ function createShared(): HearthShared {
         float w = (1.0 - y) * (0.55 + 0.25 * sin(t * 13.0 + y * 11.0));
         float d = abs(x + sway) / max(0.02, w);
         float a = (1.0 - smoothstep(0.4, 1.0, d)) * smoothstep(0.0, 0.08, y) * (1.0 - smoothstep(0.55, 1.0, y));
-        vec3 col = mix(vec3(1.0, 0.6, 0.24), vec3(0.9, 0.2, 0.03), smoothstep(0.0, 0.5, y + d * 0.35));
+        // ten crossed tongues overlap additively: keep each one dim and orange so the stack never blooms white
+        vec3 col = mix(vec3(1.0, 0.45, 0.12), vec3(0.85, 0.16, 0.02), smoothstep(0.0, 0.5, y + d * 0.35));
         float k = a * min(1.0, uHeat) * 0.8;
-        gl_FragColor = vec4(col * 1.15 * k, k);
+        gl_FragColor = vec4(col * 0.7 * k, k);
         #include <colorspace_fragment>
       }`,
     transparent: true,
