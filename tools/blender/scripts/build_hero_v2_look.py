@@ -108,7 +108,7 @@ if cut_edges:
 bm.normal_update()
 ruff_verts = []
 candidates = [v for v in bm.verts if sum(x for k,x in v[dl].items() if gname[k] in ("Neck1","Neck2","Neck3","Torso3","Head")) > 0.35 and v.normal.y < -0.2]
-for x,z in [(-.22,2.36),(.22,2.36),(-.2,1.88),(.2,1.88),(0,1.8)]:
+for x,z in [(-.22,2.36),(.22,2.36),(-.14,1.98),(.14,1.98),(0,1.8)]:
     if not candidates: break
     root = min(candidates, key=lambda v:(v.co-Vector((x,-1.04,z))).length_squared)
     weights0 = dict(root[dl]); base = root.co-root.normal*.055
@@ -173,7 +173,7 @@ for v in me.vertices:
             k = (1 - smooth(line - 0.12, line + 0.12, co.z)) * (1 - smooth(0.0, 0.6, n.z))
             k *= 1 - smooth(head_c.y - 0.04, head_c.y + 0.22, co.y)
         elif co.y < CHEST_Y:
-            half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
+            half = 0.10 + 0.21 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
             k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
             k *= smooth(0.25, -0.4, n.y)  # throat faces forward; never paint a cream nape stripe
         else:
@@ -403,19 +403,6 @@ fox.data.color_attributes.remove(fox.data.color_attributes["Glow"])
 tail_c, tcore_c = load("tail_col.png"), load("tail_core.png")
 # tail core: alpha-clipped so the fur ends in flame-tongue shapes (the flame cards take over from there)
 M_TAIL = pbr("FoxTailFur", tail_c, None, rough=0.9, spec=0.15)
-cards_c = load("cards_col.png")
-tf_c, tf_e = load("tail_flame.png"), load("tail_flame_emit.png")
-# fur-to-flame locks over the plume's outer half: unlit burnt-orange strands at the root, glowing only where
-# they have turned to flame (separate emission map); "wisp" name -> game keeps them soft-emissive
-M_TFLAME = pbr("SpiritWispTailFlame", tf_c, None, emit_img=tf_e, emit_str=1.0, rough=0.85, alpha_mode="BLEND", spec=0.1)
-M_TFLAME.use_backface_culling = False
-M_TUFT = pbr("FoxFurCards", cards_c, None, rough=0.9, alpha_mode="MASK", spec=0.15)
-# spirit FX: names contain "wisp" so the game's tuneMaterials keeps them soft-emissive (not the fur branch)
-fx_c, glow_c, tglow_c = load("spirit_fx.png"), load("fox_glow.png"), load("tail_glow.png")
-M_FX = pbr("SpiritWispFX", fx_c, None, emit_img=fx_c, emit_str=1.4, rough=0.6, alpha_mode="BLEND", spec=0.0)
-M_GLOW = pbr("SpiritWispGlow", glow_c, None, emit_img=glow_c, emit_str=0.5, rough=0.8, alpha_mode="BLEND", spec=0.0)
-M_TGLOW = pbr("SpiritWispTailGlow", tglow_c, None, emit_img=tglow_c, emit_str=1.1, rough=0.8, alpha_mode="BLEND", spec=0.0)
-for m_ in (M_FX, M_GLOW, M_TGLOW): m_.use_backface_culling = False
 TAIL_CLIPS = (0.18, 0.32, 0.46, 0.6)
 M_TSHELL = [pbr(f"FoxTailFurShell{k + 1}", tail_c, None, rough=0.9, alpha_mode="MASK", spec=0.15, clip=c_) for k, c_ in enumerate(TAIL_CLIPS)]
 
@@ -587,22 +574,7 @@ for v, s_ in zip(tme.vertices, vs_):
     t = tan - v.normal * tan.dot(v.normal); tflow.append(t.normalized() if t.length > 1e-4 else Vector())
 tail_shell = shells(tail, tlen, tflow, M_TSHELL, "SpiritFox_TailShell")
 
-# ---------------------------------------------------------------- 6b. spirit inner glow: thin emissive shells UNDER the fur shells
-def glow_shell(src, lengths, keep, frac, mat, name):
-    o = src.copy(); o.data = src.data.copy(); o.name = name; sc.collection.objects.link(o)
-    o.modifiers.clear(); md = o.modifiers.new("Armature", "ARMATURE"); md.object = arm; o.parent = arm
-    bm_ = bmesh.new(); bm_.from_mesh(o.data); bm_.verts.ensure_lookup_table(); bm_.normal_update()
-    kill_ = [f for f in bm_.faces if max(keep[v.index] for v in f.verts) < 0.03]
-    for v in bm_.verts: v.co = v.co + v.normal * (lengths[v.index] * frac + 0.006)
-    bmesh.ops.delete(bm_, geom=kill_, context="FACES")
-    bm_.to_mesh(o.data); bm_.free()
-    o.data.materials.clear(); o.data.materials.append(mat)
-    for p in o.data.polygons: p.material_index = 0
-    return o
-glow_body = glow_shell(fox, furlen, glow, 0.3, M_GLOW, "SpiritFox_Glow")
-glow_tail = glow_shell(tail, tlen, [smooth(0.45, 0.6, s_) for s_ in vs_], 0.3, M_TGLOW, "SpiritFox_TailGlow")
-
 # Spirit wisps and embers are generated at animated surface anchors by foxLook.ts.
-for o in (tail_shell, glow_body, glow_tail):
+for o in (tail_shell,):
     o.parent = arm
-print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, tail_shell, glow_body, glow_tail]})
+print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, tail_shell]})

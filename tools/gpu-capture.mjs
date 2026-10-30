@@ -1083,6 +1083,13 @@ try {
       await H('setKeys', ['KeyW']); await advance(70); await shot(`fox-${state}-chase-run`);
       await H('setKeys', ['KeyW', 'KeyA']); await advance(25); await shot(`fox-${state}-chase-turn`);
       await H('setKeys', []);
+      // Labelled tracking review: live controller input, camera follows at hero-readable distance.
+      await H('setKeys', ['KeyW']);
+      await video(`fox-${state}-run-staged-close`, 2 * fps, async () => {
+        const f = await H('getFoxPos');
+        await H('photo', [f.x+2.7,f.y+0.9,f.z-3.0], [f.x,f.y+0.52,f.z], 34);
+      });
+      await H('setKeys', []); await H('photoOff');
     }
   }
   if (wants('turntable')) {
