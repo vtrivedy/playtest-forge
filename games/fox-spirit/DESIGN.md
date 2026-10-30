@@ -135,3 +135,6 @@ Marsh Mouth (57,36) teaches color → melt → moving front → washed crossing.
 Verification: GPU water shot retains frozen/melt/front/wash/refreeze stills and video, captures __game, and checks front/tail timing and SW2 inlet. Review visuals, apply critique, rerun.
 
 Water review corrections (12:15 ET): the crossing has a permanent shallow stone bed; flowing water removes the ink hazard, never the supporting ground. A local ink skin covers the dry channel. The final 0.8 s of hold warns that the wash is ending. Driver 12:05 changes the frozen look to pale translucent ice with warm inner light. Water already past a Shade drains away at 8 m/s; the Shade cannot erase it instantly. Flume beds and water are batched. No controller/animation edits.
+
+### Authored fox action refinement — 13:15
+Jump poses must show an anatomical hind push, all-four gathered paws at apex, then forepaw reach before landing. Author each action on the current hero armature with sagittal IK, preserving bone scale; keep immediate input response. Dash receives a distinct low extended pose, and the tail plume keeps a visible air gap above the floor. Verify every frame and compare independent bone measurements against planted-only metrics; low planted residual alone does not prove natural swing.

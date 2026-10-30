@@ -169,9 +169,9 @@ export class AuthoredLocomotion {
       const base=this.tailBone.getWorldPosition(v()); let lift=0;
       for(const bone of this.tails.slice(1)) {
         const p=bone.getWorldPosition(v()); const ground=this.input.groundAt(p.x,p.z,this.group.position.y+.6);
-        if(Number.isFinite(ground))lift=Math.max(lift,Math.atan2(Math.max(0,ground+.07-p.y),Math.max(.2,p.distanceTo(base))));
+        if(Number.isFinite(ground))lift=Math.max(lift,Math.atan2(Math.max(0,ground+.24-p.y),Math.max(.2,p.distanceTo(base))));
       }
-      if(lift>0) {overlay(this.tailBone,new THREE.Vector3(1,0,0),Math.min(.45,lift));this.root.updateWorldMatrix(true,true);}
+      if(lift>0) {overlay(this.tailBone,new THREE.Vector3(1,0,0),Math.min(.65,lift));this.root.updateWorldMatrix(true,true);}
     }
     const gait=this.metrics.gait as Gait;
     const data=GAITS[gait];

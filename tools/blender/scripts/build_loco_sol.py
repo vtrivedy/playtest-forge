@@ -97,38 +97,48 @@ for i in range(25):
     wrot(p,'Neck1',(1,0,0),8*k); tail_wave(p,t,amp_yaw=2,amp_pitch=3,lift=8)
     poses.append(p)
 make('skid',poses)
-# Immediate gameplay takeoff: a 3-frame anatomical gather followed by a readable hind push.
-# The collider stays responsive; the pelvis loads inside the rising capsule, without mesh scaling.
-jump_source=SRC_ACTIONS['jump_up']
-jump_final=sample(jump_source,jump_source.frame_range[1])
-old=bpy.data.actions.get('jump_up')
-if old: bpy.data.actions.remove(old)
-frames=[]
-for i in range(13):
-    t=i/12; k=max(0,min(1,(t-.20)/.6)); k=k*k*(3-2*k)
-    p=blend(base,jump_final,k)
-    load=math.sin(math.pi*min(1,t/.4)) if t<.4 else 0
-    wloc(p,'Body',(0,0,-.16*load))
-    wrot(p,'Neck1',(1,0,0),8*load)
-    frames.append(p)
-make('jump_up',frames)
-# Landing absorbs in the skeleton over .30s, then returns to a quiet stance.
-land_source=SRC_ACTIONS['land']
-land_start=sample(land_source,0)
-old=bpy.data.actions.get('land')
-if old: bpy.data.actions.remove(old)
-frames=[]
-for i in range(19):
-    t=i/18; k=t*t*(3-2*t)
-    p=blend(land_start,base,k)
-    load=math.sin(math.pi*min(1,t/.55))*(1-t) if t<.55 else 0
-    wloc(p,'Body',(0,0,-.16*load))
-    wrot(p,'Neck1',(1,0,0),9*load)
-    frames.append(p)
-make('land',frames)
+# Complete action poses use the same anatomical chains as the ground gaits.
+def action_pose(body_drop=0, fore=(0,0), hind=(0,0), pitch=0):
+    p=copy(base)
+    for bn in LEG_BONES: p[bn][1]=Quaternion()
+    wloc(p,'Body',(0,0,body_drop)); wrot(p,'Body',(1,0,0),pitch)
+    wrot(p,'Neck1',(1,0,0),10-pitch*.5)
+    tail_wave(p,0,amp_yaw=0,amp_pitch=1,lift=-15)
+    apply_dict(p)
+    for side in 'LR':
+        f=FORE[side]; target=f['foot']+Vector(fore)
+        aa,bb=ik2(posed_yz(f['up'])[0],target,f['a'],f['b'],pole=1)
+        set_chain(p,[f['up'],f['lo'],f['paw']],[aa,bb,rest_ang(f['paw'])])
+        h=HIND[side]; target=h['foot']+Vector(hind)
+        mt=rest_ang(h['mt'])+math.radians(-12 if hind[1]>.3 else 0)
+        joint=target-Vector((math.cos(mt),math.sin(mt)))*h['c']
+        aa,bb=ik2(posed_yz(h['th'])[0],joint,h['a'],h['b'])
+        set_chain(p,[h['th'],h['sh'],h['mt'],h['paw']],[aa,bb,mt,rest_ang(h['paw'])])
+    return p
+load=action_pose(-.28,(0,0),(0,0),-3)
+push=action_pose(.06,(-.16,.35),(.25,-.04),-6)
+tuck=action_pose(-.03,(.25,.72),(-.38,.8),-2)
+reach=action_pose(-.08,(-.38,.12),(-.1,.42),7)
+absorb=action_pose(-.28,(-.08,0),(.08,0),4)
+def authored_action(name,keys,n):
+    old=bpy.data.actions.get(name)
+    if old:bpy.data.actions.remove(old)
+    frames=[]
+    for i in range(n+1):
+        t=i/n
+        for (ta,pa),(tb,pb) in zip(keys,keys[1:]):
+            if t<=tb:
+                k=max(0,min(1,(t-ta)/(tb-ta))); k=k*k*(3-2*k)
+                frames.append(blend(pa,pb,k));break
+    make(name,frames)
+authored_action('jump_up',[(0,load),(.3,push),(1,tuck)],12)
+authored_action('jump_apex',[(0,tuck),(.5,action_pose(-.02,(.23,.68),(-.36,.76),0)),(1,tuck)],30)
+authored_action('jump_fall',[(0,tuck),(.35,reach),(1,reach)],24)
+authored_action('land',[(0,reach),(.22,absorb),(1,base)],18)
+authored_action('dash',[(0,action_pose(-.25,(-.35,.20),(.25,.20),-3)),(.5,action_pose(-.28,(-.38,.23),(.30,.23),-4)),(1,action_pose(-.25,(-.35,.20),(.25,.20),-3))],18)
 # Imported clips were 24fps; preserve their seconds after switching authoring scene to 60fps.
 for name,act in SRC_ACTIONS.items():
-    if name in {'run','jump_up','land'}: continue
+    if name in {'run','jump_up','jump_apex','jump_fall','land','dash'}: continue
     if act.name not in bpy.data.actions: continue
     for fc in act.fcurves:
         for key in fc.keyframe_points:
