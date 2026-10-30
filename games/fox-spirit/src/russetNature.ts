@@ -312,7 +312,7 @@ export async function loadNatureKit(): Promise<NatureKit> {
     },
     standalone(v, x, y, z, o) {
       const V = variants.get(v)!;
-      const before = new Set(cells.keys());
+      const before = new Map([...cells].map(([key, cell]) => [key, cell.geos.length]));
       kit.place(v, x, y, z, o);
       const geos: THREE.BufferGeometry[] = [];
       let src: THREE.MeshStandardMaterial | null = null;
@@ -320,9 +320,13 @@ export async function loadNatureKit(): Promise<NatureKit> {
         if (!e.mat.userData.foliage) continue;
         const own = V.parts.some((p) => p.mat === e.mat);
         if (!own) continue;
-        geos.push(e.geos.pop()!);
+        // Extract only geometry appended by this tree. Shared material cells
+        // elsewhere in the world may already be empty or contain other trees.
+        const count = before.get(key) ?? 0;
+        if (e.geos.length <= count) continue;
+        geos.push(...e.geos.splice(count));
         src = e.mat.userData.src as THREE.MeshStandardMaterial;
-        if (!e.geos.length && !before.has(key)) cells.delete(key);
+        if (!e.geos.length) cells.delete(key);
       }
       const mesh = new THREE.Mesh(mergeGeometries(geos, false), foliageMat(o.name, src!));
       for (const g of geos) g.dispose();
@@ -371,6 +375,7 @@ export async function loadNatureKit(): Promise<NatureKit> {
     },
     build(group) {
       for (const e of cells.values()) {
+        if (!e.geos.length) continue;
         const g = mergeGeometries(e.geos, false);
         for (const s of e.geos) s.dispose();
         if (!g) continue;
