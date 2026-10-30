@@ -88,10 +88,10 @@ const SHOT: Array<{ t: number; frame: 'fox' | 'world'; pos: [number, number, num
   { t: 0, frame: 'fox', pos: [3.6, 1.12, 5.85], look: [-3.86, 1.41, 0.24], fov: 52 },
   { t: IGNITE_S, frame: 'fox', pos: [3.46, 1.15, 5.72], look: [-3.86, 1.41, 0.24], fov: 52 },
   { t: 1.6, frame: 'fox', pos: [3.7, 1.4, 6.3], look: [-3.4, 1.2, 0.8], fov: 53 },
-  { t: 2.6, frame: 'world', pos: [-9, 4, 13], look: [3, -5, 5], fov: 56 },
-  { t: 3.6, frame: 'world', pos: [-16, 6.5, 23], look: [5, -8, 9], fov: 56 },
-  { t: 5.0, frame: 'world', pos: [-27, 10, 41], look: [9, -13, 15], fov: 54 },
-  { t: 6.0, frame: 'world', pos: [-28, 10.3, 42.5], look: [9, -13, 15], fov: 54 },
+  { t: 2.7, frame: 'world', pos: [-12, 2.5, 18], look: [2, -8, 6], fov: 54 },
+  { t: 3.7, frame: 'world', pos: [-18, 5.5, 27], look: [4, -10, 10], fov: 54 },
+  { t: 5.0, frame: 'world', pos: [-22, 8.5, 34], look: [7, -11, 13], fov: 52 },
+  { t: 6.0, frame: 'world', pos: [-23, 8.8, 35.5], look: [7, -11, 13], fov: 52 },
 ];
 
 export type RestorePhase = 'idle' | 'approach' | 'ignited';
@@ -267,7 +267,7 @@ export function createRestoreCinematic(opts: {
         // the basin wakes as the fox steps up: a slow warm breath before the flare
         opts.setFlood(0, 0.6 * THREE.MathUtils.smoothstep(age, 0.15, IGNITE_S));
         opts.colorField.auraRadius = THREE.MathUtils.lerp(baseAura, DRAWN_AURA, THREE.MathUtils.smoothstep(age, 0, 0.7));
-        for (const t of opts.colorField.trail) t.life -= dt * 2.5;
+        for (const t of opts.colorField.trail) t.life -= dt * 8;
         if (age >= IGNITE_S) ignite();
         return;
       }
