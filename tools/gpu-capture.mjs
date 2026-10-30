@@ -306,6 +306,34 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
+  if (selected.split(',').includes('shade')) {
+    await boot(quality, true);
+    const actor = () => page.evaluate(() => window.__gameHooks.shades?.state().actors[0]);
+    const first = await actor();
+    if (!first) throw Error('Target ref has no Shade review hook');
+    await H('teleport', first.pos[0] + 3, first.pos[1], first.pos[2], -Math.PI / 2);
+    await H('setStick', 0, 0);
+    const keyFrames = Array.from({ length: 24 }, (_, i) => i * fps / 2);
+    save('shade-script.json', { label: 'Staged patrol/contact/dash-free; real encounter state, no forced damage/free', contactAt: 4, dashAt: 7 });
+    await video('shade-staged', 12 * fps, async i => {
+      if (i === 4 * fps || i === 7 * fps) {
+        const current = await actor();
+        const offset = i === 4 * fps ? .4 : 3;
+        await H('teleport', current.pos[0] + offset, current.pos[1], current.pos[2], -Math.PI / 2);
+      }
+      await H('setStick', i >= 7 * fps && i < 7.3 * fps ? -1 : 0, 0);
+      await H('setKeys', i === 7 * fps ? ['ShiftLeft'] : []);
+    }, undefined, { keyFrames, label: i => `Shade ${i / fps}s | staged review`,
+      afterStep: async () => {
+        const current = await actor(), [x, y, z] = current.pos;
+        await H('photo', [x + 7, y + 3.2, z + 8], [x, y + 1.1, z], 46);
+      },
+    });
+    await H('setStick', null); await H('setKeys', []); await shot('shade-end');
+    const encounter = await page.evaluate(() => window.__gameHooks.shades.state());
+    save('shade-result.json', encounter);
+    if (!encounter.hits || !encounter.frees) report.failures.push('Shade script did not demonstrate both contact and dash-free; inspect the trace');
+  }
   if (wants('route')) {
     await boot(quality, true);
     save('route-waypoints.json', await H('route'));

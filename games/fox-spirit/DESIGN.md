@@ -94,3 +94,8 @@ from the initial idle, then report horizontal speed during low, grounded contact
 and height error against the collision surface. Keep requested target vs actual
 paw errors separate. These are bone landmarks, not claimed toe-mesh measurements.
 The review must disclose that limitation and exclude staged teleport transitions.
+
+### Encounter review
+The explicit `shade` GPU shot stages the fox near the first live Shade, then records
+patrol, real contact/knockback and a real dash through it. Resets are labelled staged;
+no health or freed flags are forced. Preserve per-second __game/state and key frames.
