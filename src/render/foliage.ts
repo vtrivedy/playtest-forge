@@ -89,12 +89,12 @@ export function createWindGrass(
       varying float vH;
       varying vec2 vUv;
       varying vec3 vWorld;
-      attribute vec3 instanceColor;
+      attribute vec3 aTint;
       varying vec3 vInst;
       void main() {
         vH = uv.y;
         vUv = uv;
-        vInst = instanceColor;
+        vInst = aTint;
         vec3 p = position;
         float h2 = vH * vH;
         float phase = instanceMatrix[3].x * 0.85 + instanceMatrix[3].z * 0.62;
@@ -130,7 +130,7 @@ export function createWindGrass(
         vec3 root = mix(uMono, uColor, sat);
         vec3 tip  = mix(uTipMono, uTip, sat);
         vec3 col = mix(root, tip, smoothstep(0.08, 0.88, vH));
-        col *= vInst;
+        col *= max(vInst, vec3(0.75));
         col *= 0.65 + vH * 0.55;
         float edge = 1.0 - abs(vUv.x - 0.5) * 1.6;
         col *= 0.78 + 0.22 * clamp(edge, 0.0, 1.0);
@@ -167,18 +167,15 @@ export function createWindGrass(
   }
   mesh.count = placed;
   mesh.instanceMatrix.needsUpdate = true;
-  // per-blade warm/cool variance (multiplies tip/root in shader via instanceColor)
-  if (placed > 0) {
-    const ic = new Float32Array(placed * 3);
-    for (let i = 0; i < placed; i++) {
-      const warm = 0.85 + Math.random() * 0.25;
-      const cool = 0.9 + Math.random() * 0.12;
-      ic[i * 3] = warm;
-      ic[i * 3 + 1] = cool;
-      ic[i * 3 + 2] = 0.8 + Math.random() * 0.2;
-    }
-    mesh.instanceColor = new THREE.InstancedBufferAttribute(ic, 3);
+  // per-blade tint — MUST be InstancedBufferAttribute on geometry (custom ShaderMaterial
+  // does not reliably bind mesh.instanceColor; a missing attr zeros blades to invisible)
+  const ic = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    ic[i * 3] = 0.88 + Math.random() * 0.22;
+    ic[i * 3 + 1] = 0.9 + Math.random() * 0.12;
+    ic[i * 3 + 2] = 0.82 + Math.random() * 0.2;
   }
+  geo.setAttribute('aTint', new THREE.InstancedBufferAttribute(ic, 3));
   scene.add(mesh);
 
   const pushTmp = new THREE.Vector3(9999, 0, 9999);
