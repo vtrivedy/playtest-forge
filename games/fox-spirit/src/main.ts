@@ -1010,7 +1010,8 @@ async function boot() {
     const waitSeedwell = ((prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit) || (prevLabel === 'SW1-feed' && !world.seedwells[0]!.lit);
     // Let the visible front cross the six-metre bed before stepping off the dry boardwalk.
     const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
-    if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= wp.y + 0.5) auto.liftReady = true;
+    const liftWp = route[auto.idx - 1];
+    if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= liftWp!.y + (liftWp!.rise ?? 0.5)) auto.liftReady = true;
     const waitLift = !!prevLabel?.startsWith('lift:') && !auto.liftReady;
     const waitBridge = waitLift || waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);

@@ -54,7 +54,11 @@ export type { ShadeSpot } from './encounters/shades';
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
 /** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
-export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
+export type Waypoint = {
+  x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string;
+  /** lift waypoints: metres to rise in the column before steering off (default 0.5) */
+  rise?: number;
+};
 
 export type SeedwellState = {
   id: 'SW1' | 'SW2' | 'SW3';
@@ -420,10 +424,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(66, 1.0, 22);
   WS(69.8, 1.0, 22);
   WS(80.8, 4.6, 22, { act: 'glide', label: 'launch' });
-  W(-112, 20, -24, { ground: false, label: 'SW1' });
-  // dash H2 through the Kiln Shade's drain (the stroke punches through), then glide on east
-  W(-111.4, 20, -23.0, { ground: false, act: 'dash', label: 'kiln-dash' });
-  W(-110.5, 20, -22.1, { ground: false, label: 'SW1-feed' });
+  W(-107.8, 20, -20.8, { ground: false, label: 'SW1' }); // near side of the ledge; the basin itself is solid
+  // the Shade guts H2 on the ledge; the bowl hangs out over the east rim, in the column of HE on the
+  // y15 shelf below, out of the Shade's reach: drop to it, wake it, ride its heat back up past the bowl
+  W(-106.4, 20, -22.2, { ground: false });
+  W(-104.9, 15, -22.5, { ground: false, label: 'drop:HE' });
+  W(-103.9, 15, -24, { ground: false, act: 'glide', label: 'lift:HE', rise: 6.8 });
+  W(-108.6, 20, -23.2, { ground: false, label: 'SW1-feed' });
   // glide off SW1 east, over the terraces' north shoulder, into Amberwood
   W(-108, 20, -25, { ground: false, act: 'glide' });
   W(-72, 0, -26, { ground: false });
@@ -1705,16 +1712,29 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   {
     const sw = seedwells[0]!.pos;
     for (const [id, ang] of [['HS', Math.PI / 2], ['HE', 0]] as const) {
-      const cx = sw.x + Math.cos(ang) * 7.4;
-      const cz = sw.z + Math.sin(ang) * 7.4;
+      // deep enough that a run off the rim lands on it, not past it
+      const cx = sw.x + Math.cos(ang) * 8.1;
+      const cz = sw.z + Math.sin(ang) * 8.1;
       const yaw = -ang;
-      col.add(boxCollider({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 11, tag: 'kiln-shelf' }));
-      slab({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 9.5, rough: 0.8, seed: 90 + id.length, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45), overhang: 0.6 });
+      col.add(boxCollider({ x: cx, z: cz, w: 5.6, d: 5.4, yaw, top: 15, bottom: 11, tag: 'kiln-shelf' }));
+      slab({ x: cx, z: cz, w: 5.6, d: 5.4, yaw, top: 15, bottom: 9.5, rough: 0.8, seed: 90 + id.length, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45), overhang: 0.6 });
       const hx = sw.x + Math.cos(ang) * 6.95;
       const hz = sw.z + Math.sin(ang) * 6.95;
       col.add(cylCollider({ x: hx, z: hz, r: 0.82, top: 16, bottom: 14, tag: 'hearth' }));
       hearthSpots.push({ id, x: hx, y: 15, z: hz, height: 9.5 });
     }
+  }
+  // SW1's bowl leaves H2 for the rim (§4 of levels-opus CRITIQUE-1530): it hangs from a carved mast on
+  // the ledge out over the east edge, inside HE's column. The Shade drains within 4 m of its own height, so
+  // H2 beside it always gutters, while HE five metres down burns clean and its heat rises past the dish.
+  {
+    const sw = seedwells[0]!.pos;
+    const h2 = inletSpots[0]!.pillar;
+    bk('stone', h2.x, h2.z).add(lanternColumn, trs(h2.x, h2.y, h2.z, 0.4, 1.35, 6.6 / 1.9, 1.35), PAL.stone);
+    const pillar = new THREE.Vector3(sw.x + 4.8, sw.y, sw.z - 2.2);
+    const bowl = new THREE.Vector3(sw.x + 6.6, sw.y + 1.6, sw.z - 1.4);
+    col.add(cylCollider({ x: pillar.x, z: pillar.z, r: 0.45, top: bowl.y + 0.6, bottom: sw.y - 1, tag: 'kiln-pillar' }));
+    inletSpots[0] = { seedwell: 0, source: 'HE', pos: bowl, sealAt: inletSpots[0]!.sealAt, pillar, latchTime: 2 };
   }
   // Water's HP launch is on the near aqueduct pier; direct fox colour cannot fill SW2.
   hearthSpots.push({ id: 'HP', x: 95, y: 6, z: 18, height: 10 });
