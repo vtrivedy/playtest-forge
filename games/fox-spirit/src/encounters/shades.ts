@@ -9,12 +9,14 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
  * aura/trail and spent dash strokes (≤ 1) read as 0 there, and unsupplied reactors in it skip their hold.
  * A dash through it frees it: it comes apart into leaves. Contact without a dash knocks the fox back.
  */
-export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number };
+export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 
 export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean };
 export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 0.8, invulnerability: 1, debug: false };
 
 type ShadeActor = {
+  active: boolean;
+  afterLatch?: string;
   id: string;
   curve: THREE.CatmullRomCurve3;
   length: number;
@@ -177,6 +179,7 @@ export type ShadeSystem = {
   /** Advance patrols; returns contact/free events for the fox */
   update: (dt: number, t: number, fox: THREE.Vector3, dashing: boolean) => Array<{ type: 'freed' | 'hit'; id: string; pos: THREE.Vector3 }>;
   resetSweep: () => void;
+  activateAfterLatch: (id: string) => void;
   state: () => Array<{ id: string; pos: number[]; freed: boolean }>;
 };
 
@@ -229,20 +232,23 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: new THREE.Vector3(), heading: 0, group, mat, fringe, pool, presence: 1, freed: false };
+    return { active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, fringe, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
   const sys: ShadeSystem = {
     tun,
     resetSweep() { previousFox = null; },
+    activateAfterLatch(id) { for (const s of shades) if (s.afterLatch === id) s.active = true; },
     drains(p) {
-      for (const s of shades) if (!s.freed && Math.hypot(p.x - s.pos.x, p.z - s.pos.z) < tun.drainRadius && Math.abs(p.y - s.pos.y) < 4) return true;
+      for (const s of shades) if (s.active && !s.freed && Math.hypot(p.x - s.pos.x, p.z - s.pos.z) < tun.drainRadius && Math.abs(p.y - s.pos.y) < 4) return true;
       return false;
     },
     update(dt, t, fox, dashing) {
       const ev: Array<{ type: 'freed' | 'hit'; id: string; pos: THREE.Vector3 }> = [];
       for (const s of shades) {
+        if (!s.active) { s.group.visible = false; s.pool.visible = false; s.debug.visible = false; continue; }
+        s.group.visible = s.presence > 0; s.pool.visible = s.presence > 0;
         if (s.freed) {
           s.releaseAge += dt;
           const age = s.releaseAge;
@@ -281,7 +287,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           s.heading = Math.atan2(tmp.x, tmp.z);
           // drift: a slow bob, as if the ink were suspended in water
           const gy = groundAt(s.pos.x, s.pos.z, s.pos.y + 2);
-          if (Number.isFinite(gy)) s.pos.y = gy;
+          if (Number.isFinite(gy) && Math.abs(gy - s.pos.y) < 1) s.pos.y = gy;
           // Sweep the fox segment so a fast dash cannot skip a narrow animal between frames.
           // Teleport/reset hooks explicitly clear the previous endpoint.
           let nearest = fox;
@@ -335,7 +341,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       return ev;
     },
     state() {
-      return shades.map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 10 ? 72 : 0 }));
+      return shades.filter(s => s.active).map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 10 ? 72 : 0 }));
     },
   };
   if (gui) {

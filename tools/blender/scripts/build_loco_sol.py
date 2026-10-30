@@ -83,6 +83,8 @@ for name,hz,duty,sweep,lift,phases in specs:
     metadata[name]={'stride':sum(c['sweep']/c['duty'] for c in contacts)/4,'contacts':contacts}
 # Quiet turn steps and a low braced stop, authored as dedicated clips.
 for name,direction in [('turn_left',1),('turn_right',-1)]:
+    old=bpy.data.actions.get(name)
+    if old:bpy.data.actions.remove(old)
     poses=[]
     for i in range(49):
         t=i/48; p=gait_pose(t,{'L_hind':0,'L_fore':.25,'R_hind':.5,'R_fore':.75},.65,.16,.09,'walk')
@@ -90,13 +92,6 @@ for name,direction in [('turn_left',1),('turn_right',-1)]:
         wrot(p,'Neck1',(0,0,1),direction*9)
         poses.append(p)
     make(name,poses)
-poses=[]
-for i in range(25):
-    t=i/24; p=copy(base); k=math.sin(math.pi*t)*(1-t)
-    wloc(p,'Body',(0,0,-.10*k)); wrot(p,'Body',(1,0,0),-7*k)
-    wrot(p,'Neck1',(1,0,0),8*k); tail_wave(p,t,amp_yaw=2,amp_pitch=3,lift=8)
-    poses.append(p)
-make('skid',poses)
 # Complete action poses use the same anatomical chains as the ground gaits.
 def action_pose(body_drop=0, fore=(0,0), hind=(0,0), pitch=0):
     p=copy(base)
@@ -131,6 +126,8 @@ def authored_action(name,keys,n):
                 k=max(0,min(1,(t-ta)/(tb-ta))); k=k*k*(3-2*k)
                 frames.append(blend(pa,pb,k));break
     make(name,frames)
+brace=action_pose(-.25,(-.30,0),(.16,0),-8)
+authored_action('skid',[(0,base),(.15,brace),(.7,brace),(1,base)],24)
 authored_action('jump_up',[(0,load),(.3,push),(1,tuck)],12)
 authored_action('jump_apex',[(0,tuck),(.5,action_pose(-.02,(.23,.68),(-.36,.76),0)),(1,tuck)],30)
 authored_action('jump_fall',[(0,tuck),(.35,reach),(1,reach)],24)
@@ -138,7 +135,7 @@ authored_action('land',[(0,base),(.22,absorb),(1,base)],18)
 authored_action('dash',[(0,action_pose(-.25,(-.35,.20),(.25,.20),-3)),(.5,action_pose(-.28,(-.38,.23),(.30,.23),-4)),(1,action_pose(-.25,(-.35,.20),(.25,.20),-3))],18)
 # Imported clips were 24fps; preserve their seconds after switching authoring scene to 60fps.
 for name,act in SRC_ACTIONS.items():
-    if name in {'run','jump_up','jump_apex','jump_fall','land','dash'}: continue
+    if name not in {'idle','glide','burst'}: continue
     if act.name not in bpy.data.actions: continue
     for fc in act.fcurves:
         for key in fc.keyframe_points:

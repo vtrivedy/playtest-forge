@@ -159,6 +159,27 @@ with no assists/deaths, not winning the realm. The default full route remains an
 unassisted restoration test. This lets level streams review later regions while
 earlier crossings are under repair, without hiding those failures.
 
+### Capture hero staging — 14:15 ET
+The relocated arrival hearth occludes the old poseHero location in review stills.
+Use the same collision-checked open meadow (6,78) and three-quarter lens as the
+fox review shot, with the actual idle actor. Keep gameplay routes unchanged;
+this is an explicitly staged character review, not traversal evidence.
+Flume encounter placement correction: patrol along a narrow return loop sampled
+from the real Reed Falls channel, preserving its authored height. A grounding
+query may adjust feet only to a nearby surface, never to the valley floor below
+an elevated aqueduct. Keep the brief's 2.2 m/s patrol speed.
+
+Remaining encounters use authored loops on existing walkable shelves. Two hill
+Shades occupy the first and final intact flights, leaving the broken gaps clear.
+Restored-edge Shades remain dormant until their Seedwell latch, activate once,
+and never respawn after release. Activation adds no new collection loop and does
+not undo permanently restored chemistry. The unavailable SW3 hollow-floor/K1
+geometry remains a level dependency; do not place a creature inside a solid trunk.
+
+Placement review correction: return loops need enough width for the frozen
+silhouette to drift through a turn. Increase the flume/stair return offset within
+the existing channel/flight width; skinny hairpins caused a near-instant reversal.
+Keep speed and encounter collision unchanged.
 ### World surface pass — 13:40
 Keep all landmark transforms and collision unchanged. Reuse the library's CC0
 ambientCG Rock035 and Poly Haven bark to give water masonry and timber readable,
@@ -180,3 +201,16 @@ existing masonry bases and along the grotto roof. Normalize the imported forms,
 restyle through the shared stone palette, and batch into the existing world
 buckets. Keep traversable edges and collider footprints unchanged; no random
 scatter in route corridors. Review the grotto and meadow at gameplay distance.
+### Landing support transfer — 13:35
+At travel speed, hold the contact clip only for the first50ms, then resume authored strides. Carry the remaining absorption with a damped pelvis translation spring, driven by pre-contact vertical speed, so fixed feet do not trail behind a moving body for300ms. Stationary landings keep the full authored recovery. Expose squash and spring frequency; report spring displacement and planted residual separately. Graft only the landing impulse idea from b59448c; retain the selected movement controller.
+
+### Rendered pad contact calibration — 14:05
+Derive each pad from the actual core mesh vertices weighted at least65% to its paw bone. Average its lowest15mm band in bind pose, retain that point in paw-local space, and pin that point rather than the wrist/MTP landmark. Lower the visual rig by the mean pad offset so the forelegs remain reachable, then solve to pad-derived wrist targets while preserving paw rotation. Report the contact landmark explicitly. Keep independent capture joint telemetry and rendered-pad checks separate. No controller or fox-look changes.
+
+### Brake intent pose — 14:10
+Use input release/opposition and measured deceleration only to drive a restrained nose-up, rump-down brace. Do not graft the competing movement controller. A dedicated authored skid has forepaws ahead, hind feet beneath the rump, a quick load and a held recovery. Blend a small brake-load layer onto moving gaits so the animal braces before it has already stopped. Expose load amplitude and retain per-frame brake telemetry. Capture this as a separate pass after landing/pad contact.
+
+## Listening Crown extension
+Design: `docs/design/wellspring-summit.md`. From the Wellspring west arch, a permanent stair reaches a compact cliff ruin. Two existing hearth columns reach a heat-fed crown bowl. A two-second element inlet latches permanent heat and an inward wind route to the summit; dash-through Shade or strong stroke are both valid. No new inputs, ability, collectible, or World 1 gate. Safe stairs remain available. Tunable seal time, saved latch, and `__game.crown` state support GPU verification.
+
+Foliage extraction: standalone trees remove only geometry appended by their own placement. Empty material cells never reach mergeGeometries.

@@ -65,6 +65,8 @@ float fxNoise(vec3 x) {
 }`;
 
 function patchFur(mat: THREE.MeshStandardMaterial) {
+  const shell = mat.name.toLowerCase().includes("shell");
+  const tail = mat.name.toLowerCase().startsWith('foxtailfur');
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, furUniforms);
     shader.vertexShader = shader.vertexShader
@@ -97,14 +99,23 @@ ${NOISE_GLSL}`,
       .replace(
         '#include <opaque_fragment>',
         `{
-  float fres = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), uRim.y);
+  float facing = saturate(dot(normal, normalize(vViewPosition)));
+  ${shell ? "float coverage = 1.0 - smoothstep(0.25, 0.65, facing); if (fxNoise(vRest * vec3(73.0, 41.0, 61.0)) > coverage) discard;" : ""}
+  float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.35, 0.8, fxNoise(vRest * vec3(40.0, 22.0, 9.0)));
   outgoingLight += uRimColor * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
+  ${tail ? `
+  #ifdef USE_MAP
+    float tipHeat = smoothstep(0.72, 1.0, vMapUv.y);
+    outgoingLight += uRimColor * 0.12 * tipHeat;
+    float tipCoverage = 1.0 - smoothstep(0.92, 1.0, vMapUv.y);
+    if (fxNoise(vRest * vec3(93.0, 71.0, 87.0)) > tipCoverage) discard;
+  #endif` : ''}
 }
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => 'fox-fur';
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}`;
   mat.needsUpdate = true;
 }
 
@@ -181,7 +192,7 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.depthWrite = false;
         mesh.castShadow = false;
         // translucent: the brush dissolves into soft flame instead of an opaque fan over the rump
-        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.5 : 0.68);
+        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.12 : n.includes('tailflame') ? 0.24 : 0.32);
         if (isGlow) mat.side = THREE.FrontSide;
       } else if (n.includes('eye')) {
         patchEye(mat, mesh.geometry);
@@ -191,8 +202,11 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       } else if (n.includes('fur')) {
+        // The opaque coat supplies the soft shadow; shell shadow maps ignore our grazing-angle fade.
+        if (n.includes('shell')) mesh.castShadow = false;
         mat.color.setHex(0xffffff);
-        mat.roughness = 0.62;
+        mat.roughness = 0.85;
+        mat.normalScale.setScalar(0.35);
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
         patchFur(mat);

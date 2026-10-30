@@ -41,6 +41,9 @@ import type { InletSpot } from './chem/inlet';
 import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 import type { RootSpot } from './chem/growth';
+import { waterSpots } from './chem/water';
+import type { ShadeSpot } from './encounters/shades';
+export type { ShadeSpot } from './encounters/shades';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -51,7 +54,6 @@ import type { RootSpot } from './chem/growth';
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
 /** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
-export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number };
 export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
 
 export type SeedwellState = {
@@ -394,7 +396,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(42, 0, 46);
   W(54, 0, 40, { label: 'cp-marsh' });
   // C · Reedmarsh — boardwalk, hummock, ghost-ink stones, SW2 island
-  W(57, 0.3, 36.3, { ground: false });
+  W(56.65, 0.3, 36.3, { ground: false, label: 'wash:marsh-mouth' });
+  W(60.0, -0.05, 34.05, { ground: false });
+  W(62.034, -0.05, 32.736, { ground: false });
   W(64.5, 0.3, 31.4, { ground: false });
   W(68.5, 0.4, 28.2, { ground: false, act: 'jump' });
   W(73.5, 0.25, 25, { ground: false, act: 'jump' });
@@ -1786,7 +1790,39 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x: p.x + 2.2, z: p.z + 1.7, w: 3.2, d: 3.2, top: 34, bottom: 33.3, round: true, rough: 0.35, seed: 367, topColor: PAL.stone });
   }
   // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
-  shadeSpots.push({ id: 'shade-flume', speed: 1.1, patrol: [[102, 4.7, 24], [98, 4.5, 26], [96, 0, 29], [104, 0, 30]] });
+  {
+    const channel = new THREE.CatmullRomCurve3(waterSpots.find(s => s.id === 'reed-falls')!.path, false, 'centripetal');
+    const patrol: ShadeSpot['patrol'] = [];
+    for (const side of [1, -1]) for (let j = 0; j <= 8; j++) {
+      const t = 0.25 + (side === 1 ? j : 8 - j) / 8 * 0.2;
+      const p = channel.getPoint(t), tangent = channel.getTangent(t);
+      p.x += tangent.z * 0.52 * side; p.z -= tangent.x * 0.52 * side;
+      patrol.push([p.x, p.y, p.z]);
+    }
+    shadeSpots.push({ id: 'shade-flume', patrol });
+  }
+  // Narrow loops on intact flights, never across either broken jump.
+  for (const [id, x0, x1, z, y0, y1] of [
+    ['shade-hill-low', 4.5, -4.5, -68.7, 12.83, 16.37],
+    ['shade-hill-high', 4.5, -4.5, -80.5, 33.63, 37.17],
+  ] as const) {
+    const patrol: ShadeSpot['patrol'] = [];
+    for(const side of [1,-1]) for(let j=0;j<=8;j++) {
+      const f=(side===1?j:8-j)/8;
+      patrol.push([x0+(x1-x0)*f,y0+(y1-y0)*f,z+side*.52]);
+    }
+    shadeSpots.push({id,patrol});
+  }
+  // Restored-edge encounters awaken once; permanent elements remain immune.
+  for(const [id,afterLatch,cx,cy,cz,rx,rz] of [
+    ['shade-edge-kiln','SW1',-112,20,-27,1.5,.8],
+    ['shade-edge-reeds','SW2',95,6,18,1.2,.8],
+    ['shade-edge-maple','SW3',-8,12,-60,1.5,.8],
+  ] as const) {
+    const patrol: ShadeSpot['patrol']=[];
+    for(let j=0;j<16;j++){const a=j/16*Math.PI*2;patrol.push([cx+Math.cos(a)*rx,cy,cz+Math.sin(a)*rz]);}
+    shadeSpots.push({id,afterLatch,patrol});
+  }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
