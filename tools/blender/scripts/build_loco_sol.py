@@ -1,12 +1,16 @@
 """Bake role-based locomotion onto the current hero; no mesh rebuild.
 blender -b -P tools/blender/scripts/build_loco_sol.py
 """
-import bpy, math, os
+import bpy, math, os, sys
 from mathutils import Vector, Quaternion, Euler
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.gltf(filepath=f'{ROOT}/assets/hero/spirit_fox.glb')
+args=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
+if not args: raise RuntimeError('Pass an explicit source GLB after --; output must never be its own input')
+if os.path.realpath(args[0]) == os.path.realpath(f'{ROOT}/assets/hero/spirit_fox.glb'): raise RuntimeError('Source and output must differ')
+bpy.ops.import_scene.gltf(filepath=os.path.abspath(args[0]))
 sc = bpy.context.scene
+SOURCE_FPS = sc.render.fps
 sc.render.fps = 60
 arm = next(o for o in sc.objects if o.type == 'ARMATURE')
 SRC_ACTIONS = {a.name.split('_SpiritFox')[0]: a for a in bpy.data.actions}
@@ -26,7 +30,7 @@ def gait_pose(t, phases, duty, sweep, lift, kind):
     p = copy(base)
     for bn in LEG_BONES: p[bn][1] = Quaternion()
     if kind == 'gallop':
-        return gallop_pose(t)
+        return gallop_pose(t, st=1.7)
     bob = .018 if kind == 'walk' else .035
     wloc(p, 'Body', (0, 0, -0.015 + bob * math.cos(4 * math.pi * t)))
     wrot(p, 'Body', (0, 1, 0), (1.4 if kind == 'walk' else 2.2) * math.sin(2*math.pi*t))
@@ -50,8 +54,8 @@ def gait_pose(t, phases, duty, sweep, lift, kind):
             a,b = ik2(posed_yz(l['th'])[0],joint,l['a'],l['b'])
             set_chain(p,[l['th'],l['sh'],l['mt'],l['paw']],[a,b,mt,rest_ang(l['paw'])])
     return p
-specs = [('walk',1.4,.65,.48,.12,{'L_hind':0,'L_fore':.25,'R_hind':.5,'R_fore':.75}),
-         ('trot',2.2,.48,.72,.22,{'L_hind':0,'R_fore':0,'R_hind':.5,'L_fore':.5}),
+specs = [('walk',1.4,.65,1.1,.23,{'L_hind':0,'L_fore':.25,'R_hind':.5,'R_fore':.75}),
+         ('trot',2.2,.48,1.5,.34,{'L_hind':0,'R_fore':0,'R_hind':.5,'L_fore':.5}),
          ('run',2.8,.34,.90,.34,LEGS)]
 for name,hz,duty,sweep,lift,phases in specs:
     old = bpy.data.actions.get(name)
@@ -81,7 +85,7 @@ for name,act in SRC_ACTIONS.items():
     if act.name not in bpy.data.actions: continue
     for fc in act.fcurves:
         for key in fc.keyframe_points:
-            key.co.x *= 2.5; key.handle_left.x *= 2.5; key.handle_right.x *= 2.5
+            key.co.x *= 60/SOURCE_FPS; key.handle_left.x *= 60/SOURCE_FPS; key.handle_right.x *= 60/SOURCE_FPS
 arm.animation_data.action=bpy.data.actions['idle']
 for o in bpy.data.objects:
     if o.type=='ARMATURE' and o.animation_data:

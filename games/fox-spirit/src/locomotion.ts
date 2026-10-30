@@ -5,9 +5,9 @@ export type MotionInput = {
   groundAt: (x: number, z: number, ceiling: number) => number;
 };
 const GAITS = {
-  walk: { sweep: .48, duty: .65, phases: [ .25, .75, 0, .5 ] },
-  trot: { sweep: .72, duty: .48, phases: [ 0, .5, .5, 0 ] },
-  run: { sweep: .95, duty: .34, phases: [ .55, .46, 0, .08 ] },
+  walk: { sweep: 1.1, duty: .65, phases: [ .25, .75, 0, .5 ] },
+  trot: { sweep: 1.5, duty: .48, phases: [ .5, 0, 0, .5 ] },
+  run: { sweep: 1.615, duty: .34, phases: [ .55, .46, 0, .08 ] },
 };
 type Gait = keyof typeof GAITS;
 const v = () => new THREE.Vector3();
@@ -16,14 +16,16 @@ const q = () => new THREE.Quaternion();
 /** Authored pose is evaluated first; contact correction only moves a two-bone chain. */
 export class AuthoredLocomotion {
   params = { walkSpeed: 1.4, trotSpeed: 3.5, gallopSpeed: 6.5, strideScale: 1,
-    plantStrength: .85, maxCorrection: .16, turnLean: .045, tailLag: .1, debug: false };
-  metrics = { gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0,
+    plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, debug: false };
+  metrics = { gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D;
     planted: boolean; anchor: THREE.Vector3; clearance: number; dot: THREE.Mesh }[] = [];
   private debugGroup = new THREE.Group();
+  private phase = 0;
   private yaw = 0;
+  private pitch = 0;
   private turn = 0;
   private lean = 0;
   private tail = 0;
@@ -42,8 +44,8 @@ export class AuthoredLocomotion {
     for (const [upper, lower, paw] of [
       ['FrontUpperLegL','FrontLowerLegL','FrontPawL'],
       ['FrontUpperLegR','FrontLowerLegR','FrontPawR'],
-      ['BackLegL','BackUpperLegL','BackLowerLegL'],
-      ['BackLegR','BackUpperLegR','BackLowerLegR'],
+      ['BackLegL','BackUpperLegL','BackPawL'],
+      ['BackLegR','BackUpperLegR','BackPawR'],
     ]) {
       const find = (name: string) => root.getObjectByName(name) ?? root.getObjectByName(name.replace(/([LR])$/, '.$1'));
       const a=find(upper), b=find(lower), c=find(paw);
@@ -73,21 +75,19 @@ export class AuthoredLocomotion {
     const weights = {walk:1-w,trot:w*(1-r),run:r};
     let dominant: Gait='walk';
     for (const name of Object.keys(GAITS) as Gait[]) if (weights[name]>weights[dominant]) dominant=name;
-    const old=this.actions.get(this.metrics.gait);
-    const phase=old ? (old.time/old.getClip().duration)%1 : 0;
+    const stride = (Object.keys(GAITS) as Gait[]).reduce((sum,name) =>
+      sum + weights[name]*GAITS[name].sweep*this.armScale/GAITS[name].duty, 0)*this.params.strideScale;
+    this.phase=(this.phase+dt*speed/Math.max(.01,stride))%1;
     for (const name of Object.keys(GAITS) as Gait[]) {
       const action=this.actions.get(name); if (!action) continue;
       if (!action.isRunning()) action.reset().play();
       action.enabled=true; action.paused=false;
       action.stopFading();
       action.setEffectiveWeight(weights[name]);
-      // Stance displacement / stance time = nominal root speed. No arbitrary minimum cadence.
-      const data=GAITS[name];
-      const nominal=data.sweep*this.armScale/(data.duty*action.getClip().duration);
-      const rate=speed/Math.max(.01,nominal*this.params.strideScale);
-      action.setEffectiveTimeScale(rate);
-      if (this.metrics.gait!==dominant && old) action.time=phase*action.getClip().duration;
-      if (name===dominant) this.metrics.playback=rate;
+      // One normalized phase for every clip. The mixer interpolates compatible poses, not unrelated cycles.
+      action.time=this.phase*action.getClip().duration;
+      action.setEffectiveTimeScale(0);
+      if (name===dominant) this.metrics.playback=speed*action.getClip().duration/Math.max(.01,stride);
     }
     this.metrics.gait=dominant;
     this.metrics.clipWeights=weights;
@@ -105,21 +105,33 @@ export class AuthoredLocomotion {
       this.overlays.push({bone,rotation:bone.quaternion.clone()});
       bone.quaternion.multiply(q().setFromAxisAngle(axis,angle));
     };
-    overlay(this.spine,new THREE.Vector3(0,1,0),this.lean);
+    const forward=new THREE.Vector3(Math.sin(this.input.yaw),0,Math.cos(this.input.yaw));
+    const front=this.group.position.clone().addScaledVector(forward,.45);
+    const back=this.group.position.clone().addScaledVector(forward,-.45);
+    const fg=this.input.groundAt(front.x,front.z,this.group.position.y+.8);
+    const bg=this.input.groundAt(back.x,back.z,this.group.position.y+.8);
+    const slope=this.input.grounded && Number.isFinite(fg) && Number.isFinite(bg) ? -Math.atan2(fg-bg,.9) : 0;
+    this.pitch=THREE.MathUtils.damp(this.pitch,THREE.MathUtils.clamp(slope,-.4,.4),10,dt);
+    this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
+    this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(this.pitch,0,this.lean)));
     overlay(this.tailBone,new THREE.Vector3(0,0,1),THREE.MathUtils.clamp(this.tail,-.3,.3));
     this.root.updateWorldMatrix(true,true);
     const gait=this.metrics.gait as Gait;
     const data=GAITS[gait];
     const action=this.actions.get(gait);
-    const phase=action ? (action.time/action.getClip().duration)%1 : 0;
+    const phase=this.phase;
     this.metrics.phase=phase;
-    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxCorrection=0;
+    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxCorrection=0;
     const locomoting=['run','walk','trot'].includes(active);
     this.debugGroup.visible=this.params.debug;
     this.feet.forEach((foot,i)=>{
       const paw=foot.paw.getWorldPosition(v());
       const ph=data ? (phase-data.phases[i]+1)%1 : 0;
-      const stance=this.input.grounded && (locomoting ? !!data && ph<data.duty : active==='idle');
+      const support=(Object.keys(GAITS) as Gait[]).reduce((sum,name)=> {
+        const d=GAITS[name]; const p=(phase-d.phases[i]+1)%1;
+        return sum+(p<d.duty ? (this.metrics.clipWeights[name] ?? 0) : 0);
+      },0);
+      const stance=this.input.grounded && (locomoting ? support>.55 : active==='idle');
       if (stance) {
         const ground=this.input.groundAt(paw.x,paw.z,this.group.position.y+.6);
         if (!Number.isFinite(ground)) {foot.planted=false;return;}
@@ -132,6 +144,8 @@ export class AuthoredLocomotion {
         // Save both joints so correction cannot accumulate when a clip doesn't key that bone.
         for (const bone of [foot.upper,foot.lower]) this.overlays.push({bone,rotation:bone.quaternion.clone()});
         this.solve(foot.upper,foot.lower,foot.paw,paw.add(delta));
+        const corrected=foot.paw.getWorldPosition(v());
+        this.metrics.maxResidual=Math.max(this.metrics.maxResidual,corrected.distanceTo(foot.anchor));
         this.metrics.stanceFeet++;
       }
       foot.planted=stance;

@@ -378,6 +378,8 @@ async function boot() {
   let airT = 0;
   let jumpedThisAir = false;
   let landT = 0;
+  let skidT = 0;
+  let previousSpeed = 0;
   let hitstop = 0;
   let lastHitstop = -1;
   let shrineOn = false;
@@ -644,6 +646,7 @@ async function boot() {
         pos: [p.x, p.y - foxActor.feetOffset, p.z],
         vel: [vel.x, vel.y, vel.z],
         foxYaw: foxActor.group.rotation.y,
+        locomotion: foxActor.locomotion?.metrics,
         airT,
         anim: foxActor.getAnim(),
         grounded,
@@ -1045,6 +1048,9 @@ async function boot() {
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
     const speed = Math.hypot(vel.x, vel.z);
     landT -= dt;
+    skidT -= dt;
+    if (grounded && wish.lengthSq() < .01 && previousSpeed > 4 && speed < previousSpeed) skidT = Math.max(skidT, .3);
+    previousSpeed = speed;
     {
       let anim: FoxAnimState = 'idle';
       let fade = 0.16;
@@ -1067,10 +1073,13 @@ async function boot() {
         } else if (landT > 0 && (speed < 3.5 || landT > 0.16)) {
           anim = 'land';
           fade = 0.05;
+        } else if (skidT > 0 && wish.lengthSq() < .01) {
+          anim = 'skid'; fade = .06;
+        } else if (speed < .6 && Math.abs(foxActor.locomotion?.metrics.turnRate ?? 0) > .8) {
+          anim = (foxActor.locomotion?.metrics.turnRate ?? 0) > 0 ? 'turn_left' : 'turn_right';
         } else if (speed > 0.08) {
           anim = 'run';
-          // stride follows ground speed (clip authored near full run speed)
-          rate = THREE.MathUtils.clamp(speed / 8.4, 0.55, 1.45);
+          // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
       foxActor.setMotion?.({ speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y,
