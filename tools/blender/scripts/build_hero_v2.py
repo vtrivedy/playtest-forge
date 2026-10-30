@@ -1,7 +1,7 @@
 """
 Hero v2 — Spirit Fox restyle of the CC0 Quaternius fox (assets/hero/source/fox_quaternius_raw.glb).
-Stages: re-proportion rest pose to the art lock -> smooth continuous mesh -> (later) fur bake,
-ember tail, tufts, eyes -> 9 game clips -> GLB.
+Stages: re-proportion rest pose to the art lock -> smooth continuous mesh -> look (fur bake,
+ember tail, tufts, eyes) -> 9 game clips -> game rig contract -> GLB.
 blender -b -P build_hero_v2.py -- out.glb [stage]
 """
 import sys, math
@@ -57,27 +57,35 @@ def scl(name, sx=1.0, sy=1.0, sz=1.0):
     P[name].scale = (sx, sy, sz); upd()
 
 # neck up, head held level and proud (calm, alert carriage like the turnaround)
-rot_world("Neck1", "X", -27)
+rot_world("Neck1", "X", -38)
 rot_world("Neck2", "X", -15)
 rot_world("Neck3", "X", -6)
-rot_world("Head", "X", 42)
-scl("Head", 1.12, 1.08, 1.12)
+rot_world("Head", "X", 53)
+scl("Head", 1.18, 1.12, 1.18)
 # tall ears, more upright
 for s in ("L", "R"):
     sign = 1 if s == "L" else -1
     rot_world(f"Ear1.{s}", "Y", -14 * sign)
     rot_world(f"Ear1.{s}", "X", 6)
-    scl(f"Ear1.{s}", 1.2, 1.62, 1.2)  # big fox ears (turnaround: ears ~= head length)
-# sturdy legs (concept: solid umber-socked legs, not spindly): thicker, no extra length
+    scl(f"Ear1.{s}", 1.35, 1.9, 1.35)  # big fox ears (turnaround: ears ~= head length)
+# slender but solid legs (turnaround: umber-socked, defined joints)
 for s in ("L", "R"):
-    scl(f"FrontUpperLeg.{s}", 1.3, 0.97, 1.3)
-    scl(f"BackUpperLeg.{s}", 1.22, 0.97, 1.22)
+    scl(f"FrontUpperLeg.{s}", 1.12, 0.97, 1.12)
+    scl(f"BackUpperLeg.{s}", 1.1, 1.06, 1.1)
+# compact trunk + longer legs (turnaround side view: body ~0.75x ear height, belly ~0.36x off the ground)
+# turnaround paw spacing ~0.48x ear height (was 0.59): the chest, neck, head and forelegs slide back toward
+# the hips, spread over two spine joints so the flank compresses without pinching
+P["Torso2"].location.y -= 0.2; upd()  # bone-local +y points forward
+P["Torso3"].location.y -= 0.2; upd()
+for s in ("L", "R"):
+    scl(f"FrontLowerLeg.{s}", 1.0, 1.08, 1.0)
+    scl(f"BackLowerLeg.{s}", 1.0, 1.06, 1.0)
 # tail: droop from the rump, then sweep back/up (bushy plume rebuilt later)
-rot_world("Tail1", "X", -40)
-scl("Tail1", 1.58, 1.58, 1.58)  # long brush (concept tail ~ body length; outer ~45% dissolves into flame)
+rot_world("Tail1", "X", -52)
+scl("Tail1", 1.32, 1.32, 1.32)  # brush hangs from the rump and reaches ~0.45x ear height behind it; outer ~45% dissolves into flame
 rot_world("Tail3", "X", 8)
-rot_world("Tail5", "X", 22)
-rot_world("Tail7", "X", 40)
+rot_world("Tail5", "X", 24)
+rot_world("Tail7", "X", 30)
 # slight sweep to the fox's right (concept back view): from the chase cam the plume curls off the rump
 # instead of stacking straight toward the camera
 rot_world("Tail3", "Z", 9)
@@ -139,6 +147,8 @@ if STAGE != "proportion":
     exec(open(f"{ROOT}/tools/blender/scripts/build_hero_v2_look.py").read())
 if STAGE == "all":
     exec(open(f"{ROOT}/tools/blender/scripts/build_hero_v2_anims.py").read())
+if STAGE != "proportion":
+    exec(open(f"{ROOT}/tools/blender/scripts/build_hero_v2_rig.py").read())
 
 # ---------------------------------------------------------------- export
 if not arm.animation_data.action and "idle" in bpy.data.actions:

@@ -1,8 +1,8 @@
 """Real-GPU Russetvale capture. No local browser or permanent deployment.
 
 modal run tools/modal/gpu_capture.py --ref main --shots all
---shots probe | perf | route | orbit | all (or comma-separated); --fetch-only RUN_ID
-Design/operating notes: /tmp/sol-gpu/DESIGN.md during initial implementation.
+--shots probe | perf | route | orbit | fox | gait | stills | turntable | all (or comma-separated); --fetch-only RUN_ID
+Gait requires 60 fps. Usage and review workflow: tools/CAPTURE.md.
 """
 from pathlib import Path
 import modal
@@ -84,14 +84,16 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
          orbit_seconds: int = 20, fetch_only: str = '', out: str = '',
          gpu: str = 'A10', backend: str = 'egl', size: str = '1920x1080',
          quality: str = 'high', fps: int = 60, cube_only: bool = False, verbose: bool = False):
-    import subprocess, time, json, tarfile, re
+    import subprocess, time, json, tarfile, re, uuid
     if backend not in {'vulkan', 'egl', 'gl', 'swiftshader'} or quality not in {'low', 'med', 'high'}:
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'gait', 'stills'}:
-        raise ValueError('shots: all, probe, perf, route, orbit, gait, stills or comma-separated')
-    run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:64]}-{time.strftime("%Y%m%d-%H%M%S")}'
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'turntable'}:
+        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, turntable or comma-separated')
+    if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
+        raise ValueError('Gait requires --fps 60')
+    run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:40]}-{shots.replace(",", "_")}-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:10]}'
     destination = Path(out) if out else ROOT.parent / 'playtest-forge-artifacts/gpu' / re.sub(r'[^a-zA-Z0-9_.-]', '_', ref)
     destination.mkdir(parents=True, exist_ok=True)
     print(f'Run ID: {run_id}; output: {destination}', flush=True)

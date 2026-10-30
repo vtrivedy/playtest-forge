@@ -78,3 +78,14 @@ into review WAVs, keyboard traversal, mute/unlock checks, staged restoration, sc
 
 ## Sprint 2 authored locomotion (LOCO-SOL)
 Existing hero geometry/materials remain the baseline. Blender-baked walk/trot/rotary gallop clips provide the primary pose; AnimationMixer blends by speed with stride-matched playback. Grounded contact correction and damped tail/torso overlays provide terrain and momentum response. Turn, skid, jump/air/land remain authored states. Expose blend speeds, stride scale, plant correction, turn lean and spring damping in the existing debug GUI and publish contact/state metrics through the game hooks. Verify on the remote GPU gait gym before comparison; this branch stays isolated pending driver selection.
+
+## Sprint 2 gait review gym
+`?gym=gait` places the live fox/controller on an uncluttered measured course away
+from Russetvale: flat runway, 15-degree ascent, crest, descent. Same lighting,
+materials, animation and physics as gameplay. A harness-only world-space analog
+stick (magnitude 0..1) exercises walk/trot/gallop without changing feel parameters.
+The GPU harness records deterministic idle, speed bands, tight turns, hard stop,
+jump/landing and slopes; a quarter-speed segment uses smaller simulation steps,
+not duplicated frames. Side tracking keeps paws large enough to judge contact.
+1080p60 MP4, labelled pose contact sheet, per-frame state and __game snapshots
+are the evidence. Staged resets are explicitly recorded; route remains unassisted.
