@@ -216,20 +216,15 @@ try {
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
     if (!actors.length) throw Error('No Shade encounter authored');
     save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
+    let lens = null;
     const camera = async () => {
       const actor = await page.evaluate(() => window.__gameHooks.shades.state().actors[0]);
       const [x,y,z] = actor.pos;
-      const direction = await page.evaluate(({x,y,z,heading}) => {
-        const col=window.__gameHooks.debug.world.collision;
-        // Prefer the animal's profile; reject lenses behind kiln masonry.
-        for(const turn of [0,Math.PI,.5,-.5,Math.PI+.5,Math.PI-.5]){
-          const a=heading+Math.PI/2+turn,dx=Math.sin(a),dz=Math.cos(a);let clear=true;
-          for(let d=.7;d<7;d+=.2)if(col.blocked(x+dx*d,z+dz*d,y+1.2+2*d/7)){clear=false;break;}
-          if(clear)return [dx,dz];
-        }
-        return [Math.cos(heading),-Math.sin(heading)];
-      }, {x,y,z,heading:actor.heading??0});
-      await H('photo', [x + direction[0]*7, y + 3.2, z + direction[1]*7], [x, y + 1.2, z], 48);
+      if(!lens){
+        const dx=x+112,dz=z+24,d=Math.hypot(dx,dz)||1;
+        lens=[x+dx/d*8,y+3.6,z+dz/d*8];
+      }
+      await H('photo', lens, [x,y+1.2,z],48);
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(([x,y,z]) => {
@@ -270,6 +265,7 @@ try {
     }, p);
     save('shade-contact-setup.json', contactSetup);
     await H('teleport', ...contactSetup.pos, Math.PI);
+    lens=null;
     await camera();
     await video('shade-contact', 66, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 65] });
     const contact = await page.evaluate(() => window.__gameHooks.shades.state());
@@ -287,6 +283,7 @@ try {
     await H('teleport', ...dashSetup.pos, dashSetup.yaw);
     await H('setStick', ...dashSetup.direction);
     await H('setKeys', ['ShiftLeft']);
+    lens=null;
     await camera();
     await video('shade-free', 210, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
@@ -299,6 +296,7 @@ try {
     await advance(600, false);
     if ((await page.evaluate(() => window.__gameHooks.shades.state().actors[0].leaves)) !== 0) throw Error('Leaf one-shot did not end empty');
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
+    await advance(0);
     await shot('shade-after-free');
     save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
     // Separate live third-person take: same encounter and controller, actual keyboard events.
