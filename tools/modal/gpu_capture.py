@@ -6,9 +6,10 @@ Gait requires 60 fps. Usage and review workflow: tools/CAPTURE.md.
 """
 from pathlib import Path
 import modal
+import os
 
 ROOT = Path(__file__).resolve().parents[2] if modal.is_local() else Path('/tmp/game')
-app = modal.App('russetvale-capture-review')
+app = modal.App(os.environ.get('FOX_CAPTURE_APP', 'russetvale-capture-review'))
 results = modal.Volume.from_name('russetvale-gpu-captures', create_if_missing=True)
 image = (
     modal.Image.from_registry('node:22-bookworm-slim', add_python='3.12')
@@ -22,6 +23,7 @@ if modal.is_local():
     image = image.add_local_file(ROOT / 'tools/gpu-capture.mjs', '/opt/browser/gpu-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/levels-capture.mjs', '/opt/browser/levels-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/windgap-capture.mjs', '/opt/browser/windgap-capture.mjs')
+    image = image.add_local_file(ROOT / 'tools/marshmouth-capture.mjs', '/opt/browser/marshmouth-capture.mjs')
 
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)
@@ -112,8 +114,8 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap'}:
-        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, water, shade, turntable, updraft, wind, growth, levels, windgap or comma-separated')
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'crown', 'flow'}:
+        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, water, shade, turntable, updraft, wind, growth, levels, windgap, marshmouth, crown, flow or comma-separated')
     if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
         raise ValueError('Gait requires --fps 60')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:40]}-{shots.replace(",", "_")}-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:10]}'

@@ -31,6 +31,9 @@ for v in bm.verts:
     if n.z < -0.3 and co.y < bh("FrontUpperLeg.L").y + 0.25:
         push += 0.1 * min(1, chest) * -n.z  # deeper brisket between / ahead of the forelegs
     hw = w.get("Head", 0)
+    # Taper the lower cheek plane into the throat; a broad jaw made the cream read as a collar.
+    jaw_taper = smooth(head_c.z + 0.06, head_c.z - 0.32, co.z) * hw
+    co.x *= 1 - 0.14 * jaw_taper
     if hw > 0.3 and n.z < -0.3 and co.y > head_c.y - 0.12:
         push += 0.045 * hw * -n.z  # full throat under the jaw (no shadow shelf between cheeks and bib)
     belly = wsum(w, "Torso", "Torso2")
@@ -71,15 +74,23 @@ if nose_ids:
     for i in nose_ids: bm.verts[i].co = nc + (bm.verts[i].co - nc) * 0.62 + Vector((0, 0.004, 0))
 # delete the old thin tail beyond the root (rebuilt as plume)
 kill = [v for v in bm.verts if sum(x for k, x in v[dl].items() if gname[k] in ("Tail2", "Tail3", "Tail4", "Tail5", "Tail6", "Tail7", "Tail8")) > 0.5]
+old_boundaries = {e for e in bm.edges if e.is_boundary}
 bmesh.ops.delete(bm, geom=kill, context="VERTS")
+# Close only the opening created by removing the stock tail; otherwise a black triangular
+# hole remains above the new brush root in the chase and back review views.
+cut_edges = [e for e in bm.edges if e.is_boundary and e not in old_boundaries]
+if cut_edges:
+    caps = bmesh.ops.holes_fill(bm, edges=cut_edges, sides=0)["faces"]
+    for face in caps: face.smooth = True
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
 bm.to_mesh(me); bm.free(); me.update()
 
 # ---------------------------------------------------------------- 2. region colours (rest pose rules)
 # warm burnt orange (yellower than vermilion: ACES + warm fog push it red in engine); sock/paw authored a
 # notch light because the streak * AO bake darkens them (lands near the concept's (102, 62, 38) umber)
-PAL = dict(rust=(212, 124, 50), dorsal=(146, 70, 28), belly=(226, 168, 112), cream=(242, 228, 202),
+PAL = dict(rust=(212, 124, 50), dorsal=(146, 70, 28), belly=(226, 168, 112), cream=(234, 218, 188),
            umber=(108, 62, 36), sock=(66, 42, 29), paw=(46, 31, 23), earback=(50, 29, 20), nose=(22, 15, 13),
-           amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(236, 214, 186))
+           amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(174, 145, 110))
 mat_names = [m.name for m in me.materials]
 MI = {n: i for i, n in enumerate(mat_names)}
 eye_vs, nose_vs, cream_vs, grey_vs = set(), set(), set(), set()
@@ -106,11 +117,15 @@ for v in me.vertices:
     c = mix(c, PAL["dorsal"], smooth(-0.12, 0.7, n.z) * 0.88)           # broad dark rust saddle over the back / haunches (painted mass)
     c = mix(c, PAL["belly"], smooth(-0.15, -0.8, n.z) * 0.75)           # warm pale underside (not pink)
     # cream: throat + bib tapering down the chest, muzzle, cheeks, inner ears (no belly/rump patches)
-    if v.index in cream_vs and leg < 0.3:
+    if leg < 0.3:
         if wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"]) > 0.3:
-            k = 1.0
+            k = 0.0  # ear interiors are painted below; never flood ear backs with the cheek blaze
         elif w.get("Head", 0) > 0.3:
-            k = 1.0 - smooth(0.05, 0.5, n.z)  # cream cheeks / lower muzzle only; the snout bridge stays rust
+            # Paint a soft oblique cheek boundary from anatomy, never the source polygon IDs.
+            line = (eyeL.z + eyeR.z) * 0.5 - 0.12 + 0.07 * smooth(0.08, 0.38, abs(co.x))
+            line += 0.025 * math.sin(co.y * 12.0)
+            k = (1 - smooth(line - 0.12, line + 0.12, co.z)) * (1 - smooth(0.0, 0.6, n.z))
+            k *= 1 - smooth(head_c.y - 0.04, head_c.y + 0.22, co.y)
         elif co.y < CHEST_Y:
             half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
             k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
@@ -134,7 +149,7 @@ for v in me.vertices:
     ear = wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"])
     if ear > 0.2:
         tipt = wsum(w, "Ear3.L", "Ear3.R", "Ear4.L", "Ear4.R")
-        if n.y > -0.1: c = mix(c, PAL["earback"], min(1, ear) * (0.15 + 0.85 * tipt))
+        if n.y > -0.1: c = mix(c, PAL["earback"], min(1, ear) * (0.7 + 0.3 * tipt))
         else: c = mix(c, PAL["earin"], min(1, ear) * 0.75 * (1 - tipt)); c = mix(c, PAL["earback"], tipt * 0.7)
     # eye liner ring + amber eyes with slit pupils
     d, _, _ = ekd.find(co)
