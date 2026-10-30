@@ -114,8 +114,8 @@ for v in me.vertices:
         elif w.get("Head", 0) > 0.3:
             k = 1.0 - smooth(0.05, 0.5, n.z)  # cream cheeks / lower muzzle only; the snout bridge stays rust
         elif co.y < CHEST_Y:
-            half = 0.07 + 0.2 * smooth(1.25, 1.95, co.z)  # V-shaped bib: wide at the throat, narrow between the forelegs
-            k = smooth(1.12, 1.4, co.z) * (1 - smooth(half - 0.03, half + 0.05, abs(co.x)))
+            half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
+            k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
         else:
             k = 0.0
         c = mix(c, PAL["cream"], k)
