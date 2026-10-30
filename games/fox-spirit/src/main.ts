@@ -322,7 +322,7 @@ async function boot() {
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
   fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
-  const move = { ...DEFAULT_MOVE };
+  const move = { ...DEFAULT_MOVE, jumpWindup: .05 };
   const moveState = createMoveState(Math.PI);
   const moveGui = gui.addFolder('Ground momentum');
   for (const key of ['accel','decel','skidDecel','lateralAccel','pivotRate'] as const) moveGui.add(move,key,.1,70,.1);
@@ -497,6 +497,7 @@ async function boot() {
   let airT = 0;
   let jumpedThisAir = false;
   let landT = 0;
+  let windupT = -1;
   let skidT = 0;
   let previousSpeed = 0;
   let hitstop = 0;
@@ -663,6 +664,7 @@ async function boot() {
       shades.resetSweep();
       foxActor.group.position.set(x, y + foxActor.feetOffset + 0.05, z);
       foxActor.group.rotation.y = yaw;
+      windupT=-1;
       foxActor.locomotion?.reset();
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
@@ -1073,7 +1075,16 @@ async function boot() {
       airT += dt;
     }
 
-    const jv = jumpFeel.tryJump(feel.jumpVelocity * groundBounce, fox.position.y);
+    // Three 60Hz frames of visible load; coyote jumps keep immediate launch.
+    let jv: number | null = null;
+    if (windupT >= 0) {
+      windupT += dt;
+      if (windupT >= move.jumpWindup || !grounded) {
+        windupT=-1;
+        jv=jumpFeel.tryJump(feel.jumpVelocity * groundBounce,fox.position.y);
+      }
+    } else if (grounded && jumpFeel.buffer>0 && move.jumpWindup>0) windupT=0;
+    else jv=jumpFeel.tryJump(feel.jumpVelocity * groundBounce,fox.position.y);
     if (jv !== null) {
       vel.y = jv;
       grounded = false;
@@ -1271,7 +1282,9 @@ async function boot() {
         rate = harnessAnimLock === 'run' ? 1 : 1;
       } else {
         const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
-        if (dashing) {
+        if (windupT >= 0) {
+          anim='jump_up'; fade=.04;
+        } else if (dashing) {
           anim = 'dash';
           fade = 0.05;
         } else if (!grounded && !offLedge) {
