@@ -82,6 +82,55 @@ function threadMaterial(): THREE.ShaderMaterial {
   });
 }
 
+/** Curling autumn leaves riding the current: each point is a turning maple-ish leaf, lit warm on one face. */
+function leafMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uScale: { value: 520 } },
+    vertexShader: /* glsl */ `
+      attribute float seed;
+      uniform float uTime, uScale;
+      varying float vSpin;
+      varying float vTone;
+      varying float vFlip;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mv;
+        vSpin = seed * 6.2832 + uTime * (1.6 + seed * 2.4);
+        // tumbling: the leaf turns edge-on and back, so it flickers thin/wide like a real one
+        vFlip = 0.25 + 0.75 * abs(sin(uTime * (2.0 + seed * 3.0) + seed * 17.0));
+        vTone = fract(seed * 7.13);
+        gl_PointSize = mix(0.2, 0.34, fract(seed * 3.7)) * uScale / max(0.5, -mv.z);
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uOpacity;
+      varying float vSpin;
+      varying float vTone;
+      varying float vFlip;
+      void main() {
+        vec2 q = gl_PointCoord - 0.5;
+        float c = cos(vSpin), s = sin(vSpin);
+        vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
+        r.x /= vFlip;
+        // five-lobed leaf outline with a stem notch, soft at the edge
+        float ang = atan(r.y, r.x);
+        float rad = 0.36 + 0.07 * cos(ang * 5.0) - 0.05 * smoothstep(0.85, 1.0, -sin(ang));
+        float d = length(r) - rad;
+        float a = 1.0 - smoothstep(-0.03, 0.02, d);
+        if (a < 0.05) discard;
+        float vein = smoothstep(0.03, 0.0, abs(r.x)) * 0.25;
+        vec3 rust = vec3(0.52, 0.17, 0.06);
+        vec3 amber = vec3(0.86, 0.44, 0.14);
+        vec3 ochre = vec3(0.78, 0.58, 0.24);
+        vec3 col = mix(mix(rust, amber, smoothstep(0.0, 0.6, vTone)), ochre, smoothstep(0.7, 1.0, vTone));
+        col *= (0.7 + 0.45 * vFlip) - vein;
+        gl_FragColor = vec4(col, a * uOpacity);
+        #include <colorspace_fragment>
+      }`,
+    transparent: true,
+    depthWrite: false,
+  });
+}
+
 export type WindSystem = {
   readonly tun: WindTunables;
   readonly currents: Current[];
@@ -119,6 +168,7 @@ export function createWind(scene: THREE.Scene, spots: WindSpot[], opts: { gui?: 
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N_LEAF * 3), 3));
     const leafU = new Float32Array(N_LEAF);
     const leafOff = new Float32Array(N_LEAF * 3);
+    const leafSeed = new Float32Array(N_LEAF);
     let s = spot.id.length * 97 + 13;
     const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
     for (let i = 0; i < N_LEAF; i++) {
@@ -128,9 +178,10 @@ export function createWind(scene: THREE.Scene, spots: WindSpot[], opts: { gui?: 
       leafOff[i * 3] = Math.cos(a) * r;
       leafOff[i * 3 + 1] = Math.sin(a) * r * 0.6;
       leafOff[i * 3 + 2] = rnd();
+      leafSeed[i] = rnd();
     }
-    const leafMat = new THREE.PointsMaterial({ color: 0xc8582a, size: 0.22, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false });
-    const leaves = new THREE.Points(geo, leafMat);
+    geo.setAttribute('seed', new THREE.BufferAttribute(leafSeed, 1));
+    const leaves = new THREE.Points(geo, leafMaterial());
     leaves.frustumCulled = false;
     scene.add(leaves);
     const debug = new THREE.Line(new THREE.BufferGeometry().setFromPoints(samples), new THREE.LineBasicMaterial({ color: 0x66ccff, depthTest: false }));
@@ -150,8 +201,9 @@ export function createWind(scene: THREE.Scene, spots: WindSpot[], opts: { gui?: 
         const h = c.reactor.heat;
         c.threads.uniforms.uTime!.value = t;
         c.threads.uniforms.uHeat!.value = h;
-        const lm = c.leaves.material as THREE.PointsMaterial;
-        lm.opacity = Math.min(1, h * 1.2) * 0.9;
+        const lm = c.leaves.material as THREE.ShaderMaterial;
+        lm.uniforms.uOpacity!.value = Math.min(1, h * 1.2) * 0.95;
+        lm.uniforms.uTime!.value = t;
         c.leaves.visible = h > 0.01;
         if (c.leaves.visible) {
           const pos = c.leaves.geometry.attributes.position as THREE.BufferAttribute;
