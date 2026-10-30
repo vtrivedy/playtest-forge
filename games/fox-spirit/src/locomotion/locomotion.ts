@@ -21,6 +21,8 @@ export type LocoParams = {
   reachMargin: number;
   /** Planted paws farther than reach × this (horizontal) from their stride centre step immediately */
   strideWindow: number;
+  /** 0..1 share of the worst pair's reach deficit applied to the whole body (keeps the back level) */
+  levelSink: number;
   /** Deepest the paw-reach cap may lower shoulders/hips (u) */
   maxSink: number;
   /** Stance feet farther than reach × this from their hip are forced to step */
@@ -82,9 +84,10 @@ export const DEFAULT_LOCO: LocoParams = {
   reachMargin: 0.96,
   strideWindow: 0.62,
   maxSink: 0.1,
+  levelSink: 0.8,
   overreach: 1.04,
   pitchAccel: 0.008,
-  maxPitch: 0.22,
+  maxPitch: 0.14,
   lean: 0.8,
   maxRoll: 0.28,
   spineBend: 0.16,
@@ -106,7 +109,7 @@ export const DEFAULT_LOCO: LocoParams = {
   tailSway: 0.05,
   tailStream: 0.7,
   tailDroop: 0.12,
-  airPoseRate: 14,
+  airPoseRate: 20,
   bodyRate: 12,
   terrainRate: 7,
   maxSlopePitch: 0.3,
@@ -315,6 +318,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       L.foot.y = plantY(L, L.foot.x, L.foot.z);
       L.mode = 'plant';
       L.contact = true;
+      L.wasPlanted = false;
     }
     for (let i = 0; i < tailN; i++) {
       tailP[i].copy(rig.tailRest[i]).applyMatrix4(model.matrixWorld);
@@ -385,7 +389,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       state.crouchVel -= p.landCrouch * impact * 16;
     }
     if (!grounded && prevGrounded && input.vel.y > 1) state.crouchVel += p.takeoffStretch * 18;
-    const crouchTarget = -p.windupCrouch * input.windup - (input.skidding ? p.skidSquat * 0.5 : 0);
+    const crouchTarget = -(input.skidding ? p.skidSquat * 0.5 : 0);
     state.crouchVel += (-(state.crouch - crouchTarget) * p.crouchStiffness - state.crouchVel * p.crouchDamping) * dt;
     state.crouch += state.crouchVel * dt;
     state.crouch = THREE.MathUtils.clamp(state.crouch, -0.3, 0.15);
@@ -431,8 +435,10 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     // the reach cap may only sink the body so far; beyond that the paw has to step
     foreMax = Math.max(foreMax, foreUp - p.maxSink);
     hindMax = Math.max(hindMax, hindUp - p.maxSink);
-    const fT = THREE.MathUtils.clamp(Math.min(foreUp, foreMax), -0.35, 0.3);
-    const hT = THREE.MathUtils.clamp(Math.min(hindUp, hindMax), -0.35, 0.3);
+    // a fox keeps its back level: most of whichever pair's reach deficit is larger sinks the whole body
+    const share = Math.max(foreUp - foreMax, hindUp - hindMax, 0) * p.levelSink;
+    const fT = THREE.MathUtils.clamp(Math.min(foreUp - share, foreMax), -0.35, 0.3);
+    const hT = THREE.MathUtils.clamp(Math.min(hindUp - share, hindMax), -0.35, 0.3);
     state.liftF = THREE.MathUtils.damp(state.liftF, fT, fT < state.liftF ? 30 : p.bodyRate, dt);
     state.liftH = THREE.MathUtils.damp(state.liftH, hT, hT < state.liftH ? 30 : p.bodyRate, dt);
     const bodyLen = rig.shoulder.distanceTo(rig.hip);
@@ -452,7 +458,9 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     state.clock += dt;
     const breathe = !moving && grounded ? Math.sin(state.clock * 2.1) * 0.004 : 0;
     // shoulder / hip heights: feet-follow lift + bob + crouch + dynamic pitch, hard-capped by paw reach
-    const common = bob + state.crouch + breathe;
+    // wind-up crouch is driven directly (it only lasts a few frames — a spring would never show it)
+    const windup = Math.sin(Math.min(1, input.windup) * Math.PI * 0.5);
+    const common = bob + state.crouch + breathe - p.windupCrouch * windup;
     const halfPitch = Math.sin(state.pitchDyn) * bodyLen * 0.5;
     const frontY = Math.min(state.liftF + common + halfPitch, foreMax);
     const hindY2 = Math.min(state.liftH + common - halfPitch, hindMax);
@@ -598,7 +606,8 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
         if (L.mode === 'plant' || L.mode === 'step') {
           // push-off: planted feet stay put until the leg runs out of reach
           const hip = L.rig.chain[0].getWorldPosition(_v2);
-          if (L.mode === 'step' || hip.distanceTo(L.foot) > L.rig.reach * 0.97 || input.dashing) {
+          // push-off: fores lift and tuck first, hinds drive until nearly straight, then trail
+          if (L.mode === 'step' || L.rig.fore || hip.distanceTo(L.foot) > L.rig.reach * 0.9 || input.dashing) {
             L.mode = 'air';
             L.contact = false;
           }
@@ -710,8 +719,9 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       y = 0.2;
       z = fore ? 0.28 : -0.32;
     } else if (input.vel.y > 1.5) {
-      y = fore ? 0.3 : 0.12;
-      z = fore ? -0.02 : -0.28;
+      // rising: fores folded up under the chest, hinds stretched back from the push
+      y = fore ? 0.3 : 0.1;
+      z = fore ? -0.04 : -0.38;
     } else if (input.vel.y > -2) {
       y = fore ? 0.28 : 0.24;
       z = fore ? 0.04 : 0.08;
