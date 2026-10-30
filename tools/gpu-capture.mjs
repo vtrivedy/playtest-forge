@@ -658,6 +658,44 @@ try {
     const summary = { hearth: h0, A: {}, B: {}, C: {}, K: {} };
     const lens = [[hx - 6, hy + 8, hz + 11], [hx + 2, hy + 3, hz - 1], 50];
     await H('teleport', hx - 12, hy, hz + 16, Math.PI); await H('photo', ...lens); await advance(30); await shot('updraft-still-cold');
+    // Same fixed-step lifecycle as tools/fx-capture.ts, on the hardware renderer.
+    // Contact sheet records actual cumulative steps (not wall-clock elapsed time).
+    const lifecycle = [];
+    const lifeShot = async (name, frame) => {
+      await shot(`updraft-fx-${name}`);
+      lifecycle.push({ name, frame, hearth: hearth(await H('state')), game: await page.evaluate(() => window.__game) });
+    };
+    await lifeShot('00-cold', 0);
+    await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI);
+    await H('photo', ...lens);
+    let lifeFrame = 0;
+    for (const target of [15, 30, 45, 90, 180]) {
+      await advance(target - lifeFrame); lifeFrame = target;
+      await lifeShot(`lit-${target}f`, target);
+    }
+    await H('teleport', hx - 14, hy, hz + 18, Math.PI); await H('photo', ...lens);
+    for (const target of [60, 120, 180, 210, 240, 300, 360, 420]) {
+      await advance(target + 180 - lifeFrame); lifeFrame = target + 180;
+      await lifeShot(`decay-${target}f`, lifeFrame);
+    }
+    const sheet = await context.newPage();
+    try {
+      await sheet.setViewportSize({ width: 1600, height: 900 });
+      const cards = lifecycle.map(f => `<figure><figcaption>${f.name} ${f.hearth.state} heat=${f.hearth.heat}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, `updraft-fx-${f.name}.png`)).toString('base64')}"></figure>`).join('');
+      await sheet.setContent(`<style>*{box-sizing:border-box}body{margin:0;background:#211b16;color:#eadfc8;font:14px sans-serif;display:grid;grid-template-columns:repeat(4,1fr)}figure{margin:0}figcaption{height:26px;padding:5px}img{display:block;width:100%}</style>${cards}`);
+      await sheet.evaluate(() => Promise.all([...document.images].map(im => im.decode())));
+      await sheet.screenshot({ path: path.join(out, 'updraft-fx-contact.png'), fullPage: true });
+    } finally { await sheet.close(); }
+    save('updraft-fx-check.json', {
+      effect: 'hearth-updraft', method: 'fx-capture lifecycle / fixed 60Hz / hardware GPU',
+      ok: lifecycle[0].hearth.heat === 0 && lifecycle.some(f => f.hearth.heat >= 0.99) && lifecycle.at(-1).hearth.heat === 0,
+      frames: lifecycle,
+    });
+    // Distance affordance lens: identical lit staging, camera 20m from column axis.
+    await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(30);
+    await H('photo', [hx - 12, hy + 6, hz + 16], [hx, hy + 3, hz], 50);
+    await advance(1); await shot('updraft-fx-distance-20m');
+    await H('teleport', hx - 14, hy, hz + 18, Math.PI); await advance(480, false);
     const runFrom = [hx - 1.4, hy, hz + 9];
     for (const variant of ['A', 'B']) {
       await H('photoOff');
