@@ -180,30 +180,8 @@ export async function createFox(): Promise<FoxActor> {
     const root = gltf.scene;
     tuneMaterials(root);
 
-    // Authoring pass against fox-turnaround.jpg: bigger bushy tail, longer snout, taller ears.
-    // Scale skinned child meshes + rest-pose bones (mixer still drives rotations).
-    root.traverse((obj) => {
-      const n = (obj.name || '').toLowerCase();
-      if ((obj as THREE.Mesh).isMesh) {
-        if (n.includes('tail') || n.includes('spiritfox_tail')) {
-          obj.scale.multiplyScalar(1.55);
-        } else if (n.includes('fur') && n.includes('tuft')) {
-          obj.scale.multiplyScalar(1.25);
-        } else if (n.includes('wisp')) {
-          obj.scale.multiplyScalar(1.2);
-        }
-      }
-      // Bone rest-scale (safe: clips key rotation/position, not scale)
-      if ((obj as THREE.Bone).isBone) {
-        if (/^tail\d/i.test(obj.name) || obj.name === 'Tail1') {
-          obj.scale.set(1.35, 1.35, 1.45);
-        } else if (obj.name === 'Head') {
-          obj.scale.set(1.05, 1.05, 1.35); // elongate snout axis
-        } else if (/^Ear/i.test(obj.name)) {
-          obj.scale.set(1.15, 1.35, 1.15);
-        }
-      }
-    });
+    // Proportions (plume tail, snout, ears, fur shells) are authored in the GLB
+    // by the Opus Blender pass — do not re-inflate meshes/bones here.
 
     // Scale by height so the slender quadruped proportions stay — not max-axis (was puffing width)
     const box0 = new THREE.Box3().setFromObject(root);

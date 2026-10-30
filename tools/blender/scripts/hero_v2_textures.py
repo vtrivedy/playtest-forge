@@ -60,28 +60,35 @@ def flame(x0, y0, w, h, seed):
 for i in range(4):
     flame((i % 2) * 256, (i // 2) * 512, 256, 512, 11 + i)
 
-def tuft(x0, y0, w, h, base, tip, seed, strands=26):
-    """Fur tuft: tapered strands fanning from bottom-center to the top."""
+def tuft(x0, y0, w, h, base, tip, seed, strands=110):
+    """Soft fur lock: teardrop envelope filled with fine tapered strands that break up at the edge."""
     rnd = random.Random(seed)
     layer = Image.new("RGBA", (w, h), (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
     for s in range(strands):
-        a = rnd.uniform(-0.45, 0.45); L = h * rnd.uniform(0.6, 0.97); bw = w * rnd.uniform(0.05, 0.09)
-        bx = w / 2 + rnd.uniform(-0.18, 0.18) * w; by = h
-        curl = rnd.uniform(-0.3, 0.3)
+        u = rnd.uniform(-1, 1)                                   # lateral slot in the lock
+        L = h * (0.97 - 0.55 * abs(u) ** 1.2) * rnd.uniform(0.4, 1.0)
+        bx = w / 2 + u * w * 0.30; by = h
+        bw = w * rnd.uniform(0.012, 0.026)
         pts_l, pts_r = [], []
-        for i in range(21):
-            t = i / 20
-            ang = a + curl * t * t
-            cx = bx + math.sin(ang) * L * t; cy = by - math.cos(ang) * L * t
-            ww = bw * (1 - t) ** 0.9
+        for i in range(25):
+            t = i / 24
+            bulge = math.sin(min(1, t * 1.6) * math.pi * 0.5) * (1 - t) * 0.22  # widen then gather to the tip
+            cx = bx + u * w * bulge + math.sin(t * 3 + s) * 2; cy = by - L * t
+            ww = bw * (1 - t) ** 0.8 + 0.6
             pts_l.append((cx - ww, cy)); pts_r.append((cx + ww, cy))
-        shade = rnd.uniform(0.85, 1.1)
-        c = tuple(min(255, int(v * shade)) for v in lerp(base, tip, rnd.uniform(0.3, 1)))
+        c = lerp(base, tip, min(1, 0.25 + 0.75 * rnd.uniform(0.6, 1.0)))
+        k_ = rnd.uniform(0.78, 1.08); c = tuple(min(255, int(v * k_)) for v in c)
         d.polygon(pts_l + pts_r[::-1], fill=c + (255,))
-    col.alpha_composite(layer.filter(ImageFilter.GaussianBlur(1.2)), (x0, y0))
+    # root shading so layered locks read as depth, not flat paper
+    grad = Image.new("L", (w, h)); gp = grad.load()
+    for yy in range(h):
+        for xx in range(w): gp[xx, yy] = int(255 * (0.72 + 0.28 * (1 - yy / h)))
+    rgb = ImageChops.multiply(layer.convert("RGB"), Image.merge("RGB", (grad, grad, grad)))
+    rgb.putalpha(layer.split()[3])
+    col.alpha_composite(rgb.filter(ImageFilter.GaussianBlur(0.8)), (x0, y0))
 
-tuft(512, 0, 256, 512, (176, 128, 86), (222, 200, 166), 3)       # cream ruff
-tuft(768, 0, 256, 512, (110, 42, 14), (190, 86, 30), 4)          # rust scruff
+tuft(512, 0, 256, 512, (232, 204, 160), (252, 240, 214), 3)        # warm cream lock (clean, no pink)
+tuft(768, 0, 256, 512, (196, 92, 34), (242, 152, 70), 4)           # burnt-orange lock -> warm gold tips
 
 def maple(x0, y0, w, seed):
     rnd = random.Random(seed)
@@ -119,13 +126,13 @@ out.save(f"{OUT}/cards_col.png", optimize=True); emi.save(f"{OUT}/cards_emit.png
 # ---------------- tail strip: u around, v along (row 0 = image top = tip in Blender v=1)
 TW, TH = 256, 1024
 tc = Image.new("RGB", (TW, TH)); te = Image.new("RGB", (TW, TH))
-TAIL = [(0, (150, 58, 22)), (0.3, (196, 86, 30)), (0.55, (232, 120, 34)), (0.78, (250, 170, 60)), (1, (255, 222, 140))]
+TAIL = [(0, (176, 84, 32)), (0.35, (204, 104, 40)), (0.62, (222, 128, 52)), (0.82, (236, 176, 108)), (1, (246, 226, 190))]  # burnt orange -> cream tip
 pc, pe = tc.load(), te.load()
 for y in range(TH):
     v = 1 - y / (TH - 1)
     for x in range(TW):
         pc[x, y] = ramp(TAIL, v)
-        e = max(0, (v - 0.5) / 0.5) ** 1.5
+        e = 0.5 * max(0, (v - 0.8) / 0.2) ** 2  # faint ember warmth at the very tip only
         pe[x, y] = lerp((0, 0, 0), ramp(TAIL, v), e)
 d = ImageDraw.Draw(tc); de = ImageDraw.Draw(te)
 rnd = random.Random(99)
@@ -137,5 +144,14 @@ for s in range(900):  # long strands along v
     for dx in (0, TW, -TW):
         d.line([(x + dx, y), (x + dx + rnd.uniform(-6, 6), y + L)], fill=c, width=rnd.choice([1, 2, 2, 3]))
 tc = tc.filter(ImageFilter.GaussianBlur(0.8))
+# alpha = long strand mask along v (used by the tail fur shells with alpha-clip; core ignores alpha)
+am = Image.new("L", (TW, TH), 0); da = ImageDraw.Draw(am)
+for s in range(2600):
+    x = rnd.uniform(0, TW); y = rnd.uniform(0, TH); L = rnd.uniform(30, 110); val = rnd.uniform(0.35, 1.0)
+    for i in range(8):  # taper: bright root -> fading tip (tip toward higher v = image top)
+        t0, t1 = i / 8, (i + 1) / 8
+        for dx in (0, TW, -TW):
+            da.line([(x + dx, y - L * t0), (x + dx + 1.5 * t1, y - L * t1)], fill=int(255 * val * (1 - t0) ** 0.7), width=2)
+tc.putalpha(am)
 tc.save(f"{OUT}/tail_col.png", optimize=True); te.save(f"{OUT}/tail_emit.png", optimize=True)
 print("textures ok")

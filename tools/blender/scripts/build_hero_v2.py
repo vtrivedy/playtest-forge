@@ -11,7 +11,7 @@ from mathutils import Vector, Matrix
 ROOT = "/workspace/siyu/playtest-forge"
 SRC = f"{ROOT}/assets/hero/source/fox_quaternius_raw.glb"
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-OUT = argv[0] if argv else f"{ROOT}/assets/hero/candidates/opus/spirit_fox_v2.glb"
+OUT = argv[0] if argv else f"{ROOT}/assets/hero/spirit_fox.glb"
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
@@ -23,6 +23,17 @@ for o in [o for o in sc.objects if o.type == "MESH" and o is not fox]:
     bpy.data.objects.remove(o, do_unlink=True)
 arm.name = "SpiritFox_Armature"; fox.name = "SpiritFox_Body"
 SRC_ACTIONS = {a.name.split("_AnimalArmature")[0]: a for a in bpy.data.actions}
+# the CC0 feet are skinned to IK/foot helper bones that are dropped before export -> fold them into the real
+# leg chain first (else the paws are unweighted and stay frozen at rest while the legs move)
+HELPER_TO_LEG = {f"{h}.{s}": f"{leg}.{s}" for s in "LR" for h, leg in
+                 (("FF", "FrontLowerLeg"), ("IKFrontLeg", "FrontLowerLeg"), ("FFB", "BackLowerLeg"), ("IKBackLeg", "BackLowerLeg"))}
+for hname, lname in HELPER_TO_LEG.items():
+    hg, lg = fox.vertex_groups.get(hname), fox.vertex_groups[lname]
+    if not hg: continue
+    for v in fox.data.vertices:
+        w = next((g.weight for g in v.groups if g.group == hg.index), 0.0)
+        if w > 0: lg.add([v.index], min(1.0, w + next((g.weight for g in v.groups if g.group == lg.index), 0.0)), "REPLACE")
+    fox.vertex_groups.remove(hg)
 arm.animation_data_create(); arm.animation_data.action = None
 
 def upd(): bpy.context.view_layer.update()
@@ -55,7 +66,7 @@ for s in ("L", "R"):
     sign = 1 if s == "L" else -1
     rot_world(f"Ear1.{s}", "Y", -14 * sign)
     rot_world(f"Ear1.{s}", "X", 6)
-    scl(f"Ear1.{s}", 1.05, 1.38, 1.05)
+    scl(f"Ear1.{s}", 1.2, 1.62, 1.2)  # big fox ears (turnaround: ears ~= head length)
 # slender, slightly longer legs
 for s in ("L", "R"):
     scl(f"FrontUpperLeg.{s}", 0.93, 1.07, 0.93)
@@ -77,6 +88,34 @@ bpy.ops.object.mode_set(mode="POSE")
 bpy.ops.pose.armature_apply(selected=False)
 bpy.ops.object.mode_set(mode="OBJECT")
 m = fox.modifiers.new("Armature", "ARMATURE"); m.object = arm
+
+# ---------------------------------------------------------------- paw bones (paw flex for run / land)
+GROUND = min(v.co.z for v in fox.data.vertices)
+PAW_TOP = GROUND + 0.30
+bpy.context.view_layer.objects.active = arm
+bpy.ops.object.mode_set(mode="EDIT")
+EB = arm.data.edit_bones
+PAWS = {}
+for s in ("L", "R"):
+    for leg, pname in ((f"FrontLowerLeg.{s}", f"FrontPaw.{s}"), (f"BackLowerLeg.{s}", f"BackPaw.{s}")):
+        par = EB[leg]
+        d = (par.tail - par.head)
+        t = (PAW_TOP - par.head.z) / d.z if abs(d.z) > 1e-6 else 1.0
+        h = par.head + d * max(0.0, t)  # fetlock on the leg line (front: extrapolated past the carpus bone)
+        b = EB.new(pname); b.head = h; b.tail = Vector((h.x, h.y - 0.22, GROUND + 0.05)); b.roll = 0
+        b.parent = par; b.use_connect = False; b.use_deform = True
+        PAWS[pname] = (leg, s)
+bpy.ops.object.mode_set(mode="OBJECT")
+for pname, (leg, s) in PAWS.items():
+    vg = fox.vertex_groups.new(name=pname); lg = fox.vertex_groups[leg].index
+    for v in fox.data.vertices:
+        wl = next((g.weight for g in v.groups if g.group == lg), 0.0)
+        if wl < 0.5 or v.co.z > PAW_TOP + 0.06: continue
+        k = min(1.0, max(0.0, (PAW_TOP + 0.06 - v.co.z) / 0.14))
+        k = k * k * (3 - 2 * k)
+        for g in v.groups: g.weight *= (1 - k)
+        vg.add([v.index], k, "REPLACE")
+print("PAWS", GROUND, PAW_TOP, list(PAWS))
 
 # ---------------------------------------------------------------- smooth continuous mesh
 bpy.context.view_layer.objects.active = fox
