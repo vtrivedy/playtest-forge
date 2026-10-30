@@ -69,7 +69,7 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
   for (const h of hearths) hearthBrazier(stone, h.x, h.y, h.z, 860 + hearths.indexOf(h));
   world.hearthSpots.push(...hearths);
   world.windSpots.push({ id: 'crown-home', source: [-49, 34.7, -119], radius: 3.4,
-    path: [[-46, 41, -114], [-33, 41, -107], [-23, 40.5, -97], [-19, 40, -88]] });
+    path: [[-46, 43, -114], [-33, 43, -107], [-23, 43, -97], [-19, 43, -88]] });
   world.shadeSpots.push({ id: 'crown-shade', speed: 1.5,
     patrol: [[-47, 29, -107], [-42, 29, -107], [-42, 29, -111], [-47, 29, -111]] });
   // Reuse the realm's textured PBR materials and mask patching.
