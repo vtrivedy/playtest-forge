@@ -77,6 +77,10 @@ scl("Tail1", 1.32, 1.32, 1.32)
 rot_world("Tail3", "X", 2)
 rot_world("Tail5", "X", 14)
 rot_world("Tail7", "X", 30)
+# slight sweep to the fox's right (concept back view): from the chase cam the plume curls off the rump
+# instead of stacking straight toward the camera
+rot_world("Tail3", "Z", 5)
+rot_world("Tail6", "Z", 7)
 
 bpy.ops.object.mode_set(mode="OBJECT")
 # bake posed shape into mesh, then make it the rest pose

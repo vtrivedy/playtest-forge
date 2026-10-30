@@ -1,5 +1,6 @@
 """Procedural textures for hero v2 (system python + PIL, deterministic).
-Writes assets/hero/source/v2/{cards_col.png, cards_emit.png, tail_col.png, tail_emit.png}
+Writes assets/hero/source/v2/{cards_col.png, cards_emit.png, tail_col.png, tail_emit.png, tail_core.png}
+tail v = arc fraction along the tail (0 root .. 1 old tip); fur only exists to ~0.68, then the plume is flame cards.
 cards atlas 1024: [0..512 x 0..1024] 4 flame wisps (128x1024 each... laid as 2x2 of 256x512)
                   [512..1024 x 0..512]  2 fur tufts (cream | rust), 256x512 each
                   [512..1024 x 512..1024] 4 maple leaves 256x256
@@ -82,13 +83,13 @@ def tuft(x0, y0, w, h, base, tip, seed, strands=110):
     # root shading so layered locks read as depth, not flat paper
     grad = Image.new("L", (w, h)); gp = grad.load()
     for yy in range(h):
-        for xx in range(w): gp[xx, yy] = int(255 * (0.72 + 0.28 * (1 - yy / h)))
+        for xx in range(w): gp[xx, yy] = int(255 * (0.84 + 0.16 * (1 - yy / h)))
     rgb = ImageChops.multiply(layer.convert("RGB"), Image.merge("RGB", (grad, grad, grad)))
     rgb.putalpha(layer.split()[3])
     col.alpha_composite(rgb.filter(ImageFilter.GaussianBlur(0.8)), (x0, y0))
 
 tuft(512, 0, 256, 512, (232, 204, 160), (252, 240, 214), 3)        # warm cream lock (clean, no pink)
-tuft(768, 0, 256, 512, (196, 92, 34), (242, 152, 70), 4)           # burnt-orange lock -> warm gold tips
+tuft(768, 0, 256, 512, (212, 112, 44), (246, 166, 80), 4)          # burnt-orange lock (body orange) -> warm gold tips
 
 def maple(x0, y0, w, seed):
     rnd = random.Random(seed)
@@ -126,12 +127,14 @@ out.save(f"{OUT}/cards_col.png", optimize=True); emi.save(f"{OUT}/cards_emit.png
 # ---------------- tail strip: u around, v along (row 0 = image top = tip in Blender v=1)
 TW, TH = 256, 1024
 tc = Image.new("RGB", (TW, TH)); te = Image.new("RGB", (TW, TH))
-TAIL = [(0, (176, 84, 32)), (0.35, (204, 104, 40)), (0.62, (222, 128, 52)), (0.82, (236, 176, 108)), (1, (246, 226, 190))]  # burnt orange -> cream tip
+# same burnt orange as the body, brightening toward the flame (no khaki / brown plume)
+TAIL = [(0, (214, 116, 48)), (0.3, (222, 124, 50)), (0.5, (226, 136, 54)), (0.66, (242, 170, 84)), (1, (250, 214, 150))]
 pc, pe = tc.load(), te.load()
 for y in range(TH):
     v = 1 - y / (TH - 1)
     for x in range(TW):
-        pc[x, y] = ramp(TAIL, v)
+        under = max(0.0, -math.sin(x / TW * 2 * math.pi))  # underside a touch lighter: it sits in shadow
+        pc[x, y] = tuple(min(255, int(ch * (1 + 0.12 * under))) for ch in ramp(TAIL, v))
         e = 0.5 * max(0, (v - 0.8) / 0.2) ** 2  # faint ember warmth at the very tip only
         pe[x, y] = lerp((0, 0, 0), ramp(TAIL, v), e)
 d = ImageDraw.Draw(tc); de = ImageDraw.Draw(te)
@@ -152,6 +155,17 @@ for s in range(2600):
         t0, t1 = i / 8, (i + 1) / 8
         for dx in (0, TW, -TW):
             da.line([(x + dx, y - L * t0), (x + dx + 1.5 * t1, y - L * t1)], fill=int(255 * val * (1 - t0) ** 0.7), width=2)
-tc.putalpha(am)
+# fur dissolves into flame: alpha envelope eaten from the tip in flame-tongue shapes (core = MASK clip 0.5)
+env = Image.new("L", (TW, TH)); ep = env.load()
+ph = [rnd.uniform(0, 6.3) for _ in range(3)]
+for x in range(TW):
+    th = x / TW * 2 * math.pi
+    edge = 0.5 + 0.06 * math.sin(3 * th + ph[0]) + 0.05 * math.sin(7 * th + ph[1]) + 0.03 * math.sin(13 * th + ph[2])
+    for y in range(TH):
+        v = 1 - y / (TH - 1)
+        ep[x, y] = int(255 * max(0.0, min(1.0, (edge + 0.12 - v) / 0.24)))
+env = env.filter(ImageFilter.GaussianBlur(2))
+core = tc.copy(); core.putalpha(env); core.save(f"{OUT}/tail_core.png", optimize=True)
+tc.putalpha(ImageChops.multiply(am, env))
 tc.save(f"{OUT}/tail_col.png", optimize=True); te.save(f"{OUT}/tail_emit.png", optimize=True)
 print("textures ok")

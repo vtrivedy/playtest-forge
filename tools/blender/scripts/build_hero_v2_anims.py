@@ -2,6 +2,7 @@
 # Builds the 9 game clips (idle, run, jump_up, jump_apex, jump_fall, glide, dash, land, burst)
 # run / dash / glide are a procedural sagittal gallop; idle / jumps / land / burst resample the CC0
 # Quaternius clips (re-proportioned rest) + world-axis overlays.
+import random
 from mathutils import Quaternion, Euler
 FPS = sc.render.fps  # 24
 # drop IK / pole helper bones (no deform weights, not driven in glTF)
@@ -45,8 +46,27 @@ def tail_wave(p, t, amp_yaw=6, amp_pitch=3, speed=1.0, lift=0.0, per=0.0):
         wrot(p, b, (0, 0, 1), amp_yaw * math.sin(ph) * (0.4 + i / 8))
         wrot(p, b, (1, 0, 0), amp_pitch * math.sin(ph * 0.5 + 1.0) + (lift if i == 0 else per))
 
+FXB = [b for b in BONES if b.startswith("Fx")]
+def fx_flicker(frames):
+    """spirit-flame flicker on the Fx* bones: stretch/squash along the flame + a small sway. Whole cycles per
+    clip so loops are seamless; per-bone phases so the plume, ears and nape never pulse in sync."""
+    n = max(1, len(frames) - 1); sec = n / FPS
+    for bn in FXB:
+        r_ = random.Random(sum(map(ord, bn)))
+        ph = [r_.uniform(0, 6.283) for _ in range(4)]
+        c1, c2 = max(1, round(sec * 2.6)), max(2, round(sec * 4.7))
+        ear = bn.startswith("FxEar")
+        for f, pose in enumerate(frames):
+            t = f / n
+            a1 = math.sin(2 * math.pi * c1 * t + ph[0]); a2 = math.sin(2 * math.pi * c2 * t + ph[1])
+            sy = 1 + 0.12 * a1 + 0.06 * a2
+            sxz = 1 - 0.06 * a1 + 0.04 * math.sin(2 * math.pi * c2 * t + ph[2])
+            pose[bn][2] = Vector((sxz, sy, sxz))
+            sway = (9 if ear else 5)
+            pose[bn][1] = Euler((math.radians(sway * 0.6 * a2), 0, math.radians(sway * math.sin(2 * math.pi * c1 * t + ph[3])))).to_quaternion()
 def make(name, frames):
     """frames: list of pose dicts, one per frame starting at 0."""
+    fx_flicker(frames)
     act = bpy.data.actions.new(name); act.use_fake_user = True; act.id_root = "OBJECT"
     fcs = {}
     prevq = {}
@@ -211,7 +231,7 @@ f0_, f1_ = sample(S["Gallop_Jump"], 13.6), sample(S["Gallop_Jump"], 14.6)
 fa = [blend(f0_, f1_, 0.5 - 0.5 * math.cos(2 * math.pi * i / 12)) for i in range(13)]
 for f, p in enumerate(fa):
     wrot(p, "Body", (1, 0, 0), 6)
-    tail_wave(p, f / 12, amp_yaw=4, amp_pitch=5, lift=20)
+    tail_wave(p, f / 12, amp_yaw=4, amp_pitch=5, lift=7)  # trails behind, never flips up into a crest
     for e in EARS: wrot(p, e, (1, 0, 0), 16)
 make("jump_fall", fa)
 
@@ -222,6 +242,7 @@ for i in range(25):
     t = i / 24; p = gallop_pose(0.36)
     for s_ in "LR":
         wrot(p, f"FrontUpperLeg.{s_}", (1, 0, 0), -16); wrot(p, f"FrontLowerLeg.{s_}", (1, 0, 0), -6)
+        wrot(p, f"FrontPaw.{s_}", (1, 0, 0), 38)  # carpal break: paw folds at the wrist (no noodle leg)
         wrot(p, f"BackLeg.{s_}", (1, 0, 0), 14)
     wrot(p, "Body", (0, 1, 0), 4 * math.sin(2 * math.pi * t))
     wloc(p, "Body", (0, 0, 0.04 * math.sin(2 * math.pi * t + 1)))
@@ -256,7 +277,9 @@ def burst_pose(c, r):
     wrot(p, "Head", (1, 0, 0), -6 * r)
     for e in EARS: wrot(p, e, (1, 0, 0), 14 * c - 8 * r)
     for i, b in enumerate(TAILS): wrot(p, b, (1, 0, 0), (12 - 10 * c if i == 0 else 0) + ((30 if i == 0 else 6) * r))
-    for s_ in "LR": wrot(p, f"FrontUpperLeg.{s_}", (1, 0, 0), -18 * r)
+    for s_ in "LR":
+        wrot(p, f"FrontUpperLeg.{s_}", (1, 0, 0), -18 * r); wrot(p, f"FrontLowerLeg.{s_}", (1, 0, 0), 22 * r)
+        wrot(p, f"FrontPaw.{s_}", (1, 0, 0), 40 * r)  # rear-up: forelegs bend at elbow + wrist
     return p
 keys = [(0, 0, 0), (4, 1, 0), (6, 0.6, 0.4), (9, 0, 1), (12, 0, 1), (18, 0, 0)]
 bu = []
