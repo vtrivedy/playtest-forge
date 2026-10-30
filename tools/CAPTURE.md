@@ -65,3 +65,6 @@ records patrol, contact/knockback and dash-free on safe collision-checked lanes.
 `python3 tools/compare-gait.py LEFT/gait RIGHT/gait --out REVIEW` builds the matched
 side-by-side MP4 and joint-landmark tables. Both captures must use the same tool hash,
 quality, timing and gym metadata. Read the stated proxy limitations before scoring.
+Review jobs use Modal's `--detach` mode so client disconnects do not cancel GPU work.
+The helper still waits for completion and fetches the durable archive; failed or
+interrupted results retain their run ID for `--fetch-only` recovery.
