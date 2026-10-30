@@ -100,10 +100,16 @@ export function createAmberwoodRegion(parent: THREE.Group, col: CollisionWorld, 
     const steps = Math.ceil((1 - t0) * 96);
     return Array.from({ length: steps + 1 }, (_, i) => point(t0 + (1 - t0) * i / steps));
   };
-  const p0 = point(0), p2 = point(10 / top), pEnd = point(1);
+  // K2 counter-spirals from the ring into the same socket; keeping it on a
+  // distinct line avoids coincident root meshes after permanent restoration.
+  const alternate = Array.from({ length: 49 }, (_, i) => {
+    const t = i / 48, a = turns * Math.PI * 2 + (1 - t) * 1.1 * Math.PI * 2;
+    return [x + Math.sin(a) * radius, 10 + (top - 10) * t, z + Math.cos(a) * radius] as [number, number, number];
+  });
+  const p0 = point(0), p2 = alternate[0]!, pEnd = point(1);
   const rootSpots: RootSpot[] = [
     { id: HEARTWOOD.roots[0], knot: new THREE.Vector3(p0[0] - 0.7, 0, p0[2] - 0.5), path: path(0), segments: 4, width: 1.6, restoredBy: 'SW3' },
-    { id: HEARTWOOD.roots[1], knot: new THREE.Vector3(p2[0], 10, p2[2]), path: path(10 / top), segments: 2, width: 1.6, restoredBy: 'SW3' },
+    { id: HEARTWOOD.roots[1], knot: new THREE.Vector3(p2[0], 10, p2[2]), path: alternate, segments: 2, width: 1.6, restoredBy: 'SW3' },
   ];
   const mesh = bark.toMesh(barkMaterial, { boxUV: 2 });
   if (mesh) { mesh.name = 'Hollow maple heartwood'; parent.add(mesh); }
