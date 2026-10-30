@@ -254,9 +254,17 @@ try {
       stroke.strength=1;
       const spent={strength:field.strokeAt(pos),supplied:h.chem.supplyAt(pos)};
       field.strokes.splice(field.strokes.indexOf(stroke),1);field.fox.copy(original);
-      return {label:'Isolated public colour-field rule probe; staged aura/stroke samples, restored immediately; no encounter release forced',aura,strong,spent};
+      const source=h.chem.updrafts.hearths[0].reactor;
+      const reactor=new source.constructor('shade-rule-probe','hearth',[pos],source.tun);
+      reactor.update(source.tun.igniteTime,()=>1,()=>true);
+      reactor.update(.1,()=>0,()=>true);
+      const gutter={state:reactor.state,holdLeft:reactor.holdLeft,heat:reactor.heat};
+      reactor.restored=true;reactor.update(1,()=>0,()=>true);
+      const restored={state:reactor.state,heat:reactor.heat};
+
+      return {label:'Isolated public colour-field rule probe; staged aura/stroke samples, restored immediately; no encounter release forced',aura,strong,spent,gutter,restored};
     });
-    if(rules.aura.raw<.9||rules.aura.supplied!==0||rules.strong.supplied!==1||rules.spent.supplied!==0)throw Error(`Shade colour rules failed ${JSON.stringify(rules)}`);
+    if(rules.aura.raw<.9||rules.aura.supplied!==0||rules.strong.supplied!==1||rules.spent.supplied!==0||rules.gutter.holdLeft!==0||rules.gutter.state!=='guttering'||rules.restored.heat!==1||rules.restored.state!=='restored')throw Error(`Shade colour rules failed ${JSON.stringify(rules)}`);
     save('shade-colour-rules.json',rules);
 
     await camera();
