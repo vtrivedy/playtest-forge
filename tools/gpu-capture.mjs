@@ -348,7 +348,7 @@ try {
       const contactBefore=await page.evaluate(()=>window.__gameHooks.shades.state());
       await H('teleport',...approach.pos,0);
       const [cx,cy,cz]=edge.pos;
-      await H('photo',[cx+1,cy+4,cz+8],[cx+approach.direction[0]*1.5,cy+1,cz+approach.direction[1]*1.5],48);
+      await H('photo',[cx+5.5,cy+3.8,cz+5.5],[cx+approach.direction[0]*1.5,cy+1,cz+approach.direction[1]*1.5],48);
       await H('setStick',-approach.direction[0],-approach.direction[1]);let touch=null;
       await video('shade-clear-contact',110,async i=>{
         const state=await page.evaluate(()=>window.__gameHooks.shades.state());
@@ -370,7 +370,7 @@ try {
       const before=await page.evaluate(()=>window.__gameHooks.shades.state());
       await H('teleport',...setup.pos,setup.yaw);
       const [x,y,z]=edge.pos;
-      await H('photo',[x+1,y+3.2,z+8],[x,y+1.2,z],48);
+      await H('photo',[x+5.5,y+3.8,z+5.5],[x,y+1.6,z],48);
       await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
       await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,{traceEveryFrame:true,keyFrames:[0,5,12,24,36,48,75,119]});
       const after=await page.evaluate(()=>window.__gameHooks.shades.state());
@@ -1083,6 +1083,13 @@ try {
       await H('setKeys', ['KeyW']); await advance(70); await shot(`fox-${state}-chase-run`);
       await H('setKeys', ['KeyW', 'KeyA']); await advance(25); await shot(`fox-${state}-chase-turn`);
       await H('setKeys', []);
+      // Labelled tracking review: live controller input, camera follows at hero-readable distance.
+      await H('setKeys', ['KeyW']);
+      await video(`fox-${state}-run-staged-close`, 2 * fps, async () => {
+        const f = await H('getFoxPos');
+        await H('photo', [f.x+2.7,f.y+0.9,f.z-3.0], [f.x,f.y+0.52,f.z], 34);
+      });
+      await H('setKeys', []); await H('photoOff');
     }
   }
   if (wants('turntable')) {

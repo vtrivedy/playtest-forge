@@ -182,19 +182,7 @@ export function applyFoxLook(root: THREE.Object3D) {
       const n = (mat.name || mesh.name || '').toLowerCase();
       if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
       if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-      if (n.includes('spiritwisp')) {
-        // authored flame / glow cards: light, not matter (no shadows; the shadow pass ignores blend alpha)
-        mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffffff);
-        const isGlow = n.includes('glow');
-        mat.emissiveIntensity = isGlow ? 0.3 : Math.min(mat.emissiveIntensity || 0.5, 0.5);
-        mat.transparent = true;
-        mat.depthWrite = false;
-        mesh.castShadow = false;
-        // translucent: the brush dissolves into soft flame instead of an opaque fan over the rump
-        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.12 : n.includes('tailflame') ? 0.24 : 0.32);
-        if (isGlow) mat.side = THREE.FrontSide;
-      } else if (n.includes('eye')) {
+      if (n.includes('eye')) {
         patchEye(mat, mesh.geometry);
         eyeMats.push(mat);
       } else if (n.includes('nose')) {
@@ -303,11 +291,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const R = FOX_RIG;
   // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — calm at idle: nothing on the ears / head
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
-    [body, [R.spine[3], R.neck[0]], 0.65, 2, 0.16, 0.06, 0.7],
-    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.18, 0.06, 0.8],
+    [body, [R.spine[3], R.neck[0]], 0.65, 0, 0.16, 0.06, 0.7],
+    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 0, 0.18, 0.06, 0.8],
     [tail, R.tail.slice(3), 0.0, 8, 0.34, 0.15, 0.9],
-    [body, R.ear("l").slice(2), -1.0, 1, 0.12, 0.06, 0.4],
-    [body, R.ear("r").slice(2), -1.0, 1, 0.12, 0.06, 0.4],
+    [body, R.ear("l").slice(2), -1.0, 0, 0.12, 0.06, 0.4],
+    [body, R.ear("r").slice(2), -1.0, 0, 0.12, 0.06, 0.4],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
