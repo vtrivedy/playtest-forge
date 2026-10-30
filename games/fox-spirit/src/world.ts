@@ -70,10 +70,10 @@ function makeTerrain(radius: number): {
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const colors = new Float32Array(pos.count * 3);
   // Parchment ground — paper-warm base with rust moss / path ink
-  const cGrass = new THREE.Color(0xd2b896); // parchment meadow
+  const cGrass = new THREE.Color(0xe8d2a8); // luminous parchment meadow
   const cMoss = new THREE.Color(0x9a5a38); // rust moss
   const cDirt = new THREE.Color(0x7a5538);
-  const cPath = new THREE.Color(0xb89870); // worn parchment path
+  const cPath = new THREE.Color(0xd4b888); // luminous worn path
   const cRock = new THREE.Color(0x5c5650);
   const cCliff = new THREE.Color(0x4a4540);
   const tmp = new THREE.Color();
@@ -103,7 +103,7 @@ function makeTerrain(radius: number): {
   const cnv = document.createElement('canvas');
   cnv.width = 256; cnv.height = 256;
   const ctx = cnv.getContext('2d')!;
-  ctx.fillStyle = '#c8b090';
+  ctx.fillStyle = '#e2cba0';
   ctx.fillRect(0, 0, 256, 256);
   for (let i = 0; i < 9000; i++) {
     const x = Math.random() * 256;
@@ -240,9 +240,9 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
   const grass = createWindGrass(scene, {
     count: 11000,
     radius: 28,
-    bladeHeight: 0.52,
-    bladeBaseW: 0.095,
-    bladeTipW: 0.012,
+    bladeHeight: 0.28,
+    bladeBaseW: 0.1,
+    bladeTipW: 0.014,
     color: 0x8a4e1e,       // rust root (restored)
     tipColor: 0xc9963a,    // muted gold tip
     monoColor: 0x3a3228,   // dark sepia root (readable against parchment ground)

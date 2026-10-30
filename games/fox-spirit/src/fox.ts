@@ -120,16 +120,35 @@ export async function createFox(): Promise<FoxActor> {
         for (const raw of list) {
           const mat = raw as THREE.MeshStandardMaterial;
           if (!mat || !mat.isMeshStandardMaterial) continue;
-          const n = (mat.name || '').toLowerCase();
+          const n = (mat.name || c.name || '').toLowerCase();
           // Emission only on ember tips / wisps — body stays lit by scene, not bloom-orb
-          if (n.includes('ember') || n.includes('wisp') || n.includes('flame') || n.includes('tip')) {
-            mat.emissive = mat.emissive ?? new THREE.Color(0xff3a00);
-            mat.emissiveIntensity = 0.22;
+          if (n.includes('ember') || n.includes('wisp') || n.includes('flame') || n.includes('tip') || n.includes('tail')) {
+            mat.color.setHex(0xff8a30);
+            mat.emissive = new THREE.Color(0xff4a10);
+            mat.emissiveIntensity = 0.28;
             mat.toneMapped = true;
           } else if (n.includes('eye')) {
-            mat.emissiveIntensity = Math.min(mat.emissiveIntensity ?? 0.3, 0.35);
+            mat.emissiveIntensity = Math.min(mat.emissiveIntensity ?? 0.3, 0.4);
+          } else if (n.includes('belly') || n.includes('chest') || n.includes('under') || n.includes('sock') || n.includes('white') || n.includes('cream')) {
+            // Cream underbelly for silhouette contrast vs parchment ground
+            mat.color.setHex(0xf5e6d0);
+            mat.roughness = 0.62;
+            if (mat.emissive) mat.emissive.setHex(0x000000);
+            mat.emissiveIntensity = 0;
+          } else if (n.includes('fur') || n.includes('body') || n.includes('fox') || n.includes('skin') || n.includes('coat')) {
+            // Bright russet — high value so hero separates from ground
+            mat.color.setHex(0xe06028);
+            mat.roughness = 0.55;
+            mat.emissive = new THREE.Color(0x4a1808);
+            mat.emissiveIntensity = 0.08; // tiny fill so dark side isn't a mud blob
           } else {
-            // strip accidental body emission so silhouette reads under bloom
+            // Default body: lift dark GLB albedo into readable russet
+            const c0 = mat.color;
+            const lum = 0.2126 * c0.r + 0.7152 * c0.g + 0.0722 * c0.b;
+            if (lum < 0.35) {
+              mat.color.setHex(0xd45822);
+              mat.roughness = Math.min(mat.roughness ?? 0.7, 0.6);
+            }
             if (mat.emissive) mat.emissive.setHex(0x000000);
             mat.emissiveIntensity = 0;
           }
@@ -139,7 +158,7 @@ export async function createFox(): Promise<FoxActor> {
     const box = new THREE.Box3().setFromObject(root);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const targetLen = 2.7; // ~1.45× original — readable, not overshooting into grass
+    const targetLen = 3.0; // ~1.6× — trailer mid-frame fill
     const s = targetLen / Math.max(size.x, size.y, size.z, 0.001);
     root.scale.setScalar(s);
     box.setFromObject(root);
@@ -150,8 +169,8 @@ export async function createFox(): Promise<FoxActor> {
     const group = new THREE.Group();
     group.add(root);
     // Soft tip glow only — never wrap the whole body in bloom
-    const foxLight = new THREE.PointLight(0xff6622, 0.1, 2.2);
-    foxLight.position.set(-0.55, 0.55, 0); // near tail tip
+    const foxLight = new THREE.PointLight(0xff8844, 0.55, 5.5);
+    foxLight.position.set(0.15, 0.7, 0.35); // soft key on body + rim toward camera
     group.add(foxLight);
     const feetOffset = 0.02;
     return {

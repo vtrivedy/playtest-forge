@@ -70,7 +70,7 @@ export function createWindGrass(
 
   // Wider blades so density reads as a carpet, not pin stakes
   const geo = buildBladeGeometry(
-    opts.bladeHeight ?? 0.62,
+    opts.bladeHeight ?? 0.32,
     opts.bladeBaseW ?? 0.09,
     opts.bladeTipW ?? 0.01,
     8,
@@ -168,8 +168,8 @@ export function createWindGrass(
     // slight lean variety
     dummy.rotation.x = (Math.random() - 0.5) * 0.15;
     dummy.rotation.z = (Math.random() - 0.5) * 0.12;
-    const sx = 0.95 + Math.random() * 0.85;
-    const sy = 0.9 + Math.random() * 0.95;
+    const sx = 1.0 + Math.random() * 0.7;
+    const sy = 0.7 + Math.random() * 0.45; // ankle–knee, never torso
     dummy.scale.set(sx, sy, sx);
     dummy.updateMatrix();
     mesh.setMatrixAt(placed++, dummy.matrix);

@@ -38,7 +38,7 @@ async function boot() {
 
   const forge = await createForgeRenderer({
     container: document.body,
-    exposure: 1.05,
+    exposure: 1.18,
     shadows: true,
     shadowMapSize: 1024,
   });
@@ -49,7 +49,7 @@ async function boot() {
   // Low warm sun ahead-left of the shrine path (back-lights the north view, like key art)
   const sunDir = new THREE.Vector3(-0.3, 0.17, -0.94).normalize();
   lights.rim.position.copy(sunDir).multiplyScalar(20);
-  lights.rim.intensity = 0.8;
+  lights.rim.intensity = 1.55;
   const fog = applyHeightFog(scene, { density: 0.0075 });
   const sky = createPaintedSky(scene, {
     zenith: new THREE.Color(0x7f7aa6),
@@ -86,10 +86,10 @@ async function boot() {
   foxActor.group.position.y += foxActor.feetOffset;
 
   const cam = createFollowCamera({
-    fov: 50,
-    distance: 3.7,
-    height: 1.65,
-    lookAtHeight: 0.7,
+    fov: 48,
+    distance: 3.2,
+    height: 1.45,
+    lookAtHeight: 0.65,
     yAt: world.yAt,
   });
   cam.resize(innerWidth, innerHeight);
