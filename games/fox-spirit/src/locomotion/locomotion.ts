@@ -14,6 +14,9 @@ export type LocoParams = {
   strideLead: number;
   /** 0..1 how far moving strides centre under the hip instead of the standing paw spot */
   strideUnderHip: number;
+  /** Scapula swing (rad per unit of paw offset / leg reach) and its cap */
+  scapulaSwing: number;
+  maxScapula: number;
   /** Body lowers so planted paws stay within reach × this */
   reachMargin: number;
   /** Stance feet farther than reach × this from their hip are forced to step */
@@ -62,6 +65,8 @@ export const DEFAULT_LOCO: LocoParams = {
   idleStepTime: 0.2,
   strideLead: 0.5,
   strideUnderHip: 0.7,
+  scapulaSwing: 0.6,
+  maxScapula: 0.3,
   reachMargin: 0.96,
   overreach: 1.04,
   pitchAccel: 0.012,
@@ -512,6 +517,25 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     neutralFoot(L.rig, pos, yawAt, out, params.strideUnderHip);
     out.addScaledVector(vel, stanceT * params.strideLead);
     out.y = plantY(L, out.x, out.z);
+    // never aim a paw where the leg can't reach at touchdown (it would pop forward on contact)
+    const c = Math.cos(yawAt);
+    const sn = Math.sin(yawAt);
+    const hx = L.rig.restJoints[0].x;
+    const hz = L.rig.restJoints[0].z;
+    const hipX = pos.x + hx * c + hz * sn;
+    const hipZ = pos.z - hx * sn + hz * c;
+    const hipY = pos.y + L.rig.restJoints[0].y + (L.rig.fore ? state.liftF : state.liftH);
+    const r = L.rig.reach * params.reachMargin;
+    const dy = Math.min(r * 0.98, Math.max(0, hipY - out.y));
+    const maxH = Math.sqrt(r * r - dy * dy);
+    const dx = out.x - hipX;
+    const dz = out.z - hipZ;
+    const h = Math.hypot(dx, dz);
+    if (h > maxH) {
+      out.x = hipX + (dx * maxH) / h;
+      out.z = hipZ + (dz * maxH) / h;
+      out.y = plantY(L, out.x, out.z);
+    }
     return out;
   }
 
@@ -659,6 +683,14 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
   function solveLeg(L: LegState) {
     const chain = L.rig.chain;
     const js = L.joints;
+    if (L.rig.scapula) {
+      // shoulder blade swings the shoulder joint toward the paw (fore legs get most of their reach here)
+      const sh = chain[0].getWorldPosition(_v2);
+      const fwdW = _v3.set(0, 0, 1).applyQuaternion(bodyQ);
+      const dz = _v.copy(L.foot).sub(sh).dot(fwdW);
+      const ang = THREE.MathUtils.clamp((dz / L.rig.reach) * params.scapulaSwing, -params.maxScapula, params.maxScapula);
+      rotateBoneAxis(L.rig.scapula, _side.set(1, 0, 0).applyQuaternion(bodyQ), -ang);
+    }
     for (let i = 0; i < chain.length; i++) chain[i].getWorldPosition(js[i]);
     L.rig.foot.getWorldPosition(js[chain.length]);
     // soft reach: never fully lock the leg straight

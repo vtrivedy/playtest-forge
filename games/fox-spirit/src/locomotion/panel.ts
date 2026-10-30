@@ -33,6 +33,10 @@ export function createLocoPanel(gui: GUI, loco: Locomotion, move: MoveParams) {
   ff.add(p, 'idleStepTime', 0.06, 0.6, 0.01);
   ff.add(p, 'strideLead', 0, 1, 0.01);
   ff.add(p, 'overreach', 0.9, 1.3, 0.01);
+  ff.add(p, 'scapulaSwing', 0, 1.5, 0.01);
+  ff.add(p, 'maxScapula', 0, 0.6, 0.01);
+  ff.add(p, 'reachMargin', 0.8, 1, 0.005);
+  ff.add(p, 'strideUnderHip', 0, 1, 0.01);
   ff.add(p, 'airPoseRate', 2, 40, 0.5);
   const fb = f.addFolder('Body');
   fb.add(p, 'pitchAccel', 0, 0.05, 0.001);
