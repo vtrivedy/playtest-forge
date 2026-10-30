@@ -881,6 +881,22 @@ async function boot() {
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
     prevFeet = p.y + 0.1;
     vel.set(0, 0, 0);
+    if (auto.active) {
+      // Retry the route from its checkpoint approach; a far-side target after a
+      // death cuts across the marsh ink instead of re-entering the boardwalk.
+      let retry = 0, nearest = Infinity;
+      for (let i = 0; i < Math.min(auto.idx + 1, world.route.length); i++) {
+        const w = world.route[i]!;
+        if (!w.label?.startsWith('cp-') && !w.label?.startsWith('SW')) continue;
+        const d = Math.hypot(w.x - p.x, w.z - p.z);
+        if (d < nearest) { nearest = d; retry = i; }
+      }
+      auto.idx = retry;
+      auto.phase = 'run'; auto.act = undefined; auto.space = false;
+      auto.dash = auto.dashQueued = false;
+      auto.wish.set(0, 0, 0); auto.stuckT = 0; auto.bestD = Infinity;
+      auto.log.push(`retry@${retry}`);
+    }
   }
 
   /**
@@ -973,7 +989,9 @@ async function boot() {
     const prevLabel = route[auto.idx - 1]?.label;
     // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
     const waitSeedwell = (prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit;
-    const waitBridge = (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
+    // Let the visible front cross the six-metre bed before stepping off the dry boardwalk.
+    const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
+    const waitBridge = waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;

@@ -2,6 +2,7 @@
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
 import { captureWindGap } from './windgap-capture.mjs';
+import { captureMarshMouth } from './marshmouth-capture.mjs';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -598,6 +599,12 @@ try {
     }
     save('updraft-acceptance.json', summary);
     console.log('UPDRAFT', JSON.stringify(summary));
+  }
+  if (wants('marshmouth')) {
+    for (const variant of ['aura', 'dash']) for (let trial = 1; trial <= 3; trial++) {
+      await boot(quality, true);
+      await captureMarshMouth({ H, advance, shot, video, save, page, fps, report }, variant, trial);
+    }
   }
   if (wants('windgap')) {
     await boot(quality, true);

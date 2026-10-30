@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { boxCollider, type CollisionWorld } from './collision';
-import { Bucket, PAL, stoneBlock, trs } from './russetKit';
+import { Bucket, stoneBlock, trs } from './russetKit';
 import type { Root, RootSpot } from './chem/growth';
-import type { Hearth, HearthSpot } from './chem/updraft';
+import type { Hearth, HearthSpot, UpdraftTunables } from './chem/updraft';
 import { heatFeeds } from './chem/inlet';
 
 export const SUMMIT_REPAIR = {
@@ -18,6 +18,8 @@ export type SummitRepair = {
   update: (dt: number, roots: ReadonlyArray<Root>, flooded: boolean) => void;
   /** Integrator accumulates normal two-second inlet seal from this output. */
   feeds: (hearth: Hearth | undefined, radius: number) => boolean;
+  /** Clip real lift and existing column FX against the moving stone underside. */
+  fitColumn: (hearth: Hearth | undefined, tun: UpdraftTunables) => void;
   state: () => { rootLive: boolean; rootGrown: number; lintelLift: number; clearance: boolean };
 };
 
@@ -70,6 +72,11 @@ export function createSummitRepair(parent: THREE.Group, col: CollisionWorld, sto
       lift = THREE.MathUtils.damp(lift, flooded ? s.lift : support * s.lift, 6, dt);
       lintel.position.y = s.lintelColdBottom + lift;
       c.bottom = lintel.position.y; c.top0 = c.top1 = c.bottom + s.lintelThickness;
+    },
+    fitColumn(hearth, tun) {
+      if (!hearth) return;
+      hearth.height = Math.max(0.12, c.bottom - hearth.base.y);
+      hearth.layout(tun);
     },
     feeds(hearth, radius) {
       return rootLive && lift >= s.lift - 0.05 && !!hearth && heatFeeds(hearth, basin, radius);

@@ -391,7 +391,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(42, 0, 46);
   W(54, 0, 40, { label: 'cp-marsh' });
   // C · Reedmarsh — boardwalk, hummock, ghost-ink stones, SW2 island
-  W(57, 0.3, 36.3, { ground: false });
+  W(56.65, 0.3, 36.3, { ground: false, label: 'wash:marsh-mouth' });
+  W(60.0, -0.05, 34.05, { ground: false });
+  W(62.034, -0.05, 32.736, { ground: false });
   W(64.5, 0.3, 31.4, { ground: false });
   W(68.5, 0.4, 28.2, { ground: false, act: 'jump' });
   W(73.5, 0.25, 25, { ground: false, act: 'jump' });
