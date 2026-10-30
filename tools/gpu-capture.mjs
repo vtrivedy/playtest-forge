@@ -245,7 +245,7 @@ try {
       await H('setKeys', segment.jump && local < .18 * fps ? ['Space'] : segment.dash && local === 0 ? ['ShiftLeft'] : []);
     }, undefined, {
       dt: i => segmentAt(i).slow ? 1 / 240 : 1 / 60,
-      keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.anim} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
+      keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.gait ?? st.locomotion?.gait ?? st.anim ?? 'unreported'} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
       afterStep: async (i, state) => {
         const [x, , z] = state.pos;
         if (state.deaths) throw Error(`Gait course death at frame ${i}`);
@@ -410,7 +410,9 @@ try {
     for (const state of ['sepia', 'restored']) {
       await boot(quality, true);
       if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
-      await H('teleport', ...poses.meadow.fox, Math.PI);
+      // Open meadow between the portal (z85) and broken arch (z64).
+      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
+      await H('teleport', 6, reviewY, 78, Math.PI);
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
       await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
