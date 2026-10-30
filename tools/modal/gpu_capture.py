@@ -44,6 +44,16 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
                 raise ValueError('Run ID belongs to another capture')
             if metadata.get('status', 'success') == 'success':
                 return metadata
+        # A retry must not blend its PNGs/report with an interrupted attempt.
+        prior_files = [p for p in out.iterdir() if not p.name.startswith('attempt-')]
+        if prior_files:
+            attempt = 1
+            while (out / f'attempt-{attempt:03d}').exists():
+                attempt += 1
+            history = out / f'attempt-{attempt:03d}'
+            history.mkdir()
+            for old_file in prior_files:
+                old_file.rename(history / old_file.name)
         gpu = run(['nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'], capture_output=True).stdout.strip() if backend != 'swiftshader' else 'CPU / SwiftShader (explicit fallback)'
         (out / 'nvidia-smi.txt').write_text(gpu + '\n')
         print('GPU:', gpu, flush=True)
@@ -80,6 +90,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         metadata = {'status': 'success', 'ref': ref, 'commit': sha, 'gpu': gpu, 'shots': shots, 'runId': run_id,
                     'buildSeconds': round(built-started, 2), 'captureSeconds': round(time.monotonic()-built, 2),
                     'backend': backend, 'size': size, 'quality': quality, 'fps': fps,
+                    'routeFrom': route_from, 'routeTo': route_to,
                     'captureToolSha': json.loads((out / 'report.json').read_text())['captureToolSha'],
                     'totalSeconds': round(time.monotonic()-started, 2)}
         (out / 'run.json').write_text(json.dumps(metadata, indent=2))

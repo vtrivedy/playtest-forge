@@ -22,10 +22,27 @@ def contact_sheet(folder: Path):
     gait_sheet = folder / 'gait-contact-sheet.png'
     if gait_sheet.exists():
         return gait_sheet
-    entries = [(p, p.stem) for p in sorted(folder.glob('*.png')) if 'contact' not in p.stem and p.stem not in {'cube', 'hardware-probe'}]
+    entries = [(p, p.stem) for p in sorted(folder.glob('*.png'), key=lambda p: (p.stem.endswith('-end'), p.name)) if 'contact' not in p.stem and p.stem not in {'cube', 'hardware-probe'}]
     entries = [(p, label) for p, label in entries if p.exists()]
     if not entries:
         return None
+    report_file = folder / 'report.json'
+    report = json.loads(report_file.read_text()) if report_file.exists() else {}
+    labelled = []
+    for p, label in entries:
+        state = report.get('shots', {}).get(p.stem, {}).get('state')
+        frame = re.fullmatch(r'(.+)-(\d{5})', p.stem)
+        if frame:
+            state = next((r['state'] for r in report.get('videos', {}).get(frame[1], {}).get('trace', []) if r['frame'] == int(frame[2])), state)
+        if state and 'auto' in state:
+            label += f" | wp{state['auto']['idx']} d{state.get('deaths', '?')}"
+            if state['auto'].get('stalled'):
+                label += ' STALLED'
+        acceptance_file = folder / 'route-acceptance.json'
+        if p.stem == 'route-end' and acceptance_file.exists():
+            label += ' ' + json.loads(acceptance_file.read_text())['reason'].upper()
+        labelled.append((p, label))
+    entries = labelled
     cols, cell_w, cell_h = 4, 480, 300
     sheet = Image.new('RGB', (cols * cell_w, ((len(entries) + cols - 1) // cols) * cell_h), '#211b16')
     draw = ImageDraw.Draw(sheet)
@@ -103,6 +120,12 @@ def main():
             if metadata['commit'] != ref or metadata['shots'] != shot:
                 raise ValueError('Fetched capture belongs to a different commit or shot')
             report = json.loads((folder / 'report.json').read_text())
+            expected = {'size': args.size, 'fps': args.fps, 'routeFrom': args.route_from, 'routeTo': args.route_to}
+            for key, value in expected.items():
+                if metadata.get(key) != value:
+                    raise ValueError(f'Capture setting mismatch: {key} expected {value}, got {metadata.get(key)}')
+            if not metadata.get('captureToolSha') or metadata['captureToolSha'] != report.get('captureToolSha'):
+                raise ValueError('Capture tool identity differs between run metadata and report')
             if metadata.get('status', 'success') == 'failed' or report.get('failures') or report.get('errors'):
                 effective_exit = effective_exit or 1
             elif effective_exit and metadata.get('status') == 'success':
