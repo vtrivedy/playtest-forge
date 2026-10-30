@@ -70,6 +70,11 @@ async function boot() {
   const distant = createDistantLand(scene, {
     silhouette: new THREE.Color(0x4a3a3c),
     haze: sky.params.mist,
+    count: 18,
+    minRadius: 125,
+    maxScale: 24,
+    focusBias: 0.5,
+    focusAngle: Math.atan2(-1, 0), // shrine path looks north (-Z)
     sunDir,
     sunColor: sky.params.sunColor,
   });

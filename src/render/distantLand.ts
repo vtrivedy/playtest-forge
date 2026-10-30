@@ -26,6 +26,11 @@ export type DistantLandOptions = {
   mistLayers: number;
   /** Deterministic layout seed */
   seed: number;
+  /** Azimuth (radians, atan2(z, x)) the camera mostly faces — islands cluster here */
+  focusAngle: number;
+  /** Fraction of islands placed within ±focusSpread of focusAngle */
+  focusBias: number;
+  focusSpread: number;
 };
 
 export type DistantLand = {
@@ -93,8 +98,8 @@ function islandVariant(rand: () => number, ruins: boolean): THREE.BufferGeometry
     const baseA = rand() * Math.PI * 2;
     for (let i = 0; i < pillars; i++) {
       const a = baseA + i * 0.5;
-      const ph = 0.6 + rand() * 1.4;
-      const p = new THREE.BoxGeometry(0.11, ph, 0.11);
+      const ph = 0.5 + rand() * 1.0;
+      const p = new THREE.BoxGeometry(0.07, ph, 0.07);
       p.translate(Math.cos(a) * 0.55, 0.25 + ph / 2, Math.sin(a) * 0.55);
       parts.push(p);
     }
@@ -138,6 +143,9 @@ export function createDistantLand(scene: THREE.Scene, opts: Partial<DistantLandO
     mistFloor: -18,
     mistLayers: 3,
     seed: 7,
+    focusAngle: -Math.PI / 2,
+    focusBias: 0.6,
+    focusSpread: 0.85,
     ...opts,
   };
   const rand = rng(o.seed);
@@ -207,7 +215,10 @@ export function createDistantLand(scene: THREE.Scene, opts: Partial<DistantLandO
   const dummy = new THREE.Object3D();
   for (let i = 0; i < o.count; i++) {
     // golden-angle ring so islands don't clump; tiers by radius
-    const ang = i * 2.39996 + rand() * 0.5;
+    const focused = i < Math.round(o.count * o.focusBias);
+    const ang = focused
+      ? o.focusAngle + (((i * 0.618034) % 1) * 2 - 1) * o.focusSpread + (rand() - 0.5) * 0.15
+      : i * 2.39996 + rand() * 0.5;
     const t = (i % 3) / 2 + rand() * 0.2;
     const r = THREE.MathUtils.lerp(o.minRadius, o.maxRadius, Math.min(1, t));
     // farther islands sit higher + bigger so they still read over mist
