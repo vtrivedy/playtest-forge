@@ -105,3 +105,5 @@ This supersedes the one-way ferry ending above. The shrine makes the source perm
 - **Reveal:** the bell ledge looks across a second aqueduct to a lower orchard islet; the first slice ends in a reachable place with another view, not a door to future content.
 
 Acceptance now includes one arrival frame showing source, bell and a low-only destination; three visible buoyant bodies rising; `__game.reach.level`; HIGH→LOW→HIGH real dash input, a low-lane traversal / shortcut, and a recovery checkpoint within10s of a boarding miss. Retaining an occupied float never counts as water at the shrine inlet.
+
+Closing the sluice for HIGH sends water down the short flume again: a1.8s transit delay before the2.5s rise gives the fox time to board after restoration. LOW drains in1.67s after its1s warning. This keeps the ferry re-boardable after a fall; the source-bank checkpoint avoids replaying the long causeway.
