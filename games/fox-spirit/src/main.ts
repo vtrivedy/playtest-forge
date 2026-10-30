@@ -28,6 +28,7 @@ import {
   createEmberMotes,
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
+import { createListeningCrown } from './listeningCrown';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
 import type { FoxAnimState } from './fox';
@@ -156,6 +157,7 @@ async function boot() {
   });
 
   const world = await createRussetvale(scene);
+  const crown = createListeningCrown(scene, world);
   const col = world.collision;
   const gaitGym = new URLSearchParams(location.search).get('gym') === 'gait' ? createGaitGym(scene, col) : null;
   let harnessStick: THREE.Vector3 | null = null;
@@ -401,6 +403,8 @@ async function boot() {
   let shadeKnockbackFloor: number | null = null;
   const wind = createWind(scene, world.windSpots, { gui });
   const windF: WindForce = { k: 0, tx: 0, ty: 0, tz: 0, px: 0, py: 0, pz: 0 };
+  crown.attach(updrafts, wind, gui);
+  crown.restoreSaved((p, r) => colorField.restore(p, r, 0.05));
   const water = createWater(scene, world.collision, gui);
   world.waterWashedAt = water.washedAt;
   world.waterInkAt = water.inkAt;
@@ -782,6 +786,7 @@ async function boot() {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        crown: crown.state(),
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
@@ -1397,6 +1402,14 @@ async function boot() {
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
+    crown.update(dt, (p, r) => {
+      colorField.restore(p, r, 3.2);
+      autumnFX.swirl(p, 40, 1.6);
+      audio.play('shrine');
+      hud.setPrompt('The crown breathes · follow the leaves home');
+      hud.hidePromptSoon(4);
+    });
+
     // Quiet leaf contacts belong to planted paws, not a periodic emitter behind the body.
     if (grounded && speed > 2) {
       for (const paw of foxActor.locomotion?.footfalls ?? []) autumnFX.kick(paw, .18);
@@ -1521,6 +1534,7 @@ async function boot() {
       elapsedSec: Number(elapsed.toFixed(2)),
       deaths,
       backend,
+      crown: crown.state(),
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
       chem: { water: water.state(), growth: growth.state().roots, updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [
