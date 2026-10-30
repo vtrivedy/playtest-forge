@@ -148,7 +148,7 @@ def paint_materials_by_region(mesh, mats):
         if y > 0.66 and z < 0.62 and abs(x) < 0.05:
             f.material_index = idx["Nose"]
         # Eyes
-        elif 0.64 < z < 0.72 and 0.50 < y < 0.60 and abs(x) > 0.03:
+        elif 0.67 < z < 0.70 and 0.54 < y < 0.58 and 0.035 < abs(x) < 0.08:
             f.material_index = idx["EyeAmber"]
         # Ear tips / ember (high Z ears or anything behind y<-0.38)
         elif z > 0.90 or y < -0.38:
@@ -197,7 +197,7 @@ def build_mesh(mats):
 
     # Narrow amber eyes (flattened)
     for side, sx in (("L", -1), ("R", 1)):
-        eye = sphere(f"Fox_Eye_{side}", (sx * 0.055, 0.55, 0.68), (0.028, 0.012, 0.018), 10, 8)
+        eye = sphere(f"Fox_Eye_{side}", (sx * 0.055, 0.56, 0.685), (0.022, 0.006, 0.010), 10, 8)
         apply_mat(eye, m_eye); parts.append(eye)
 
     # Large upright ears — tips dissolve to ember
