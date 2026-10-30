@@ -78,6 +78,7 @@ export class Hearth {
   readonly ash: THREE.MeshStandardMaterial;
   readonly embers: THREE.ShaderMaterial;
   readonly glow: THREE.ShaderMaterial;
+  readonly ribbons: THREE.ShaderMaterial;
   readonly smoke: THREE.MeshBasicMaterial;
   readonly flame: THREE.ShaderMaterial;
   readonly light: THREE.PointLight;
@@ -139,6 +140,14 @@ export class Hearth {
     haze.renderOrder = 2;
     this.group.add(haze);
 
+    // spiral heat ribbons: the shape of the rising air, readable from across the meadow
+    this.ribbons = shared.ribbons.clone();
+    const rib = new THREE.Mesh(shared.ribbonGeo, this.ribbons);
+    rib.position.y = BED_Y;
+    rib.frustumCulled = false;
+    rib.renderOrder = 3;
+    this.group.add(rib);
+
     this.light = new THREE.PointLight(0xff8a3a, 0, 16, 1.6);
     this.light.position.y = BED_Y + 1.2;
     this.group.add(this.light);
@@ -170,6 +179,8 @@ export class Hearth {
     this.embers.uniforms.uRadius!.value = tun.radius;
     this.glow.uniforms.uHeight!.value = this.height;
     this.glow.uniforms.uRadius!.value = tun.radius * 0.85;
+    this.ribbons.uniforms.uHeight!.value = this.height;
+    this.ribbons.uniforms.uRadius!.value = tun.radius;
   }
 
   update(dt: number, t: number, supplyAt: SupplyFn, debugOn: boolean, drainedAt?: (p: THREE.Vector3) => boolean): void {
@@ -183,6 +194,8 @@ export class Hearth {
     this.embers.uniforms.uHeat!.value = vis + this.flare * 0.6;
     this.glow.uniforms.uTime!.value = t;
     this.glow.uniforms.uHeat!.value = vis + this.flare * 0.5;
+    this.ribbons.uniforms.uTime!.value = t;
+    this.ribbons.uniforms.uHeat!.value = vis + this.flare * 0.5;
     this.flame.uniforms.uTime!.value = t;
     this.flame.uniforms.uHeat!.value = Math.min(1.4, vis + this.flare * 0.8);
     this.ash.emissiveIntensity = 0.04 + vis * 2.6 + this.flare * 2;
@@ -227,6 +240,8 @@ type HearthShared = {
   smoke: THREE.MeshBasicMaterial;
   embers: THREE.ShaderMaterial;
   glow: THREE.ShaderMaterial;
+  ribbons: THREE.ShaderMaterial;
+  ribbonGeo: THREE.BufferGeometry;
   flame: THREE.ShaderMaterial;
   bedGeo: THREE.BufferGeometry;
   smokeGeo: THREE.BufferGeometry;
@@ -517,7 +532,73 @@ function createShared(): HearthShared {
     blending: THREE.AdditiveBlending,
   });
 
+  // three helical bands (unit height/radius; scaled in the shader) with scrolling dashes of warm air
+  const ribbonGeo = (() => {
+    const pos: number[] = [];
+    const uv: number[] = [];
+    const idx: number[] = [];
+    const N = 72;
+    let base = 0;
+    for (let b = 0; b < 3; b++) {
+      const ph = (b / 3) * Math.PI * 2;
+      for (let i = 0; i <= N; i++) {
+        const u = i / N;
+        const a = ph + u * Math.PI * 2 * 1.6;
+        const r = 0.45 + 0.3 * u;
+        for (const e of [-1, 1]) {
+          pos.push(Math.cos(a) * r, u + e * 0.035, Math.sin(a) * r);
+          uv.push(u, e * 0.5 + 0.5 + b * 7.31);
+        }
+        if (i < N) {
+          const k = base + i * 2;
+          idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+        }
+      }
+      base += (N + 1) * 2;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    return g;
+  })();
+  const ribbons = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 2.2 } },
+    vertexShader: /* glsl */ `
+      uniform float uHeight, uRadius, uTime;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vec3 p = vec3(position.x * uRadius, position.y * uHeight, position.z * uRadius);
+        // the bands breathe and twist slowly so the column never looks like a static prop
+        float tw = uTime * 0.6;
+        float c = cos(tw), s = sin(tw);
+        p.xz = mat2(c, -s, s, c) * p.xz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uTime, uHeat;
+      varying vec2 vUv;
+      void main() {
+        float u = vUv.x;
+        float band = fract(vUv.y);
+        float edge = 1.0 - abs(band - 0.5) * 2.0;
+        float seed = floor(vUv.y);
+        float dash = smoothstep(0.15, 0.6, sin(u * 22.0 - uTime * 5.5 + seed) * 0.5 + 0.5);
+        float ends = smoothstep(0.0, 0.08, u) * (1.0 - smoothstep(0.7, 1.0, u));
+        float a = uHeat * edge * dash * ends * 0.55;
+        gl_FragColor = vec4(vec3(1.0, 0.58, 0.22) * a * 1.4, a);
+        #include <colorspace_fragment>
+      }`,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+  });
+
   return {
+    ribbons,
+    ribbonGeo,
     ash,
     smoke,
     embers,

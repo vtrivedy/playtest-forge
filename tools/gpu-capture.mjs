@@ -292,8 +292,8 @@ try {
     const h0 = hearth(await H('state'));
     const [hx, hy, hz] = h0.pos;
     const summary = { hearth: h0, A: {}, B: {}, C: {}, K: {} };
-    const lens = [[hx - 5, hy + 7, hz + 12], [hx + 3, hy + 2, hz - 1], 50];
-    await H('teleport', hx - 9, hy, hz + 16, Math.PI); await H('photo', ...lens); await advance(30); await shot('updraft-still-cold');
+    const lens = [[hx - 6, hy + 8, hz + 11], [hx + 2, hy + 3, hz - 1], 50];
+    await H('teleport', hx - 12, hy, hz + 16, Math.PI); await H('photo', ...lens); await advance(30); await shot('updraft-still-cold');
     const runFrom = [hx - 1.4, hy, hz + 9];
     for (const variant of ['A', 'B']) {
       await H('photoOff');
@@ -361,7 +361,7 @@ try {
       const h2 = hearthOf(st0, 'H2');
       const sw = { x: -112, z: -24 };
       const dx = h2.pos[0] - sw.x, dz = h2.pos[2] - sw.z, dl = Math.hypot(dx, dz), ux = dx / dl, uz = dz / dl;
-      const yaw = Math.atan2(-ux, -uz);
+      const yaw = Math.atan2(ux, uz);
       await H('teleport', sw.x - ux * 2, 20, sw.z - uz * 2, yaw); await advance(30);
       const tl = [];
       let phase = 'aura', p0 = 0;

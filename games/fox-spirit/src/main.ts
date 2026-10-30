@@ -35,7 +35,6 @@ import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
 import { createUpdrafts, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
-import { createShades } from './chem/shade';
 import type { ColorStroke } from '../../../src/render/colorField';
 
 /**
@@ -209,6 +208,7 @@ async function boot() {
     maskSize: 512,
   });
   colorField.initMask(renderer);
+  colorField.groundAt = (x, z) => col.highestAt(x, z);
   // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
   const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75 };
   for (const m of world.materials) {
@@ -320,18 +320,22 @@ async function boot() {
       h.flare = byDash ? 1.6 : 1;
       emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: byDash ? 60 : 26, speed: byDash ? [2, 5] : [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: byDash ? 1.4 : 0.8, size: [0.04, 0.1], heat: 0.7 });
       audio.play('checkpoint');
+      // the breath lets go: ground leaves round the hearth lift into the column
+      autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), byDash ? 44 : 30, 1.7);
       if (byDash) cam.shake(0.15);
     },
   });
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
-  const shades = createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
-  /** Temporary colour as reactors read it: a Shade's drain zeroes aura/trail and spent strokes (≤ 1) */
+  /**
+   * Colour drains (world-1.md §1.2): encounters register predicates here (Shades: within 3 m). Inside a drain
+   * reactors read aura/trail and spent strokes (≤ 1) as 0, and an unsupplied reactor skips its hold.
+   */
+  const colorDrains: Array<(p: THREE.Vector3) => boolean> = [];
+  const drainedAt = (q: THREE.Vector3) => colorDrains.some((f) => f(q));
   const supplyAt = (q: THREE.Vector3) => {
-    if (!shades.drains(q)) return colorField.sample(q);
-    const s = colorField.strokeAt(q);
-    return s > 1 ? 1 : 0;
+    if (!drainedAt(q)) return colorField.sample(q);
+    return colorField.strokeAt(q) > 1 ? 1 : 0;
   };
-  let shadeInvuln = 0;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number) {
@@ -347,6 +351,7 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
   let inColumn = false;
+  let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
   const fLook = gui.addFolder('Look');
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
@@ -474,6 +479,8 @@ async function boot() {
     },
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
+    /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
+    chem: { updrafts, inlets, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
     teleportToShrine() {
       const p = world.wellspringPos;
@@ -637,7 +644,7 @@ async function boot() {
       return {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
-        chem: { ...updrafts.state(), shades: shades.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        chem: { ...updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         audio: audio.debug(),
@@ -1113,33 +1120,16 @@ async function boot() {
       if (!dashing) dashStroke = null;
     }
     colorField.update(dt);
-    updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), shades.drains);
+    updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
     colorField.glows.length = 0;
-    for (const h of updrafts.hearths) if (h.reactor.heat > 0) colorField.glows.push({ x: h.base.x, z: h.base.z, radius: 4.2, strength: h.reactor.heat * 0.8 });
-    shadeInvuln = Math.max(0, shadeInvuln - dt);
-    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
-      if (e.type === 'freed') {
-        // freed: the ink comes apart into leaves that warm as they fall
-        autumnFX.swirl(e.pos, 46, 1.4);
-        emberMotes.burst(e.pos, { count: 40, speed: [1.5, 4], lift: 0.6, life: [0.8, 1.8], flash: 1.2, size: [0.04, 0.09], heat: 0.6 });
-        hitstop = 0.08;
-        cam.shake(0.3);
-        audio.play('bridge');
-      } else if (shadeInvuln <= 0) {
-        // contact: knocked back out of the ink, brief grace
-        const dx = fox.position.x - e.pos.x;
-        const dz = fox.position.z - e.pos.z;
-        const d = Math.hypot(dx, dz) || 1;
-        vel.x = (dx / d) * shades.tun.knockback;
-        vel.z = (dz / d) * shades.tun.knockback;
-        vel.y = Math.max(vel.y, 3.5);
-        grounded = false;
-        shadeInvuln = 1.0;
-        cam.shake(0.25);
-        foxActor.pulse(0.4);
-        audio.play('hazard');
-      }
+    hearthLeafT += dt;
+    const leafPulse = hearthLeafT > 1.6;
+    if (leafPulse) hearthLeafT = 0;
+    for (const h of updrafts.hearths) if (h.reactor.heat > 0) {
+      colorField.glows.push({ x: h.base.x, z: h.base.z, radius: 4.2, strength: h.reactor.heat * 0.8 });
+      // keep leaves riding a burning column, near the fox only (shared leaf pool)
+      if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
     }
     for (const i of inlets.update(dt, (q) => updrafts.hearths.some((h) => heatFeeds(h, q, updrafts.tun.radius)))) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;

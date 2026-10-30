@@ -38,7 +38,6 @@ import {
 import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } from './russetTextures';
 import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
-import type { ShadeSpot } from './chem/shade';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -48,6 +47,8 @@ import type { ShadeSpot } from './chem/shade';
  */
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
+/** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
+export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number };
 export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
 
 export type SeedwellState = {
