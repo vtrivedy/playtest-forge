@@ -16,9 +16,11 @@ import {
   applyLookdevLights,
   applyHeightFog,
   matchFogToSky,
+  syncFog,
   createDistantLand,
   createFoxWisps,
   createAutumnParticles,
+  detectQuality,
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createFox } from './fox';
@@ -75,7 +77,7 @@ let feelPreset: keyof typeof FEEL_PRESETS = presetParam === 'spring' ? 'spring' 
 const feel: FoxFeel = { ...FEEL_PRESETS[feelPreset] };
 const jumpFeel = new JumpFeel();
 const feelMetrics = emptyFeelMetrics();
-const BLOOM = 0.1;
+const BLOOM = 0.16;
 /** Ember pickup freeze — just enough to register the hit; cooldown so ember lines don't stutter */
 const HITSTOP_S = 0.03;
 const HITSTOP_COOLDOWN_S = 0.35;
@@ -85,11 +87,15 @@ async function boot() {
   hud.setStatus('Loading Russetvale…');
   const audio = createGameAudio();
 
+  // Quality tier: ?q=low|med|high, else auto (software GL → low)
+  const quality = detectQuality();
+  console.info(`[quality] ${quality.tier} (${quality.reason}) gpu="${quality.gpu}"`);
   const forge = await createForgeRenderer({
     container: document.body,
     exposure: 1.18,
-    shadows: true,
-    shadowMapSize: 1024,
+    shadows: quality.shadows,
+    pixelRatio: quality.pixelRatio,
+    softShadows: quality.softShadows,
   });
   const { renderer, backend } = forge;
 
@@ -143,6 +149,8 @@ async function boot() {
   lights.key.shadow.camera.bottom = -34;
   lights.key.shadow.camera.far = 140;
   lights.key.shadow.camera.updateProjectionMatrix();
+  lights.key.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
+  lights.key.castShadow = quality.shadows;
   scene.add(lights.key.target);
   const foxActor = await createFox();
   scene.add(foxActor.group);
@@ -179,6 +187,7 @@ async function boot() {
     surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
   });
   cam.snapBehind(Math.PI);
+  cam.camera.far = quality.far;
   cam.resize(innerWidth, innerHeight);
 
   const colorField = createColorField({
@@ -194,15 +203,19 @@ async function boot() {
 
   const post = createPostStack(renderer, scene, cam.camera, {
     bloomStrength: BLOOM,
-    bloomThreshold: 0.96,
+    bloomThreshold: 0.9,
+    bloomRadius: 0.6,
     vignette: 0.34,
-    grain: 0.015,
-    enableGTAO: false,
+    grain: 0.01,
+    enableGTAO: quality.gtao,
+    bloom: quality.bloom,
+    smaa: quality.smaa,
+    pixelRatio: renderer.getPixelRatio(),
   });
 
   const wisps = createFoxWisps(scene, 28); // spirit-fire aura
   const emberTrail = createEmberTrail(scene, 36);
-  const autumnFX = createAutumnParticles(scene, 180, 110);
+  const autumnFX = createAutumnParticles(scene, Math.round(180 * quality.particleScale), Math.round(110 * quality.particleScale));
   const leafKick = createLeafKick(scene);
   const occlusion = createOcclusionFader(scene, {
     solidAt: (x, z) => col.highestAt(x, z),
@@ -269,6 +282,26 @@ async function boot() {
   fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
   fCam.add(cam.params, 'shake', 0, 2, 0.05);
   fCam.close();
+  const fLook = gui.addFolder('Look');
+  fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
+  fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
+  fLook.add(post.params, 'bloomStrength', 0, 1, 0.01);
+  fLook.add(post.params, 'bloomThreshold', 0, 2, 0.01);
+  fLook.add(post.params, 'highlightKnee', 0.5, 4, 0.05);
+  fLook.add(post.params, 'highlightCap', 1, 6, 0.05);
+  fLook.add(post.params, 'vignette', 0, 1, 0.01);
+  fLook.add(post.params, 'grain', 0, 0.05, 0.001);
+  fLook.add(fog, 'density', 0, 0.012, 0.0001).name('fog').onChange(() => syncFog(scene, fog));
+  for (const k of ['sepia', 'restored'] as const) {
+    const f = fLook.addFolder(`grade ${k}`);
+    f.add(post.grade[k], 'saturation', 0, 2, 0.01);
+    f.add(post.grade[k], 'contrast', 0.6, 1.5, 0.01);
+    f.add(post.grade[k], 'lift', 0, 0.05, 0.001);
+    f.addColor(post.grade[k], 'shadowTint');
+    f.addColor(post.grade[k], 'highlightTint');
+    f.close();
+  }
+  fLook.close();
 
   const keys = new Set<string>();
   addEventListener('keydown', (e) => {
@@ -363,6 +396,8 @@ async function boot() {
   };
   win.__gameHooks = {
     hasClips: foxActor.hasClips,
+    /** Debug handles for lookdev probes (read-only use from the harness) */
+    debug: { scene, renderer, post, colorField },
     teleportToShrine() {
       const p = world.wellspringPos;
       foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.2, p.z + 4.5);
@@ -472,6 +507,43 @@ async function boot() {
     photoOff() {
       photo = null;
     },
+    /** Render `frames` full frames (sim paused) and report per-frame cost + renderer counters across all passes. */
+    perf(frames = 6) {
+      draw();
+      renderer.info.autoReset = false;
+      renderer.info.reset();
+      // readPixels forces a GPU sync (finish() is a no-op hint on SwiftShader/ANGLE)
+      const gl = renderer.getContext();
+      const px = new Uint8Array(4);
+      const sync = () => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      };
+      sync();
+      const t0 = performance.now();
+      for (let i = 0; i < frames; i++) {
+        draw();
+        sync();
+      }
+      const ms = (performance.now() - t0) / frames;
+      const r = renderer.info.render;
+      const out = {
+        msPerFrame: Number(ms.toFixed(1)),
+        fps: Number((1000 / ms).toFixed(2)),
+        drawCalls: Math.round(r.calls / frames),
+        triangles: Math.round(r.triangles / frames),
+        geometries: renderer.info.memory.geometries,
+        textures: renderer.info.memory.textures,
+        programs: renderer.info.programs?.length ?? 0,
+        pixelRatio: renderer.getPixelRatio(),
+        drawingBuffer: [renderer.domElement.width, renderer.domElement.height],
+        shadowMap: renderer.shadowMap.enabled ? lights.key.shadow.mapSize.x : 0,
+        passes: post.composer.passes.filter((p) => p.enabled).length,
+        quality: quality.tier,
+      };
+      renderer.info.autoReset = true;
+      return out;
+    },
     state() {
       const p = foxActor.group.position;
       return {
@@ -511,7 +583,7 @@ async function boot() {
           landingNdc: cam.debug.landing,
           internals: cam.debug.internals(),
         },
-        fx: { enabled: fxEnabled, bloom: post.bloom.strength, bloomParam: post.params.bloomStrength, grain: post.params.grain },
+        fx: { enabled: fxEnabled, quality: quality.tier, bloom: post.bloom?.enabled ? post.bloom.strength : 0, bloomParam: post.params.bloomStrength, grain: post.params.grain },
       };
     },
   };
@@ -998,6 +1070,9 @@ async function boot() {
         cam.camera.updateProjectionMatrix();
       }
     }
+    // grade follows the flood: faded sepia → rich autumn over the 6 s wave
+    post.params.restore = floodT >= 0 ? THREE.MathUtils.smootherstep(floodT, 0.4, 6) : 0;
+
     // keep film grain off the hero
     heroNdc.set(fox.position.x, fox.position.y - foxActor.feetOffset + foxActor.height * 0.45, fox.position.z).project(cam.camera);
     const heroR = THREE.MathUtils.clamp(0.9 / Math.max(0.5, cam.camera.position.distanceTo(fox.position)), 0.05, 0.4);
@@ -1031,6 +1106,7 @@ async function boot() {
         `jumps=${feelMetrics.jumps}`,
         `dashes=${feelMetrics.dashesUsed}`,
         `preset=${feelPreset}`,
+        `quality=${quality.tier}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',
       ],

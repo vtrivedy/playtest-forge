@@ -52,8 +52,11 @@ export class ColorField {
   private maskCam: THREE.OrthographicCamera | null = null;
   private fadeMat: THREE.ShaderMaterial | null = null;
   private stampMat: THREE.ShaderMaterial | null = null;
-  private stampMesh: THREE.Mesh | null = null;
-  private readonly _stampPos = new THREE.Vector3();
+  private stampMesh: THREE.InstancedMesh | null = null;
+  private stampStrength: THREE.InstancedBufferAttribute | null = null;
+  private stampNoise: THREE.InstancedBufferAttribute | null = null;
+  private static readonly MAX_STAMPS = 96;
+  private readonly _stampMatrix = new THREE.Matrix4();
   private maskSize: number;
   private _renderer: THREE.WebGLRenderer | null = null;
 
@@ -172,10 +175,9 @@ export class ColorField {
       depthWrite: false,
     });
 
+    // All stamps (restores + fox + trail) go out as one instanced draw per frame
     this.stampMat = new THREE.ShaderMaterial({
       uniforms: {
-        uStrength: { value: 1 },
-        uNoiseAmp: { value: 0.08 },
         uTime: { value: 0 },
       },
       transparent: true,
@@ -183,16 +185,22 @@ export class ColorField {
       depthTest: false,
       depthWrite: false,
       vertexShader: /* glsl */ `
+        attribute float aStrength;
+        attribute float aNoise;
         varying vec2 vUv;
+        varying float vStrength;
+        varying float vNoise;
         void main() {
           vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          vStrength = aStrength;
+          vNoise = aNoise;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */ `
-        uniform float uStrength;
-        uniform float uNoiseAmp;
         uniform float uTime;
         varying vec2 vUv;
+        varying float vStrength;
+        varying float vNoise;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
         float noise(vec2 p){
           vec2 i = floor(p); vec2 f = fract(p);
@@ -202,15 +210,26 @@ export class ColorField {
         }
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
-          float n = noise(p * 4.0 + uTime) * uNoiseAmp;
+          float n = noise(p * 4.0 + uTime) * vNoise;
           float d = length(p) + n;
           float soft = 1.0 - smoothstep(0.55, 1.0, d);
-          float ink = soft * soft * uStrength;
+          float ink = soft * soft * vStrength;
           gl_FragColor = vec4(ink, ink, ink, 1.0);
         }`,
     });
-    this.stampMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.stampMat);
+    const N = ColorField.MAX_STAMPS;
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    this.stampStrength = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+    this.stampNoise = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+    this.stampStrength.setUsage(THREE.DynamicDrawUsage);
+    this.stampNoise.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aStrength', this.stampStrength);
+    geo.setAttribute('aNoise', this.stampNoise);
+    this.stampMesh = new THREE.InstancedMesh(geo, this.stampMat, N);
+    this.stampMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.stampMesh.frustumCulled = false;
+    this.maskScene.add(this.stampMesh);
   }
 
   private rebuildMaskCam(): void {
@@ -244,7 +263,6 @@ export class ColorField {
     renderer.clear();
     renderer.autoClear = false;
 
-    this.maskScene.clear();
     const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number }> = [];
 
     for (const r of this.restores) {
@@ -276,18 +294,22 @@ export class ColorField {
       });
     }
 
-    const tNow = performance.now() * 0.001;
-    for (const s of stamps) {
-      this.stampMesh.position.set(s.x, 0, s.z);
-      this.stampMesh.scale.set(s.size, s.size, 1);
-      this.stampMesh.rotation.x = -Math.PI / 2;
-      this.stampMat.uniforms.uStrength!.value = s.strength;
-      this.stampMat.uniforms.uNoiseAmp!.value = s.noise;
-      this.stampMat.uniforms.uTime!.value = tNow;
-      this.maskScene.add(this.stampMesh);
-      renderer.render(this.maskScene, this.maskCam);
-      this.maskScene.remove(this.stampMesh);
+    const mesh = this.stampMesh;
+    const n = Math.min(stamps.length, ColorField.MAX_STAMPS);
+    const m = this._stampMatrix;
+    for (let i = 0; i < n; i++) {
+      const s = stamps[i]!;
+      m.makeScale(s.size, 1, s.size).setPosition(s.x, 0, s.z);
+      mesh.setMatrixAt(i, m);
+      this.stampStrength!.setX(i, s.strength);
+      this.stampNoise!.setX(i, s.noise);
     }
+    mesh.count = n;
+    mesh.instanceMatrix.needsUpdate = true;
+    this.stampStrength!.needsUpdate = true;
+    this.stampNoise!.needsUpdate = true;
+    this.stampMat.uniforms.uTime!.value = performance.now() * 0.001;
+    renderer.render(this.maskScene, this.maskCam);
 
     renderer.setRenderTarget(prevTarget);
     renderer.autoClear = prevAutoClear;
@@ -396,8 +418,9 @@ export class ColorField {
             }
             float ad = distance(p, uFox);
             s = max(s, pow(1.0 - clamp(ad / uAura, 0.0, 1.0), 1.15));
+            // the mask RT already carries the trail; the analytic loop is the no-RT fallback
             for (int i = 0; i < 24; i++) {
-              if (i >= uTrailCount) break;
+              if (i >= uTrailCount || uUseMaskMap > 0.5) break;
               vec3 tp = vec3(uTrail[i*4], uTrail[i*4+1], uTrail[i*4+2]);
               float life = uTrail[i*4+3];
               float td = distance(p, tp);
@@ -408,33 +431,27 @@ export class ColorField {
           }
 
           vec3 inkWash(vec3 color, vec3 worldPos, vec3 worldN) {
+            // Faded sepia old photograph: luminance-preserving tone (darks stay dark — a lifted
+            // floor turned thin dark reeds into pale streaks), soft paper shoulder, a ghost of hue.
             float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-            // Faded sepia old-photograph grade (autumn art direction)
-            vec3 sepia = vec3(
-              luma * 1.08,
-              luma * 0.90,
-              luma * 0.62
-            );
-            vec3 shadow = vec3(0.18, 0.14, 0.10);
-            vec3 paper  = vec3(0.93, 0.87, 0.74);
-            vec3 ink = mix(shadow, sepia, smoothstep(0.02, 0.55, luma));
-            ink = mix(ink, paper * (0.55 + luma * 0.55), smoothstep(0.42, 0.92, luma));
-            // amber / ochre lift in mids (pressed-leaf warmth)
-            ink = mix(ink, vec3(0.74, 0.56, 0.34), 0.16 * smoothstep(0.18, 0.58, luma));
-            // paper grain + foxing blotches (y folded in so cliffs don't streak vertically)
+            vec3 ink = luma * vec3(1.12, 0.93, 0.66);
+            // faded blacks: a little warm lift, not a grey floor
+            ink = ink * 0.94 + vec3(0.016, 0.012, 0.008);
+            // paper shoulder so sunlit stone tops out cream, never white
+            float sh = smoothstep(0.35, 1.6, luma);
+            ink = mix(ink, vec3(0.86, 0.74, 0.56) * (0.45 + luma * 0.4), sh * 0.6);
+            // ochre warmth in the mids (pressed-leaf) and a trace of the original hue
+            ink = mix(ink, ink * vec3(1.08, 0.97, 0.8), smoothstep(0.04, 0.3, luma) * (1.0 - sh));
+            ink = mix(ink, color * 0.92, 0.1);
+            // low-frequency foxing / water stains only — fine world noise aliased into stipple
             vec2 gp = worldPos.xz + worldPos.y * vec2(0.71, 1.37);
-            float g = (noise21(gp * 7.0) - 0.5) * 0.10;
-            g += (noise21(gp * 22.0) - 0.5) * 0.045;
-            g += (noise21(gp * 48.0) - 0.5) * 0.02;
-            float fox = smoothstep(0.62, 0.9, noise21(gp * 1.6 + 3.1));
-            ink += g;
-            ink = mix(ink, ink * vec3(0.92, 0.78, 0.58), fox * 0.22);
-            // soft wash hatch (not harsh charcoal)
-            float hatch = step(0.55, fract((worldPos.x + worldPos.z + worldPos.y * 0.8) * 3.2 + luma));
-            float shadowAmt = 1.0 - smoothstep(0.05, 0.35, luma);
-            ink = mix(ink, ink * 0.86, shadowAmt * hatch * 0.4);
-            float rim = pow(1.0 - max(0.0, dot(normalize(worldN), vec3(0.2, 0.85, 0.15))), 2.0);
-            ink += rim * vec3(0.07, 0.05, 0.028);
+            float g = (noise21(gp * 0.9) - 0.5) * 0.12 + (noise21(gp * 3.1) - 0.5) * 0.06;
+            float fox = smoothstep(0.62, 0.9, noise21(gp * 0.35 + 3.1));
+            ink *= 1.0 + g;
+            ink = mix(ink, ink * vec3(0.9, 0.76, 0.56), fox * 0.25);
+            // top-lit surfaces catch a breath of paper (soft wash, not a rim halo)
+            float up = clamp(dot(normalize(worldN), vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
+            ink += up * up * vec3(0.012, 0.009, 0.005);
             return ink;
           }
           `,

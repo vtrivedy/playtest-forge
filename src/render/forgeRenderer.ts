@@ -15,6 +15,10 @@ export type RendererOptions = {
   exposure?: number;
   shadows?: boolean;
   shadowMapSize?: number;
+  /** Backbuffer pixel-ratio cap (quality tier); default 2 */
+  pixelRatio?: number;
+  /** PCFSoft vs PCF shadow filtering */
+  softShadows?: boolean;
 };
 
 /**
@@ -55,13 +59,13 @@ export async function createForgeRenderer(opts: RendererOptions = {}): Promise<F
     backend = 'webgl2';
   }
 
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, opts.pixelRatio ?? 2));
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = opts.exposure ?? 1.05;
   renderer.shadowMap.enabled = opts.shadows !== false;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = opts.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
   container.appendChild(renderer.domElement);
 
   return {

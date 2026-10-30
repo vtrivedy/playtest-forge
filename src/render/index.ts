@@ -12,7 +12,10 @@ export { ColorField, createColorField } from './colorField';
 export type { ColorFieldOptions, RestoreRegion, TrailSample } from './colorField';
 
 export { createPostStack } from './postStack';
-export type { PostStack, PostStackOptions } from './postStack';
+export type { PostStack, PostStackOptions, GradeParams } from './postStack';
+
+export { detectQuality, probeGpu } from './quality';
+export type { QualityTier, QualitySettings } from './quality';
 
 export { createPaintedSky, applyLookdevLights } from './sky';
 export type { PaintedSky, SkyParams } from './sky';
