@@ -257,3 +257,9 @@ Replace the lantern's plain stacked rectangular support with the CC0 Quaternius
 Column asset, scaled to the same 1.9 m support height and collision footprint.
 Keep the lamp, light, checkpoint and all site positions. Batch its fluted shaft,
 base and capital into the existing weathered stone bucket; no parallel old stem.
+
+Stag lookdev r5: close review identifies excessive normal displacement thickening
+thin lower legs into hanging ink lobes. Reduce geometric wobble to centimetres;
+keep translucency/wash for the drifting edge. Preserve the source stag's long
+limbs and original antlers. This is the final bounded silhouette pass before
+cross-model review, not an additional pose/model path.
