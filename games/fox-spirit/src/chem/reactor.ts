@@ -5,7 +5,7 @@ import * as THREE from 'three';
  * it reads supply at its probes, warms over `igniteTime`, holds `holdTime` after supply ends, then
  * gutters over `gutterTime` (visible warning, output ramps down). Restored reactors never cool.
  */
-export type ReactorKind = 'hearth' | 'wind';
+export type ReactorKind = 'hearth' | 'wind' | 'water';
 export type ReactorState = 'cold' | 'burning' | 'holding' | 'guttering' | 'restored';
 
 export type ReactorTunables = {

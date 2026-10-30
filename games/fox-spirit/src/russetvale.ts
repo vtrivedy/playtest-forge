@@ -82,6 +82,7 @@ export type Realm = {
   checkpoints: Array<{ pos: THREE.Vector3; lit: boolean }>;
   /** Heat-element placements (visuals + lift live in chem/updraft.ts) */
   hearthSpots: HearthSpot[];
+  waterWashedAt?: (x: number, z: number) => boolean;
   /** Seedwell inlets: each latches only from an element's output (world-1.md §1.4) */
   inletSpots: InletSpot[];
   /** Shade patrols (world-1.md §3.8) */
@@ -2191,7 +2192,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       if (!wellLit) wsGlow.emissiveIntensity = 0.06 + flood;
 
       // hazards
-      if (inkActive && marshE(fox.x, fox.z) < 0.9 && feetY < MARSH.ink + 0.15) ev.push({ type: 'hazard', kind: 'ink' });
+      if (inkActive && !realm.waterWashedAt?.(fox.x, fox.z) && marshE(fox.x, fox.z) < 0.9 && feetY < MARSH.ink + 0.15) ev.push({ type: 'hazard', kind: 'ink' });
       if (feetY < -24) ev.push({ type: 'hazard', kind: 'fall' });
       void flood;
       return ev;

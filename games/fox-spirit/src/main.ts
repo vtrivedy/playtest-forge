@@ -34,6 +34,7 @@ import { createHud } from './hud';
 import { createOcclusionFader } from './occlusion';
 import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
+import { createWater } from './chem/water';
 import { createUpdrafts, type Hearth, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
 import { createWind, type WindForce } from './chem/wind';
@@ -348,6 +349,8 @@ async function boot() {
   };
   const wind = createWind(scene, world.windSpots, { gui });
   const windF: WindForce = { k: 0, tx: 0, ty: 0, tz: 0, px: 0, py: 0, pz: 0 };
+  const water = createWater(scene, world.collision, gui);
+  world.waterWashedAt = water.washedAt;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {
@@ -548,7 +551,7 @@ async function boot() {
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
-    chem: { updrafts, inlets, colorDrains, supplyAt },
+    chem: { water, updrafts, inlets, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
     /** Fox look tunables (live; see foxLook.ts) */
     foxLook: FOX_LOOK,
@@ -715,7 +718,7 @@ async function boot() {
       return {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
-        chem: { ...updrafts.state(), wind: wind.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         audio: audio.debug(),
@@ -1212,6 +1215,7 @@ async function boot() {
       }
     }
     colorField.update(dt);
+    water.update(dt, simClock, supplyAt, drainedAt);
     updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     wind.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
@@ -1354,7 +1358,7 @@ async function boot() {
       deaths,
       backend,
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
-      chem: { updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
+      chem: { water: water.state(), updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [
         `zone=${zone}`,
         `seedwells=${world.seedwells.map((q) => `${q.id}:${q.lit ? 1 : 0}`).join(',')}`,

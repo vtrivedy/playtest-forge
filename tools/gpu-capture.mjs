@@ -350,6 +350,22 @@ try {
     save('shade-result.json', { ...encounter, deaths: (await H('state')).deaths, note: 'Patrol at normal spawn; contact and dash start at validated surfaces. Falls after a real hit/dash remain visible outcomes.' });
     if (!encounter.hits || !encounter.frees) report.failures.push('Shade script did not demonstrate both contact and dash-free; inspect the trace');
   }
+  if (wants('water')) {
+    await boot(quality, true);
+    await H('teleport', 51, 0, 43, Math.PI);
+    const lens = [[64, 7, 44], [59, 0.5, 34], 48];
+    await H('photo', ...lens); await advance(10); await shot('water-frozen');
+    const timeline = [];
+    await video('water-cycle', 12 * fps, async i => {
+      if (i === 0) await H('teleport', 56, 0.3, 37, Math.PI);
+      if (i === Math.round(1.4 * fps)) await H('teleport', 49, 0, 44, Math.PI);
+      if ([Math.round(0.3 * fps), Math.round(0.8 * fps), 2 * fps, 6 * fps, 8 * fps, 11 * fps].includes(i)) {
+        await shot(`water-${i}`);
+        timeline.push({ frame: i, state: (await H('state')).chem.water });
+      }
+    });
+    save('water-acceptance.json', timeline);
+  }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
     // A: run past the cold H-a hearth, jump into its column, ride it onto the 5 m shelf, watch hold → gutter.
