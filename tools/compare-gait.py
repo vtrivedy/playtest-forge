@@ -66,15 +66,27 @@ def main():
     parser.add_argument('--out',required=True,type=Path)
     parser.add_argument('--left-label',default='s2-loco');parser.add_argument('--right-label',default='s2-loco-sol')
     parser.add_argument('--metrics-only',action='store_true')
+    parser.add_argument('--tool-sources',nargs=2,type=Path,help='Auditable exact source pair when only the inactive turntable block differs')
     args=parser.parse_args();args.out.mkdir(parents=True,exist_ok=True)
     left,ls=analyze(args.left);right,rs=analyze(args.right)
-    if any(left[k]!=right[k] for k in ['frames','fps','viewport','quality','backend','captureToolSha']):raise ValueError('Captures have different timing/dimensions')
+    if any(left[k]!=right[k] for k in ['frames','fps','viewport','quality','backend']):raise ValueError('Captures have different timing/dimensions/quality')
+    tool_proof=None
+    if left['captureToolSha']!=right['captureToolSha']:
+        if not args.tool_sources:raise ValueError('Different capture tools; exact source proof is required')
+        import hashlib
+        sources=[source.read_bytes() for source in args.tool_sources]
+        for source,data in zip(sources,[left,right]):
+            if hashlib.sha256(source).hexdigest()!=data['captureToolSha']:raise ValueError('Tool source hash does not match capture metadata')
+        def active(source):
+            text=source.decode();return text.split("  if (wants('turntable')) {",1)[0]+text[text.index('} catch (e) { report.failures'): ]
+        if active(sources[0])!=active(sources[1]):raise ValueError('Active gait/boot/video code differs')
+        tool_proof={'sources':[str(p) for p in args.tool_sources],'activeCodeSha':hashlib.sha256(active(sources[0]).encode()).hexdigest(),'difference':'Only the inactive turntable shot differs; all boot/video/gait code is byte-identical'}
     if not left['captureToolSha']:raise ValueError('Capture tool identity is missing; recapture both refs with current tooling')
     if ls['gym']!=rs['gym']:raise ValueError('Different gym configuration')
     if ls['segments']!=rs['segments']:raise ValueError('Captures use different input scripts')
-    summary={'left':left,'right':right,'method':'Solved paw-bone heads (fore: carpus, hind: MTP joint), not pads or toe mesh. Near-ground means within 3cm of idle JOINT clearance on two consecutive body-grounded frames; swing/landing can enter this band, so this is a motion proxy, not measured contact/skating. Joint height deviation is not mesh penetration; gallop suspension can raise every joint. Torso mean offset vs idle/floor and oscillation are separate. Slope rows use only actual incline frames; first 9 frames after staged resets are excluded. Ns, speed and gait histograms are reported. Human pad/toe judgment and readability scoring remain necessary.'}
+    summary={'left':left,'right':right,'toolEquivalenceProof':tool_proof,'method':'Solved paw-bone heads (fore: carpus, hind: MTP joint), not pads or toe mesh. Near-ground means within 3cm of idle JOINT clearance on two consecutive body-grounded frames; swing/landing can enter this band, so this is a motion proxy, not measured contact/skating. Joint height deviation is not mesh penetration; gallop suspension can raise every joint. Torso mean offset vs idle/floor and oscillation are separate. Slope rows use only actual incline frames; first 9 frames after staged resets are excluded. Ns, speed and gait histograms are reported. Human pad/toe judgment and readability scoring remain necessary.'}
     (args.out/'comparison.json').write_text(json.dumps(summary,indent=2))
-    lines=['# Matched gait measurements','',summary['method'],'',f"Left: {args.left} / {left['commit']}",f"Right: {args.right} / {right['commit']}",'','| Segment | Candidate | Near-height joint speed p95 (m/s), N | Closest joint height dev p95 (m) | Torso mean offset / oscillation (deg) | Speed median | Gaits (frames) |','|---|---|---:|---:|---:|---:|---|']
+    lines=['# Matched gait measurements','',str(tool_proof) if tool_proof else 'Exact capture-tool hashes match.','',summary['method'],'',f"Left: {args.left} / {left['commit']}",f"Right: {args.right} / {right['commit']}",'','| Segment | Candidate | Near-height joint speed p95 (m/s), N | Closest joint height dev p95 (m) | Torso mean offset / oscillation (deg) | Speed median | Gaits (frames) |','|---|---|---:|---:|---:|---:|---|']
     def value(metric):return 'n/a' if metric is None else f"{metric['p95']:.3f}"
     for segment in left['segments']:
         for label,data in [(args.left_label,left),(args.right_label,right)]:

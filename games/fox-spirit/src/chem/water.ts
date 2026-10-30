@@ -5,7 +5,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { boxCollider, type CollisionWorld } from '../collision';
 
-export type WaterSpot = { id: string; lip: THREE.Vector3; foot: THREE.Vector3; path: THREE.Vector3[]; width: number; wash?: boolean; probes?: THREE.Vector3[] };
+export type WaterSpot = { id: string; lip: THREE.Vector3; foot: THREE.Vector3; path: THREE.Vector3[]; width: number; wash?: boolean; probes?: THREE.Vector3[]; channel?: boolean; gate?: boolean };
 type Parcel = { head: number; tail: number; live: boolean };
 export const waterSpots: WaterSpot[] = [{
   id: 'marsh-mouth', lip: new THREE.Vector3(57, 3.5, 36), foot: new THREE.Vector3(57, 0, 36),
@@ -14,6 +14,10 @@ export const waterSpots: WaterSpot[] = [{
   id: 'reed-falls', lip: new THREE.Vector3(100, 15, 18), foot: new THREE.Vector3(100, 10, 18), width: 1.8,
   probes: [new THREE.Vector3(100, 15, 18), new THREE.Vector3(100, 12.5, 18), new THREE.Vector3(100, 10, 18)],
   path: [[100, 6, 18], [104, 5.2, 22.7627], [94, 4, 23.7627], [92, 3.2, 17], [95, 2.3, 10]].map(p => new THREE.Vector3(p[0], p[1], p[2])),
+}, {
+  id: 'pond-grotto', lip: new THREE.Vector3(-30, 3, 62), foot: new THREE.Vector3(-30, 0, 62), width: 2.4, channel: false, gate: true,
+  probes: [new THREE.Vector3(-30, 0.7, 62), new THREE.Vector3(-30, 2, 62)],
+  path: [new THREE.Vector3(-30, -0.16, 62), new THREE.Vector3(-29, -0.18, 65), new THREE.Vector3(-25, -0.18, 68)],
 }];
 
 /** Advected slugs preserve both fronts: stopping supply never clears a whole flume instantly. */
@@ -38,6 +42,11 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     const f = (i + 1) / 10, top = 2 + f * 4;
     block(91 + f * 3.5, (2 + top) / 2, 10 + f * 6.1, 2.4, top - 2 + 0.05, 0.8, 0, true);
   }
+  // S1: a small roofed grotto behind the pond falls, with stable ground on both sides.
+  for (const x of [-31.65, -28.35]) block(x, 1.35, 60.4, 0.75, 3.3, 4.8, 0, true);
+  block(-30, 3.05, 60.4, 4.1, 0.6, 4.8, 0, true);
+  block(-30, 1.35, 58.1, 4.1, 3.3, 0.75, 0, true);
+  block(-30, -0.2, 60.5, 3.2, 0.45, 4.8, 0, true);
   const foamColor = new THREE.Color();
   const warningColor = new THREE.Color(0xb09b67);
   const waters = waterSpots.map(spot => {
@@ -51,6 +60,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
       shader.fragmentShader = 'uniform float uWaterTime; uniform float uWaterFlow; varying vec2 vWaterP;\n' + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nfloat streak = pow(max(0.0, sin(vWaterP.x * 22.0 + sin(vWaterP.y * 1.5 - uWaterTime * 7.0))), 10.0); diffuseColor.rgb += vec3(0.12, 0.115, 0.095) * streak * uWaterFlow;');
     };
+    const gate = spot.gate ? collision.add(boxCollider({ x: spot.lip.x, z: spot.lip.z, w: spot.width, d: 0.2, top: spot.lip.y, bottom: spot.foot.y, tag: 'frozen-water' })) : null;
     const height = spot.lip.y - spot.foot.y;
     const fallGeo = new THREE.PlaneGeometry(spot.width * 0.8, height, 12, 24);
     const positions = fallGeo.attributes.position!;
@@ -97,23 +107,23 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
       const bed = new THREE.Mesh(new THREE.BoxGeometry(spot.width, 0.2, length / cells + 0.03), stone);
       bed.position.copy(p).add(new THREE.Vector3(0, -0.16, 0)); bed.rotation.y = yaw; bed.receiveShadow = true;
       if (spot.wash) scene.add(bed);
-      else { bed.updateMatrix(); masonry.push(bed.geometry.clone().applyMatrix4(bed.matrix)); }
+      else if (spot.channel !== false) { bed.updateMatrix(); masonry.push(bed.geometry.clone().applyMatrix4(bed.matrix)); }
       stamp.position.copy(p); stamp.rotation.set(-Math.PI / 2, 0, yaw); stamp.scale.setScalar(0); stamp.updateMatrix(); surface.setMatrixAt(i, stamp.matrix);
       const collider = boxCollider({ x: p.x, z: p.z, w: spot.width, d: length / cells + 0.04, yaw, top: p.y - 0.05, bottom: p.y - 0.4, tag: 'water-washed' });
       collider.enabled = true;
-      if (i % 4 === 0) {
+      if (i % 4 === 0 && spot.channel !== false) {
         const mid = curve.getPointAt(Math.min(1, (d + length / cells * 1.5) / length));
         collider.x = mid.x; collider.z = mid.z; collider.hz *= 4; collider.top0 = collider.top1 = mid.y - 0.05;
         collision.add(collider);
       }
       bed.visible = !spot.wash;
-      if (!spot.wash) {
+      if (!spot.wash && spot.channel !== false) {
         for (const side of [-1, 1]) block(p.x + Math.cos(yaw) * side * spot.width * 0.53, p.y + 0.1, p.z - Math.sin(yaw) * side * spot.width * 0.53, 0.2, 0.48, length / cells + 0.03, yaw);
         if (i % 16 === 0) block(p.x, (p.y - 2) / 2, p.z, 0.7, p.y + 2, 0.8, yaw);
       }
       return { d, p, bed, yaw, index: i, collider, wet: false };
     });
-    return { spot, reactor, fall, animation, glass, light, length, surface, wetState, stamp, samples, parcels: [] as Parcel[], flowing: false, arriving: false };
+    return { spot, reactor, gate, fall, animation, glass, light, length, surface, wetState, stamp, samples, parcels: [] as Parcel[], flowing: false, arriving: false };
   });
   const masonryMesh = new THREE.Mesh(mergeGeometries(masonry.map(g => g.index ? g.toNonIndexed() : g)), stone); masonryMesh.castShadow = true; masonryMesh.receiveShadow = true; scene.add(masonryMesh);
   masonry.forEach(g => g.dispose());
@@ -133,6 +143,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   return {
     tun, waters,
     arriving(id: string) { return waters.some(w => w.spot.id === id && w.arriving); },
+    restoreAll() { for (const w of waters) w.reactor.restored = true; },
     restoreWithin(pos: THREE.Vector3, radius: number) { for (const w of waters) if (Math.hypot(w.spot.lip.x - pos.x, w.spot.lip.z - pos.z) <= radius) w.reactor.restored = true; },
     update(dt: number, time: number, supply: SupplyFn, drainedAt?: (p: THREE.Vector3) => boolean) {
       for (const w of waters) {
@@ -141,6 +152,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         if (flowing && !w.flowing) w.parcels.push({ head: 0, tail: 0, live: true });
         if (!flowing && w.flowing) for (const p of w.parcels) p.live = false;
         w.flowing = flowing;
+        if (w.gate) w.gate.enabled = !flowing;
         const warning = w.reactor.state === 'holding' ? THREE.MathUtils.clamp(1 - w.reactor.holdLeft / 0.8, 0, 1) : 0;
         const travel = tun.speed * dt;
         for (const p of w.parcels) { p.head += travel; if (!p.live) p.tail += travel; }

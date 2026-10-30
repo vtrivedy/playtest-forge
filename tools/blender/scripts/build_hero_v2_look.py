@@ -31,8 +31,6 @@ for v in bm.verts:
     if n.z < -0.3 and co.y < bh("FrontUpperLeg.L").y + 0.25:
         push += 0.1 * min(1, chest) * -n.z  # deeper brisket between / ahead of the forelegs
     hw = w.get("Head", 0)
-    if hw > 0.3 and abs(n.x) > 0.45 and co.y > head_c.y - 0.05 and co.z < head_c.z + 0.05:
-        push += 0.02 * hw * abs(n.x)  # cheek fluff (slight: a swollen cheek band blunts the face)
     if hw > 0.3 and n.z < -0.3 and co.y > head_c.y - 0.12:
         push += 0.045 * hw * -n.z  # full throat under the jaw (no shadow shelf between cheeks and bib)
     belly = wsum(w, "Torso", "Torso2")
@@ -54,7 +52,7 @@ for v in snout:
 for sgn in (1, -1):
     ev = [bm.verts[i] for i in eye_ids if bm.verts[i].co.x * sgn > 0]
     ec = sum((v.co for v in ev), Vector()) / len(ev)
-    for v in ev: v.co = ec + (v.co - ec) * Vector((1.5, 1.3, 1.38))  # concept: large almond eyes (watchful, not round)
+    for v in ev: v.co = ec + (v.co - ec) * Vector((1.3, 1.5, 1.02))  # almond: long fore-aft, low lid height (watchful, not round)
 # compact oval paws (turnaround: neat dark paws barely longer than the leg is wide), flat sole
 paw_groups = [g for g in gname.values() if "Paw" in g]
 for pg in paw_groups:
@@ -149,7 +147,7 @@ for v in me.vertices:
     cols.append(c)
     # shell-fur length (model units; fox ~3.3 tall): long ruff/cheeks, short face/lower legs, none on paws/eyes
     neck = wsum(w, "Neck1", "Neck2", "Neck3", "Torso3")
-    L = 0.06 + 0.06 * min(1, neck) + 0.025 * wsum(w, "Back", "BackLeg.L", "BackLeg.R")
+    L = 0.045 + 0.045 * min(1, neck) + 0.02 * wsum(w, "Back", "BackLeg.L", "BackLeg.R")  # short: long shells read as raised chips
     if w.get("Head", 0) > 0.4: L = 0.016 + 0.05 * smooth(0.2, 0.6, abs(n.x)) * (1 - smooth(-0.3, -0.7, n.y))
     L = max(L, 0.07 * jaw)  # throat fur hangs over the jaw / bib crease
     if ear > 0.3: L = 0.012
@@ -555,15 +553,6 @@ def pick(cond, n):
 def topw(w):
     it = sorted(w.items(), key=lambda kv: -kv[1])[:3]; s = sum(x for _, x in it) or 1
     return {k: x / s for k, x in it}
-# tail fur locks over the fur half: laid flat along the brush (low splay -> no hedgehog spikes end-on), body
-# burnt orange; they hand over to the fur-to-flame locks below
-for j in range(110):
-    s = 0.05 + 0.65 * (j / 109)  # the brush stays fur well past its middle
-    p, tan, w, side, up = frame(s); th = j * 2.39996 + rnd.uniform(-0.3, 0.3)  # golden-angle spiral -> even layering
-    off = side * math.cos(th) + up * math.sin(th)
-    _, _, w2 = at(min(1.0, s + 0.1))
-    h = (0.3 + 0.2 * smooth(0.05, 0.4, s)) * rnd.uniform(0.85, 1.15)  # small, narrow locks: big ones read as flat leaves
-    card("tuft", p + off * radius(s) * 0.86, (tan + off * 0.14).normalized(), off, h * 0.22, h, "rusttuft", w, wts_top=w2)
 def fxb(s): return "FxPlumeA" if s < 0.55 else "FxPlumeB" if s < 0.78 else "FxPlumeC"
 # fur -> flame: translucent locks rooted on the brush over its outer half. Each is dense fur at the root and
 # breaks up into amber flame toward its tip, so the tail dissolves gradually (concept) instead of ending
