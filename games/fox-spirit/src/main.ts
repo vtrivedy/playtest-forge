@@ -867,7 +867,10 @@ async function boot() {
       return;
     }
     // steer (in air: brake once over the target; wait at the bridge head until the roots finish growing)
-    const waitBridge = route[auto.idx - 1]?.label === 'bridge-head' && world.bridgeGrown() < 1;
+    const prevLabel = route[auto.idx - 1]?.label;
+    // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
+    const waitSeedwell = (prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit;
+    const waitBridge = (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell;
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
