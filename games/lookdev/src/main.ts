@@ -190,7 +190,7 @@ async function main() {
   for (const m of patched) colorField.patchMaterial(m);
 
   const post = createPostStack(forge.renderer, scene, camera, {
-    bloomStrength: 0.48,
+    bloomStrength: 0.42,
     bloomThreshold: 0.78,
     vignette: 0.3,
     grain: 0.12,
@@ -377,7 +377,7 @@ async function main() {
     restoreTriggered = true;
     const c = shrine.position.clone().setY(island.yAt(shrine.position.x, shrine.position.z));
     colorField.restore(c, 14, 2.6);
-    setShrineGlow(2.8);
+    setShrineGlow(1.6);
     shrineT = 0;
     autumnFX.setWavefront(c, 1.5, 2.5);
   }

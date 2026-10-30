@@ -50,6 +50,7 @@ async function shot(name, url) {
 await shot('_warmup', 'http://127.0.0.1:5190/?t=2');
 await shot('01-sepia-open', 'http://127.0.0.1:5190/?t=0.8');
 await shot('02-ember-trail', 'http://127.0.0.1:5190/?t=5');
+await shot('02b-fox-close', 'http://127.0.0.1:5190/?t=7&restore=0');
 await shot('03-shrine-flood', 'http://127.0.0.1:5190/?t=10.5&restore=1');
 await shot('04-autumn-restored', 'http://127.0.0.1:5190/?t=13&restore=1');
 await shot('05-wide-amber', 'http://127.0.0.1:5190/?t=18&restore=1');
