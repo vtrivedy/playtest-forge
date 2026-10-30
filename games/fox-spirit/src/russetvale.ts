@@ -440,6 +440,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-72, 0, -26, { ground: false });
   W(-40, 0, -18);
   W(-14, 0, -6);
+  W(-8, 0, -0.6); // stay on the south bank: the straight line clips the gorge's west lip (zS −3.2)
   W(0, 0, -1.5, { label: 'cp-amber' });
   // Creek Root: wake the knot, wait for the bridge, cross the gorge behind it
   W(4.6, 0, -0.9, { label: 'grow:creek' });
