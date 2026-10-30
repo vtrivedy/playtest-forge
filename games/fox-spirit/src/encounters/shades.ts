@@ -11,8 +11,8 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
  */
 export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 
-export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number };
-export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 0.8, invulnerability: 1, debug: false, inkOpacity: 0.16, inkSize: 0.65 };
+export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number; noticeDistance: number; noticeTime: number; leafSize: number };
+export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 0.8, invulnerability: 1, debug: false, inkOpacity: 0.16, inkSize: 0.65, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14 };
 
 type ShadeActor = {
   active: boolean;
@@ -346,7 +346,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
             const fade = Math.min(1, age * 9) * (1 - THREE.MathUtils.smoothstep(age, 8, 10));
             const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(age * 1.8 + seed.phase, seed.phase + age, Math.sin(age + seed.phase)));
             if (seed.landed) q.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, seed.phase));
-            const size = 0.14 * fade * (0.88 + (k % 5) * 0.06);
+            const size = tun.leafSize * fade * (0.88 + (k % 5) * 0.06);
             matrix.compose(p, q, new THREE.Vector3(size, size, size));
             s.leaves.setMatrixAt(k, matrix);
             leafColor.copy(inkColor).lerp(autumnColors[k % 4]!, THREE.MathUtils.smoothstep(age, 0.08 + (k % 4) * 0.04, 0.8));
@@ -362,11 +362,11 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           s.curve.getPointAt(s.u, s.pos);
           s.curve.getTangentAt(s.u, tmp);
           s.heading = Math.atan2(tmp.x, tmp.z);
-          const near = Math.hypot(fox.x-s.pos.x,fox.z-s.pos.z)<6 && Math.abs(fox.y-s.pos.y)<3;
-          s.notice=THREE.MathUtils.damp(s.notice,near?1:0,10,dt);
+          const near = Math.hypot(fox.x-s.pos.x,fox.z-s.pos.z)<tun.noticeDistance && Math.abs(fox.y-s.pos.y)<3;
+          s.notice=THREE.MathUtils.damp(s.notice,near?1:0,3/tun.noticeTime,dt);
           const facing=Math.atan2(fox.x-s.pos.x,fox.z-s.pos.z)-s.heading;
           const yaw=Math.atan2(Math.sin(facing),Math.cos(facing));
-          s.noticeYaw=THREE.MathUtils.damp(s.noticeYaw,near?THREE.MathUtils.clamp(yaw,-.45,.45):0,10,dt);
+          s.noticeYaw=THREE.MathUtils.damp(s.noticeYaw,near?THREE.MathUtils.clamp(yaw,-.45,.45):0,3/tun.noticeTime,dt);
           // drift: a slow bob, as if the ink were suspended in water
           const gy = groundAt(s.pos.x, s.pos.z, s.pos.y + 2);
           if (Number.isFinite(gy) && Math.abs(gy - s.pos.y) < 1) s.pos.y = gy;
@@ -429,7 +429,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       return ev;
     },
     state() {
-      return shades.filter(s => s.active).map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 10 ? 48 : 0 }));
+      return shades.filter(s => s.active).map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, notice: Number(s.notice.toFixed(3)), noticeYaw: Number(s.noticeYaw.toFixed(3)), heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 10 ? 48 : 0 }));
     },
   };
   if (gui) {
@@ -443,6 +443,9 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     f.add(tun, 'invulnerability', 0.3, 2, 0.05);
     f.add(tun, 'inkOpacity',0,.4,.01);
     f.add(tun, 'inkSize',.2,1.5,.05);
+    f.add(tun, 'noticeDistance',3,10,.25);
+    f.add(tun, 'noticeTime',.15,.6,.05);
+    f.add(tun, 'leafSize',.06,.22,.01);
     f.add(tun, 'debug');
     f.close();
   }
