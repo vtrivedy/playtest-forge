@@ -141,8 +141,6 @@ export function createRestoreCinematic(opts: {
   setFlood: (k: number, pulse: number) => void;
   /** Gameplay state flips here (restored flag, status, HUD text) */
   onIgnite: () => void;
-  /** Collect the loose embers within r of c (they home into the fox) */
-  gatherEmbers?: (c: THREE.Vector3, r: number) => void;
   camera: FollowCamera;
   audio: GameAudio;
   hud: Hud;
@@ -248,7 +246,6 @@ export function createRestoreCinematic(opts: {
       approach.set(STAND[0], 0, STAND[1]).normalize();
       // fox's right while facing the basin
       right.set(approach.z, 0, -approach.x);
-      opts.gatherEmbers?.(S, 9);
       const keys: CameraPathKey[] = SHOT.map((k) => ({ t: k.t, pos: keyPoint(k.frame, k.pos), look: keyPoint(k.frame, k.look), fov: k.fov }));
       opts.camera.playPath({ keys, blendInS: 0.35, blendOutS: 1.6, lockS: LOCK_S });
     },

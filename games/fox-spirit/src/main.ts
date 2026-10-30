@@ -33,6 +33,7 @@ import { createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
 import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
+import { createUpdrafts, type Lift } from './chem/updraft';
 
 /**
  * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
@@ -230,8 +231,8 @@ async function boot() {
     // restore vortex + front leaf release share this pool with running kicks
     burstPool: 360,
   });
-  const emberMotes = createEmberMotes(scene, { maxMotes: world.emberSpots.length });
-  for (const e of world.emberSpots) emberMotes.add(e.p, e.value > 1 ? 1.6 : 1);
+  // spark bursts only (Seedwell, Wellspring, hearth flares) — no pickups
+  const emberMotes = createEmberMotes(scene, { maxMotes: 0 });
   const occlusion = createOcclusionFader(scene, {
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
@@ -252,19 +253,6 @@ async function boot() {
       shrineOn = true;
       status = 'won';
       hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
-    },
-    // the Wellspring calls the summit's loose embers home: they rise and dissolve as the fox steps up
-    gatherEmbers: (c, r) => {
-      const got = world.takeEmbersNear(c, r);
-      for (const g of got) {
-        embersGot += g.value;
-        emberMotes.collect(g.index, true);
-      }
-      if (got.length) {
-        feelMetrics.gemsCollected = embersGot;
-        hud.setEmbers(embersGot);
-        audio.play('ember');
-      }
     },
     camera: cam,
     audio,
@@ -318,6 +306,20 @@ async function boot() {
   fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
   fCam.add(cam.params, 'shake', 0, 2, 0.05);
   fCam.close();
+  // colour chemistry (world-1.md §1, §5): hearths → ember updrafts
+  const updrafts = createUpdrafts(scene, world.hearthSpots, {
+    gui,
+    onIgnite: (h) => {
+      emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: 26, speed: [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.6], flash: 0.8, size: [0.04, 0.09], heat: 0.7 });
+      audio.play('checkpoint');
+    },
+  });
+  for (const m of updrafts.materials) {
+    m.userData.cfRestoredChroma = 0.5;
+    colorField.patchMaterial(m);
+  }
+  const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
+  let inColumn = false;
   const fLook = gui.addFolder('Look');
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
@@ -372,7 +374,6 @@ async function boot() {
   let turntableMode = false;
   let turntableYaw = 0;
   let turntableAnim: FoxAnimState = 'idle';
-  let embersGot = 0;
   let airDashUsed = false;
   let prevFeet = world.spawnPos.y;
   let groundBounce = 1;
@@ -610,9 +611,8 @@ async function boot() {
       const p = foxActor.group.position;
       return {
         zone,
-        embers: embersGot,
-        emberTotal: world.emberTotal,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
+        chem: updrafts.state(),
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         audio: audio.debug(),
@@ -660,18 +660,7 @@ async function boot() {
 
   function handleEvents(events: ReturnType<typeof world.update>) {
     for (const e of events) {
-      if (e.type === 'ember') {
-        embersGot += e.value;
-        feelMetrics.gemsCollected = embersGot;
-        hud.setEmbers(embersGot);
-        audio.play('ember');
-        emberMotes.collect(e.index);
-        if (simClock - lastHitstop > HITSTOP_COOLDOWN_S) {
-          hitstop = HITSTOP_S;
-          lastHitstop = simClock;
-        }
-        foxActor.pulse(2.2);
-      } else if (e.type === 'seedwell') {
+      if (e.type === 'seedwell') {
         const s = world.seedwells[e.index]!;
         colorField.restore(s.pos, s.radius, 3.2);
         autumnFX.swirl(s.pos, 40, 1.6);
@@ -704,7 +693,6 @@ async function boot() {
   hud.setStatus(`Sepia Russetvale · ${backend}`);
   hud.setPrompt('WASD · Space jump / hold glide · Shift dash · drag to look · Reach the shrine');
   hud.hidePromptSoon(8);
-  hud.setEmbers(0);
 
   publishGame({
     title: 'Fox Spirit',
@@ -969,20 +957,32 @@ async function boot() {
     const dashing = dashT > 0;
     if (wasDashing && !dashing) jumpStats.lastDashDist = Number(Math.hypot(fox.position.x - dashFrom.x, fox.position.z - dashFrom.z).toFixed(2));
 
-    // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it
-    glideHoldT = !grounded && spaceDown && vel.y < 0 && !dashing ? glideHoldT + dt : 0;
-    gliding = glideHoldT > feel.glideDelay;
+    // ember updraft at the feet (chem/updraft.ts): lift factor k, axis for steering/centering
+    updrafts.liftAt(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z, lift);
+    const enteredColumn = lift.k > 0.02 && !inColumn && !grounded;
+    inColumn = lift.k > 0.02 && !grounded;
+    if (enteredColumn) cam.punch(3);
+    // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
+    // In a burning column glide starts at once and persists through the rise while jump is held.
+    glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
+    gliding = glideHoldT > feel.glideDelay || (inColumn && glideHoldT > 0);
     if (dashing && !grounded) vel.y = Math.max(vel.y, 0) * 0.9;
-    else if (gliding) {
+    else if (gliding && lift.k > 0) {
+      // ride the column: vy eases toward the lift target (no snap at the column edge)
+      const vTarget = THREE.MathUtils.lerp(-feel.glideSink, updrafts.tun.maxRise, lift.k);
+      vel.y = THREE.MathUtils.damp(vel.y, vTarget, updrafts.tun.liftResponse, dt);
+      vel.x *= Math.exp(-feel.glideDrag * dt);
+      vel.z *= Math.exp(-feel.glideDrag * dt);
+    } else if (gliding) {
       // ease into the glide sink from a fast fall (no jolt), then hold it exactly
       if (vel.y > -feel.glideSink) vel.y = Math.max(vel.y - feel.gravity * feel.glideGravityScale * dt, -feel.glideSink);
       else vel.y = THREE.MathUtils.damp(vel.y, -feel.glideSink, 7, dt);
       vel.x *= Math.exp(-feel.glideDrag * dt);
       vel.z *= Math.exp(-feel.glideDrag * dt);
     } else if (!grounded) {
-      // heavier fall, floaty apex while jump is held
+      // heavier fall, floaty apex while jump is held; a column softens a plain fall
       const hang = spaceDown && Math.abs(vel.y) < 1.4 ? feel.apexHang : 1;
-      const fall = vel.y < 0 ? feel.fallGravity : 1;
+      const fall = vel.y < 0 ? feel.fallGravity * (1 - updrafts.tun.fallLift * lift.k) : 1;
       vel.y -= feel.gravity * fall * hang * dt;
     }
     if (gliding && !wasGliding) glideFrom.copy(fox.position);
@@ -996,7 +996,14 @@ async function boot() {
     wasGliding = gliding;
 
     if (!dashing) {
-      const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward : feel.moveSpeed);
+      const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward * (1 - updrafts.tun.columnSteer * lift.radialK * (lift.k > 0 ? 1 : 0)) : feel.moveSpeed);
+      if (gliding && lift.k > 0) {
+        // centre pull: the column holds a glider instead of letting it sail through
+        const dx = lift.ax - fox.position.x;
+        const dz = lift.az - fox.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d > 0.05) desired.add(new THREE.Vector3(dx / d, 0, dz / d).multiplyScalar(updrafts.tun.centerPull * lift.radialK));
+      }
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
       cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
@@ -1067,6 +1074,8 @@ async function boot() {
 
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
     colorField.update(dt);
+    updrafts.update(dt, simClock, (q) => colorField.sample(q), document.body.classList.contains('debug-on'));
+    updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
     // Leaf kick while running
     kickCooldown -= dt;
@@ -1140,6 +1149,7 @@ async function boot() {
     drawFrame++;
     colorField.renderMask(dt);
     for (const m of world.materials) colorField.syncMaterial(m);
+    for (const m of updrafts.materials) colorField.syncMaterial(m);
 
     // Wisps / autumn
     if (fxEnabled) {
@@ -1190,22 +1200,22 @@ async function boot() {
     const lit = world.seedwells.filter((q) => q.lit).length;
     hud.setStatus(
       shrineOn
-        ? `AUTUMN RESTORED · embers ${embersGot}/${world.emberTotal} · ${elapsed.toFixed(1)}s`
-        : `${zone} · Seedwells ${lit}/3 · embers ${embersGot}/${world.emberTotal} · ${backend}`,
+        ? `AUTUMN RESTORED · ${elapsed.toFixed(1)}s`
+        : `${zone} · Seedwells ${lit}/3 · ${backend}`,
     );
 
     publishGame({
       title: 'Fox Spirit — Russetvale',
       status,
-      score: embersGot * 10 + lit * 250 + (shrineOn ? 1000 : 0),
+      score: lit * 250 + (shrineOn ? 1000 : 0),
       lives: 1,
       elapsedSec: Number(elapsed.toFixed(2)),
       deaths,
       backend,
-      winCondition: 'Light 3 Seedwells, cross the root bridge, wake the Ember Wellspring',
+      winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
+      chem: { updraft: updrafts.state() },
       notes: [
         `zone=${zone}`,
-        `embers=${embersGot}/${world.emberTotal}`,
         `seedwells=${world.seedwells.map((q) => `${q.id}:${q.lit ? 1 : 0}`).join(',')}`,
         `bridge=${world.bridgeGrown().toFixed(2)}`,
         `restored=${shrineOn}`,
