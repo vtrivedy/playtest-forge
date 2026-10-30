@@ -53,7 +53,7 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
   stair([-22, 38, -88], [-39, 24, -96], 821);
   stair([-41, 24, -99], [-49, 29, -101.5], 823);
   stair([-49, 29, -109], [-57, 34, -113], 824, 1.8);
-  stair([-57, 34, -113], [-53, 34, -116], 825, 1.8);
+  stair([-57, 34, -113], [-53, 34, -116], 825, 1.2);
   // Split crown: open silhouette, bowl held over the upper hearth's rising leaves.
   ruinArch(stone, -48, 34, -121, 0.12, { span: 5.2, pillarH: 3.2, broken: 0.35, seed: 830 });
   ruinArch(stone, -51, 34, -117, 1.4, { span: 3.8, pillarH: 2.3, broken: 0.6, seed: 831 });

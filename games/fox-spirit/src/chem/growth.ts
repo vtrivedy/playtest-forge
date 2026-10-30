@@ -698,7 +698,18 @@ function buildBraid(curve: THREE.CatmullRomCurve3, length: number, seed: number)
   ];
   // strands start buried in the knot (s < 0 shows from the first instant of growth)
   const s0 = -0.6;
+  // braid frame from the horizontal heading and the true binormal: on a steep root, cross(t, up) spins and
+  // an offset along world up folds into the tangent, collapsing the braid into a twisting flat band
+  const prevSide = new THREE.Vector3(1, 0, 0);
+  const frame = (t: THREE.Vector3) => {
+    const flat = new THREE.Vector3(t.x, 0, t.z);
+    const side = flat.lengthSq() > 1e-4 ? new THREE.Vector3().crossVectors(flat.normalize(), up) : prevSide.clone();
+    if (side.dot(prevSide) < 0) side.negate();
+    prevSide.copy(side);
+    return { side, normal: new THREE.Vector3().crossVectors(side, t).normalize() };
+  };
   strands.forEach((st, k) => {
+    prevSide.set(1, 0, 0);
     tube(
       acc,
       rings,
@@ -708,10 +719,10 @@ function buildBraid(curve: THREE.CatmullRomCurve3, length: number, seed: number)
         const u = THREE.MathUtils.clamp(s / length, 0, 1);
         const c = curve.getPointAt(u);
         const t = curve.getTangentAt(u);
-        const side = new THREE.Vector3().crossVectors(t, up).normalize();
+        const { side, normal } = frame(t);
         const tw = st.ph + s * 1.25 + (vnoise3(s * 0.7, k, seed) - 0.5) * 0.8;
         // the braid flattens into a deck: wider than tall
-        c.addScaledVector(side, Math.cos(tw) * st.rh * 1.35).addScaledVector(up, Math.sin(tw) * st.rh * 0.55 - DECK);
+        c.addScaledVector(side, Math.cos(tw) * st.rh * 1.35).addScaledVector(normal, Math.sin(tw) * st.rh * 0.55 - DECK);
         if (s < 0) c.addScaledVector(t, s * 0.4).addScaledVector(up, s * 0.5);
         const thick = 1 + 0.55 * Math.exp(-Math.max(s, 0) / 1.4);
         const end = THREE.MathUtils.smoothstep(length - s, 0, 1.2) * 0.6 + 0.4;

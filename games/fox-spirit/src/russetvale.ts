@@ -248,6 +248,17 @@ function sp(s: number, t: number): { x: number; z: number } {
   return { x: TO.x + TD.x * s + TN.x * t, z: TO.z + TD.y * s + TN.y * t };
 }
 
+// ---------------------------------------------------------------- SW3 root (Amberwood)
+
+const SW3_AT = { x: -10, y: 17.5, z: -36 };
+/** SW3's root: from the forest-floor knot 1.3 turns up the outside of the trunk to the crown lip (f 0..1). */
+function sw3RootPoint(f: number): [number, number, number] {
+  const g0 = groundRaw(SW3_AT.x, SW3_AT.z + 5);
+  const a = 1.3 * Math.PI * 2 * f;
+  const r = 4.9 - 1.1 * f;
+  return [SW3_AT.x + Math.sin(a) * r, g0 + 0.25 + (SW3_AT.y - g0 - 0.25) * f, SW3_AT.z + Math.cos(a) * r];
+}
+
 // ---------------------------------------------------------------- build
 
 export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
@@ -291,6 +302,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   M.rock.normalScale.set(1.1, 1.1);
   for (const m of [M.leaf, M.litter]) leafCutout(m, atlas);
   for (const m of [M.leaf, M.reed]) nearCameraFade(m);
+  for (const m of [M.rock, M.stone]) nearCameraFade(m, 0.3, 1.25);
   weatheredSurface(M.stone);
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
@@ -455,27 +467,28 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-108, 20, -25, { ground: false, act: 'glide' });
   W(-72, 0, -26, { ground: false });
   W(-40, 0, -18);
-  W(-14, 0, -6);
-  W(-8, 0, -0.6); // stay on the south bank: the straight line clips the gorge's west lip (zS −3.2)
+  // round the creek gorge's west end (its taper reaches x −13), then along the south bank
+  W(-15.5, 0, -8.5);
+  W(-15, 0, -1.5);
+  W(-8, 0, -1.0);
   W(0, 0, -1.5, { label: 'cp-amber' });
   // Creek Root: wake the knot, wait for the bridge, cross the gorge behind it
   W(4.6, 0, -0.9, { label: 'grow:creek' });
   W(5.9, 0, -7.4, { ground: false });
   W(6.9, 0, -13.6, { ground: false });
-  // D · Amberwood canopy climb
-  W(11.6, 0, -12.4, { act: 'jump' });
-  W(12, 1.5, -14, { ground: false, act: 'jump' });
-  W(9.6, 3.0, -16.4, { ground: false });
-  W(8.0, 3.0, -17.9, { ground: false });
-  W(0.8, 6.8, -24.8, { ground: false });
-  W(-1.6, 7, -26.2, { ground: false, act: 'jump' });
-  W(-7, 8.8, -25.2, { ground: false, act: 'jump' });
-  W(-13, 10.6, -26.2, { ground: false, act: 'jump' });
-  W(-17.4, 12.4, -30.2, { ground: false, act: 'jump' });
-  W(-17.9, 14.2, -36, { ground: false, act: 'jump' });
-  W(-15, 16, -41.4, { ground: false, act: 'jump' });
-  W(-10.8, 17.5, -37.4, { ground: false, label: 'SW3' });
-  W(-9, 17.5, -35.5, { ground: false, act: 'glide' });
+  // D · Amberwood: SW3's crown bowl is dry, and a dead root runs from it down the trunk to a knot on
+  // the forest floor. Wake the knot, keep it lit while the root climbs into the bowl (live + grown feeds
+  // the seal), then climb the root itself. The canopy chain stays as the optional way up.
+  W(-6, 0, -24);
+  W(-9.3, 0, -29.7, { label: 'grow:sw3-root' });
+  W(-9.6, 0, -29.9, { ground: false, label: 'SW3-feed' });
+  // follow the root all the way round; cutting its last quarter-turn walks into the trunk's lip
+  for (let k = 1; k <= 12; k++) {
+    const [x, y, z] = sw3RootPoint(k / 12);
+    W(x, y, z, { ground: false });
+  }
+  W(-7.0, 17.5, -36.8, { ground: false, label: 'SW3' });
+  W(-6.6, 17.5, -35.9, { ground: false, act: 'glide' });
   W(0, 8, -31.2, { ground: false, label: 'bridge-head' });
   // E · root bridge → arena → switchback ascent → Wellspring
   W(0, 10, -37.5, { ground: false });
@@ -497,7 +510,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-6.4, 38, -80.5, { ground: false });
   W(-5, 38, -83.5, { ground: false });
   // finale: wake the root knot at the west foot (it lifts the fallen lintel), then light the summit hearth
-  W(-3.5, 38, -84.4, { ground: false, label: 'grow:summit-KS' });
+  W(-5.6, 38, -83.5, { ground: false, label: 'grow:summit-KS' });
   W(-1.2, 39.04, -86.6, { ground: false, label: 'wellspring' });
   W(-1.2, 39.56, -88.8, { ground: false, label: 'restored' }); // stand by the hearth until the basin wakes
 
@@ -1161,7 +1174,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
 
   // ==================================================================== AMBERWOOD
   // canopy route: boulder steps → leaning branch → bounce crown pads spiralling the hollow Seedwell maple
-  const SW3P = new THREE.Vector3(-10, 17.5, -36);
+  const SW3P = new THREE.Vector3(SW3_AT.x, SW3_AT.y, SW3_AT.z);
   boulderStep(12, -14, 1.8, 1.5, 91);
   boulderStep(9.5, -16.5, 1.6, 3.0, 92);
   // creek gorge walls: fractured rock faces under each rim (visual; the sheer drop is in groundRaw)
@@ -1780,7 +1793,22 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // Water's HP launch is on the near aqueduct pier; direct fox colour cannot fill SW2.
   hearthSpots.push({ id: 'HP', x: 95, y: 6, z: 18, height: 10 });
   inletSpots.push({ seedwell: 1, source: 'reed-falls', pos: new THREE.Vector3(95, 2.3, 10), sealAt: new THREE.Vector3(95, 2.78, 10), pillar: new THREE.Vector3(95, 2, 10), latchTime: 7 });
-  kiln(2, 'HK', 1.68, -1.56, 4.5);
+  // SW3 is fed by growth, not another hearth bowl: a root from a knot on the forest floor spirals 1.3 turns
+  // up the outside of the trunk and pours into a dish on the crown lip. It feeds only while grown and live;
+  // the SW3 latch keeps it for good, and the grown root is the way up.
+  {
+    const sw = seedwells[2]!.pos;
+    const g0 = groundRaw(sw.x, sw.z + 5);
+    const path: Array<[number, number, number]> = [];
+    for (let i = 0; i <= 64; i++) path.push(sw3RootPoint(i / 64));
+    const end = path[path.length - 1]!;
+    const inward = new THREE.Vector2(sw.x - end[0], sw.z - end[2]).normalize();
+    path.push([end[0] + inward.x * 0.8, sw.y, end[2] + inward.y * 0.8]);
+    rootSpots.push({ id: 'sw3-root', knot: new THREE.Vector3(sw.x, g0, sw.z + 5.6), path, segments: 5, width: 1.6, restoredBy: 'SW3' });
+    const bowl = new THREE.Vector3(end[0] - inward.y * 1.1, sw.y + 0.5, end[2] + inward.x * 1.1);
+    const pillar = new THREE.Vector3(bowl.x + inward.x * 0.9, sw.y, bowl.z + inward.y * 0.9);
+    inletSpots.push({ seedwell: 2, source: 'sw3-root', pos: bowl, sealAt: new THREE.Vector3(sw.x, sw.y + 0.78, sw.z), pillar, latchTime: 2 });
+  }
 
   // SW1 Kiln Shade: circles H2 inside its drain reach, pulled in on the Seedwell side so it never leaves
   // the ledge — the wake alone can't keep H2 lit; dash H2 (stroke > 1 punches through) or free the Shade

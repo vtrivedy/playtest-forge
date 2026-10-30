@@ -99,6 +99,7 @@ const HITSTOP_COOLDOWN_S = 0.35;
 
 async function boot() {
   const hud = createHud();
+  const realmTitle=document.getElementById('title-card');
   hud.setStatus('Loading Russetvale…');
   const audio = createGameAudio();
 
@@ -145,13 +146,13 @@ async function boot() {
   const distant = createDistantLand(scene, {
     silhouette: new THREE.Color(0x4a3a3c),
     haze: sky.params.mist,
-    count: 22,
-    minRadius: 230,
-    maxRadius: 360,
-    minY: -60,
-    maxY: 30,
-    minScale: 18,
-    maxScale: 44,
+    count: 14,
+    minRadius: 300,
+    maxRadius: 600,
+    minY: -90,
+    maxY: 15,
+    minScale: 10,
+    maxScale: 30,
     mistFloor: -40,
     focusBias: 0.5,
     focusAngle: Math.atan2(-1, 0), // shrine path looks north (-Z)
@@ -208,6 +209,7 @@ async function boot() {
   })();
 
   const cam = createFollowCamera({
+    scenery: world.group,
     surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
   });
   cam.snapBehind(Math.PI);
@@ -1038,7 +1040,7 @@ async function boot() {
     // steer (in air: brake once over the target; wait at the bridge head until the roots finish growing)
     const prevLabel = route[auto.idx - 1]?.label;
     // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
-    const waitSeedwell = ((prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit) || (prevLabel === 'SW1-feed' && !world.seedwells[0]!.lit);
+    const waitSeedwell = ((prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit) || (prevLabel === 'SW1-feed' && !world.seedwells[0]!.lit) || (prevLabel === 'SW3-feed' && !world.seedwells[2]!.lit);
     // Let the visible front cross the six-metre bed before stepping off the dry boardwalk.
     const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
     const liftWp = route[auto.idx - 1];
@@ -1463,7 +1465,7 @@ async function boot() {
       // keep leaves riding a burning column, near the fox only (shared leaf pool)
       if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
     }
-    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); return updrafts.hearths.some((h) => heatFeeds(h, q.pos, updrafts.tun.radius)); })) latchSeedwell(i);
+    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); if (q.source === 'sw3-root') { const r = growth.roots.find((x) => x.spot.id === q.source); return !!r && r.grown >= 0.999 && r.reactor.heat >= 0.5 && r.wither <= 0; } return updrafts.hearths.some((h) => heatFeeds(h, q.pos, updrafts.tun.radius)); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     // summit finale: the root holds the lintel up, the hearth's column (clipped by the stone) reaches the basin
     world.summit.update(dt, growth.roots, shrineOn);
@@ -1475,7 +1477,7 @@ async function boot() {
     }
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
-    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn, dashing, shades.drains(new THREE.Vector3(187,30,-118)));
+    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn, dashing, shades.drains(new THREE.Vector3(117,30,-118)));
     crown.update(dt, (p, r) => {
       autumnFX.swirl(p, 40, 1.6);
       audio.play('shrine');
@@ -1491,7 +1493,8 @@ async function boot() {
     if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
     if (reach.submergedAt(fox.position, fox.position.y - foxActor.feetOffset)) handleEvents([{type:'hazard',kind:'ink'}]);
     restore.update(dt);
-    zone = world.zoneAt(fox.position.x, fox.position.z);
+    zone = reach.contains(fox.position) ? `Ashwater Reach · ${reach.state().level.toUpperCase()}` : world.zoneAt(fox.position.x, fox.position.z);
+    if(realmTitle)realmTitle.textContent=reach.contains(fox.position)?'ASHWATER REACH · THE DROWNED ORCHARD':'RUSSETVALE · EMBER WELLSPRING';
     if (scene.fog instanceof THREE.FogExp2) scene.fog.density = THREE.MathUtils.damp(scene.fog.density, fog.density * (zone.includes('Reedmarsh') ? reedLook.fogScale : 1), 2, dt);
 
     // through a dash, keep the last estimate (the dash is short and gravity-free)
@@ -1596,7 +1599,7 @@ async function boot() {
     const lit = world.seedwells.filter((q) => q.lit).length;
     hud.setStatus(
       shrineOn
-        ? `AUTUMN RESTORED · ${elapsed.toFixed(1)}s`
+        ? (reach.contains(fox.position) ? `ASHWATER REACH · ${reach.state().level.toUpperCase()}` : `AUTUMN RESTORED · ${elapsed.toFixed(1)}s`)
         : `${zone} · Seedwells ${lit}/3 · ${backend}`,
     );
 

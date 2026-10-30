@@ -245,7 +245,12 @@ export class ColorField {
         uTime: { value: 0 },
       },
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      // Sources combine by strongest contribution, exactly as sample() does.
+      // Summing overlapping trail stamps turned their soft edges into a hard disc.
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.MaxEquation,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneFactor,
       depthTest: false,
       depthWrite: false,
       side: THREE.DoubleSide, // mask camera views stamps from below
@@ -445,6 +450,7 @@ export class ColorField {
       shader.uniforms.uTrailRadius = { value: field.trailRadius };
       shader.uniforms.uTrailLife = { value: field.trailLife };
       shader.uniforms.uGlobalColor = { value: field.globalColor };
+      shader.uniforms.uGroundSurface = { value: mat.name === 'rv-terrain' || mat.name === 'rv-ground' ? 1 : 0 };
       shader.uniforms.uTrail = { value: new Float32Array(24 * 4) };
       shader.uniforms.uTrailCount = { value: 0 };
       // up to 4 restores
@@ -498,6 +504,8 @@ export class ColorField {
           uniform int uRestoreCount;
           // leading warm light band of a travelling restore front (written by colorMaskAt)
           float cfRim;
+          float cfPermanent;
+          uniform float uGroundSurface;
           uniform sampler2D uMaskMap;
           uniform float uUseMaskMap;
           uniform vec4 uBounds;
@@ -517,6 +525,7 @@ export class ColorField {
           float colorMaskAt(vec3 p) {
             float s = uGlobalColor;
             cfRim = 0.0;
+            cfPermanent = uGlobalColor;
             if (uUseMaskMap > 0.5) {
               vec2 uv = vec2(
                 (p.x - uBounds.x) / (uBounds.y - uBounds.x),
@@ -538,6 +547,7 @@ export class ColorField {
               float n = ((noise21(p.xz * 0.35 + uTime * 0.15) - 0.5) * 0.8 + (noise21(p.xz * 1.7 - uTime * 0.1) - 0.5) * 0.35) * edge * 1.6;
               float local = 1.0 - smoothstep(rad - edge + n, rad + edge * 0.5 + n, d);
               s = max(s, local);
+              cfPermanent = max(cfPermanent, local);
               // the band just behind the front glows warm while it travels
               float behind = rad + n - d;
               cfRim = max(cfRim, uRestoreRim[i] * smoothstep(-edge * 0.4, edge * 0.3, behind) * (1.0 - smoothstep(edge * 0.4, edge * 2.6, behind)));
@@ -593,7 +603,8 @@ export class ColorField {
           float edgeBoost = smoothstep(0.15, 0.55, cm) * (1.0 - smoothstep(0.55, 0.95, cm));
           vec3 washed = inkWash(outgoingLight, vWorldPosCF, vWorldNormalCF);
           // restored hue strength per material: stone/rock come back as warm-grey stone, not orange paint
-          vec3 chroma = mix(dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)) * vec3(1.04, 0.98, 0.88), outgoingLight, uRestoredChroma) * (1.0 + edgeBoost * 0.12);
+          vec3 chroma = mix(dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)) * vec3(1.04, 0.98, 0.88), outgoingLight, mix(uRestoredChroma, 1.0, cfPermanent * uGroundSurface)) * (1.0 + edgeBoost * 0.12);
+          chroma *= mix(vec3(1.0), vec3(1.12, 1.04, 0.86), cfPermanent * uGroundSurface);
           // Keep the full feather instead of amplifying low mask values into a painted disc.
           // Modulation vanishes at 0/1, so untouched and fully restored regions remain exact.
           float brushEdge = (noise21(vWorldPosCF.xz * 0.85) - 0.5) * 0.5

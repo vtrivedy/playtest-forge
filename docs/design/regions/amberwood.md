@@ -38,6 +38,10 @@ The Creek Root at (6,−2) is a curled knot beside an actual 10 m gorge. Touchin
                               crown ramp → [!] valley vista
 ```
 
+## SW3 as built (levels-opus 16:40): trace the dead root
+
+The crown dish beside SW3 is dry. A dead root runs from it down the outside of the trunk to a coiled knot on the forest floor (south foot), visible both from the crown and from the creek approach. Wake the knot and keep it lit: the root grows 1.3 turns up the trunk (5 segments, about 7.5 s) and pours into the dish. Only a grown, live root feeds the seal (2 s), so walking off early lets it wither. The SW3 latch keeps the root for good, and the grown root is the critical-path way up to the crown. The canopy pad chain stays as the optional route. This replaces the HK hearth bowl that copied SW1.
+
 ## Critical path
 
 1. Wake or dash the Creek Root knot and cross its grown segments. The gorge makes the new route physically useful before the shrine. Stable banks and the shallow recovery bed permit a retry; retained occupied collision is visible as withering wood, not an invisible bridge.
