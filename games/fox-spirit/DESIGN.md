@@ -340,3 +340,11 @@ Dress the already shipped Crown/Reach shelf undersides and bridge bays with the
 existing hanging-spire/ruin kit. Keep every platform top, collider and route fixed.
 Add arched structural silhouettes below the thin causeway so it reads as an old
 aqueduct rather than a screen-space line. No new traversal or gate is added.
+
+Driver16:45 / Opus re-critique closure: darker ink core with a warm ash rim for
+sepia-on-sepia separation. Ground wash samples up/down stairs and suppresses
+steep faces. Release consumes antlers-to-feet over1.2s;48 leaves start warm-sepia,
+colorize while falling, and scatter mostly along the patrol rather than across
+the stair edge. An oblique exterior lens retains the whole settling arc. Keep
+the original caught-mid-motion premise and chemistry ownership; no new gait/IK
+system or deleting another stream's heat-column meshes.
