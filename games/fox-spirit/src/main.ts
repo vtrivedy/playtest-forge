@@ -507,6 +507,9 @@ async function boot() {
       turntableAnim = (opts?.anim as FoxAnimState) || 'idle';
       harnessAnimLock = turntableAnim;
       setFx(opts?.fx !== false);
+      foxActor.setMotion?.({speed: turntableAnim==='run' ? 9 : turntableAnim==='walk' ? 1.4 : turntableAnim==='trot' ? 3.8 : 0,
+        grounded: ['idle','run','walk','trot','skid','land'].includes(turntableAnim), yaw: turntableYaw, verticalSpeed: 0,
+        groundAt: () => ty});
       foxActor.setAnim(turntableAnim);
     },
     stopTurntable() {
@@ -1089,7 +1092,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
@@ -1279,6 +1282,9 @@ async function boot() {
       fox.position.set(tx, ty + foxActor.feetOffset, tz);
       fox.rotation.y = turntableYaw; // model spins; camera fixed (classic turntable)
       vel.set(0, 0, 0);
+      foxActor.setMotion?.({speed: turntableAnim==='run' ? 9 : turntableAnim==='walk' ? 1.4 : turntableAnim==='trot' ? 3.8 : 0,
+        grounded: ['idle','run','walk','trot','skid','land'].includes(turntableAnim), yaw: turntableYaw, verticalSpeed: 0,
+        groundAt: () => ty});
       foxActor.setAnim(turntableAnim);
       foxActor.update(rawDt, elapsed, turntableAnim === 'glide');
       cam.camera.position.set(tx, fox.position.y + 1.25, tz + 3.6);

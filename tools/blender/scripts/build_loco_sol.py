@@ -156,9 +156,12 @@ for name,data in metadata.items():
         mean=statistics.mean(speeds) if speeds else 0
         measured.append({'meanStanceSpeed':mean,'stanceSpeedCV':statistics.pstdev(speeds)/max(.001,abs(mean)) if speeds else 0,
                          'stanceHeightRange':max(heights)-min(heights) if heights else 0})
+    if any(m['stanceSpeedCV']>.05 or m['stanceHeightRange']>.015 for m in measured):
+        raise RuntimeError(f'{name}: authored stance failed speed/height gate: {measured}')
     data['measured']=measured
+    channel_hash.update(name.encode())
     for fc in act.fcurves:
-        channel_hash.update(fc.data_path.encode())
+        channel_hash.update(f'{fc.data_path}:{fc.array_index}'.encode())
         for key in fc.keyframe_points: channel_hash.update(f'{key.co.x:.6f},{key.co.y:.6f}'.encode())
     print('MEASURED',name,json.dumps(measured))
 arm.animation_data.action=original_action

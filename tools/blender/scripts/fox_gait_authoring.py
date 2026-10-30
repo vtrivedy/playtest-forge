@@ -173,14 +173,9 @@ def gallop_pose(t, st=1.0):
             center=L_["foot"].copy(); center.x=REST_YZ[L_["up"]][0].x+.05
             P = paw_path(stance, u, center, 0.43 * st, 0.43 * st, 0.5, early=1.25)
             sh = posed_yz(L_["up"])[0]
-            if stance:
-                a1, a2 = ik2(sh, P, L_["a"], L_["b"], pole=1)
-            else:  # swing: FK blend between lift-off and reach poses; carpus folds the paw up behind
-                f0 = paw_path(True, 1.0, center, 0.43 * st, 0.43 * st, 0.0); f1 = paw_path(True, 0.0, center, 0.43 * st, 0.43 * st, 0.0)
-                b0, c0 = ik2(sh, f0, L_["a"], L_["b"], pole=1); b1, c1 = ik2(sh, f1, L_["a"], L_["b"], pole=1)
-                k = ease_io2(u)
-                a1 = b0 + (b1 - b0) * k - math.radians(10) * math.sin(math.pi * u)
-                a2 = c0 + (c1 - c0) * k + math.radians(72) * math.sin(math.pi * min(1.0, u * 1.15)) ** 1.2
+            # The authored paw arc is the constraint through stance AND swing. FK angle interpolation
+            # can cross the +/-pi branch and flip the forepaw above the shoulder on a normalized rig.
+            a1, a2 = ik2(sh, P, L_["a"], L_["b"], pole=1)
             pw = rest_ang(L_["paw"]) + math.radians((42 * max(0, (u - 0.5) / 0.5) ** 1.5) if stance else 42 * (1 - ease_io2(u)) + 75 * math.sin(math.pi * min(1, u * 1.3)))
             set_chain(p, [L_["up"], L_["lo"], L_["paw"]], [a1, a2, pw])
     apply_dict(p)
