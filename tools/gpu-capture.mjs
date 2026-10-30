@@ -245,6 +245,21 @@ try {
     const probe = await H('shadesProbe');
     if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
     save('shade-drain-probe.json', probe);
+    const rules = await page.evaluate(() => {
+      const h=window.__gameHooks,field=h.debug.colorField;
+      const pos=field.fox.clone().fromArray(h.shades.state().actors[0].pos);
+      const original=field.fox.clone(); field.fox.copy(pos);
+      const aura={raw:field.sample(pos),supplied:h.chem.supplyAt(pos)};
+      const stroke=field.stroke(pos,pos,{life:6,strength:1.8,radius:1});
+      const strong={strength:field.strokeAt(pos),supplied:h.chem.supplyAt(pos)};
+      stroke.strength=1;
+      const spent={strength:field.strokeAt(pos),supplied:h.chem.supplyAt(pos)};
+      field.strokes.splice(field.strokes.indexOf(stroke),1);field.fox.copy(original);
+      return {label:'Isolated public colour-field rule probe; staged aura/stroke samples, restored immediately; no encounter release forced',aura,strong,spent};
+    });
+    if(rules.aura.raw<.9||rules.aura.supplied!==0||rules.strong.supplied!==1||rules.spent.supplied!==0)throw Error(`Shade colour rules failed ${JSON.stringify(rules)}`);
+    save('shade-colour-rules.json',rules);
+
     await camera();
     await video('shade-patrol', 120, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 30, 60, 90, 119] });
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
@@ -316,7 +331,7 @@ try {
       const [x,y,z]=actor.pos,col=window.__gameHooks.debug.world.collision;
       for(let k=0;k<128;k++){
         const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=.1;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+        for(let r=-2;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
         if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],yaw:Math.atan2(-dx,-dz)};
       }throw Error('No clear live dash approach');
     });
@@ -330,6 +345,27 @@ try {
     const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
     if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
     save('shade-live-acceptance.json',{label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
+    const flume = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
+    if(flume){
+      await H('teleport',95,6,18,0);
+      await H('photo',[103,10,31],[99,5,23],48);
+      await video('shade-flume',120,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,90,119]});
+      const result=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
+      if(result.pos[1]<3.5||result.pos[1]>7)throw Error('Flume Shade left elevated channel');
+      save('shade-flume-acceptance.json',{actor:result,game:await page.evaluate(()=>window.__game)});
+      for(const [id,observer,lens,target] of [
+        ['shade-hill-low',[8,12,-67],[11,20,-60],[0,15,-68.7]],
+        ['shade-hill-high',[8,32.8,-79.5],[12,41,-73],[0,35,-80.5]],
+      ]){
+        await H('teleport',...observer,0);await H('photo',lens,target,48);
+        await video(id,90,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,89]});
+        const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
+        if(!actor)throw Error(`Missing ${id}`);
+        save(`${id}-acceptance.json`,actor);
+      }
+
+    }
+
 
   }
   if (wants('gait')) {
