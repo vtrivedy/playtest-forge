@@ -36,6 +36,7 @@ import {
 import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } from './russetTextures';
 import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
+import type { WindSpot } from './chem/wind';
 import { loadNatureKit, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 
 /**
@@ -85,6 +86,8 @@ export type Realm = {
   inletSpots: InletSpot[];
   /** Shade patrols (world-1.md §3.8) */
   shadeSpots: ShadeSpot[];
+  /** Wind currents (world-1.md §1.3 wind; §3.3 beat 6 wind river) */
+  windSpots: WindSpot[];
   /** An inlet's seal filled: light the Seedwell (permanent colour, checkpoint, its route) */
   latchSeedwell: (index: number) => RealmEvent[];
   respawnPos: () => THREE.Vector3;
@@ -1605,6 +1608,26 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
     shadeSpots.push({ id: 'shade-kiln', patrol });
   }
+  // Wind river (§3.3 beat 6): from the top of H2's column over the Kiln, east above the Amberwood crowns,
+  // down onto the arena's west rim. Woken briefly by colour at the Seedwell; flows for good once SW1 latches
+  // (permanent route 1 up the hill: a plain glide from the column top covers ≈ 50 m of the ≈ 95 m).
+  const windSpots: WindSpot[] = [];
+  {
+    const sw = seedwells[0]!.pos;
+    const h2 = hearthSpots.find((h) => h.id === 'H2')!;
+    windSpots.push({
+      id: 'wind-river',
+      source: [sw.x, sw.y + 1, sw.z],
+      path: [
+        [h2.x, 27.5, h2.z],
+        [-95, 28.5, -28],
+        [-75, 28.5, -37],
+        [-55, 27.5, -48],
+        [-34, 24.5, -61],
+        [-18, 15.5, -65],
+      ],
+    });
+  }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
@@ -2022,6 +2045,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     hearthSpots,
     inletSpots,
     shadeSpots,
+    windSpots,
     latchSeedwell(i) {
       const s = seedwells[i]!;
       if (s.lit) return [];

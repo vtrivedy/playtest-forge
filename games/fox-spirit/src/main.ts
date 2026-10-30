@@ -36,6 +36,7 @@ import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
 import { createUpdrafts, type Hearth, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
+import { createWind, type WindForce } from './chem/wind';
 import type { ColorStroke } from '../../../src/render/colorField';
 
 /**
@@ -343,11 +344,14 @@ async function boot() {
     if (!drainedAt(q)) return colorField.sample(q);
     return colorField.strokeAt(q) > 1 ? 1 : 0;
   };
+  const wind = createWind(scene, world.windSpots, { gui });
+  const windF: WindForce = { k: 0, tx: 0, ty: 0, tz: 0, px: 0, py: 0, pz: 0 };
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
     for (const h of updrafts.hearths) if (Math.hypot(h.base.x - sw.pos.x, h.base.z - sw.pos.z) <= sw.radius) h.reactor.restored = true;
+    wind.restoreNear(sw.pos, sw.radius);
     const inlet = inlets.inlets.find((q) => q.seedwell === i);
     if (inlet) inlet.latched = true;
     const ev = world.latchSeedwell(i);
@@ -708,7 +712,7 @@ async function boot() {
       return {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
-        chem: { ...updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        chem: { ...updrafts.state(), wind: wind.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         audio: audio.debug(),
@@ -1078,6 +1082,7 @@ async function boot() {
 
     // ember updraft at the feet (chem/updraft.ts): lift factor k, axis for steering/centering
     updrafts.liftAt(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z, lift);
+    wind.forceAt(fox.position, windF);
     const enteredColumn = lift.k > 0.02 && !inColumn && !grounded;
     inColumn = lift.k > 0.02 && !grounded;
     if (enteredColumn) cam.punch(3);
@@ -1096,6 +1101,12 @@ async function boot() {
       // ride the column: vy eases toward the lift target (no snap at the column edge)
       const vTarget = THREE.MathUtils.lerp(-feel.glideSink, updrafts.tun.maxRise, lift.k);
       vel.y = THREE.MathUtils.damp(vel.y, vTarget, updrafts.tun.liftResponse, dt);
+      vel.x *= Math.exp(-feel.glideDrag * dt);
+      vel.z *= Math.exp(-feel.glideDrag * dt);
+    } else if (gliding && windF.k > 0) {
+      // ride the wind: sink mostly held, plus the current's own climb/descent
+      const vTarget = -feel.glideSink * (1 - wind.tun.hold * windF.k) + windF.ty * wind.tun.push * windF.k;
+      vel.y = THREE.MathUtils.damp(vel.y, vTarget, 3, dt);
       vel.x *= Math.exp(-feel.glideDrag * dt);
       vel.z *= Math.exp(-feel.glideDrag * dt);
     } else if (gliding) {
@@ -1130,6 +1141,13 @@ async function boot() {
         const dz = lift.az - fox.position.z;
         const d = Math.hypot(dx, dz);
         if (d > 0.05) desired.add(new THREE.Vector3(dx / d, 0, dz / d).multiplyScalar(updrafts.tun.centerPull * lift.radialK));
+      }
+      if (gliding && windF.k > 0) {
+        // the current carries the glider along it and gently back toward its core
+        desired.x += windF.tx * wind.tun.push * windF.k;
+        desired.z += windF.tz * wind.tun.push * windF.k;
+        const pd = Math.hypot(windF.px, windF.pz);
+        if (pd > 0.3) desired.add(new THREE.Vector3(windF.px / pd, 0, windF.pz / pd).multiplyScalar(wind.tun.centerPull * windF.k * Math.min(1, pd / 2)));
       }
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
@@ -1192,6 +1210,7 @@ async function boot() {
     }
     colorField.update(dt);
     updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
+    wind.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
     colorField.glows.length = 0;
     hearthLeafT += dt;

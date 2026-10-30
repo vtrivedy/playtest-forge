@@ -455,6 +455,36 @@ try {
     save('updraft-acceptance.json', summary);
     console.log('UPDRAFT', JSON.stringify(summary));
   }
+  if (wants('wind')) {
+    // Wind river acceptance (world-1.md §3.3 beat 6): SW1 latched → ride H2 up, glide into the river, land on the arena rim.
+    await boot(quality, true);
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+    await H('lightSeedwells'); await advance(240, false);
+    const st0 = await H('state');
+    const h2 = st0.chem.hearths.find(h => h.id === 'H2');
+    const [hx, hy, hz] = h2.pos;
+    // stand 1.6 m west of H2 facing east (along the river's first leg)
+    const yawE = Math.atan2(1, 0.45);
+    await H('teleport', hx - 1.6, 20, hz - 0.7, yawE); await advance(30);
+    let phase = 'jump', t0 = 0;
+    const tl = [];
+    await video('wind-river', 26 * fps, async i => {
+      const st = await H('state');
+      tl.push({ i, pos: st.pos, vel: st.vel, gliding: st.gliding, grounded: st.grounded, wind: st.chem.wind[0] });
+      let keys = [];
+      if (phase === 'jump') { keys = ['KeyD', 'Space']; if (i > 4) phase = 'rise'; }
+      else if (phase === 'rise') { keys = ['Space']; if (st.pos[1] > 27 || (st.vel[1] < 0.5 && i > 60)) { phase = 'ride'; t0 = i; } }
+      else if (phase === 'ride') { keys = ['KeyW', 'Space']; if (st.grounded) phase = 'landed'; }
+      await H('setKeys', keys);
+    }, (st, i) => phase === 'landed' && i > 30, { keyFrames: [0, 60, 150, 300, 450, 600, 750, 900] });
+    const end = await H('state');
+    const peak = Math.max(...tl.map(r => r.pos[1]));
+    const landedArena = end.grounded && Math.hypot(end.pos[0], end.pos[2] + 60) < 20 && end.pos[1] > 10;
+    const summary = { end: end.pos, grounded: end.grounded, landedArena, peak, wind: end.chem.wind, rideFrames: tl.length - t0 };
+    save('wind-acceptance.json', summary); save('wind-timeline.json', tl.filter((_, k) => k % 10 === 0));
+    console.log('WIND', JSON.stringify(summary));
+    await H('setKeys', []);
+  }
   if (wants('route')) {
     await boot(quality, true);
     save('route-waypoints.json', await H('route'));
