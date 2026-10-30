@@ -554,7 +554,10 @@ export function createFollowCamera(opts: {
           const pt = Math.min(path.t, tEnd);
           evalPath(path.keys, pt, 'pos', pathPos);
           evalPath(path.keys, pt, 'look', pathLook);
+          // long blends arc up and over (the hand-back from the valley pullback would cut through the shrine)
+          const lift = Math.min(7, outPos.distanceTo(pathPos) * 0.3) * 4 * pathW * (1 - pathW);
           outPos.lerp(pathPos, pathW);
+          outPos.y += lift;
           outLook.lerp(pathLook, pathW);
           outFov = THREE.MathUtils.lerp(outFov, pathFov(path.keys, pt, params.fov), pathW);
         }

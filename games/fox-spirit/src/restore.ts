@@ -10,9 +10,10 @@ import type { Hud } from './hud';
  *
  *   0–1.0   approach hold: fox walks up to the basin, low three-quarter lens, world still sepia
  *   1.0     ignition: basin flare, small spark core, leaf vortex — the colour front starts
- *   1.0–3.5 lens cranes out over the stairs while the front runs down stairs, bank and trees
- *   3.5–5.0 pull back along the valley; fox, dome and maple stay as anchors
- *   5.0–6.0 settle; then the lens eases back to traversal (any move / jump / dash takes it sooner)
+ *   1.4–3.5 lens orbits the fox's front as it turns to the stairs, then looks down the hill past its
+ *           shoulder: restored summit against the still-sepia valley as the front runs out
+ *   3.5–5.0 pull back west and up; fox, dome and arches stay as anchors over the turning valley
+ *   5.0–6.5 settle; then the lens arcs back to traversal (any move / jump / dash takes it sooner)
  */
 export const IGNITE_S = 1.0;
 /** Player input is held until the ignition has landed */
@@ -95,6 +96,7 @@ const SHOT: Array<{ t: number; frame: 'fox' | 'world'; pos: [number, number, num
   { t: 4.6, frame: 'world', pos: [-13, 7, -6], look: [2.5, -3.2, 9], fov: 52 },
   { t: 5.4, frame: 'world', pos: [-15.5, 8.6, -7.8], look: [3, -4, 10], fov: 52 },
   { t: 6.0, frame: 'world', pos: [-15.9, 8.8, -8.1], look: [3, -4, 10], fov: 52 },
+  { t: 6.5, frame: 'world', pos: [-16.0, 8.85, -8.2], look: [3, -4, 10], fov: 52 },
 ];
 /** Fox stance: turned a little toward the lens while it faces the basin, then toward the valley once lit */
 const FACE_OFFSET = -0.75;
@@ -248,7 +250,7 @@ export function createRestoreCinematic(opts: {
       right.set(approach.z, 0, -approach.x);
       opts.gatherEmbers?.(S, 9);
       const keys: CameraPathKey[] = SHOT.map((k) => ({ t: k.t, pos: keyPoint(k.frame, k.pos), look: keyPoint(k.frame, k.look), fov: k.fov }));
-      opts.camera.playPath({ keys, blendInS: 0.7, blendOutS: 1.4, lockS: LOCK_S });
+      opts.camera.playPath({ keys, blendInS: 0.35, blendOutS: 1.6, lockS: LOCK_S });
     },
     get faceYaw() {
       return floodAge > 0.3 ? VALLEY_YAW : Math.atan2(-approach.x, -approach.z) + FACE_OFFSET;

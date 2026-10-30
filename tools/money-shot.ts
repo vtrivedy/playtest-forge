@@ -32,7 +32,9 @@ const seed = Number(arg('seed', '7'));
 const fps = Number(arg('fps', '30'));
 /** Sim substeps per video frame (physics at fps × substeps Hz) */
 const sub = Number(arg('sub', '2'));
-const seconds = Number(arg('seconds', '7.6'));
+const seconds = Number(arg('seconds', '6'));
+/** Sequence age at the first video frame: after the 0.35 s blend-in, once the fox's walk-in trail has faded */
+const startAge = Number(arg('start', '0.4'));
 const showHud = flag('hud');
 /** Fast iteration: simulate every frame but only render + save the checkpoint stills (no MP4) */
 const stillsOnly = flag('stills');
@@ -118,6 +120,8 @@ try {
   if (s.restored) throw new Error('restored=true at trigger time — ignition must come later');
   console.log(`trigger after ${(walkFrames / 60).toFixed(2)} s walk at pos ${s.pos.map((v) => v.toFixed(2)).join(',')}`);
 
+  // ---- run (unrecorded) through the blend-in, then the sequence at fixed sim time per frame
+  while (s.restore.age < startAge - 1e-6) s = await advance(1, 1 / 60, true);
   // ---- the sequence: fixed sim time per frame
   const total = Math.round(seconds * fps);
   const states: string[] = [];
