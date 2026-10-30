@@ -1,3 +1,4 @@
+import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
 import { CollisionWorld, boxCollider, cylCollider, type Collider } from './collision';
@@ -39,6 +40,9 @@ import type { InletSpot } from './chem/inlet';
 import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 import type { RootSpot } from './chem/growth';
+import { waterSpots } from './chem/water';
+import type { ShadeSpot } from './encounters/shades';
+export type { ShadeSpot } from './encounters/shades';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -49,7 +53,6 @@ import type { RootSpot } from './chem/growth';
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
 /** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
-export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number };
 export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
 
 export type SeedwellState = {
@@ -268,12 +271,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   M.stone.normalScale.set(0.9, 0.9);
   Object.assign(M.bark, barkTextures());
   M.bark.color.setScalar(1.25);
+  weatheredSurface(M.wood, true);
   Object.assign(M.rock, rockTex);
   M.rock.color.setScalar(1.25);
   M.rock.normalScale.set(1.1, 1.1);
   for (const m of [M.leaf, M.litter]) leafCutout(m, atlas);
   for (const m of [M.leaf, M.reed]) nearCameraFade(m);
-  stoneWeathering(M.stone, new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg'));
+  weatheredSurface(M.stone);
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
@@ -327,15 +331,14 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   };
 
   // -------------------------------------------------- shrine glow materials (carved stone that warms)
-  const glowMat = (name: string) =>
-    new THREE.MeshStandardMaterial({
-      name,
-      vertexColors: true,
-      color: 0xb8a68a,
-      roughness: 0.6,
-      emissive: new THREE.Color(0xff8a2a),
-      emissiveIntensity: 0.0,
+  const glowMat = (name: string) => {
+    const mat = new THREE.MeshStandardMaterial({
+      name, vertexColors: true, color: 0xb8a68a, roughness: 0.82,
+      emissive: new THREE.Color(0xff8a2a), emissiveIntensity: 0.0,
     });
+    weatheredSurface(mat);
+    return mat;
+  };
 
   /** Rock slab + litter-textured ground cap on walkable tops. */
   // ground-cap leafiness: drifts under trees and at the summit maple, a worn path and a
@@ -1774,7 +1777,39 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x: p.x + 2.2, z: p.z + 1.7, w: 3.2, d: 3.2, top: 34, bottom: 33.3, round: true, rough: 0.35, seed: 367, topColor: PAL.stone });
   }
   // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
-  shadeSpots.push({ id: 'shade-flume', speed: 1.1, patrol: [[102, 4.7, 24], [98, 4.5, 26], [96, 0, 29], [104, 0, 30]] });
+  {
+    const channel = new THREE.CatmullRomCurve3(waterSpots.find(s => s.id === 'reed-falls')!.path, false, 'centripetal');
+    const patrol: ShadeSpot['patrol'] = [];
+    for (const side of [1, -1]) for (let j = 0; j <= 8; j++) {
+      const t = 0.25 + (side === 1 ? j : 8 - j) / 8 * 0.2;
+      const p = channel.getPoint(t), tangent = channel.getTangent(t);
+      p.x += tangent.z * 0.52 * side; p.z -= tangent.x * 0.52 * side;
+      patrol.push([p.x, p.y, p.z]);
+    }
+    shadeSpots.push({ id: 'shade-flume', patrol });
+  }
+  // Narrow loops on intact flights, never across either broken jump.
+  for (const [id, x0, x1, z, y0, y1] of [
+    ['shade-hill-low', 4.5, -4.5, -68.7, 12.83, 16.37],
+    ['shade-hill-high', 4.5, -4.5, -80.5, 33.63, 37.17],
+  ] as const) {
+    const patrol: ShadeSpot['patrol'] = [];
+    for(const side of [1,-1]) for(let j=0;j<=8;j++) {
+      const f=(side===1?j:8-j)/8;
+      patrol.push([x0+(x1-x0)*f,y0+(y1-y0)*f,z+side*.52]);
+    }
+    shadeSpots.push({id,patrol});
+  }
+  // Restored-edge encounters awaken once; permanent elements remain immune.
+  for(const [id,afterLatch,cx,cy,cz,rx,rz] of [
+    ['shade-edge-kiln','SW1',-112,20,-27,1.5,.8],
+    ['shade-edge-reeds','SW2',95,6,18,1.2,.8],
+    ['shade-edge-maple','SW3',-8,12,-60,1.5,.8],
+  ] as const) {
+    const patrol: ShadeSpot['patrol']=[];
+    for(let j=0;j<16;j++){const a=j/16*Math.PI*2;patrol.push([cx+Math.cos(a)*rx,cy,cz+Math.sin(a)*rz]);}
+    shadeSpots.push({id,afterLatch,patrol});
+  }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
@@ -2396,55 +2431,6 @@ function leafCutout(mat: THREE.MeshStandardMaterial, atlas: THREE.Texture): void
       #include <alphatest_fragment>`,
     );
   };
-}
-
-/**
- * Masonry weathering: a CC0 rock scan (ambientCG Rock035) as a value-only detail layer, lichen and
- * moss pooled on up-facing ledges and block tops, and soot/rain streaks down vertical faces, so
- * ruins read as old stone rather than clean stacked boxes. Hue still comes from the vertex palette.
- */
-function stoneWeathering(mat: THREE.MeshStandardMaterial, detail: THREE.Texture): void {
-  detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
-  detail.colorSpace = THREE.SRGBColorSpace;
-  const prev = mat.onBeforeCompile;
-  mat.onBeforeCompile = (shader, renderer) => {
-    prev.call(mat, shader, renderer);
-    shader.uniforms.uStoneDetail = { value: detail };
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>
-        varying vec3 vSWPos;
-        varying vec3 vSWN;`)
-      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
-        vSWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-        vSWN = normalize(mat3(modelMatrix) * objectNormal);`);
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>
-        uniform sampler2D uStoneDetail;
-        varying vec3 vSWPos;
-        varying vec3 vSWN;
-        float swHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
-        float swNoise(vec2 p) {
-          vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
-          return mix(mix(swHash(i), swHash(i + vec2(1, 0)), u.x), mix(swHash(i + vec2(0, 1)), swHash(i + vec2(1, 1)), u.x), u.y);
-        }`)
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        {
-          vec3 swN = normalize(vSWN);
-          float swL = dot(texture2D(uStoneDetail, vMapUv * 0.37).rgb, vec3(0.3, 0.59, 0.11));
-          diffuseColor.rgb *= mix(1.0, clamp(swL * 2.2, 0.4, 1.5), 0.8);
-          // rust/ochre lichen blooms on the faces, darker damp seams between them
-          float swLi = swNoise(vSWPos.xz * 1.3 + vSWPos.y * 0.9) * 0.6 + swNoise(vec2(vSWPos.x - vSWPos.z, vSWPos.y) * 4.0) * 0.4;
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.58, 0.4, 0.2) * (0.8 + 0.4 * swL), smoothstep(0.58, 0.75, swLi) * 0.55);
-          diffuseColor.rgb *= 1.0 - smoothstep(0.32, 0.18, swLi) * 0.25;
-          float swUp = smoothstep(0.4, 0.85, swN.y);
-          float swM = smoothstep(0.4, 0.68, swNoise(vSWPos.xz * 0.8 + vSWPos.y * 0.37) * 0.7 + swNoise(vSWPos.xz * 3.1) * 0.3);
-          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.34, 0.31, 0.15) * (0.75 + 0.5 * swL), swUp * swM * 0.8);
-          float swV = 1.0 - abs(swN.y);
-          float swS = swNoise(vec2((vSWPos.x + vSWPos.z) * 1.9, vSWPos.y * 0.16));
-          diffuseColor.rgb *= 1.0 - swV * smoothstep(0.45, 0.85, swS) * 0.38;
-        }`);
-  };
-  mat.needsUpdate = true;
 }
 
 /**

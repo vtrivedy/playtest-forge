@@ -245,6 +245,29 @@ try {
     const probe = await H('shadesProbe');
     if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
     save('shade-drain-probe.json', probe);
+    const rules = await page.evaluate(() => {
+      const h=window.__gameHooks,field=h.debug.colorField;
+      const pos=field.fox.clone().fromArray(h.shades.state().actors[0].pos);
+      const original=field.fox.clone(); field.fox.copy(pos);
+      const aura={raw:field.sample(pos),supplied:h.chem.supplyAt(pos)};
+      const stroke=field.stroke(pos,pos,{life:6,strength:1.8,radius:1});
+      const strong={strength:field.strokeAt(pos),supplied:h.chem.supplyAt(pos)};
+      stroke.strength=1;
+      const spent={strength:field.strokeAt(pos),supplied:h.chem.supplyAt(pos)};
+      field.strokes.splice(field.strokes.indexOf(stroke),1);field.fox.copy(original);
+      const source=h.chem.updrafts.hearths[0].reactor;
+      const reactor=new source.constructor('shade-rule-probe','hearth',[pos],source.tun);
+      reactor.update(source.tun.igniteTime,()=>1,()=>true);
+      reactor.update(.1,()=>0,()=>true);
+      const gutter={state:reactor.state,holdLeft:reactor.holdLeft,heat:reactor.heat};
+      reactor.restored=true;reactor.update(1,()=>0,()=>true);
+      const restored={state:reactor.state,heat:reactor.heat};
+
+      return {label:'Isolated public colour-field rule probe; staged aura/stroke samples, restored immediately; no encounter release forced',aura,strong,spent,gutter,restored};
+    });
+    if(rules.aura.raw<.9||rules.aura.supplied!==0||rules.strong.supplied!==1||rules.spent.supplied!==0||rules.gutter.holdLeft!==0||rules.gutter.state!=='guttering'||rules.restored.heat!==1||rules.restored.state!=='restored')throw Error(`Shade colour rules failed ${JSON.stringify(rules)}`);
+    save('shade-colour-rules.json',rules);
+
     await camera();
     await video('shade-patrol', 120, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 30, 60, 90, 119] });
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
@@ -316,7 +339,7 @@ try {
       const [x,y,z]=actor.pos,col=window.__gameHooks.debug.world.collision;
       for(let k=0;k<128;k++){
         const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=.1;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+        for(let r=-2;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
         if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],yaw:Math.atan2(-dx,-dz)};
       }throw Error('No clear live dash approach');
     });
@@ -330,6 +353,27 @@ try {
     const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
     if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
     save('shade-live-acceptance.json',{label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
+    const flume = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
+    if(flume){
+      await H('teleport',95,6,18,0);
+      await H('photo',[103,10,31],[99,5,23],48);
+      await video('shade-flume',120,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,90,119]});
+      const result=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
+      if(result.pos[1]<3.5||result.pos[1]>7)throw Error('Flume Shade left elevated channel');
+      save('shade-flume-acceptance.json',{actor:result,game:await page.evaluate(()=>window.__game)});
+      for(const [id,observer,lens,target] of [
+        ['shade-hill-low',[8,12,-67],[11,20,-60],[0,15,-68.7]],
+        ['shade-hill-high',[8,32.8,-79.5],[12,41,-73],[0,35,-80.5]],
+      ]){
+        await H('teleport',...observer,0);await H('photo',lens,target,48);
+        await video(id,90,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,89]});
+        const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
+        if(!actor)throw Error(`Missing ${id}`);
+        save(`${id}-acceptance.json`,actor);
+      }
+
+    }
+
 
   }
   if (wants('gait')) {
@@ -342,6 +386,21 @@ try {
     await page.evaluate(() => {
       const fox = window.__gameHooks.debug.fox;
       window.__capturePaws = Object.fromEntries(Object.entries({ LF: 'front_paw_l', RF: 'front_paw_r', LH: 'hind_paw_l', RH: 'hind_paw_r' }).map(([id, name]) => [id, fox.getObjectByName(name)]));
+      window.__capturePadVertices={};
+      for(const [id,bone] of Object.entries(window.__capturePaws)) {
+        const samples=[];
+        fox.traverse(mesh=>{
+          if(!mesh.isSkinnedMesh || /fur|shell|glow|flame|spiritfx/i.test(mesh.name))return;
+          const boneIndex=mesh.skeleton.bones.indexOf(bone);if(boneIndex<0)return;
+          const indices=mesh.geometry.getAttribute('skinIndex'),weights=mesh.geometry.getAttribute('skinWeight');
+          for(let i=0;i<indices.count;i++) {
+            let weight=0;
+            for(let j=0;j<4;j++)if(indices.getComponent(i,j)===boneIndex)weight+=weights.getComponent(i,j);
+            if(weight>=.65)samples.push({mesh,index:i});
+          }
+        });
+        window.__capturePadVertices[id]=samples;
+      }
     });
     // Times are output seconds; slow motion advances 1/240s per 60fps frame.
     const segments = [
@@ -383,6 +442,18 @@ try {
           const ground = world.collision.groundAt(point.x, point.z, feetY + .6).y;
           feet[id] = { position: point.toArray(), ground: Number.isFinite(ground) ? ground : null, clearance: Number.isFinite(ground) ? point.y - ground : null };
         }
+        const pads={}, updatedMeshes=new Set();
+        for(const [id,samples] of Object.entries(window.__capturePadVertices)) {
+          let closest=null;
+          for(const {mesh,index} of samples) {
+            if(!updatedMeshes.has(mesh)){mesh.skeleton.update();updatedMeshes.add(mesh);}
+            const point=mesh.localToWorld(mesh.getVertexPosition(index,fox.position.clone()));
+            const ground=world.collision.groundAt(point.x,point.z,feetY+.6).y;
+            const clearance=point.y-ground;
+            if(Number.isFinite(clearance) && (!closest || clearance<closest.clearance))closest={clearance,position:point.toArray(),ground,index,mesh:mesh.name};
+          }
+          pads[id]={...closest,vertexCount:samples.length};
+        }
         const hip = fox.getObjectByName('pelvis'), chest = fox.getObjectByName('spine_04');
         let body = null;
         if (hip && chest) {
@@ -392,7 +463,7 @@ try {
           const behind = world.collision.groundAt(center.x - Math.sin(yaw) * .4, center.z - Math.cos(yaw) * .4, feetY + .6).y;
           body = { hip: a.toArray(), chest: b.toArray(), pitch: Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z)), floorPitch: Math.atan2(ahead - behind, .8) };
         }
-        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet, body };
+        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet, pads, padLandmark: 'lowest actual skinned core-mesh vertex with paw weight>=.65; fur/shader displacement excluded', body };
       }, state.pos[1]),
       keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.gait ?? st.locomotion?.gait ?? st.anim ?? 'unreported'} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
       afterStep: async (i, state) => {
@@ -730,6 +801,68 @@ try {
     save('growth-acceptance.json', summary);
     console.log('GROWTH', JSON.stringify(summary));
   }
+  if (wants('flow')) {
+    // Independent segments: staged starts are explicit; movement afterward is real and unassisted.
+    const segments = [{name:'mills',label:'cp-mills',seconds:24}, {name:'kiln',label:'SW1',seconds:15}, {name:'canopy',label:'cp-amber',seconds:26}, {name:'hill',label:'cp-arena',seconds:28}];
+    for (const seg of segments) {
+      await boot(quality, true);
+      const route = await H('route'), idx = route.findIndex(w => w.label === seg.label), wp = route[idx];
+      await H('teleport', wp.x, wp.y, wp.z, Math.PI);
+      await H('autopilot', true, idx, {assist:false});
+      await video(`flow-${seg.name}-staged-start`, seg.seconds * fps, async () => {}, st => !st.auto.active);
+      await shot(`flow-${seg.name}-end`);
+    }
+  }
+  if (wants('crown')) {
+    await boot(quality, true);
+    await H('forceRestore'); await advance(660, false);
+    const afterFlood = await H('state');
+    save('crown-after-valley-flood.json', afterFlood);
+    if (afterFlood.crown.restored) throw Error('Valley flood solved the Crown remotely');
+    await H('teleport', -10, 38, -87, -Math.PI / 2);
+    await advance(2); await shot('crown-entry');
+    const points = [
+      {x:-19,z:-88,y:38}, {x:-22,z:-88,y:38}, {x:-39,z:-96,y:24}, {x:-37,z:-101,y:24},
+      {x:-37,z:-101,y:30,jump:true}, {x:-43,z:-108,y:29},
+      {x:-45,z:-112,y:29,dash:true}, {x:-45,z:-112,y:44,jump:true},
+      {x:-19,z:-88,y:38,jump:true,land:true}, {x:-12,z:-88,y:38,land:true}, {x:-12,z:-93,y:38,land:true},
+    ];
+    let phase=0, age=0, reached=false;
+    await video('crown-roundtrip-staged-start', 48 * fps, async () => {
+      const st = await H('state'), p=points[phase];
+      age += 1/fps;
+      const dx=p.x-st.pos[0], dz=p.z-st.pos[2], d=Math.hypot(dx,dz);
+      if (d<0.85 && st.pos[1]>=p.y-0.5 && (!p.land || st.grounded) && age>.25) {
+        if(phase===points.length-1) reached=true;
+        else { phase++; age=0; console.log('CROWN PHASE', phase, JSON.stringify(st.pos)); }
+      }
+      const target=points[phase], vx=target.x-st.pos[0], vz=target.z-st.pos[2], len=Math.hypot(vx,vz);
+      const mag = Math.min(1,len / 1.2);
+      await H('setStick',len>.2?vx/len*mag:0,len>.2?vz/len*mag:0);
+      const keys=target.jump && !(target.land && len<1.2)?['Space']:[];
+      if(target.dash && age<.06) keys.push('ShiftLeft');
+      await H('setKeys',keys);
+    }, st => reached || st.deaths>0 || age>9, {keyFrames:[0,3*fps,6*fps,9*fps,12*fps], traceEveryFrame:true});
+    await H('setKeys',[]); await H('setStick',null); await shot('crown-end');
+    const st=await H('state');
+    save('crown-acceptance.json',{reached,phase,restored:st.crown.restored,deaths:st.deaths,end:st});
+    if (!reached || !st.crown.restored || st.deaths || !st.grounded) report.failures.push('Crown round trip did not finish restored, grounded, and without deaths');
+    // Prove the permanent walking fallback in both directions, with no jumping or staged movement.
+    const walkOut = [[-19,38,-88],[-22,38,-88],[-39,24,-96],[-41,24,-99],[-49,29,-101.5],[-49,29,-109],[-57,34,-113],[-53,34,-116]];
+    const walk = [...walkOut, ...walkOut.slice(0,-1).reverse(),[-12,38,-88],[-12,38,-93]];
+    let walkIdx=0, walkAge=0;
+    await video('crown-walking-fallback', 50*fps, async () => {
+      const q=await H('state'), p=walk[walkIdx], dx=p[0]-q.pos[0], dz=p[2]-q.pos[2], d=Math.hypot(dx,dz);
+      walkAge+=1/fps;
+      if(d<.55 && q.pos[1]>=p[1]-.5 && q.grounded && walkIdx<walk.length-1) {walkIdx++; walkAge=0; console.log('CROWN WALK',walkIdx,JSON.stringify(q.pos));}
+      const target=walk[walkIdx], vx=target[0]-q.pos[0], vz=target[2]-q.pos[2], len=Math.hypot(vx,vz);
+      await H('setKeys',[]); await H('setStick',len>.2?vx/len*Math.min(.65,len):0,len>.2?vz/len*Math.min(.65,len):0);
+    }, q => q.deaths>0 || walkAge>9 || walkIdx===walk.length-1 && q.grounded && Math.hypot(q.pos[0]+12,q.pos[2]+93)<.7, {keyFrames:[0,5*fps,10*fps,15*fps]});
+    await H('setStick',null); await advance(30); await shot('crown-walk-end');
+    const walkEnd=await H('state'); save('crown-walk-acceptance.json',{walkIdx,of:walk.length,grounded:walkEnd.grounded,deaths:walkEnd.deaths,end:walkEnd.pos});
+    if(walkIdx!==walk.length-1 || walkEnd.deaths) report.failures.push('Crown permanent walking fallback incomplete');
+
+  }
   if (wants('route')) {
     await boot(quality, true);
     const route = await H('route');
@@ -771,9 +904,9 @@ try {
     for (const state of ['sepia', 'restored']) {
       await boot(quality, true);
       if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
-      // Open meadow between the portal (z85) and broken arch (z64).
-      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
-      await H('teleport', 6, reviewY, 78, Math.PI);
+      // Central arrival lane: keep the front camera and running fox clear of H-a and its rock wall.
+      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
+      await H('teleport', 0, reviewY, 70, Math.PI);
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
       await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
@@ -782,7 +915,8 @@ try {
         back_three_q: [-3.3, 0.9, 4.4, 30], back: [0, 0.9, 5.4, 30], face: [-0.8, 0.95, -2.2, 26] };
       for (const [name, [dx, dy, dz, fov]] of Object.entries(views)) {
         const look = name === 'face' ? [p.x, p.y + 0.82, p.z - 0.45] : at;
-        await H('photo', [p.x + dx, p.y + dy, p.z + dz], look, fov);
+        const cameraFloor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [p.x + dx, p.z + dz]);
+        await H('photo', [p.x + dx, Math.max(p.y + dy, cameraFloor + 0.3), p.z + dz], look, fov);
         await advance(3); await shot(`fox-${state}-${name}`);
       }
       await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);
@@ -794,12 +928,14 @@ try {
   if (wants('turntable')) {
     // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
-    const turntableY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
-    await H('teleport', 6, turntableY, 78, Math.PI); await advance(60, false);
+    const turntableY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
+    await H('teleport', 0, turntableY, 70, Math.PI); await advance(60, false);
     const p = await H('getFoxPos'), n = 8 * fps;
     await video('fox-turntable', n, async i => {
       const a = i / n * Math.PI * 2;
-      await H('photo', [p.x + Math.sin(a) * 3.4, p.y + 0.75, p.z - Math.cos(a) * 3.4], [p.x, p.y + 0.5, p.z], 34);
+      const cx = p.x + Math.sin(a) * 3.4, cz = p.z - Math.cos(a) * 3.4;
+      const floor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [cx, cz]);
+      await H('photo', [cx, Math.max(p.y + 0.75, floor + 0.3), cz], [p.x, p.y + 0.5, p.z], 34);
     });
   }
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }

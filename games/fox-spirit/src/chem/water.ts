@@ -1,3 +1,4 @@
+import { weatheredSurface } from '../worldSurfaces';
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
 import { Reactor, type SupplyFn } from './reactor';
@@ -24,6 +25,7 @@ export const waterSpots: WaterSpot[] = [{
 export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?: GUI) {
   const tun = { speed: 8, threshold: 0.3, igniteTime: 0.6, holdTime: 3, gutterTime: 2 };
   const stone = new THREE.MeshStandardMaterial({ color: 0x75664d, roughness: 0.94 });
+  weatheredSurface(stone);
   const masonry: THREE.BufferGeometry[] = [];
   const block = (x: number, y: number, z: number, w: number, h: number, d: number, yaw = 0, solid = false) => {
     const g = new RoundedBoxGeometry(w, h, d, 2, Math.min(0.14, w * 0.12, h * 0.12, d * 0.12));
