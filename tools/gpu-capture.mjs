@@ -869,7 +869,7 @@ try {
       const q=points[phase],vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
       await H('setStick',len>.2?vx/len*Math.min(1,len):0,len>.2?vz/len*Math.min(1,len):0);
       const keys=q.jump?['Space']:[];if(q.dash&&len<3&&!painted){keys.push('ShiftLeft');painted=true;}await H('setKeys',keys);
-    },st=>reached||st.deaths>0||age>12,{keyFrames:[0,10*fps,20*fps,25*fps]});
+    },st=>reached&&st.reach.restored||st.deaths>0||age>12,{keyFrames:[0,10*fps,20*fps,25*fps]});
     await H('setKeys',[]);await H('setStick',null);await advance(30);await shot('reach-end');
     const end=await H('state');save('reach-acceptance.json',{phase,reached,end});
     // Staged architecture views are separate from the real summit-to-basin traversal above.
