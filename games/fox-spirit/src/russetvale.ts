@@ -33,7 +33,7 @@ import {
   talus,
   LEAF_CELL,
 } from './russetKit';
-import { stoneTextures, rockTextures, groundTextures, leafAtlas } from './russetTextures';
+import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } from './russetTextures';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -226,6 +226,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   Object.assign(M.stone, stoneTex);
   M.stone.color.setScalar(1.2);
   M.stone.normalScale.set(0.9, 0.9);
+  Object.assign(M.bark, barkTextures());
+  M.bark.color.setScalar(1.25);
   Object.assign(M.rock, rockTex);
   M.rock.color.setScalar(1.3);
   M.rock.normalScale.set(1.1, 1.1);
@@ -297,7 +299,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   };
   const slab = (spec: RockSpec) => {
     rockSlab(bk('rock', spec.x, spec.z), spec);
-    if (spec.topColor !== null) groundCap(bk('ground', spec.x, spec.z, false), spec, spec.topColor ?? PAL.soilTop, 1.0, capLeafy);
+    if (spec.topColor !== null) groundCap(bk('ground', spec.x, spec.z, false), spec, spec.topColor ?? PAL.soilTop, 0.5, capLeafy);
   };
 
   // ==================================================================== ROUTE
@@ -525,7 +527,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       hangingRoot(rb, ur, Math.cos(th) * R, -1 - ur() * 5, Math.sin(th) * R, 5 + ur() * 16, inward, 0.12 + ur() * 0.3);
     }
     const um = ub.toMesh(M.rock, { cast: false, receive: false, boxUV: 4 });
-    const rm = rb.toMesh(M.bark, { cast: false, receive: false });
+    const rm = rb.toMesh(M.bark, { cast: false, receive: false, boxUV: 2 });
     if (um) group.add(um);
     if (rm) group.add(rm);
   }
@@ -887,7 +889,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         c.copy(tone).offsetHSL((rr() - 0.5) * 0.03, (rr() - 0.5) * 0.08, (rr() - 0.5) * 0.12);
         cb.copy(PAL.bankDamp).multiplyScalar(0.8);
         nrm.set(Math.cos(bendA), 0.5, Math.sin(bendA)).normalize();
-        const seg = 4;
+        const seg = 3;
         let prevL: THREE.Vector3 | null = null;
         let prevR: THREE.Vector3 | null = null;
         let prevC = cb.clone();
@@ -964,9 +966,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mistMat);
     const a = r() * Math.PI * 2;
     const d = Math.sqrt(r()) * 0.9;
-    m.position.set(MARSH.x + Math.cos(a) * MARSH.rx * d, -1.25 + r() * 0.5, MARSH.z + Math.sin(a) * MARSH.rz * d);
+    m.position.set(MARSH.x + Math.cos(a) * MARSH.rx * d, -1.32 + r() * 0.2, MARSH.z + Math.sin(a) * MARSH.rz * d);
     m.scale.setScalar(12 + r() * 12);
-    m.rotation.x = -Math.PI / 2 + 0.25;
+    m.rotation.x = -Math.PI / 2 + 0.06; // hugs the ink: never veils the tussocks or boardwalk
     m.userData.phase = r() * 6.28;
     mists.push(m);
     group.add(m);
@@ -1148,7 +1150,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       b.add(tube, undefined, PAL.root.clone().lerp(PAL.moss, 0.3));
       tube.dispose();
     }
-    const mesh = b.toMesh(M.bark)!;
+    const mesh = b.toMesh(M.bark, { boxUV: 2 })!;
     return mesh;
   })();
   bridgeMesh.scale.set(1, 1, 0.001);
@@ -1597,6 +1599,44 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         });
       }
     }
+    // red thickets: dense bush masses banked against tree roots and the meadow's edges
+    // (the key art's flaming foreground; the 10 % accent once restored)
+    {
+      const thr = rng(2201);
+      const thHues = [PAL.maple, PAL.crimson, PAL.russet, PAL.maple, PAL.amber];
+      let made = 0;
+      for (let i = 0; i < 400 && made < 46; i++) {
+        let x: number;
+        let z: number;
+        if (i % 2 === 0) {
+          const [tx, tz, th] = TREE_SPOTS[Math.floor(thr() * TREE_SPOTS.length)]!;
+          const a = thr() * Math.PI * 2;
+          const d = th * (0.12 + thr() * 0.22);
+          x = tx + Math.cos(a) * d;
+          z = tz + Math.sin(a) * d;
+        } else {
+          const th = thr() * Math.PI * 2;
+          const R = outlineR(th) - 4 - thr() * 10;
+          x = Math.cos(th) * R;
+          z = Math.sin(th) * R;
+        }
+        if (!insideIsland(x, z, 3) || routeNear(route, x, z, 3.2) || marshE(x, z) < 1.2 || inTerraces(x, z, 3)) continue;
+        if (Math.hypot(x - POND.x, (z - POND.z) * 1.6) < 18 || z < -50) continue;
+        made++;
+        const n = 4 + Math.floor(thr() * 5);
+        for (let k = 0; k < n; k++) {
+          const a = thr() * Math.PI * 2;
+          const d = Math.sqrt(thr()) * 2.4;
+          const px = x + Math.cos(a) * d;
+          const pz = z + Math.sin(a) * d;
+          if (routeNear(route, px, pz, 2.2)) continue;
+          const g = groundAtCover(px, pz);
+          if (!Number.isFinite(g)) continue;
+          shrub(bk('leaf', px, pz, false), thr, px, g, pz, 0.7 + thr() * 0.6, thHues[Math.floor(thr() * thHues.length)]!);
+        }
+        litterPatch(bk('litter', x, z, false), thr, x, z, 3.2, 26, (px, pz) => groundAtCover(px, pz));
+      }
+    }
     // Amberwood floor: thick leaf fall under each maple
     for (const [x, z] of AMBER_TREES) litterPatch(bk('litter', x, z, false), lr, x, z, 8, 110, (px, pz) => groundAtCover(px, pz));
   }
@@ -1651,7 +1691,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       }
       maple(bkb, lb, x + rad * 0.3, y + rad * 0.08, z - rad * 0.3, { height: 7 + sr() * 5, trunkR: 0.45, leaf: crownHues[i % 4]!, seed: 1200 + i, density: 0.5, lean: 0.3 });
       for (const [bb, mat] of [[ob, M.rock], [sb, M.stone], [lb, M.leaf], [bkb, M.bark]] as const) {
-        const m = bb.toMesh(mat, { cast: false, receive: false, boxUV: mat === M.rock ? 4 : mat === M.stone ? 1.6 : undefined });
+        const m = bb.toMesh(mat, { cast: false, receive: false, boxUV: mat === M.rock ? 4 : mat === M.stone ? 1.6 : mat === M.bark ? 2 : undefined });
         if (m) group.add(m);
       }
     }
@@ -1728,7 +1768,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   for (const { b, mat, cast } of buckets.values()) {
     verts += b.vertexCount;
     perMat[mat.name] = (perMat[mat.name] ?? 0) + b.vertexCount;
-    const m = b.toMesh(mat, { cast, receive: true, planarUV: mat === M.ground ? GROUND_TILE : undefined, boxUV: mat === M.stone ? 1.6 : mat === M.rock ? 4 : undefined });
+    const m = b.toMesh(mat, { cast, receive: true, planarUV: mat === M.ground ? GROUND_TILE : undefined, boxUV: mat === M.stone ? 1.6 : mat === M.rock ? 4 : mat === M.bark ? 2 : undefined });
     if (m) {
       // Canopy / leaf buckets sit between follow-cam and the fox — fade them.
       if (mat.name === 'rv-canopy' || mat.name.includes('leaf') || mat.name.includes('canopy')) {
@@ -1913,7 +1953,7 @@ function inTerraces(x: number, z: number, margin: number): boolean {
   return s > -8 - margin && s < T_END + margin && Math.abs(t) < 15 + margin;
 }
 
-const GROUND_TILE = 3.2;
+const GROUND_TILE = 4.4;
 
 /**
  * Alpha-cut leaf cards. Mip averaging thins alpha below the cutoff at distance, so far

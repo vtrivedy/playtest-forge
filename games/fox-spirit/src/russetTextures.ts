@@ -216,6 +216,45 @@ export function rockTextures(N = 512): SurfaceSet {
   return { map: toTexture(N, rgba, true), normalMap: normalFromHeight(N, H, 2.6), roughnessMap: toTexture(N, rough, false) };
 }
 
+// ---------------------------------------------------------------- bark (vertical fissured plates, ~2 m tile)
+
+export function barkTextures(N = 512): SurfaceSet {
+  const H: Field = new Float32Array(N * N);
+  const A: Field = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const u = x / N;
+      const v = y / N;
+      // plates between wandering vertical furrows, each plate broken by cross-cracks
+      const warp = (pfbm(u, v, 3, 3, 21) - 0.5) * 0.9 + (pfbm(u, v, 7, 2, 22) - 0.5) * 0.25;
+      const f = u * 5 + warp * 1.8;
+      const col = Math.floor(f);
+      const fr = f - col;
+      const cy = v * 2 + ihash(((col % 5) + 5) % 5, 1, 31) * 3 + (pfbm(u, v, 5, 2, 24) - 0.5) * 0.3;
+      const cell = Math.floor(cy);
+      const cf = cy - cell;
+      const plate = Math.pow(Math.sin(fr * Math.PI), 0.35) * Math.min(1, 0.55 + Math.min(cf, 1 - cf) * 12);
+      const shade = ihash(((col % 5) + 5) % 5, ((cell % 2) + 2) % 2, 33);
+      const cross = pfbm(u, v, 12, 3, 23);
+      const k = y * N + x;
+      H[k] = plate * (0.7 + shade * 0.3) + cross * 0.2 + ihash(x, y, 4) * 0.05;
+      A[k] = 0.42 + plate * (0.36 + shade * 0.2) + (cross - 0.5) * 0.2;
+    }
+  }
+  const rgba = new Uint8Array(N * N * 4);
+  const rough = new Uint8Array(N * N * 4);
+  for (let k = 0; k < N * N; k++) {
+    const a = Math.max(0.2, Math.min(1, A[k]!));
+    rgba[k * 4] = Math.round(a * 255);
+    rgba[k * 4 + 1] = Math.round(a * 0.95 * 255);
+    rgba[k * 4 + 2] = Math.round(a * 0.88 * 255);
+    rgba[k * 4 + 3] = 255;
+    rough[k * 4] = rough[k * 4 + 1] = rough[k * 4 + 2] = 235;
+    rough[k * 4 + 3] = 255;
+  }
+  return { map: toTexture(N, rgba, true), normalMap: normalFromHeight(N, H, 3.0), roughnessMap: toTexture(N, rough, false) };
+}
+
 // ---------------------------------------------------------------- ground: soil + leaf carpet (blended per fragment)
 
 /**
