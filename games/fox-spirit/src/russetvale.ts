@@ -1819,6 +1819,22 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         });
       }
     }
+    // open ground between the clumps: dry tussock drifts and loose stones break up the plane
+    for (let i = 0; i < 1400; i++) {
+      const x = (lr() * 2 - 1) * 128;
+      const z = (lr() * 2 - 1) * 100;
+      if (!insideIsland(x, z, 4) || routeNear(route, x, z, 1.6) || marshE(x, z) < 1.05) continue;
+      if (Math.hypot(x - POND.x, (z - POND.z) * 1.6) < 16 || Math.hypot(x, z + 58) < 17 || (z < -66 && Math.abs(x) < 24)) continue;
+      const g = groundAtCover(x, z);
+      if (!Number.isFinite(g) || Math.abs(g - groundRaw(x, z)) > 0.3) continue;
+      const tuft = fbm3(x * 0.07 + 3.1, 2.2, z * 0.07, 2);
+      if (tuft > 0.52 && lr() < 0.8) {
+        plant(x, g, z, 0.2 + lr() * 0.4, shrubHues[0]!, 0.86 + lr() * 0.14);
+      } else if (lr() < 0.25) {
+        const rr = 0.08 + lr() * lr() * 0.35;
+        boulder(bk('rock', x, z, false), x, g - rr * 0.35, z, rr, 4000 + i, 0.55);
+      }
+    }
     // red thickets: dense bush masses banked against tree roots and the meadow's edges
     // (the key art's flaming foreground; the 10 % accent once restored)
     {
@@ -2311,7 +2327,7 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
         // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of
         // dry olive-gold grass where the litter thins, so open ground never reads as one plane
         float gMac = gNoise(vGPos.xz * 0.045 + 21.0) * 0.65 + gNoise(vGPos.xz * 0.13 + 5.0) * 0.35;
-        diffuseColor.rgb *= mix(vec3(0.72, 0.68, 0.64), vec3(1.14, 1.06, 0.88), gMac);
+        diffuseColor.rgb *= mix(vec3(0.6, 0.56, 0.52), vec3(1.18, 1.08, 0.86), smoothstep(0.2, 0.8, gMac));
         float gGrass = smoothstep(0.52, 0.72, gNoise(vGPos.xz * 0.06 + 40.0)) * (1.0 - gVis);
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.2, 1.12, 0.62) + vec3(0.05, 0.045, 0.0), gGrass * 0.7);`);
   };
