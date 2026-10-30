@@ -18,20 +18,19 @@ import {
   matchFogToSky,
   syncFog,
   createDistantLand,
-  createFoxWisps,
   createAutumnParticles,
   detectQuality,
   createEmberMotes,
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createFox } from './fox';
+import { FOX_LOOK } from './foxLook';
 import { createFollowCamera } from './camera';
 import type { LocoInput } from './locomotion/locomotion';
 import { DEFAULT_MOVE, createMoveState, groundMove } from './locomotion/controller';
 import { createLocoPanel } from './locomotion/panel';
 import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
-import { createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
 import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
@@ -225,8 +224,6 @@ async function boot() {
     pixelRatio: renderer.getPixelRatio(),
   });
 
-  const wisps = createFoxWisps(scene, 28); // spirit-fire aura
-  const emberTrail = createEmberTrail(scene, 36);
   const autumnFX = createAutumnParticles(scene, Math.round(180 * quality.particleScale), Math.round(60 * quality.particleScale), {
     colorField,
     groundAt: (x, z) => col.highestAt(x, z),
@@ -342,6 +339,23 @@ async function boot() {
     f.addColor(post.grade[k], 'highlightTint');
     f.close();
   }
+  const fFox = fLook.addFolder('fox');
+  fFox.add(FOX_LOOK.furTint, '0', 0.5, 1.5, 0.01).name('fur tint r');
+  fFox.add(FOX_LOOK.furTint, '1', 0.5, 1.5, 0.01).name('fur tint g');
+  fFox.add(FOX_LOOK.furTint, '2', 0.5, 1.5, 0.01).name('fur tint b');
+  fFox.add(FOX_LOOK, 'furSaturation', 0, 1.5, 0.01);
+  fFox.add(FOX_LOOK, 'furValue', 0.5, 1.5, 0.01);
+  fFox.add(FOX_LOOK, 'strokeStrength', 0, 0.5, 0.01);
+  fFox.add(FOX_LOOK, 'strokeScale', 0.25, 4, 0.01);
+  fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
+  fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
+  fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'lickStream', 0, 1, 0.01);
+  fFox.add(FOX_LOOK, 'emberRate', 0, 60, 1);
+  fFox.add(FOX_LOOK, 'emberSize', 0.005, 0.08, 0.001);
+  fFox.close();
   fLook.close();
 
   const keys = new Set<string>();
@@ -427,8 +441,6 @@ async function boot() {
     fxEnabled = !!on;
     // the post stack re-applies params every frame, so write params (not the pass)
     post.params.bloomStrength = on ? BLOOM : 0;
-    wisps.points.visible = fxEnabled;
-    emberTrail.points.visible = fxEnabled;
     foxActor.setSpiritFxVisible(fxEnabled);
   };
 
@@ -454,6 +466,8 @@ async function boot() {
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
     fx: { autumnFX, emberMotes },
+    /** Fox look tunables (live; see foxLook.ts) */
+    foxLook: FOX_LOOK,
     teleportToShrine() {
       const p = world.wellspringPos;
       foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.2, p.z + 4.5);
@@ -1141,15 +1155,6 @@ async function boot() {
     colorField.renderMask(dt);
     for (const m of world.materials) colorField.syncMaterial(m);
 
-    // Wisps / autumn
-    if (fxEnabled) {
-      wisps.update(dt, fox.position, shrineOn ? 0.85 : 0.45);
-      emberTrail.update(dt, fox.position, gliding ? 0.9 : shrineOn ? 0.7 : 0.5);
-    } else {
-      // Silhouette pass: park FX far offscreen
-      wisps.update(dt, new THREE.Vector3(0, -50, 0), 0);
-      emberTrail.update(dt, new THREE.Vector3(0, -50, 0), 0);
-    }
     autumnFX.update(dt, fox.position);
     emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
     sky.update(dt);

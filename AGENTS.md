@@ -16,3 +16,10 @@ Ship **beautiful, great-feeling** Spyro-inspired (original IP) three.js creature
 ## Models
 - Codex: `gpt-6.1-sol`
 - Claude Code: `claude-opus-5-5`
+
+## Sprint process (adapted from Claude Code Game Studios)
+- Feel critic: `.claude/agents/game-feel-critic.md` — skating/rigid fox = FAIL
+- Level systems: `.claude/agents/level-systems-designer.md` — restore unlocks verbs; no orb-core-loop
+- Skills: `.claude/skills/playtest-feel-gate/`, `.claude/skills/scope-check-sprint/`
+- Checklists: `docs/process/game-feel-checklist.md`, `docs/process/level-design-template.md`
+- Credit: `docs/process/SOURCE-claude-code-game-studios.md` (MIT © Donchitos; adapted, not wholesale)

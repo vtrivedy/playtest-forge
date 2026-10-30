@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { applyFoxLook, createSpiritFx } from './foxLook';
 import { createLocomotion, type Locomotion, type LocoInput } from './locomotion/locomotion';
 
 export type FoxActor = {
@@ -19,86 +20,10 @@ export type FoxActor = {
   setSpiritFxVisible: (on: boolean) => void;
 };
 
-function tuneMaterials(root: THREE.Object3D) {
-  root.traverse((c) => {
-    if (!(c as THREE.Mesh).isMesh) return;
-    const mesh = c as THREE.Mesh;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    const mats = mesh.material;
-    const list = Array.isArray(mats) ? mats : mats ? [mats] : [];
-    for (const raw of list) {
-      const mat = raw as THREE.MeshStandardMaterial;
-      if (!mat?.isMeshStandardMaterial) continue;
-      const n = (mat.name || mesh.name || '').toLowerCase();
-
-      if (n.includes('spiritwisp') || n.includes('spirit_wisp') || n.includes('emberwisp')) {
-        // Authored amber maps — white emissive so ACES doesn't turn FX crimson
-        mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffffff);
-        const isGlow = n.includes('glow');
-        mat.emissiveIntensity = isGlow ? 0.35 : Math.min(mat.emissiveIntensity || 0.7, 0.7);
-        mat.transparent = true;
-        mat.depthWrite = false;
-        mat.toneMapped = true;
-        // Flame / glow cards are light, not matter: the shadow pass ignores blend alpha, so they would
-        // stamp full dark quads over the tail and body
-        mesh.castShadow = false;
-        if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-        if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
-        if (isGlow) {
-          mat.opacity = Math.min(mat.opacity ?? 1, 0.55);
-          mat.side = THREE.FrontSide; // stop back-face flank hotspot
-        }
-      } else if (n.includes('embertail') || (n.includes('ember') && n.includes('tail')) || n === 'embertail') {
-        mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffffff);
-        mat.emissiveIntensity = Math.min(mat.emissiveIntensity || 0.55, 0.6);
-        mat.transparent = true;
-        mat.opacity = 0.95;
-        mat.depthWrite = true;
-        mat.toneMapped = true;
-        if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-        if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
-      } else if (n.includes('fur tuft') || n === 'furtufts') {
-        mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffffff);
-        mat.emissiveIntensity = 0.25;
-        mat.transparent = true;
-        mat.opacity = 0.9;
-        mat.toneMapped = true;
-      } else if (n.includes('eye')) {
-        mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffe08a);
-        mat.emissiveIntensity = Math.min(mat.emissiveIntensity || 0.5, 0.65);
-      } else if (n.includes('nose')) {
-        mat.color.setHex(0xffffff);
-        if (mat.emissive) mat.emissive.setHex(0x000000);
-        mat.emissiveIntensity = 0;
-      } else if (n.includes('foxfur') || n.includes('fur') || n === 'cube') {
-        // Keep fox_fur_col 1:1 so cream bib + umber socks survive.
-        mat.color.setHex(0xffffff);
-        mat.roughness = 0.62;
-        if (mat.emissive) mat.emissive.setHex(0x000000);
-        mat.emissiveIntensity = 0;
-        mat.map && (mat.map.colorSpace = THREE.SRGBColorSpace);
-      } else {
-        if (mat.map) {
-          mat.color.setHex(0xffffff);
-          mat.map.colorSpace = THREE.SRGBColorSpace;
-        }
-        if (mat.emissive && mat.emissiveIntensity > 0.8) {
-          mat.emissiveIntensity = 0.4;
-        }
-      }
-    }
-  });
-}
-
 export async function createFox(groundAt: (x: number, z: number, refY: number) => number): Promise<FoxActor> {
   const gltf = await new GLTFLoader().loadAsync('/assets/hero/spirit_fox.glb');
   const root = gltf.scene;
-  tuneMaterials(root);
+  applyFoxLook(root);
 
   const spiritFxMeshes: THREE.Object3D[] = [];
   root.traverse((c) => {
@@ -137,6 +62,8 @@ export async function createFox(groundAt: (x: number, z: number, refY: number) =
 
   const group = new THREE.Group();
   group.add(root);
+  const spiritFx = createSpiritFx(root, group);
+  let clock = 0;
 
   // Soft key — low intensity so silhouette still reads with FX off
   const foxLight = new THREE.PointLight(0xff8844, 0.35, 4.5);
@@ -160,9 +87,12 @@ export async function createFox(groundAt: (x: number, z: number, refY: number) =
     update(dt, input) {
       foxLight.intensity += (0.35 - foxLight.intensity) * Math.min(1, 8 * dt);
       loco.update(dt, input);
+      clock += dt;
+      spiritFx.update(dt, clock, input.gliding);
     },
     setSpiritFxVisible(on: boolean) {
       for (const m of spiritFxMeshes) m.visible = on;
+      spiritFx.setVisible(on);
     },
   };
 }
