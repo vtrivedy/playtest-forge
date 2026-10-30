@@ -76,6 +76,9 @@ Verification: shared synthesis functions rendered through browser OfflineAudioCo
 into review WAVs, keyboard traversal, mute/unlock checks, staged restoration, screenshots,
 `window.__game` and audio diagnostics. Do not change movement, camera or visual tuning.
 
+## Sprint 2 authored locomotion (LOCO-SOL)
+Existing hero geometry/materials remain the baseline. Blender-baked walk/trot/rotary gallop clips provide the primary pose; AnimationMixer blends by speed with stride-matched playback. Grounded contact correction and damped tail/torso overlays provide terrain and momentum response. Turn, skid, jump/air/land remain authored states. Expose blend speeds, stride scale, plant correction, turn lean and spring damping in the existing debug GUI and publish contact/state metrics through the game hooks. Verify on the remote GPU gait gym before comparison; this branch stays isolated pending driver selection.
+
 ## Sprint 2 gait review gym
 `?gym=gait` places the live fox/controller on an uncluttered measured course away
 from Russetvale: flat runway, 15-degree ascent, crest, descent. Same lighting,
@@ -133,6 +136,8 @@ Verification: GPU water shot retains frozen/melt/front/wash/refreeze stills and 
 
 Water review corrections (12:15 ET): the crossing has a permanent shallow stone bed; flowing water removes the ink hazard, never the supporting ground. A local ink skin covers the dry channel. The final 0.8 s of hold warns that the wash is ending. Driver 12:05 changes the frozen look to pale translucent ice with warm inner light. Water already past a Shade drains away at 8 m/s; the Shade cannot erase it instantly. Flume beds and water are batched. No controller/animation edits.
 
+### Authored fox action refinement — 13:15
+Jump poses must show an anatomical hind push, all-four gathered paws at apex, then forepaw reach before landing. Author each action on the current hero armature with sagittal IK, preserving bone scale; show loading immediately and launch after50ms for grounded jumps; coyote jumps launch immediately. Dash receives a distinct low extended pose, and the tail plume keeps a visible air gap above the floor. Verify every frame and compare independent bone measurements against planted-only metrics; low planted residual alone does not prove natural swing.
 Stag lookdev r2: a solid sepia-ink core with a thin translucent, wavering back-face
 wash. Only the fringe is translucent; masonry must not show through the torso.
 Capture uses one fixed exterior lens per moment and renders the late lifecycle
