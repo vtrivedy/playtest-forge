@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
 import { Reactor, type SupplyFn } from './reactor';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { boxCollider, type CollisionWorld } from '../collision';
 
@@ -21,7 +22,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   const stone = new THREE.MeshStandardMaterial({ color: 0x75664d, roughness: 0.94 });
   const masonry: THREE.BufferGeometry[] = [];
   const block = (x: number, y: number, z: number, w: number, h: number, d: number, yaw = 0, solid = false) => {
-    const g = new THREE.BoxGeometry(w, h, d);
+    const g = new RoundedBoxGeometry(w, h, d, 2, Math.min(0.14, w * 0.12, h * 0.12, d * 0.12));
     const matrix = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), new THREE.Vector3(1, 1, 1));
     g.applyMatrix4(matrix); masonry.push(g);
     if (solid) collision.add(boxCollider({ x, z, w, d, yaw, top: y + h / 2, bottom: y - h / 2, tag: 'water-masonry' }));
@@ -38,6 +39,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     block(91 + f * 3.5, (2 + top) / 2, 10 + f * 6.1, 2.4, top - 2 + 0.05, 0.8, 0, true);
   }
   const foamColor = new THREE.Color();
+  const warningColor = new THREE.Color(0xb09b67);
   const waters = waterSpots.map(spot => {
     const reactor = new Reactor(spot.id, 'water', spot.probes ?? [spot.lip.clone(), spot.foot.clone().setY(0.6)], tun);
     const glass = new THREE.MeshPhysicalMaterial({ color: 0xc7c6af, roughness: 0.22, metalness: 0, transmission: 0, thickness: 0.3, transparent: true, opacity: 0.88, emissive: 0x775832, emissiveIntensity: 0.18, side: THREE.DoubleSide });
@@ -63,8 +65,29 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     const curve = new THREE.CatmullRomCurve3(spot.path, false, 'centripetal');
     const length = curve.getLength();
     const cells = Math.ceil(length / 0.25);
-    const surfaceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0.08, transparent: true, opacity: 0.85, emissive: 0x263d36, emissiveIntensity: 0.12 });
+    const surfaceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.04, transparent: true, opacity: 0.85, emissive: 0x263d36, emissiveIntensity: 0.12 });
     const surface = new THREE.InstancedMesh(new THREE.PlaneGeometry(spot.width * 0.94, length / cells + 0.03), surfaceMat, cells);
+    const flowD = new THREE.InstancedBufferAttribute(new Float32Array(cells), 1);
+    const wetState = new THREE.InstancedBufferAttribute(new Float32Array(cells), 1);
+    wetState.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < cells; i++) flowD.setX(i, (i + 0.5) * length / cells);
+    surface.geometry.setAttribute('aFlowD', flowD); surface.geometry.setAttribute('aWet', wetState);
+    surfaceMat.onBeforeCompile = shader => {
+      shader.uniforms.uWaterTime = animation.uWaterTime;
+      shader.vertexShader = 'attribute float aFlowD; attribute float aWet; varying float vFlowD; varying float vWet; varying vec2 vWaterUV; uniform float uWaterTime;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\nvFlowD = aFlowD - (uv.y - 0.5) * ${(length / cells).toFixed(6)}; vWet = aWet; vWaterUV = uv;`);
+      shader.fragmentShader = 'uniform float uWaterTime; varying float vFlowD; varying float vWet; varying vec2 vWaterUV;\n' + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        float drift = vFlowD - uWaterTime * 8.0;
+        float foam = pow(max(0.0, sin(drift * 2.2 + sin(vWaterUV.x * 11.0) * 0.6)), 14.0);
+        float edgeFoam = pow(abs(vWaterUV.x - 0.5) * 2.0, 10.0) * (0.5 + 0.5 * sin(drift * 3.0));
+        diffuseColor.rgb += vec3(0.23, 0.22, 0.17) * (foam * 0.65 + edgeFoam * 0.35) * vWet;
+      `);
+      shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+        vec3 ripple = vec3(sin(vFlowD * 3.4 - uWaterTime * 8.0) * 0.19, 0.0, sin(vWaterUV.x * 16.0 + vFlowD * 2.1 - uWaterTime * 6.0) * 0.14);
+        normal = normalize(normal + (viewMatrix * vec4(ripple, 0.0)).xyz * vWet);
+      `);
+    };
     surface.instanceMatrix.setUsage(THREE.DynamicDrawUsage); surface.frustumCulled = false; scene.add(surface);
     const stamp = new THREE.Object3D();
     const samples = Array.from({ length: cells }, (_, i) => {
@@ -75,7 +98,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
       bed.position.copy(p).add(new THREE.Vector3(0, -0.16, 0)); bed.rotation.y = yaw; bed.receiveShadow = true;
       if (spot.wash) scene.add(bed);
       else { bed.updateMatrix(); masonry.push(bed.geometry.clone().applyMatrix4(bed.matrix)); }
-      stamp.position.copy(p); stamp.rotation.set(-Math.PI / 2, 0, -yaw); stamp.scale.setScalar(0); stamp.updateMatrix(); surface.setMatrixAt(i, stamp.matrix);
+      stamp.position.copy(p); stamp.rotation.set(-Math.PI / 2, 0, yaw); stamp.scale.setScalar(0); stamp.updateMatrix(); surface.setMatrixAt(i, stamp.matrix);
       const collider = boxCollider({ x: p.x, z: p.z, w: spot.width, d: length / cells + 0.04, yaw, top: p.y - 0.05, bottom: p.y - 0.4, tag: 'water-washed' });
       collider.enabled = true;
       if (i % 4 === 0) {
@@ -90,11 +113,23 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
       }
       return { d, p, bed, yaw, index: i, collider, wet: false };
     });
-    return { spot, reactor, fall, animation, glass, light, length, surface, stamp, samples, parcels: [] as Parcel[], flowing: false, arriving: false };
+    return { spot, reactor, fall, animation, glass, light, length, surface, wetState, stamp, samples, parcels: [] as Parcel[], flowing: false, arriving: false };
   });
-  const masonryMesh = new THREE.Mesh(mergeGeometries(masonry), stone); masonryMesh.castShadow = true; masonryMesh.receiveShadow = true; scene.add(masonryMesh);
+  const masonryMesh = new THREE.Mesh(mergeGeometries(masonry.map(g => g.index ? g.toNonIndexed() : g)), stone); masonryMesh.castShadow = true; masonryMesh.receiveShadow = true; scene.add(masonryMesh);
   masonry.forEach(g => g.dispose());
   if (gui) { const f = gui.addFolder('Water'); f.add(tun, 'threshold', 0.05, 0.9, 0.05); f.add(tun, 'speed', 2, 16, 0.5); f.add(tun, 'igniteTime', 0.1, 2, 0.05); f.add(tun, 'holdTime', 0, 10, 0.1); f.add(tun, 'gutterTime', 0.2, 5, 0.1); f.close(); }
+  function crossingAt(x: number, z: number): boolean | null {
+    for (const w of waters) {
+      if (!w.spot.wash) continue;
+      let nearest = w.samples[0]!, distance = Infinity;
+      for (const s of w.samples) {
+        const d = (s.p.x - x) ** 2 + (s.p.z - z) ** 2;
+        if (d < distance) { distance = d; nearest = s; }
+      }
+      if (distance < (w.spot.width * 0.48) ** 2) return nearest.wet;
+    }
+    return null;
+  }
   return {
     tun, waters,
     arriving(id: string) { return waters.some(w => w.spot.id === id && w.arriving); },
@@ -123,14 +158,15 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
           s.wet = w.parcels.some(p => s.d <= p.head && s.d >= p.tail);
           s.bed.visible = !w.spot.wash || s.wet; s.collider.enabled = true;
           w.stamp.position.copy(s.p); w.stamp.position.y += 0.06 + Math.sin(s.d * 3 - time * 7) * 0.018;
-          w.stamp.rotation.set(-Math.PI / 2, 0, -s.yaw); w.stamp.scale.setScalar(s.wet || w.spot.wash ? 1 : 0); w.stamp.updateMatrix();
+          w.stamp.rotation.set(-Math.PI / 2, 0, s.yaw); w.stamp.scale.setScalar(s.wet || w.spot.wash ? 1 : 0); w.stamp.updateMatrix();
           w.surface.setMatrixAt(s.index, w.stamp.matrix);
-          const foam = Math.pow(Math.max(0, Math.sin(s.d * 4 - time * 9)), 12);
-          if (s.wet) { foamColor.setRGB(0.34 + foam * 0.18, 0.43 + foam * 0.17, 0.38 + foam * 0.15); foamColor.lerp(new THREE.Color(0xb09b67), warning * 0.55); }
+          w.wetState.setX(s.index, s.wet ? 1 : 0);
+          if (s.wet) { foamColor.setRGB(0.12, 0.20, 0.16); foamColor.lerp(warningColor, warning * 0.55); }
           else foamColor.set(0x261f18);
           w.surface.setColorAt(s.index, foamColor);
         }
         w.surface.instanceMatrix.needsUpdate = true;
+        w.wetState.needsUpdate = true;
         if (w.surface.instanceColor) w.surface.instanceColor.needsUpdate = true;
         w.arriving = w.parcels.some(p => p.head >= w.length && p.tail < w.length);
         w.animation.uWaterTime.value = time; w.animation.uWaterFlow.value = flowing ? 1 : 0;
@@ -145,8 +181,8 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         w.fall.scale.x = 1 + (flowing ? Math.sin(time * 9) * 0.035 : 0);
       }
     },
-    inkAt(x: number, z: number) { return waters.some(w => w.spot.wash && w.samples.some(s => !s.wet && Math.hypot(s.p.x - x, s.p.z - z) < w.spot.width * 0.48)); },
-    washedAt(x: number, z: number) { return waters.some(w => w.spot.wash && w.samples.some(s => s.wet && Math.hypot(s.p.x - x, s.p.z - z) < w.spot.width * 0.48)); },
+    inkAt(x: number, z: number) { return crossingAt(x, z) === false; },
+    washedAt(x: number, z: number) { return crossingAt(x, z) === true; },
     state() { return waters.map(w => ({ id: w.spot.id, state: w.reactor.state, heat: w.reactor.heat, flowing: w.flowing, arriving: w.arriving, length: w.length, wetMeters: w.samples.filter(s => s.wet).length * w.length / w.samples.length, fronts: w.parcels.map(p => ({ head: p.head, tail: p.tail })) })); },
   };
 }

@@ -429,7 +429,7 @@ try {
     const timeline = [];
     await video('water-cycle', 12 * fps, async i => {
       if (i === 0) { await H('teleport', 56, 0.3, 37, Math.PI); await H('photo', ...lens); }
-      if (i === Math.round(1.4 * fps)) { await H('teleport', 49, 0, 44, Math.PI); await H('photo', ...lens); }
+      if (i === Math.round(1.4 * fps)) { await H('teleport', 51, 0, 43, Math.PI); await H('photo', ...lens); }
       if ([Math.round(0.3 * fps), Math.round(0.8 * fps), 2 * fps, 6 * fps, 8 * fps, 11 * fps].includes(i)) {
         await shot(`water-${i}`);
         timeline.push({ frame: i, state: (await H('state')).chem.water });
@@ -445,7 +445,7 @@ try {
     save('water-acceptance.json', { cycle: timeline, crossing: await H('state') });
     await H('teleport', 95, 2, 10, Math.PI);
     await H('photo', [113, 15, 37], [98, 8, 19], 52); await advance(2); await shot('water-reed-frozen');
-    await H('teleport', 100, 15, 20, Math.PI);
+    await H('teleport', 100, 15, 19.2, Math.PI);
     await H('photo', [113, 15, 37], [98, 8, 19], 52);
     await video('water-reed-feed', 14 * fps, async i => {
       if ([fps, 5 * fps, 10 * fps, 13 * fps].includes(i)) await shot(`water-reed-${i}`);
