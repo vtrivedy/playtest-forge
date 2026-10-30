@@ -13,9 +13,9 @@ export const FOX_LOOK = {
   strokeStrength: 0.18,
   strokeScale: 1.0,
   /** broken amber rim at grazing angles = the spirit glow at the silhouette */
-  rimStrength: 0.35,
-  rimPower: 3.0,
-  rimColor: [1.0, 0.45, 0.12] as [number, number, number],
+  rimStrength: 0.6,
+  rimPower: 2.5,
+  rimColor: [1.0, 0.72, 0.42] as [number, number, number], // pale gold: separates the fox from orange ground
   eyeGlow: 0.18,
   /** spirit wisps (thin curling flame off the back and tail): height multiplier, brightness, stream-back with speed */
   lickScale: 1.0,
@@ -108,6 +108,55 @@ ${NOISE_GLSL}`,
   mat.needsUpdate = true;
 }
 
+/** Procedural fox eye (the eye mesh is ~10 verts, too coarse for a painted pupil): amber iris with a
+ *  vertical slit pupil, dark limbal ring, a small catchlight; only the iris glows, faintly. */
+function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
+  const pos = geo.getAttribute('position');
+  const idx = geo.index;
+  const used = new Set<number>();
+  if (idx) for (let i = 0; i < idx.count; i++) used.add(idx.getX(i));
+  else for (let i = 0; i < pos.count; i++) used.add(i);
+  const cen = [new THREE.Vector3(), new THREE.Vector3()], cnt = [0, 0];
+  for (const i of used) { const k = pos.getX(i) > 0 ? 0 : 1; cen[k]!.add(new THREE.Vector3().fromBufferAttribute(pos, i)); cnt[k]!++; }
+  cen.forEach((c, k) => c.divideScalar(Math.max(1, cnt[k]!)));
+  let r = 0;
+  for (const i of used) {
+    const v = new THREE.Vector3().fromBufferAttribute(pos, i), c = cen[v.x > 0 ? 0 : 1]!;
+    r = Math.max(r, Math.hypot(v.y - c.y, v.z - c.z));
+  }
+  mat.map = null;
+  mat.color.setHex(0xffffff);
+  mat.roughness = 0.2;
+  mat.emissive = new THREE.Color(0xffffff);
+  const uni = { uEyeL: { value: cen[0] }, uEyeR: { value: cen[1] }, uEyeR0: { value: r } };
+  mat.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uni);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRest;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRest;\nuniform vec3 uEyeL; uniform vec3 uEyeR; uniform float uEyeR0;\nvec3 eyeIris;')
+      .replace(
+        '#include <map_fragment>',
+        `{
+  vec3 c = vRest.x > 0.0 ? uEyeL : uEyeR;
+  vec2 q = (vRest.zy - c.zy) / uEyeR0;          // forward, up in units of the eye radius
+  float d = length(q);
+  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.2, 0.78)));
+  vec3 iris = mix(vec3(0.95, 0.55, 0.12), vec3(0.55, 0.22, 0.05), smoothstep(0.15, 0.85, d));
+  iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.7, 0.95, d));   // limbal ring + lid shadow
+  iris = mix(iris, vec3(0.02, 0.01, 0.008), pupil);
+  float glint = 1.0 - smoothstep(0.08, 0.14, length(q - vec2(0.3, 0.32)));
+  diffuseColor.rgb = mix(iris, vec3(1.0, 0.95, 0.85), glint);
+  eyeIris = vec3(1.0, 0.55, 0.15) * (1.0 - pupil) * (1.0 - smoothstep(0.6, 0.9, d));
+}`,
+      )
+      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= eyeIris;');
+  };
+  mat.customProgramCacheKey = () => 'fox-eye';
+  mat.needsUpdate = true;
+}
+
 /** Material pass over the loaded GLB (spirit FX cards, eyes, nose, fur). */
 export function applyFoxLook(root: THREE.Object3D) {
   root.traverse((c) => {
@@ -135,9 +184,7 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.5 : 0.68);
         if (isGlow) mat.side = THREE.FrontSide;
       } else if (n.includes('eye')) {
-        mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffa040); // faint amber: a watchful glint, not a lamp
-        mat.emissiveMap = mat.map; // glow follows the iris: slit pupil and lid stay dark
+        patchEye(mat, mesh.geometry);
         eyeMats.push(mat);
       } else if (n.includes('nose')) {
         mat.color.setHex(0xffffff);

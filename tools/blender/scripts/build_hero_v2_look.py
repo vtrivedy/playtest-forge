@@ -80,7 +80,7 @@ bm.to_mesh(me); bm.free(); me.update()
 # warm burnt orange (yellower than vermilion: ACES + warm fog push it red in engine); sock/paw authored a
 # notch light because the streak * AO bake darkens them (lands near the concept's (102, 62, 38) umber)
 PAL = dict(rust=(212, 124, 50), dorsal=(146, 70, 28), belly=(226, 168, 112), cream=(242, 228, 202),
-           umber=(124, 74, 42), sock=(92, 58, 37), paw=(68, 45, 31), earback=(70, 40, 26), nose=(22, 15, 13),
+           umber=(108, 62, 36), sock=(66, 42, 29), paw=(46, 31, 23), earback=(50, 29, 20), nose=(22, 15, 13),
            amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(236, 214, 186))
 mat_names = [m.name for m in me.materials]
 MI = {n: i for i, n in enumerate(mat_names)}
@@ -557,8 +557,8 @@ def topw(w):
     return {k: x / s for k, x in it}
 # tail fur locks over the fur half: laid flat along the brush (low splay -> no hedgehog spikes end-on), body
 # burnt orange; they hand over to the fur-to-flame locks below
-for j in range(90):
-    s = 0.05 + 0.55 * (j / 89)
+for j in range(110):
+    s = 0.05 + 0.65 * (j / 109)  # the brush stays fur well past its middle
     p, tan, w, side, up = frame(s); th = j * 2.39996 + rnd.uniform(-0.3, 0.3)  # golden-angle spiral -> even layering
     off = side * math.cos(th) + up * math.sin(th)
     _, _, w2 = at(min(1.0, s + 0.1))
@@ -569,25 +569,25 @@ def fxb(s): return "FxPlumeA" if s < 0.55 else "FxPlumeB" if s < 0.78 else "FxPl
 # breaks up into amber flame toward its tip, so the tail dissolves gradually (concept) instead of ending
 # in a separate fire jet. Tips flicker on the FX bones.
 TF = ["tf0", "tf1", "tf2", "tf3"]
-for j in range(64):
-    s = 0.4 + 0.42 * (j / 63)
+for j in range(40):
+    s = 0.6 + 0.24 * (j / 39)  # fur -> flame only over the outer third
     p, tan, w, side, up = frame(s)
     th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
     off = side * math.cos(th) + up * math.sin(th)
-    k = smooth(0.4, 0.82, s)
+    k = smooth(0.6, 0.84, s)
     h = (0.75 + 0.55 * k) * rnd.uniform(0.85, 1.15)
     root = p + off * radius(min(s, S_FUR)) * (0.8 - 0.35 * k)
     lean = (tan * 1.0 + rise(off) * (0.22 + 0.12 * k) + up * 0.1).normalized()
     card("tflame", root, lean, off, h * rnd.uniform(0.5, 0.62), h, TF[j % 4], w, cross=(j % 4 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.7))
 # soft flame tongues from the dissolve line out past the old tip: the brush's outer silhouette, amber-rust
 PL = ["plume0", "plume1", "plume2", "plume3"]
-for j in range(56):
-    s = 0.56 + 0.46 * (j / 55) ** 0.9
+for j in range(26):
+    s = 0.74 + 0.28 * (j / 25) ** 0.9  # soft wisps peel off the tip only
     p, tan, w, side, up = frame(min(s, 1.0))
     if s > 1: p = p + tan * (s - 1) * total
     th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
     off = side * math.cos(th) + up * math.sin(th)
-    k = smooth(0.56, 1.0, s)
+    k = smooth(0.74, 1.0, s)
     h = (0.6 + 0.45 * k) * rnd.uniform(0.85, 1.15)  # low trailing tongues: no bonfire over the rump from the chase cam
     wd = h * rnd.uniform(0.65, 0.85)
     root = p + off * radius(min(s, S_FUR)) * (0.75 - 0.5 * k)
