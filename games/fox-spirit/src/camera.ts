@@ -92,7 +92,7 @@ export type FollowCamera = {
    */
   getYaw: () => number;
   resize: (w: number, h: number) => void;
-  debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string };
+  debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string; blocked: () => boolean };
 };
 
 const TAU = Math.PI * 2;
@@ -153,14 +153,16 @@ export function createFollowCamera(opts: {
   let sceneryT = 1;
   let sceneryLimit = 1;
   let sceneryName = '';
+  let sceneryFade = 0;
   const landAt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   /** Where the fox / predicted landing sit on screen (NDC) — framing metrics for the harness */
   const debug = {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
+    blocked: () => sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
     internals: () =>
-      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} blocker=${sceneryName}`,
+      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
   };
   let shotW = 0;
   /** Active authored path (restore cinematic) */
@@ -577,8 +579,14 @@ export function createFollowCamera(opts: {
       // interpolated arc can pass straight through a pillar even with a safe goal.
       boomFocus.set(p.x, p.y + params.lookHeight, p.z);
       sceneryLimit = sceneryFraction(boomFocus, rig);
-      if (firstFrame) sceneryT = sceneryLimit;
-      else sceneryT = THREE.MathUtils.damp(sceneryT, sceneryLimit, sceneryLimit < sceneryT ? 24 : 2.2, dt);
+      // A very short boom cannot fit the full animal. Ease into the existing world
+      // cutout instead of zooming through the fox's ears. The overlap is continuous:
+      // distant posts pull in, close bowls fade, and the damped transition stays covered.
+      const clearRange = boomFocus.distanceTo(rig) * sceneryLimit;
+      sceneryFade = sceneryLimit < 0.999 ? 1 - THREE.MathUtils.smoothstep(clearRange, 1.1, 1.8) : 0;
+      const sceneryGoal = THREE.MathUtils.lerp(sceneryLimit, 1, sceneryFade);
+      if (firstFrame) sceneryT = sceneryGoal;
+      else sceneryT = THREE.MathUtils.damp(sceneryT, sceneryGoal, sceneryGoal < sceneryT ? 24 : 2.2, dt);
       safeLens.lerpVectors(boomFocus, rig, sceneryT);
       // Keep the spring independent of compression: release returns along the same
       // boom smoothly, rather than feeding a new collision impulse into its velocity.

@@ -257,6 +257,7 @@ async function boot() {
   // spark bursts only (Seedwell, Wellspring, hearth flares) — no pickups
   const emberMotes = createEmberMotes(scene, { maxMotes: 0 });
   const occlusion = createOcclusionFader(scene, {
+    blocked: cam.debug.blocked,
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });

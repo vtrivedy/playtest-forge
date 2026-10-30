@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Bucket, hearthBrazier } from '../../games/fox-spirit/src/russetKit';
+import { createOcclusionFader } from '../../games/fox-spirit/src/occlusion';
 import { createFollowCamera } from '../../games/fox-spirit/src/camera';
 import type { CameraFrame } from '../../games/fox-spirit/src/camera';
 
@@ -22,7 +24,7 @@ cam.resize(1920, 1080);
 const f = frame();
 tick(cam, f);
 const contracted = cam.camera.position.distanceTo(f.target);
-assert(contracted < 2, `Decorative post should shorten the boom: ${contracted}`);
+assert(contracted < 3, `Decorative post should shorten the boom: ${contracted}`);
 assert(cam.debug.internals().includes('decorative-post'));
 assert(Math.abs(cam.debug.fox[1]) < 0.8, 'Compressed boom must keep the fox in frame');
 post.visible = false;
@@ -100,6 +102,31 @@ for (const y of [0, 1.25]) {
   assert(Math.abs(ndc.y) < 0.85, `Final raised lens must frame feet and ears: ${ndc.y}`);
 }
 post.visible = false;
+
+// Reproduce the actual captured H0 bowl. Pure pull-in put ears at NDC y2.40;
+// close scenery must use the existing cutout while retaining whole-body framing.
+const bowlScene = new THREE.Scene();
+const bowlBucket = new Bucket();
+const hx = -59.72842326556918, hz = 27.077438179359337;
+hearthBrazier(bowlBucket, hx, 6, hz, 301);
+bowlScene.add(bowlBucket.toMesh(new THREE.MeshStandardMaterial({ name: 'rv-stone' }))!);
+const bowlCam = createFollowCamera({ scenery: bowlScene,
+  surfaceAt: (x, z) => Math.hypot(x - hx, z - hz) < 0.82 ? 7 : 6,
+});
+bowlCam.resize(1280, 720);
+bowlCam.snapBehind(0.349 - Math.PI);
+const bowlFrame = frame();
+bowlFrame.target.set(-59.87092746862208, 6, 25.11017733045462);
+tick(bowlCam, bowlFrame);
+for (const y of [6, 7.25]) {
+  const ndc = new THREE.Vector3(bowlFrame.target.x, y, bowlFrame.target.z).project(bowlCam.camera);
+  assert(Math.abs(ndc.y) < 0.85, `Captured bowl must not crop feet or ears: ${ndc.y}`);
+}
+assert(bowlCam.debug.blocked(), 'Close decorative bowl must activate the cutout');
+const fader = createOcclusionFader(bowlScene, { solidAt: () => -Infinity, blocked: bowlCam.debug.blocked });
+const dimensionsOnly = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(1280, 720) } as unknown as THREE.WebGLRenderer;
+for (let i = 0; i < 60; i++) fader.update(1 / 60, bowlCam.camera, dimensionsOnly, bowlFrame.target, 1.25, Math.PI);
+assert(fader.strength > 0.99, 'Geometry blocker must fade even without a gameplay height collider');
 
 // A steady diagonal must not cause camera-relative steering to spiral.
 const diagonal = createFollowCamera();

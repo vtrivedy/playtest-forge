@@ -16,6 +16,8 @@ export function createOcclusionFader(
     solidAt: (x: number, z: number) => number;
     /** Subtree that must never be cut (the fox) */
     exclude?: THREE.Object3D;
+    /** Geometry-aware follow boom: close props and in-flight compression need a cutout. */
+    blocked?: () => boolean;
   },
 ) {
   // x,y = centre of the fox's projected bounds (framebuffer px), z = fox view depth (m); radii in px
@@ -129,7 +131,7 @@ export function createOcclusionFader(
       head.copy(foxPos).y += foxHeight * 1.05;
       // sight test every other frame (canopy raycast is the expensive part)
       if ((frame++ & 1) === 0) lastBlocked = sightBlocked(camera.position, chest) || sightBlocked(camera.position, head);
-      if (lastBlocked) blockedHold = 0.35;
+      if (lastBlocked || opts.blocked?.()) blockedHold = 0.35;
       else blockedHold -= dt;
       const goal = blockedHold > 0 ? 1 : 0;
       uOccStrength.value = THREE.MathUtils.damp(uOccStrength.value, goal, goal > uOccStrength.value ? 10 : 4, dt);
