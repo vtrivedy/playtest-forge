@@ -171,6 +171,7 @@ try {
         if (options.afterStep) await options.afterStep(i, state);
         await H('advance', 0, dt, true);
         state = await H('state');
+        if (options.sample) state.capture = await options.sample(i, state);
         if (options.traceEveryFrame) trace.push({ frame: i, dt, state, ...(i % fps === 0 ? { game: await page.evaluate(() => window.__game) } : {}) });
         if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
         const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
@@ -216,6 +217,10 @@ try {
     if (!gym) throw Error('Target ref has no gait gym; merge capture tooling first');
     await H('teleport', gym.origin[0] - 20, gym.origin[1], gym.origin[2], Math.PI / 2);
     await H('setStick', 0, 0);
+    await page.evaluate(() => {
+      const fox = window.__gameHooks.debug.fox;
+      window.__capturePaws = Object.fromEntries(Object.entries({ LF: 'front_paw_l', RF: 'front_paw_r', LH: 'hind_paw_l', RH: 'hind_paw_r' }).map(([id, name]) => [id, fox.getObjectByName(name)]));
+    });
     // Times are output seconds; slow motion advances 1/240s per 60fps frame.
     const segments = [
       { name: 'idle', seconds: 1, stick: [0, 0] },
@@ -245,6 +250,18 @@ try {
       await H('setKeys', segment.jump && local < .18 * fps ? ['Space'] : segment.dash && local === 0 ? ['ShiftLeft'] : []);
     }, undefined, {
       dt: i => segmentAt(i).slow ? 1 / 240 : 1 / 60,
+      sample: async (i, state) => page.evaluate(feetY => {
+        const { fox, world } = window.__gameHooks.debug;
+        fox.updateWorldMatrix(true, true);
+        const feet = {};
+        for (const [id, bone] of Object.entries(window.__capturePaws)) {
+          if (!bone) { feet[id] = { missing: true }; continue; }
+          const point = bone.getWorldPosition(fox.position.clone());
+          const ground = world.collision.groundAt(point.x, point.z, feetY + .6).y;
+          feet[id] = { position: point.toArray(), ground: Number.isFinite(ground) ? ground : null, clearance: Number.isFinite(ground) ? point.y - ground : null };
+        }
+        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet };
+      }, state.pos[1]),
       keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.gait ?? st.locomotion?.gait ?? st.anim ?? 'unreported'} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
       afterStep: async (i, state) => {
         const [x, , z] = state.pos;
