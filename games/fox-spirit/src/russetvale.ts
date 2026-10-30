@@ -866,7 +866,23 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // ==================================================================== REEDMARSH
   const inkGeo = new THREE.CircleGeometry(1, 64);
   inkGeo.rotateX(-Math.PI / 2);
-  const inkMat = new THREE.MeshStandardMaterial({ name: 'rv-ink', color: 0x1f1914, roughness: 0.18, metalness: 0.0 });
+  const inkMat = new THREE.MeshStandardMaterial({ name: 'rv-ink', color: 0x1f1914, roughness: 0.38, metalness: 0.0 });
+  const inkTime = { value: 0 };
+  inkMat.onBeforeCompile = shader => {
+    shader.uniforms.uInkTime = inkTime;
+    shader.vertexShader = 'varying vec3 vInkWorld;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvInkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = 'uniform float uInkTime; varying vec3 vInkWorld;\n' + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+      vec3 inkRipple = vec3(sin(vInkWorld.x * 1.7 + vInkWorld.z * 0.7 - uInkTime * 0.6), 0.0, cos(vInkWorld.z * 2.1 - uInkTime * 0.8)) * 0.07;
+      normal = normalize(normal + (viewMatrix * vec4(inkRipple, 0.0)).xyz);`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
+      float inkFresnel = pow(1.0 - abs(dot(normal, geometryViewDir)), 4.0);
+      outgoingLight += vec3(0.035, 0.025, 0.014) * inkFresnel;
+      // Material-local shoulder keeps reflected lamps warm without white disks.
+      outgoingLight /= vec3(1.0) + outgoingLight * 0.8;
+      #include <opaque_fragment>`);
+  };
   const ink = new THREE.Mesh(inkGeo, inkMat);
   ink.scale.set(MARSH.rx * 0.97, 1, MARSH.rz * 0.97);
   ink.position.set(MARSH.x, MARSH.ink, MARSH.z);
@@ -2330,6 +2346,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     },
     update(dt, t, fox, feetY, colorAt) {
       for (const water of waterVisuals) water.update(t);
+      inkTime.value = t;
       const ev: RealmEvent[] = [];
       // checkpoints
       for (let i = 0; i < checkpoints.length; i++) {

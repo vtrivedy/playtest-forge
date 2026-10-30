@@ -264,3 +264,13 @@ the same CC0 carved column for those supports, scaled within their original
 width/depth/height envelopes, retaining the glyph positions and every inlet.
 Add shallow scanned fragments and leaf banks at existing ruin feet on the
 terraces and kiln ledge. Do not alter collision, launch edges or route waypoints.
+
+### Wind visual readability
+The live current particles currently render as square Points sprites. Reuse the
+existing maple-leaf atlas, selecting one alpha-cut leaf cell for each sprite.
+Keep particle count, paths, speed, opacity/reactor timing and current force intact.
+Verify the same wind-gap traversal with leafy silhouettes in place of squares.
+Water critique correction: reduce the falls' local lamp from 2–5 to 0.8–2 light
+units and give the marsh ink subtle animated normals plus a soft highlight
+shoulder. It remains dark hazard ink; only surface response changes. Restored
+falls acquire a warmer ochre tint. Retest the water crossing and lifecycle.
