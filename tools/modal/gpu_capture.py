@@ -12,7 +12,7 @@ app = modal.App('russetvale-gpu-capture')
 results = modal.Volume.from_name('russetvale-gpu-captures', create_if_missing=True)
 image = (
     modal.Image.from_registry('node:22-bookworm-slim', add_python='3.12')
-    .apt_install('git', 'ffmpeg', 'libvulkan1', 'libegl1', 'libgles2', 'libgl1', 'libglx0', 'vulkan-tools', 'curl')
+    .apt_install('git', 'ffmpeg', 'libvulkan1', 'libegl1', 'libgles2', 'libgl1', 'libglx0', 'vulkan-tools', 'curl', 'xvfb', 'libgbm1')
     .run_commands('mkdir -p /opt/browser && cd /opt/browser && npm init -y && npm install playwright@1.64.1',
                   'cd /opt/browser && npx playwright install --with-deps chromium')
     .env({'NVIDIA_DRIVER_CAPABILITIES': 'all', 'PLAYWRIGHT_BROWSERS_PATH': '/ms-playwright'})
@@ -23,7 +23,7 @@ if modal.is_local():
 
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)
-def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds: int) -> dict:
+def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds: int, backend: str, size: str, quality: str, fps: int, cube_only: bool, verbose: bool) -> dict:
     import os, subprocess, time, json, tarfile
     started = time.monotonic()
     out = Path('/captures') / run_id
@@ -31,7 +31,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
     def run(args, **kw):
         return subprocess.run(args, check=True, text=True, **kw)
     try:
-        gpu = run(['nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'], capture_output=True).stdout.strip()
+        gpu = run(['nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'], capture_output=True).stdout.strip() if backend != 'swiftshader' else 'CPU / SwiftShader (explicit fallback)'
         (out / 'nvidia-smi.txt').write_text(gpu + '\n')
         print('GPU:', gpu, flush=True)
         print(run(['sh', '-c', 'ldconfig -p | grep -E "libEGL_nvidia|libGLX_nvidia|libnvidia-glcore" || true'], capture_output=True).stdout, flush=True)
@@ -49,13 +49,30 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         run(['npm', 'ci', '--no-audit', '--no-fund'], cwd=repo)
         run(['npx', 'vite', 'build', '--config', 'games/fox-spirit/vite.config.ts'], cwd=repo)
         built = time.monotonic()
-        run(['node', '/opt/browser/gpu-capture.mjs', '--repo', str(repo), '--out', str(out),
-             '--shots', shots, '--route-seconds', str(route_seconds), '--orbit-seconds', str(orbit_seconds)], env=dict(os.environ, DEBUG='pw:browser'))
+        command = ['node', '/opt/browser/gpu-capture.mjs', '--repo', str(repo), '--out', str(out),
+             '--shots', shots, '--route-seconds', str(route_seconds), '--orbit-seconds', str(orbit_seconds),
+             '--backend', backend, '--size', size, '--quality', quality, '--fps', str(fps),
+             '--cube-only', str(cube_only).lower(), '--verbose', str(verbose).lower()]
+        browser_env = dict(os.environ)
+        if verbose:
+            browser_env['DEBUG'] = 'pw:browser'
+        with (out / 'capture.log').open('w') as log:
+            proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=browser_env)
+            for line in proc.stdout:
+                log.write(line)
+                log.flush()
+                print(line, end='', flush=True)
+            if proc.wait():
+                raise subprocess.CalledProcessError(proc.returncode, command)
         metadata = {'ref': ref, 'commit': sha, 'gpu': gpu, 'shots': shots, 'runId': run_id,
                     'buildSeconds': round(built-started, 2), 'captureSeconds': round(time.monotonic()-built, 2),
+                    'backend': backend, 'size': size, 'quality': quality, 'fps': fps,
                     'totalSeconds': round(time.monotonic()-started, 2)}
         (out / 'run.json').write_text(json.dumps(metadata, indent=2))
         return metadata
+    except Exception as exc:
+        (out / 'failure.json').write_text(json.dumps({'error': str(exc), 'ref': ref, 'elapsedSeconds': round(time.monotonic() - started, 2)}, indent=2))
+        raise
     finally:
         archive = Path('/captures') / f'{run_id}.tar'
         with tarfile.open(archive, 'w') as tar:
@@ -64,8 +81,14 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
 
 @app.local_entrypoint()
 def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
-         orbit_seconds: int = 20, fetch_only: str = '', out: str = ''):
+         orbit_seconds: int = 20, fetch_only: str = '', out: str = '',
+         gpu: str = 'A10', backend: str = 'egl', size: str = '1920x1080',
+         quality: str = 'high', fps: int = 60, cube_only: bool = False, verbose: bool = False):
     import subprocess, time, json, tarfile, re
+    if backend not in {'vulkan', 'egl', 'gl', 'swiftshader'} or quality not in {'low', 'med', 'high'}:
+        raise ValueError('Invalid backend or quality')
+    if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
+        raise ValueError('Invalid capture dimensions, fps or duration')
     if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit'}:
         raise ValueError('shots: all, probe, perf, route, orbit or comma-separated')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:64]}-{time.strftime("%Y%m%d-%H%M%S")}'
@@ -79,7 +102,7 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
             resolved_ref = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', '--verify', f'{ref}^{{commit}}'], text=True).strip()
         token = subprocess.check_output(['gh', 'auth', 'token'], text=True).strip()
         try:
-            meta = capture.with_options(secrets=[modal.Secret.from_dict({'GH_TOKEN': token})]).remote(resolved_ref, shots, run_id, route_seconds, orbit_seconds)
+            meta = capture.with_options(gpu=None if backend == 'swiftshader' else gpu, secrets=[modal.Secret.from_dict({'GH_TOKEN': token})]).remote(resolved_ref, shots, run_id, route_seconds, orbit_seconds, backend, size, quality, fps, cube_only, verbose)
             print(json.dumps(meta, indent=2))
         except Exception as exc:
             error = exc

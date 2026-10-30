@@ -8,11 +8,33 @@ import { once } from 'node:events';
 const arg = (k, d) => process.argv.includes(`--${k}`) ? process.argv[process.argv.indexOf(`--${k}`) + 1] : d;
 const repo = arg('repo', process.cwd()), out = arg('out', '/tmp/gpu-capture');
 const selected = arg('shots', 'all');
+const backend = arg('backend', 'egl'), quality = arg('quality', 'high'), fps = Number(arg('fps', '60'));
+const [width, height] = arg('size', '1920x1080').split('x').map(Number);
+if (![30, 60].includes(fps) || ![width, height].every(n => Number.isInteger(n) && n > 0)) throw Error('Invalid size/fps');
+if (!['vulkan', 'egl', 'gl', 'swiftshader'].includes(backend)) throw Error('Unknown backend');
 const wants = k => selected === 'all' || selected.split(',').includes(k);
 fs.mkdirSync(out, { recursive: true });
 const save = (name, data) => fs.writeFileSync(path.join(out, name), JSON.stringify(data, null, 2));
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.glb': 'model/gltf-binary', '.png': 'image/png', '.jpg': 'image/jpeg', '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.svg': 'image/svg+xml', '.wasm': 'application/wasm' };
 const server = http.createServer((req, res) => {
+  if (req.url === '/gpu-cube.html') {
+    res.setHeader('Content-Type', 'text/html');
+    res.end(`<html><body style="margin:0"><script type="module">
+      import * as THREE from '/gpu-three.js';
+      const renderer = new THREE.WebGLRenderer(); renderer.setSize(${width}, ${height}); document.body.append(renderer.domElement);
+      const scene = new THREE.Scene(); scene.background = new THREE.Color(0x173247);
+      const camera = new THREE.PerspectiveCamera(50, ${width}/${height}, .1, 100); camera.position.z = 4;
+      const cube = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshNormalMaterial()); scene.add(cube);
+      window.cubeProbe = () => { cube.rotation.x += .1; cube.rotation.y += .1; renderer.render(scene,camera);
+        const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
+        return {lost: gl.isContextLost(), renderer: ext && gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)}; };
+      window.cubeProbe();
+    </script></body></html>`); return;
+  }
+  if (req.url === '/gpu-three.js' || req.url === '/three.core.js') {
+    res.setHeader('Content-Type', 'text/javascript');
+    fs.createReadStream(path.join(repo, 'node_modules/three/build', req.url === '/gpu-three.js' ? 'three.module.js' : 'three.core.js')).pipe(res); return;
+  }
   if (req.url === '/favicon.ico') { res.writeHead(204).end(); return; }
   const url = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   const builtFile = path.resolve(repo, 'dist/fox-spirit', `.${url}`);
@@ -25,35 +47,40 @@ const server = http.createServer((req, res) => {
 });
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
-const errors = [], log = [], report = { viewport: [1920, 1080], fps: 60, seed: 42, perf: {}, shots: {}, videos: {}, failures: [] };
+const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, perf: {}, shots: {}, videos: {}, failures: [] };
 let browser;
 try {
-  browser = await chromium.launch({ headless: true, channel: 'chromium', args: [
-    '--no-sandbox', '--disable-gpu-sandbox', '--disable-dev-shm-usage', '--enable-gpu', '--use-gl=angle', '--use-angle=vulkan',
-    '--enable-features=Vulkan', '--disable-vulkan-surface', '--ignore-gpu-blocklist',
+  const headed = backend === 'gl';
+  let xvfb;
+  if (headed) { xvfb = spawn('Xvfb', [':99', '-screen', '0', `${width}x${height}x24`, '-ac']); process.env.DISPLAY = ':99'; await new Promise(r => setTimeout(r, 1000)); }
+  const backendArgs = backend === 'vulkan' ? ['--use-gl=angle', '--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface']
+    : backend === 'egl' ? ['--use-gl=angle', '--use-angle=gl-egl']
+    : backend === 'gl' ? ['--use-gl=angle', '--use-angle=gl']
+    : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
+  browser = await chromium.launch({ headless: !headed, channel: 'chromium',
+    ignoreDefaultArgs: ['--enable-unsafe-swiftshader'], args: [
+    '--no-sandbox', '--disable-gpu-sandbox', '--disable-dev-shm-usage', '--enable-gpu', ...backendArgs,
+    '--disable-gpu-watchdog', '--disable-gpu-process-crash-limit', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
+    ...(arg('verbose', 'false') === 'true' ? ['--enable-logging=stderr', '--v=1'] : []),
   ] });
-  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
-  // Freeze rAF before the game's first frame. Existing manual hook advances all physics/FX.
+  if (xvfb) browser.on('disconnected', () => xvfb.kill());
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const cube = await context.newPage();
+  await cube.goto('http://127.0.0.1:5180/gpu-cube.html');
+  await cube.waitForFunction(() => !!window.cubeProbe);
+  const cubeSamples = [];
+  for (let i = 0; i < 60; i++) cubeSamples.push(await cube.evaluate(() => window.cubeProbe()));
+  save('cube.json', cubeSamples);
+  await cube.screenshot({ path: path.join(out, 'cube.png') });
+  console.log('CUBE', JSON.stringify(cubeSamples.at(-1)));
+  if (cubeSamples.some(s => s.lost || !s.renderer || backend !== 'swiftshader' && !/nvidia/i.test(s.renderer))) throw Error('Cube hardware probe failed');
+  await cube.close();
+  if (arg('cube-only', 'false') === 'true') { await browser.close(); server.close(); process.exit(0); }
+  // Suppress automatic frames; the existing advance hook drives simulation and rendering.
   await context.addInitScript(() => {
     let seed = 42;
     Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-    const originalExtension = WebGL2RenderingContext.prototype.getExtension;
-    WebGL2RenderingContext.prototype.getExtension = function(name) {
-      const ext = originalExtension.call(this, name);
-      if (name === 'WEBGL_lose_context' && ext) {
-        const canvas = this.canvas;
-        const lose = ext.loseContext.bind(ext);
-        ext.loseContext = () => {
-          // ANGLE/Vulkan in headless Chrome can propagate the throwaway probe's
-          // deliberate loss to the newly created game context. Let page teardown
-          // release detached probes; preserve deliberate loss on live canvases.
-          if (!canvas.isConnected) return;
-          return lose();
-        };
-      }
-      return ext;
-    };
     document.addEventListener('webglcontextlost', e => console.warn('CONTEXT LOSS EVENT', e.target.width, e.target.height, e.target.isConnected, e.statusMessage), true);
     window.requestAnimationFrame = () => 0;
     window.cancelAnimationFrame = () => {};
@@ -88,16 +115,17 @@ try {
     await cdp.detach();
     save('renderer.json', gl); fs.writeFileSync(path.join(out, 'renderer.txt'), gl.renderer + '\n');
     console.log('HARDWARE PROBE', JSON.stringify(gl));
-    if (!/nvidia/i.test(gl.renderer) || /swiftshader|llvmpipe|lavapipe|software|subzero/i.test(gl.renderer)) throw Error(`Hardware GPU required: ${gl.renderer}`);
+    if (gl.lost || !gl.renderer || backend !== 'swiftshader' && (!/nvidia/i.test(gl.renderer) || /swiftshader|llvmpipe|lavapipe|software|subzero/i.test(gl.renderer))) throw Error(`Hardware GPU required: ${gl.renderer}`);
     report.renderer = gl;
     await advance(30);
+    if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error('WebGL context lost after warmup');
     return H('state');
   }
   async function shot(name) {
     await page.screenshot({ path: path.join(out, `${name}.png`), animations: 'disabled' });
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
   }
-  await boot();
+  await boot(quality);
   await shot('hardware-probe');
   const poses = {
     establish: { fox: [0, 0, 80], photo: [[-60, 46, 120], [10, 14, -40], 52] },
@@ -127,9 +155,9 @@ try {
     }
   }
   async function video(name, frameCount, beforeFrame, stop) {
-    const started = Date.now(), trace = [], frames = [];
+    const started = Date.now(), trace = [], frames = [], start = await H('state');
     const output = path.join(out, `${name}.mp4`);
-    const encoder = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', '60', '-vcodec', 'mjpeg', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output], { stdio: ['pipe', 'ignore', 'inherit'] });
+    const encoder = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-vcodec', 'mjpeg', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output], { stdio: ['pipe', 'ignore', 'inherit'] });
     let encoderError;
     encoder.stdin.on('error', e => { encoderError = e; });
     const completed = once(encoder, 'close');
@@ -137,17 +165,18 @@ try {
     try {
       for (let i = 0; i < frameCount; i++) {
         await beforeFrame(i);
-        state = await advance(1);
-        if (state.look.quality !== 'high' || state.look.pixelRatio !== 1) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
+        state = await advance(60 / fps);
+        if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
         const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
         if (encoderError) throw encoderError;
         if (!encoder.stdin.write(jpeg)) await once(encoder.stdin, 'drain');
         count++;
-        if (i % 60 === 0) {
+        if (i % fps === 0) {
+          if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error(`Context lost at video frame ${i}`);
           trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
           console.log('FRAME', name, i, 'sim', state.t.toFixed(2), 'wp', state.auto.idx, 'restored', state.restored);
         }
-        if (i % 600 === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
+        if (i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
         if (stop?.(state, i)) break;
       }
     } finally { encoder.stdin.end(); }
@@ -155,27 +184,27 @@ try {
     if (code !== 0) throw Error(`ffmpeg ${name} exited ${code}`);
     const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
     const stream = probe.streams[0];
-    if (stream.width !== 1920 || stream.height !== 1080 || stream.r_frame_rate !== '60/1' || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
-    report.videos[name] = { frames: count, duration: count / 60, wallSeconds: (Date.now() - started) / 1000, end: state, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
+    if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
+    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
     return state;
   }
   if (wants('route')) {
-    await boot('high', true);
+    await boot(quality, true);
     save('route-waypoints.json', await H('route'));
     await H('autopilot', true, 0, { assist: false });
     let restoredAt;
-    const state = await video('route-unassisted', Number(arg('route-seconds', '360')) * 60, async () => {}, (st, i) => {
+    const state = await video('route-unassisted', Number(arg('route-seconds', '360')) * fps, async () => {}, (st, i) => {
       if (st.restored && restoredAt === undefined) restoredAt = i;
-      return restoredAt !== undefined && i - restoredAt >= 660 || !st.auto.active && !st.restored;
+      return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     });
     await shot('route-end');
     if (!state.restored || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}`);
   }
   if (wants('orbit')) {
-    await boot('high', true); await H('forceRestore'); await advance(660, false);
+    await boot(quality, true); await H('forceRestore'); await advance(660, false);
     await H('teleport', 0, 38, -84, Math.PI);
-    const n = Number(arg('orbit-seconds', '20')) * 60;
+    const n = Number(arg('orbit-seconds', '20')) * fps;
     await video('restored-orbit-staged', n, async i => {
       const a = -0.65 + i / (n - 1) * Math.PI * 0.7;
       await H('photo', [Math.sin(a) * 125, 66 + Math.sin(i / n * Math.PI) * 12, -18 + Math.cos(a) * 125], [0, 15, -25], 52);
