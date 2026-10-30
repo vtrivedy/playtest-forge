@@ -1,4 +1,5 @@
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
+import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
@@ -55,7 +56,11 @@ export type { ShadeSpot } from './encounters/shades';
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
 /** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
-export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
+export type Waypoint = {
+  x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string;
+  /** lift waypoints: metres to rise above the lift before steering off (default: 0.5 m above the next waypoint) */
+  rise?: number;
+};
 
 export type SeedwellState = {
   id: 'SW1' | 'SW2' | 'SW3';
@@ -74,7 +79,6 @@ export type RealmEvent =
   | { type: 'bridge' }
   | { type: 'checkpoint'; index: number }
   | { type: 'page'; id: 'reed-ruin' }
-  | { type: 'wellspring' }
   | { type: 'hazard'; kind: 'ink' | 'fall' };
 
 export type Realm = {
@@ -108,6 +112,10 @@ export type Realm = {
   zoneAt: (x: number, z: number) => string;
   bridgeGrown: () => number;
   wellspringLit: () => boolean;
+  /** Summit finale: a grown root lifts the fallen lintel so the summit hearth's column reaches the basin */
+  summit: SummitRepair;
+  /** The basin was fed for its latch time: the Wellspring wakes (main runs the restore) */
+  lightWellspring: () => void;
   /** Per-frame: animation + triggers. `colorAt` = ColorField saturation probe. */
   update: (dt: number, t: number, fox: THREE.Vector3, feetY: number, colorAt: (p: THREE.Vector3) => number) => RealmEvent[];
   /** Flood tween 0..1 (lone maple, wellspring glow); `pulse` adds an ignition flare to the basin glow/light */
@@ -423,9 +431,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(24.2, 9.7, 6, { act: 'dash', label: 'hearth-brush' });
   WS(27.2, 9.7, 6, { act: 'glide', label: 'lift:H0' });
   WS(29.5, 8.5, 10);
-  WS(36.5, -1.2, 10);
-  WS(36.5, -8.8, 14);
-  WS(36.4, -4, 14);
+  WS(31.8, -6, 10);
+  WS(34.7, -11, 10);
+  WS(34.7, -0.2, 14);
+  WS(37.6, 0.8, 14);
   WS(38.8, 2.5, 14);
   WS(39.7, 2.5, 14, { act: 'glide', label: 'wind-gap' });
   WS(62.3, 0.6, 14);
@@ -435,15 +444,19 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(66, 1.0, 22);
   WS(69.8, 1.0, 22);
   WS(80.8, 4.6, 22, { act: 'glide', label: 'launch' });
-  W(-112, 20, -24, { ground: false, label: 'SW1' });
-  // dash H2 through the Kiln Shade's drain (the stroke punches through), then glide on east
-  W(-111.4, 20, -23.0, { ground: false, act: 'dash', label: 'kiln-dash' });
-  W(-110.5, 20, -22.1, { ground: false, label: 'SW1-feed' });
+  W(-107.8, 20, -20.8, { ground: false, label: 'SW1' }); // near side of the ledge; the basin itself is solid
+  // the Shade guts H2 on the ledge; the bowl hangs out over the east rim, in the column of HE on the
+  // y15 shelf below, out of the Shade's reach: drop to it, wake it, ride its heat back up past the bowl
+  W(-106.4, 20, -22.2, { ground: false });
+  W(-104.9, 15, -22.5, { ground: false, label: 'drop:HE' });
+  W(-103.9, 15, -24, { ground: false, act: 'glide', label: 'lift:HE', rise: 6.8 });
+  W(-108.6, 20, -23.2, { ground: false, label: 'SW1-feed' });
   // glide off SW1 east, over the terraces' north shoulder, into Amberwood
   W(-108, 20, -25, { ground: false, act: 'glide' });
   W(-72, 0, -26, { ground: false });
   W(-40, 0, -18);
   W(-14, 0, -6);
+  W(-8, 0, -0.6); // stay on the south bank: the straight line clips the gorge's west lip (zS −3.2)
   W(0, 0, -1.5, { label: 'cp-amber' });
   // Creek Root: wake the knot, wait for the bridge, cross the gorge behind it
   W(4.6, 0, -0.9, { label: 'grow:creek' });
@@ -483,7 +496,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(6.4, 32.8, -80.5, { ground: false });
   W(-6.4, 38, -80.5, { ground: false });
   W(-5, 38, -83.5, { ground: false });
-  W(0, 38, -86, { ground: false, label: 'wellspring' });
+  // finale: wake the root knot at the west foot (it lifts the fallen lintel), then light the summit hearth
+  W(-3.5, 38, -84.4, { ground: false, label: 'grow:summit-KS' });
+  W(-1.2, 39.04, -86.6, { ground: false, label: 'wellspring' });
+  W(-1.2, 39.56, -88.8, { ground: false, label: 'restored' }); // stand by the hearth until the basin wakes
 
   // ==================================================================== TERRAIN
   {
@@ -726,8 +742,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       stoneBlock(sb, trs(p.x, 6 + hh * (i + 0.5), p.z, T_YAW + (r() - 0.5) * 0.1), 1.9, hh * 0.98, 1.9, seed * 10 + i, 0.12);
     }
   }
-  // R4 lateral flight on k3 (10 → 14)
-  flightT(36.5, -0.6, 10, 36.5, -9.6, 14, 2.6, 5);
+  // R4 lateral flight on k2 (10 → 14), set wholly in front of terrace 3 (s36) and climbing toward
+  // the wind gap: the closed cheek is terrace 3's face, the top lands on an apron facing the gap,
+  // and the mill (s39, t-7.6) stays behind the fox instead of across the walk to the launch.
+  flightT(34.7, -9.8, 10, 34.7, -0.8, 14, 2.6, 5);
+  {
+    const p = sp(34.85, 0.3);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 2.6, d: 2.9, yaw: T_YAW, top: 14, bottom: 9.5, tag: 'r4-landing' }));
+    slab({ x: p.x, z: p.z, w: 2.6, d: 2.9, yaw: T_YAW, top: 14, bottom: 9.5, rough: 0.3, seed: 75, topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
+  }
   // Wind gap: twenty flat metres, with the y10 terrace four metres below for recovery.
   // R5 lateral flight on k4b (14 → 18)
   flightT(62.3, 0.4, 14, 62.3, 9.8, 18, 2.4, 6);
@@ -842,7 +865,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     for (let i = 0; i < colsT.length; i++) {
       const [s, t, y, h] = colsT[i]!;
       const p = sp(s, t);
-      ruinColumn(bk('stone', p.x, p.z), p.x, y, p.z, h, 60 + i);
+      // CC0 carved drum (Quaternius), stood at its broken height
+      bk('stone', p.x, p.z).add(lanternColumn, trs(p.x, y, p.z, i * 1.7, 1.5, h / 1.9, 1.5), PAL.stone);
     }
   }
 
@@ -1585,6 +1609,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const wsGlowB = new Bucket();
   domedShrine(bk('stone', 0, -89), wsGlowB, WSP.x, WSP.y, WSP.z, 1.3, 170);
   col.add(boxCollider({ x: WSP.x, z: WSP.z, w: 6.0, d: 6.0, top: WSP.y + 0.5, bottom: WSP.y - 1, tag: 'shrine-plinth' }));
+  // finale (world-1.md §3.7): reaching the shrine wins nothing. A fallen lintel caps the summit hearth's
+  // column below the basin; wake the root knot at the west foot and it lifts the stone, then heat reaches it
+  const summit = createSummitRepair(group, col, M.stone);
+  rootSpots.push(summit.rootSpot);
+  hearthSpots.push(summit.hearthSpot);
+  col.add(cylCollider({ x: summit.hearthSpot.x, z: summit.hearthSpot.z, r: 0.82, top: summit.hearthSpot.y + 1, bottom: summit.hearthSpot.y - 1.5, tag: 'hearth' }));
   archAt(bk('stone', -8, -88), -8.5, 38, -86.5, 0.25, { span: 3.4, pillarH: 4.4, seed: 171, pointed: true });
   archAt(bk('stone', -7, -94), -6.5, 38, -94, -0.3, { span: 3, pillarH: 3.6, seed: 172, broken: 0.5 });
   ruinColumn(bk('stone', 9, -85), 9, 38, -84.5, 2.2, 173);
@@ -1715,23 +1745,37 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x, z, w: 3.6, d: 3.2, top: 26, bottom: 24.9, rough: 0.45, seed: 349, topColor: PAL.stone.clone().lerp(PAL.rustMoss, 0.2), overhang: 0.15 });
     // Ruined spine carries the shelf, keeping its eastern face open to the river.
     col.add(boxCollider({ x: x - 0.8, z: z - 0.6, w: 1.4, d: 1.3, top: 25, bottom: 19.8, tag: 'kiln-spine' }));
-    for (let i = 0; i < 7; i++) stoneBlock(bk('stone', x, z), trs(x - 0.8, 20.35 + i * 0.72, z - 0.6, (i % 2) * 0.08), 1.4, 0.74, 1.3, 350 + i, 0.12);
+    // two broad carved drums (CC0 Quaternius column) carry the shelf instead of a stacked-block monolith
+    for (let i = 0; i < 2; i++) bk('stone', x, z).add(lanternColumn, trs(x - 0.8, 19.8 + i * 2.6, z - 0.6, i * 1.3, 2.25, 2.6 / 1.9, 2.25), PAL.stone);
   }
   // Kiln catch shelves (§3.4 recovery): y15 ledges on the spire's south and east faces, each with a hearth
   // whose column (to ≈ y25) overlaps the kiln ledge rim — a missed step is a ride back, not a long walk
   {
     const sw = seedwells[0]!.pos;
     for (const [id, ang] of [['HS', Math.PI / 2], ['HE', 0]] as const) {
-      const cx = sw.x + Math.cos(ang) * 7.4;
-      const cz = sw.z + Math.sin(ang) * 7.4;
+      // deep enough that a run off the rim lands on it, not past it
+      const cx = sw.x + Math.cos(ang) * 8.1;
+      const cz = sw.z + Math.sin(ang) * 8.1;
       const yaw = -ang;
-      col.add(boxCollider({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 11, tag: 'kiln-shelf' }));
-      slab({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 9.5, rough: 0.8, seed: 90 + id.length, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45), overhang: 0.6 });
+      col.add(boxCollider({ x: cx, z: cz, w: 5.6, d: 5.4, yaw, top: 15, bottom: 11, tag: 'kiln-shelf' }));
+      slab({ x: cx, z: cz, w: 5.6, d: 5.4, yaw, top: 15, bottom: 9.5, rough: 0.8, seed: 90 + id.length, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45), overhang: 0.6 });
       const hx = sw.x + Math.cos(ang) * 6.95;
       const hz = sw.z + Math.sin(ang) * 6.95;
       col.add(cylCollider({ x: hx, z: hz, r: 0.82, top: 16, bottom: 14, tag: 'hearth' }));
       hearthSpots.push({ id, x: hx, y: 15, z: hz, height: 9.5 });
     }
+  }
+  // SW1's bowl leaves H2 for the rim (§4 of levels-opus CRITIQUE-1530): it hangs from a carved mast on
+  // the ledge out over the east edge, inside HE's column. The Shade drains within 4 m of its own height, so
+  // H2 beside it always gutters, while HE five metres down burns clean and its heat rises past the dish.
+  {
+    const sw = seedwells[0]!.pos;
+    const h2 = inletSpots[0]!.pillar;
+    bk('stone', h2.x, h2.z).add(lanternColumn, trs(h2.x, h2.y, h2.z, 0.4, 1.35, 6.6 / 1.9, 1.35), PAL.stone);
+    const pillar = new THREE.Vector3(sw.x + 4.8, sw.y, sw.z - 2.2);
+    const bowl = new THREE.Vector3(sw.x + 6.6, sw.y + 1.6, sw.z - 1.4);
+    col.add(cylCollider({ x: pillar.x, z: pillar.z, r: 0.45, top: bowl.y + 0.6, bottom: sw.y - 1, tag: 'kiln-pillar' }));
+    inletSpots[0] = { seedwell: 0, source: 'HE', pos: bowl, sealAt: inletSpots[0]!.sealAt, pillar, latchTime: 2 };
   }
   // Water's HP launch is on the near aqueduct pier; direct fox colour cannot fill SW2.
   hearthSpots.push({ id: 'HP', x: 95, y: 6, z: 18, height: 10 });
@@ -1806,6 +1850,25 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     col.add(cylCollider({ x: p.x + 2.2, z: p.z + 1.7, r: 1.6, top: 34, bottom: 33.3, tag: 'mill-cap-perch' }));
     slab({ x: p.x + 2.2, z: p.z + 1.7, w: 3.2, d: 3.2, top: 34, bottom: 33.3, round: true, rough: 0.35, seed: 367, topColor: PAL.stone });
   }
+  // S5 "the curl under the gap": gliding the wind gap, a cold ash curl shows on the y10 floor at the foot
+  // of the far cliff, with a warm-lit broken arch on a balcony high on the same face. Drop down (4 m, safe),
+  // wake HG, ride it to the y22 balcony: a side view of the Kiln spire and the gap you just crossed.
+  {
+    const h = sp(58.6, -8);
+    hearthSpots.push({ id: 'HG', x: h.x, y: 10, z: h.z, height: 12.5 });
+    col.add(cylCollider({ x: h.x, z: h.z, r: 0.82, top: 11, bottom: 9, tag: 'hearth' }));
+    const b = sp(62, -8);
+    col.add(boxCollider({ x: b.x, z: b.z, w: 4.6, d: 3.6, yaw: T_YAW, top: 22, bottom: 20.8, tag: 'gap-balcony' }));
+    slab({ x: b.x, z: b.z, w: 4.6, d: 3.6, yaw: T_YAW, top: 22, bottom: 20.8, rough: 0.4, seed: 371, topColor: PAL.stone.clone().lerp(PAL.rustMoss, 0.3), overhang: 0.2 });
+    const c = sp(62.6, -8);
+    bk('stone', c.x, c.z).add(lanternColumn, trs(c.x, 14, c.z, 0.7, 2.0, 6.8 / 1.9, 2.0), PAL.stone);
+    const a = sp(62.8, -8);
+    archAt(bk('stone', a.x, a.z), a.x, 22, a.z, T_YAW, { span: 2.6, pillarH: 3.2, broken: 0.35, seed: 372, pointed: true });
+    const glow = new THREE.PointLight(0xffa860, 6, 9, 2);
+    glow.position.set(a.x, 23.4, a.z);
+    group.add(glow);
+    litterPatch(bk('litter', b.x, b.z, false), rng(373), b.x, b.z, 1.9, 40, () => 22);
+  }
   // The Shade visits the flume, then drifts around the recovery balconies.
   // Its excursion leaves a real water-arrival window; a permanent on-flume
   // drain made even sustained source colour unsolvable without freeing it.
@@ -1833,7 +1896,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     shadeSpots.push({id,afterLatch,patrol});
   }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
-  inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
+  inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i, lanternColumn));
 
   const lanternMat = glowMat('rv-glow-lanterns');
   lanternMat.color.set(0x8a6040);
@@ -1980,11 +2043,14 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       const yaw = lr() * Math.PI * 2;
       if (kind < 0.62) {
         // low leaf-carpet mounds (key art's creeper cover), not topiary puffballs
-        nature.place('bush_red', x, g - 0.1 * size, z, { yaw, scale: 0.6 + size * 0.9, squash: 0.35 + lr() * 0.25, hue, hue2: shrubHues[Math.floor(lr() * shrubHues.length)]!, cast: size > 0.8 });
+        const scale = 0.4 + size * 0.4;
+        const lowHue = PAL.leafBrown.clone().lerp(hue, 0.35 + lr() * 0.2);
+        nature.place('bush_red', x, g - 0.025, z, { yaw, scale, squash: 0.2 / (nature.height('bush_red') * scale),
+          gaps: 0.32, hue: lowHue, hue2: PAL.russet, cast: false });
       } else if (kind < 0.85) {
-        nature.place('fern', x, g - 0.05, z, { yaw, scale: 0.06 + size * 0.08, hue: BRACKEN[0], hue2: BRACKEN[1], cast: false });
+        nature.place('fern', x, g - 0.05, z, { yaw, scale: (0.14 + Math.min(size, 1.4) * 0.055) / nature.height('fern'), hue: BRACKEN[0], hue2: BRACKEN[1], cast: false });
       } else {
-        nature.place('grass_wispy', x, g - 0.05, z, { yaw, scale: 0.6 + size * 0.7, hue: TUSSOCK[0], hue2: TUSSOCK[1], cast: false });
+        nature.place('grass_wispy', x, g - 0.05, z, { yaw, scale: (0.16 + Math.min(size, 1.4) * 0.05) / nature.height('grass_wispy'), hue: TUSSOCK[0], hue2: TUSSOCK[1], cast: false });
       }
     };
     const placeShrub = (x: number, z: number, size: number) => {
@@ -2351,6 +2417,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     zoneAt,
     bridgeGrown: () => bridgeT,
     wellspringLit: () => wellLit,
+    summit,
+    lightWellspring() {
+      wellLit = true;
+    },
     respawnPos() {
       const p = checkpoints[lastCheckpoint]?.pos ?? spawnPos;
       return p.clone();
@@ -2426,11 +2496,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         (m.material as THREE.MeshBasicMaterial).opacity = inkActive ? 0.55 : 0.3;
       }
 
-      // wellspring
-      if (!wellLit && Math.hypot(fox.x - WSP.x, fox.z - WSP.z) < 5.2 && feetY > WSP.y - 1.5) {
-        wellLit = true;
-        ev.push({ type: 'wellspring' });
-      }
       if (!wellLit) wsGlow.emissiveIntensity = 0.06 + flood;
 
       // hazards
