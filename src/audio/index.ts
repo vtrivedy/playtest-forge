@@ -95,7 +95,7 @@ export function createGameAudio() {
         if (natureClock <= 0) { if (restored > 0.3) play(rng() > 0.5 ? 'bird' : 'cricket'); natureClock = 6 + rng() * 10; }
       }
     },
-    debug() { return { state: ctx?.state ?? 'locked', restored, enabled, ...audioSettings, counts: { ...counts }, voices: activeUntil.length }; },
+    debug() { return { state: ctx?.state ?? 'locked', masterGain: ctx ? master.gain.value : 0, glideGain: ctx ? glide.gain.value : 0, restored, enabled, ...audioSettings, counts: { ...counts }, voices: activeUntil.length }; },
     dispose() {
       disposed = true; document.removeEventListener('visibilitychange', visible); window.removeEventListener('keydown', key);
       if (ctx) { pressed.stop(); warm.stop(); airSource?.stop(); void ctx.close(); }

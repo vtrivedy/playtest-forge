@@ -15,10 +15,11 @@ try {
   await page.waitForFunction(() => window.__gameHooks?.state);
   const before = await page.evaluate(() => window.__gameHooks.state());
   if (before.audio.state !== 'locked') throw Error('Audio unlocked before gesture');
+  await page.evaluate(root => { window.__audioRoot = root; }, process.cwd().replace(/^\//, ''));
   const report = [];
   for (const name of ['footstep-leaf', 'footstep-stone', 'land', 'jump', 'dash', 'ember', 'ember-streak', 'shrine', 'bird', 'cricket', 'glide', 'ambience-sepia', 'ambience-restored', 'ambience-crossfade']) {
     const rendered = await page.evaluate(async name => {
-      const modulePath = '/@fs/workspace/siyu/pf-audio/src/audio/synthesis.ts';
+      const modulePath = new URL('./src/audio/synthesis.ts', location.origin + '/@fs/' + window.__audioRoot + '/').pathname;
       const { cue, noiseBuffer, ambience, breath } = await import(modulePath);
       const duration = name.startsWith('ambience') ? 14 : name === 'shrine' ? 9 : 3;
       const ctx = new OfflineAudioContext(1, duration * 24000, 24000), master = ctx.createGain(), limiter = ctx.createDynamicsCompressor();
@@ -53,7 +54,7 @@ try {
   if (unlocked.audio.state !== 'running') throw Error('Gesture did not unlock audio');
   await page.keyboard.press('KeyM'); await page.waitForTimeout(150);
   const muted = await page.evaluate(() => window.__gameHooks.state());
-  if (!muted.audio.muted) throw Error('M did not mute');
+  if (!muted.audio.muted || muted.audio.masterGain > 0.02) throw Error('M did not silence the graph');
   await page.keyboard.press('KeyM');
   for (const keys of [['KeyW'], ['KeyW', 'Space'], ['KeyW', 'ShiftLeft'], ['Space']]) {
     for (const k of keys) await page.keyboard.down(k);
