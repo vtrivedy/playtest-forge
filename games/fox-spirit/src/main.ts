@@ -507,9 +507,6 @@ async function boot() {
       turntableAnim = (opts?.anim as FoxAnimState) || 'idle';
       harnessAnimLock = turntableAnim;
       setFx(opts?.fx !== false);
-      foxActor.setMotion?.({speed: turntableAnim==='run' ? 9 : turntableAnim==='walk' ? 1.4 : turntableAnim==='trot' ? 3.8 : 0,
-        grounded: ['idle','run','walk','trot','skid','land'].includes(turntableAnim), yaw: turntableYaw, verticalSpeed: 0,
-        groundAt: () => ty});
       foxActor.setAnim(turntableAnim);
     },
     stopTurntable() {
