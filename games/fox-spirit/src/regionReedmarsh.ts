@@ -58,7 +58,7 @@ export function createReedmarshRegion(
   for (let i = 0; i < 8; i++) slab(90.5 + i * 0.55, 16.7, 1.1, 2, 5 + (i + 1) * 0.5, 4.5, 930 + i);
 
   const causeway = [
-    new THREE.Vector3(70, 0.35, 0),
+    new THREE.Vector3(70, -1.8, 0),
     new THREE.Vector3(63, 1.1, -12),
     new THREE.Vector3(52, 2.2, -24),
     new THREE.Vector3(40, 4.6, -36),
