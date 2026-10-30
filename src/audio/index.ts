@@ -1,4 +1,6 @@
 import { ambience, breath, cue, noiseBuffer, random } from './synthesis';
+import type { Surface } from './surfaces';
+export { surfaceOf } from './surfaces';
 import type { Cue, VoiceOptions } from './synthesis';
 
 export const audioSettings = { volume: 0.55, muted: false };
@@ -10,7 +12,9 @@ export function createGameAudio() {
   let lastPickup = -10, streak = 0, shrineAt = -10, pendingShrine = false;
   const rng = random(901), activeUntil: number[] = [];
   const counts: Partial<Record<Cue, number>> = {};
-  let disposed = false;
+  let disposed = false, wasGliding = false;
+  let queued: { name: Cue; opts: VoiceOptions } | undefined;
+  let airFilter: BiquadFilterNode;
   let airSource: AudioBufferSourceNode | undefined;
   const visible = () => {
     if (!ctx) return;
@@ -18,7 +22,7 @@ export function createGameAudio() {
     else if (enabled) void ctx.resume().catch(() => {});
   };
   const key = (e: KeyboardEvent) => {
-    if (e.code === 'KeyM' && !e.repeat && !(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]')) {
+    if (e.code === 'KeyM' && !e.repeat && !(e.target as HTMLElement)?.closest?.('input,textarea,[contenteditable]')) {
       audioSettings.muted = !audioSettings.muted;
       syncSettings();
     }
@@ -31,7 +35,8 @@ export function createGameAudio() {
     master.gain.setTargetAtTime(audioSettings.muted ? 0 : volume, ctx.currentTime, 0.035);
   }
   function play(name: Cue, opts: VoiceOptions = {}) {
-    if (!ctx || ctx.state !== 'running' || disposed) return;
+    if (disposed) return;
+    if (!ctx || ctx.state !== 'running') { if (ctx && ctx.state !== 'closed' && !document.hidden) queued = { name, opts }; return; }
     const t = ctx.currentTime;
     if (name === 'shrine') { pendingShrine = true; return; }
     if (name === 'footstep' && stepClock > 0) return;
@@ -40,7 +45,7 @@ export function createGameAudio() {
     if (name === 'ember') { streak = t - lastPickup < 1.5 ? Math.min(7, streak + 1) : 0; lastPickup = t; opts = { ...opts, streak }; }
     cue(ctx, master, noise, name, t, opts); counts[name] = (counts[name] ?? 0) + 1;
     activeUntil.push(t + 1.5); // conservative budget; synthesis cleans its nodes on end
-    if (name === 'footstep') stepClock = 0.28;
+    if (name === 'footstep' || name === 'land') stepClock = 0.22;
   }
   function swell(duration = 4.5) {
     pendingShrine = false;
@@ -64,15 +69,16 @@ export function createGameAudio() {
         // Long-lived filtered air, independently faded from ambience.
         const air = ctx.createBufferSource(), filter = ctx.createBiquadFilter();
         air.buffer = noise; air.loop = true; filter.type = 'bandpass'; filter.frequency.value = 1500; filter.Q.value = 0.5;
-        air.connect(filter).connect(glide); air.start();
+        air.connect(filter).connect(glide); air.start(); airFilter = filter;
         air.onended = () => { air.disconnect(); filter.disconnect(); };
         airSource = air;
       }
       await ctx.resume();
+      if (queued) { const q = queued; queued = undefined; play(q.name, q.opts); }
     },
     play, swell,
     setAmbient(on: boolean) { enabled = on; },
-    update(dt: number, moving: boolean, grounded: boolean, gliding: boolean, localRestore = 0, stone = false, speed = 6) {
+    update(dt: number, moving: boolean, grounded: boolean, gliding: boolean, localRestore = 0, surface: Surface = 'leaf', speed = 6, dashing = false) {
       const step = Number.isFinite(dt) ? Math.max(0, Math.min(dt, 0.1)) : 0;
       stepClock = Math.max(0, stepClock - step);
       restored += (Math.max(0, Math.min(1, localRestore)) - restored) * (1 - Math.exp(-step / 2));
@@ -81,21 +87,25 @@ export function createGameAudio() {
       syncSettings();
       pressed.gain.setTargetAtTime(enabled ? Math.cos(restored * Math.PI / 2) : 0, t, 0.4);
       warm.gain.setTargetAtTime(enabled ? Math.sin(restored * Math.PI / 2) : 0, t, 0.4);
-      glide.gain.setTargetAtTime(gliding && !grounded ? 0.075 : 0, t, 0.09);
+      const glideOn = gliding && !grounded;
+      if (glideOn && !wasGliding) play('glide');
+      wasGliding = glideOn;
+      glide.gain.setTargetAtTime(glideOn ? 0.04 + Math.min(16, speed) * 0.004 : 0, t, 0.09);
+      airFilter.frequency.setTargetAtTime(900 + Math.min(16, speed) * 85, t, 0.15);
       if (pendingShrine) swell();
-      if (moving && grounded && stepClock <= 0) {
-        play('footstep', { stone }); stepClock = Math.max(0.16, 1.9 / Math.max(2, speed)) * (0.92 + rng() * 0.16);
+      if (moving && grounded && !dashing && stepClock <= 0) {
+        play('footstep', { surface }); stepClock = Math.max(0.16, 1.9 / Math.max(2, speed)) * (0.92 + rng() * 0.16);
       }
       if (enabled) {
         leafClock -= step; natureClock -= step;
         if (leafClock <= 0) {
-          breath(ctx, master, noise, t, 0.8 + rng(), 2100, 0.018 * restored, 700, 0.25);
+          if (restored > 0.02) breath(ctx, master, noise, t, 0.8 + rng(), 2100, 0.018 * restored, 700, 0.25);
           leafClock = 2 + rng() * 4;
         }
         if (natureClock <= 0) { if (restored > 0.3) play(rng() > 0.5 ? 'bird' : 'cricket'); natureClock = 6 + rng() * 10; }
       }
     },
-    debug() { return { state: ctx?.state ?? 'locked', masterGain: ctx ? master.gain.value : 0, glideGain: ctx ? glide.gain.value : 0, restored, enabled, ...audioSettings, counts: { ...counts }, voices: activeUntil.length }; },
+    debug() { return { state: ctx?.state ?? 'locked', masterGain: ctx ? master.gain.value : 0, pressedGain: ctx ? pressed.gain.value : 0, warmGain: ctx ? warm.gain.value : 0, glideGain: ctx ? glide.gain.value : 0, restored, enabled, ...audioSettings, counts: { ...counts }, voices: activeUntil.length }; },
     dispose() {
       disposed = true; document.removeEventListener('visibilitychange', visible); window.removeEventListener('keydown', key);
       if (ctx) { pressed.stop(); warm.stop(); airSource?.stop(); void ctx.close(); }

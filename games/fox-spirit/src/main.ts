@@ -27,7 +27,7 @@ import { createRussetvale, type Waypoint } from './russetvale';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
 import type { FoxAnimState } from './fox';
-import { createGameAudio } from './audio';
+import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
 import { createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
@@ -644,13 +644,15 @@ async function boot() {
         cam.playShot({ subjects: [foxActor.group.position.clone(), s.pos.clone()], holdS: 1.7, blendS: 0.6 });
         cam.shake(0.3);
       } else if (e.type === 'bridge') {
-        audio.swell(3);
+        audio.play('bridge');
       } else if (e.type === 'checkpoint') {
-        audio.play('ember');
+        audio.play('checkpoint');
       } else if (e.type === 'wellspring') {
         if (!shrineOn) triggerFlood();
       } else if (e.type === 'hazard') {
+        audio.play('hazard');
         respawn();
+        audio.play('respawn');
         deaths += 1;
         hud.setPrompt(e.kind === 'ink' ? 'The ink swallows colour — keep to the stones' : 'The cloud sea returns you');
         hud.hidePromptSoon(3);
@@ -867,7 +869,7 @@ async function boot() {
           cam.land(impact);
           landT = 0.1 + 0.28 * impact;
           if (impact > 0.75) cam.shake(0.18 * impact);
-          audio.play('land', { strength: impact, stone: /^(terrace|stair|mill|sw1-spire|ghost|arena|pillar|row|shrine-plinth)/.test(probe.collider?.tag ?? '') });
+          audio.play('land', { strength: impact, surface: surfaceOf(probe.collider?.tag) });
         }
         jumpedThisAir = false;
       }
@@ -1051,7 +1053,7 @@ async function boot() {
       const distance = Math.hypot(fox.position.x - region.center.x, fox.position.z - region.center.z);
       audioRestore = Math.max(audioRestore, THREE.MathUtils.smoothstep(region.radius - distance, -3, 3));
     }
-    audio.update(dt, speed > 1.2, grounded, gliding, audioRestore, /^(terrace|stair|mill|sw1-spire|ghost|arena|pillar|row|shrine-plinth)/.test(probe.collider?.tag ?? ''), speed);
+    audio.update(dt, speed > 1.2, grounded, gliding, audioRestore, surfaceOf(probe.collider?.tag), speed, dashing);
   }
   const feetPos = new THREE.Vector3();
   const heroNdc = new THREE.Vector3();
