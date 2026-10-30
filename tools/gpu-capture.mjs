@@ -220,8 +220,8 @@ try {
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
       // fox faces -Z at yaw PI: "front" camera sits on -Z
-      const views = { front: [0, 0.55, -2.9, 30], three_q: [-1.9, 0.6, -2.2, 30], side: [-3.0, 0.5, 0, 30],
-        back_three_q: [-1.8, 0.75, 2.4, 30], back: [0, 0.8, 3.0, 30], face: [-0.45, 0.85, -1.15, 28] };
+      const views = { front: [0, 0.6, -5.2, 30], three_q: [-3.5, 0.7, -4.0, 30], side: [-5.6, 0.55, 0, 30],
+        back_three_q: [-3.3, 0.9, 4.4, 30], back: [0, 0.9, 5.4, 30], face: [-0.8, 0.95, -2.2, 26] };
       for (const [name, [dx, dy, dz, fov]] of Object.entries(views)) {
         const look = name === 'face' ? [p.x, p.y + 0.82, p.z - 0.45] : at;
         await H('photo', [p.x + dx, p.y + dy, p.z + dz], look, fov);
