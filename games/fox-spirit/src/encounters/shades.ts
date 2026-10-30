@@ -125,7 +125,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         p += normal * (n3(p * 3.0 + vec3(0.0, uTime * 1.3, uSeed)) - 0.5) * w * 2.0;
         p.x += sin(uTime * 1.7 + p.y * 2.0 + uSeed) * 0.075;
         // freeing: the body lifts and spreads as it comes apart
-        p += normal * ((1.0 - uPresence) * 0.35 + uFringe * 0.14);
+        p += normal * ((1.0 - uPresence) * 0.035 + uFringe * 0.14);
         vP = p; vY = p.y;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         vN = normalize(normalMatrix * normal);
@@ -206,10 +206,10 @@ function inkWisps(seed: number) {
 
 function poolMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uRadius: { value: 3 } },
+    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uRadius: { value: 3 }, uReleased: {value:0}, uReleaseAge: {value:0} },
     vertexShader: /* glsl */ `attribute float aValid; varying float vValid; varying vec2 vUv; void main() { vValid = aValid; vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: /* glsl */ `
-      uniform float uTime, uPresence;
+      uniform float uTime, uPresence, uReleased, uReleaseAge;
       varying vec2 vUv; varying float vValid;
       ${NOISE}
       void main() {
@@ -219,7 +219,14 @@ function poolMaterial(): THREE.ShaderMaterial {
         float a = (1.0 - smoothstep(0.55 + n * 0.25, 1.0, r)) * 0.74 * uPresence;
         // faint ring at the drain edge so the reach reads in play
         a += smoothstep(0.86, 0.93, r) * (1.0 - smoothstep(0.93, 1.0, r)) * 0.25 * uPresence;
-        gl_FragColor = vec4(vec3(0.008, 0.005, 0.003), a * smoothstep(0.2, 0.8, vValid));
+        vec3 color = vec3(0.008, 0.005, 0.003);
+        if(uReleased > 0.5){
+          float wave = clamp(uReleaseAge/1.4,0.0,1.0);
+          a=(1.0-smoothstep(0.025,0.16,abs(r-wave)))*(1.0-smoothstep(0.7,1.5,uReleaseAge))*.3;
+          color=vec3(.16,.055,.012);
+        }
+        gl_FragColor = vec4(color, a * smoothstep(0.2, 0.8, vValid));
+        #include <colorspace_fragment>
       }`,
     transparent: true,
     depthWrite: false,
@@ -314,7 +321,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       const ev: Array<{ type: 'freed' | 'hit'; id: string; pos: THREE.Vector3 }> = [];
       for (const s of shades) {
         if (!s.active) { s.group.visible = false; s.pool.visible = false; s.debug.visible = false; continue; }
-        s.group.visible = s.presence > 0; s.pool.visible = s.presence > 0;
+        s.group.visible = s.presence > 0; s.pool.visible = s.freed ? s.releaseAge < 1.5 : true;
         s.smoke.material.uniforms.uTime!.value=t;
         s.smoke.material.uniforms.uPresence!.value=s.presence;
         s.smoke.material.uniforms.uOpacity!.value=tun.inkOpacity*(1+s.notice*.4);
@@ -349,7 +356,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           if (s.leaves.instanceColor) s.leaves.instanceColor.needsUpdate = true;
           s.presence = Math.max(0, s.presence - dt / tun.releaseTime);
           s.group.visible = s.presence > 0;
-          s.pool.visible = s.presence > 0;
+          s.pool.visible = s.freed ? s.releaseAge < 1.5 : true;
         } else {
           s.u = (s.u + (dt * (s.speed ?? tun.speed)) / s.length) % 1;
           s.curve.getPointAt(s.u, s.pos);
@@ -413,6 +420,8 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         s.pool.position.copy(s.pos);
         s.pool.scale.setScalar(tun.drainRadius);
         const pm = s.pool.material as THREE.ShaderMaterial;
+        pm.uniforms.uReleased!.value = s.freed ? 1 : 0;
+        pm.uniforms.uReleaseAge!.value = s.releaseAge;
         pm.uniforms.uTime!.value = t;
         pm.uniforms.uPresence!.value = s.presence;
       }
