@@ -26,6 +26,7 @@ export type GameState = {
   shades?: { wisps: number; hits: number; frees: number; invulnerable: number; knockbackTravel: number; tun?: Record<string, number | boolean>; actors: Array<{ id: string; pos: number[]; freed: boolean }> };
   /** Game-specific systemic state (e.g. fox-spirit colour chemistry) */
   chem?: unknown;
+  reach?: unknown;
   /** Fox-spirit summit extension: shrine seal and permanent return route. */
   crown?: { restored: boolean; seal: number; fed: boolean; bowl: number[]; hearths: string[]; returnWind: string };
 };

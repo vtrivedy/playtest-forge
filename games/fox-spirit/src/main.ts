@@ -29,6 +29,7 @@ import {
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createListeningCrown } from './listeningCrown';
+import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
 import type { FoxAnimState } from './fox';
@@ -158,6 +159,7 @@ async function boot() {
 
   const world = await createRussetvale(scene);
   const crown = await createListeningCrown(scene, world);
+  const reach = await createAshwaterReach(scene, world);
   const col = world.collision;
   const gaitGym = new URLSearchParams(location.search).get('gym') === 'gait' ? createGaitGym(scene, col) : null;
   let harnessStick: THREE.Vector3 | null = null;
@@ -220,6 +222,7 @@ async function boot() {
   });
   colorField.initMask(renderer);
   crown.init(renderer);
+  reach.init(renderer);
   colorField.groundAt = (x, z) => col.highestAt(x, z);
   // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
   const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75 };
@@ -397,7 +400,7 @@ async function boot() {
   const drainedAt = (q: THREE.Vector3) => colorDrains.some((f) => f(q));
   colorDrains.push(shades.drains);
   const supplyAt = (q: THREE.Vector3) => {
-    if (!drainedAt(q)) return crown.contains(q) ? crown.supplyAt(q) : colorField.sample(q);
+    if (!drainedAt(q)) return reach.contains(q) ? reach.supplyAt(q) : crown.contains(q) ? crown.supplyAt(q) : colorField.sample(q);
     return colorField.strokeAt(q) > 1 ? 1 : 0;
   };
   const shadeContact = new ShadeContact();
@@ -407,6 +410,7 @@ async function boot() {
   crown.attach(updrafts, wind, gui);
 
   const water = createWater(scene, world.collision, gui);
+  reach.attach(water, gui);
   world.waterWashedAt = water.washedAt;
   world.waterInkAt = water.inkAt;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
@@ -789,6 +793,7 @@ async function boot() {
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         crown: crown.state(),
+        reach: reach.state(),
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
@@ -1399,6 +1404,7 @@ async function boot() {
     colorField.update(dt);
     if (colorField.globalColor >= 0.99) water.restoreAll();
     crown.sync(dt, colorField);
+    reach.sync(dt, colorField);
     water.update(dt, simClock, supplyAt, drainedAt);
     updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     wind.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
@@ -1417,6 +1423,7 @@ async function boot() {
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
+    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn);
     crown.update(dt, (p, r) => {
       autumnFX.swirl(p, 40, 1.6);
       audio.play('shrine');
@@ -1549,6 +1556,7 @@ async function boot() {
       deaths,
       backend,
       crown: crown.state(),
+      reach: reach.state(),
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
       chem: { water: water.state(), growth: growth.state().roots, updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [

@@ -1,4 +1,3 @@
-# Fox Spirit — autumn feel prototype
 
 See `docs/vision.md`. Refs: `assets/concept/fox-turnaround.jpg`, `world-keyart.jpg`.
 
@@ -260,3 +259,9 @@ base and capital into the existing weathered stone bucket; no parallel old stem.
 
 ### World showcase + turn/head correction — 15:15
 Keep the selected controller and constrain its grounded travel to the same turning envelope as the visible fox. Opposed input brakes while the fox pivots, preventing a full-speed sideways stance. Feed the intended look direction into a spring-led head/neck turn; distribute a smaller body bend along the four spine bones and cancel part of terrain pitch at the head. Retain authored clips as the primary pose. Re-shoot20s on real Reedmarsh boardwalk and Windmill Rise approach terrain using the gameplay camera, warm grade, and per-frame state. Staged cuts remain disclosed.
+### Opus capture audit follow-up — 15:36 ET
+Preserve failed retry files below attempt-N directories before writing a fresh
+attempt, preventing mixed sheets. Verify durable success against route interval,
+size/fps, and matching report/tool hashes. Order route evidence chronologically
+with endpoint last and state labels. Save structured route acceptance with an
+explicit stall/budget/death/assist reason. Existing play failures remain failures.

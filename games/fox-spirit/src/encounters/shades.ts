@@ -109,7 +109,7 @@ function inkMaterial(): THREE.ShaderMaterial {
       void main() {
         vec3 p = position;
         // wavering: the ink never quite holds still; it boils more toward the feet
-        float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.15 + 0.1;
+        float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.015 + 0.025;
         p += normal * (n3(p * 3.0 + vec3(0.0, uTime * 1.3, uSeed)) - 0.5) * w * 2.0;
         p.x += sin(uTime * 1.7 + p.y * 2.0 + uSeed) * 0.075;
         // freeing: the body lifts and spreads as it comes apart

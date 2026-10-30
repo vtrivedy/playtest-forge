@@ -22,10 +22,27 @@ def contact_sheet(folder: Path):
     gait_sheet = folder / 'gait-contact-sheet.png'
     if gait_sheet.exists():
         return gait_sheet
-    entries = [(p, p.stem) for p in sorted(folder.glob('*.png')) if 'contact' not in p.stem and p.stem not in {'cube', 'hardware-probe'}]
+    entries = [(p, p.stem) for p in sorted(folder.glob('*.png'), key=lambda p: (p.stem.endswith('-end'), p.name)) if 'contact' not in p.stem and p.stem not in {'cube', 'hardware-probe'}]
     entries = [(p, label) for p, label in entries if p.exists()]
     if not entries:
         return None
+    report_file = folder / 'report.json'
+    report = json.loads(report_file.read_text()) if report_file.exists() else {}
+    labelled = []
+    for p, label in entries:
+        state = report.get('shots', {}).get(p.stem, {}).get('state')
+        frame = re.fullmatch(r'(.+)-(\d{5})', p.stem)
+        if frame:
+            state = next((r['state'] for r in report.get('videos', {}).get(frame[1], {}).get('trace', []) if r['frame'] == int(frame[2])), state)
+        if state and 'auto' in state:
+            label += f" | wp{state['auto']['idx']} d{state.get('deaths', '?')}"
+            if state['auto'].get('stalled'):
+                label += ' STALLED'
+        acceptance_file = folder / 'route-acceptance.json'
+        if p.stem == 'route-end' and acceptance_file.exists():
+            label += ' ' + json.loads(acceptance_file.read_text())['reason'].upper()
+        labelled.append((p, label))
+    entries = labelled
     cols, cell_w, cell_h = 4, 480, 300
     sheet = Image.new('RGB', (cols * cell_w, ((len(entries) + cols - 1) // cols) * cell_h), '#211b16')
     draw = ImageDraw.Draw(sheet)
@@ -48,6 +65,8 @@ def main():
     parser.add_argument('--route-seconds', type=int, default=120)
     parser.add_argument('--route-from', type=int, default=0)
     parser.add_argument('--route-to', type=int, default=-1)
+    parser.add_argument('--size', default='1920x1080', help='Capture WIDTHxHEIGHT')
+    parser.add_argument('--fps', type=int, default=60, choices=[30, 60])
     parser.add_argument('--gpu', default='A10', choices=['A10','L4'], help='Hardware GPU pool')
     parser.add_argument('--sheet-only', type=Path, help='Build a sheet for an existing capture directory')
     args = parser.parse_args()
@@ -57,6 +76,8 @@ def main():
             if sheet:
                 print(sheet)
         return
+    if not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', args.size):
+        parser.error('Size must be WIDTHxHEIGHT with positive integers')
     shots = args.shots.split(',')
     if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe', 'fox', 'water', 'shade', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'turntable', 'flow', 'crown', 'showcase'}:
         parser.error('Unknown shot')
@@ -87,7 +108,7 @@ def main():
     def capture(shot):
         folder = destination / shot
         folder.mkdir(parents=True, exist_ok=True)
-        command = ['modal', 'run', '--detach', 'tools/modal/gpu_capture.py', '--ref', ref, '--shots', shot, '--route-seconds', str(args.route_seconds), '--gpu', args.gpu, '--route-from', str(args.route_from), '--route-to', str(args.route_to), '--out', str(folder)]
+        command = ['modal', 'run', '--detach', 'tools/modal/gpu_capture.py', '--ref', ref, '--shots', shot, '--route-seconds', str(args.route_seconds), '--gpu', args.gpu, '--size', args.size, '--fps', str(args.fps), '--route-from', str(args.route_from), '--route-to', str(args.route_to), '--out', str(folder)]
         print(f'Starting {shot}: {folder}', flush=True)
         with (folder / 'modal.log').open('w') as log:
             result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
@@ -99,6 +120,12 @@ def main():
             if metadata['commit'] != ref or metadata['shots'] != shot:
                 raise ValueError('Fetched capture belongs to a different commit or shot')
             report = json.loads((folder / 'report.json').read_text())
+            expected = {'size': args.size, 'fps': args.fps, 'routeFrom': args.route_from, 'routeTo': args.route_to}
+            for key, value in expected.items():
+                if metadata.get(key) != value:
+                    raise ValueError(f'Capture setting mismatch: {key} expected {value}, got {metadata.get(key)}')
+            if not metadata.get('captureToolSha') or metadata['captureToolSha'] != report.get('captureToolSha'):
+                raise ValueError('Capture tool identity differs between run metadata and report')
             if metadata.get('status', 'success') == 'failed' or report.get('failures') or report.get('errors'):
                 effective_exit = effective_exit or 1
             elif effective_exit and metadata.get('status') == 'success':
