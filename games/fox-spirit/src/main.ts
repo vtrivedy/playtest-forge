@@ -25,7 +25,7 @@ import { createHud } from './hud';
 import { createLeafKick, createEmberTrail } from './fx';
 import { createRestoreCinematic } from './restore';
 
-const feel: FeelParams = { ...PRESET_SPRING };
+const feel: FeelParams = { ...PRESET_SPRING, moveSpeed: PRESET_SPRING.moveSpeed * 1.12 };
 const jumpFeel = new JumpFeel();
 const feelMetrics = emptyFeelMetrics();
 
@@ -332,7 +332,7 @@ async function boot() {
     }
 
     // Shrine restore
-    if (!shrineOn && fox.position.distanceTo(world.shrinePos) < 2.2) {
+    if (!shrineOn && fox.position.distanceTo(world.shrinePos) < 3.6) {
       shrineOn = true;
       status = 'won';
       restore.trigger();
