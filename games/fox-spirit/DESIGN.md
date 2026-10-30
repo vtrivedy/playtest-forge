@@ -291,3 +291,10 @@ The temporary ColorField render grade should blend through the full mask range
 with world-space edge variation; keep gameplay supply sampling unchanged. Lower
 ground chroma toward muted brown, leaving bright autumn accents to leaves and
 fox. This addresses the orange-disc appearance without extending the source.
+
+### Remaining stacked supports
+Use one loaded CC0 column source for ruin piers, including arch supports and shrine
+piers. Retain the arch ring, span, height and footprint; intact and snapped source
+variants share the same material and preserve small authored leans. Remove the
+stacked-box pier construction. Source geometry stays alive while region builders
+use the kit. Keep sacred glyphs and all gameplay collision unchanged.

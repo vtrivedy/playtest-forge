@@ -2275,7 +2275,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const x = SW1P.x + Math.cos(a) * 2.6, z = SW1P.z + Math.sin(a) * 2.6;
     rubble.place(bk('rock', x, z), x, SW1P.y - 0.08, z, 0.65, 470 + k, 0.45);
   }
-  lanternColumn.dispose();
   rubble.dispose();
 
   // ==================================================================== merge buckets
