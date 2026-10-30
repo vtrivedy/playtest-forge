@@ -198,3 +198,12 @@ Use input release/opposition and measured deceleration only to drive a restraine
 
 ## Listening Crown extension
 Design: `docs/design/wellspring-summit.md`. From the Wellspring west arch, a permanent stair reaches a compact cliff ruin. Two existing hearth columns reach a heat-fed crown bowl. A two-second element inlet latches permanent heat and an inward wind route to the summit; dash-through Shade or strong stroke are both valid. No new inputs, ability, collectible, or World 1 gate. Safe stairs remain available. Tunable seal time, saved latch, and `__game.crown` state support GPU verification.
+
+### Capture blocker: empty foliage buckets — 14:20 ET
+GPU levels502c57f and main476a6eb fail before window.__game boot with an
+undefined geometry.index read in mergeGeometries called by NatureKit.build.
+Standalone foliage extraction can leave a previously existing cell empty.
+Skip empty buckets during build; also skip them when extracting standalone
+foliage so an old empty cell cannot contribute undefined geometry. Actual
+populated foliage and gameplay remain on the same path. Verify with GPU boot
+and region stills before considering the startup regression repaired.
