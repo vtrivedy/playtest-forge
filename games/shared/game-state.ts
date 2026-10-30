@@ -23,6 +23,8 @@ export type GameState = {
   loseCondition?: string;
   notes?: string[];
   feel?: FeelSnapshot;
+  /** Game-specific systemic state (e.g. fox-spirit colour chemistry) */
+  chem?: unknown;
 };
 
 declare global {

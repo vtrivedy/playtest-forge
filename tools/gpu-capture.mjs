@@ -98,7 +98,7 @@ try {
     page.setDefaultTimeout(180000);
     page.on('pageerror', e => { errors.push(String(e)); console.error('PAGEERROR', String(e)); });
     page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error') errors.push(m.text()); if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
-    await page.goto(`http://127.0.0.1:5180/?q=${q}${query}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://127.0.0.1:5180/?q=${q}&fresh${query}`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { polling: 100 });
     await H('setManual', true);
     if (fixedClock) await page.evaluate(() => {
@@ -336,6 +336,125 @@ try {
     save('shade-result.json', encounter);
     if (!encounter.hits || !encounter.frees) report.failures.push('Shade script did not demonstrate both contact and dash-free; inspect the trace');
   }
+  if (wants('updraft')) {
+    // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
+    // A: run past the cold H-a hearth, jump into its column, ride it onto the 5 m shelf, watch hold → gutter.
+    // B: light it again, hover in the column (jump held, no steering) until it gutters under the glider.
+    // C: dash through the cold hearth, walk away; measure lit time. K: SW1 Kiln with its Shade (aura vs dash).
+    await boot(quality, true);
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+    const hearthOf = (st, id) => st.chem.hearths.find(h => h.id === id);
+    const hearth = st => hearthOf(st, 'H-a');
+    const h0 = hearth(await H('state'));
+    const [hx, hy, hz] = h0.pos;
+    const summary = { hearth: h0, A: {}, B: {}, C: {}, K: {} };
+    const lens = [[hx - 6, hy + 8, hz + 11], [hx + 2, hy + 3, hz - 1], 50];
+    await H('teleport', hx - 12, hy, hz + 16, Math.PI); await H('photo', ...lens); await advance(30); await shot('updraft-still-cold');
+    const runFrom = [hx - 1.4, hy, hz + 9];
+    for (const variant of ['A', 'B']) {
+      await H('photoOff');
+      await H('teleport', ...runFrom, Math.PI); await advance(40);
+      let phase = 'run', i0 = -1, landed = -1, minVyGutter = Infinity;
+      const keyFrames = [], timeline = [];
+      const name = variant === 'A' ? 'updraft-ride' : 'updraft-hover';
+      await video(name, 13 * fps, async i => {
+        const st = await H('state'), hs = hearth(st), [x, y] = st.pos;
+        timeline.push({ i, t: st.t, pos: st.pos, vy: st.vel[1], grounded: st.grounded, gliding: st.gliding, heat: hs.heat, state: hs.state, supply: hs.supply });
+        if (hs.state === 'guttering' && !st.grounded) minVyGutter = Math.min(minVyGutter, st.vel[1]);
+        if (phase === 'run' && st.pos[2] < hz + 0.2) { phase = 'ride'; i0 = i; keyFrames.push(i); }
+        if (phase === 'ride' && st.grounded && i - i0 > 20) { phase = 'stand'; landed = i; keyFrames.push(i); }
+        if (phase === 'ride' && (i - i0) % 30 === 15 && keyFrames.length < 6) keyFrames.push(i);
+        if (phase === 'stand' && (i - landed) === 150 && keyFrames.length < 8) keyFrames.push(i);
+        if (variant === 'A' && phase === 'stand' && i - landed === 40) await H('photo', [hx - 6, hy + 8, hz + 11], [hx + 2, hy + 3, hz - 1], 50);
+        let keys = [];
+        if (phase === 'run') keys = ['KeyW'];
+        else if (phase === 'ride' && variant === 'B') keys = ['Space'];
+        else if (phase === 'ride') keys = st.vel[1] < 0 && x > hx + 3.2 ? (x > hx + 6.5 ? [] : ['KeyD']) : ['KeyD', 'Space'];
+        else if (variant === 'A' && i - landed < 20) keys = ['KeyD'];
+        await H('setKeys', keys);
+      }, (st, i) => phase === 'stand' && i - landed > 5.5 * fps, { keyFrames, label: (f, st) => st ? `${name} f${f} y=${st.pos[1].toFixed(2)} heat=${hearth(st).heat.toFixed(2)} ${hearth(st).state}` : `${name} f${f}` });
+      const after = await H('state');
+      const firstLit = timeline.find(r => r.heat > 0);
+      const lastSupplied = [...timeline].reverse().find(r => r.supply >= after.chem.tun.threshold);
+      const holdEnd = timeline.find(r => lastSupplied && r.t > lastSupplied.t && r.state === 'guttering');
+      const cold = timeline.find(r => holdEnd && r.t > holdEnd.t && r.state === 'cold');
+      summary[variant] = {
+        ignitedAtS: firstLit ? Number((firstLit.t - timeline[0].t).toFixed(3)) : null,
+        holdS: lastSupplied && holdEnd ? Number((holdEnd.t - lastSupplied.t).toFixed(3)) : null,
+        gutterS: holdEnd && cold ? Number((cold.t - holdEnd.t).toFixed(3)) : null,
+        minVyWhileGutteringAirborne: Number.isFinite(minVyGutter) ? Number(minVyGutter.toFixed(3)) : null,
+        ride: after.chem.lastRide, end: { pos: after.pos, grounded: after.grounded, deaths: after.deaths },
+      };
+      save(`${name}-timeline.json`, timeline);
+      await H('setKeys', []); await H('photoOff');
+      await advance(300, false); // let it go cold before the next variant
+    }
+    { // C: dash stroke — run toward the hearth, dash past it, keep running; lit time from the timeline
+      await H('teleport', ...runFrom, Math.PI); await advance(40);
+      const tl = [];
+      for (let i = 0; i < 16 * 60; i++) {
+        const st = await H('state'), [, , z] = st.pos;
+        const keys = i < 600 ? ['KeyW'] : [];
+        if (z < hz + 4.5 && !tl.dashed) { keys.push('ShiftLeft'); tl.dashed = st.t; }
+        await H('setKeys', keys);
+        await H('advance', 1, 1 / 60, false);
+        const hs = hearth(st);
+        tl.push({ t: st.t, heat: hs.heat, state: hs.state, supply: hs.supply });
+      }
+      const lit = tl.filter(r => r.heat > 0);
+      summary.C = { dashedAt: tl.dashed, litFrom: lit[0]?.t ?? null, litTo: lit.at(-1)?.t ?? null, litS: lit.length ? Number((lit.at(-1).t - lit[0].t).toFixed(2)) : 0,
+        suppliedS: Number((tl.filter(r => r.supply >= 0.3).length / 60).toFixed(2)) };
+      await H('setKeys', []);
+    }
+    { // D: falling entry from the opposite (shelf) side — light it, step off the shelf lip, glide into the column
+      await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(20);
+      await H('teleport', hx + 6.5, hy + 5.3, hz, -Math.PI / 2); await advance(10);
+      let left = -1;
+      const tl = [];
+      await video('updraft-fall-entry', 9 * fps, async i => {
+        const st = await H('state');
+        tl.push({ i, pos: st.pos, vy: st.vel[1], grounded: st.grounded, gliding: st.gliding, heat: hearth(st).heat });
+        if (left < 0 && !st.grounded) left = i;
+        const over = Math.abs(st.pos[0] - hx) < 1.0;
+        await H('setKeys', left < 0 ? ['KeyW'] : over || st.vel[1] > 0 ? ['Space'] : ['KeyW', 'Space']);
+      }, (st, i) => left > 0 && st.grounded && i - left > 30, { keyFrames: [10, 40, 70, 100, 140, 200] });
+      const ride = (await H('state')).chem.lastRide;
+      summary.D = { ride, minVyBeforeLift: Math.min(...tl.map(r => r.vy)), peak: Math.max(...tl.map(r => r.pos[1])) };
+      await H('setKeys', []); await advance(300, false);
+    }
+    // debug view of the column volume + lit still (staged, lit by standing at the bowl)
+    await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(20);
+    await page.evaluate(() => document.body.classList.add('debug-on'));
+    await H('photo', ...lens); await advance(30); await shot('updraft-still-debug');
+    await page.evaluate(() => document.body.classList.remove('debug-on')); await advance(2); await shot('updraft-still-lit');
+    await H('photoOff');
+    { // K: SW1 Kiln — aura alone next to H2 under the Shade, then a dash through H2 → latch
+      const st0 = await H('state');
+      const h2 = hearthOf(st0, 'H2');
+      const sw = { x: -112, z: -24 };
+      const dx = h2.pos[0] - sw.x, dz = h2.pos[2] - sw.z, dl = Math.hypot(dx, dz), ux = dx / dl, uz = dz / dl;
+      const yaw = Math.atan2(ux, uz);
+      await H('teleport', sw.x - ux * 2, 20, sw.z - uz * 2, yaw); await advance(30);
+      const tl = [];
+      let phase = 'aura', p0 = 0;
+      await video('kiln', 14 * fps, async i => {
+        const st = await H('state'), hs = hearthOf(st, 'H2'), inlet = st.chem.inlets[0];
+        tl.push({ i, t: st.t, phase, pos: st.pos, heat: hs.heat, state: hs.state, supply: hs.supply, seal: inlet.seal, lit: st.seedwells[0].lit, shades: st.chem.shades });
+        let keys = [];
+        if (phase === 'aura') { keys = i < 30 ? ['KeyW'] : []; if (i > 30 + 5 * fps) { phase = 'back'; p0 = i; } }
+        else if (phase === 'back') { keys = ['KeyS']; if (i - p0 > 35) { phase = 'dash'; p0 = i; } }
+        else if (phase === 'dash') { keys = i - p0 < 12 ? ['KeyW'] : i - p0 === 12 ? ['KeyW', 'ShiftLeft'] : []; if (i - p0 > 20) { phase = 'wait'; p0 = i; } }
+        await H('setKeys', keys);
+      }, (st, i) => phase === 'wait' && i - p0 > 6 * fps, { keyFrames: [0, 60, 200, 330, 400, 460, 560, 700] });
+      const aura = tl.filter(r => r.phase === 'aura');
+      const end = await H('state');
+      summary.K = { auraMaxSeal: Math.max(...aura.map(r => r.seal)), auraLatched: aura.some(r => r.lit), latched: end.seedwells[0].lit,
+        latchedAtS: (() => { const r = tl.find(q => q.lit); const d = tl.find(q => q.phase === 'dash'); return r && d ? Number((r.t - d.t).toFixed(2)) : null; })(), shades: end.chem.shades, deaths: end.deaths };
+      save('kiln-timeline.json', tl);
+    }
+    save('updraft-acceptance.json', summary);
+    console.log('UPDRAFT', JSON.stringify(summary));
+  }
   if (wants('route')) {
     await boot(quality, true);
     save('route-waypoints.json', await H('route'));
@@ -382,6 +501,16 @@ try {
       await H('setKeys', ['KeyW', 'KeyA']); await advance(25); await shot(`fox-${state}-chase-turn`);
       await H('setKeys', []);
     }
+  }
+  if (wants('turntable')) {
+    // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
+    await boot(quality, true); await H('forceRestore'); await advance(660, false);
+    await H('teleport', ...poses.meadow.fox, Math.PI); await advance(60, false);
+    const p = await H('getFoxPos'), n = 8 * fps;
+    await video('fox-turntable', n, async i => {
+      const a = i / n * Math.PI * 2;
+      await H('photo', [p.x + Math.sin(a) * 3.4, p.y + 0.75, p.z - Math.cos(a) * 3.4], [p.x, p.y + 0.5, p.z], 34);
+    });
   }
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
 finally {

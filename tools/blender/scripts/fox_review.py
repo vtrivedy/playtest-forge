@@ -21,6 +21,7 @@ VIEWS = {
     "side":    ((270, 60, 700, 390), 75, 378, (1, 0, 0.03)),
     "three_q": ((680, 55, 1010, 390), 68, 382, (0.74, -0.67, 0.06)),
     "back":    ((1015, 55, 1265, 390), 65, 384, (0, 1, 0.05)),
+    "face":    ((95, 40, 200, 200), 55, 385, (0.45, -1, 0.1)),  # head close-up (framed on the head below)
 }
 PAPER = (0.62, 0.50, 0.36)  # linear-ish match to the turnaround's parchment
 
@@ -40,6 +41,13 @@ if arm and arm.animation_data:
     else:
         for pb in arm.pose.bones: pb.matrix_basis.identity()
 bpy.context.view_layer.update()
+# spirit flame / glow cards are light in the game (emissive over additive-ish blend): drop their dark albedo
+for m in {s.material for o in fox for s in o.material_slots if s.material and "spiritwisp" in s.material.name.lower()}:
+    b = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if not b: continue
+    for l in list(b.inputs["Base Color"].links): m.node_tree.links.remove(l)
+    b.inputs["Base Color"].default_value = (0, 0, 0, 1)
+    b.inputs["Emission Strength"].default_value *= 2.0
 
 def world_pts(objs):
     dg = bpy.context.evaluated_depsgraph_get()
@@ -112,11 +120,20 @@ for view, (box, ear_px, ground_px, d) in VIEWS.items():
     # camera: ortho, frames plane + fox
     span_w = pw + gap + fox_w + 0.3 * H
     mid = (plane_c + centre) / 2
+    if view == "face":  # frame the head only, beside the concept face crop
+        head_pts = [p for p in pts if p.z > ground + 0.62 * H]
+        hc = sum(head_pts, Vector()) / len(head_pts)
+        hw = max((p - hc).dot(right) for p in head_pts) - min((p - hc).dot(right) for p in head_pts)
+        plane_c = hc - right * (hw / 2 + gap + pw / 2) + up * ((ground_px - (box[1] + box[3]) / 2) * s - (hc.z - ground))
+        pl.matrix_world = Matrix.Translation(plane_c) @ rot.to_4x4() @ Matrix.Diagonal((pw, ph, 1, 1))
+        span_w = pw + gap + hw + 0.2 * H; mid = (plane_c + hc) / 2; ph = max(ph, 0.4 * H); fox_h = ph
+    else:
+        fox_h = H
     cam.matrix_world = Matrix.Translation(mid + d * H * 10) @ rot.to_4x4()
     cam.data.clip_end = H * 40
-    aspect = span_w / (max(ph, H) * 1.15)
+    aspect = span_w / (max(ph, fox_h) * 1.15)
     sc.render.resolution_x = int(600 * aspect) // 2 * 2
-    cam.data.ortho_scale = max(span_w, max(ph, H) * 1.15 * aspect)
+    cam.data.ortho_scale = max(span_w, max(ph, fox_h) * 1.15 * aspect)
     sc.render.filepath = os.path.join(OUT, f"{LABEL}_{view}.png")
     bpy.ops.render.render(write_still=True)
     bpy.data.objects.remove(pl, do_unlink=True)

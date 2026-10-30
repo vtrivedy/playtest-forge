@@ -67,7 +67,7 @@ export async function createFox(groundAt: (x: number, z: number, refY: number) =
 
   // Soft key — low intensity so silhouette still reads with FX off
   const foxLight = new THREE.PointLight(0xff8844, 0.35, 4.5);
-  foxLight.position.set(0.2, 0.55, 0.4);
+  foxLight.position.set(0, 1.6, 0.3); // above the fox: a soft warm wash, never a hot spot on the hip fur
   group.add(foxLight);
 
   // The GLB's authored clips are not used: every pose is built at runtime by the locomotion system.
@@ -88,7 +88,7 @@ export async function createFox(groundAt: (x: number, z: number, refY: number) =
       foxLight.intensity += (0.35 - foxLight.intensity) * Math.min(1, 8 * dt);
       loco.update(dt, input);
       clock += dt;
-      spiritFx.update(dt, clock, input.gliding);
+      spiritFx.update(dt, clock, input.gliding); // last: anchors read the final bone pose of this step
     },
     setSpiritFxVisible(on: boolean) {
       for (const m of spiritFxMeshes) m.visible = on;

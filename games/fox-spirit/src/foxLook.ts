@@ -16,14 +16,14 @@ export const FOX_LOOK = {
   rimStrength: 0.35,
   rimPower: 3.0,
   rimColor: [1.0, 0.45, 0.12] as [number, number, number],
-  eyeGlow: 0.65,
-  /** flame licks: height multiplier, brightness, how far they stream back with speed */
+  eyeGlow: 0.18,
+  /** spirit wisps (thin curling flame off the back and tail): height multiplier, brightness, stream-back with speed */
   lickScale: 1.0,
   lickIntensity: 1.0,
   lickStream: 0.35,
   /** embers per second at rest / extra per m/s of speed; size in metres */
-  emberRate: 14,
-  emberRateSpeed: 4,
+  emberRate: 3,
+  emberRateSpeed: 2,
   emberSize: 0.022,
 };
 
@@ -86,8 +86,12 @@ ${NOISE_GLSL}`,
   vec3 q = vRest * uStroke.y;
   float clump = fxNoise(q * vec3(5.0, 4.0, 1.6)) * 0.65 + fxNoise(q * vec3(13.0, 9.0, 3.5)) * 0.35;
   diffuseColor.rgb *= 1.0 + uStroke.x * (clump - 0.5) * 2.0;
-  float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-  diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, uSatVal.x) * uTint * uSatVal.y;
+  // grade only the saturated fur (rust / umber); cream bib, muzzle and ear insides keep their warm white
+  vec3 c = diffuseColor.rgb;
+  float sat = (max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b))) / max(1e-4, max(c.r, max(c.g, c.b)));
+  float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  vec3 graded = mix(vec3(lum), c, uSatVal.x) * uTint;
+  diffuseColor.rgb = mix(c, graded, smoothstep(0.25, 0.55, sat)) * uSatVal.y;
 }`,
       )
       .replace(
@@ -123,17 +127,17 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.color.setHex(0xffffff);
         mat.emissive = new THREE.Color(0xffffff);
         const isGlow = n.includes('glow');
-        mat.emissiveIntensity = isGlow ? 0.35 : Math.min(mat.emissiveIntensity || 0.7, 0.7);
+        mat.emissiveIntensity = isGlow ? 0.3 : Math.min(mat.emissiveIntensity || 0.5, 0.5);
         mat.transparent = true;
         mat.depthWrite = false;
         mesh.castShadow = false;
-        if (isGlow) {
-          mat.opacity = Math.min(mat.opacity ?? 1, 0.55);
-          mat.side = THREE.FrontSide;
-        }
+        // translucent: the brush dissolves into soft flame instead of an opaque fan over the rump
+        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.5 : 0.68);
+        if (isGlow) mat.side = THREE.FrontSide;
       } else if (n.includes('eye')) {
         mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffc060);
+        mat.emissive = new THREE.Color(0xffa040); // faint amber: a watchful glint, not a lamp
+        mat.emissiveMap = mat.map; // glow follows the iris: slit pupil and lid stay dark
         eyeMats.push(mat);
       } else if (n.includes('nose')) {
         mat.color.setHex(0xffffff);
@@ -192,15 +196,15 @@ void main() {
   float y = vUv.y;
   float n = fxNoise(vec3(vUv.x * 3.0, y * 2.5 - uTime * 2.6, vSeed * 7.0));
   float n2 = fxNoise(vec3(vUv.x * 7.0, y * 6.0 - uTime * 4.1, vSeed * 3.0 + 5.0));
-  float x = vUv.x - 0.5 + (n - 0.5) * 0.55 * y + (n2 - 0.5) * 0.12 * y;
+  float x = vUv.x - 0.5 + (n - 0.5) * 0.8 * y + (n2 - 0.5) * 0.15 * y + sin(y * 5.0 + uTime * 1.7 + vSeed) * 0.12 * y;
   // teardrop: wide low, licking to a point; ragged top
-  float width = 0.42 * pow(1.0 - y, 0.85) * smoothstep(0.0, 0.18, y) + 0.02;
+  float width = 0.34 * pow(1.0 - y, 1.1) * smoothstep(0.0, 0.22, y) + 0.015;
   float body = 1.0 - smoothstep(width * 0.35, width, abs(x));
   body *= 1.0 - smoothstep(0.55, 1.0, y + (n2 - 0.5) * 0.5);
   float core = (1.0 - smoothstep(0.0, width * 0.55, abs(x))) * (1.0 - smoothstep(0.1, 0.6, y));
-  vec3 col = mix(vec3(0.85, 0.16, 0.03), vec3(1.0, 0.48, 0.1), smoothstep(0.0, 0.7, body));
-  col = mix(col, vec3(1.0, 0.82, 0.48), core * 0.8);
-  float a = body * vAlpha * uIntensity;
+  vec3 col = mix(vec3(0.8, 0.18, 0.03), vec3(1.0, 0.45, 0.08), smoothstep(0.0, 0.8, body));
+  col = mix(col, vec3(1.0, 0.62, 0.22), core * 0.45);
+  float a = body * vAlpha * uIntensity * 0.55;
   if (a < 0.003) discard;
   gl_FragColor = vec4(col * a, a);
 }`;
@@ -238,13 +242,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const body = skinned.find((m) => matName(m) === 'foxfur');
   const tail = skinned.find((m) => matName(m) === 'foxtailfur');
   const R = FOX_RIG;
-  // [mesh, bones, min rest normal.y, licks, lick height m, lick width m, lean back]
+  // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — calm at idle: nothing on the ears / head
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
-    [body, [...R.ear('l').slice(3), ...R.ear('r').slice(3)], -1, 4, 0.2, 0.09, 0.4],
-    [body, [R.neck[2], R.head], 0.55, 3, 0.16, 0.09, 0.6],
-    [body, [R.neck[0], R.neck[1], R.spine[3]], 0.6, 4, 0.13, 0.09, 0.7],
-    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.09, 0.07, 0.8],
-    [tail, R.tail.slice(3), 0.0, 5, 0.2, 0.12, 0.9],
+    [body, [R.spine[3], R.neck[0]], 0.65, 2, 0.16, 0.035, 0.7],
+    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.18, 0.035, 0.8],
+    [tail, R.tail.slice(3), 0.0, 5, 0.26, 0.05, 0.9],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
@@ -305,8 +307,41 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   embers.renderOrder = 3;
 
   const tmp = new THREE.Vector3(), prev = new THREE.Vector3(), vel = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  let hasPrev = false, visible = true, spawnAcc = 0, next = 0;
+  const dir = new THREE.Vector3();
+  let hasPrev = false, visible = true, spawnAcc = 0, pending = 0, next = 0, time = 0, speed = 0;
   const anchorPos = (a: Anchor, out: THREE.Vector3) => a.mesh.getVertexPosition(a.index, out).applyMatrix4(a.mesh.matrixWorld);
+  const anchorMeshes = [...new Set([...licks.map((l) => l.a.mesh), ...emberPool.map((a) => a.mesh)])];
+
+  // Anchors are skinned surface points: resolve them after the final bone pose of this step with fresh world
+  // matrices + bone palette (render-time hooks run after three.js uploads attributes = one render late).
+  const anchorNow = () => {
+    group.updateWorldMatrix(true, true);
+    for (const m of anchorMeshes) m.skeleton.update();
+    const L = FOX_LOOK;
+    licks.forEach((lk, i) => {
+      anchorPos(lk.a, tmp);
+      aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
+      dir.copy(up).addScaledVector(vel, -L.lickStream * lk.lean * 0.25).normalize();
+      aDir.setXYZ(i, dir.x, dir.y, dir.z);
+      const flick = 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
+      const stretch = 1 + Math.min(1, speed * 0.12) * lk.lean;
+      aShape.setXYZ(i, lk.w * L.lickScale, lk.h * L.lickScale * flick * stretch, lk.seed);
+      aAlpha.setX(i, 0.45 + 0.35 * flick);
+    });
+    aPos.needsUpdate = aDir.needsUpdate = aShape.needsUpdate = aAlpha.needsUpdate = true;
+    for (; pending > 0 && emberPool.length; pending--) {
+      const i = next; next = (next + 1) % N;
+      anchorPos(emberPool[Math.floor(rnd() * emberPool.length)]!, tmp);
+      ePos[i * 3] = tmp.x; ePos[i * 3 + 1] = tmp.y; ePos[i * 3 + 2] = tmp.z;
+      eVel[i * 3] = vel.x * 0.3 + (rnd() - 0.5) * 0.25;
+      eVel[i * 3 + 1] = 0.25 + rnd() * 0.35;
+      eVel[i * 3 + 2] = vel.z * 0.3 + (rnd() - 0.5) * 0.25;
+      eAge[i] = 0; eLife[i] = 0.7 + rnd() * 1.1;
+      eSize[i] = L.emberSize * (0.5 + rnd());
+    }
+    (eg.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    (eg.getAttribute('aSize') as THREE.BufferAttribute).needsUpdate = true;
+  };
 
   return {
     setVisible(on) {
@@ -322,35 +357,14 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       prev.copy(tmp); hasPrev = true;
       if (!visible) return;
       const L = FOX_LOOK;
-      const speed = Math.hypot(vel.x, vel.z);
+      time = t;
+      speed = Math.hypot(vel.x, vel.z);
       lickMat.uniforms.uTime!.value = t;
       lickMat.uniforms.uIntensity!.value = L.lickIntensity * (gliding ? 1.25 : 1);
       emberMat.uniforms.uScale!.value = innerHeight * 1.1;
-      // flame licks: rise from their surface point, stream back against motion
-      licks.forEach((lk, i) => {
-        anchorPos(lk.a, tmp);
-        aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
-        const d = up.clone().addScaledVector(vel, -L.lickStream * lk.lean * 0.25).normalize();
-        aDir.setXYZ(i, d.x, d.y, d.z);
-        const flick = 0.75 + 0.25 * Math.sin(t * (5 + lk.seed) + lk.seed * 3) * Math.sin(t * 2.3 + lk.seed);
-        const stretch = 1 + Math.min(1, speed * 0.12) * lk.lean;
-        aShape.setXYZ(i, lk.w * L.lickScale, lk.h * L.lickScale * flick * stretch, lk.seed);
-        aAlpha.setX(i, 0.55 + 0.45 * flick);
-      });
-      aPos.needsUpdate = aDir.needsUpdate = aShape.needsUpdate = aAlpha.needsUpdate = true;
-      // embers
       spawnAcc += dt * (L.emberRate + L.emberRateSpeed * speed) * (gliding ? 1.6 : 1);
-      while (spawnAcc >= 1 && emberPool.length) {
-        spawnAcc -= 1;
-        const i = next; next = (next + 1) % N;
-        anchorPos(emberPool[Math.floor(rnd() * emberPool.length)]!, tmp);
-        ePos[i * 3] = tmp.x; ePos[i * 3 + 1] = tmp.y; ePos[i * 3 + 2] = tmp.z;
-        eVel[i * 3] = vel.x * 0.3 + (rnd() - 0.5) * 0.25;
-        eVel[i * 3 + 1] = 0.25 + rnd() * 0.35;
-        eVel[i * 3 + 2] = vel.z * 0.3 + (rnd() - 0.5) * 0.25;
-        eAge[i] = 0; eLife[i] = 0.7 + rnd() * 1.1;
-        eSize[i] = L.emberSize * (0.5 + rnd());
-      }
+      pending = Math.min(N, pending + Math.floor(spawnAcc));
+      spawnAcc -= Math.floor(spawnAcc);
       for (let i = 0; i < N; i++) {
         if (eAge[i]! >= eLife[i]!) { eHeat[i] = 0; continue; }
         eAge[i] += dt;
@@ -363,8 +377,8 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
         eHeat[i] = (1 - u) * Math.min(1, u * 8) * (0.75 + 0.25 * Math.sin(t * 17 + eSeed[i]! * 9));
       }
       (eg.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-      (eg.getAttribute('aSize') as THREE.BufferAttribute).needsUpdate = true;
       (eg.getAttribute('aHeat') as THREE.BufferAttribute).needsUpdate = true;
+      anchorNow();
     },
   };
 }

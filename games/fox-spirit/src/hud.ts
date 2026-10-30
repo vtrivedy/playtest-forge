@@ -2,7 +2,6 @@ export type Hud = {
   setDebugVisible: (v: boolean) => void;
   toggleDebug: () => void;
   setStatus: (text: string) => void;
-  setEmbers: (n: number) => void;
   setPrompt: (text: string) => void;
   flashRestore: () => void;
   hidePromptSoon: (afterS?: number) => void;
@@ -11,7 +10,6 @@ export type Hud = {
 export function createHud(): Hud {
   const debug = document.getElementById('debug-panel');
   const status = document.getElementById('status');
-  const embers = document.getElementById('ember-n');
   const prompt = document.getElementById('prompt');
   const flash = document.getElementById('restore-flash');
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
@@ -33,7 +31,6 @@ export function createHud(): Hud {
     setDebugVisible,
     toggleDebug,
     setStatus(text) { if (status) status.textContent = text; },
-    setEmbers(n) { if (embers) embers.textContent = String(Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0); },
     setPrompt(text) {
       clearTimeout(hideTimer);
       if (prompt) {

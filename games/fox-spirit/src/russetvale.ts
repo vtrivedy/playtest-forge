@@ -19,6 +19,8 @@ import {
   stairFlight,
   domedShrine,
   seedwell,
+  hearthBrazier,
+  kilnBowl,
   lanternPost,
   litterPatch,
   shrub,
@@ -34,6 +36,8 @@ import {
   LEAF_CELL,
 } from './russetKit';
 import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } from './russetTextures';
+import type { HearthSpot } from './chem/updraft';
+import type { InletSpot } from './chem/inlet';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -42,7 +46,9 @@ import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } 
  * +x east, −z north, units metres.
  */
 
-export type RouteAct = 'jump' | 'jumpdash' | 'glide';
+export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
+/** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
+export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number };
 export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
 
 export type SeedwellState = {
@@ -51,6 +57,8 @@ export type SeedwellState = {
   pos: THREE.Vector3;
   radius: number;
   lit: boolean;
+  /** Inlet seal fill 0..1 (chem/inlet.ts) — the basin warms as it fills */
+  seal: number;
   glow: THREE.MeshStandardMaterial;
   light: THREE.PointLight;
 };
@@ -59,7 +67,6 @@ export type RealmEvent =
   | { type: 'seedwell'; index: number }
   | { type: 'bridge' }
   | { type: 'checkpoint'; index: number }
-  | { type: 'ember'; value: number; index: number }
   | { type: 'wellspring' }
   | { type: 'hazard'; kind: 'ink' | 'fall' };
 
@@ -73,11 +80,16 @@ export type Realm = {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   seedwells: SeedwellState[];
   checkpoints: Array<{ pos: THREE.Vector3; lit: boolean }>;
+  /** Heat-element placements (visuals + lift live in chem/updraft.ts) */
+  hearthSpots: HearthSpot[];
+  /** Seedwell inlets: each latches only from an element's output (world-1.md §1.4) */
+  inletSpots: InletSpot[];
+  /** Shade patrols (world-1.md §3.8) */
+  shadeSpots: ShadeSpot[];
+  /** An inlet's seal filled: light the Seedwell (permanent colour, checkpoint, its route) */
+  latchSeedwell: (index: number) => RealmEvent[];
   respawnPos: () => THREE.Vector3;
   route: Waypoint[];
-  emberTotal: number;
-  /** Pickup spots (visuals live in the game's EmberMotes kit). */
-  emberSpots: ReadonlyArray<{ p: THREE.Vector3; value: number }>;
   zoneAt: (x: number, z: number) => string;
   bridgeGrown: () => number;
   wellspringLit: () => boolean;
@@ -87,8 +99,6 @@ export type Realm = {
   setFlood: (k: number, pulse?: number) => void;
   /** Harness: un-light the Wellspring so the restore event can be replayed from sepia */
   resetWellspring: () => void;
-  /** Take every uncollected ember within r (xz) of c — the Wellspring calls the summit's embers home */
-  takeEmbersNear: (c: THREE.Vector3, r: number) => Array<{ index: number; value: number }>;
 };
 
 // ---------------------------------------------------------------- island shape
@@ -305,7 +315,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   };
 
   // ==================================================================== ROUTE
-  // Critical path, authored once; drives path paint, litter, embers and the autopilot.
+  // Critical path, authored once; drives path paint, litter and the autopilot.
   const route: Waypoint[] = [];
   const W = (x: number, y: number, z: number, o: Partial<Waypoint> = {}) => route.push({ x, y, z, ground: true, ...o });
   const WS = (s: number, t: number, y: number, o: Partial<Waypoint> = {}) => {
@@ -364,6 +374,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(69.8, 1.0, 22);
   WS(80.8, 4.6, 22, { act: 'glide', label: 'launch' });
   W(-112, 20, -24, { ground: false, label: 'SW1' });
+  // dash H2 through the Kiln Shade's drain (the stroke punches through), then glide on east
+  W(-111.4, 20, -23.0, { ground: false, act: 'dash', label: 'kiln-dash' });
+  W(-110.5, 20, -22.1, { ground: false });
   // glide off SW1 east, over the terraces' north shoulder, into Amberwood
   W(-108, 20, -25, { ground: false, act: 'glide' });
   W(-72, 0, -26, { ground: false });
@@ -742,6 +755,27 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       const p = sp(s, t);
       ruinColumn(bk('stone', p.x, p.z), p.x, y, p.z, h, 60 + i);
     }
+  }
+
+  // ==================================================================== CHEMISTRY placements (world-1.md §3.3)
+  const hearthSpots: HearthSpot[] = [];
+  {
+    // H-a meadow step: a 5 m shelf with no ramp beside the opening path; the hearth at its foot is the way up
+    const sx = 13;
+    const sz = 75.5;
+    const g0 = groundRaw(sx, sz);
+    col.add(boxCollider({ x: sx, z: sz, w: 9, d: 9, yaw: 0.12, top: g0 + 5, bottom: g0 - 2, tag: 'hearth-step' }));
+    slab({ x: sx, z: sz, w: 9, d: 9, yaw: 0.12, top: g0 + 5, bottom: g0 - 1.5, rough: 0.9, seed: 77, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.55), overhang: 0.3 });
+    const hx = 5.6;
+    const hz = 74.2;
+    const hy = groundRaw(hx, hz);
+    col.add(cylCollider({ x: hx, z: hz, r: 0.82, top: hy + 1.0, bottom: hy - 1, tag: 'hearth' }));
+    hearthSpots.push({ id: 'H-a', x: hx, y: hy, z: hz, height: 9 });
+    // H0, the same toy rearranged (transfer, §3.3 beat 3): on terrace 2 at the foot of the 4 m wall up to
+    // terrace 3, beside the pillar-stump jump chain — an unmarked second way up
+    const h0 = sp(26.2, 8.5);
+    col.add(cylCollider({ x: h0.x, z: h0.z, r: 0.82, top: 7.0, bottom: 5, tag: 'hearth' }));
+    hearthSpots.push({ id: 'H0', x: h0.x, y: 6, z: h0.z, height: 8 });
   }
 
   // SW1 Wind Seedwell spire (−112, −24, y20)
@@ -1499,11 +1533,71 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const light = new THREE.PointLight(0xff9a40, 0, 18, 1.6);
     light.position.set(p.x + ox, p.y + 2.2, p.z + oz);
     group.add(light);
-    seedwells.push({ id, name, pos: new THREE.Vector3(p.x + ox, p.y, p.z + oz), radius, lit: false, glow: g, light });
+    seedwells.push({ id, name, pos: new THREE.Vector3(p.x + ox, p.y, p.z + oz), radius, lit: false, seal: 0, glow: g, light });
   };
   mkSeedwell('SW1', 'Wind Seedwell', SW1P, 40, 201);
   mkSeedwell('SW2', 'Reed Seedwell', SW2P, 35, 202);
   mkSeedwell('SW3', 'Maple Seedwell', SW3P, 30, 203);
+
+  // Kiln inlets: a hearth beside each Seedwell whose updraft rises through a bowl hung over it.
+  // SW1 is the Kiln (world-1.md §3.4). SW2 / SW3 use heat until water (§3.5) and growth (§3.6) ship.
+  const inletSpots: InletSpot[] = [];
+  const kiln = (si: number, id: string, dx: number, dz: number, bowlUp: number, side = 1) => {
+    const sw = seedwells[si]!;
+    const hx = sw.pos.x + dx;
+    const hz = sw.pos.z + dz;
+    const hy = sw.pos.y;
+    col.add(cylCollider({ x: hx, z: hz, r: 0.82, top: hy + 1.0, bottom: hy - 1, tag: 'hearth' }));
+    hearthSpots.push({ id, x: hx, y: hy, z: hz, height: 9 });
+    // pillar stands outside the column, perpendicular to the hearth→Seedwell line; the dish hangs 1.3 m
+    // off the axis — inside the column, clear of a fox riding the centre
+    const l = Math.hypot(dx, dz);
+    const ux = (-dz / l) * side;
+    const uz = (dx / l) * side;
+    const px = hx + ux * 2.7;
+    const pz = hz + uz * 2.7;
+    col.add(cylCollider({ x: px, z: pz, r: 0.45, top: hy + bowlUp + 0.6, bottom: hy - 1, tag: 'kiln-pillar' }));
+    inletSpots.push({ seedwell: si, source: id, pos: new THREE.Vector3(hx + ux * 1.3, hy + bowlUp, hz + uz * 1.3), sealAt: new THREE.Vector3(sw.pos.x, sw.pos.y + 0.78, sw.pos.z), pillar: new THREE.Vector3(px, hy, pz), latchTime: 2 });
+  };
+  kiln(0, 'H2', 2.2, 2.6, 5.5);
+  // Kiln catch shelves (§3.4 recovery): y15 ledges on the spire's south and east faces, each with a hearth
+  // whose column (to ≈ y25) overlaps the kiln ledge rim — a missed step is a ride back, not a long walk
+  {
+    const sw = seedwells[0]!.pos;
+    for (const [id, ang] of [['HS', Math.PI / 2], ['HE', 0]] as const) {
+      const cx = sw.x + Math.cos(ang) * 7.4;
+      const cz = sw.z + Math.sin(ang) * 7.4;
+      const yaw = -ang;
+      col.add(boxCollider({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 11, tag: 'kiln-shelf' }));
+      slab({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 9.5, rough: 0.8, seed: 90 + id.length, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45), overhang: 0.6 });
+      const hx = sw.x + Math.cos(ang) * 6.95;
+      const hz = sw.z + Math.sin(ang) * 6.95;
+      col.add(cylCollider({ x: hx, z: hz, r: 0.82, top: 16, bottom: 14, tag: 'hearth' }));
+      hearthSpots.push({ id, x: hx, y: 15, z: hz, height: 9.5 });
+    }
+  }
+  // HP sits on the island's approach so arriving across the stones brushes it
+  kiln(1, 'HP', 0.8, 2.6, 4.5, -1);
+  kiln(2, 'HK', 1.68, -1.56, 4.5);
+
+  // SW1 Kiln Shade: circles H2 inside its drain reach, pulled in on the Seedwell side so it never leaves
+  // the ledge — the wake alone can't keep H2 lit; dash H2 (stroke > 1 punches through) or free the Shade
+  const shadeSpots: ShadeSpot[] = [];
+  {
+    const h2 = hearthSpots.find((h) => h.id === 'H2')!;
+    const sw = seedwells[0]!.pos;
+    const away = Math.atan2(h2.z - sw.z, h2.x - sw.x);
+    const patrol: Array<[number, number, number]> = [];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const toward = Math.cos(a - away - Math.PI); // 1 on the Seedwell side
+      const r = 2.4 - Math.max(0, toward) * 0.8;
+      patrol.push([h2.x + Math.cos(a) * r, h2.y, h2.z + Math.sin(a) * r]);
+    }
+    shadeSpots.push({ id: 'shade-kiln', patrol });
+  }
+  hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
+  inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
   const lanternMat = glowMat('rv-glow-lanterns');
   lanternMat.emissiveIntensity = 0.05;
@@ -1766,36 +1860,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   }
 
-  // ==================================================================== EMBERS (critical-path breadcrumbs)
-  const emberSpots: Array<{ p: THREE.Vector3; value: number }> = [];
-  {
-    let acc = 0;
-    let n = 0;
-    for (let i = 0; i < route.length - 1; i++) {
-      const a = route[i]!;
-      const b = route[i + 1]!;
-      const len = Math.hypot(b.x - a.x, b.z - a.z, b.y - a.y);
-      const spacing = 3.4;
-      for (let d = spacing - acc; d < len; d += spacing) {
-        const t = d / len;
-        const x = a.x + (b.x - a.x) * t;
-        const z = a.z + (b.z - a.z) * t;
-        const air = a.act ? Math.sin(t * Math.PI) * (a.act === 'glide' ? 1.5 : 1.6) : 0;
-        let y = a.y + (b.y - a.y) * t + air;
-        if (!a.act) {
-          const g = col.highestAt(x, z);
-          if (g > y - 1.5 && g < y + 1.5) y = g;
-        }
-        if (a.act === 'glide' && len > 30) continue; // long glides: drop motes only near landing
-        n++;
-        emberSpots.push({ p: new THREE.Vector3(x, y + 0.7, z), value: n % 12 === 0 ? 5 : 1 });
-      }
-      acc = (acc + len) % spacing;
-    }
-  }
-  const emberTaken = new Array<boolean>(emberSpots.length).fill(false);
-  const emberTotal = emberSpots.reduce((s, e) => s + e.value, 0);
-
   // ==================================================================== ATMOSPHERE: cloud sea sheets under the realm
   {
     const cv = document.createElement('canvas');
@@ -1846,7 +1910,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       group.add(m);
     }
   }
-  console.info(`[russetvale] merged ${buckets.size} buckets, ${verts} verts, ${col.colliders.length} colliders, ${emberSpots.length} embers`, JSON.stringify(perMat));
+  console.info(`[russetvale] merged ${buckets.size} buckets, ${verts} verts, ${col.colliders.length} colliders`, JSON.stringify(perMat));
 
   // ==================================================================== runtime
   const spawnPos = new THREE.Vector3(0, groundRaw(0, 90), 90);
@@ -1872,9 +1936,26 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     bounds: { minX: -140, maxX: 140, minZ: -110, maxZ: 110 },
     seedwells,
     checkpoints,
+    hearthSpots,
+    inletSpots,
+    shadeSpots,
+    latchSeedwell(i) {
+      const s = seedwells[i]!;
+      if (s.lit) return [];
+      s.lit = true;
+      const ev: RealmEvent[] = [{ type: 'seedwell', index: i }];
+      // seedwell doubles as checkpoint
+      checkpoints.push({ pos: s.pos.clone().add(new THREE.Vector3(0, 0, 2.6)), lit: true });
+      lastCheckpoint = checkpoints.length - 1;
+      if (s.id === 'SW2') inkActive = false;
+      // SW3's permanent route up the hill base is the root bridge (world-1.md §3.6)
+      if (s.id === 'SW3' && !bridgeGrowing) {
+        bridgeGrowing = true;
+        ev.push({ type: 'bridge' });
+      }
+      return ev;
+    },
     route,
-    emberTotal,
-    emberSpots,
     zoneAt,
     bridgeGrown: () => bridgeT,
     wellspringLit: () => wellLit,
@@ -1886,16 +1967,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wellLit = false;
       realm.setFlood(0);
     },
-    takeEmbersNear(c, r) {
-      const got: Array<{ index: number; value: number }> = [];
-      for (let i = 0; i < emberSpots.length; i++) {
-        const e = emberSpots[i]!;
-        if (emberTaken[i] || Math.hypot(e.p.x - c.x, e.p.z - c.z) > r || Math.abs(e.p.y - c.y) > 4) continue;
-        emberTaken[i] = true;
-        got.push({ index: i, value: e.value });
-      }
-      return got;
-    },
     setFlood(k, pulse = 0) {
       flood = k;
       const arr = loneCol.array as Float32Array;
@@ -1906,16 +1977,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     },
     update(dt, t, fox, feetY, colorAt) {
       const ev: RealmEvent[] = [];
-      // embers
-      for (let i = 0; i < emberSpots.length; i++) {
-        const e = emberSpots[i]!;
-        if (emberTaken[i]) continue;
-        if (Math.abs(fox.x - e.p.x) < 1.2 && Math.abs(fox.z - e.p.z) < 1.2 && Math.abs(fox.y + 0.5 - e.p.y) < 1.4) {
-          emberTaken[i] = true;
-          ev.push({ type: 'ember', value: e.value, index: i });
-        }
-      }
-
       // checkpoints
       for (let i = 0; i < checkpoints.length; i++) {
         const c = checkpoints[i]!;
@@ -1933,19 +1994,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       // seedwells
       for (let i = 0; i < seedwells.length; i++) {
         const s = seedwells[i]!;
-        if (!s.lit && fox.distanceTo(s.pos) < 3.6) {
-          s.lit = true;
-          ev.push({ type: 'seedwell', index: i });
-          // seedwell doubles as checkpoint
-          checkpoints.push({ pos: s.pos.clone().add(new THREE.Vector3(0, 0, 2.6)), lit: true });
-          lastCheckpoint = checkpoints.length - 1;
-          if (s.id === 'SW2') inkActive = false;
-          if (seedwells.every((q) => q.lit) && !bridgeGrowing) {
-            bridgeGrowing = true;
-            ev.push({ type: 'bridge' });
-          }
-        }
-        const target = s.lit ? 2.2 + Math.sin(t * 2.2 + i) * 0.25 : 0.0;
+        const target = s.lit ? 2.2 + Math.sin(t * 2.2 + i) * 0.25 : s.seal * 1.4;
         s.glow.emissiveIntensity += (target - s.glow.emissiveIntensity) * Math.min(1, dt * 1.5);
         s.light.intensity += ((s.lit ? 40 : 0) - s.light.intensity) * Math.min(1, dt * 1.5);
       }
