@@ -106,11 +106,11 @@ for s_ in "LR":
     f_["foot"] = REST_YZ[f_["paw"]][0].copy()
     h_["a"] = seglen(*REST_YZ[h_["th"]]); h_["b"] = seglen(*REST_YZ[h_["sh"]])
     h_["c"] = seglen(REST_YZ[h_["mt"]][0], REST_YZ[h_["paw"]][0]); h_["foot"] = REST_YZ[h_["paw"]][0].copy()
-def ik2(root, target, a_, b_):
+def ik2(root, target, a_, b_, pole=-1):
     """2-bone IK in the sagittal plane, knee toward -y (forward). returns abs angles (bone1, bone2)."""
     d = target - root; L = max(abs(a_ - b_) + 1e-4, min(a_ + b_ - 1e-4, d.length))
     base = ang(d); al = math.acos(max(-1, min(1, (a_ * a_ + L * L - b_ * b_) / (2 * a_ * L))))
-    a1 = base - al                                     # knee/stifle forward of the root->target line
+    a1 = base + pole * al                                     # knee/stifle forward of the root->target line
     knee = root + Vector((math.cos(a1), math.sin(a1))) * a_
     tgt = root + d.normalized() * L
     return a1, ang(tgt - knee)
@@ -176,10 +176,10 @@ def gallop_pose(t, st=1.0):
             P = paw_path(stance, u, center, 0.43 * st, 0.43 * st, 0.5, early=1.25)
             sh = posed_yz(L_["up"])[0]
             if stance:
-                a1, a2 = ik2(sh, P, L_["a"], L_["b"])
+                a1, a2 = ik2(sh, P, L_["a"], L_["b"], pole=1)
             else:  # swing: FK blend between lift-off and reach poses; carpus folds the paw up behind
                 f0 = paw_path(True, 1.0, center, 0.43 * st, 0.43 * st, 0.0); f1 = paw_path(True, 0.0, center, 0.43 * st, 0.43 * st, 0.0)
-                b0, c0 = ik2(sh, f0, L_["a"], L_["b"]); b1, c1 = ik2(sh, f1, L_["a"], L_["b"])
+                b0, c0 = ik2(sh, f0, L_["a"], L_["b"], pole=1); b1, c1 = ik2(sh, f1, L_["a"], L_["b"], pole=1)
                 k = ease_io2(u)
                 a1 = b0 + (b1 - b0) * k - math.radians(10) * math.sin(math.pi * u)
                 a2 = c0 + (c1 - c0) * k + math.radians(72) * math.sin(math.pi * min(1.0, u * 1.15)) ** 1.2

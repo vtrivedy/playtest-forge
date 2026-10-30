@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { FOX_RIG } from './foxRig';
 
 export type MotionInput = {
   speed: number; grounded: boolean; yaw: number; verticalSpeed: number;
@@ -8,11 +9,22 @@ import GAITS from '../../../assets/hero/spirit_fox.loco.json';
 type Gait = keyof typeof GAITS;
 const v = () => new THREE.Vector3();
 const q = () => new THREE.Quaternion();
+class Spring {
+  value=0; velocity=0;
+  step(target:number, dt:number, frequency:number, damping:number) {
+    const n=Math.max(1,Math.ceil(dt/.008)); const h=dt/n; const omega=2*Math.PI*frequency;
+    for(let i=0;i<n;i++) {
+      this.velocity+=(omega*omega*(target-this.value)-2*damping*omega*this.velocity)*h;
+      this.value+=this.velocity*h;
+    }
+    return this.value;
+  }
+}
 
 /** Authored pose is evaluated first; contact correction only moves a two-bone chain. */
 export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 5.5,
-    plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, debug: false };
+    plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -26,12 +38,22 @@ export class AuthoredLocomotion {
     this.beforeMixer();
     for (const foot of this.feet) foot.planted=false;
     this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
+    this.leanSpring.value=0;this.leanSpring.velocity=0;
+    this.pitchSpring.value=0;this.pitchSpring.velocity=0;
+    for(const spring of this.tailSprings){spring.value=0;spring.velocity=0;}
+    this.previousSpeed=this.input.speed;
   }
   private yaw = 0;
   private pitch = 0;
   private turn = 0;
   private lean = 0;
   private tail = 0;
+  private leanSpring=new Spring();
+  private pitchSpring=new Spring();
+  private tailSprings=Array.from({length:8},()=>new Spring());
+  private tails: THREE.Object3D[]=[];
+  readonly footfalls: THREE.Vector3[]=[];
+  private previousSpeed=0;
   private armScale = 1;
   private spine?: THREE.Object3D;
   private tailBone?: THREE.Object3D;
@@ -42,17 +64,14 @@ export class AuthoredLocomotion {
     const arm = root.getObjectByName('SpiritFox_Armature');
     this.armScale = arm ? arm.getWorldScale(v()).x : root.getWorldScale(v()).x;
     this.yaw=group.rotation.y;
-    this.spine = root.getObjectByName('Body');
-    this.tailBone = root.getObjectByName('Tail1');
+    this.spine = root.getObjectByName(FOX_RIG.pelvis);
+    this.tailBone = root.getObjectByName(FOX_RIG.tail[0]);
+    this.tails=FOX_RIG.tail.map(name=>root.getObjectByName(name)).filter((b): b is THREE.Object3D=>!!b);
     const floor = new THREE.Box3().setFromObject(root).min.y;
-    for (const [upper, lower, paw] of [
-      ['FrontUpperLegL','FrontLowerLegL','FrontPawL'],
-      ['FrontUpperLegR','FrontLowerLegR','FrontPawR'],
-      ['BackLegL','BackUpperLegL','BackPawL'],
-      ['BackLegR','BackUpperLegR','BackPawR'],
-    ]) {
-      const find = (name: string) => root.getObjectByName(name) ?? root.getObjectByName(name.replace(/([LR])$/, '.$1'));
-      const a=find(upper), b=find(lower), c=find(paw);
+    const chains = [FOX_RIG.foreleg('l'),FOX_RIG.foreleg('r')].map(l=>[l.upper,l.lower,l.paw]);
+    chains.push(...[FOX_RIG.hindleg('l'),FOX_RIG.hindleg('r')].map(l=>[l.thigh,l.shin,l.paw]));
+    for (const [upper, lower, paw] of chains) {
+      const a=root.getObjectByName(upper), b=root.getObjectByName(lower), c=root.getObjectByName(paw);
       if (!a || !b || !c) continue;
       const dot = new THREE.Mesh(new THREE.SphereGeometry(.025,6,4), new THREE.MeshBasicMaterial({color:0xffcc44, depthTest:false}));
       this.debugGroup.add(dot);
@@ -106,7 +125,7 @@ export class AuthoredLocomotion {
     this.yaw=this.input.yaw;
     this.turn=THREE.MathUtils.damp(this.turn,dy/step,12,dt);
     this.metrics.turnRate=this.turn;
-    this.lean=THREE.MathUtils.damp(this.lean,THREE.MathUtils.clamp(-this.turn*this.input.speed*this.params.turnLean,-.22,.22),10,dt);
+    this.lean=this.leanSpring.step(THREE.MathUtils.clamp(-this.turn*this.input.speed*this.params.turnLean,-.16,.16),dt,this.params.springFrequency,this.params.springDamping);
     this.tail=THREE.MathUtils.damp(this.tail,-this.turn*this.params.tailLag,7,dt);
     const overlay=(bone:THREE.Object3D|undefined,axis:THREE.Vector3,angle:number)=>{
       if (!bone) return;
@@ -119,16 +138,25 @@ export class AuthoredLocomotion {
     const fg=this.input.groundAt(front.x,front.z,this.group.position.y+.8);
     const bg=this.input.groundAt(back.x,back.z,this.group.position.y+.8);
     const slope=this.input.grounded && Number.isFinite(fg) && Number.isFinite(bg) ? -Math.atan2(fg-bg,.9) : 0;
-    this.pitch=THREE.MathUtils.damp(this.pitch,THREE.MathUtils.clamp(slope,-.4,.4),10,dt);
+    const acceleration=(this.input.speed-this.previousSpeed)/step; this.previousSpeed=this.input.speed;
+    this.pitch=this.pitchSpring.step(THREE.MathUtils.clamp(slope+acceleration*.002,-.4,.4),dt,this.params.springFrequency,this.params.springDamping);
     this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
     this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(this.pitch,0,this.lean)));
-    overlay(this.tailBone,new THREE.Vector3(0,0,1),THREE.MathUtils.clamp(this.tail,-.3,.3));
+    let tailTarget=THREE.MathUtils.clamp(-this.turn*this.params.tailLag,-.25,.25);
+    for(let i=0;i<this.tails.length;i++) {
+      const bone=this.tails[i]; const spring=this.tailSprings[i];
+      const angle=spring.step(tailTarget,dt,Math.max(1.2,this.params.springFrequency-i*.16),this.params.springDamping);
+      overlay(bone,new THREE.Vector3(0,0,1),angle*(i===0 ? 1 : .35));
+      tailTarget=angle*.9;
+    }
+    if(active==='idle' || active==='skid') overlay(this.tailBone,new THREE.Vector3(1,0,0),-.20);
     this.root.updateWorldMatrix(true,true);
     const gait=this.metrics.gait as Gait;
     const data=GAITS[gait];
     const action=this.actions.get(gait);
     const phase=this.phase;
     this.metrics.phase=phase;
+    this.footfalls.length=0;
     this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxCorrection=0;
     const locomoting=['run','walk','trot'].includes(active);
     this.debugGroup.visible=this.params.debug;
@@ -141,9 +169,10 @@ export class AuthoredLocomotion {
       },0);
       const stance=this.input.grounded && (locomoting ? support>.55 : active==='idle');
       if (stance) {
-        const ground=this.input.groundAt(paw.x,paw.z,this.group.position.y+.6);
+        const sample=foot.planted ? foot.anchor : paw;
+        const ground=this.input.groundAt(sample.x,sample.z,this.group.position.y+.6);
         if (!Number.isFinite(ground)) {foot.planted=false;return;}
-        if (!foot.planted) foot.anchor.copy(paw);
+        if (!foot.planted) { foot.anchor.copy(paw); if(locomoting && this.input.speed>1) this.footfalls.push(paw.clone().setY(ground)); }
         if(active==='idle')foot.anchor.lerp(paw,1-Math.exp(-5*dt));
         foot.anchor.y=ground+foot.clearance;
         const delta=foot.anchor.clone().sub(paw);

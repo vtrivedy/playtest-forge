@@ -17,15 +17,16 @@ const box=new THREE.Box3().setFromObject(root);root.scale.setScalar(1.25/(box.ma
 const scaled=new THREE.Box3().setFromObject(root);root.position.y-=scaled.min.y;
 const mixer=new THREE.AnimationMixer(root);const actions=new Map(gltf.animations.map(c=>[c.name,mixer.clipAction(c)]));
 const loco=new AuthoredLocomotion(root,group,actions);
-console.log('rig',root.scale.x,root.getObjectByName('FrontPawL')?.name,gltf.animations.map(a=>a.name));
-for(const speed of [1.62,4.05,9]) {
+console.log('rig',root.scale.x,root.getObjectByName('front_paw_l')?.name,gltf.animations.map(a=>a.name));
+for(const slope of [0,Math.tan(Math.PI/12),-Math.tan(Math.PI/12)]) for(const speed of [1.62,4.05,9]) {
+ loco.reset();group.position.set(0,0,0);
  let worst=0,sum=0,contacts=0,residual=0; const phases=[];
  for(let i=0;i<120;i++) {
-  group.position.z+=speed/60; group.updateMatrixWorld(true);
-  loco.input={speed,grounded:true,yaw:0,verticalSpeed:0,groundAt:()=>0};
+  group.position.z+=speed/60;group.position.y=group.position.z*slope; group.updateMatrixWorld(true);
+  loco.input={speed,grounded:true,yaw:0,verticalSpeed:0,groundAt:(_x,z)=>z*slope};
   loco.beforeMixer();loco.blend(1/60,'run');mixer.update(1/60);loco.afterMixer(1/60,'run');
   worst=Math.max(worst,loco.metrics.maxPlantError);residual=Math.max(residual,loco.metrics.maxResidual);sum+=loco.metrics.maxPlantError;contacts+=loco.metrics.stanceFeet;
   if(i%20===0)phases.push({...loco.metrics});
  }
- console.log(JSON.stringify({speed,worst,residual,mean:sum/120,contacts:contacts/120,phases}));
+ console.log(JSON.stringify({speed,slope,worst,residual,mean:sum/120,contacts:contacts/120,phases}));
 }

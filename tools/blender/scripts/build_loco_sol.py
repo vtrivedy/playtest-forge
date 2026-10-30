@@ -1,5 +1,5 @@
 """Bake role-based locomotion onto the current hero; no mesh rebuild.
-blender -b -P tools/blender/scripts/build_loco_sol.py
+blender -b -P tools/blender/scripts/build_loco_sol.py -- /tmp/source-fox-v3.glb
 """
 import bpy, math, os, sys, json, hashlib
 from mathutils import Vector, Quaternion, Euler
@@ -13,6 +13,20 @@ sc = bpy.context.scene
 SOURCE_FPS = sc.render.fps
 sc.render.fps = 60
 arm = next(o for o in sc.objects if o.type == 'ARMATURE')
+# Bone-role aliases exist only while authoring; the exported rig keeps FOX's contract names.
+ROLE = {'pelvis':'Body','spine_01':'Torso','spine_02':'Torso2','spine_04':'Torso3','head':'Head'}
+for i in range(1,4): ROLE[f'neck_{i:02}']=f'Neck{i}'
+for i in range(1,9): ROLE[f'tail_{i:02}']=f'Tail{i}'
+for side in 'lr':
+    for src,dst in [('upperarm','FrontUpperLeg'),('forearm','FrontLowerLeg'),('front_paw','FrontPaw'),('thigh','BackLeg'),('shin','BackUpperLeg'),('hind_foot','BackLowerLeg'),('hind_paw','BackPaw')]:
+        ROLE[f'{src}_{side}']=f'{dst}.{side.upper()}'
+    for i in range(1,5): ROLE[f'ear_{i:02}_{side}']=f'Ear{i}.{side.upper()}'
+if 'pelvis' not in arm.data.bones: raise RuntimeError('Expected FOX v3 rig contract')
+for src,dst in ROLE.items():
+    if src in arm.data.bones: arm.data.bones[src].name=dst
+for act in bpy.data.actions:
+    for fc in act.fcurves:
+        for src,dst in ROLE.items(): fc.data_path=fc.data_path.replace(f'pose.bones["{src}"]',f'pose.bones["{dst}"]')
 SRC_ACTIONS = {a.name.split('_SpiritFox')[0]: a for a in bpy.data.actions}
 # Reuse proven role-aware pose writer and sagittal anatomical solver, not the look stage.
 exec(compile(open(f'{ROOT}/tools/blender/scripts/fox_gait_authoring.py').read(), 'fox_gait_authoring.py', 'exec'))
@@ -39,7 +53,7 @@ def gait_pose(t, phases, duty, sweep, lift, kind):
             l = FORE[side]
             center=l['foot'].copy(); center.x=REST_YZ[l['up']][0].x+.05
             target = paw_path(stance, u, center, sweep/2, sweep/2, lift)
-            a,b = ik2(posed_yz(l['up'])[0], target, l['a'], l['b'])
+            a,b = ik2(posed_yz(l['up'])[0], target, l['a'], l['b'], pole=1)
             paw = rest_ang(l['paw']) + math.radians(30 * math.sin(math.pi*u) if not stance else 0)
             set_chain(p, [l['up'],l['lo'],l['paw']], [a,b,paw])
         else:
@@ -90,6 +104,11 @@ for name,act in SRC_ACTIONS.items():
     for fc in act.fcurves:
         for key in fc.keyframe_points:
             key.co.x *= 60/SOURCE_FPS; key.handle_left.x *= 60/SOURCE_FPS; key.handle_right.x *= 60/SOURCE_FPS
+for src,dst in ROLE.items():
+    if dst in arm.data.bones: arm.data.bones[dst].name=src
+for act in bpy.data.actions:
+    for fc in act.fcurves:
+        for src,dst in ROLE.items(): fc.data_path=fc.data_path.replace(f'pose.bones["{dst}"]',f'pose.bones["{src}"]')
 arm.animation_data.action=bpy.data.actions['idle']
 for o in bpy.data.objects:
     if o.type=='ARMATURE' and o.animation_data:

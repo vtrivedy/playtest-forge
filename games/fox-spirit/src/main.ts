@@ -29,7 +29,7 @@ import { createFollowCamera } from './camera';
 import type { FoxAnimState } from './fox';
 import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
-import { createEmberTrail } from './fx';
+import { FOX_LOOK } from './foxLook';
 import { createOcclusionFader } from './occlusion';
 import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
@@ -222,8 +222,7 @@ async function boot() {
     pixelRatio: renderer.getPixelRatio(),
   });
 
-  const wisps = createFoxWisps(scene, 28); // spirit-fire aura
-  const emberTrail = createEmberTrail(scene, 36);
+
   const autumnFX = createAutumnParticles(scene, Math.round(180 * quality.particleScale), Math.round(60 * quality.particleScale), {
     colorField,
     groundAt: (x, z) => col.highestAt(x, z),
@@ -309,8 +308,14 @@ async function boot() {
     folder.add(params, 'maxCorrection', 0, .3, .01);
     folder.add(params, 'turnLean', 0, .1, .001);
     folder.add(params, 'tailLag', 0, .3, .01);
+    folder.add(params, 'springFrequency', 1, 6, .1);
+    folder.add(params, 'springDamping', .4, 1.5, .05);
     folder.add(params, 'debug');
   }
+  const fFoxLook=gui.addFolder('Fox look');
+  fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
+  fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
+  fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
@@ -431,8 +436,7 @@ async function boot() {
     fxEnabled = !!on;
     // the post stack re-applies params every frame, so write params (not the pass)
     post.params.bloomStrength = on ? BLOOM : 0;
-    wisps.points.visible = fxEnabled;
-    emberTrail.points.visible = fxEnabled;
+
     foxActor.setSpiritFxVisible(fxEnabled);
   };
 
@@ -447,6 +451,7 @@ async function boot() {
   };
   win.__gameHooks = {
     hasClips: foxActor.hasClips,
+    foxLook: FOX_LOOK,
     gym: gaitGym ? { slopeDegrees: 15, origin: gaitGym.spawn.toArray() } : null,
     setStick(x: number | null, z = 0) {
       if (x === null) { harnessStick = null; return; }
@@ -1091,14 +1096,11 @@ async function boot() {
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
     colorField.update(dt);
 
-    // Leaf kick while running
-    kickCooldown -= dt;
-    if (grounded && speed > 3.5 && kickCooldown <= 0) {
-      autumnFX.kick(fox.position.clone().setY(fox.position.y - foxActor.feetOffset), 0.85);
-      kickCooldown = 0.18;
+    // Quiet leaf contacts belong to planted paws, not a periodic emitter behind the body.
+    if (grounded && speed > 2) {
+      for (const paw of foxActor.locomotion?.footfalls ?? []) autumnFX.kick(paw, .18);
     }
 
-    // Realm: embers, checkpoints, seedwells, bridge, wellspring, hazards
     if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
     restore.update(dt);
     zone = world.zoneAt(fox.position.x, fox.position.z);
@@ -1165,14 +1167,6 @@ async function boot() {
     for (const m of world.materials) colorField.syncMaterial(m);
 
     // Wisps / autumn
-    if (fxEnabled) {
-      wisps.update(dt, fox.position, shrineOn ? 0.85 : 0.45);
-      emberTrail.update(dt, fox.position, gliding ? 0.9 : shrineOn ? 0.7 : 0.5);
-    } else {
-      // Silhouette pass: park FX far offscreen
-      wisps.update(dt, new THREE.Vector3(0, -50, 0), 0);
-      emberTrail.update(dt, new THREE.Vector3(0, -50, 0), 0);
-    }
     autumnFX.update(dt, fox.position);
     emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
     sky.update(dt);
