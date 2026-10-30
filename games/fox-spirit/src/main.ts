@@ -125,6 +125,7 @@ async function boot() {
   lights.key.color.set(0xffc58a);
   // mist pools in the valleys and the void below the realm; summits and landmarks stay legible
   const fog = applyHeightFog(scene, { density: 0.0042, height: 0, heightFalloff: 0.045 });
+  const reedLook = { fogScale: 0.65 };
   const sky = createPaintedSky(scene, {
     zenith: new THREE.Color(0x7f7aa6),
     mid: new THREE.Color(0xe2a060),
@@ -419,6 +420,7 @@ async function boot() {
 
   const water = createWater(scene, world.collision, gui);
   reach.attach(water, gui);
+  for (const m of water.materials) { m.userData.cfRestoredChroma = 0.5; colorField.patchMaterial(m); world.materials.push(m); }
   world.waterWashedAt = water.washedAt;
   world.waterInkAt = water.inkAt;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
@@ -503,6 +505,7 @@ async function boot() {
   fLook.add(post.params, 'vignette', 0, 1, 0.01);
   fLook.add(post.params, 'grain', 0, 0.05, 0.001);
   fLook.add(post.params, 'painterly', 0, 1, 0.01);
+  fLook.add(reedLook, 'fogScale', 0.4, 1, 0.01).name('Reed haze');
   fLook.add(fog, 'density', 0, 0.012, 0.0001).name('fog').onChange(() => syncFog(scene, fog));
   for (const k of ['sepia', 'restored'] as const) {
     const f = fLook.addFolder(`grade ${k}`);
@@ -1489,6 +1492,7 @@ async function boot() {
     if (reach.submergedAt(fox.position, fox.position.y - foxActor.feetOffset)) handleEvents([{type:'hazard',kind:'ink'}]);
     restore.update(dt);
     zone = world.zoneAt(fox.position.x, fox.position.z);
+    if (scene.fog instanceof THREE.FogExp2) scene.fog.density = THREE.MathUtils.damp(scene.fog.density, fog.density * (zone.includes('Reedmarsh') ? reedLook.fogScale : 1), 2, dt);
 
     // through a dash, keep the last estimate (the dash is short and gravity-free)
     if (grounded) landingValid = false;

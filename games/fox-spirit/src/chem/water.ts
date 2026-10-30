@@ -44,6 +44,17 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     const f = (i + 1) / 10, top = 2 + f * 4;
     block(98.5 - f * 2.5, (2 + top) / 2, 10 + f * 6.1, 2.4, top - 2 + 0.05, 0.8, 0, true);
   }
+  // Worn aqueduct paving uses the shipped CC0 masonry scan and normal map;
+  // the broad source deck must read as stone rather than a flat brown slab.
+  const deckMap = new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_Color.jpg');
+  const deckNormal = new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_NormalGL.jpg');
+  for (const texture of [deckMap, deckNormal]) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(3, 1.2); texture.anisotropy = 8; }
+  deckMap.colorSpace = THREE.SRGBColorSpace;
+  const deckMaterial = new THREE.MeshStandardMaterial({ name: 'reed-aqueduct-paving', color: 0xc4b69b, map: deckMap, normalMap: deckNormal, roughness: 0.9 });
+  deckMaterial.normalScale.set(0.55, 0.55);
+  const deck = new THREE.Mesh(new THREE.PlaneGeometry(10.8, 3.75), deckMaterial);
+  deck.rotation.x = -Math.PI / 2; deck.position.set(100, 15.014, 20); deck.receiveShadow = true; scene.add(deck);
+  for (let i = 0; i < 6; i++) block(95.5 + i * 1.8, 15.07, 21.72, 1.64, 0.16, 0.36, 0.01 * Math.sin(i));
   // S1: a small roofed grotto behind the pond falls, with stable ground on both sides.
   for (const x of [-31.65, -28.35]) block(x, 1.35, 60.4, 0.75, 3.3, 4.8, 0, true);
   block(-30, 3.05, 60.4, 4.1, 0.6, 4.8, 0, true);
@@ -153,7 +164,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     return null;
   }
   return {
-    tun, waters,
+    tun, waters, materials: [stone, deckMaterial],
     arriving(id: string) { return waters.some(w => w.spot.id === id && w.arriving); },
     restoreAll() { for (const w of waters) if (!w.spot.realm || w.spot.realm === 'russetvale') w.reactor.restored = true; },
     restoreWithin(pos: THREE.Vector3, radius: number) { for (const w of waters) if (Math.hypot(w.spot.lip.x - pos.x, w.spot.lip.z - pos.z) <= radius) w.reactor.restored = true; },
