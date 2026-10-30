@@ -40,19 +40,19 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
   // A catch under the upper flight, no more than 5 m below its departure.
   shelf(-38, -113, 24, 12, 12, 813);
   // Continuous 3.4 m stair descent, then side stairs as the safe return route.
-  function stair(a: [number, number, number], b: [number, number, number], seed: number) {
+  function stair(a: [number, number, number], b: [number, number, number], seed: number, width = 3.4) {
     const [ax, ay, az] = a, [bx, by, bz] = b;
     const len = Math.hypot(bx - ax, bz - az), yaw = Math.atan2(bx - ax, bz - az);
-    stairFlight(stone, { x: ax, y: ay, z: az }, { x: bx, y: by, z: bz }, 3.4, seed, { open: [true, true] });
-    col.add(boxCollider({ x: (ax + bx) / 2, z: (az + bz) / 2, w: 3.4, d: len + 0.4, yaw, top: ay, top1: by, bottom: Math.min(ay, by) - 1, tag: 'crown-stair' }));
+    stairFlight(stone, { x: ax, y: ay, z: az }, { x: bx, y: by, z: bz }, width, seed, { open: [true, true] });
+    col.add(boxCollider({ x: (ax + bx) / 2, z: (az + bz) / 2, w: width, d: len + 0.4, yaw, top: ay, top1: by, bottom: Math.min(ay, by) - 1, tag: 'crown-stair' }));
   }
   // The first landing clears every nested hill collider before descending.
   shelf(-19, -88, 38, 7, 5, 822);
   stair([-11, 38, -88], [-19, 38, -88], 820);
   stair([-22, 38, -88], [-39, 24, -96], 821);
   stair([-41, 24, -99], [-49, 29, -101.5], 823);
-  stair([-49, 29, -109], [-57, 34, -113], 824);
-  stair([-57, 34, -113], [-53, 34, -116], 825);
+  stair([-49, 29, -109], [-57, 34, -113], 824, 1.8);
+  stair([-57, 34, -113], [-53, 34, -116], 825, 1.8);
   // Split crown: open silhouette, bowl held over the upper hearth's rising leaves.
   ruinArch(stone, -48, 34, -121, 0.12, { span: 5.2, pillarH: 3.2, broken: 0.35, seed: 830 });
   ruinArch(stone, -51, 34, -117, 1.4, { span: 3.8, pillarH: 2.3, broken: 0.6, seed: 831 });
