@@ -152,8 +152,8 @@ def gallop_pose(t, st=1.0):
     pitch = 2.5 * math.sin(2 * math.pi * (t - 0.2)) * st             # front rises as the forelegs load
     wrot(p, "Body", (1, 0, 0), -pitch)
     wloc(p, "Body", (0, 0, 0.06 * st * math.cos(2 * math.pi * (t - 0.32)) - 0.28))
-    wrot(p, "Neck1", (1, 0, 0), pitch * 0.7 - 3 * flex * st + 5)   # gaze stays level (stoic)
-    wrot(p, "Head", (1, 0, 0), -2.5 * math.sin(2 * math.pi * (t - 0.3)) - 5)
+    wrot(p, "Neck1", (1, 0, 0), pitch * 0.7 - 6 * flex * st + 20)   # gaze stays level (stoic)
+    wrot(p, "Head", (1, 0, 0), -2.5 * math.sin(2 * math.pi * (t - 0.3)) - 14)
     for e in EARS: wrot(p, e, (1, 0, 0), 14 + 3 * math.sin(2 * math.pi * t))
     tail_wave(p, t, amp_yaw=3, amp_pitch=6, speed=1.0, lift=-10, per=-2)
     apply_dict(p)
