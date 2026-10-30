@@ -479,11 +479,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-6, 0, -24);
   W(-9.3, 0, -29.7, { label: 'grow:sw3-root' });
   W(-9.6, 0, -29.9, { ground: false, label: 'SW3-feed' });
-  for (let k = 1; k < 8; k++) {
-    const [x, y, z] = sw3RootPoint(k / 8);
+  // follow the root all the way round; cutting its last quarter-turn walks into the trunk's lip
+  for (let k = 1; k <= 12; k++) {
+    const [x, y, z] = sw3RootPoint(k / 12);
     W(x, y, z, { ground: false });
   }
-  W(-7.4, 17.5, -36.6, { ground: false, label: 'SW3' });
+  W(-7.0, 17.5, -36.8, { ground: false, label: 'SW3' });
   W(-6.6, 17.5, -35.9, { ground: false, act: 'glide' });
   W(0, 8, -31.2, { ground: false, label: 'bridge-head' });
   // E · root bridge → arena → switchback ascent → Wellspring
