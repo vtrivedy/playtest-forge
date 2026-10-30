@@ -5,6 +5,7 @@ import { boxCollider } from './collision';
 import type { Realm } from './russetvale';
 import { Bucket, PAL, rockSlab, stairFlight, ruinArch, stoneBlock, trs, kilnBowl, hangingRoot, rng } from './russetKit';
 import { waterSpots, type createWater } from './chem/water';
+import { createInlets } from './chem/inlet';
 import { loadNatureKit } from './russetNature';
 import { weatheredSurface } from './worldSurfaces';
 
@@ -77,13 +78,24 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   nature.place('twisted_3',211,36,-124,{scale:.5,yaw:1.2,gaps:.35,hue:PAL.russet,hue2:PAL.gold});
   nature.place('twisted_1',174,30,-130,{scale:.4,yaw:2,gaps:.4,hue:PAL.leafBrown,hue2:PAL.copper});
   for(const m of nature.build(group)){field.patchMaterial(m);mats.push(m);}
+  const bellMat=new THREE.MeshStandardMaterial({color:0x8b5832,metalness:.6,roughness:.5,emissive:0xc17530,emissiveIntensity:.02});
+  const bell=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(.9,0),new THREE.Vector2(.65,.25),new THREE.Vector2(.55,1.05),new THREE.Vector2(.2,1.35),new THREE.Vector2(0,1.45)],20),bellMat);
+  bell.position.set(207,40.5,-119);group.add(bell);field.patchMaterial(bellMat);mats.push(bellMat);
+  const hanger=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,2.3,6),bellMat);hanger.position.set(207,43.1,-119);group.add(hanger);
+  // Pale basin piers give the rising water a fixed reference; the inlet seal sits on the high-water notch.
+  const basin=new Bucket();for(const x of[181.3,192.7])for(const z of[-122.8,-113.2])stoneBlock(basin,trs(x,33,z),.45,6.5,.45,1100+Math.round(x+z),.06);
+  const basinMesh=basin.toMesh(mats[2]!,{cast:true,receive:true,boxUV:1.6});if(basinMesh)group.add(basinMesh);
+  let inlet: ReturnType<typeof createInlets>;
   let water: ReturnType<typeof createWater>;
   function restoreSource(duration=3){const w=water.waters.find(w=>w.spot.id===source);if(w)w.reactor.restored=true;if(!field.restores.length)field.restore(new THREE.Vector3(190,30,-118),55,duration);}
   return {
     contains:(p:THREE.Vector3)=>p.x>138,
     supplyAt:(p:THREE.Vector3)=>field.sample(p),
     init(renderer:THREE.WebGLRenderer){field.initMask(renderer);},
-    attach(w:typeof water,gui:GUI){water=w;const f=gui.addFolder('Ashwater Reach');f.add(tun,'fillRate',.05,.5,.01);f.add(tun,'drainRate',.02,.5,.01);f.add(tun,'warningTime',.8,4,.1);f.add(tun,'latchTime',.5,5,.1);f.close();if(restored)restoreSource(.2);},
+    attach(w:typeof water,gui:GUI){water=w;
+      inlet=createInlets(scene,[{seedwell:0,source,pos:new THREE.Vector3(192.2,36,-118),sealAt:new THREE.Vector3(192.2,36.12,-118),pillar:new THREE.Vector3(192.7,30,-118),latchTime:tun.latchTime}],new THREE.MeshStandardMaterial({color:0x6d5036,roughness:.8}));
+      if(restored){inlet.inlets[0]!.latched=true;inlet.inlets[0]!.seal=1;}
+      const f=gui.addFolder('Ashwater Reach');f.add(tun,'fillRate',.05,.5,.01);f.add(tun,'drainRate',.02,.5,.01);f.add(tun,'warningTime',.8,4,.1);f.add(tun,'latchTime',.5,5,.1).onChange((v:number)=>{inlet.inlets[0]!.latchTime=v;});f.close();if(restored)restoreSource(.2);},
     sync(dt:number,base:ReturnType<typeof createColorField>){field.trail=[];field.strokes=[];field.update(dt);field.setFox(base.fox);field.trail=base.trail.map(t=>({...t}));field.strokes=base.strokes.map(t=>({...t}));field.renderMask(dt);for(const m of mats)field.syncMaterial(m);},
     update(dt:number,fox:THREE.Vector3,feetY:number,grounded:boolean,flood:boolean){
       open=flood;gate.enabled=!open;gateMesh.visible=!open;
@@ -95,7 +107,8 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       else if(warning>0)warning=Math.max(0,warning-dt);
       else if(occupied&&fill>0)retained=true;
       else fill=Math.max(0,fill-dt*tun.drainRate);
-      if(!restored){seal=THREE.MathUtils.clamp(seal+(arrived&&fill>=.98?dt:-dt)/tun.latchTime,0,1);if(seal>=1){restored=true;restoreSource();try{localStorage.setItem(saveKey,'1');}catch{}}}
+      const latched=inlet.update(dt,()=>arrived&&fill>=.98);seal=inlet.inlets[0]!.seal;if(!restored&&latched.length){restored=true;restoreSource();try{localStorage.setItem(saveKey,'1');}catch{}}
+      bellMat.emissiveIntensity=.02+seal*.7;bell.rotation.z=restored?Math.sin(field.time*1.7)*.07:0;
       raft.position.y=30+tun.rise*fill;raftCol.top0=raftCol.top1=raft.position.y;raftCol.bottom=raft.position.y-.5;
       pool.position.y=29.8+tun.rise*fill;
       waterMat.color.setHex(retained?0x69543a:0x8a6441);
