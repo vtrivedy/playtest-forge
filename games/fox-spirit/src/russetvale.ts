@@ -482,6 +482,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // finale: wake the root knot at the west foot (it lifts the fallen lintel), then light the summit hearth
   W(-3.5, 38, -84.4, { ground: false, label: 'grow:summit-KS' });
   W(-1.2, 39.04, -86.6, { ground: false, label: 'wellspring' });
+  W(-1.6, 39.04, -86.4, { ground: false, label: 'restored' }); // stand by the hearth until the basin wakes
 
   // ==================================================================== TERRAIN
   {

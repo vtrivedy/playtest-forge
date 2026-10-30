@@ -1021,7 +1021,8 @@ async function boot() {
     const liftTop = liftWp?.rise !== undefined ? liftWp.y + liftWp.rise : wp.y + 0.5;
     if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= liftTop) auto.liftReady = true;
     const waitLift = !!prevLabel?.startsWith('lift:') && !auto.liftReady;
-    const waitBridge = waitLift || waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
+    const waitFinale = prevLabel === 'wellspring' && !shrineOn;
+    const waitBridge = waitLift || waitWash || waitFinale || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
