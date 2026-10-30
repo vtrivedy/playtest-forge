@@ -405,7 +405,7 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Dense fallen-leaf carpet along the critical path
   {
-    const carpetCount = 180;
+    const carpetCount = 90;
     const leafGeo = new THREE.PlaneGeometry(0.12, 0.15);
     const carpetDummy = new THREE.Object3D();
     for (let i = 0; i < carpetCount; i++) {
@@ -428,7 +428,7 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
       materials.push(mat);
       const card = new THREE.Mesh(leafGeo, mat);
       card.position.set(x, y + 0.03 + Math.random() * 0.04, z);
-      card.rotation.set(-Math.PI / 2 + (Math.random() - 0.5) * 0.35, Math.random() * Math.PI, (Math.random() - 0.5) * 0.4);
+      card.rotation.set(-Math.PI / 2 + (Math.random() - 0.5) * 0.12, Math.random() * Math.PI, (Math.random() - 0.5) * 0.1);
       card.scale.setScalar(0.45 + Math.random() * 0.4);
       card.castShadow = true;
       group.add(card);

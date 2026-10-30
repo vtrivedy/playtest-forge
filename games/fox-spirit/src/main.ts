@@ -238,8 +238,13 @@ async function boot() {
   };
   win.__gameHooks = {
     teleportToShrine() {
-      foxActor.group.position.set(world.shrinePos.x, world.shrinePos.y + foxActor.feetOffset + 0.2, world.shrinePos.z + 1.5);
+      // Stand on the approach path facing the shrine — never under the plinth overhang
+      const x = world.shrinePos.x;
+      const z = world.shrinePos.z + 4.2;
+      foxActor.group.position.set(x, world.yAt(x, z) + foxActor.feetOffset, z);
+      foxActor.group.rotation.y = Math.PI; // face north toward shrine
       vel.set(0, 0, 0);
+      foxActor.setAnim('idle');
     },
     setFxEnabled(on: boolean) {
       fxEnabled = !!on;

@@ -70,8 +70,8 @@ function tuneMaterials(root: THREE.Object3D) {
         if (mat.emissive) mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       } else if (n.includes('foxfur') || n.includes('fur') || n === 'cube') {
-        // Keep fox_fur_col texture (russet + white belly + black socks). Only gentle warm tint.
-        mat.color.setHex(0xffe0c8);
+        // Keep fox_fur_col 1:1 so white bib + black socks survive (warm tint was pink-washing the bib).
+        mat.color.setHex(0xffffff);
         mat.roughness = 0.62;
         if (mat.emissive) mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
@@ -175,6 +175,31 @@ export async function createFox(): Promise<FoxActor> {
     const gltf = await new GLTFLoader().loadAsync('/assets/hero/spirit_fox.glb');
     const root = gltf.scene;
     tuneMaterials(root);
+
+    // Authoring pass against fox-turnaround.jpg: bigger bushy tail, longer snout, taller ears.
+    // Scale skinned child meshes + rest-pose bones (mixer still drives rotations).
+    root.traverse((obj) => {
+      const n = (obj.name || '').toLowerCase();
+      if ((obj as THREE.Mesh).isMesh) {
+        if (n.includes('tail') || n.includes('spiritfox_tail')) {
+          obj.scale.multiplyScalar(1.55);
+        } else if (n.includes('fur') && n.includes('tuft')) {
+          obj.scale.multiplyScalar(1.25);
+        } else if (n.includes('wisp')) {
+          obj.scale.multiplyScalar(1.2);
+        }
+      }
+      // Bone rest-scale (safe: clips key rotation/position, not scale)
+      if ((obj as THREE.Bone).isBone) {
+        if (/^tail\d/i.test(obj.name) || obj.name === 'Tail1') {
+          obj.scale.set(1.35, 1.35, 1.45);
+        } else if (obj.name === 'Head') {
+          obj.scale.set(1.05, 1.05, 1.35); // elongate snout axis
+        } else if (/^Ear/i.test(obj.name)) {
+          obj.scale.set(1.15, 1.35, 1.15);
+        }
+      }
+    });
 
     // Scale by height so the slender quadruped proportions stay — not max-axis (was puffing width)
     const box0 = new THREE.Box3().setFromObject(root);
