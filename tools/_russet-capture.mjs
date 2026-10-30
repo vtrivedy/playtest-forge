@@ -63,6 +63,8 @@ async function boot() {
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForFunction(() => !!(window.__game && window.__gameHooks), null, { timeout: 180000 });
   await page.waitForTimeout(1500);
+  // let shaders compile and a few sim seconds render before any shot
+  await page.waitForFunction(() => window.__gameHooks.state().t > 1.5, null, { timeout: 600000 });
 }
 
 

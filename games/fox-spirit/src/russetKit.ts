@@ -111,8 +111,10 @@ export class Bucket {
       this.n.fromBufferAttribute(nn, i);
       if (m) {
         this.v.applyMatrix4(m);
-        this.n.applyMatrix3(this.nm).normalize();
+        this.n.applyMatrix3(this.nm);
       }
+      if (!(this.n.lengthSq() > 1e-8) || !Number.isFinite(this.n.x)) this.n.set(0, 1, 0);
+      this.n.normalize();
       this.pos.push(this.v.x, this.v.y, this.v.z);
       this.nor.push(this.n.x, this.n.y, this.n.z);
       if (c) this.col.push(c.getX(i), c.getY(i), c.getZ(i));
@@ -129,9 +131,14 @@ export class Bucket {
     this.col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b, cc.r, cc.g, cc.b);
   }
 
-  toMesh(material: THREE.Material, opts: { cast?: boolean; receive?: boolean } = {}): THREE.Mesh | null {
+  toMesh(material: THREE.Material, opts: { cast?: boolean; receive?: boolean; planarUV?: number } = {}): THREE.Mesh | null {
     if (!this.pos.length) return null;
     const geo = new THREE.BufferGeometry();
+    if (opts.planarUV) {
+      const uv: number[] = [];
+      for (let i = 0; i < this.pos.length; i += 3) uv.push(this.pos[i]! / opts.planarUV, this.pos[i + 2]! / opts.planarUV);
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    }
     geo.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
@@ -232,7 +239,7 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
   let geo: THREE.BufferGeometry;
   if (s.round) {
     const r = s.w / 2;
-    const radial = Math.max(12, Math.round(r * 2.6));
+    const radial = Math.max(22, Math.round(r * 3.2));
     geo = new THREE.CylinderGeometry(r, r * 0.92, h, radial, Math.max(2, Math.round(h / 0.55)), false);
   } else {
     geo = new THREE.BoxGeometry(
@@ -364,7 +371,7 @@ export function stoneBlock(b: Bucket, m: THREE.Matrix4, w: number, h: number, d:
       const ci = (v.x > 0 ? 1 : 0) + (v.y > 0 ? 2 : 0) + (v.z > 0 ? 4 : 0);
       const c = cornerChip[ci]! > 0.6 ? chip * 1.1 : chip * 0.35;
       v.x -= Math.sign(v.x) * c;
-      v.y -= Math.sign(v.y) * c * 0.8;
+      v.y -= Math.sign(v.y) * c * 0.25;
       v.z -= Math.sign(v.z) * c;
     }
     p.setXYZ(i, v.x, v.y, v.z);
@@ -411,7 +418,7 @@ export function ruinArch(
     stoneBlock(b, base.clone().multiply(trs(px, 0.2, 0, 0)), bw * 1.25, 0.4, bw * 1.25, seed + side * 3, 0.1);
     for (let i = 0; i < n - lose; i++) {
       const jitter = trs(px + (r() - 0.5) * 0.06, 0.4 + bh * (i + 0.5), (r() - 0.5) * 0.06, (r() - 0.5) * 0.08);
-      stoneBlock(b, base.clone().multiply(jitter), bw, bh * 0.97, bw, seed * 31 + i + side * 100, 0.1);
+      stoneBlock(b, base.clone().multiply(jitter), bw, bh * 1.02, bw, seed * 31 + i + side * 100, 0.1);
     }
     if (lose > 0) {
       // fallen blocks at the foot
@@ -436,7 +443,7 @@ export function ruinArch(
     const cx = -Math.cos(am) * R;
     const cy = springY + Math.sin(am) * R * 1.02 + pointedLift;
     const len = R * (a1 - a0) * 1.06;
-    const m = base.clone().multiply(trs(cx, cy, 0, 0, 1, 1, 1, 0, am - Math.PI / 2));
+    const m = base.clone().multiply(trs(cx, cy, 0, 0, 1, 1, 1, 0, Math.PI / 2 - am));
     stoneBlock(b, m, len, bw * 0.95, bw * 0.95, seed * 53 + i, 0.08);
   }
   if (broken < 0.3) {
@@ -1069,5 +1076,49 @@ export function hangingSpire(b: Bucket, x: number, y: number, z: number, r: numb
     out.copy(k < 0.5 ? PAL.rockA : PAL.rockC).lerp(PAL.rockDeep, THREE.MathUtils.clamp(-q.y / len + 0.5, 0, 1) * 0.8);
   });
   b.add(geo, trs(x, y - len / 2, z, seed));
+  geo.dispose();
+}
+
+/** Walkable ground cap on a slab top (litter-textured ground material), inset from the chipped rim. */
+export function groundCap(b: Bucket, s: RockSpec, color: THREE.Color, inset = 1.0): void {
+  let geo: THREE.BufferGeometry;
+  if (s.round) {
+    geo = new THREE.CircleGeometry(Math.max(0.3, s.w / 2 - inset), Math.max(12, Math.round(s.w * 2)));
+  } else {
+    geo = new THREE.PlaneGeometry(Math.max(0.3, s.w - inset * 2), Math.max(0.3, s.d - inset * 2), Math.max(1, Math.round(s.w / 2)), Math.max(1, Math.round(s.d / 2)));
+  }
+  geo.rotateX(-Math.PI / 2);
+  const p = geo.attributes.position as THREE.BufferAttribute;
+  const cols: number[] = [];
+  const c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) + s.x;
+    const z = p.getZ(i) + s.z;
+    p.setY(i, 0.03);
+    if (!s.round) {
+      // match rockSlab's irregular corner rounding (plus margin) so the cap never overhangs
+      const hw = s.w / 2;
+      const hd = s.d / 2;
+      let vx = p.getX(i);
+      let vz = p.getZ(i);
+      if (Math.abs(vx) > hw * 0.5 && Math.abs(vz) > hd * 0.5) {
+        const kx = (Math.abs(vx) - hw * 0.5) / (hw * 0.5);
+        const kz = (Math.abs(vz) - hd * 0.5) / (hd * 0.5);
+        const cut = Math.max(0, Math.min(kx, kz)) * Math.min(hw, hd) * 0.5;
+        vx -= Math.sign(vx) * cut;
+        vz -= Math.sign(vz) * cut;
+        p.setX(i, vx);
+        p.setZ(i, vz);
+      }
+    }
+    c.copy(color).lerp(PAL.leafBrown, vnoise3(x * 0.3, 1, z * 0.3) * 0.35).multiplyScalar(1.25 + vnoise3(x, 2, z) * 0.2);
+    cols.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  // flat up normals: corner cuts can collapse triangles, and a zero normal → NaN → bloom blackout
+  const nrm = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) nrm[i * 3 + 1] = 1;
+  geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  b.add(geo, trs(s.x, s.top, s.z, s.yaw ?? 0));
   geo.dispose();
 }

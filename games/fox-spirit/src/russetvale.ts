@@ -10,6 +10,8 @@ import {
   fbm3,
   trs,
   rockSlab,
+  groundCap,
+  type RockSpec,
   boulder,
   stoneBlock,
   ruinArch,
@@ -152,6 +154,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, ...o });
   const M = {
     terrain: mk({ name: 'rv-terrain', roughness: 0.95 }),
+    ground: mk({ name: 'rv-ground', roughness: 0.95 }),
     rock: mk({ name: 'rv-rock', roughness: 0.93 }),
     stone: mk({ name: 'rv-stone', roughness: 0.86 }),
     bark: mk({ name: 'rv-bark', roughness: 0.9 }),
@@ -162,6 +165,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     reed: mk({ name: 'rv-reed', roughness: 0.8, side: THREE.DoubleSide }),
   };
   M.terrain.map = leafLitterTexture();
+  M.ground.map = M.terrain.map;
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
 
   // Spatial buckets: material × 64 m cell, so frustum culling still works on merged meshes.
@@ -188,6 +192,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       emissive: new THREE.Color(0xff8a2a),
       emissiveIntensity: 0.0,
     });
+
+  /** Rock slab + litter-textured ground cap on walkable tops. */
+  const slab = (spec: RockSpec) => {
+    rockSlab(bk('rock', spec.x, spec.z), spec);
+    if (spec.topColor !== null) groundCap(bk('ground', spec.x, spec.z, false), spec, spec.topColor ?? PAL.soilTop);
+  };
 
   // ==================================================================== ROUTE
   // Critical path, authored once; drives path paint, litter, embers and the autopilot.
@@ -416,7 +426,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const c = sp((tr.s0 + tr.s1) / 2, 0);
     const len = tr.s1 - tr.s0;
     col.add(boxCollider({ x: c.x, z: c.z, w: tr.w, d: len, yaw: T_YAW, top: tr.top, bottom: -4, tag: `terrace${i}` }));
-    rockSlab(bk('rock', c.x, c.z), {
+    slab({
       x: c.x,
       z: c.z,
       yaw: T_YAW,
@@ -577,7 +587,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // SW1 Wind Seedwell spire (−112, −24, y20)
   const SW1P = new THREE.Vector3(-112, 20, -24);
   col.add(cylCollider({ x: SW1P.x, z: SW1P.z, r: 6.2, top: 20, bottom: -30, tag: 'sw1-spire' }));
-  rockSlab(bk('rock', SW1P.x, SW1P.z), { x: SW1P.x, z: SW1P.z, w: 12.4, d: 12.4, top: 20, bottom: -2, round: true, rough: 0.8, seed: 31, topColor: PAL.grassGold });
+  slab({ x: SW1P.x, z: SW1P.z, w: 12.4, d: 12.4, top: 20, bottom: -2, round: true, rough: 0.8, seed: 31, topColor: PAL.grassGold });
   {
     const sb = new Bucket();
     hangingSpire(sb, SW1P.x, -1, SW1P.z, 6, 24, 12);
@@ -623,7 +633,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
 
   const hummock = (x: number, z: number, rr: number, top: number, seed: number) => {
     col.add(cylCollider({ x, z, r: rr, top, bottom: -3, tag: 'hummock' }));
-    rockSlab(bk('rock', x, z), { x, z, w: rr * 2, d: rr * 2, top, bottom: -2.6, round: true, rough: 0.35, seed, topColor: PAL.mud.clone().lerp(PAL.moss, 0.5) });
+    slab({ x, z, w: rr * 2, d: rr * 2, top, bottom: -2.6, round: true, rough: 0.35, seed, topColor: PAL.mud.clone().lerp(PAL.moss, 0.5) });
   };
   hummock(69, 28, 3, 0.4, 51);
   hummock(90, 15, 3, 1.2, 52);
@@ -648,7 +658,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   flight({ x: 90.0, z: 15.0, y: 1.2 }, { x: 92.4, z: 12.6, y: 2.0 }, 2.2, 21, false);
   const SW2P = new THREE.Vector3(95, 2, 10);
   col.add(cylCollider({ x: SW2P.x, z: SW2P.z, r: 5, top: 2, bottom: -3, tag: 'sw2-island' }));
-  rockSlab(bk('rock', SW2P.x, SW2P.z), { x: SW2P.x, z: SW2P.z, w: 10, d: 10, top: 2, bottom: -2.4, round: true, rough: 0.5, seed: 61, topColor: PAL.stone.clone().lerp(PAL.moss, 0.3) });
+  slab({ x: SW2P.x, z: SW2P.z, w: 10, d: 10, top: 2, bottom: -2.4, round: true, rough: 0.5, seed: 61, topColor: PAL.stone.clone().lerp(PAL.moss, 0.3) });
   // sunken ruin walls round the island
   ruinArch(bk('stone', 99, 6), 99.5, 2, 6.5, 0.8, { span: 2.6, pillarH: 3, seed: 71, broken: 0.6 });
   ruinColumn(bk('stone', 91, 5), 91, 2, 6.5, 2.2, 72);
@@ -677,8 +687,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const px = x + Math.cos(a) * d;
         const pz = z + Math.sin(a) * d;
         const lean = (rr() - 0.5) * 0.35;
-        const w = 0.05 + rr() * 0.04;
-        c.copy(PAL.copper).lerp(PAL.gold, rr() * 0.5).offsetHSL(0, 0, (rr() - 0.5) * 0.15);
+        const w = 0.025 + rr() * 0.03;
+        c.copy(PAL.copper).lerp(PAL.russet, rr() * 0.6).offsetHSL(0, 0, (rr() - 0.5) * 0.12).multiplyScalar(0.55);
         const top = new THREE.Vector3(px + Math.cos(a) * lean * h, base + h, pz + Math.sin(a) * lean * h);
         const l = new THREE.Vector3(px - Math.sin(a) * w, base, pz + Math.cos(a) * w);
         const rgt = new THREE.Vector3(px + Math.sin(a) * w, base, pz - Math.cos(a) * w);
@@ -848,15 +858,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // root-knuckle bridge head (0,−31) y8
   col.add(cylCollider({ x: 0, z: -31.2, r: 2.6, top: 8, bottom: -1, tag: 'bridge-head' }));
-  rockSlab(bk('rock', 0, -31), { x: 0, z: -31.2, w: 5.2, d: 5.2, top: 8, bottom: -1, round: true, rough: 0.6, seed: 95, topColor: PAL.moss });
+  slab({ x: 0, z: -31.2, w: 5.2, d: 5.2, top: 8, bottom: -1, round: true, rough: 0.6, seed: 95, topColor: PAL.moss });
 
   // root bridge (grows when all 3 Seedwells are lit): (0,−31.5) y8 → (0,−43.2) y12
   const bridgeC = col.add(boxCollider({ x: 0, z: -37.35, w: 2.6, d: 11.7, yaw: Math.PI, top: 8, top1: 12, bottom: 6.5, tag: 'root-bridge' }));
   bridgeC.enabled = false;
   const bridgeMesh = (() => {
     const b = new Bucket();
-    for (let k = 0; k < 5; k++) {
-      const off = (k - 2) * 0.5;
+    for (let k = 0; k < 9; k++) {
+      const off = (k - 4) * 0.3;
       const pts = [
         new THREE.Vector3(off * 1.5, 6.5, -29.5),
         new THREE.Vector3(off, 7.6, -32),
@@ -864,21 +874,25 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         new THREE.Vector3(off, 11.4, -43),
         new THREE.Vector3(off * 1.6, 11.0, -45.5),
       ];
-      const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 28, k === 2 ? 0.55 : 0.38, 7, false);
+      for (const p of pts) p.y -= 0.3 + Math.abs(k - 4) * 0.06 + Math.cos(k * 1.7) * 0.08;
+      const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 28, k === 4 ? 0.5 : 0.3 + (k % 3) * 0.06, 7, false);
       b.add(tube, undefined, PAL.root.clone().lerp(PAL.barkLight, k * 0.08));
       tube.dispose();
     }
-    // walking deck of woven roots (leaf litter on top)
-    const deck = new THREE.BoxGeometry(2.4, 0.3, 11.8, 2, 1, 12);
-    const dp = deck.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < dp.count; i++) {
-      const lz = dp.getZ(i);
-      const t = (lz + 5.9) / 11.8; // 0 at north end
-      dp.setY(i, dp.getY(i) + THREE.MathUtils.lerp(12, 8, t) - 0.2);
-      dp.setZ(i, lz - 37.35);
+    // cross-lashing roots tie the bundle into a walkable span (collider is the ramp under them)
+    for (let k = 0; k < 7; k++) {
+      const z = -32.5 - k * 1.7;
+      const t = (z + 31.5) / -11.7;
+      const y = 8 + t * 4 - 0.25;
+      const c = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-1.5, y - 0.5, z + 0.3),
+        new THREE.Vector3(0, y + 0.05, z),
+        new THREE.Vector3(1.5, y - 0.5, z - 0.3),
+      ]);
+      const tube = new THREE.TubeGeometry(c, 8, 0.18, 6, false);
+      b.add(tube, undefined, PAL.root.clone().lerp(PAL.moss, 0.3));
+      tube.dispose();
     }
-    b.add(deck, undefined, PAL.bark);
-    deck.dispose();
     const mesh = b.toMesh(M.bark)!;
     return mesh;
   })();
@@ -952,7 +966,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // ==================================================================== WELLSPRING HILL
   const ARENA = { x: 0, z: -58, r: 16, top: 12 };
   col.add(cylCollider({ x: ARENA.x, z: ARENA.z, r: ARENA.r, top: ARENA.top, bottom: -3, tag: 'arena' }));
-  rockSlab(bk('rock', 0, -58), { x: 0, z: -58, w: ARENA.r * 2, d: ARENA.r * 2, top: ARENA.top, bottom: -3, round: true, rough: 0.9, seed: 101, topColor: PAL.stone.clone().lerp(PAL.grassDry, 0.5) });
+  slab({ x: 0, z: -58, w: ARENA.r * 2, d: ARENA.r * 2, top: ARENA.top, bottom: -3, round: true, rough: 0.9, seed: 101, topColor: PAL.stone.clone().lerp(PAL.grassDry, 0.5) });
   // ring of broken, ash-stained pillars
   for (let k = 0; k < 9; k++) {
     const a = (k / 9) * Math.PI * 2 + 0.2;
@@ -976,7 +990,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const rw = rows[i]!;
     const cz = (rw.z0 + ZB) / 2;
     col.add(boxCollider({ x: 0, z: cz, w: rw.hw * 2, d: rw.z0 - ZB, top: rw.top, bottom: -4, tag: `row${i}` }));
-    rockSlab(bk('rock', 0, cz), {
+    slab({
       x: 0,
       z: cz,
       w: rw.hw * 2,
@@ -1009,7 +1023,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   }
   // the hill's mass continues below to the ground (one chunky base)
-  rockSlab(bk('rock', 0, -88), { x: 0, z: -88, w: 40, d: 20, top: 16, bottom: -4, rough: 1.0, seed: 140, topColor: null });
+  slab({ x: 0, z: -88, w: 40, d: 20, top: 16, bottom: -4, rough: 1.0, seed: 140, topColor: null });
   // switchback flights
   flight({ x: 6.6, z: -68.7, y: 12 }, { x: -6.6, z: -68.7, y: 17.2 }, 2.4, 150);
   flight({ x: -6.6, z: -71.5, y: 17.2 }, { x: 6.6, z: -71.5, y: 22.4 }, 2.4, 151);
@@ -1398,7 +1412,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   for (const { b, mat, cast } of buckets.values()) {
     verts += b.vertexCount;
     perMat[mat.name] = (perMat[mat.name] ?? 0) + b.vertexCount;
-    const m = b.toMesh(mat, { cast, receive: true });
+    const m = b.toMesh(mat, { cast, receive: true, planarUV: mat === M.ground ? 2.6 : undefined });
     if (m) {
       // Canopy / leaf buckets sit between follow-cam and the fox — fade them.
       if (mat.name === 'rv-canopy' || mat.name.includes('leaf') || mat.name.includes('canopy')) {

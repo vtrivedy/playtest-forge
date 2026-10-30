@@ -99,7 +99,7 @@ async function boot() {
   const sunDir = new THREE.Vector3(-0.3, 0.17, -0.94).normalize();
   lights.rim.position.copy(sunDir).multiplyScalar(20);
   lights.rim.intensity = 1.55;
-  const fog = applyHeightFog(scene, { density: 0.0052 });
+  const fog = applyHeightFog(scene, { density: 0.0042 });
   const sky = createPaintedSky(scene, {
     zenith: new THREE.Color(0x7f7aa6),
     mid: new THREE.Color(0xe2a060),

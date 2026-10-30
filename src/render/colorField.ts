@@ -421,15 +421,16 @@ export class ColorField {
             ink = mix(ink, paper * (0.55 + luma * 0.55), smoothstep(0.42, 0.92, luma));
             // amber / ochre lift in mids (pressed-leaf warmth)
             ink = mix(ink, vec3(0.74, 0.56, 0.34), 0.16 * smoothstep(0.18, 0.58, luma));
-            // paper grain + foxing blotches
-            float g = (noise21(worldPos.xz * 7.0) - 0.5) * 0.10;
-            g += (noise21(worldPos.xz * 22.0) - 0.5) * 0.045;
-            g += (noise21(worldPos.xz * 48.0) - 0.5) * 0.02;
-            float fox = smoothstep(0.62, 0.9, noise21(worldPos.xz * 1.6 + 3.1));
+            // paper grain + foxing blotches (y folded in so cliffs don't streak vertically)
+            vec2 gp = worldPos.xz + worldPos.y * vec2(0.71, 1.37);
+            float g = (noise21(gp * 7.0) - 0.5) * 0.10;
+            g += (noise21(gp * 22.0) - 0.5) * 0.045;
+            g += (noise21(gp * 48.0) - 0.5) * 0.02;
+            float fox = smoothstep(0.62, 0.9, noise21(gp * 1.6 + 3.1));
             ink += g;
             ink = mix(ink, ink * vec3(0.92, 0.78, 0.58), fox * 0.22);
             // soft wash hatch (not harsh charcoal)
-            float hatch = step(0.55, fract((worldPos.x + worldPos.z) * 3.2 + luma));
+            float hatch = step(0.55, fract((worldPos.x + worldPos.z + worldPos.y * 0.8) * 3.2 + luma));
             float shadowAmt = 1.0 - smoothstep(0.05, 0.35, luma);
             ink = mix(ink, ink * 0.86, shadowAmt * hatch * 0.4);
             float rim = pow(1.0 - max(0.0, dot(normalize(worldN), vec3(0.2, 0.85, 0.15))), 2.0);
