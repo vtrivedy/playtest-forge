@@ -76,8 +76,9 @@ const feel: FoxFeel = { ...FEEL_PRESETS[feelPreset] };
 const jumpFeel = new JumpFeel();
 const feelMetrics = emptyFeelMetrics();
 const BLOOM = 0.1;
-/** Ember pickup freeze — just enough to register the hit */
-const HITSTOP_S = 0.045;
+/** Ember pickup freeze — just enough to register the hit; cooldown so ember lines don't stutter */
+const HITSTOP_S = 0.03;
+const HITSTOP_COOLDOWN_S = 0.35;
 
 async function boot() {
   const hud = createHud();
@@ -296,6 +297,7 @@ async function boot() {
   let jumpedThisAir = false;
   let landT = 0;
   let hitstop = 0;
+  let lastHitstop = -1;
   let shrineOn = false;
   let fxEnabled = true;
   let turntableMode = false;
@@ -455,6 +457,10 @@ async function boot() {
       if (render) draw();
       return win.__gameHooks!.state && (win.__gameHooks!.state as () => unknown)();
     },
+    /** Drag-orbit equivalent (radians) for keyboard steering tests */
+    orbit(dYaw: number) {
+      cam.orbit(dYaw);
+    },
     /** Press keys for the next advance() calls (harness input in manual mode) */
     setKeys(codes: string[]) {
       keys.clear();
@@ -487,6 +493,9 @@ async function boot() {
         deaths,
         t: simClock,
         pos: [p.x, p.y - foxActor.feetOffset, p.z],
+        vel: [vel.x, vel.y, vel.z],
+        foxYaw: foxActor.group.rotation.y,
+        airT,
         anim: foxActor.getAnim(),
         grounded,
         gliding,
@@ -524,7 +533,10 @@ async function boot() {
         feelMetrics.gemsCollected = embersGot;
         hud.setEmbers(embersGot);
         audio.play('ember');
-        hitstop = HITSTOP_S;
+        if (simClock - lastHitstop > HITSTOP_COOLDOWN_S) {
+          hitstop = HITSTOP_S;
+          lastHitstop = simClock;
+        }
         foxActor.pulse(2.2);
       } else if (e.type === 'seedwell') {
         const s = world.seedwells[e.index]!;
@@ -576,20 +588,41 @@ async function boot() {
     vel.set(0, 0, 0);
   }
 
-  /** Ballistic landing preview for the camera (same gravity/glide model as the sim). */
-  function predictLanding(pos: THREE.Vector3, v: THREE.Vector3, glidingNow: boolean): boolean {
+  /**
+   * Landing preview for the camera: integrates the same rules as step() with the current input held —
+   * wish acceleration + air control, fall gravity, apex hang, glide activation (held jump while falling),
+   * eased glide sink, wall blocking. A short-horizon estimate, not a promise.
+   */
+  function predictLanding(pos: THREE.Vector3, v: THREE.Vector3, held: boolean, wishDir: THREE.Vector3, glideT: number): boolean {
     let x = pos.x;
     let y = pos.y - foxActor.feetOffset;
     let z = pos.z;
+    let vx = v.x;
     let vy = v.y;
-    const h = 0.05;
-    for (let i = 0; i < 70; i++) {
-      const g = feel.gravity * (glidingNow ? feel.glideGravityScale : vy < 0 ? feel.fallGravity : 1);
-      vy -= g * h;
-      if (glidingNow) vy = Math.max(vy, -feel.glideSink);
+    let vz = v.z;
+    let gT = glideT;
+    const h = 1 / 30;
+    for (let i = 0; i < 100; i++) {
+      gT = held && vy < 0 ? gT + h : 0;
+      const gl = gT > feel.glideDelay;
+      if (gl) {
+        if (vy > -feel.glideSink) vy = Math.max(vy - feel.gravity * feel.glideGravityScale * h, -feel.glideSink);
+        else vy += (-feel.glideSink - vy) * (1 - Math.exp(-7 * h));
+        vx *= Math.exp(-feel.glideDrag * h);
+        vz *= Math.exp(-feel.glideDrag * h);
+      } else {
+        const hang = held && Math.abs(vy) < 1.4 ? feel.apexHang : 1;
+        vy -= feel.gravity * (vy < 0 ? feel.fallGravity : 1) * hang * h;
+      }
+      const target = gl ? feel.glideForward : feel.moveSpeed;
+      const k = 1 - Math.exp(-feel.accel * (gl ? 0.9 : feel.airControl) * h);
+      vx += (wishDir.x * target - vx) * k;
+      vz += (wishDir.z * target - vz) * k;
       const py = y;
-      x += v.x * h;
-      z += v.z * h;
+      if (!col.blocked(x + vx * h, z, py)) x += vx * h;
+      else vx = 0;
+      if (!col.blocked(x, z + vz * h, py)) z += vz * h;
+      else vz = 0;
       y += vy * h;
       if (vy < 0) {
         const gy = col.groundAt(x, z, py).y;
@@ -899,7 +932,9 @@ async function boot() {
     restore.update(dt);
     zone = world.zoneAt(fox.position.x, fox.position.z);
 
-    landingValid = !grounded && predictLanding(fox.position, vel, gliding);
+    // through a dash, keep the last estimate (the dash is short and gravity-free)
+    if (grounded) landingValid = false;
+    else if (!dashing) landingValid = predictLanding(fox.position, vel, spaceDown, wish, glideHoldT);
     cam.update(rawDt, {
       target: feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
       vel,
@@ -909,7 +944,7 @@ async function boot() {
       airTime: airT,
       landing: landingValid ? landing : null,
     });
-    occlusion.update(rawDt, cam.camera, renderer, feetPos, foxActor.height);
+    occlusion.update(rawDt, cam.camera, renderer, feetPos, foxActor.height, fox.rotation.y);
     audio.update(dt, speed > 1.2, grounded, gliding);
   }
   const feetPos = new THREE.Vector3();

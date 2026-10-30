@@ -177,7 +177,8 @@ if (mode === 'shots') {
   // UNASSISTED full route; sample the traversal camera every 2 sim frames
   await boot();
   await H('autopilot', true, 0, { assist: false });
-  const acc = { frames: 0, air: 0, landingInFrame: 0, foxHigh: 0, foxLow: 0, foxOff: 0, pops: 0, maxCamSpeed: 0, occluded: 0, dist: [], events: [], misses: [], shotFrames: 0 };
+  const acc = { frames: 0, air: 0, landingInFrame: 0, foxHigh: 0, foxLow: 0, foxOff: 0, pops: 0, maxCamSpeed: 0, occluded: 0, dist: [], events: [], misses: [], shotFrames: 0, airAll: 0, longestMiss: 0, missByPhase: {} };
+  let missRun = 0;
   let prev = null;
   let st;
   for (let i = 0; i < 60 * 200; i++) {
@@ -191,6 +192,13 @@ if (mode === 'shots') {
     else if (fy > 0.45) acc.foxHigh++;
     else if (fy < -0.75) acc.foxLow++;
     if (st.camera.occlusion > 0.5) acc.occluded++;
+    if (!st.grounded) {
+      acc.airAll++;
+      const lnd = st.camera.landingNdc;
+      const ok = lnd && Math.abs(lnd[0]) < 0.95 && Math.abs(lnd[1]) < 0.95;
+      if (!ok) { missRun += 2 / 60; acc.longestMiss = Math.max(acc.longestMiss, missRun); } else missRun = 0;
+      if (!ok && lnd) { const ph = st.anim; acc.missByPhase[ph] = (acc.missByPhase[ph] ?? 0) + 1; }
+    } else missRun = 0;
     if (!st.grounded && st.camera.landingNdc) {
       acc.air++;
       const [lx, ly] = st.camera.landingNdc;
@@ -214,7 +222,11 @@ if (mode === 'shots') {
   const r = {
     label: 'UNASSISTED framing — full route from spawn, traversal camera sampled every 2 frames',
     reached: `${st.auto.idx}/${st.auto.of}`, restored: st.restored, stalled: st.auto.stalled || null, simSeconds: Number(st.t.toFixed(1)),
+    stops: 'at restoration (the wellspring step itself is not walked)',
+    predictionCoveragePct: Number((100 * acc.air / Math.max(1, acc.airAll)).toFixed(1)),
     landingInFramePct: Number((100 * acc.landingInFrame / Math.max(1, acc.air)).toFixed(1)),
+    longestLandingMissS: Number(acc.longestMiss.toFixed(2)),
+    landingMissByAnim: acc.missByPhase,
     foxHighPct: Number((100 * acc.foxHigh / acc.frames).toFixed(1)),
     foxLowPct: Number((100 * acc.foxLow / acc.frames).toFixed(1)),
     foxOffscreenPct: Number((100 * acc.foxOff / acc.frames).toFixed(2)),
@@ -245,7 +257,7 @@ if (mode === 'shots') {
     st = await advance(1, false);
     for (const [k, f] of Object.entries(want)) {
       if (!got[k] && f(st)) {
-        st = await advance(1);
+        await advance(0); // render the triggering state itself (no extra sim step)
         got[k] = { t: st.t, zone: st.zone, anim: st.anim, camera: { foxNdc: st.camera.foxNdc, landingNdc: st.camera.landingNdc, occlusion: st.camera.occlusion } };
         await shot(`moments/${k}`);
       }
@@ -253,6 +265,55 @@ if (mode === 'shots') {
     if (!st.auto.active) break;
   }
   save('moments/index', { label: 'UNASSISTED stills — first frame of each situation on the bot run from spawn', got });
+} else if (mode === 'steer') {
+  // KEYBOARD steering with the bot OFF (STAGED start on open meadow): does the camera-relative basis +
+  // auto-recentre do what a player expects? Heading = fox velocity direction, yaw = camera steering yaw.
+  await boot();
+  const deg = (r) => Number(((r * 180) / Math.PI).toFixed(1));
+  const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  const heading = (st) => Math.atan2(st.vel[0], st.vel[2]);
+  const tests = {
+    'W 3s': [[['KeyW'], 180]],
+    'W+D 3s': [[['KeyW', 'KeyD'], 180]],
+    'D 4s': [[['KeyD'], 240]],
+    'S toward lens 2s': [[['KeyS'], 120]],
+    'W then S reversal': [[['KeyW'], 90], [['KeyS'], 90]],
+    'W + orbit 60° mid-run': [[['KeyW'], 60], ['orbit', Math.PI / 3], [['KeyW'], 120]],
+  };
+  const res = {};
+  for (const [name, seq] of Object.entries(tests)) {
+    await H('teleport', -20, 0, 66, Math.PI);
+    await H('setKeys', []);
+    await advance(40, false);
+    const s0 = await H('state');
+    const trace = [];
+    let first = null;
+    let flipT = null;
+    let t = 0;
+    for (const stepDef of seq) {
+      if (stepDef[0] === 'orbit') { await H('orbit', stepDef[1]); continue; }
+      await H('setKeys', stepDef[0]);
+      for (let i = 0; i < stepDef[1]; i += 6) {
+        const st = await advance(6, false);
+        t += 0.1;
+        const sp = Math.hypot(st.vel[0], st.vel[2]);
+        if (sp > 2 && first === null) first = heading(st);
+        if (name.includes('reversal') && stepDef[0][0] === 'KeyS' && flipT === null && first !== null && sp > 2 && Math.abs(wrapA(heading(st) - first)) > 2.6) flipT = t;
+        trace.push({ t: Number(t.toFixed(1)), x: Number(st.pos[0].toFixed(2)), z: Number(st.pos[2].toFixed(2)), heading: deg(heading(st)), camYaw: deg(st.camera.yaw), speed: Number(sp.toFixed(2)) });
+      }
+    }
+    const end = trace[trace.length - 1];
+    res[name] = {
+      headingChangeDeg: first === null ? null : deg(wrapA((end.heading * Math.PI) / 180 - first)),
+      camYawChangeDeg: deg(wrapA(((end.camYaw - deg(s0.camera.yaw)) * Math.PI) / 180)),
+      travelled: Number(Math.hypot(end.x - s0.pos[0], end.z - s0.pos[2]).toFixed(2)),
+      reversalS: flipT,
+      trace: trace.filter((_, i) => i % 3 === 0),
+    };
+    console.log(name, JSON.stringify({ ...res[name], trace: undefined }));
+  }
+  await H('setKeys', []);
+  save('steer', { label: 'STAGED start (meadow teleport), KEYBOARD input only, autopilot off, 60 Hz', res });
 } else if (mode === 'video') {
   // UNASSISTED traversal from spawn, rendered every 2nd 60 Hz step → 30 fps video
   const seconds = Number(arg('seconds', '14'));

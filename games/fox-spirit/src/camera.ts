@@ -124,7 +124,8 @@ export function createFollowCamera(opts: {
   let pullHold = 0;
   let pullGoal = 0;
   /** Active shot: pose solved once at start (no per-frame re-solve pops); look tracks the subjects */
-  let shot: (CameraShot & { t: number; end: number }) | null = null;
+  let shot: (CameraShot & { t: number; end: number; yielding?: boolean }) | null = null;
+  let shotStill = 1;
   let landW = 0;
   let liftNow = 0;
   let boomT = 1;
@@ -268,10 +269,11 @@ export function createFollowCamera(opts: {
     playShot(s) {
       // a shot already on screen just extends; restarting would pop from its pose back to traversal
       if (shot) {
-        shot.end = Math.max(shot.end, shot.t + s.holdS + (shot.blendS ?? 0.6));
+        if (!shot.yielding) shot.end = Math.max(shot.end, shot.t + s.holdS + (shot.blendS ?? 0.6));
         return;
       }
       shot = { ...s, t: 0, end: (s.blendS ?? 0.6) * 2 + s.holdS };
+      shotStill = 1;
       frameShot(shot);
     },
     land(impact) {
@@ -322,7 +324,9 @@ export function createFollowCamera(opts: {
         const heading = Math.atan2(f.vel.x, f.vel.z);
         const behind = wrap(heading + Math.PI);
         const toward = -Math.cos(heading - yaw); // 1 = running away from camera
-        const weight = toward > -0.2 ? Math.max(0.15, toward) : 0;
+        // only nudge near-forward runs (≲35° off): diagonals and strafes stay straight and
+        // predictable instead of chasing themselves into a spiral (W+D held 3 s turned 150°)
+        const weight = THREE.MathUtils.smoothstep(toward, Math.cos(THREE.MathUtils.degToRad(35)), Math.cos(THREE.MathUtils.degToRad(8)));
         const rate = params.recenterRate * Math.min(1, speed / 7.5) * weight * (f.gliding ? 1.4 : 1);
         const d = wrap(behind - yaw);
         yaw = wrap(yaw + THREE.MathUtils.clamp(d, -rate * dt, rate * dt));
@@ -415,18 +419,29 @@ export function createFollowCamera(opts: {
         const blend = shot.blendS ?? 0.6;
         if (shot.t >= shot.end) shot = null;
         else {
-          // the fox keeps playing during a shot; if it runs out of the safe frame, bow out early
+          // reward framing yields to play: any jump/dash, or the fox / its landing leaving the safe
+          // frame, starts the blend-out from the *current* weight (works mid blend-in, no pop)
           ndc.set(p.x, p.y + 0.6, p.z).project(camera);
-          const leaving = Math.abs(ndc.x) > 0.8 || Math.abs(ndc.y) > 0.8 || ndc.z > 1 || f.airTime > 0.25;
-          if (shot.t > blend && leaving) {
-            shot.end = Math.min(shot.end, shot.t + blend);
+          let leaving = Math.abs(ndc.x) > 0.8 || Math.abs(ndc.y) > 0.8 || ndc.z > 1 || !f.grounded || f.dashing;
+          if (!leaving && f.landing) {
+            ndc.copy(f.landing).project(camera);
+            leaving = Math.abs(ndc.x) > 0.85 || Math.abs(ndc.y) > 0.85 || ndc.z > 1;
+          }
+          if (leaving && !shot.yielding) {
+            const x0 = Math.min(1, shot.t / blend, (shot.end - shot.t) / blend);
+            shot.end = shot.t + blend * 0.7 * x0;
+            shot.yielding = true;
           }
           tmp.copy(shot.subjects[1] ?? p).add(p).multiplyScalar(0.5);
           shotLook.x = THREE.MathUtils.damp(shotLook.x, tmp.x, 3, dt);
           shotLook.y = THREE.MathUtils.damp(shotLook.y, tmp.y, 3, dt);
           shotLook.z = THREE.MathUtils.damp(shotLook.z, tmp.z, 3, dt);
-          const x = Math.min(1, shot.t / blend, (shot.end - shot.t) / blend);
-          shotW = x * x * (3 - 2 * x);
+          const x = shot.yielding
+            ? Math.max(0, (shot.end - shot.t) / (blend * 0.7))
+            : Math.min(1, shot.t / blend, (shot.end - shot.t) / blend);
+          // strongest while the fox stands still; a moving player gets a lighter intervention
+          shotStill = THREE.MathUtils.damp(shotStill, speed > 1.5 ? 0.45 : 1, 3, dt);
+          shotW = x * x * (3 - 2 * x) * shotStill;
         }
       }
       const outPos = tmp.copy(rig);
@@ -438,6 +453,11 @@ export function createFollowCamera(opts: {
         outFov = THREE.MathUtils.lerp(outFov, shot.fov ?? params.fov, shotW);
       }
       outPos.y += dip * (1 - shotW);
+      // the rendered lens (shot blend + dip) gets the same floor guarantee as the rig
+      if (opts.surfaceAt) {
+        const floor = opts.surfaceAt(outPos.x, outPos.z, outPos.y + 1.5);
+        if (Number.isFinite(floor) && outPos.y < floor + params.clearance * 0.8) outPos.y = floor + params.clearance * 0.8;
+      }
 
       camera.position.copy(outPos);
       camera.lookAt(outLook);

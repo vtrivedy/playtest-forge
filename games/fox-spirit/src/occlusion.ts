@@ -18,8 +18,9 @@ export function createOcclusionFader(
     exclude?: THREE.Object3D;
   },
 ) {
-  // x,y = fox chest in framebuffer px, z = fox view depth (m), w = radius px
+  // x,y = centre of the fox's projected bounds (framebuffer px), z = fox view depth (m); radii in px
   const uOccFox = { value: new THREE.Vector4(0, 0, 0, 1) };
+  const uOccRad = { value: new THREE.Vector2(1, 1) };
   const uOccStrength = { value: 0 };
   const patched = new WeakSet<THREE.Material>();
 
@@ -32,26 +33,29 @@ export function createOcclusionFader(
       prev.call(mat, shader, renderer);
       shader.uniforms.uOccFox = uOccFox;
       shader.uniforms.uOccStrength = uOccStrength;
+      shader.uniforms.uOccRad = uOccRad;
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
           `#include <common>
           uniform vec4 uOccFox;
+          uniform vec2 uOccRad;
           uniform float uOccStrength;`,
         )
         .replace(
           '#include <clipping_planes_fragment>',
           `#include <clipping_planes_fragment>
           if (uOccStrength > 0.001) {
-            float occR = length(gl_FragCoord.xy - uOccFox.xy) / uOccFox.w;
+            float occR = length((gl_FragCoord.xy - uOccFox.xy) / uOccRad);
             float occNear = uOccFox.z - vViewPosition.z; // vViewPosition = -mvPosition → +depth
-            float occCut = uOccStrength * (1.0 - smoothstep(0.6, 1.0, occR)) * smoothstep(0.7, 1.6, occNear);
+            // soft-edged ellipse fitted to the fox; nearby geometry counts from 0.45 m in front
+            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(0.45, 1.2, occNear);
             // 4x4 Bayer stipple — no sorting, no blending, keeps a ghost of the occluder
             vec2 occP = mod(floor(gl_FragCoord.xy), 4.0);
             vec2 occLo = mod(occP, 2.0);
             vec2 occHi = floor(occP * 0.5);
             float occB = (4.0 * mod(2.0 * occLo.x + 3.0 * occLo.y, 4.0) + mod(2.0 * occHi.x + 3.0 * occHi.y, 4.0) + 0.5) / 16.0;
-            if (occB < occCut * 0.85) discard;
+            if (occB < occCut * 0.72) discard; // keep ~28 % of the occluder as a ghost
           }`,
         );
     };
@@ -112,7 +116,14 @@ export function createOcclusionFader(
     get strength() {
       return uOccStrength.value;
     },
-    update(dt: number, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, foxPos: THREE.Vector3, foxHeight: number) {
+    update(
+      dt: number,
+      camera: THREE.PerspectiveCamera,
+      renderer: THREE.WebGLRenderer,
+      foxPos: THREE.Vector3,
+      foxHeight: number,
+      foxYaw: number,
+    ) {
       camera.updateMatrixWorld();
       chest.copy(foxPos).y += foxHeight * 0.45;
       head.copy(foxPos).y += foxHeight * 1.05;
@@ -123,15 +134,22 @@ export function createOcclusionFader(
       const goal = blockedHold > 0 ? 1 : 0;
       uOccStrength.value = THREE.MathUtils.damp(uOccStrength.value, goal, goal > uOccStrength.value ? 10 : 4, dt);
 
+      // screen bounds of the fox: feet, ears, snout and tail tip
       renderer.getDrawingBufferSize(size);
-      ndc.copy(chest).project(camera);
-      const cx = (ndc.x * 0.5 + 0.5) * size.x;
-      const cy = (ndc.y * 0.5 + 0.5) * size.y;
-      ndc.copy(head).project(camera);
-      const hy = (ndc.y * 0.5 + 0.5) * size.y;
-      const radius = Math.max(size.y * 0.09, Math.abs(hy - cy) * 2.4);
+      const fx = Math.sin(foxYaw);
+      const fz = Math.cos(foxYaw);
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const [along, up] of [[0, 0], [0, 1.05], [0.75, 0.6], [-1.1, 0.5], [0.4, 0], [-0.5, 0]] as const) {
+        ndc.set(foxPos.x + fx * along, foxPos.y + foxHeight * up, foxPos.z + fz * along).project(camera);
+        const px = (ndc.x * 0.5 + 0.5) * size.x;
+        const py = (ndc.y * 0.5 + 0.5) * size.y;
+        x0 = Math.min(x0, px); x1 = Math.max(x1, px);
+        y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+      }
+      const pad = size.y * 0.03;
+      uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 0.62 + pad), Math.max(size.y * 0.05, (y1 - y0) * 0.62 + pad));
       const depth = chest.applyMatrix4(camera.matrixWorldInverse).z * -1;
-      uOccFox.value.set(cx, cy, depth, radius);
+      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, 1);
     },
   };
 }
