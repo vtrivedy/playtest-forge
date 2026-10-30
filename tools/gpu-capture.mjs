@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
 import { captureWindGap } from './windgap-capture.mjs';
 import { captureMarshMouth } from './marshmouth-capture.mjs';
+import { captureReed } from './reed-capture.mjs';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -332,6 +333,53 @@ try {
     await advance(0);
     await shot('shade-after-free');
     save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    let edge = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
+    if(!edge || edge.freed)throw Error('No live high-hill Shade for clear encounter evidence');
+    if(edge && !edge.freed){
+      const approach=await page.evaluate(([x,y,z])=>{
+        const col=window.__gameHooks.debug.world.collision;
+        for(let k=0;k<128;k++){
+          const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+          for(let r=.55;r<4.6;r+=.1){const px=x+dx*r,pz=z+dz*r,fy=col.groundAt(px,pz,y+2.5).y;if(!Number.isFinite(fy)||Math.abs(fy-y)>2.4||col.blocked(px,pz,fy+.01)){safe=false;break;}}
+          if(safe)return{pos:[x+dx*1.45,col.groundAt(x+dx*1.45,z+dz*1.45,y+2.5).y,z+dz*1.45],direction:[dx,dz]};
+        }throw Error('No clear restored-edge contact lane');
+      },edge.pos);
+      const contactBefore=await page.evaluate(()=>window.__gameHooks.shades.state());
+      await H('teleport',...approach.pos,0);
+      const [cx,cy,cz]=edge.pos;
+      await H('photo',[cx+1,cy+4,cz+8],[cx+approach.direction[0]*1.5,cy+1,cz+approach.direction[1]*1.5],48);
+      await H('setStick',-approach.direction[0],-approach.direction[1]);let touch=null;
+      await video('shade-clear-contact',110,async i=>{
+        const state=await page.evaluate(()=>window.__gameHooks.shades.state());
+        if(state.hits>contactBefore.hits&&touch===null){touch=i-1;await H('setStick',null);}
+      },(_,i)=>touch!==null&&i>=touch+61,{traceEveryFrame:true,keyFrames:[0,6,12,18,36,60]});
+      await H('setStick',null);
+      const contactAfter=await page.evaluate(()=>window.__gameHooks.shades.state());
+      if(contactAfter.hits!==contactBefore.hits+1||contactAfter.knockbackTravel<2.9)throw Error(`Edge contact failed ${JSON.stringify(contactAfter)}`);
+      save('shade-clear-contact-acceptance.json',{approach,before:contactBefore,after:contactAfter});
+      edge=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
+      const setup=await page.evaluate(([x,y,z])=>{
+        const col=window.__gameHooks.debug.world.collision;
+        for(let k=0;k<128;k++){
+          const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+          for(let r=-2;r<3;r+=.1){const px=x+dx*r,pz=z+dz*r,fy=col.groundAt(px,pz,y+2.5).y;if(!Number.isFinite(fy)||Math.abs(fy-y)>2.4||col.blocked(px,pz,fy+.01)){safe=false;break;}}
+          if(safe)return{pos:[x+dx*2.7,col.groundAt(x+dx*2.7,z+dz*2.7,y+2.5).y,z+dz*2.7],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
+        }throw Error('No safe restored-edge dash runway');
+      },edge.pos);
+      const before=await page.evaluate(()=>window.__gameHooks.shades.state());
+      await H('teleport',...setup.pos,setup.yaw);
+      const [x,y,z]=edge.pos;
+      await H('photo',[x+1,y+3.2,z+8],[x,y+1.2,z],48);
+      await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
+      await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,{traceEveryFrame:true,keyFrames:[0,5,12,24,36,48,75,119]});
+      const after=await page.evaluate(()=>window.__gameHooks.shades.state());
+      if(after.frees!==before.frees+1||after.hits!==before.hits||!after.actors.find(a=>a.id==='shade-hill-high')?.freed)throw Error(`Restored-edge dash failed ${JSON.stringify(after)}`);
+      await advance(180,false);await advance(0);await shot('shade-clear-litter');
+      await advance(600,false);await advance(0);await shot('shade-clear-empty');
+      const end=await page.evaluate(()=>window.__gameHooks.shades.state());
+      if(end.actors.find(a=>a.id==='shade-hill-high').leaves!==0)throw Error('Edge dissolve did not end empty');
+      save('shade-clear-acceptance.json',{label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
+    }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
     const live = await page.evaluate(() => {
@@ -377,48 +425,46 @@ try {
 
   }
   if (wants('showcase')) {
-    await boot(quality,true,'&gym=gait');
+    await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
-    const gym=await page.evaluate(()=>window.__gameHooks.gym);
-    if(!gym)throw Error('Showcase requires gait gym');
-    const ramp=Math.tan(Math.PI/12);
+    await H('photoOff');
+    const n=Math.hypot(.684,.729),td=[-.684/n,-.729/n],tn=[.729/n,-.684/n];
+    const sp=(s,t,y)=>[-48+td[0]*s+tn[0]*t,y,52+td[1]*s+tn[1]*t];
+    const board=[.868243,-.496139];
     const segments=[
-      {name:'walk',seconds:2,stick:[.18,0],reset:[580,0,0]},
-      {name:'trot',seconds:2,stick:[.45,0]},
-      {name:'gallop',seconds:3,stick:[1,0]},
-      {name:'left turn',seconds:1,stick:[0,-1]},
-      {name:'right turn',seconds:1,stick:[1,0]},
-      {name:'jump and land',seconds:2,stick:[.45,0],jump:true,reset:[610,0,0]},
-      {name:'slope ascent',seconds:3,stick:[.6,0],reset:[653,0,0]},
-      {name:'slope jump and land',seconds:2,stick:[.45,0],jump:true,reset:[658,3*ramp,0]},
-      {name:'slope descent',seconds:3,stick:[.6,0],reset:[673,12*ramp,0]},
-      {name:'brake',seconds:1,stick:[0,0]},
+      {name:'Reedmarsh boardwalk walk',seconds:2,stick:board.map(v=>v*.18),reset:[62.5,.3,32.5]},
+      {name:'Windmill terrace trot',seconds:2,stick:tn.map(v=>v*.45),reset:sp(8,-5,2)},
+      {name:'Windmill terrace gallop',seconds:2,stick:tn,reset:sp(8,-8,2)},
+      {name:'Windmill carved turns',seconds:3,turn:true,reset:sp(5,0,2)},
+      {name:'Windmill jump and recovery',seconds:2,stick:tn.map(v=>v*.45),jump:true,reset:sp(5,0,2)},
+      {name:'Windmill entrance ascent',seconds:3,stick:td.map(v=>v*.18),reset:sp(-6,0,.1+1.9*.5/6.9)},
+      {name:'Windmill slope jump and land',seconds:3,stick:td.map(v=>v*.18),jump:true,reset:sp(-4,0,.1+1.9*2.5/6.9)},
+      {name:'Windmill dash',seconds:1,stick:tn,dash:true,reset:sp(8,-8,2)},
+      {name:'Windmill brake and settle',seconds:2,stick:[0,0]},
     ];
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
     const keyFrames=segments.flatMap(segment=>[segment.start+Math.round(fps*.25),segment.end-1]);
-    save('showcase-script.json',{label:'20 seconds, live controller input, staged segment resets, fixed side-follow lens, no forced poses',segments,gym});
+    save('showcase-script.json',{label:'20 seconds in real World1, live controller, staged segment cuts, standard gameplay camera, no forced poses or grade',segments});
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
-      if(local===0){if(segment.reset)await H('teleport',...segment.reset,Math.PI/2);await H('setStick',...segment.stick);}
-      await H('setKeys',segment.jump && local<Math.round(.25*fps)?['Space']:[]);
-    },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{
-      if(state.deaths)throw Error(`Showcase course death at ${i}`);
-      await page.evaluate(([x,y,z])=>{
-        const h=window.__gameHooks,ground=h.debug.world.collision.highestAt(x,z);
-        h.photo([x,ground+1.6,z+6],[x,ground+.85+Math.max(0,y-ground)*.25,z],42);
-      },state.pos);
-    }});
+      let stick=segment.stick;
+      if(segment.turn){const angle=local/fps*2;stick=[(tn[0]*Math.cos(angle)+td[0]*Math.sin(angle))*.45,(tn[1]*Math.cos(angle)+td[1]*Math.sin(angle))*.45];}
+      if(local===0 && segment.reset){const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...segment.reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
+      await H('setStick',...stick);
+      await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
+    },undefined,{traceEveryFrame:true,keyFrames});
     await H('setKeys',[]);await H('setStick',null);
     const result=report.videos.showcase;
-    const slope=segments.find(segment=>segment.name==='slope jump and land');
+    const slope=segments.find(segment=>segment.name==='Windmill slope jump and land');
     const rows=result.trace.filter(row=>row.frame>=slope.start && row.frame<slope.end);
     const air=rows.findIndex(row=>!row.state.grounded);
     const landed=air>=0?rows.slice(air+1).find(row=>row.state.grounded):null;
-    const p=landed?.state.pos;
-    const acceptance={seconds:cursor/fps,frames:cursor,slopeJumpAirborne:air>=0,slopeLanding:p??null,landedOnIncline:!!p && p[0]>655 && p[0]<667,deaths:(await H('state')).deaths};
+    const pos=landed?.state.pos;
+    const terraceS=pos ? (pos[0]+48)*td[0]+(pos[2]-52)*td[1] : null;
+    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Windmill Rise',camera:'standard gameplay',slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
-    if(!acceptance.landedOnIncline)throw Error('Showcase did not land on the actual incline');
+    if(!acceptance.landedOnIncline || acceptance.deaths)throw Error('World showcase did not complete safely with an incline landing');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
@@ -716,6 +762,10 @@ try {
     save('updraft-acceptance.json', summary);
     console.log('UPDRAFT', JSON.stringify(summary));
   }
+  if (wants('reed')) {
+    await boot(quality, true);
+    await captureReed({ H, advance, shot, video, save, page, fps, report });
+  }
   if (wants('marshmouth')) {
     for (const variant of ['aura', 'dash']) for (let trial = 1; trial <= 3; trial++) {
       await boot(quality, true);
@@ -993,8 +1043,18 @@ try {
       await boot(quality, true);
       if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
       // Central arrival lane: keep the front camera and running fox clear of H-a and its rock wall.
-      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
-      await H('teleport', 0, reviewY, 70, Math.PI);
+      const stages = await page.evaluate(() => {
+        const h = window.__gameHooks, col = h.debug.world.collision;
+        return [[0,70],[-8,78],[-18,76],[20,62],[-20,52],[12,52],[28,54]].map(([x,z]) => {
+          const y = col.highestAt(x,z), look = [x,y+0.5,z];
+          const views = [[0,.6,-5.2],[3.5,.7,-4],[-5.6,.55,0],[-3.3,.9,4.4],[0,.9,5.4],[-.8,.95,-2.2]];
+          const blockers = views.map(([dx,dy,dz]) => h.photoBlocker([x+dx,Math.max(y+dy,col.highestAt(x+dx,z+dz)+.3),z+dz],look));
+          return {x,y,z,blockers,score:blockers.filter(Boolean).length};
+        }).sort((a,b)=>a.score-b.score);
+      });
+      save(`fox-${state}-stages.json`, stages);
+      const stage = stages[0];
+      await H('teleport', stage.x, stage.y, stage.z, Math.PI);
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
       await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
@@ -1006,6 +1066,7 @@ try {
         const cameraFloor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [p.x + dx, p.z + dz]);
         await H('photo', [p.x + dx, Math.max(p.y + dy, cameraFloor + 0.3), p.z + dz], look, fov);
         await advance(3); await shot(`fox-${state}-${name}`);
+
       }
       await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);
       await H('setKeys', ['KeyW']); await advance(70); await shot(`fox-${state}-chase-run`);
