@@ -1038,7 +1038,7 @@ async function boot() {
     // steer (in air: brake once over the target; wait at the bridge head until the roots finish growing)
     const prevLabel = route[auto.idx - 1]?.label;
     // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
-    const waitSeedwell = ((prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit) || (prevLabel === 'SW1-feed' && !world.seedwells[0]!.lit);
+    const waitSeedwell = ((prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit) || (prevLabel === 'SW1-feed' && !world.seedwells[0]!.lit) || (prevLabel === 'SW3-feed' && !world.seedwells[2]!.lit);
     // Let the visible front cross the six-metre bed before stepping off the dry boardwalk.
     const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
     const liftWp = route[auto.idx - 1];
@@ -1463,7 +1463,7 @@ async function boot() {
       // keep leaves riding a burning column, near the fox only (shared leaf pool)
       if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
     }
-    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); return updrafts.hearths.some((h) => heatFeeds(h, q.pos, updrafts.tun.radius)); })) latchSeedwell(i);
+    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); if (q.source === 'sw3-root') { const r = growth.roots.find((x) => x.spot.id === q.source); return !!r && r.grown >= 0.999 && r.reactor.heat >= 0.5 && r.wither <= 0; } return updrafts.hearths.some((h) => heatFeeds(h, q.pos, updrafts.tun.radius)); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     // summit finale: the root holds the lintel up, the hearth's column (clipped by the stone) reaches the basin
     world.summit.update(dt, growth.roots, shrineOn);

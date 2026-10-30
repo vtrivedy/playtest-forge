@@ -51,8 +51,9 @@ export function createSummitRepair(parent: THREE.Group, col: CollisionWorld, sto
   const feet = socket.toMesh(stoneMaterial, { boxUV: 1.6 }); if (feet) parent.add(feet);
   const rootSpot: RootSpot = {
     id: s.rootId,
-    knot: new THREE.Vector3(-4.6, 38, -85.4),
-    path: [[-4.4, 38.08, -85.4], [-3.9, 38.7, -85.9], [-3.6, 40.1, -86.9], [-2.7, 41.2, -87.8], [-1.7, 42.12, -87.6]],
+    // a long, low climb from the apron to the lintel's underside (a short steep root read as a ribbon)
+    knot: new THREE.Vector3(-6.8, 38, -84.2),
+    path: [[-6.3, 38.1, -84.4], [-5.1, 38.5, -85.0], [-3.9, 39.3, -85.8], [-3.0, 40.5, -86.7], [-2.2, 41.5, -87.3], [-1.7, 42.12, -87.6]],
     segments: 2, width: 1.4,
     // Flood explicitly restores this root; no local Seedwell bypasses repair.
   };
