@@ -834,7 +834,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     for (let i = 0; i < colsT.length; i++) {
       const [s, t, y, h] = colsT[i]!;
       const p = sp(s, t);
-      ruinColumn(bk('stone', p.x, p.z), p.x, y, p.z, h, 60 + i);
+      // CC0 carved drum (Quaternius), stood at its broken height
+      bk('stone', p.x, p.z).add(lanternColumn, trs(p.x, y, p.z, i * 1.7, 1.5, h / 1.9, 1.5), PAL.stone);
     }
   }
 
@@ -1787,6 +1788,25 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
     col.add(cylCollider({ x: p.x + 2.2, z: p.z + 1.7, r: 1.6, top: 34, bottom: 33.3, tag: 'mill-cap-perch' }));
     slab({ x: p.x + 2.2, z: p.z + 1.7, w: 3.2, d: 3.2, top: 34, bottom: 33.3, round: true, rough: 0.35, seed: 367, topColor: PAL.stone });
+  }
+  // S5 "the curl under the gap": gliding the wind gap, a cold ash curl shows on the y10 floor at the foot
+  // of the far cliff, with a warm-lit broken arch on a balcony high on the same face. Drop down (4 m, safe),
+  // wake HG, ride it to the y22 balcony: a side view of the Kiln spire and the gap you just crossed.
+  {
+    const h = sp(58.6, -8);
+    hearthSpots.push({ id: 'HG', x: h.x, y: 10, z: h.z, height: 12.5 });
+    col.add(cylCollider({ x: h.x, z: h.z, r: 0.82, top: 11, bottom: 9, tag: 'hearth' }));
+    const b = sp(62, -8);
+    col.add(boxCollider({ x: b.x, z: b.z, w: 4.6, d: 3.6, yaw: T_YAW, top: 22, bottom: 20.8, tag: 'gap-balcony' }));
+    slab({ x: b.x, z: b.z, w: 4.6, d: 3.6, yaw: T_YAW, top: 22, bottom: 20.8, rough: 0.4, seed: 371, topColor: PAL.stone.clone().lerp(PAL.rustMoss, 0.3), overhang: 0.2 });
+    const c = sp(62.6, -8);
+    bk('stone', c.x, c.z).add(lanternColumn, trs(c.x, 14, c.z, 0.7, 2.0, 6.8 / 1.9, 2.0), PAL.stone);
+    const a = sp(62.8, -8);
+    archAt(bk('stone', a.x, a.z), a.x, 22, a.z, T_YAW, { span: 2.6, pillarH: 3.2, broken: 0.35, seed: 372, pointed: true });
+    const glow = new THREE.PointLight(0xffa860, 6, 9, 2);
+    glow.position.set(a.x, 23.4, a.z);
+    group.add(glow);
+    litterPatch(bk('litter', b.x, b.z, false), rng(373), b.x, b.z, 1.9, 40, () => 22);
   }
   // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
   {

@@ -111,9 +111,10 @@ function leafMaterial(): THREE.ShaderMaterial {
         float c = cos(vSpin), s = sin(vSpin);
         vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
         r.x /= vFlip;
-        // five-lobed leaf outline with a stem notch, soft at the edge
+        // broad maple-ish blade: shallow lobes on an ovate outline, a stem notch, soft at the edge
+        r.y *= 0.85;
         float ang = atan(r.y, r.x);
-        float rad = 0.36 + 0.07 * cos(ang * 5.0) - 0.05 * smoothstep(0.85, 1.0, -sin(ang));
+        float rad = 0.33 + 0.03 * cos(ang * 5.0) + 0.05 * sin(ang) - 0.06 * smoothstep(0.9, 1.0, -sin(ang));
         float d = length(r) - rad;
         float a = 1.0 - smoothstep(-0.03, 0.02, d);
         if (a < 0.05) discard;
@@ -123,6 +124,7 @@ function leafMaterial(): THREE.ShaderMaterial {
         vec3 ochre = vec3(0.78, 0.58, 0.24);
         vec3 col = mix(mix(rust, amber, smoothstep(0.0, 0.6, vTone)), ochre, smoothstep(0.7, 1.0, vTone));
         col *= (0.7 + 0.45 * vFlip) - vein;
+        col = pow(col, vec3(2.2)); // authored in sRGB; the pass below re-encodes
         gl_FragColor = vec4(col, a * uOpacity);
         #include <colorspace_fragment>
       }`,
