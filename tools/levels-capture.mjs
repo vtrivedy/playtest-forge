@@ -15,7 +15,7 @@ export async function captureLevels({ boot, H, advance, shot, video, save, page,
   }
   path.push(controls.at(-1));
   // Dash east along the inner side of the bowl, remaining on the 12.4 m ledge.
-  const stagedStart = [hx - 3, hy, hz - 1.4];
+  const stagedStart = [hx - 3.8, hy, hz - 1.4];
   await H('teleport', ...stagedStart, Math.PI / 2);
   await H('setStick', 0, 0); await H('setKeys', []); await advance(8);
   await shot('levels-00-staged-cold-start');
