@@ -36,3 +36,6 @@ Original procedural assets (spirit fox restyle, shrine, gems, ink enemy, NPC, au
 ## Notes
 - Kenney Nature Kit models use flat vertex colors (no textures) — ideal for our desaturate / restore-color shader.
 - Quaternius fox is a CC0 starting point; final hero should match `concept/fox-turnaround.jpg`.
+
+## Sprint 2 library
+See `library/CREDITS.md` for Poly Haven / ambientCG / fox candidate licenses and BlenderKit notes.

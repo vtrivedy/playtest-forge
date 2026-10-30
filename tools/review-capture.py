@@ -7,6 +7,7 @@ Requires the target ref to contain the gait gym commit. No local browser runs.
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from uuid import uuid4
 from pathlib import Path
 import json
 import re
@@ -18,15 +19,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def contact_sheet(folder: Path):
     from PIL import Image, ImageDraw, ImageOps
-    script_file = folder / 'gait-script.json'
-    if script_file.exists():
-        script = json.loads(script_file.read_text())
-        entries = []
-        for frame in script['keyFrames']:
-            segment = next(s for s in script['segments'] if s['start'] <= frame < s['end'])
-            entries.append((folder / f'gait-{frame:05d}.png', f"{segment['name']} | frame {frame}"))
-    else:
-        entries = [(p, p.stem) for p in sorted(folder.glob('*.png')) if 'contact' not in p.stem and p.stem not in {'cube', 'hardware-probe'}]
+    gait_sheet = folder / 'gait-contact-sheet.png'
+    if gait_sheet.exists():
+        return gait_sheet
+    entries = [(p, p.stem) for p in sorted(folder.glob('*.png')) if 'contact' not in p.stem and p.stem not in {'cube', 'hardware-probe'}]
     entries = [(p, label) for p, label in entries if p.exists()]
     if not entries:
         return None
@@ -58,14 +54,32 @@ def main():
             if sheet:
                 print(sheet)
         return
-    # Pin once so branches moving during the review cannot produce mismatched shots.
-    sha = subprocess.check_output(['git', 'ls-remote', 'origin', args.ref], cwd=ROOT, text=True).split()
-    if not sha:
-        sha = [subprocess.check_output(['git', 'rev-parse', f'{args.ref}^{{commit}}'], cwd=ROOT, text=True).strip()]
-    ref = sha[0]
-    destination = args.out or Path('/workspace/siyu/playtest-forge-artifacts/sprint2/capture') / f"{re.sub(r'[^a-zA-Z0-9_.-]', '_', args.ref)}-{datetime.now():%Y%m%d-%H%M%S}"
+    shots = args.shots.split(',')
+    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe', 'fox'}:
+        parser.error('Unknown shot')
+    # Exact remote branch name; immutable SHA inputs are also accepted.
+    remote = subprocess.check_output(['git', 'ls-remote', '--heads', 'origin', f'refs/heads/{args.ref}'], cwd=ROOT, text=True).splitlines()
+    matches = [line.split()[0] for line in remote if line.split()[1] == f'refs/heads/{args.ref}']
+    if len(matches) == 1:
+        ref = matches[0]
+        source = 'remote-head'
+        local = subprocess.run(['git', 'rev-parse', '--verify', '--quiet', f'{args.ref}^{{commit}}'], cwd=ROOT, text=True, capture_output=True)
+        if local.returncode == 0 and local.stdout.strip() != ref:
+            print(f'Warning: local {args.ref} differs from remote; reviewing pushed commit {ref}', flush=True)
+    elif re.fullmatch(r'[0-9a-fA-F]{40}', args.ref):
+        ref = args.ref
+        source = 'github-commit'
+    else:
+        ref = subprocess.check_output(['git', 'rev-parse', '--verify', f'{args.ref}^{{commit}}'], cwd=ROOT, text=True).strip()
+        source = 'github-commit'
+    if source == 'github-commit':
+        published = subprocess.check_output(['gh', 'api', f'repos/vtrivedy/playtest-forge/commits/{ref}', '--jq', '.sha'], text=True).strip()
+        if published != ref:
+            raise ValueError('Commit is not available on GitHub; push it before GPU review')
+    print(f'Reviewing {source} {args.ref} at immutable commit {ref}', flush=True)
+    destination = args.out.resolve() if args.out else Path('/workspace/siyu/playtest-forge-artifacts/sprint2/capture') / f"{re.sub(r'[^a-zA-Z0-9_.-]', '_', args.ref)}-{datetime.now():%Y%m%d-%H%M%S}-{uuid4().hex[:6]}"
     destination.mkdir(parents=True, exist_ok=True)
-    (destination / 'review.json').write_text(json.dumps({'ref': args.ref, 'commit': ref, 'shots': args.shots}, indent=2))
+    (destination / 'review.json').write_text(json.dumps({'ref': args.ref, 'commit': ref, 'source': source, 'shots': args.shots}, indent=2))
 
     def capture(shot):
         folder = destination / shot
@@ -74,13 +88,17 @@ def main():
         print(f'Starting {shot}: {folder}', flush=True)
         with (folder / 'modal.log').open('w') as log:
             result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
-        sheet = contact_sheet(folder)
-        print(f"{shot}: exit={result.returncode}; sheet={sheet}; files={folder}", flush=True)
-        return {'shot': shot, 'exit': result.returncode, 'path': str(folder), 'sheet': str(sheet) if sheet else None}
+        sheet, sheet_error = None, None
+        try:
+            sheet = contact_sheet(folder)
+            metadata = json.loads((folder / 'run.json').read_text())
+            if metadata['commit'] != ref or metadata['shots'] != shot:
+                raise ValueError('Fetched capture belongs to a different commit or shot')
+        except Exception as error:
+            sheet_error = str(error)
+        print(f"{shot}: exit={result.returncode or (1 if sheet_error else 0)}; sheet={sheet}; files={folder}; error={sheet_error}", flush=True)
+        return {'shot': shot, 'exit': result.returncode or (1 if sheet_error else 0), 'sheetError': sheet_error, 'path': str(folder), 'sheet': str(sheet) if sheet else None}
 
-    shots = args.shots.split(',')
-    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe'}:
-        parser.error('Unknown shot')
     with ThreadPoolExecutor(max_workers=min(3, len(shots))) as pool:
         results = list(pool.map(capture, shots))
     (destination / 'results.json').write_text(json.dumps(results, indent=2))

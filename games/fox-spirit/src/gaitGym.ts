@@ -10,7 +10,7 @@ export function createGaitGym(scene: THREE.Scene, collision: CollisionWorld) {
     return d < 55 ? 0 : d < 67 ? (d - 55) * slope : d < 73 ? 12 * slope : d < 85 ? (85 - d) * slope : 0;
   };
   const terrain = collision.terrain;
-  collision.terrain = (x, z) => Math.abs(z) < 30 && x > origin - 50 && x < origin + 150 ? height(x) : terrain(x, z);
+  collision.terrain = (x, z) => Math.abs(z) < 20 && x > origin - 50 && x < origin + 150 ? height(x) : terrain(x, z);
   const geometry = new THREE.PlaneGeometry(200, 40, 200, 1);
   geometry.rotateX(-Math.PI / 2);
   geometry.translate(origin + 50, 0, 0);
