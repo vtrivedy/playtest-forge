@@ -257,3 +257,10 @@ Replace the lantern's plain stacked rectangular support with the CC0 Quaternius
 Column asset, scaled to the same 1.9 m support height and collision footprint.
 Keep the lamp, light, checkpoint and all site positions. Batch its fluted shaft,
 base and capital into the existing weathered stone bucket; no parallel old stem.
+
+### Windmill / kiln ground-level ruin pass
+The kiln's tall rectangular glyph stones dominate the cold-start camera. Reuse
+the same CC0 carved column for those supports, scaled within their original
+width/depth/height envelopes, retaining the glyph positions and every inlet.
+Add shallow scanned fragments and leaf banks at existing ruin feet on the
+terraces and kiln ledge. Do not alter collision, launch edges or route waypoints.

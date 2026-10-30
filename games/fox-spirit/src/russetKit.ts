@@ -1297,7 +1297,7 @@ export function domedShrine(stone: Bucket, glow: Bucket, x: number, y: number, z
 }
 
 /** Seedwell: octagonal carved basin of fitted wedge blocks, three standing glyph stones. */
-export function seedwell(stone: Bucket, glow: Bucket, x: number, y: number, z: number, seed: number): void {
+export function seedwell(stone: Bucket, glow: Bucket, column: THREE.BufferGeometry, x: number, y: number, z: number, seed: number): void {
   const r = rng(seed * 811 + 5);
   setSite(y, y + 3);
   // basin ring: 8 wedge blocks, fitted
@@ -1325,7 +1325,7 @@ export function seedwell(stone: Bucket, glow: Bucket, x: number, y: number, z: n
     const sz = z + Math.sin(a) * 2.6;
     const h = 2.1 + r() * 0.8;
     const yaw = Math.atan2(x - sx, z - sz);
-    stoneBlock(stone, trs(sx, y + h / 2 - 0.1, sz, yaw, 1, 1, 1, (r() - 0.5) * 0.1, (r() - 0.5) * 0.1), 0.75, h, 0.45, seed * 7 + k, 0.2);
+    stone.add(column, trs(sx, y - 0.1, sz, yaw, 0.75 / 0.61, h / 1.9, 0.45 / 0.61), stoneTint(r));
     const leaf = leafShape(0.26, 0.4);
     glow.add(leaf, trs(sx + Math.sin(yaw) * 0.24, y + h * 0.62, sz + Math.cos(yaw) * 0.24, yaw), PAL.amber);
     leaf.dispose();

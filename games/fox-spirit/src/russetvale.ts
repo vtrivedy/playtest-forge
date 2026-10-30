@@ -1645,7 +1645,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const mkSeedwell = (id: SeedwellState['id'], name: string, p: THREE.Vector3, radius: number, seed: number, ox = 0, oz = 0) => {
     const g = glowMat(`rv-glow-${id}`);
     const gb = new Bucket();
-    seedwell(bk('stone', p.x, p.z), gb, p.x + ox, p.y, p.z + oz, seed);
+    seedwell(bk('stone', p.x, p.z), gb, lanternColumn, p.x + ox, p.y, p.z + oz, seed);
     const m = gb.toMesh(g, { cast: false });
     if (m) group.add(m);
     patchable.push(g);
@@ -1763,7 +1763,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x, z, w: 14, d: 14, top: y, bottom: -4, round: true, rough: 0.65, seed: 360, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.5) });
     const sb = bk('stone', x, z);
     archAt(sb, x, y, z - 2, 0, { span: 3.2, pillarH: 4.4, broken: 0.25, seed: 361 });
-    seedwell(sb, new Bucket(), x, y, z - 2, 362);
+    seedwell(sb, new Bucket(), lanternColumn, x, y, z - 2, 362);
     hearthSpots.push({ id: 'islet-return', x: x + 3.5, y, z: z + 1.5, height: 12 });
     litterPatch(bk('litter', x, z, false), rng(363), x, z, 5.5, 60, () => y);
   }
@@ -2233,6 +2233,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   for (const [x, y, z, seed] of [[55.6, -0.1, 35.3, 440], [95, -1.9, 20, 441], [105, -1.9, 20, 442]] as const) {
     rubble.place(bk('rock', x, z), x, y, z, 1.05, seed, 1.4);
   }
+  // Shallow CC0 fragments nest in the existing terrace ruin bases, away from landings.
+  for (const [s, t, y, seed] of [[3, 12, 2, 460], [19, -12, 6, 461], [30, -11, 10, 462], [70, 8, 22, 463], [79, -7, 22, 464]] as const) {
+    const p = sp(s, t);
+    rubble.place(bk('rock', p.x, p.z), p.x, y - 0.12, p.z, 1.05, seed, 0.55);
+  }
+  for (let k = 0; k < 3; k++) {
+    const a = k / 3 * Math.PI * 2 + 0.5;
+    const x = SW1P.x + Math.cos(a) * 2.6, z = SW1P.z + Math.sin(a) * 2.6;
+    rubble.place(bk('rock', x, z), x, SW1P.y - 0.08, z, 0.65, 470 + k, 0.45);
+  }
   rubble.dispose();
 
   // ==================================================================== merge buckets
@@ -2502,7 +2512,7 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
         vec3 gHue = gLeafHue(gLeaf.a);
         float gTake = step(fract(gLeaf.a * 5.37), 0.72);
         gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.70, 0.20, 0.12) : vec3(0.66, 0.27, 0.12), smoothstep(0.58, 0.74, gReg) * gTake);
-        gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.76, 0.60, 0.29) : vec3(0.82, 0.50, 0.17), smoothstep(0.42, 0.28, gReg) * gTake);
+        gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.76, 0.60, 0.29) : vec3(0.82, 0.50, 0.17), (1.0 - smoothstep(0.28, 0.42, gReg)) * gTake);
         vec3 gLeafCol = gLeaf.rgb * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
         diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);
         // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of
