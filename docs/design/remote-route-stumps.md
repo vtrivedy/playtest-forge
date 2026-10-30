@@ -7,3 +7,7 @@ Replace only the stumps' repeated procedural block courses with the existing CC0
 Unchanged: both box colliders, route coordinates, landing heights, hearths, lighting, camera, fox, physics and mechanics. Preserve deterministic random consumption from the removed stacks so unrelated downstream scenery remains unchanged.
 
 Validation: TypeScript and fox Vite build. Driver GPU baseline and matched after stills + staged route 0..16, immutable pushed commits. Personally inspect PNGs and window.__game evidence; obtain saved Opus critique, address concrete issues, request one retest. No landing until reviewed improvement; integrate main and repeat build checks before any authorized fast-forward push.
+
+## Revision after Opus code review
+
+The first fit leaves the source's round shaft visibly inside the unchanged square collider and compresses capital/base proportions differently. Restyle the library geometry into a square remnant: expand its cross-sections toward the existing square envelope while retaining shallow source moulding relief. Remap the base to 0.28 m and capital to 0.42 m on both stumps, with only the middle section taking the remaining height. Keep top-face inset below 1 cm. Pass the existing footprint width explicitly, add quiet per-stump value variation, and preserve flat landing heights. This is a derived presentation of the same CC0 source, not a collider change. GPU comparison/retest remains required.
