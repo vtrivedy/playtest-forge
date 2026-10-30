@@ -371,7 +371,7 @@ async function boot() {
   const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
   // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
   let frontFxT = 0;
-  const growth = createGrowth(scene, world.rootSpots, [], world.collision, {
+  const growth = createGrowth(scene, world.rootSpots, world.padSpots, world.collision, {
     gui,
     onIgnite: (r) => {
       const byDash = r.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
@@ -794,6 +794,7 @@ async function boot() {
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         crown: crown.state(),
         reach: reach.state(),
+        albumPages: world.reedRegion.pageFound ? ['reed-ruin'] : [],
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
@@ -857,6 +858,10 @@ async function boot() {
         hud.hidePromptSoon(5);
         cam.playShot({ subjects: [foxActor.group.position.clone(), s.pos.clone()], holdS: 1.7, blendS: 0.6 });
         cam.shake(0.3);
+      } else if (e.type === 'page') {
+        audio.play('checkpoint');
+        hud.setPrompt('A pressed page returns to the Album.');
+        hud.hidePromptSoon(4);
       } else if (e.type === 'bridge') {
         audio.play('bridge');
       } else if (e.type === 'checkpoint') {
@@ -986,7 +991,7 @@ async function boot() {
       if (auto.act === 'glide') auto.space = auto.pressT < 0.12 || vel.y > 0 || d > 0.9;
       if (onGround && auto.pressT > 0.1) auto.phase = 'run';
     }
-    const reach = wp.label === 'channel' || wp.label?.startsWith('wash:') || wp.label?.startsWith('lift:') ? 0.28 : 0.9;
+    const reach = wp.label === 'channel' || wp.label?.startsWith('wash:') || wp.label?.startsWith('lift:') || wp.label?.startsWith('wind-ready:') ? 0.28 : 0.9;
     if (d < reach && wp.y - (pos.y - foxActor.feetOffset) < 1.0 && (onGround || auto.phase === 'run')) {
       auto.idx += 1;
       auto.stuckT = 0;
@@ -1012,7 +1017,8 @@ async function boot() {
     const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
     if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= wp.y + 0.5) auto.liftReady = true;
     const waitLift = !!prevLabel?.startsWith('lift:') && !auto.liftReady;
-    const waitBridge = waitLift || waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
+    const waitWind = !!prevLabel?.startsWith('wind-ready:') && (wind.state().find(w => w.id === prevLabel.slice(11))?.heat ?? 0) < 0.98;
+    const waitBridge = waitWind || waitLift || waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
