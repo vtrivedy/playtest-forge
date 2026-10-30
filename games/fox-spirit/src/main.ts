@@ -306,6 +306,10 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
+    folder.add(params,'brakeSquat',0,.08,.002);
+    folder.add(params,'brakePitch',0,.2,.005);
+    folder.add(params,'landSquash',0,.2,.005);
+    folder.add(params,'landFrequency',2,6,.1);
     folder.add(params, 'trotSpeed', 2, 6, .1);
     folder.add(params, 'gallopSpeed', 4, 10, .1);
     folder.add(params, 'plantStrength', 0, 1, .01);
@@ -1104,7 +1108,7 @@ async function boot() {
         if (jumpedThisAir) jumpStats.lastDist = Number(Math.hypot(fox.position.x - takeoff.x, fox.position.z - takeoff.z).toFixed(2));
         if (airT > 0.12) {
           cam.land(impact);
-          landT = 0.24 + 0.16 * impact;
+          landT = Math.hypot(vel.x,vel.z)>1.5 ? .083 : .30;
           if (impact > 0.75) cam.shake(0.18 * impact);
           audio.play('land', { strength: impact, surface: surfaceOf(probe.collider?.tag) });
         }
@@ -1219,6 +1223,9 @@ async function boot() {
     }
     wasGliding = gliding;
 
+    const speedBeforeControl=Math.hypot(vel.x,vel.z);
+    const opposition=speedBeforeControl>.01 && wish.lengthSq()>.001 ? (vel.x*wish.x+vel.z*wish.z)/(speedBeforeControl*wish.length()) : -1;
+    const brakeIntent=grounded && !dashing && speedBeforeControl>1 ? THREE.MathUtils.clamp((.35-opposition)/1.35,0,1) : 0;
     if (!dashing) {
       const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward * (1 - updrafts.tun.columnSteer * lift.radialK * (lift.k > 0 ? 1 : 0)) : feel.moveSpeed);
       if (gliding && lift.k > 0) {
@@ -1330,7 +1337,7 @@ async function boot() {
           else if (vel.y > 2.2) anim = 'jump_up';
           else if (vel.y > -1.6) anim = 'jump_apex';
           else anim = 'jump_fall';
-        } else if (landT > 0 && (speed < 3.5 || landT > 0.12)) {
+        } else if (landT > 0 && (speed < 1.5 || landT > .033)) {
           anim = 'land';
           fade = 0.05;
         } else if (skidT > 0 && wish.lengthSq() < .01) {
@@ -1342,7 +1349,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
