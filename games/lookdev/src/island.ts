@@ -23,9 +23,10 @@ export function createIslandMesh(radius = 12): {
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const colors = new Float32Array(pos.count * 3);
-  const cGrass = new THREE.Color(0x3ecf7a);
-  const cDirt = new THREE.Color(0x7a6848);
-  const cRock = new THREE.Color(0x5c626a);
+  const cGrass = new THREE.Color(0xc9a04a);
+  const cDirt = new THREE.Color(0x8a4a28);
+  const cLitter = new THREE.Color(0xa8441f);
+  const cRock = new THREE.Color(0x6a5a4a);
   const tmp = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -35,7 +36,11 @@ export function createIslandMesh(radius = 12): {
     const r = Math.hypot(x, z) / radius;
     if (y < 0.18) tmp.copy(cRock);
     else if (r > 0.8) tmp.copy(cDirt);
-    else tmp.copy(cGrass);
+    else {
+      // leaf-litter splotches (painterly restored carpet)
+      const litter = Math.sin(x * 4.2 + z * 3.7) * Math.cos(x * 2.1 - z * 5.3);
+      tmp.copy(litter > 0.35 ? cLitter : litter > 0.05 ? cDirt : cGrass);
+    }
     tmp.offsetHSL(0, 0, Math.sin(x * 3.1 + z * 2.7) * 0.045);
     colors[i * 3] = tmp.r;
     colors[i * 3 + 1] = tmp.g;
@@ -55,7 +60,7 @@ export function createIslandMesh(radius = 12): {
 
   const under = new THREE.Mesh(
     new THREE.ConeGeometry(radius * 0.95, 7.5, 56, 1, true),
-    new THREE.MeshStandardMaterial({ color: 0x454950, roughness: 0.94, flatShading: true }),
+    new THREE.MeshStandardMaterial({ color: 0x3a2e24, roughness: 0.94, flatShading: true }),
   );
   under.position.y = -3.4;
   under.castShadow = true;
@@ -74,7 +79,7 @@ export function scatterProps(
   mats: THREE.MeshStandardMaterial[],
 ): THREE.Object3D[] {
   const objs: THREE.Object3D[] = [];
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6a7078, roughness: 0.92, flatShading: true });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x6e5a44, roughness: 0.92, flatShading: true });
   mats.push(rockMat);
 
   for (let i = 0; i < 22; i++) {
@@ -97,7 +102,7 @@ export function scatterProps(
   }
 
   // ruin arch (concept key art)
-  const ruinMat = new THREE.MeshStandardMaterial({ color: 0x7a8088, roughness: 0.9, flatShading: true });
+  const ruinMat = new THREE.MeshStandardMaterial({ color: 0x7a6a55, roughness: 0.9, flatShading: true });
   mats.push(ruinMat);
   const arch = new THREE.Group();
   const colL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.2, 0.35), ruinMat);
@@ -128,7 +133,8 @@ export function scatterProps(
     const z = Math.sin(a) * r;
     const y = yAt(x, z);
     if (y < 0.3) continue;
-    const tree = createStylizedTree(0x2f9a52, 0x5a4030);
+    const leaf = i % 4 === 0 ? 0xb8321f : i % 4 === 1 ? 0xc45a28 : i % 4 === 2 ? 0xa8441f : 0xd4782a;
+    const tree = createStylizedTree(leaf, 0x4a3020);
     tree.position.set(x, y, z);
     tree.scale.setScalar(0.8 + (i % 3) * 0.18);
     scene.add(tree);
@@ -144,8 +150,31 @@ export function scatterProps(
     });
   }
 
+
+  // hero maple near path (keyart accent)
+  {
+    const hx = 3.2, hz = -1.5;
+    const hy = yAt(hx, hz);
+    if (hy > 0.25) {
+      const hero = createStylizedTree(0xb8321f, 0x3a2418);
+      hero.position.set(hx, hy, hz);
+      hero.scale.setScalar(1.45);
+      scene.add(hero);
+      objs.push(hero);
+      hero.traverse((c) => {
+        if ((c as THREE.Mesh).isMesh) {
+          const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
+          if (!leafMats.includes(m)) {
+            leafMats.push(m);
+            mats.push(m);
+          }
+        }
+      });
+    }
+  }
+
   // distant satellite islands (silhouette like key art)
-  const satMat = new THREE.MeshStandardMaterial({ color: 0x5a6068, roughness: 0.95, flatShading: true });
+  const satMat = new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.95, flatShading: true });
   mats.push(satMat);
   const sats: Array<[number, number, number, number]> = [
     [18, 4, -8, 2.2],
@@ -176,7 +205,7 @@ export function createShrine(yAt: (x: number, z: number) => number): {
   const y = yAt(x, z);
   group.position.set(x, y, z);
 
-  const stone = new THREE.MeshStandardMaterial({ color: 0x8a9098, roughness: 0.82, metalness: 0.05 });
+  const stone = new THREE.MeshStandardMaterial({ color: 0x8a7a68, roughness: 0.82, metalness: 0.05 });
   const glow = new THREE.MeshStandardMaterial({
     color: 0xffcc66,
     emissive: 0xffaa33,
@@ -208,6 +237,7 @@ export function createShrine(yAt: (x: number, z: number) => number): {
 }
 
 /** Wispy multicolored fox — cream body + rainbow spirit tail (turnaround ref). */
+/** Burnt-orange ember fox (autumn turnaround ref). Fully saturated — do not ColorField-patch. */
 export function createFoxStandIn(): {
   group: THREE.Group;
   materials: THREE.MeshStandardMaterial[];
@@ -215,80 +245,81 @@ export function createFoxStandIn(): {
 } {
   const group = new THREE.Group();
   const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0xfff4e8,
-    emissive: 0xffd0e8,
-    emissiveIntensity: 0.08,
+    color: 0xd4682a,
+    emissive: 0x882200,
+    emissiveIntensity: 0.18,
     roughness: 0.55,
   });
-  const pawMat = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.7 });
-  const spiritMat = new THREE.MeshStandardMaterial({
-    color: 0xff66cc,
-    emissive: 0xaa44ff,
-    emissiveIntensity: 1.1,
+  const creamMat = new THREE.MeshStandardMaterial({
+    color: 0xf2e6d4,
+    roughness: 0.6,
+  });
+  const pawMat = new THREE.MeshStandardMaterial({ color: 0x2a221c, roughness: 0.7 });
+  const emberMat = new THREE.MeshStandardMaterial({
+    color: 0xff8a30,
+    emissive: 0xff5a1a,
+    emissiveIntensity: 1.35,
     roughness: 0.25,
     transparent: true,
-    opacity: 0.92,
+    opacity: 0.95,
   });
-  const emblemMat = new THREE.MeshStandardMaterial({
-    color: 0xffd56a,
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xffc857,
     emissive: 0xffaa33,
-    emissiveIntensity: 1.4,
-    roughness: 0.35,
+    emissiveIntensity: 1.2,
+    roughness: 0.3,
   });
 
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.28, 18, 14), bodyMat);
-  body.scale.set(1.05, 0.95, 1.25);
+  body.scale.set(1.0, 0.9, 1.35);
   body.position.y = 0.38;
   body.castShadow = true;
   group.add(body);
 
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 14), bodyMat);
-  head.position.set(0, 0.62, 0.26);
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), creamMat);
+  chest.scale.set(0.9, 1.1, 0.5);
+  chest.position.set(0, 0.36, 0.28);
+  group.add(chest);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 16, 14), bodyMat);
+  head.position.set(0, 0.6, 0.3);
   head.castShadow = true;
   group.add(head);
 
-  for (const sx of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 5), bodyMat);
-    ear.position.set(0.11 * sx, 0.82, 0.2);
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), creamMat);
+  snout.scale.set(0.8, 0.7, 1.2);
+  snout.position.set(0, 0.55, 0.45);
+  group.add(snout);
+
+  for (const sx of [-1, 1] as const) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.18, 5), bodyMat);
+    ear.position.set(0.1 * sx, 0.78, 0.24);
     ear.rotation.z = sx * 0.28;
     group.add(ear);
-    const inner = new THREE.Mesh(
-      new THREE.ConeGeometry(0.04, 0.12, 4),
-      new THREE.MeshStandardMaterial({ color: 0x3a3038, roughness: 0.6 }),
-    );
-    inner.position.set(0.11 * sx, 0.78, 0.22);
-    inner.rotation.z = sx * 0.28;
-    group.add(inner);
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), goldMat);
+    tip.position.set(0.1 * sx, 0.88, 0.22);
+    group.add(tip);
   }
 
-  // spirit flame tuft
-  const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), spiritMat);
-  tuft.scale.set(0.7, 1.4, 0.7);
-  tuft.position.set(0, 0.92, 0.18);
-  group.add(tuft);
-
-  // chest emblem
-  const emblem = new THREE.Mesh(new THREE.CircleGeometry(0.07, 8), emblemMat);
-  emblem.position.set(0, 0.42, 0.34);
-  group.add(emblem);
-
-  // rainbow wispy tail — elongated emissive blob (particles handle the rest)
-  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), spiritMat);
-  tail.scale.set(0.65, 0.65, 2.6);
-  tail.position.set(0, 0.42, -0.55);
+  // ember tail plume
+  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), emberMat);
+  tail.scale.set(0.7, 0.7, 2.8);
+  tail.position.set(0, 0.42, -0.58);
   group.add(tail);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), goldMat);
+  tip.position.set(0, 0.45, -1.05);
+  group.add(tip);
 
-  // simple paws
   for (const [px, pz] of [
     [-0.12, 0.16],
     [0.12, 0.16],
     [-0.12, -0.14],
     [0.12, -0.14],
   ] as const) {
-    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), pawMat);
-    paw.position.set(px, 0.08, pz);
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), pawMat);
+    paw.position.set(px, 0.07, pz);
     group.add(paw);
   }
 
-  return { group, materials: [bodyMat, pawMat, spiritMat, emblemMat], tail };
+  return { group, materials: [bodyMat, creamMat, pawMat, emberMat, goldMat], tail };
 }

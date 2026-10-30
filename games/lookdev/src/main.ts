@@ -11,22 +11,9 @@ import {
   createStylizedWater,
   createWindGrass,
   createFoxWisps,
+  createAutumnParticles,
 } from '../../../src/render';
 import { createIslandMesh, scatterProps, createShrine, createFoxStandIn } from './island';
-
-declare global {
-  interface Window {
-    __game: {
-      status: string;
-      notes: string[];
-      frameMs: number;
-      fps: number;
-      colorSample: number;
-      shrineT: number;
-      backend: string;
-    };
-  }
-}
 
 async function main() {
   const forge = await createForgeRenderer({ container: document.body, exposure: 1.05 });
@@ -35,14 +22,14 @@ async function main() {
   camera.position.set(0, 8, 18);
 
   applyLookdevLights(scene);
-  const fog = applyHeightFog(scene, { density: 0.022, color: new THREE.Color(0xb0b6be) });
+  const fog = applyHeightFog(scene, { density: 0.022, color: new THREE.Color(0xd8c4a0) });
   const sky = createPaintedSky(scene, {
-    zenith: new THREE.Color(0x8a929c),
-    horizon: new THREE.Color(0xc8ced4),
-    nadir: new THREE.Color(0x5a6068),
-    sunColor: new THREE.Color(0xe8eef2),
-    cloudAmount: 0.75,
-    sunBloom: 0.18,
+    zenith: new THREE.Color(0xb89268),
+    horizon: new THREE.Color(0xe8d4b0),
+    nadir: new THREE.Color(0x6a5040),
+    sunColor: new THREE.Color(0xffd9a0),
+    cloudAmount: 0.7,
+    sunBloom: 0.28,
   });
 
   const island = createIslandMesh(12);
@@ -67,6 +54,8 @@ async function main() {
   const grass = createWindGrass(scene, {
     count: 700,
     radius: 9.5,
+    color: 0xc9a84a,
+    monoColor: 0x8a7358,
     ySampler: (x, z) => island.yAt(x, z),
   });
 
@@ -74,6 +63,7 @@ async function main() {
   scene.add(fox.group);
   // fox stays saturated — do NOT patch fox materials
   const wisps = createFoxWisps(scene, 56);
+  const autumnFX = createAutumnParticles(scene, 200, 100);
 
   const colorField = createColorField({
     auraRadius: 3.2,
@@ -206,12 +196,60 @@ async function main() {
     shrine.materials[1]!.emissiveIntensity = 0.15;
   }
 
+  /** Jump flythrough clock; O(1) — safe under SwiftShader. */
+  function seek(timeS: number, opts: { restore?: boolean } = {}) {
+    restart();
+    t = timeS;
+    elapsed = timeS;
+    // Drop a short trail along recent path samples
+    const trailN = 16;
+    for (let i = trailN; i >= 0; i--) {
+      const u = Math.max(0, timeS - i * 0.08);
+      const sample = samplePath(u);
+      const fp = sample.fox.clone();
+      fp.y = island.yAt(fp.x, fp.z) + 0.3;
+      colorField.trail.push({ x: fp.x, y: fp.y, z: fp.z, life: colorField.trailLife * (1 - i / (trailN + 1)) });
+    }
+    const now = samplePath(timeS);
+    const foxNow = now.fox.clone();
+    foxNow.y = island.yAt(foxNow.x, foxNow.z);
+    colorField.setFox(foxNow.clone().setY(foxNow.y + 0.3));
+    fox.group.position.copy(foxNow);
+    camera.position.copy(now.pos);
+    camera.lookAt(now.look);
+
+    const wantRestore = opts.restore || path.some((k) => k.restore && timeS >= k.t);
+    if (wantRestore) {
+      triggerRestore();
+      const age = Math.max(0, timeS - 9);
+      shrineT = age;
+      const r = colorField.restores[0];
+      if (r) {
+        r.age = age;
+        r.t = Math.min(1, age / r.durationS);
+        const e = 1 - Math.pow(1 - r.t, 3);
+        r.radius = r.targetRadius * e;
+        autumnFX.setWavefront(r.center, r.radius, r.t < 1 ? 1.8 : 0.4);
+      }
+    }
+  }
+
+  (window as unknown as { __lookdev: object }).__lookdev = {
+    seek,
+    restore: triggerRestore,
+    restart,
+    get t() { return t; },
+    colorField,
+  };
+
   function triggerRestore() {
     if (restoreTriggered) return;
     restoreTriggered = true;
-    colorField.restore(shrine.position.clone().setY(island.yAt(shrine.position.x, shrine.position.z)), 14, 2.6);
-    shrine.materials[1]!.emissiveIntensity = 2.2;
+    const c = shrine.position.clone().setY(island.yAt(shrine.position.x, shrine.position.z));
+    colorField.restore(c, 14, 2.6);
+    shrine.materials[1]!.emissiveIntensity = 2.8;
     shrineT = 0;
+    autumnFX.setWavefront(c, 1.5, 2.5);
   }
 
   function samplePath(time: number): { pos: THREE.Vector3; look: THREE.Vector3; fox: THREE.Vector3 } {
@@ -230,6 +268,13 @@ async function main() {
       look: a.look.clone().lerp(b.look, s),
       fox: a.fox.clone().lerp(b.fox, s),
     };
+  }
+
+  // URL bootstrap: ?t=12&restore=1
+  const boot = new URLSearchParams(location.search);
+  const bootT = Number(boot.get('t') || '');
+  if (Number.isFinite(bootT) && bootT > 0) {
+    seek(bootT, { restore: boot.get('restore') === '1' || bootT >= 9 });
   }
 
   function onResize() {
@@ -291,6 +336,11 @@ async function main() {
       fox.tail.rotation.x = Math.sin(elapsed * 2.1) * 0.1;
     }
     wisps.update(dt, foxPos);
+    if (colorField.restores[0]) {
+      const r = colorField.restores[0];
+      autumnFX.setWavefront(r.center, r.radius, r.t < 1 ? 1.8 : 0.35);
+    }
+    autumnFX.update(dt);
     sky.update(dt);
     water.update(elapsed);
     grass.update(elapsed);
@@ -305,7 +355,7 @@ async function main() {
     post.render();
 
     const colorSample = colorField.sample(new THREE.Vector3(0, 1, 0));
-    window.__game = {
+    (window as any).__game = {
       status: restoreTriggered ? (shrineT > 2.5 ? 'restored' : 'restoring') : 'mono',
       notes: [
         `t=${t.toFixed(2)}`,
@@ -324,7 +374,7 @@ async function main() {
     };
 
     if (hud) {
-      hud.textContent = `Color Fox lookdev · ${window.__game.status} · ${fps.toFixed(0)} fps · color@center ${colorSample.toFixed(2)}`;
+      hud.textContent = `Color Fox lookdev · ${(window as any).__game.status} · ${fps.toFixed(0)} fps · color@center ${colorSample.toFixed(2)}`;
     }
 
     requestAnimationFrame(frame);

@@ -26,11 +26,11 @@ export type PaintedSky = {
 /** Fullscreen-ish skydome with painted gradient + soft sun + cheap clouds. */
 export function createPaintedSky(scene: THREE.Scene, overrides: Partial<SkyParams> = {}): PaintedSky {
   const params: SkyParams = {
-    zenith: new THREE.Color(overrides.zenith ?? 0x8a929c),
-    horizon: new THREE.Color(overrides.horizon ?? 0xc8ced4),
-    nadir: new THREE.Color(overrides.nadir ?? 0x5a6068),
+    zenith: new THREE.Color(overrides.zenith ?? 0xb89268),
+    horizon: new THREE.Color(overrides.horizon ?? 0xe8d4b0),
+    nadir: new THREE.Color(overrides.nadir ?? 0x6a5040),
     sunDir: (overrides.sunDir ?? new THREE.Vector3(0.45, 0.55, 0.35)).normalize(),
-    sunColor: new THREE.Color(overrides.sunColor ?? 0xe8eef2),
+    sunColor: new THREE.Color(overrides.sunColor ?? 0xffd9a0),
     sunSize: overrides.sunSize ?? 0.04,
     sunBloom: overrides.sunBloom ?? 0.35,
     cloudAmount: overrides.cloudAmount ?? 0.72,
@@ -143,10 +143,10 @@ export function applyLookdevLights(scene: THREE.Scene): {
   rim: THREE.DirectionalLight;
   hemi: THREE.HemisphereLight;
 } {
-  const hemi = new THREE.HemisphereLight(0xc8d0d8, 0x3a4048, 0.7);
+  const hemi = new THREE.HemisphereLight(0xffe2c0, 0x4a3828, 0.65);
   scene.add(hemi);
 
-  const key = new THREE.DirectionalLight(0xe8eef5, 2.1);
+  const key = new THREE.DirectionalLight(0xffd4a0, 2.5);
   key.position.set(10, 18, 8);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
@@ -160,11 +160,11 @@ export function applyLookdevLights(scene: THREE.Scene): {
   key.shadow.normalBias = 0.035;
   scene.add(key);
 
-  const fill = new THREE.DirectionalLight(0x88aaff, 0.5);
+  const fill = new THREE.DirectionalLight(0xc08050, 0.45);
   fill.position.set(-12, 7, -6);
   scene.add(fill);
 
-  const rim = new THREE.DirectionalLight(0xc0c8d8, 0.35);
+  const rim = new THREE.DirectionalLight(0xffaa66, 0.55);
   rim.position.set(-2, 5, -14);
   scene.add(rim);
 

@@ -23,8 +23,11 @@ export type { HeightFogParams } from './atmosphere';
 export { createStylizedWater } from './water';
 export type { StylizedWater } from './water';
 
-export { createWindGrass, createStylizedTree } from './foliage';
+export { createWindGrass, createStylizedTree, createMapleTree } from './foliage';
 export type { WindFoliage } from './foliage';
 
 export { createFoxWisps } from './wisps';
 export type { FoxWisps } from './wisps';
+
+export { createAutumnParticles } from './leaves';
+export type { AutumnParticles } from './leaves';

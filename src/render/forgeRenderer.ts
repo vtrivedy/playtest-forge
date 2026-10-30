@@ -32,9 +32,8 @@ export async function createForgeRenderer(opts: RendererOptions = {}): Promise<F
       if (nav.gpu) {
         const mod = await import('three/webgpu');
         const adapter = await nav.gpu.requestAdapter();
-        if (adapter && (mod as { WebGPURenderer?: new (o: object) => THREE.WebGLRenderer }).WebGPURenderer) {
-          const W = (mod as { WebGPURenderer: new (o: object) => THREE.WebGLRenderer & { init: () => Promise<void> } })
-            .WebGPURenderer;
+        const W = (mod as unknown as { WebGPURenderer?: new (o: object) => THREE.WebGLRenderer & { init: () => Promise<void> } }).WebGPURenderer;
+        if (adapter && W) {
           const gpuRenderer = new W({ antialias: true, alpha: false });
           await gpuRenderer.init();
           renderer = gpuRenderer;

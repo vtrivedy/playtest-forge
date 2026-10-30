@@ -29,7 +29,7 @@ export type ColorFieldOptions = {
  *  (b) decaying trail (ring buffer)
  *  (c) permanent restored regions with painterly noise-edged wavefront
  *
- * Materials patched via onBeforeCompile get ink-wash mono → full chroma by mask.
+ * Materials patched via onBeforeCompile get faded-sepia grade → autumn chroma by mask.
  * Fox / wisps should NOT be patched (stay saturated).
  */
 export class ColorField {
@@ -409,25 +409,31 @@ export class ColorField {
 
           vec3 inkWash(vec3 color, vec3 worldPos, vec3 worldN) {
             float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-            // charcoal ink-wash: cool gray shadows, warm paper lights (key art)
-            vec3 cool = vec3(0.28, 0.30, 0.34);
-            vec3 mid  = vec3(0.52, 0.55, 0.58);
-            vec3 warm = vec3(0.86, 0.84, 0.80);
-            vec3 ink = mix(cool, mid, smoothstep(0.05, 0.42, luma));
-            ink = mix(ink, warm, smoothstep(0.42, 0.85, luma));
-            ink *= 0.5 + luma * 0.85;
-            // paper grain (visible)
-            float g = (noise21(worldPos.xz * 9.0) - 0.5) * 0.07;
-            g += (noise21(worldPos.xz * 28.0) - 0.5) * 0.03;
+            // Faded sepia old-photograph grade (autumn art direction)
+            vec3 sepia = vec3(
+              luma * 1.08,
+              luma * 0.90,
+              luma * 0.62
+            );
+            vec3 shadow = vec3(0.18, 0.14, 0.10);
+            vec3 paper  = vec3(0.93, 0.87, 0.74);
+            vec3 ink = mix(shadow, sepia, smoothstep(0.02, 0.55, luma));
+            ink = mix(ink, paper * (0.55 + luma * 0.55), smoothstep(0.42, 0.92, luma));
+            // amber / ochre lift in mids (pressed-leaf warmth)
+            ink = mix(ink, vec3(0.74, 0.56, 0.34), 0.16 * smoothstep(0.18, 0.58, luma));
+            // paper grain + foxing blotches
+            float g = (noise21(worldPos.xz * 7.0) - 0.5) * 0.10;
+            g += (noise21(worldPos.xz * 22.0) - 0.5) * 0.045;
+            g += (noise21(worldPos.xz * 48.0) - 0.5) * 0.02;
+            float fox = smoothstep(0.62, 0.9, noise21(worldPos.xz * 1.6 + 3.1));
             ink += g;
-            // cross-hatch in deep shadow (charcoal feel)
-            float h1 = step(0.5, fract((worldPos.x + worldPos.z) * 5.5));
-            float h2 = step(0.5, fract((worldPos.x - worldPos.z) * 5.5 + 0.25));
-            float hatch = h1 * 0.55 + h2 * 0.45;
-            float shadow = 1.0 - smoothstep(0.04, 0.32, luma);
-            ink = mix(ink, ink * 0.78, shadow * hatch * 0.55);
-            float rim = pow(1.0 - max(0.0, dot(normalize(worldN), vec3(0.15, 0.85, 0.2))), 2.2);
-            ink += rim * 0.05;
+            ink = mix(ink, ink * vec3(0.92, 0.78, 0.58), fox * 0.22);
+            // soft wash hatch (not harsh charcoal)
+            float hatch = step(0.55, fract((worldPos.x + worldPos.z) * 3.2 + luma));
+            float shadowAmt = 1.0 - smoothstep(0.05, 0.35, luma);
+            ink = mix(ink, ink * 0.86, shadowAmt * hatch * 0.4);
+            float rim = pow(1.0 - max(0.0, dot(normalize(worldN), vec3(0.2, 0.85, 0.15))), 2.0);
+            ink += rim * vec3(0.07, 0.05, 0.028);
             return ink;
           }
           `,
@@ -440,7 +446,8 @@ export class ColorField {
           float edgeBoost = smoothstep(0.15, 0.55, cm) * (1.0 - smoothstep(0.55, 0.95, cm));
           vec3 washed = inkWash(outgoingLight, vWorldPosCF, vWorldNormalCF);
           vec3 chroma = outgoingLight * (1.0 + edgeBoost * 0.12);
-          outgoingLight = mix(washed, chroma, cm);
+          float bleed = smoothstep(0.0, 0.35, cm);
+          outgoingLight = mix(washed, chroma, mix(cm, bleed, 0.35));
           #include <opaque_fragment>
           `,
         );

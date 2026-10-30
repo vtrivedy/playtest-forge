@@ -16,8 +16,8 @@ export type HeightFogParams = {
  */
 export function applyHeightFog(scene: THREE.Scene, params: Partial<HeightFogParams> = {}): HeightFogParams {
   const p: HeightFogParams = {
-    color: new THREE.Color(params.color ?? 0xb8c4d4),
-    density: params.density ?? 0.018,
+    color: new THREE.Color(params.color ?? 0xc4a882),
+    density: params.density ?? 0.02,
     height: params.height ?? 2,
     heightFalloff: params.heightFalloff ?? 0.08,
     horizonStrength: params.horizonStrength ?? 0.4,

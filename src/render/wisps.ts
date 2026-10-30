@@ -2,15 +2,14 @@ import * as THREE from 'three';
 
 export type FoxWisps = {
   points: THREE.Points;
-  /** Call each frame; `fox` is the spirit world position. */
   update: (dt: number, fox: THREE.Vector3, colorAmount?: number) => void;
   dispose: () => void;
 };
 
-const WISP_COLORS = [0xff4fd8, 0x4ff0ff, 0xffd56a, 0xa78bfa, 0xff8f6a];
+/** Ember-orange / gold wisps + spark trails (autumn fox). Always saturated. */
+const EMBER = [0xff8a30, 0xffc857, 0xff5a1a, 0xffaa44, 0xffe08a];
 
-/** Glowing multicolor wisp particles that orbit / trail the fox. Always saturated. */
-export function createFoxWisps(scene: THREE.Scene, count = 48): FoxWisps {
+export function createFoxWisps(scene: THREE.Scene, count = 56): FoxWisps {
   const geo = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
@@ -18,7 +17,7 @@ export function createFoxWisps(scene: THREE.Scene, count = 48): FoxWisps {
   const c = new THREE.Color();
   for (let i = 0; i < count; i++) {
     phases[i] = Math.random() * Math.PI * 2;
-    c.setHex(WISP_COLORS[i % WISP_COLORS.length]!);
+    c.setHex(EMBER[i % EMBER.length]!);
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -27,10 +26,10 @@ export function createFoxWisps(scene: THREE.Scene, count = 48): FoxWisps {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 0.18,
+    size: 0.16,
     vertexColors: true,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.95,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     sizeAttenuation: true,
@@ -48,20 +47,21 @@ export function createFoxWisps(scene: THREE.Scene, count = 48): FoxWisps {
     update(dt, fox) {
       t += dt;
       trail.push(fox.clone());
-      if (trail.length > 20) trail.shift();
+      if (trail.length > 24) trail.shift();
       const pos = geo.getAttribute('position') as THREE.BufferAttribute;
       for (let i = 0; i < count; i++) {
         const ph = phases[i]!;
-        const orbit = 0.25 + (i % 5) * 0.08;
-        const y = 0.35 + Math.sin(t * 2.2 + ph) * 0.25 + (i % 7) * 0.03;
-        const ang = t * (1.2 + (i % 3) * 0.2) + ph;
-        // mix orbit around fox with delayed trail slots
-        const slot = trail[Math.max(0, trail.length - 1 - (i % trail.length))] ?? fox;
+        const orbit = 0.2 + (i % 5) * 0.07;
+        const y = 0.25 + Math.sin(t * 2.5 + ph) * 0.2 + (i % 7) * 0.025;
+        const ang = t * (1.4 + (i % 3) * 0.25) + ph;
+        const slot = trail[Math.max(0, trail.length - 1 - (i % Math.max(1, trail.length)))] ?? fox;
         const ox = fox.x + Math.cos(ang) * orbit;
         const oz = fox.z + Math.sin(ang) * orbit;
-        const wx = THREE.MathUtils.lerp(ox, slot.x, 0.35);
-        const wz = THREE.MathUtils.lerp(oz, slot.z, 0.35);
-        pos.setXYZ(i, wx, fox.y + y, wz);
+        // prefer trailing embers behind fox
+        const wx = THREE.MathUtils.lerp(ox, slot.x, 0.55);
+        const wz = THREE.MathUtils.lerp(oz, slot.z, 0.55);
+        const wy = fox.y + y + (i % 4) * 0.04;
+        pos.setXYZ(i, wx, wy, wz);
       }
       pos.needsUpdate = true;
     },

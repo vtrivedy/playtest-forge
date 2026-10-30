@@ -15,9 +15,9 @@ export function createStylizedWater(
   const size = opts.size ?? 80;
   const uniforms = {
     uTime: { value: 0 },
-    uDeep: { value: new THREE.Color(opts.colorDeep ?? 0x1a3a55) },
-    uShallow: { value: new THREE.Color(opts.colorShallow ?? 0x4aa0b8) },
-    uSky: { value: new THREE.Color(0xf0c9a0) },
+    uDeep: { value: new THREE.Color(opts.colorDeep ?? 0x3a4038) },
+    uShallow: { value: new THREE.Color(opts.colorShallow ?? 0x6a7860) },
+    uSky: { value: new THREE.Color(0xe8d4b0) },
   };
 
   const material = new THREE.ShaderMaterial({
