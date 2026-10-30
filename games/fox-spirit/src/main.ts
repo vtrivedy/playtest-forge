@@ -113,8 +113,8 @@ async function boot() {
     enableGTAO: false,
   });
 
-  const wisps = createFoxWisps(scene, 5); // tip-only drift
-  const emberTrail = createEmberTrail(scene, 16);
+  const wisps = createFoxWisps(scene, 28); // spirit-fire aura
+  const emberTrail = createEmberTrail(scene, 36);
   const autumnFX = createAutumnParticles(scene, 180, 110);
   const leafKick = createLeafKick(scene);
 
@@ -371,8 +371,8 @@ async function boot() {
 
     // Wisps / autumn
     if (fxEnabled) {
-      wisps.update(dt, fox.position, shrineOn ? 0.55 : 0.08);
-      emberTrail.update(dt, fox.position, gliding ? 0.55 : shrineOn ? 0.4 : 0.22);
+      wisps.update(dt, fox.position, shrineOn ? 0.85 : 0.45);
+      emberTrail.update(dt, fox.position, gliding ? 0.9 : shrineOn ? 0.7 : 0.5);
     } else {
       // Silhouette pass: park FX far offscreen
       wisps.update(dt, new THREE.Vector3(0, -50, 0), 0);
