@@ -18,13 +18,14 @@ import {
   createDistantLand,
   createFoxWisps,
   createAutumnParticles,
+  createEmberMotes,
 } from '../../../src/render';
 import { createWorld } from './world';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
 import { createGameAudio } from './audio';
 import { createHud } from './hud';
-import { createLeafKick, createEmberTrail } from './fx';
+import { createEmberTrail } from './fx';
 import { createRestoreCinematic } from './restore';
 
 const feel: FeelParams = { ...PRESET_SPRING, moveSpeed: PRESET_SPRING.moveSpeed * 1.12 };
@@ -140,8 +141,8 @@ async function boot() {
 
   const wisps = createFoxWisps(scene, 28); // spirit-fire aura
   const emberTrail = createEmberTrail(scene, 36);
-  const autumnFX = createAutumnParticles(scene, 180, 110);
-  const leafKick = createLeafKick(scene);
+  const autumnFX = createAutumnParticles(scene, 180, 60, { colorField, groundAt: world.yAt });
+  const emberMotes = createEmberMotes(scene);
 
   const restore = createRestoreCinematic({
     colorField,
@@ -149,6 +150,7 @@ async function boot() {
     radius: 28,
     durationS: 3.8,
     autumnFX,
+    motes: emberMotes,
     camera: cam,
     audio,
     hud,
@@ -169,23 +171,11 @@ async function boot() {
   gui.add(feel, 'dashSpeed', 10, 30, 0.5);
 
   // Ember motes along path
-  type Ember = { mesh: THREE.Mesh; taken: boolean };
-  const embers: Ember[] = [];
-  const emberMat = new THREE.MeshStandardMaterial({
-    color: 0xffaa44,
-    emissive: 0xff6600,
-    emissiveIntensity: 0.95,
-    metalness: 0.4,
-    roughness: 0.25,
-  });
-  for (let i = 0; i < 8; i++) {
+  const embers = Array.from({ length: 8 }, (_, i) => {
     const z = 10 - i * 2.5;
     const x = Math.sin(i * 1.3) * 0.8;
-    const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), emberMat);
-    mesh.position.set(x, world.yAt(x, z) + 0.55, z);
-    scene.add(mesh);
-    embers.push({ mesh, taken: false });
-  }
+    return { id: emberMotes.add(new THREE.Vector3(x, world.yAt(x, z) + 0.5, z)), taken: false };
+  });
 
   const keys = new Set<string>();
   addEventListener('keydown', (e) => {
@@ -462,10 +452,9 @@ async function boot() {
     kickCooldown -= dt;
     const speed = Math.hypot(vel.x, vel.z);
     if (grounded && speed > 3.5 && kickCooldown <= 0) {
-      leafKick.burst(fox.position.clone().setY(world.yAt(fox.position.x, fox.position.z) + 0.1), 0.85);
+      autumnFX.kick(fox.position.clone().setY(world.yAt(fox.position.x, fox.position.z)), 0.85);
       kickCooldown = 0.18;
     }
-    leafKick.update(dt);
 
     // Wisps / autumn
     if (fxEnabled) {
@@ -476,7 +465,7 @@ async function boot() {
       wisps.update(dt, new THREE.Vector3(0, -50, 0), 0);
       emberTrail.update(dt, new THREE.Vector3(0, -50, 0), 0);
     }
-    autumnFX.update(dt);
+    autumnFX.update(dt, fox.position);
     sky.update(dt);
     distant.update(dt);
     // Grass stays sepia until restore; fox aura must NOT paint every blade yellow
@@ -485,11 +474,9 @@ async function boot() {
     // Embers pickup
     for (const e of embers) {
       if (e.taken) continue;
-      e.mesh.rotation.y += dt * 2.4;
-      e.mesh.position.y = world.yAt(e.mesh.position.x, e.mesh.position.z) + 0.55 + Math.sin(elapsed * 3 + e.mesh.position.z) * 0.08;
-      if (fox.position.distanceTo(e.mesh.position) < 0.9) {
+      if (fox.position.distanceTo(emberMotes.positionOf(e.id)) < 0.9) {
         e.taken = true;
-        e.mesh.visible = false;
+        emberMotes.collect(e.id);
         embersGot += 1;
         feelMetrics.gemsCollected = embersGot;
         hud.setEmbers(embersGot);
@@ -505,6 +492,7 @@ async function boot() {
       hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
     }
     restore.update(dt);
+    emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
     world.update(dt, elapsed, fox.position);
 
     {

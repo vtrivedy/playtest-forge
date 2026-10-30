@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { ColorField } from '../../../src/render';
-import type { AutumnParticles } from '../../../src/render';
+import type { AutumnParticles, EmberMotes } from '../../../src/render';
 import type { FollowCamera } from './camera';
 import type { GameAudio } from './audio';
 import type { Hud } from './hud';
@@ -22,6 +22,7 @@ export function createRestoreCinematic(opts: {
   radius?: number;
   durationS?: number;
   autumnFX: AutumnParticles;
+  motes?: EmberMotes;
   camera: FollowCamera;
   audio: GameAudio;
   hud: Hud;
@@ -31,6 +32,8 @@ export function createRestoreCinematic(opts: {
   let active = false;
   let age = 0;
   let region: { radius: number; targetRadius: number } | null = null;
+  let sparkTrickle = 0;
+  const burstAt = opts.shrinePos.clone().setY(opts.shrinePos.y + 1.1);
 
   return {
     get active() {
@@ -50,10 +53,18 @@ export function createRestoreCinematic(opts: {
       opts.hud.flashRestore();
       opts.hud.setPrompt('Autumn restored');
       opts.autumnFX.setWavefront(opts.shrinePos, 2, 1.4);
+      opts.autumnFX.swirl(opts.shrinePos, 110);
+      opts.motes?.burst(burstAt, { count: 70, speed: [1.2, 3.6], lift: 1.2, flash: 2.2 });
+      sparkTrickle = 1.8;
     },
     update(dt) {
       if (!active) return;
       age += dt;
+      // after the first pop, a thinning plume of embers keeps rising off the shrine
+      if (sparkTrickle > 0) {
+        sparkTrickle -= dt;
+        opts.motes?.burst(burstAt, { count: Math.random() < sparkTrickle * 0.6 ? 2 : 1, speed: [0.3, 1.2], lift: 0.8, life: [1.4, 2.6], buoyancy: 1 });
+      }
       const r = region?.radius ?? Math.min(radius, (age / durationS) * radius);
       const strength = 1.1 + Math.sin(age * 3) * 0.15;
       opts.autumnFX.setWavefront(opts.shrinePos, r, strength);

@@ -33,4 +33,7 @@ export { createFoxWisps } from './wisps';
 export type { FoxWisps } from './wisps';
 
 export { createAutumnParticles } from './leaves';
-export type { AutumnParticles } from './leaves';
+export type { AutumnParticles, AutumnParticleOptions } from './leaves';
+
+export { createEmberMotes } from './emberMotes';
+export type { EmberMotes, EmberBurstOptions } from './emberMotes';
