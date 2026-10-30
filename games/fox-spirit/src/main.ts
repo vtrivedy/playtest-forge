@@ -631,12 +631,13 @@ async function boot() {
       }
       return;
     }
-    // steer (in air: brake once over the target)
-    if (auto.phase === 'air' && d < 0.6) auto.wish.set(0, 0, 0);
+    // steer (in air: brake once over the target; wait at the bridge head until the roots finish growing)
+    const waitBridge = route[auto.idx - 1]?.label === 'bridge-head' && world.bridgeGrown() < 1;
+    if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
     // stuck → count an assist and hop to the waypoint (reported in state), or stop on honest runs
-    if (d < auto.bestD - 0.3) {
+    if (d < auto.bestD - 0.3 || waitBridge) {
       auto.bestD = d;
       auto.stuckT = 0;
     } else auto.stuckT += dt;
