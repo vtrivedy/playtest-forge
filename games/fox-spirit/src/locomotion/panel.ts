@@ -59,6 +59,8 @@ export function createLocoPanel(gui: GUI, loco: Locomotion, move: MoveParams) {
   fc.add(p, 'landCrouch', 0, 0.4, 0.005);
   fc.add(p, 'windupCrouch', 0, 0.3, 0.005);
   fc.add(p, 'takeoffStretch', 0, 0.2, 0.005);
+  fc.add(p, 'brakeDecel', 2, 30, 0.5);
+  fc.add(p, 'brakeReach', 0, 1.5, 0.01);
   fc.add(p, 'skidPitch', 0, 0.5, 0.005);
   fc.add(p, 'skidSquat', 0, 0.3, 0.005);
   const ft = f.addFolder('Tail');

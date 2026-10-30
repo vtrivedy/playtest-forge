@@ -48,6 +48,10 @@ export type LocoParams = {
   landCrouch: number;
   windupCrouch: number;
   takeoffStretch: number;
+  /** Deceleration (u/s²) where the brake pose starts; full at 2× */
+  brakeDecel: number;
+  /** Extra fore stride lead while braking (fraction of stance stride) */
+  brakeReach: number;
   /** Skid/brace: nose-up pitch and hind squat */
   skidPitch: number;
   skidSquat: number;
@@ -100,6 +104,8 @@ export const DEFAULT_LOCO: LocoParams = {
   landCrouch: 0.16,
   windupCrouch: 0.15,
   takeoffStretch: 0.05,
+  brakeDecel: 9,
+  brakeReach: 0.6,
   skidPitch: 0.16,
   skidSquat: 0.08,
   tailStiffness: 34,
@@ -215,7 +221,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     bend: 0,
     look: 0,
     air: 0,
-    skid: 0,
+    brake: 0,
     /** Treadmill speed for staged stills (group stays put, feet cycle) */
     treadmill: 0,
     clock: 0,
@@ -394,13 +400,15 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       state.crouchVel -= p.landCrouch * impact * 16;
     }
     if (!grounded && prevGrounded && input.vel.y > 1) state.crouchVel += p.takeoffStretch * 18;
-    const crouchTarget = -(input.skidding ? p.skidSquat * 0.5 : 0);
+    // braking: hard deceleration (or a skid) loads the forehand — fores brace ahead, rump squats, nose lifts
+    const brakeT = input.skidding ? 1 : grounded && speed > 0.8 ? THREE.MathUtils.clamp((-state.fwdAccel - p.brakeDecel) / p.brakeDecel, 0, 1) : 0;
+    state.brake = THREE.MathUtils.damp(state.brake, brakeT, brakeT > state.brake ? 14 : 5, dt);
+    const crouchTarget = -p.skidSquat * 0.5 * state.brake;
     state.crouchVel += (-(state.crouch - crouchTarget) * p.crouchStiffness - state.crouchVel * p.crouchDamping) * dt;
     state.crouch += state.crouchVel * dt;
     state.crouch = THREE.MathUtils.clamp(state.crouch, -0.3, 0.15);
 
     state.air = THREE.MathUtils.damp(state.air, grounded ? 0 : 1, grounded ? 18 : 8, dt);
-    state.skid = THREE.MathUtils.damp(state.skid, input.skidding ? 1 : 0, 10, dt);
 
     // --- body height + slope: shoulders/hips follow the low-passed ground under them (not the paws, which lag a
     // stride), then are capped so every planted paw stays in reach ---
@@ -454,7 +462,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       : 0;
     const gallopRock = moving ? weights.gallop * 0.06 * Math.sin(ph + 0.6) : 0;
     const accelPitch = THREE.MathUtils.clamp(-state.fwdAccel * p.pitchAccel, -p.maxPitch, p.maxPitch);
-    const pitchTarget = (grounded ? accelPitch : 0) + gallopRock + state.skid * p.skidPitch + airPitch(input);
+    const pitchTarget = (grounded ? accelPitch : 0) + gallopRock + state.brake * p.skidPitch + airPitch(input);
     state.pitchDyn = THREE.MathUtils.damp(state.pitchDyn, pitchTarget, p.bodyRate, dt);
     const leanPhys = Math.atan((speed * state.yawRate) / 9.8);
     const rollTarget = THREE.MathUtils.clamp(-leanPhys * p.lean, -p.maxRoll, p.maxRoll);
@@ -571,7 +579,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     const pos = _v.copy(groupPos).addScaledVector(vel, travel);
     const yawAt = yaw + state.yawRate * travel;
     neutralFoot(L.rig, pos, yawAt, out, L.rig.fore ? params.strideUnderHip : params.strideUnderHip * 0.25);
-    out.addScaledVector(vel, stanceT * params.strideLead);
+    out.addScaledVector(vel, stanceT * (params.strideLead + (L.rig.fore ? state.brake * params.brakeReach : 0)));
     out.y = plantY(L, out.x, out.z);
     // never aim a paw where the leg can't reach at touchdown (it would pop forward on contact)
     const c = Math.cos(yawAt);
