@@ -86,3 +86,16 @@ jump/landing and slopes; a quarter-speed segment uses smaller simulation steps,
 not duplicated frames. Side tracking keeps paws large enough to judge contact.
 1080p60 MP4, labelled pose contact sheet, per-frame state and __game snapshots
 are the evidence. Staged resets are explicitly recorded; route remains unassisted.
+
+### Independent contact evidence for the matched locomotion review
+Capture actual paw-bone world positions after the solver, independently of either
+stream's target/anchor telemetry. Calibrate each paw's standing ground clearance
+from the initial idle, then report horizontal speed during low, grounded contact
+and height error against the collision surface. Keep requested target vs actual
+paw errors separate. These are bone landmarks, not claimed toe-mesh measurements.
+The review must disclose that limitation and exclude staged teleport transitions.
+
+### Encounter review
+The explicit `shade` GPU shot stages the fox near the first live Shade, then records
+patrol, real contact/knockback and a real dash through it. Resets are labelled staged;
+no health or freed flags are forced. Preserve per-second __game/state and key frames.

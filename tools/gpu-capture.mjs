@@ -1,6 +1,7 @@
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
@@ -47,7 +48,7 @@ const server = http.createServer((req, res) => {
 });
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
-const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, perf: {}, shots: {}, videos: {}, failures: [] };
+const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
 let browser;
 try {
   const headed = backend === 'gl';
@@ -171,6 +172,7 @@ try {
         if (options.afterStep) await options.afterStep(i, state);
         await H('advance', 0, dt, true);
         state = await H('state');
+        if (options.sample) state.capture = await options.sample(i, state);
         if (options.traceEveryFrame) trace.push({ frame: i, dt, state, ...(i % fps === 0 ? { game: await page.evaluate(() => window.__game) } : {}) });
         if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
         const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
@@ -216,6 +218,10 @@ try {
     if (!gym) throw Error('Target ref has no gait gym; merge capture tooling first');
     await H('teleport', gym.origin[0] - 20, gym.origin[1], gym.origin[2], Math.PI / 2);
     await H('setStick', 0, 0);
+    await page.evaluate(() => {
+      const fox = window.__gameHooks.debug.fox;
+      window.__capturePaws = Object.fromEntries(Object.entries({ LF: 'front_paw_l', RF: 'front_paw_r', LH: 'hind_paw_l', RH: 'hind_paw_r' }).map(([id, name]) => [id, fox.getObjectByName(name)]));
+    });
     // Times are output seconds; slow motion advances 1/240s per 60fps frame.
     const segments = [
       { name: 'idle', seconds: 1, stick: [0, 0] },
@@ -224,7 +230,8 @@ try {
       { name: 'gallop', seconds: 2, stick: [1, 0] },
       { name: 'gallop-quarter-speed', seconds: 3, stick: [1, 0], slow: true },
       { name: 'tight-left', seconds: 1, stick: [0, -1] },
-      { name: 'tight-right', seconds: 1, stick: [0, 1] },
+      { name: 'reverse', seconds: 1, stick: [0, 1] },
+      { name: 'tight-right', seconds: 1, stick: [-1, 0] },
       { name: 'hard-stop', seconds: 1, stick: [0, 0] },
       { name: 'jump-land', seconds: 2, stick: [.45, 0], jump: true, reset: [610, 0, 0] },
       { name: 'dash', seconds: 1, stick: [1, 0], dash: true, reset: [610, 0, 0] },
@@ -245,6 +252,27 @@ try {
       await H('setKeys', segment.jump && local < .18 * fps ? ['Space'] : segment.dash && local === 0 ? ['ShiftLeft'] : []);
     }, undefined, {
       dt: i => segmentAt(i).slow ? 1 / 240 : 1 / 60,
+      sample: async (i, state) => page.evaluate(feetY => {
+        const { fox, world } = window.__gameHooks.debug;
+        fox.updateWorldMatrix(true, true);
+        const feet = {};
+        for (const [id, bone] of Object.entries(window.__capturePaws)) {
+          if (!bone) { feet[id] = { missing: true }; continue; }
+          const point = bone.getWorldPosition(fox.position.clone());
+          const ground = world.collision.groundAt(point.x, point.z, feetY + .6).y;
+          feet[id] = { position: point.toArray(), ground: Number.isFinite(ground) ? ground : null, clearance: Number.isFinite(ground) ? point.y - ground : null };
+        }
+        const hip = fox.getObjectByName('pelvis'), chest = fox.getObjectByName('spine_04');
+        let body = null;
+        if (hip && chest) {
+          const a = hip.getWorldPosition(fox.position.clone()), b = chest.getWorldPosition(fox.position.clone());
+          const yaw = fox.rotation.y, center = fox.position;
+          const ahead = world.collision.groundAt(center.x + Math.sin(yaw) * .4, center.z + Math.cos(yaw) * .4, feetY + .6).y;
+          const behind = world.collision.groundAt(center.x - Math.sin(yaw) * .4, center.z - Math.cos(yaw) * .4, feetY + .6).y;
+          body = { hip: a.toArray(), chest: b.toArray(), pitch: Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z)), floorPitch: Math.atan2(ahead - behind, .8) };
+        }
+        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet, body };
+      }, state.pos[1]),
       keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.gait ?? st.locomotion?.gait ?? st.anim ?? 'unreported'} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
       afterStep: async (i, state) => {
         const [x, , z] = state.pos;
@@ -279,6 +307,34 @@ try {
     await H('poseHero', { anim: 'idle', fx: true }); await advance(2); await shot('still-hero');
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
+  }
+  if (selected.split(',').includes('shade')) {
+    await boot(quality, true);
+    const actor = () => page.evaluate(() => window.__gameHooks.shades?.state().actors[0]);
+    const first = await actor();
+    if (!first) throw Error('Target ref has no Shade review hook');
+    await H('teleport', first.pos[0] + 3, first.pos[1], first.pos[2], -Math.PI / 2);
+    await H('setStick', 0, 0);
+    const keyFrames = Array.from({ length: 24 }, (_, i) => i * fps / 2);
+    save('shade-script.json', { label: 'Staged patrol/contact/dash-free; real encounter state, no forced damage/free', contactAt: 4, dashAt: 7 });
+    await video('shade-staged', 12 * fps, async i => {
+      if (i === 4 * fps || i === 7 * fps) {
+        const current = await actor();
+        const offset = i === 4 * fps ? .4 : 3;
+        await H('teleport', current.pos[0] + offset, current.pos[1], current.pos[2], -Math.PI / 2);
+      }
+      await H('setStick', i >= 7 * fps && i < 7.3 * fps ? -1 : 0, 0);
+      await H('setKeys', i === 7 * fps ? ['ShiftLeft'] : []);
+    }, undefined, { keyFrames, label: i => `Shade ${i / fps}s | staged review`,
+      afterStep: async () => {
+        const current = await actor(), [x, y, z] = current.pos;
+        await H('photo', [x + 7, y + 3.2, z + 8], [x, y + 1.1, z], 46);
+      },
+    });
+    await H('setStick', null); await H('setKeys', []); await shot('shade-end');
+    const encounter = await page.evaluate(() => window.__gameHooks.shades.state());
+    save('shade-result.json', encounter);
+    if (!encounter.hits || !encounter.frees) report.failures.push('Shade script did not demonstrate both contact and dash-free; inspect the trace');
   }
   if (wants('route')) {
     await boot(quality, true);
