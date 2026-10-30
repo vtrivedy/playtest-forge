@@ -61,6 +61,32 @@ tick(pillarCam, frame());
 const columnPitch = Math.atan2(pillarCam.camera.position.y - 0.62, Math.hypot(pillarCam.camera.position.x, pillarCam.camera.position.z));
 assert(columnPitch < Math.PI / 5, `Column must avoid steep overhead pitch: ${THREE.MathUtils.radToDeg(columnPitch)}`);
 
+// A column crossing the raw spring endpoint used to kick it upward by1.33m
+// in one frame, even though the compressed rendered lens was in clear space.
+const movingWorld = new THREE.Group();
+const movingPillar = pillar.clone();
+movingPillar.position.set(0, 1.3, 3.6);
+movingWorld.add(movingPillar);
+const crossing = createFollowCamera({ scenery: movingWorld,
+  surfaceAt: (x, z) => Math.hypot(x, z - 3.6) < 0.45 ? 2.6 : 0,
+});
+const crossingFrame = frame();
+crossingFrame.target.x = -3;
+tick(crossing, crossingFrame, 90);
+let maxColumnVerticalStep = 0;
+let maxColumnPositionStep = 0;
+const previous = crossing.camera.position.clone();
+for (let i = 0; i < 180; i++) {
+  crossingFrame.vel.x = 4;
+  crossingFrame.target.x = -3 + i / 30;
+  crossing.update(1 / 60, crossingFrame);
+  maxColumnVerticalStep = Math.max(maxColumnVerticalStep, Math.abs(crossing.camera.position.y - previous.y));
+  maxColumnPositionStep = Math.max(maxColumnPositionStep, crossing.camera.position.distanceTo(previous));
+  previous.copy(crossing.camera.position);
+}
+assert(maxColumnVerticalStep < 0.08, `Column crossing must not kick the lens upward: ${maxColumnVerticalStep}`);
+assert(maxColumnPositionStep < 0.2, `Column crossing must compress gradually: ${maxColumnPositionStep}`);
+
 // Final floor protection can move a compressed lens after the spring was guarded.
 const raised = createFollowCamera({
   scenery: world,
@@ -134,4 +160,4 @@ const poses = [30, 60, 120].map(hz => {
   return c.camera.position;
 });
 assert(poses[0]!.distanceTo(poses[2]!) < 0.02);
-console.log(JSON.stringify({ passed: true, contractedDistance: contracted, maxJumpNdc: maxNdc, frameRateDelta: poses[0]!.distanceTo(poses[2]!) }));
+console.log(JSON.stringify({ passed: true, contractedDistance: contracted, maxJumpNdc: maxNdc, maxColumnVerticalStep, maxColumnPositionStep, frameRateDelta: poses[0]!.distanceTo(poses[2]!) }));

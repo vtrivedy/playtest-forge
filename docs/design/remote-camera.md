@@ -22,3 +22,6 @@ CPU-only stress test: a97,792-triangle merged mesh costs ~14ms/update with three
 
 ## Column framing refinement
 A CPU reproduction using a2.6m lantern-column collider found the existing3m terrain lift still creates a~44° downward view even after geometry compression. Cap terrain boom lift at0.9m: gentle grades retain clearance, while tall obstructions shorten the boom instead of climbing above the fox. Validate the near-column elevation and review on GPU before accepting the framing.
+
+## Moving-column pop refinement
+A sideways traversal past a column reproduced a1.33m one-frame vertical pop: floor correction was applied to the uncompressed spring before geometry collision, so a post could kick the spring above itself. Remove that premature floor impulse; retain the final rendered-lens floor guarantee after compression and the final feet/ears guard. Test the moving-column case for vertical continuity.

@@ -573,15 +573,6 @@ export function createFollowCamera(opts: {
         look.y = THREE.MathUtils.damp(look.y, aim.y, 7, dt);
         look.z = THREE.MathUtils.damp(look.z, aim.z, 7, dt);
       }
-      // hard floor at the lens itself (springs can overshoot into slopes)
-      if (opts.surfaceAt) {
-        const floor = opts.surfaceAt(rig.x, rig.z, rig.y + 1.5);
-        if (Number.isFinite(floor) && rig.y < floor + params.clearance) {
-          rig.y = floor + params.clearance;
-          posVel.y = Math.max(0, posVel.y);
-        }
-      }
-
       // Test the spring's actual pose, not just its destination. Otherwise a turn's
       // interpolated arc can pass straight through a pillar even with a safe goal.
       boomFocus.set(p.x, p.y + params.lookHeight, p.z);
