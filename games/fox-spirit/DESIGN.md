@@ -154,3 +154,11 @@ latches/restoration or bypasses a failed move. Regional success means reaching M
 with no assists/deaths, not winning the realm. The default full route remains an
 unassisted restoration test. This lets level streams review later regions while
 earlier crossings are under repair, without hiding those failures.
+
+### World surface pass — 13:40
+Keep all landmark transforms and collision unchanged. Reuse the library's CC0
+ambientCG Rock035 and Poly Haven bark to give water masonry and timber readable,
+world-scaled surfaces. Stone combines softened scan values with damp seams and
+moss on upward faces; timber uses grain and dark joints. Preserve restoration
+color, atmospheric values and the full-route harness. Review matched remote GPU
+stills and water frames before landing; record concrete failures and retest.

@@ -1,3 +1,4 @@
+import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
 import { CollisionWorld, boxCollider, cylCollider, type Collider } from './collision';
@@ -268,6 +269,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   M.stone.normalScale.set(0.9, 0.9);
   Object.assign(M.bark, barkTextures());
   M.bark.color.setScalar(1.25);
+  weatheredSurface(M.wood, true);
   Object.assign(M.rock, rockTex);
   M.rock.color.setScalar(1.25);
   M.rock.normalScale.set(1.1, 1.1);
