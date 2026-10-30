@@ -1837,7 +1837,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     lampLight.position.set(x, y + 2.1, z); group.add(lampLight);
     checkpoints.push({ pos: new THREE.Vector3(x - 1.6, y, z), lit: false });
   }
-  lanternColumn.dispose();
   const lanternMesh = lanternB.toMesh(lanternMat, { cast: false });
   if (lanternMesh) group.add(lanternMesh);
 
@@ -1849,7 +1848,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const pz = 92 + Math.sin(a) * 5.4;
     if (pz > 94) continue; // keep the camera side open
     const h = 1.6 + ((k * 53) % 7) * 0.25;
-    stoneBlock(bk('stone', px, pz), trs(px, groundRaw(px, pz) + h / 2 - 0.1, pz, -a, 1, 1, 1, 0.06, 0.05), 0.8, h, 0.55, 240 + k, 0.16);
+    bk('stone', px, pz).add(lanternColumn, trs(px, groundRaw(px, pz) - 0.1, pz, -a, 0.55 / 0.61, h / 1.9, 0.55 / 0.61, 0.06, 0.05), PAL.stone);
   }
   {
     const y = groundRaw(0, 85);
@@ -2243,6 +2242,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const x = SW1P.x + Math.cos(a) * 2.6, z = SW1P.z + Math.sin(a) * 2.6;
     rubble.place(bk('rock', x, z), x, SW1P.y - 0.08, z, 0.65, 470 + k, 0.45);
   }
+  lanternColumn.dispose();
   rubble.dispose();
 
   // ==================================================================== merge buckets

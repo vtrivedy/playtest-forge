@@ -1325,7 +1325,7 @@ export function seedwell(stone: Bucket, glow: Bucket, column: THREE.BufferGeomet
     const sz = z + Math.sin(a) * 2.6;
     const h = 2.1 + r() * 0.8;
     const yaw = Math.atan2(x - sx, z - sz);
-    stone.add(column, trs(sx, y - 0.1, sz, yaw, 0.75 / 0.61, h / 1.9, 0.45 / 0.61), stoneTint(r));
+    stone.add(column, trs(sx, y - 0.1, sz, yaw, 0.45 / 0.61, h / 1.9, 0.45 / 0.61, (r() - 0.5) * 0.1, (r() - 0.5) * 0.1), stoneTint(r));
     const leaf = leafShape(0.26, 0.4);
     glow.add(leaf, trs(sx + Math.sin(yaw) * 0.24, y + h * 0.62, sz + Math.cos(yaw) * 0.24, yaw), PAL.amber);
     leaf.dispose();
