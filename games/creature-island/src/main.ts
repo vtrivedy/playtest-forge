@@ -18,6 +18,7 @@ const metrics: FeelMetrics = {
   lastAirTime: 0,
   dashesUsed: 0,
   gemsCollected: 0,
+  jumps: 0,
 };
 
 const scene = new THREE.Scene();
