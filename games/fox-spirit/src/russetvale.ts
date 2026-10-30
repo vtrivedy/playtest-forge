@@ -38,7 +38,6 @@ import {
 import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } from './russetTextures';
 import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
-import type { ShadeSpot } from './encounters/shades';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -48,6 +47,8 @@ import type { ShadeSpot } from './encounters/shades';
  */
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
+/** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
+export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number };
 export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
 
 export type SeedwellState = {
@@ -770,6 +771,11 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const hy = groundRaw(hx, hz);
     col.add(cylCollider({ x: hx, z: hz, r: 0.82, top: hy + 1.0, bottom: hy - 1, tag: 'hearth' }));
     hearthSpots.push({ id: 'H-a', x: hx, y: hy, z: hz, height: 9 });
+    // H0, the same toy rearranged (transfer, §3.3 beat 3): on terrace 2 at the foot of the 4 m wall up to
+    // terrace 3, beside the pillar-stump jump chain — an unmarked second way up
+    const h0 = sp(26.2, 8.5);
+    col.add(cylCollider({ x: h0.x, z: h0.z, r: 0.82, top: 7.0, bottom: 5, tag: 'hearth' }));
+    hearthSpots.push({ id: 'H0', x: h0.x, y: 6, z: h0.z, height: 8 });
   }
 
   // SW1 Wind Seedwell spire (−112, −24, y20)
@@ -1536,7 +1542,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // Kiln inlets: a hearth beside each Seedwell whose updraft rises through a bowl hung over it.
   // SW1 is the Kiln (world-1.md §3.4). SW2 / SW3 use heat until water (§3.5) and growth (§3.6) ship.
   const inletSpots: InletSpot[] = [];
-  const kiln = (si: number, id: string, dx: number, dz: number, bowlUp: number) => {
+  const kiln = (si: number, id: string, dx: number, dz: number, bowlUp: number, side = 1) => {
     const sw = seedwells[si]!;
     const hx = sw.pos.x + dx;
     const hz = sw.pos.z + dz;
@@ -1546,15 +1552,32 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     // pillar stands outside the column, perpendicular to the hearth→Seedwell line; the dish hangs 1.3 m
     // off the axis — inside the column, clear of a fox riding the centre
     const l = Math.hypot(dx, dz);
-    const ux = -dz / l;
-    const uz = dx / l;
+    const ux = (-dz / l) * side;
+    const uz = (dx / l) * side;
     const px = hx + ux * 2.7;
     const pz = hz + uz * 2.7;
     col.add(cylCollider({ x: px, z: pz, r: 0.45, top: hy + bowlUp + 0.6, bottom: hy - 1, tag: 'kiln-pillar' }));
-    inletSpots.push({ seedwell: si, pos: new THREE.Vector3(hx + ux * 1.3, hy + bowlUp, hz + uz * 1.3), pillar: new THREE.Vector3(px, hy, pz), latchTime: 2 });
+    inletSpots.push({ seedwell: si, source: id, pos: new THREE.Vector3(hx + ux * 1.3, hy + bowlUp, hz + uz * 1.3), sealAt: new THREE.Vector3(sw.pos.x, sw.pos.y + 0.78, sw.pos.z), pillar: new THREE.Vector3(px, hy, pz), latchTime: 2 });
   };
   kiln(0, 'H2', 2.2, 2.6, 5.5);
-  kiln(1, 'HP', 2.2, -1.2, 4.5);
+  // Kiln catch shelves (§3.4 recovery): y15 ledges on the spire's south and east faces, each with a hearth
+  // whose column (to ≈ y25) overlaps the kiln ledge rim — a missed step is a ride back, not a long walk
+  {
+    const sw = seedwells[0]!.pos;
+    for (const [id, ang] of [['HS', Math.PI / 2], ['HE', 0]] as const) {
+      const cx = sw.x + Math.cos(ang) * 7.4;
+      const cz = sw.z + Math.sin(ang) * 7.4;
+      const yaw = -ang;
+      col.add(boxCollider({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 11, tag: 'kiln-shelf' }));
+      slab({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 9.5, rough: 0.8, seed: 90 + id.length, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45), overhang: 0.6 });
+      const hx = sw.x + Math.cos(ang) * 6.95;
+      const hz = sw.z + Math.sin(ang) * 6.95;
+      col.add(cylCollider({ x: hx, z: hz, r: 0.82, top: 16, bottom: 14, tag: 'hearth' }));
+      hearthSpots.push({ id, x: hx, y: 15, z: hz, height: 9.5 });
+    }
+  }
+  // HP sits on the island's approach so arriving across the stones brushes it
+  kiln(1, 'HP', 0.8, 2.6, 4.5, -1);
   kiln(2, 'HK', 1.68, -1.56, 4.5);
 
   // SW1 Kiln Shade: circles H2 inside its drain reach, pulled in on the Seedwell side so it never leaves

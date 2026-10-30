@@ -18,22 +18,23 @@ import {
   matchFogToSky,
   syncFog,
   createDistantLand,
-  createFoxWisps,
   createAutumnParticles,
   detectQuality,
   createEmberMotes,
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createFox } from './fox';
+import { FOX_LOOK } from './foxLook';
 import { createFollowCamera } from './camera';
-import type { FoxAnimState } from './fox';
+import type { LocoInput } from './locomotion/locomotion';
+import { DEFAULT_MOVE, createMoveState, groundMove } from './locomotion/controller';
+import { createLocoPanel } from './locomotion/panel';
 import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
-import { createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
 import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
-import { createUpdrafts, type Lift } from './chem/updraft';
+import { createUpdrafts, type Hearth, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
 import { ShadeContact } from './encounters/contact';
 import { createShades } from './encounters/shades';
@@ -163,7 +164,8 @@ async function boot() {
   lights.key.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
   lights.key.castShadow = quality.shadows;
   scene.add(lights.key.target);
-  const foxActor = await createFox();
+  const foxActor = await createFox((x, z, refY) => col.groundAt(x, z, refY).y);
+  scene.add(foxActor.loco.debug);
   scene.add(foxActor.group);
   foxActor.group.position.copy(gaitGym?.spawn ?? world.spawnPos);
   foxActor.group.position.y += foxActor.feetOffset;
@@ -210,6 +212,7 @@ async function boot() {
     maskSize: 512,
   });
   colorField.initMask(renderer);
+  colorField.groundAt = (x, z) => col.highestAt(x, z);
   // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
   const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75 };
   for (const m of world.materials) {
@@ -229,8 +232,6 @@ async function boot() {
     pixelRatio: renderer.getPixelRatio(),
   });
 
-  const wisps = createFoxWisps(scene, 28); // spirit-fire aura
-  const emberTrail = createEmberTrail(scene, 36);
   const autumnFX = createAutumnParticles(scene, Math.round(180 * quality.particleScale), Math.round(60 * quality.particleScale), {
     colorField,
     groundAt: (x, z) => col.highestAt(x, z),
@@ -294,6 +295,8 @@ async function boot() {
   fFeel.add(feel, 'glideForward', 4, 12, 0.1).listen();
   fFeel.add(feel, 'dashSpeed', 10, 30, 0.5).listen();
   fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
+  const move = { ...DEFAULT_MOVE };
+  createLocoPanel(gui, foxActor.loco, move);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
@@ -317,31 +320,63 @@ async function boot() {
     gui,
     onIgnite: (h) => {
       // struck by a dash: a harder flare than a hearth caught by the passing wake
-      const byDash = colorField.strokeAt(h.reactor.probes[0]!) > 0.9 || h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
+      const byDash = h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
+      if (byDash) dashStruck.add(h);
       h.flare = byDash ? 1.6 : 1;
       emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: byDash ? 60 : 26, speed: byDash ? [2, 5] : [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: byDash ? 1.4 : 0.8, size: [0.04, 0.1], heat: 0.7 });
       audio.play('checkpoint');
+      // the breath lets go: ground leaves round the hearth lift into the column
+      autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), byDash ? 44 : 30, 1.7);
       if (byDash) cam.shake(0.15);
     },
   });
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
   const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
-  /** Temporary colour as reactors read it: a Shade's drain zeroes aura/trail and spent strokes (≤ 1) */
+  /**
+   * Colour drains (world-1.md §1.2): encounters register predicates here (Shades: within 3 m). Inside a drain
+   * reactors read aura/trail and spent strokes (≤ 1) as 0, and an unsupplied reactor skips its hold.
+   */
+  const colorDrains: Array<(p: THREE.Vector3) => boolean> = [];
+  const drainedAt = (q: THREE.Vector3) => colorDrains.some((f) => f(q));
+  colorDrains.push(shades.drains);
   const supplyAt = (q: THREE.Vector3) => {
-    if (!shades.drains(q)) return colorField.sample(q);
-    const s = colorField.strokeAt(q);
-    return s > 1 ? 1 : 0;
+    if (!drainedAt(q)) return colorField.sample(q);
+    return colorField.strokeAt(q) > 1 ? 1 : 0;
   };
   const shadeContact = new ShadeContact();
   let shadeKnockbackFloor: number | null = null;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
-  function latchSeedwell(i: number) {
+  function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
     for (const h of updrafts.hearths) if (Math.hypot(h.base.x - sw.pos.x, h.base.z - sw.pos.z) <= sw.radius) h.reactor.restored = true;
     const inlet = inlets.inlets.find((q) => q.seedwell === i);
     if (inlet) inlet.latched = true;
-    handleEvents(world.latchSeedwell(i));
+    const ev = world.latchSeedwell(i);
+    if (quiet) colorField.restore(sw.pos, sw.radius, 0.05);
+    else handleEvents(ev);
+    saveLatches();
+  }
+  /** Latches are saved (world-1.md §1.4): restored on load without the ceremony. `?fresh` starts sepia. */
+  const SAVE_KEY = 'fox-spirit:russetvale:latched';
+  function saveLatches() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(world.seedwells.filter((s) => s.lit).map((s) => s.id)));
+    } catch {
+      /* storage unavailable: play on unsaved */
+    }
+  }
+  {
+    let saved: string[] = [];
+    try {
+      if (new URLSearchParams(location.search).has('fresh')) localStorage.removeItem(SAVE_KEY);
+      saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? '[]') as string[];
+    } catch {
+      saved = [];
+    }
+    world.seedwells.forEach((s, i) => {
+      if (saved.includes(s.id)) latchSeedwell(i, true);
+    });
   }
   const fStroke = gui.addFolder('Chem › Dash stroke');
   fStroke.add(DASH_STROKE, 'life', 2, 10, 0.1);
@@ -349,7 +384,18 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
   let inColumn = false;
+  const baseJumpTrack = cam.params.jumpTrack;
+  let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
+  const dashStruck = new Set<Hearth>();
+  /** Dash through an already-lit hearth: the strong flare without touching its heat (the stroke supplies it) */
+  function hearthStruck(h: Hearth) {
+    h.flare = 1.6;
+    emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: 50, speed: [2, 5], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: 1.3, size: [0.04, 0.1], heat: 0.7 });
+    autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 24, 1.7);
+    audio.play('checkpoint');
+    cam.shake(0.12);
+  }
   const fLook = gui.addFolder('Look');
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
@@ -369,6 +415,23 @@ async function boot() {
     f.addColor(post.grade[k], 'highlightTint');
     f.close();
   }
+  const fFox = fLook.addFolder('fox');
+  fFox.add(FOX_LOOK.furTint, '0', 0.5, 1.5, 0.01).name('fur tint r');
+  fFox.add(FOX_LOOK.furTint, '1', 0.5, 1.5, 0.01).name('fur tint g');
+  fFox.add(FOX_LOOK.furTint, '2', 0.5, 1.5, 0.01).name('fur tint b');
+  fFox.add(FOX_LOOK, 'furSaturation', 0, 1.5, 0.01);
+  fFox.add(FOX_LOOK, 'furValue', 0.5, 1.5, 0.01);
+  fFox.add(FOX_LOOK, 'strokeStrength', 0, 0.5, 0.01);
+  fFox.add(FOX_LOOK, 'strokeScale', 0.25, 4, 0.01);
+  fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
+  fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
+  fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'lickStream', 0, 1, 0.01);
+  fFox.add(FOX_LOOK, 'emberRate', 0, 60, 1);
+  fFox.add(FOX_LOOK, 'emberSize', 0.005, 0.08, 0.001);
+  fFox.close();
   fLook.close();
 
   const keys = new Set<string>();
@@ -396,14 +459,13 @@ async function boot() {
   let glideHoldT = 0;
   let airT = 0;
   let jumpedThisAir = false;
-  let landT = 0;
   let hitstop = 0;
   let lastHitstop = -1;
   let shrineOn = false;
   let fxEnabled = true;
   let turntableMode = false;
   let turntableYaw = 0;
-  let turntableAnim: FoxAnimState = 'idle';
+  let turntableTread = 0;
   let airDashUsed = false;
   let prevFeet = world.spawnPos.y;
   let groundBounce = 1;
@@ -443,16 +505,19 @@ async function boot() {
   let kickCooldown = 0;
   /** Manual clock: the harness advances sim time explicitly (deterministic captures on slow GPUs) */
   let manual = false;
-  /** When set, step() keeps this clip instead of picking from locomotion (run-strip captures). */
-  let harnessAnimLock: FoxAnimState | null = null;
+  /** Staged stills: the fox strides in place at this speed (0 = stand) */
+  let harnessTread = 0;
+  const treadFor = (anim?: string) => (anim === 'run' ? 5 : anim === 'walk' ? 1.1 : anim === 'gallop' ? 8 : 0);
+  const moveState = createMoveState(Math.PI);
+  /** Jump wind-up: a few frames of crouch before takeoff (−1 = none) */
+  let windupT = -1;
+  const locoIn: LocoInput = { vel: new THREE.Vector3(), grounded: true, gliding: false, dashing: false, skidding: false, windup: 0 };
   let visualDt = 0;
 
   const setFx = (on: boolean) => {
     fxEnabled = !!on;
     // the post stack re-applies params every frame, so write params (not the pass)
     post.params.bloomStrength = on ? BLOOM : 0;
-    wisps.points.visible = fxEnabled;
-    emberTrail.points.visible = fxEnabled;
     foxActor.setSpiritFxVisible(fxEnabled);
   };
 
@@ -472,8 +537,9 @@ async function boot() {
       const draining = shades.drains(p);
       return { p: p.toArray(), draining, weak, raw: colorField.sample(p), stroke: colorField.strokeAt(p) };
     },
-    hasClips: foxActor.hasClips,
     shades: { state: () => ({ ...shadeContact.state(), actors: shades.state() }), tun: shades.tun, drains: (x: number, y: number, z: number) => shades.drains(new THREE.Vector3(x, y, z)) },
+    loco: foxActor.loco,
+    move,
     gym: gaitGym ? { slopeDegrees: 15, origin: gaitGym.spawn.toArray() } : null,
     /** World-space analog input, same velocity/acceleration path as keyboard input. */
     setStick(x: number | null, z = 0) {
@@ -483,7 +549,11 @@ async function boot() {
     },
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
+    /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
+    chem: { updrafts, inlets, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
+    /** Fox look tunables (live; see foxLook.ts) */
+    foxLook: FOX_LOOK,
     teleportToShrine() {
       const p = world.wellspringPos;
       foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.2, p.z + 4.5);
@@ -492,7 +562,7 @@ async function boot() {
       vel.set(0, 0, 0);
       photo = null;
       cam.snapBehind(Math.PI);
-      foxActor.setAnim('idle');
+      foxActor.loco.snap();
     },
     /** Staged: start the restore sequence from wherever the fox stands (real play uses the trigger). */
     forceRestore() {
@@ -514,8 +584,8 @@ async function boot() {
     setFxEnabled(on: boolean) {
       setFx(on);
     },
-    getAnim() {
-      return foxActor.getAnim();
+    getGait() {
+      return foxActor.loco.snapshot();
     },
     setFeelPreset(name: 'spring' | 'brisk') {
       usePreset(name === 'brisk' ? 'brisk' : 'spring');
@@ -524,14 +594,13 @@ async function boot() {
     runTurntable(opts?: { anim?: string; fx?: boolean }) {
       turntableMode = true;
       turntableYaw = 0;
-      turntableAnim = (opts?.anim as FoxAnimState) || 'idle';
-      harnessAnimLock = turntableAnim;
+      turntableTread = treadFor(opts?.anim);
       setFx(opts?.fx !== false);
-      foxActor.setAnim(turntableAnim);
     },
     stopTurntable() {
       turntableMode = false;
-      harnessAnimLock = null;
+      harnessTread = 0;
+      foxActor.loco.state.treadmill = 0;
     },
     poseHero(opts?: { anim?: string; fx?: boolean }) {
       // Open meadow path north of the portal — clear of trees for anatomy judgment
@@ -541,11 +610,11 @@ async function boot() {
       foxActor.group.position.set(x, gy + foxActor.feetOffset, z);
       foxActor.group.rotation.y = Math.PI * 0.72; // 3/4 toward south-east cam
       vel.set(0, 0, 0);
-      const anim = (opts?.anim as FoxAnimState) || 'run';
-      harnessAnimLock = anim;
-      foxActor.setAnim(anim);
-      // Advance a few mixer frames so run pose isn't T-pose
-      for (let i = 0; i < 8; i++) foxActor.update(1 / 30, i / 30, false);
+      harnessTread = treadFor(opts?.anim ?? 'run');
+      foxActor.loco.snap();
+      // stride a few frames so the still lands mid-gait
+      foxActor.loco.state.treadmill = harnessTread;
+      for (let i = 0; i < 20; i++) foxActor.update(1 / 60, locoIn);
       setFx(opts?.fx !== false);
       // Staged still: photo framing, not the traversal camera
       const fx = foxActor.group.position;
@@ -561,6 +630,8 @@ async function boot() {
       foxActor.group.rotation.y = yaw;
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
+      moveState.heading = yaw;
+      foxActor.loco.snap();
       photo = null;
       cam.snapBehind(yaw);
     },
@@ -647,7 +718,7 @@ async function boot() {
       return {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
-        chem: { ...updrafts.state(), shades: shades.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        chem: { ...updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
@@ -668,7 +739,9 @@ async function boot() {
         vel: [vel.x, vel.y, vel.z],
         foxYaw: foxActor.group.rotation.y,
         airT,
-        anim: foxActor.getAnim(),
+        gait: foxActor.loco.state.gait,
+        loco: foxActor.loco.snapshot(),
+        locoMetrics: foxActor.loco.metrics(),
         grounded,
         gliding,
         preset: feelPreset,
@@ -840,7 +913,10 @@ async function boot() {
       return;
     }
     // steer (in air: brake once over the target; wait at the bridge head until the roots finish growing)
-    const waitBridge = route[auto.idx - 1]?.label === 'bridge-head' && world.bridgeGrown() < 1;
+    const prevLabel = route[auto.idx - 1]?.label;
+    // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
+    const waitSeedwell = (prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit;
+    const waitBridge = (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell;
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
@@ -952,7 +1028,6 @@ async function boot() {
         if (jumpedThisAir) jumpStats.lastDist = Number(Math.hypot(fox.position.x - takeoff.x, fox.position.z - takeoff.z).toFixed(2));
         if (airT > 0.12) {
           cam.land(impact);
-          landT = 0.1 + 0.28 * impact;
           if (impact > 0.75) cam.shake(0.18 * impact);
           audio.play('land', { strength: impact, surface: surfaceOf(probe.collider?.tag) });
         }
@@ -964,7 +1039,16 @@ async function boot() {
       airT += dt;
     }
 
-    const jv = jumpFeel.tryJump(feel.jumpVelocity * groundBounce, fox.position.y);
+    // grounded jumps crouch for a few frames first (anticipation); coyote jumps launch at once
+    let jv: number | null = null;
+    if (windupT >= 0) {
+      windupT += dt;
+      if (windupT >= move.jumpWindup) {
+        windupT = -1;
+        jv = jumpFeel.tryJump(feel.jumpVelocity * groundBounce, fox.position.y);
+      }
+    } else if (grounded && move.jumpWindup > 0 && jumpFeel.buffer > 0 && jumpFeel.coyote > 0) windupT = 0;
+    else jv = jumpFeel.tryJump(feel.jumpVelocity * groundBounce, fox.position.y);
     if (jv !== null) {
       vel.y = jv;
       grounded = false;
@@ -1012,6 +1096,8 @@ async function boot() {
     const enteredColumn = lift.k > 0.02 && !inColumn && !grounded;
     inColumn = lift.k > 0.02 && !grounded;
     if (enteredColumn) cam.punch(3);
+    // ride framing: the lens follows the full rise in a column (normal jumps keep the partial track)
+    cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, inColumn || (gliding && lift.k > 0) ? 1 : baseJumpTrack, 3, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
     glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
@@ -1045,7 +1131,9 @@ async function boot() {
     }
     wasGliding = gliding;
 
-    if (!dashing) {
+    if (!grounded) moveState.skidding = false;
+    if (!dashing && grounded) groundMove(moveState, move, wish, feel.moveSpeed, fox.rotation.y, vel, dt);
+    else if (!dashing) {
       const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward * (1 - updrafts.tun.columnSteer * lift.radialK * (lift.k > 0 ? 1 : 0)) : feel.moveSpeed);
       if (gliding && lift.k > 0) {
         // centre pull: the column holds a glider instead of letting it sail through
@@ -1079,59 +1167,52 @@ async function boot() {
     }
 
     const faceShrine = restore.inputLocked && wish.lengthSq() <= 0.01;
-    if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
+    if (grounded && !dashing && !faceShrine && (wish.lengthSq() > 0.0001 || Math.hypot(vel.x, vel.z) > 0.05)) {
+      // on the ground the body faces its (turn-rate-limited) travel heading — no instant pivots
+      fox.rotation.y = moveState.heading;
+    } else if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
       const yaw = faceShrine ? restore.faceYaw : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
       fox.rotation.y += d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
     }
 
-    // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
+    locoIn.vel.copy(vel);
+    locoIn.grounded = grounded;
+    locoIn.gliding = gliding;
+    locoIn.dashing = dashing;
+    locoIn.skidding = grounded && moveState.skidding;
+    locoIn.windup = windupT >= 0 ? Math.min(1, windupT / move.jumpWindup) : 0;
+    foxActor.loco.state.treadmill = harnessTread;
+    foxActor.update(dt, locoIn);
     const speed = Math.hypot(vel.x, vel.z);
-    landT -= dt;
-    {
-      let anim: FoxAnimState = 'idle';
-      let fade = 0.16;
-      let rate = 1;
-      if (harnessAnimLock) {
-        anim = harnessAnimLock;
-        fade = 0.05;
-        rate = harnessAnimLock === 'run' ? 1 : 1;
-      } else {
-        const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
-        if (dashing) {
-          anim = 'dash';
-          fade = 0.05;
-        } else if (!grounded && !offLedge) {
-          fade = 0.1;
-          if (gliding) anim = 'glide';
-          else if (vel.y > 2.2) anim = 'jump_up';
-          else if (vel.y > -1.6) anim = 'jump_apex';
-          else anim = 'jump_fall';
-        } else if (landT > 0 && (speed < 3.5 || landT > 0.16)) {
-          anim = 'land';
-          fade = 0.05;
-        } else if (speed > 1.2) {
-          anim = 'run';
-          // stride follows ground speed (clip authored near full run speed)
-          rate = THREE.MathUtils.clamp(speed / 8.4, 0.55, 1.45);
-        }
-      }
-      foxActor.setAnim(anim, fade);
-      foxActor.setTimeScale(rate);
-      foxActor.update(dt, elapsed, gliding || harnessAnimLock === 'glide');
-    }
 
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
     if (dashStroke) {
       dashStroke.b.copy(colorField.fox);
-      if (!dashing) dashStroke = null;
+      // a dash through a hearth always flares it, whether cold, holding or guttering (once per stroke)
+      for (const h of updrafts.hearths) {
+        if (dashStruck.has(h) || !h.reactor.probes.some((q) => colorField.strokeAt(q) > 1)) continue;
+        dashStruck.add(h);
+        if (h.reactor.state !== 'cold') hearthStruck(h);
+      }
+      if (!dashing) {
+        dashStroke = null;
+        dashStruck.clear();
+      }
     }
     colorField.update(dt);
-    updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), shades.drains);
+    updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
     colorField.glows.length = 0;
-    for (const h of updrafts.hearths) if (h.reactor.heat > 0) colorField.glows.push({ x: h.base.x, z: h.base.z, radius: 4.2, strength: h.reactor.heat * 0.8 });
+    hearthLeafT += dt;
+    const leafPulse = hearthLeafT > 1.6;
+    if (leafPulse) hearthLeafT = 0;
+    for (const h of updrafts.hearths) if (h.reactor.heat > 0) {
+      colorField.glows.push({ x: h.base.x, z: h.base.z, radius: 4.2, strength: h.reactor.heat * 0.8 });
+      // keep leaves riding a burning column, near the fox only (shared leaf pool)
+      if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
+    }
     shadeContact.update(dt, (dx, dz) => {
       const beforeX = fox.position.x, beforeZ = fox.position.z;
       const fy = fox.position.y - foxActor.feetOffset;
@@ -1165,7 +1246,7 @@ async function boot() {
         if (shadeContact.wisps === 0) { respawn(); deaths++; }
       }
     }
-    for (const i of inlets.update(dt, (q) => updrafts.hearths.some((h) => heatFeeds(h, q, updrafts.tun.radius)))) latchSeedwell(i);
+    for (const i of inlets.update(dt, (q) => { const h = updrafts.hearths.find((x) => x.spot.id === q.source); return !!h && heatFeeds(h, q.pos, updrafts.tun.radius); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
@@ -1242,15 +1323,6 @@ async function boot() {
     colorField.renderMask(dt);
     for (const m of world.materials) colorField.syncMaterial(m);
 
-    // Wisps / autumn
-    if (fxEnabled) {
-      wisps.update(dt, fox.position, shrineOn ? 0.85 : 0.45);
-      emberTrail.update(dt, fox.position, gliding ? 0.9 : shrineOn ? 0.7 : 0.5);
-    } else {
-      // Silhouette pass: park FX far offscreen
-      wisps.update(dt, new THREE.Vector3(0, -50, 0), 0);
-      emberTrail.update(dt, new THREE.Vector3(0, -50, 0), 0);
-    }
     autumnFX.update(dt, fox.position);
     emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
     sky.update(dt);
@@ -1331,7 +1403,7 @@ async function boot() {
         gliding,
         extra: {
           preset: feelPreset,
-          anim: foxActor.getAnim(),
+          gait: foxActor.loco.state.gait,
           lastJumpDist: jumpStats.lastDist,
           lastLandImpact: jumpStats.lastImpact,
           lastDashDist: jumpStats.lastDashDist,
@@ -1359,8 +1431,10 @@ async function boot() {
       fox.position.set(tx, ty + foxActor.feetOffset, tz);
       fox.rotation.y = turntableYaw; // model spins; camera fixed (classic turntable)
       vel.set(0, 0, 0);
-      foxActor.setAnim(turntableAnim);
-      foxActor.update(rawDt, elapsed, turntableAnim === 'glide');
+      foxActor.loco.state.treadmill = turntableTread;
+      locoIn.vel.set(0, 0, 0);
+      locoIn.grounded = true;
+      foxActor.update(rawDt, locoIn);
       cam.camera.position.set(tx, fox.position.y + 1.25, tz + 3.6);
       cam.camera.lookAt(tx, fox.position.y + 0.4, tz);
       contactShadow.position.set(tx, ty + 0.03, tz);

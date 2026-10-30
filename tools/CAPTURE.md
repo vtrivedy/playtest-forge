@@ -49,3 +49,14 @@ prove progression. `perf` is the heavier five-pose, three-quality benchmark.
 Read the PNGs and inspect trace/state before judging a branch. A beautiful still does
 not establish foot planting; use the quarter-speed strip and 1 m floor marks. Real
 fox reference clips and cautions about uncalibrated video are in sprint2/ref/fox-gait/.
+
+## FX lookdev contact sheets
+
+Soft-realism VFX loop (not pixel art): `.claude/skills/vfx-lookdev-loop/`.
+
+```sh
+npx tsx tools/fx-capture.ts --effect hearth-updraft --out playtest-forge-artifacts/sprint2/fx/hearth-updraft/r1
+```
+
+Needs chem/updraft on the branch. Fixed-step `setManual` + `advance`. SwiftShader is
+smoke-only; judge column glow on Modal GPU (`updraft` shot in `gpu-capture.mjs`).

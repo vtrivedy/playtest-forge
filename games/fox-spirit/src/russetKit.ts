@@ -1354,7 +1354,8 @@ export function hearthBrazier(stone: Bucket, x: number, y: number, z: number, se
       const top = c & 2;
       P.push(new THREE.Vector3(x + Math.cos(a) * (rr + (top && c & 4 ? 0.08 : 0)), y + 0.46 + (top ? h : 0), z + Math.sin(a) * (rr + (top && c & 4 ? 0.08 : 0))));
     }
-    hexBlock(stone, P, bevels(r, 0.3, 0.07), stoneTint(r));
+    // fire-blackened bowl stones
+    hexBlock(stone, P, bevels(r, 0.3, 0.07), stoneTint(r).multiplyScalar(0.58 + r() * 0.1));
   }
 }
 

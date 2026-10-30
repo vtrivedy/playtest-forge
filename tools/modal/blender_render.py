@@ -20,7 +20,7 @@ image = (
 )
 
 
-@app.function(image=image, gpu='L4', cpu=8, memory=16384, timeout=1800, scaledown_window=2)
+@app.function(image=image, gpu=['L4', 'A10', 'L40S', 'T4'], cpu=8, memory=16384, timeout=1800, scaledown_window=2)
 def render(script: bytes, inputs: dict, args: list) -> dict:
     import os, subprocess
     work = Path('/work'); (work / 'in').mkdir(parents=True); (work / 'out').mkdir()

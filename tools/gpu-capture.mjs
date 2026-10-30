@@ -1,6 +1,7 @@
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
@@ -47,7 +48,7 @@ const server = http.createServer((req, res) => {
 });
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
-const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, perf: {}, shots: {}, videos: {}, failures: [] };
+const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
 let browser;
 try {
   const headed = backend === 'gl';
@@ -97,7 +98,7 @@ try {
     page.setDefaultTimeout(180000);
     page.on('pageerror', e => { errors.push(String(e)); console.error('PAGEERROR', String(e)); });
     page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error') errors.push(m.text()); if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
-    await page.goto(`http://127.0.0.1:5180/?q=${q}${query}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://127.0.0.1:5180/?q=${q}&fresh${query}`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { polling: 100 });
     await H('setManual', true);
     if (fixedClock) await page.evaluate(() => {
@@ -171,6 +172,7 @@ try {
         if (options.afterStep) await options.afterStep(i, state);
         await H('advance', 0, dt, true);
         state = await H('state');
+        if (options.sample) state.capture = await options.sample(i, state);
         if (options.traceEveryFrame) trace.push({ frame: i, dt, state, ...(i % fps === 0 ? { game: await page.evaluate(() => window.__game) } : {}) });
         if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
         const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
@@ -329,6 +331,10 @@ try {
     if (!gym) throw Error('Target ref has no gait gym; merge capture tooling first');
     await H('teleport', gym.origin[0] - 20, gym.origin[1], gym.origin[2], Math.PI / 2);
     await H('setStick', 0, 0);
+    await page.evaluate(() => {
+      const fox = window.__gameHooks.debug.fox;
+      window.__capturePaws = Object.fromEntries(Object.entries({ LF: 'front_paw_l', RF: 'front_paw_r', LH: 'hind_paw_l', RH: 'hind_paw_r' }).map(([id, name]) => [id, fox.getObjectByName(name)]));
+    });
     // Times are output seconds; slow motion advances 1/240s per 60fps frame.
     const segments = [
       { name: 'idle', seconds: 1, stick: [0, 0] },
@@ -337,7 +343,8 @@ try {
       { name: 'gallop', seconds: 2, stick: [1, 0] },
       { name: 'gallop-quarter-speed', seconds: 3, stick: [1, 0], slow: true },
       { name: 'tight-left', seconds: 1, stick: [0, -1] },
-      { name: 'tight-right', seconds: 1, stick: [0, 1] },
+      { name: 'reverse', seconds: 1, stick: [0, 1] },
+      { name: 'tight-right', seconds: 1, stick: [-1, 0] },
       { name: 'hard-stop', seconds: 1, stick: [0, 0] },
       { name: 'jump-land', seconds: 2, stick: [.45, 0], jump: true, reset: [610, 0, 0] },
       { name: 'dash', seconds: 1, stick: [1, 0], dash: true, reset: [610, 0, 0] },
@@ -358,6 +365,27 @@ try {
       await H('setKeys', segment.jump && local < .18 * fps ? ['Space'] : segment.dash && local === 0 ? ['ShiftLeft'] : []);
     }, undefined, {
       dt: i => segmentAt(i).slow ? 1 / 240 : 1 / 60,
+      sample: async (i, state) => page.evaluate(feetY => {
+        const { fox, world } = window.__gameHooks.debug;
+        fox.updateWorldMatrix(true, true);
+        const feet = {};
+        for (const [id, bone] of Object.entries(window.__capturePaws)) {
+          if (!bone) { feet[id] = { missing: true }; continue; }
+          const point = bone.getWorldPosition(fox.position.clone());
+          const ground = world.collision.groundAt(point.x, point.z, feetY + .6).y;
+          feet[id] = { position: point.toArray(), ground: Number.isFinite(ground) ? ground : null, clearance: Number.isFinite(ground) ? point.y - ground : null };
+        }
+        const hip = fox.getObjectByName('pelvis'), chest = fox.getObjectByName('spine_04');
+        let body = null;
+        if (hip && chest) {
+          const a = hip.getWorldPosition(fox.position.clone()), b = chest.getWorldPosition(fox.position.clone());
+          const yaw = fox.rotation.y, center = fox.position;
+          const ahead = world.collision.groundAt(center.x + Math.sin(yaw) * .4, center.z + Math.cos(yaw) * .4, feetY + .6).y;
+          const behind = world.collision.groundAt(center.x - Math.sin(yaw) * .4, center.z - Math.cos(yaw) * .4, feetY + .6).y;
+          body = { hip: a.toArray(), chest: b.toArray(), pitch: Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z)), floorPitch: Math.atan2(ahead - behind, .8) };
+        }
+        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet, body };
+      }, state.pos[1]),
       keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.gait ?? st.locomotion?.gait ?? st.anim ?? 'unreported'} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
       afterStep: async (i, state) => {
         const [x, , z] = state.pos;
@@ -405,8 +433,8 @@ try {
     const h0 = hearth(await H('state'));
     const [hx, hy, hz] = h0.pos;
     const summary = { hearth: h0, A: {}, B: {}, C: {}, K: {} };
-    const lens = [[hx - 5, hy + 7, hz + 12], [hx + 3, hy + 2, hz - 1], 50];
-    await H('teleport', hx - 9, hy, hz + 16, Math.PI); await H('photo', ...lens); await advance(30); await shot('updraft-still-cold');
+    const lens = [[hx - 6, hy + 8, hz + 11], [hx + 2, hy + 3, hz - 1], 50];
+    await H('teleport', hx - 12, hy, hz + 16, Math.PI); await H('photo', ...lens); await advance(30); await shot('updraft-still-cold');
     const runFrom = [hx - 1.4, hy, hz + 9];
     for (const variant of ['A', 'B']) {
       await H('photoOff');
@@ -463,6 +491,22 @@ try {
         suppliedS: Number((tl.filter(r => r.supply >= 0.3).length / 60).toFixed(2)) };
       await H('setKeys', []);
     }
+    { // D: falling entry from the opposite (shelf) side — light it, step off the shelf lip, glide into the column
+      await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(20);
+      await H('teleport', hx + 6.5, hy + 5.3, hz, -Math.PI / 2); await advance(10);
+      let left = -1;
+      const tl = [];
+      await video('updraft-fall-entry', 9 * fps, async i => {
+        const st = await H('state');
+        tl.push({ i, pos: st.pos, vy: st.vel[1], grounded: st.grounded, gliding: st.gliding, heat: hearth(st).heat });
+        if (left < 0 && !st.grounded) left = i;
+        const over = Math.abs(st.pos[0] - hx) < 1.0;
+        await H('setKeys', left < 0 ? ['KeyW'] : over || st.vel[1] > 0 ? ['Space'] : ['KeyW', 'Space']);
+      }, (st, i) => left > 0 && st.grounded && i - left > 30, { keyFrames: [10, 40, 70, 100, 140, 200] });
+      const ride = (await H('state')).chem.lastRide;
+      summary.D = { ride, minVyBeforeLift: Math.min(...tl.map(r => r.vy)), peak: Math.max(...tl.map(r => r.pos[1])) };
+      await H('setKeys', []); await advance(300, false);
+    }
     // debug view of the column volume + lit still (staged, lit by standing at the bowl)
     await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(20);
     await page.evaluate(() => document.body.classList.add('debug-on'));
@@ -474,7 +518,7 @@ try {
       const h2 = hearthOf(st0, 'H2');
       const sw = { x: -112, z: -24 };
       const dx = h2.pos[0] - sw.x, dz = h2.pos[2] - sw.z, dl = Math.hypot(dx, dz), ux = dx / dl, uz = dz / dl;
-      const yaw = Math.atan2(-ux, -uz);
+      const yaw = Math.atan2(ux, uz);
       await H('teleport', sw.x - ux * 2, 20, sw.z - uz * 2, yaw); await advance(30);
       const tl = [];
       let phase = 'aura', p0 = 0;
@@ -542,6 +586,16 @@ try {
       await H('setKeys', ['KeyW', 'KeyA']); await advance(25); await shot(`fox-${state}-chase-turn`);
       await H('setKeys', []);
     }
+  }
+  if (wants('turntable')) {
+    // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
+    await boot(quality, true); await H('forceRestore'); await advance(660, false);
+    await H('teleport', ...poses.meadow.fox, Math.PI); await advance(60, false);
+    const p = await H('getFoxPos'), n = 8 * fps;
+    await video('fox-turntable', n, async i => {
+      const a = i / n * Math.PI * 2;
+      await H('photo', [p.x + Math.sin(a) * 3.4, p.y + 0.75, p.z - Math.cos(a) * 3.4], [p.x, p.y + 0.5, p.z], 34);
+    });
   }
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
 finally {

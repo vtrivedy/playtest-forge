@@ -59,6 +59,8 @@ export class ColorField {
   private _accum = 0;
   restores: RestoreRegion[] = [];
   strokes: ColorStroke[] = [];
+  /** Walkable height under (x, z) — airborne trail fades out of the ground mask with height (no decal band under a glide) */
+  groundAt: ((x: number, z: number) => number) | null = null;
   /** Visual-only warmth (e.g. a lit hearth tinting its surroundings): stamped into the mask, never read by sample() */
   glows: Array<{ x: number; z: number; radius: number; strength: number }> = [];
   /** Strokes fade linearly to 0 over their last `strokeFade` seconds */
@@ -352,23 +354,33 @@ export class ColorField {
         });
       }
     }
-    stamps.push({
-      x: this.fox.x,
-      z: this.fox.z,
-      size: this.auraRadius * 2.0,
-      strength: 0.95,
-      noise: 0.06,
-      inner: 0.55,
-    });
+    // the fox's colour reaches the ground only when it is near it: a high glide leaves no painted band
+    const near = (x: number, y: number, z: number) => {
+      if (!this.groundAt) return 1;
+      const g = this.groundAt(x, z);
+      return Number.isFinite(g) ? 1 - THREE.MathUtils.smoothstep(y - g, 0.8, 3.2) : 1;
+    };
+    const foxK = near(this.fox.x, this.fox.y, this.fox.z);
+    if (foxK > 0.01)
+      stamps.push({
+        x: this.fox.x,
+        z: this.fox.z,
+        size: this.auraRadius * 2.0 * (0.7 + 0.3 * foxK),
+        strength: 0.95 * foxK,
+        noise: 0.12,
+        inner: 0.4,
+      });
     for (const t of this.trail) {
       const life = t.life / this.trailLife;
+      const k = near(t.x, t.y, t.z);
+      if (k < 0.01) continue;
       stamps.push({
         x: t.x,
         z: t.z,
         size: this.trailRadius * 2.0,
-        strength: 0.7 * life,
-        noise: 0.1,
-        inner: 0.55,
+        strength: 0.7 * life * k,
+        noise: 0.2,
+        inner: 0.3,
       });
     }
 
