@@ -378,6 +378,8 @@ async function boot() {
   let kickCooldown = 0;
   /** Manual clock: the harness advances sim time explicitly (deterministic captures on slow GPUs) */
   let manual = false;
+  /** When set, step() keeps this clip instead of picking from locomotion (run-strip captures). */
+  let harnessAnimLock: FoxAnimState | null = null;
   let visualDt = 0;
 
   const setFx = (on: boolean) => {
@@ -386,6 +388,7 @@ async function boot() {
     post.params.bloomStrength = on ? BLOOM : 0;
     wisps.points.visible = fxEnabled;
     emberTrail.points.visible = fxEnabled;
+    foxActor.setSpiritFxVisible(fxEnabled);
   };
 
   addEventListener('resize', () => {
@@ -433,11 +436,13 @@ async function boot() {
       turntableMode = true;
       turntableYaw = 0;
       turntableAnim = (opts?.anim as FoxAnimState) || 'idle';
-      if (opts?.fx === false) setFx(false);
+      harnessAnimLock = turntableAnim;
+      setFx(opts?.fx !== false);
       foxActor.setAnim(turntableAnim);
     },
     stopTurntable() {
       turntableMode = false;
+      harnessAnimLock = null;
     },
     poseHero(opts?: { anim?: string; fx?: boolean }) {
       // Open meadow path north of the portal — clear of trees for anatomy judgment
@@ -448,10 +453,11 @@ async function boot() {
       foxActor.group.rotation.y = Math.PI * 0.72; // 3/4 toward south-east cam
       vel.set(0, 0, 0);
       const anim = (opts?.anim as FoxAnimState) || 'run';
+      harnessAnimLock = anim;
       foxActor.setAnim(anim);
       // Advance a few mixer frames so run pose isn't T-pose
       for (let i = 0; i < 8; i++) foxActor.update(1 / 30, i / 30, false);
-      if (opts?.fx === false) setFx(false);
+      setFx(opts?.fx !== false);
       // Staged still: photo framing, not the traversal camera
       const fx = foxActor.group.position;
       photo = {
@@ -973,27 +979,33 @@ async function boot() {
       let anim: FoxAnimState = 'idle';
       let fade = 0.16;
       let rate = 1;
-      const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
-      if (dashing) {
-        anim = 'dash';
+      if (harnessAnimLock) {
+        anim = harnessAnimLock;
         fade = 0.05;
-      } else if (!grounded && !offLedge) {
-        fade = 0.1;
-        if (gliding) anim = 'glide';
-        else if (vel.y > 2.2) anim = 'jump_up';
-        else if (vel.y > -1.6) anim = 'jump_apex';
-        else anim = 'jump_fall';
-      } else if (landT > 0 && (speed < 3.5 || landT > 0.16)) {
-        anim = 'land';
-        fade = 0.05;
-      } else if (speed > 1.2) {
-        anim = 'run';
-        // stride follows ground speed (clip authored near full run speed)
-        rate = THREE.MathUtils.clamp(speed / 8.4, 0.55, 1.45);
+        rate = harnessAnimLock === 'run' ? 1 : 1;
+      } else {
+        const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
+        if (dashing) {
+          anim = 'dash';
+          fade = 0.05;
+        } else if (!grounded && !offLedge) {
+          fade = 0.1;
+          if (gliding) anim = 'glide';
+          else if (vel.y > 2.2) anim = 'jump_up';
+          else if (vel.y > -1.6) anim = 'jump_apex';
+          else anim = 'jump_fall';
+        } else if (landT > 0 && (speed < 3.5 || landT > 0.16)) {
+          anim = 'land';
+          fade = 0.05;
+        } else if (speed > 1.2) {
+          anim = 'run';
+          // stride follows ground speed (clip authored near full run speed)
+          rate = THREE.MathUtils.clamp(speed / 8.4, 0.55, 1.45);
+        }
       }
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
-      foxActor.update(dt, elapsed, gliding);
+      foxActor.update(dt, elapsed, gliding || harnessAnimLock === 'glide');
     }
 
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));

@@ -33,6 +33,8 @@ export type FoxActor = {
   getAnim: () => string;
   /** True when GLB clips are driving the skeleton. */
   hasClips: boolean;
+  /** Toggle authored spirit FX meshes (wisps / flame / glow cards). Particles stay in main.ts. */
+  setSpiritFxVisible: (on: boolean) => void;
 };
 
 function tuneMaterials(root: THREE.Object3D) {
@@ -48,30 +50,35 @@ function tuneMaterials(root: THREE.Object3D) {
       if (!mat?.isMeshStandardMaterial) continue;
       const n = (mat.name || mesh.name || '').toLowerCase();
 
-      if (n.includes('embertail') || (n.includes('ember') && n.includes('tail')) || n === 'embertail') {
-        // Big bushy ember tip — glow, but not a bloom orb
-        mat.color.setHex(0xffffff); // respect authored tail_col map
-        mat.emissive = new THREE.Color(0xff6a22);
-        mat.emissiveIntensity = 0.55;
-        mat.roughness = 0.45;
-        mat.transparent = true;
-        mat.opacity = 0.95;
-        mat.depthWrite = true;
-        mat.toneMapped = true;
-      } else if (n.includes('spiritwisp') || n.includes('spirit_wisp')) {
-        // Opus spirit FX maps are already amber — don't recolor to red
+      if (n.includes('spiritwisp') || n.includes('spirit_wisp') || n.includes('emberwisp')) {
+        // Authored amber maps — white emissive so ACES doesn't turn FX crimson
         mat.color.setHex(0xffffff);
         mat.emissive = new THREE.Color(0xffffff);
-        mat.emissiveIntensity = Math.min(mat.emissiveIntensity || 0.7, 0.75);
+        const isGlow = n.includes('glow');
+        mat.emissiveIntensity = isGlow ? 0.35 : Math.min(mat.emissiveIntensity || 0.7, 0.7);
         mat.transparent = true;
         mat.depthWrite = false;
         mat.toneMapped = true;
         if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
         if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
-      } else if (n.includes('emberwisp') || n.includes('wisp') || n.includes('fur tuft') || n === 'furtufts') {
+        if (isGlow) {
+          mat.opacity = Math.min(mat.opacity ?? 1, 0.55);
+          mat.side = THREE.FrontSide; // stop back-face flank hotspot
+        }
+      } else if (n.includes('embertail') || (n.includes('ember') && n.includes('tail')) || n === 'embertail') {
         mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xff5520);
-        mat.emissiveIntensity = 0.35;
+        mat.emissive = new THREE.Color(0xffffff);
+        mat.emissiveIntensity = Math.min(mat.emissiveIntensity || 0.55, 0.6);
+        mat.transparent = true;
+        mat.opacity = 0.95;
+        mat.depthWrite = true;
+        mat.toneMapped = true;
+        if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+        if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+      } else if (n.includes('fur tuft') || n === 'furtufts') {
+        mat.color.setHex(0xffffff);
+        mat.emissive = new THREE.Color(0xffffff);
+        mat.emissiveIntensity = 0.25;
         mat.transparent = true;
         mat.opacity = 0.9;
         mat.toneMapped = true;
@@ -84,14 +91,13 @@ function tuneMaterials(root: THREE.Object3D) {
         if (mat.emissive) mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       } else if (n.includes('foxfur') || n.includes('fur') || n === 'cube') {
-        // Keep fox_fur_col 1:1 so white bib + black socks survive (warm tint was pink-washing the bib).
+        // Keep fox_fur_col 1:1 so cream bib + umber socks survive.
         mat.color.setHex(0xffffff);
         mat.roughness = 0.62;
         if (mat.emissive) mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
         mat.map && (mat.map.colorSpace = THREE.SRGBColorSpace);
       } else {
-        // Unknown: don't nuke albedo maps
         if (mat.map) {
           mat.color.setHex(0xffffff);
           mat.map.colorSpace = THREE.SRGBColorSpace;
@@ -180,6 +186,7 @@ function proceduralFox(): FoxActor {
     getAnim() {
       return anim;
     },
+    setSpiritFxVisible() {},
   };
 }
 
@@ -189,6 +196,23 @@ export async function createFox(): Promise<FoxActor> {
     const gltf = await new GLTFLoader().loadAsync('/assets/hero/spirit_fox.glb');
     const root = gltf.scene;
     tuneMaterials(root);
+
+    const spiritFxMeshes: THREE.Object3D[] = [];
+    root.traverse((c) => {
+      if (!(c as THREE.Mesh).isMesh) return;
+      const nm = (c.name || '').toLowerCase();
+      const mats = (c as THREE.Mesh).material;
+      const list = Array.isArray(mats) ? mats : mats ? [mats] : [];
+      const matNames = list.map((m) => ((m as THREE.Material).name || '').toLowerCase()).join(' ');
+      if (
+        nm.includes('spiritfx') ||
+        nm.includes('wisps') ||
+        matNames.includes('spiritwisp') ||
+        matNames.includes('emberwisp')
+      ) {
+        spiritFxMeshes.push(c);
+      }
+    });
 
     // Proportions (plume tail, snout, ears, fur shells) are authored in the GLB
     // by the Opus Blender pass — do not re-inflate meshes/bones here.
@@ -272,6 +296,9 @@ export async function createFox(): Promise<FoxActor> {
       },
       getAnim() {
         return current || 'none';
+      },
+      setSpiritFxVisible(on: boolean) {
+        for (const m of spiritFxMeshes) m.visible = on;
       },
     };
   } catch (err) {

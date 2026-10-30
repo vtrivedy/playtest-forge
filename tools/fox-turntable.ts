@@ -93,6 +93,7 @@ async function main() {
     }
 
     // Fixed-camera run strip (side view) — prove gait, not rubbery scissor
+    // Keep FX on for spirit-pass judgment; harnessAnimLock keeps run from falling back to idle
     await page.evaluate(() => {
       const h = (window as unknown as {
         __gameHooks?: {
@@ -105,20 +106,22 @@ async function main() {
         };
       }).__gameHooks;
       h?.stopTurntable?.();
-      h?.poseHero?.({ anim: 'run', fx: false });
-      // Side profile for gait (poseHero left a 3/4 photo)
+      h?.poseHero?.({ anim: 'run', fx: true });
+      // True side profile for gait (poseHero left a 3/4 photo)
       const pos = h?.getFoxPos?.() as { x: number; y: number; z: number } | undefined;
       if (pos && h?.photo) {
-        h.photo([pos.x + 3.4, pos.y + 0.85, pos.z], [pos.x, pos.y + 0.4, pos.z], 48);
+        h.photo([pos.x + 3.6, pos.y + 0.9, pos.z], [pos.x, pos.y + 0.45, pos.z], 46);
       }
       h?.setManual?.(true);
+      // Warm mixer into mid-cycle so strip doesn't start on bind pose
+      h?.advance?.(12, 1 / 24);
     });
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(100);
     for (let i = 0; i < 8; i++) {
       await page.evaluate(() => {
         const h = (window as unknown as { __gameHooks?: { advance?: (f?: number, d?: number) => unknown } }).__gameHooks;
-        // ~2 frames of run at 24fps ≈ one strip step across the 14-frame cycle
-        h?.advance?.(3, 1 / 24);
+        // ~1/8 of a typical run cycle per strip cell
+        h?.advance?.(4, 1 / 24);
       });
       await page.waitForTimeout(40);
       await page.screenshot({
@@ -137,7 +140,7 @@ async function main() {
     // Side-by-side note file
     fs.writeFileSync(
       path.join(outDir, 'README.md'),
-      `# Fox in-engine turntable\n\nanim=${anim} fx=${fxOn}\nhasClips=${info.hasClips} playing=${info.anim}\n\nCompare to assets/concept/fox-turnaround.jpg\n`,
+      `# Fox in-engine turntable\n\nyaw anim=${anim} fx=${fxOn} (mesh+particles)\nrun-strip: side cam, harnessAnimLock=run, fx on\nhasClips=${info.hasClips} playing=${info.anim}\n\nCompare to assets/concept/fox-turnaround.jpg\n`,
     );
 
     await browser.close();
