@@ -75,6 +75,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         metadata = {'ref': ref, 'commit': sha, 'gpu': gpu, 'shots': shots, 'runId': run_id,
                     'buildSeconds': round(built-started, 2), 'captureSeconds': round(time.monotonic()-built, 2),
                     'backend': backend, 'size': size, 'quality': quality, 'fps': fps,
+                    'captureToolSha': json.loads((out / 'report.json').read_text())['captureToolSha'],
                     'totalSeconds': round(time.monotonic()-started, 2)}
         (out / 'run.json').write_text(json.dumps(metadata, indent=2))
         return metadata

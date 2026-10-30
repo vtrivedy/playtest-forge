@@ -1,6 +1,7 @@
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
@@ -47,7 +48,7 @@ const server = http.createServer((req, res) => {
 });
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
-const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, perf: {}, shots: {}, videos: {}, failures: [] };
+const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
 let browser;
 try {
   const headed = backend === 'gl';
@@ -229,7 +230,8 @@ try {
       { name: 'gallop', seconds: 2, stick: [1, 0] },
       { name: 'gallop-quarter-speed', seconds: 3, stick: [1, 0], slow: true },
       { name: 'tight-left', seconds: 1, stick: [0, -1] },
-      { name: 'tight-right', seconds: 1, stick: [0, 1] },
+      { name: 'reverse', seconds: 1, stick: [0, 1] },
+      { name: 'tight-right', seconds: 1, stick: [-1, 0] },
       { name: 'hard-stop', seconds: 1, stick: [0, 0] },
       { name: 'jump-land', seconds: 2, stick: [.45, 0], jump: true, reset: [610, 0, 0] },
       { name: 'dash', seconds: 1, stick: [1, 0], dash: true, reset: [610, 0, 0] },
