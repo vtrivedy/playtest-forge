@@ -794,6 +794,7 @@ async function boot() {
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         crown: crown.state(),
         reach: reach.state(),
+        albumPages: world.reedRegion.pageFound ? ['reed-ruin'] : [],
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
@@ -857,6 +858,10 @@ async function boot() {
         hud.hidePromptSoon(5);
         cam.playShot({ subjects: [foxActor.group.position.clone(), s.pos.clone()], holdS: 1.7, blendS: 0.6 });
         cam.shake(0.3);
+      } else if (e.type === 'page') {
+        audio.play('checkpoint');
+        hud.setPrompt('A pressed page returns to the Album.');
+        hud.hidePromptSoon(4);
       } else if (e.type === 'bridge') {
         audio.play('bridge');
       } else if (e.type === 'checkpoint') {

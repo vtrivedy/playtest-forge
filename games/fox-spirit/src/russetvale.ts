@@ -73,6 +73,7 @@ export type RealmEvent =
   | { type: 'seedwell'; index: number }
   | { type: 'bridge' }
   | { type: 'checkpoint'; index: number }
+  | { type: 'page'; id: 'reed-ruin' }
   | { type: 'wellspring' }
   | { type: 'hazard'; kind: 'ink' | 'fall' };
 
@@ -2322,6 +2323,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     update(dt, t, fox, feetY, colorAt) {
       for (const water of waterVisuals) water.update(t);
       const ev: RealmEvent[] = [];
+      if (reedRegion.visit(fox, feetY)) ev.push({ type: 'page', id: 'reed-ruin' });
       // checkpoints
       for (let i = 0; i < checkpoints.length; i++) {
         const c = checkpoints[i]!;

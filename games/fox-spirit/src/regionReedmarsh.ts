@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { boxCollider, type CollisionWorld } from './collision';
-import { Bucket, PAL, rockSlab, ruinColumn } from './russetKit';
+import { Bucket, PAL, rockSlab, ruinColumn, leafShape } from './russetKit';
 
 /** The ruin is a real depression, not a room hidden below an uncut heightfield.
  * Apply this to groundRaw's final result so terrain visuals and physics agree. */
@@ -21,6 +21,8 @@ export type ReedmarshRegion = {
   restore: () => void;
   causeway: ReadonlyArray<THREE.Vector3>;
   ruinPage: THREE.Vector3;
+  readonly pageFound: boolean;
+  visit: (pos: THREE.Vector3, feetY: number) => boolean;
 };
 
 /** Stonework uses the realm's supplied textured, ColorField-patched material.
@@ -62,6 +64,7 @@ export function createReedmarshRegion(
     new THREE.Vector3(40, 4.6, -36),
     new THREE.Vector3(29, 7.8, -47),
     new THREE.Vector3(18, 12, -58),
+    new THREE.Vector3(14.5, 12, -58),
   ];
   // Ramped collider tops match the visible inclined paving exactly. Broad joint
   // platforms overlap segment ends so the fox cannot catch a triangle seam.
@@ -98,10 +101,25 @@ export function createReedmarshRegion(
   for (const [x, z, h] of [[106, 42, 3.6], [114, 42, 2.7], [106, 37, 1.8], [114, 37, 3.2]]) ruinColumn(stone, x!, -6, z!, h!, 1000 + x! + z!, 0.5);
   const stoneMesh = stone.toMesh(stoneMaterial, { boxUV: 3 });
   if (stoneMesh) { stoneMesh.name = 'Reed recovery and sunken ruin'; parent.add(stoneMesh); }
-  let restored = false;
+  const pagePos = new THREE.Vector3(110, -5.94, 42);
+  const paper = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.72, 3, 2), new THREE.MeshStandardMaterial({ color: 0xcbb88e, roughness: 1, side: THREE.DoubleSide }));
+  paper.rotation.set(-Math.PI / 2, 0, 0.18); paper.position.copy(pagePos); parent.add(paper);
+  // A pressed leaf on a torn page, seen only after finding the room. No glint.
+  const leaf = new THREE.Mesh(leafShape(0.28, 0.44), new THREE.MeshStandardMaterial({ color: 0x8e4e2a, roughness: 1, side: THREE.DoubleSide }));
+  leaf.rotation.copy(paper.rotation); leaf.position.copy(pagePos).add(new THREE.Vector3(0.06, 0.006, 0)); parent.add(leaf);
+  let restored = false, found = false;
+  try { found = !new URLSearchParams(location.search).has('fresh') && localStorage.getItem('fox-spirit:album:reed-page') === 'found'; } catch { /* save unavailable */ }
+  paper.visible = leaf.visible = !found;
   return {
+    get pageFound() { return found; },
+    visit(pos, feetY) {
+      if (!restored || found || Math.abs(feetY + 6) > 0.8 || Math.hypot(pos.x - pagePos.x, pos.z - pagePos.z) > 1.6) return false;
+      found = true; paper.visible = leaf.visible = false;
+      try { localStorage.setItem('fox-spirit:album:reed-page', 'found'); } catch { /* save unavailable */ }
+      return true;
+    },
     restore() { if (restored) return; restored = true; for (const c of routeColliders) c.enabled = true; if (causewayMesh) causewayMesh.visible = true; },
     causeway,
-    ruinPage: new THREE.Vector3(110, -5.9, 42),
+    ruinPage: pagePos,
   };
 }
