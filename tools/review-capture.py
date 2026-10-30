@@ -55,7 +55,7 @@ def main():
                 print(sheet)
         return
     shots = args.shots.split(',')
-    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe', 'fox'}:
+    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe', 'fox', 'updraft'}:
         parser.error('Unknown shot')
     # Exact remote branch name; immutable SHA inputs are also accepted.
     remote = subprocess.check_output(['git', 'ls-remote', '--heads', 'origin', f'refs/heads/{args.ref}'], cwd=ROOT, text=True).splitlines()

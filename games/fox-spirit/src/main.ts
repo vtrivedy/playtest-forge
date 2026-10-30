@@ -32,6 +32,9 @@ import { createHud } from './hud';
 import { createOcclusionFader } from './occlusion';
 import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
+import { createUpdrafts, type Hearth, type Lift } from './chem/updraft';
+import { createInlets, heatFeeds } from './chem/inlet';
+import type { ColorStroke } from '../../../src/render/colorField';
 
 /**
  * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
@@ -80,6 +83,8 @@ const jumpFeel = new JumpFeel();
 const feelMetrics = emptyFeelMetrics();
 const BLOOM = 0.16;
 /** Ember pickup freeze — just enough to register the hit; cooldown so ember lines don't stutter */
+/** Dash stroke (world-1.md §1.1): life s, strength (>1 punches through Shade drain), capsule radius m */
+const DASH_STROKE = { life: 6, strength: 1.5, radius: 1.6 };
 const HITSTOP_S = 0.03;
 const HITSTOP_COOLDOWN_S = 0.35;
 
@@ -202,6 +207,7 @@ async function boot() {
     maskSize: 512,
   });
   colorField.initMask(renderer);
+  colorField.groundAt = (x, z) => col.highestAt(x, z);
   // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
   const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75 };
   for (const m of world.materials) {
@@ -227,8 +233,8 @@ async function boot() {
     // restore vortex + front leaf release share this pool with running kicks
     burstPool: 360,
   });
-  const emberMotes = createEmberMotes(scene, { maxMotes: world.emberSpots.length });
-  for (const e of world.emberSpots) emberMotes.add(e.p, e.value > 1 ? 1.6 : 1);
+  // spark bursts only (Seedwell, Wellspring, hearth flares) — no pickups
+  const emberMotes = createEmberMotes(scene, { maxMotes: 0 });
   const occlusion = createOcclusionFader(scene, {
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
@@ -249,19 +255,6 @@ async function boot() {
       shrineOn = true;
       status = 'won';
       hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
-    },
-    // the Wellspring calls the summit's loose embers home: they rise and dissolve as the fox steps up
-    gatherEmbers: (c, r) => {
-      const got = world.takeEmbersNear(c, r);
-      for (const g of got) {
-        embersGot += g.value;
-        emberMotes.collect(g.index, true);
-      }
-      if (got.length) {
-        feelMetrics.gemsCollected = embersGot;
-        hud.setEmbers(embersGot);
-        audio.play('ember');
-      }
     },
     camera: cam,
     audio,
@@ -315,6 +308,83 @@ async function boot() {
   fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
   fCam.add(cam.params, 'shake', 0, 2, 0.05);
   fCam.close();
+  // colour chemistry (world-1.md §1, §5): hearths → ember updrafts
+  const updrafts = createUpdrafts(scene, world.hearthSpots, {
+    gui,
+    onIgnite: (h) => {
+      // struck by a dash: a harder flare than a hearth caught by the passing wake
+      const byDash = h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
+      if (byDash) dashStruck.add(h);
+      h.flare = byDash ? 1.6 : 1;
+      emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: byDash ? 60 : 26, speed: byDash ? [2, 5] : [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: byDash ? 1.4 : 0.8, size: [0.04, 0.1], heat: 0.7 });
+      audio.play('checkpoint');
+      // the breath lets go: ground leaves round the hearth lift into the column
+      autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), byDash ? 44 : 30, 1.7);
+      if (byDash) cam.shake(0.15);
+    },
+  });
+  const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
+  /**
+   * Colour drains (world-1.md §1.2): encounters register predicates here (Shades: within 3 m). Inside a drain
+   * reactors read aura/trail and spent strokes (≤ 1) as 0, and an unsupplied reactor skips its hold.
+   */
+  const colorDrains: Array<(p: THREE.Vector3) => boolean> = [];
+  const drainedAt = (q: THREE.Vector3) => colorDrains.some((f) => f(q));
+  const supplyAt = (q: THREE.Vector3) => {
+    if (!drainedAt(q)) return colorField.sample(q);
+    return colorField.strokeAt(q) > 1 ? 1 : 0;
+  };
+  const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
+  /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
+  function latchSeedwell(i: number, quiet = false) {
+    const sw = world.seedwells[i]!;
+    for (const h of updrafts.hearths) if (Math.hypot(h.base.x - sw.pos.x, h.base.z - sw.pos.z) <= sw.radius) h.reactor.restored = true;
+    const inlet = inlets.inlets.find((q) => q.seedwell === i);
+    if (inlet) inlet.latched = true;
+    const ev = world.latchSeedwell(i);
+    if (quiet) colorField.restore(sw.pos, sw.radius, 0.05);
+    else handleEvents(ev);
+    saveLatches();
+  }
+  /** Latches are saved (world-1.md §1.4): restored on load without the ceremony. `?fresh` starts sepia. */
+  const SAVE_KEY = 'fox-spirit:russetvale:latched';
+  function saveLatches() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(world.seedwells.filter((s) => s.lit).map((s) => s.id)));
+    } catch {
+      /* storage unavailable: play on unsaved */
+    }
+  }
+  {
+    let saved: string[] = [];
+    try {
+      if (new URLSearchParams(location.search).has('fresh')) localStorage.removeItem(SAVE_KEY);
+      saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? '[]') as string[];
+    } catch {
+      saved = [];
+    }
+    world.seedwells.forEach((s, i) => {
+      if (saved.includes(s.id)) latchSeedwell(i, true);
+    });
+  }
+  const fStroke = gui.addFolder('Chem › Dash stroke');
+  fStroke.add(DASH_STROKE, 'life', 2, 10, 0.1);
+  fStroke.add(DASH_STROKE, 'strength', 1, 2, 0.05);
+  fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
+  fStroke.close();
+  let inColumn = false;
+  const baseJumpTrack = cam.params.jumpTrack;
+  let hearthLeafT = 0;
+  let dashStroke: ColorStroke | null = null;
+  const dashStruck = new Set<Hearth>();
+  /** Dash through an already-lit hearth: the strong flare without touching its heat (the stroke supplies it) */
+  function hearthStruck(h: Hearth) {
+    h.flare = 1.6;
+    emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: 50, speed: [2, 5], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: 1.3, size: [0.04, 0.1], heat: 0.7 });
+    autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 24, 1.7);
+    audio.play('checkpoint');
+    cam.shake(0.12);
+  }
   const fLook = gui.addFolder('Look');
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
@@ -386,7 +456,6 @@ async function boot() {
   let turntableMode = false;
   let turntableYaw = 0;
   let turntableAnim: FoxAnimState = 'idle';
-  let embersGot = 0;
   let airDashUsed = false;
   let prevFeet = world.spawnPos.y;
   let groundBounce = 1;
@@ -406,6 +475,8 @@ async function boot() {
     wish: new THREE.Vector3(),
     space: false,
     dash: false,
+    /** route act 'dash': press dash toward the next waypoint on the next step */
+    dashQueued: false,
     phase: 'run' as 'run' | 'air',
     pressT: 0,
     stuckT: 0,
@@ -455,6 +526,8 @@ async function boot() {
     },
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
+    /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
+    chem: { updrafts, inlets, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
     /** Fox look tunables (live; see foxLook.ts) */
     foxLook: FOX_LOOK,
@@ -541,12 +614,7 @@ async function boot() {
       return world.route;
     },
     lightSeedwells() {
-      for (const s of world.seedwells) {
-        const p = s.pos;
-        foxActor.group.position.set(p.x, p.y + foxActor.feetOffset, p.z);
-        prevFeet = p.y;
-        handleEvents(world.update(0.016, elapsed, foxActor.group.position, p.y, (q) => colorField.sample(q)));
-      }
+      for (let i = 0; i < world.seedwells.length; i++) latchSeedwell(i);
     },
     autopilot(on = true, fromIdx = 0, opts?: { assist?: boolean }) {
       auto.active = on;
@@ -624,9 +692,8 @@ async function boot() {
       const p = foxActor.group.position;
       return {
         zone,
-        embers: embersGot,
-        emberTotal: world.emberTotal,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
+        chem: { ...updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         audio: audio.debug(),
@@ -674,18 +741,7 @@ async function boot() {
 
   function handleEvents(events: ReturnType<typeof world.update>) {
     for (const e of events) {
-      if (e.type === 'ember') {
-        embersGot += e.value;
-        feelMetrics.gemsCollected = embersGot;
-        hud.setEmbers(embersGot);
-        audio.play('ember');
-        emberMotes.collect(e.index);
-        if (simClock - lastHitstop > HITSTOP_COOLDOWN_S) {
-          hitstop = HITSTOP_S;
-          lastHitstop = simClock;
-        }
-        foxActor.pulse(2.2);
-      } else if (e.type === 'seedwell') {
+      if (e.type === 'seedwell') {
         const s = world.seedwells[e.index]!;
         colorField.restore(s.pos, s.radius, 3.2);
         autumnFX.swirl(s.pos, 40, 1.6);
@@ -718,7 +774,6 @@ async function boot() {
   hud.setStatus(`Sepia Russetvale · ${backend}`);
   hud.setPrompt('WASD · Space jump / hold glide · Shift dash · drag to look · Reach the shrine');
   hud.hidePromptSoon(8);
-  hud.setEmbers(0);
 
   publishGame({
     title: 'Fox Spirit',
@@ -813,6 +868,10 @@ async function boot() {
       auto.idx += 1;
       auto.stuckT = 0;
       auto.bestD = Infinity;
+      if (wp.act === 'dash' && onGround) {
+        auto.dashQueued = true;
+        return;
+      }
       if (wp.act && onGround) {
         auto.act = wp.act;
         auto.phase = 'air';
@@ -822,10 +881,17 @@ async function boot() {
       return;
     }
     // steer (in air: brake once over the target; wait at the bridge head until the roots finish growing)
-    const waitBridge = route[auto.idx - 1]?.label === 'bridge-head' && world.bridgeGrown() < 1;
+    const prevLabel = route[auto.idx - 1]?.label;
+    // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
+    const waitSeedwell = (prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit;
+    const waitBridge = (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell;
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
+    if (auto.dashQueued) {
+      auto.dash = true;
+      auto.dashQueued = false;
+    }
     // stuck → count an assist and hop to the waypoint (reported in state), or stop on honest runs
     if (d < auto.bestD - 0.3 || waitBridge) {
       auto.bestD = d;
@@ -970,6 +1036,8 @@ async function boot() {
         vel.y = Math.max(vel.y, 0);
       }
       dashFrom.copy(fox.position);
+      // the dash is the brush: a 6 s strong colour stroke along its path (world-1.md §1.1)
+      dashStroke = colorField.stroke(fox.position.clone().setY(fox.position.y + 0.25), fox.position.clone().setY(fox.position.y + 0.25), { life: DASH_STROKE.life, strength: DASH_STROKE.strength, radius: DASH_STROKE.radius });
       feelMetrics.dashesUsed += 1;
       cam.punch(5);
       cam.shake(0.22);
@@ -983,20 +1051,34 @@ async function boot() {
     const dashing = dashT > 0;
     if (wasDashing && !dashing) jumpStats.lastDashDist = Number(Math.hypot(fox.position.x - dashFrom.x, fox.position.z - dashFrom.z).toFixed(2));
 
-    // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it
-    glideHoldT = !grounded && spaceDown && vel.y < 0 && !dashing ? glideHoldT + dt : 0;
-    gliding = glideHoldT > feel.glideDelay;
+    // ember updraft at the feet (chem/updraft.ts): lift factor k, axis for steering/centering
+    updrafts.liftAt(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z, lift);
+    const enteredColumn = lift.k > 0.02 && !inColumn && !grounded;
+    inColumn = lift.k > 0.02 && !grounded;
+    if (enteredColumn) cam.punch(3);
+    // ride framing: the lens follows the full rise in a column (normal jumps keep the partial track)
+    cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, inColumn || (gliding && lift.k > 0) ? 1 : baseJumpTrack, 3, dt);
+    // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
+    // In a burning column glide starts at once and persists through the rise while jump is held.
+    glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
+    gliding = glideHoldT > feel.glideDelay || (inColumn && glideHoldT > 0);
     if (dashing && !grounded) vel.y = Math.max(vel.y, 0) * 0.9;
-    else if (gliding) {
+    else if (gliding && lift.k > 0) {
+      // ride the column: vy eases toward the lift target (no snap at the column edge)
+      const vTarget = THREE.MathUtils.lerp(-feel.glideSink, updrafts.tun.maxRise, lift.k);
+      vel.y = THREE.MathUtils.damp(vel.y, vTarget, updrafts.tun.liftResponse, dt);
+      vel.x *= Math.exp(-feel.glideDrag * dt);
+      vel.z *= Math.exp(-feel.glideDrag * dt);
+    } else if (gliding) {
       // ease into the glide sink from a fast fall (no jolt), then hold it exactly
       if (vel.y > -feel.glideSink) vel.y = Math.max(vel.y - feel.gravity * feel.glideGravityScale * dt, -feel.glideSink);
       else vel.y = THREE.MathUtils.damp(vel.y, -feel.glideSink, 7, dt);
       vel.x *= Math.exp(-feel.glideDrag * dt);
       vel.z *= Math.exp(-feel.glideDrag * dt);
     } else if (!grounded) {
-      // heavier fall, floaty apex while jump is held
+      // heavier fall, floaty apex while jump is held; a column softens a plain fall
       const hang = spaceDown && Math.abs(vel.y) < 1.4 ? feel.apexHang : 1;
-      const fall = vel.y < 0 ? feel.fallGravity : 1;
+      const fall = vel.y < 0 ? feel.fallGravity * (1 - updrafts.tun.fallLift * lift.k) : 1;
       vel.y -= feel.gravity * fall * hang * dt;
     }
     if (gliding && !wasGliding) glideFrom.copy(fox.position);
@@ -1010,7 +1092,14 @@ async function boot() {
     wasGliding = gliding;
 
     if (!dashing) {
-      const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward : feel.moveSpeed);
+      const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward * (1 - updrafts.tun.columnSteer * lift.radialK * (lift.k > 0 ? 1 : 0)) : feel.moveSpeed);
+      if (gliding && lift.k > 0) {
+        // centre pull: the column holds a glider instead of letting it sail through
+        const dx = lift.ax - fox.position.x;
+        const dz = lift.az - fox.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d > 0.05) desired.add(new THREE.Vector3(dx / d, 0, dz / d).multiplyScalar(updrafts.tun.centerPull * lift.radialK));
+      }
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
       cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
@@ -1080,7 +1169,34 @@ async function boot() {
     }
 
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
+    if (dashStroke) {
+      dashStroke.b.copy(colorField.fox);
+      // a dash through a hearth always flares it, whether cold, holding or guttering (once per stroke)
+      for (const h of updrafts.hearths) {
+        if (dashStruck.has(h) || !h.reactor.probes.some((q) => colorField.strokeAt(q) > 1)) continue;
+        dashStruck.add(h);
+        if (h.reactor.state !== 'cold') hearthStruck(h);
+      }
+      if (!dashing) {
+        dashStroke = null;
+        dashStruck.clear();
+      }
+    }
     colorField.update(dt);
+    updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
+    // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
+    colorField.glows.length = 0;
+    hearthLeafT += dt;
+    const leafPulse = hearthLeafT > 1.6;
+    if (leafPulse) hearthLeafT = 0;
+    for (const h of updrafts.hearths) if (h.reactor.heat > 0) {
+      colorField.glows.push({ x: h.base.x, z: h.base.z, radius: 4.2, strength: h.reactor.heat * 0.8 });
+      // keep leaves riding a burning column, near the fox only (shared leaf pool)
+      if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
+    }
+    for (const i of inlets.update(dt, (q) => { const h = updrafts.hearths.find((x) => x.spot.id === q.source); return !!h && heatFeeds(h, q.pos, updrafts.tun.radius); })) latchSeedwell(i);
+    for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
+    updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
     // Leaf kick while running
     kickCooldown -= dt;
@@ -1195,22 +1311,22 @@ async function boot() {
     const lit = world.seedwells.filter((q) => q.lit).length;
     hud.setStatus(
       shrineOn
-        ? `AUTUMN RESTORED · embers ${embersGot}/${world.emberTotal} · ${elapsed.toFixed(1)}s`
-        : `${zone} · Seedwells ${lit}/3 · embers ${embersGot}/${world.emberTotal} · ${backend}`,
+        ? `AUTUMN RESTORED · ${elapsed.toFixed(1)}s`
+        : `${zone} · Seedwells ${lit}/3 · ${backend}`,
     );
 
     publishGame({
       title: 'Fox Spirit — Russetvale',
       status,
-      score: embersGot * 10 + lit * 250 + (shrineOn ? 1000 : 0),
+      score: lit * 250 + (shrineOn ? 1000 : 0),
       lives: 1,
       elapsedSec: Number(elapsed.toFixed(2)),
       deaths,
       backend,
-      winCondition: 'Light 3 Seedwells, cross the root bridge, wake the Ember Wellspring',
+      winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
+      chem: { updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [
         `zone=${zone}`,
-        `embers=${embersGot}/${world.emberTotal}`,
         `seedwells=${world.seedwells.map((q) => `${q.id}:${q.lit ? 1 : 0}`).join(',')}`,
         `bridge=${world.bridgeGrown().toFixed(2)}`,
         `restored=${shrineOn}`,

@@ -40,7 +40,7 @@ No orbs, no counters, no currency. The player's reward is that the valley starts
 Every reactive object is a **Reactor**: one or more probe points, a `heat` 0..1, and a `restored` flag.
 
 1. **Restored?** `restored` is set once, at the moment a Seedwell latches with the reactor inside its radius (saved). A restored reactor has heat 1. Stop.
-2. **Supply.** `aura/trail = max over sources at the probes`; `dash = max dash-stroke strength at the probes`. If a probe is inside a Shade's drain: `aura/trail = 0` and `dash = 0` unless `dash > 1` (fresh strokes punch through). `supplied = max(aura/trail, dash) ≥ threshold` (default 0.45).
+2. **Supply.** `aura/trail = max over sources at the probes`; `dash = max dash-stroke strength at the probes`. If a probe is inside a Shade's drain: `aura/trail = 0` and `dash = 0` unless `dash > 1` (fresh strokes punch through). `supplied = max(aura/trail, dash) ≥ threshold` (default 0.3; hearths probe their bowl centre and a 0.9 m ring of 4 points at fox height, so brushing past within ≈ 1.5 m of the rim lights them).
 3. **Heat.** Supplied → heat rises to 1 over `igniteTime`, and the hold timer refreshes. Not supplied → hold for `holdTime`, then **gutter** over `gutterTime` (visible warning; output ramps down), then cold. **Drain bypasses hold:** a reactor whose probe sits in a Shade's drain and is not supplied goes straight to gutter.
 4. **Output** (lift, push, flow, growth) scales with heat.
 
@@ -259,7 +259,7 @@ The single best systemic toy. It uses a verb that already ships (glide), the Col
 
 | Tunable | Default | Range |
 |---|---|---|
-| `threshold` | 0.45 | 0.2–0.9 |
+| `threshold` | 0.3 | 0.05–0.9 |
 | `igniteTime` | 0.25 s | 0–1 |
 | `holdTime` | 3.0 s | 0–8 |
 | `gutterTime` | 0.8 s | 0.2–2 |
