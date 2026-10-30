@@ -269,7 +269,7 @@ try {
     save('shade-contact-setup.json', contactSetup);
     await H('teleport', ...contactSetup.pos, Math.PI);
     await camera();
-    await video('shade-contact', 90, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 89] });
+    await video('shade-contact', 66, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 65] });
     const contact = await page.evaluate(() => window.__gameHooks.shades.state());
     if (contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1) throw Error(`Shade contact failed: ${JSON.stringify(contact)}`);
     p = contact.actors[0].pos;
@@ -292,7 +292,10 @@ try {
     }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 120, 180, 209] });
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
     if (freed.frees !== 1 || !freed.actors[0].freed || freed.hits !== contact.hits || freed.wisps < contact.wisps) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
-    await advance(360, false);
+    await advance(90);
+    await shot('shade-leaf-litter');
+    await advance(600, false);
+    if ((await page.evaluate(() => window.__gameHooks.shades.state().actors[0].leaves)) !== 0) throw Error('Leaf one-shot did not end empty');
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
     await shot('shade-after-free');
     save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });

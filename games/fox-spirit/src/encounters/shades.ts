@@ -12,7 +12,7 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number };
 
 export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean };
-export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 1.15, invulnerability: 1, debug: false };
+export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 0.8, invulnerability: 1, debug: false };
 
 type ShadeActor = {
   id: string;
@@ -29,7 +29,7 @@ type ShadeActor = {
   presence: number;
   freed: boolean;
   leaves: THREE.InstancedMesh;
-  leafSeeds: Array<{ p: THREE.Vector3; velocity: THREE.Vector3; phase: number }>;
+  leafSeeds: Array<{ p: THREE.Vector3; velocity: THREE.Vector3; phase: number; landed: THREE.Vector3 | null }>;
   releaseAge: number;
   debug: THREE.Group;
 };
@@ -136,7 +136,7 @@ function inkMaterial(): THREE.ShaderMaterial {
       }`,
     fog: false,
     transparent: true,
-    depthWrite: false,
+    depthWrite: true,
   });
 }
 
@@ -204,7 +204,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     const leafSeeds = Array.from({ length: 72 }, (_, k) => {
       const source = geo.attributes.position!;
       const p = new THREE.Vector3().fromBufferAttribute(source, (k * 167 + i * 31) % source.count);
-      return { p, velocity: new THREE.Vector3(Math.sin(k * 2.4) * 0.75, 0.4 + (k % 7) * 0.11, Math.cos(k * 1.7) * 0.75), phase: k * 2.399 };
+      return { p, velocity: new THREE.Vector3(Math.sin(k * 2.4) * 0.75, 0.4 + (k % 7) * 0.11, Math.cos(k * 1.7) * 0.75), phase: k * 2.399, landed: null };
     });
     const debug = new THREE.Group();
     const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(curve.getPoints(96)), new THREE.LineBasicMaterial({ color: 0xc9a04a }));
@@ -230,7 +230,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         if (s.freed) {
           s.releaseAge += dt;
           const age = s.releaseAge;
-          s.leaves.visible = age < 4.5;
+          s.leaves.visible = age < 10;
           const base = s.group.position;
           for (let k = 0; k < s.leafSeeds.length; k++) {
             const seed = s.leafSeeds[k]!;
@@ -238,12 +238,19 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
             p.add(base).addScaledVector(seed.velocity, age);
             p.x += Math.sin(age * 2 + seed.phase) * age * 0.13;
             p.z += Math.cos(age * 1.6 + seed.phase) * age * 0.13;
-            p.y = Math.max(s.pos.y + 0.04, p.y - age * age * 0.75);
-            const fade = Math.min(1, age * 9) * (1 - THREE.MathUtils.smoothstep(age, 3.2, 4.5));
+            p.y -= age * age * 0.75;
+            if (!seed.landed) {
+              const floor = groundAt(p.x, p.z, Math.max(base.y + seed.p.y, p.y) + 0.2);
+              if (Number.isFinite(floor) && p.y <= floor + 0.035) seed.landed = p.clone().setY(floor + 0.035);
+            }
+            if (seed.landed) p.copy(seed.landed);
+            const fade = Math.min(1, age * 9) * (1 - THREE.MathUtils.smoothstep(age, 8, 10));
             const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(age * 1.8 + seed.phase, seed.phase + age, Math.sin(age + seed.phase)));
-            matrix.compose(p, q, new THREE.Vector3(0.11 * fade, 0.11 * fade, 0.11 * fade));
+            if (seed.landed) q.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, seed.phase));
+            const size = 0.063 * fade * (0.88 + (k % 5) * 0.06);
+            matrix.compose(p, q, new THREE.Vector3(size, size, size));
             s.leaves.setMatrixAt(k, matrix);
-            leafColor.copy(inkColor).lerp(autumnColors[k % 4]!, THREE.MathUtils.smoothstep(age, 0.12 + (k % 4) * 0.07, 1.6));
+            leafColor.copy(inkColor).lerp(autumnColors[k % 4]!, THREE.MathUtils.smoothstep(age, 0.08 + (k % 4) * 0.04, 0.8));
             s.leaves.setColorAt(k, leafColor);
           }
           s.leaves.instanceMatrix.needsUpdate = true;
@@ -294,7 +301,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       return ev;
     },
     state() {
-      return shades.map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 4.5 ? 72 : 0 }));
+      return shades.map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 10 ? 72 : 0 }));
     },
   };
   if (gui) {
@@ -312,11 +319,16 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
   return sys;
 }
 
-/** A small pointed leaf, cupped along its midrib. Units are scaled by each instance. */
+/** Lobed maple leaf, about 15 cm long in world space; a gently cupped midrib. */
 function leafGeometry() {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute([0, 1.5, 0, -0.65, 0, 0, 0, -1.1, 0, 0.65, 0, 0, 0, 0.15, 0.22], 3));
-  g.setIndex([0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4]);
+  const shape = new THREE.Shape();
+  const outline = [[0,-1.1],[-.1,-.5],[-.64,-.52],[-.4,-.14],[-1,.08],[-.63,.36],[-.74,.83],[-.27,.61],[0,1.35],[.27,.61],[.74,.83],[.63,.36],[1,.08],[.4,-.14],[.64,-.52],[.1,-.5]];
+  shape.moveTo(outline[0]![0]!, outline[0]![1]!);
+  for (const [x,y] of outline.slice(1)) shape.lineTo(x!,y!);
+  shape.closePath();
+  const g = new THREE.ShapeGeometry(shape);
+  const p = g.attributes.position!;
+  for(let i=0;i<p.count;i++) p.setZ(i, .12 * (1 - Math.min(1, Math.abs(p.getX(i)))));
   g.computeVertexNormals();
   return g;
 }
