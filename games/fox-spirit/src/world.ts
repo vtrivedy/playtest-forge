@@ -69,10 +69,11 @@ function makeTerrain(radius: number): {
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const colors = new Float32Array(pos.count * 3);
-  const cGrass = new THREE.Color(0xc9a84a); // golden autumn grass
-  const cMoss = new THREE.Color(0x8a5a32); // rust moss
-  const cDirt = new THREE.Color(0x6a4a30);
-  const cPath = new THREE.Color(0x8a6a48);
+  // Parchment ground — paper-warm base with rust moss / path ink
+  const cGrass = new THREE.Color(0xd2b896); // parchment meadow
+  const cMoss = new THREE.Color(0x9a5a38); // rust moss
+  const cDirt = new THREE.Color(0x7a5538);
+  const cPath = new THREE.Color(0xb89870); // worn parchment path
   const cRock = new THREE.Color(0x5c5650);
   const cCliff = new THREE.Color(0x4a4540);
   const tmp = new THREE.Color();
@@ -98,10 +99,29 @@ function makeTerrain(radius: number): {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   geo.computeVertexNormals();
 
+  // Soft fiber noise so ground reads as painted parchment, not plastic
+  const cnv = document.createElement('canvas');
+  cnv.width = 256; cnv.height = 256;
+  const ctx = cnv.getContext('2d')!;
+  ctx.fillStyle = '#c8b090';
+  ctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 9000; i++) {
+    const x = Math.random() * 256;
+    const y = Math.random() * 256;
+    const a = 0.04 + Math.random() * 0.08;
+    ctx.fillStyle = Math.random() > 0.5 ? `rgba(90,60,35,${a})` : `rgba(210,180,130,${a})`;
+    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+  }
+  const parchmentMap = new THREE.CanvasTexture(cnv);
+  parchmentMap.wrapS = parchmentMap.wrapT = THREE.RepeatWrapping;
+  parchmentMap.repeat.set(14, 14);
+  parchmentMap.colorSpace = THREE.SRGBColorSpace;
+
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.9,
-    metalness: 0.02,
+    map: parchmentMap,
+    roughness: 0.94,
+    metalness: 0.0,
   });
   const mesh = new THREE.Mesh(geo, material);
   mesh.receiveShadow = true;
@@ -144,13 +164,25 @@ function makeTerrain(radius: number): {
 
 function proceduralArch(mat: THREE.MeshStandardMaterial): THREE.Group {
   const arch = new THREE.Group();
-  const colL = new THREE.Mesh(new THREE.BoxGeometry(0.45, 3.2, 0.45), mat);
+  const colL = new THREE.Mesh(new THREE.BoxGeometry(0.5, 3.2, 0.5), mat);
   const colR = colL.clone();
   colL.position.set(-1.35, 1.6, 0);
   colR.position.set(1.35, 1.6, 0);
-  const lintel = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.45, 0.55), mat);
+  // Weathered chips / broken capital
+  const chipMat = mat;
+  for (const col of [colL, colR]) {
+    const chip = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.18, 0.35), chipMat);
+    chip.position.set((Math.random() - 0.5) * 0.15, 1.55, 0.28);
+    chip.rotation.z = (Math.random() - 0.5) * 0.4;
+    col.add(chip);
+  }
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.6), mat);
   lintel.position.set(0, 3.35, 0);
-  arch.add(colL, colR, lintel);
+  // Broken corner on lintel
+  const broken = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.45), mat);
+  broken.position.set(1.55, 3.15, 0.15);
+  broken.rotation.set(0.2, 0.3, -0.35);
+  arch.add(colL, colR, lintel, broken);
   arch.traverse((c) => {
     if ((c as THREE.Mesh).isMesh) {
       c.castShadow = true;
