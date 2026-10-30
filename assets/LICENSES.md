@@ -6,15 +6,16 @@ Original procedural assets (spirit fox restyle, shrine, gems, ink enemy, NPC, au
 ## Concept art
 | File | Source | License |
 |------|--------|---------|
-| `concept/fox-turnaround.jpg` | Internal concept (agent-generated draft) | Project |
-| `concept/world-keyart.jpg` | Internal concept (agent-generated draft) | Project |
+| `concept/fox-turnaround.jpg` | Internal concept — autumn ember fox (Vivek AD lock t24u) | Project |
+| `concept/world-keyart.jpg` | Internal concept — sepia→autumn restore keyart | Project |
+| `concept/old/*` | Superseded cute/rainbow draft (ignore) | Project |
 
 ## Hero
 | File | Source | License |
 |------|--------|---------|
 | `hero/source/fox_quaternius_raw.glb` | Quaternius Ultimate Animated Animals (Fox) via community mirror | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) — https://quaternius.com/packs/ultimateanimatedanimals.html |
 | `hero/source/fox_polypizza_raw.glb` | Quaternius Fox on Poly Pizza | CC0 1.0 |
-| `hero/spirit_fox.glb` (when present) | Procedural / restyled for Color Fox | Project (may incorporate CC0 base mesh — see build notes) |
+| `hero/spirit_fox.glb` (when present) | Procedural / restyled ember fox (natural proportions, rust/umber/cream, amber eyes) | Project (may incorporate CC0 Quaternius base — see build notes) |
 
 ## Environment (World 1 kit)
 | Path | Source | License |
