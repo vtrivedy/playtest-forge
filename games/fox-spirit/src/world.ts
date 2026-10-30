@@ -206,8 +206,8 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Wind grass (golden) — sync uSat from ColorField in main
   const grass = createWindGrass(scene, {
-    count: 4200,
-    radius: 27,
+    count: 7200,
+    radius: 28,
     color: 0x8a4e1e,       // rust root (restored)
     tipColor: 0xc9963a,    // muted gold tip
     monoColor: 0x3a3228,   // dark sepia root (readable against parchment ground)
@@ -310,10 +310,11 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
   const archGlb = await tryLoad('/assets/env/procedural/ruin_arch.glb');
   const ruinMat = new THREE.MeshStandardMaterial({ color: 0x7a6a55, roughness: 0.9, flatShading: true });
   materials.push(ruinMat);
+  // Keep arches off the +Z camera→shrine axis so mid/end shots stay open
   const archSites: Array<[number, number, number]> = [
-    [0, 6, 0.15],
-    [-1.5, -2, -0.4],
-    [1.2, -8, 0.55],
+    [-7.5, 4.0, 0.55],   // west flank
+    [8.0, -1.5, -0.7],   // east flank
+    [-9.0, -10.0, 0.2],  // southwest approach wing (not in center frame)
   ];
   for (const [x, z, rot] of archSites) {
     const y = yAt(x, z);
@@ -368,12 +369,12 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Dense fallen-leaf carpet along the critical path
   {
-    const carpetCount = 110;
-    const leafGeo = new THREE.PlaneGeometry(0.28, 0.34);
+    const carpetCount = 260;
+    const leafGeo = new THREE.PlaneGeometry(0.22, 0.28);
     const carpetDummy = new THREE.Object3D();
     for (let i = 0; i < carpetCount; i++) {
-      const z = 12 - (i / carpetCount) * 22 + (Math.random() - 0.5) * 1.2;
-      const x = (Math.random() - 0.5) * 4.2;
+      const z = 14 - (i / carpetCount) * 26 + (Math.random() - 0.5) * 2.4;
+      const x = (Math.random() - 0.5) * 9.0;
       const y = yAt(x, z);
       if (y < 0.2) continue;
       const col = leafColors[i % leafColors.length]!;
@@ -396,6 +397,67 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
     }
   }
 
+
+  // Red autumn shrubs + extra maple litter tufts (restored-world density)
+  {
+    const shrubColors = [0x8a1e18, 0xa8281c, 0x6e1810, 0xb8321f, 0x7a2a14];
+    for (let i = 0; i < 28; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 3.5 + Math.random() * 20;
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r * 0.9;
+      // keep center path clear for camera
+      if (Math.abs(x) < 2.2 && z < 14 && z > -14) continue;
+      const y = yAt(x, z);
+      if (y < 0.35 || y > 5) continue;
+      const col = shrubColors[i % shrubColors.length]!;
+      const mat = new THREE.MeshStandardMaterial({
+        color: col,
+        roughness: 0.88,
+        flatShading: true,
+        emissive: new THREE.Color(col),
+        emissiveIntensity: 0.06,
+      });
+      materials.push(mat);
+      const shrub = new THREE.Group();
+      const lobes = 3 + (i % 3);
+      for (let L = 0; L < lobes; L++) {
+        const blob = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28 + Math.random() * 0.22, 0), mat);
+        blob.position.set((Math.random() - 0.5) * 0.45, 0.25 + Math.random() * 0.35, (Math.random() - 0.5) * 0.45);
+        blob.scale.set(1.1 + Math.random() * 0.4, 0.7 + Math.random() * 0.35, 1.0 + Math.random() * 0.3);
+        blob.castShadow = true;
+        shrub.add(blob);
+      }
+      shrub.position.set(x, y, z);
+      shrub.scale.setScalar(0.85 + Math.random() * 0.7);
+      group.add(shrub);
+    }
+    // Scattered maple leaf cards beyond the path carpet
+    const litterGeo = new THREE.PlaneGeometry(0.2, 0.26);
+    for (let i = 0; i < 180; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.sqrt(Math.random()) * 24;
+      const x = Math.cos(a) * r;
+      const z = Math.sin(a) * r;
+      const y = yAt(x, z);
+      if (y < 0.3 || y > 5) continue;
+      const col = leafColors[i % leafColors.length]!;
+      const mat = new THREE.MeshStandardMaterial({
+        color: col,
+        roughness: 0.93,
+        side: THREE.DoubleSide,
+        emissive: new THREE.Color(col),
+        emissiveIntensity: 0.1,
+      });
+      materials.push(mat);
+      const card = new THREE.Mesh(litterGeo, mat);
+      card.position.set(x, y + 0.025, z);
+      card.rotation.set(-Math.PI / 2 + (Math.random() - 0.5) * 0.5, Math.random() * Math.PI, (Math.random() - 0.5) * 0.5);
+      card.scale.setScalar(0.6 + Math.random() * 1.1);
+      group.add(card);
+    }
+  }
+
   // Rocks (Kenney optional)
   const rockUrls = [
     '/assets/env/kenney/rock_largeA.glb',
@@ -414,6 +476,8 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
     const z = Math.sin(a) * r;
     const y = yAt(x, z);
     if (y < 0.25) continue;
+    // Keep camera approach corridor clear (was crowding mid/end frames)
+    if (Math.abs(x) < 4.5 && z < 16 && z > -14) continue;
     if (rocks.length) {
       const src = rocks[i % rocks.length]!;
       const rock = src.clone(true);

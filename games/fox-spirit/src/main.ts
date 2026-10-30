@@ -87,9 +87,9 @@ async function boot() {
 
   const cam = createFollowCamera({
     fov: 50,
-    distance: 6.4,
-    height: 2.8,
-    lookAtHeight: 0.85,
+    distance: 4.1,
+    height: 1.85,
+    lookAtHeight: 0.72,
     yAt: world.yAt,
   });
   cam.resize(innerWidth, innerHeight);
@@ -106,15 +106,15 @@ async function boot() {
   for (const m of world.materials) colorField.patchMaterial(m);
 
   const post = createPostStack(renderer, scene, cam.camera, {
-    bloomStrength: 0.14,
-    bloomThreshold: 0.94,
+    bloomStrength: 0.1,
+    bloomThreshold: 0.96,
     vignette: 0.34,
     grain: 0.06,
     enableGTAO: false,
   });
 
-  const wisps = createFoxWisps(scene, 8); // tip-only drift, not body orb
-  const emberTrail = createEmberTrail(scene, 28);
+  const wisps = createFoxWisps(scene, 5); // tip-only drift
+  const emberTrail = createEmberTrail(scene, 16);
   const autumnFX = createAutumnParticles(scene, 180, 110);
   const leafKick = createLeafKick(scene);
 
@@ -180,6 +180,7 @@ async function boot() {
   let dashT = 0;
   let gliding = false;
   let shrineOn = false;
+  let fxEnabled = true;
   let embersGot = 0;
   let elapsed = 0;
   let status: 'playing' | 'won' = 'playing';
@@ -197,6 +198,7 @@ async function boot() {
     __gameHooks?: {
       teleportToShrine: () => void;
       forceRestore: () => void;
+      setFxEnabled: (on: boolean) => void;
       getFoxPos: () => { x: number; y: number; z: number };
     };
   };
@@ -204,6 +206,9 @@ async function boot() {
     teleportToShrine() {
       foxActor.group.position.set(world.shrinePos.x, world.shrinePos.y + foxActor.feetOffset + 0.2, world.shrinePos.z + 1.5);
       vel.set(0, 0, 0);
+    },
+    setFxEnabled(on: boolean) {
+      fxEnabled = !!on;
     },
     forceRestore() {
       if (!shrineOn) {
@@ -362,8 +367,14 @@ async function boot() {
     leafKick.update(dt);
 
     // Wisps / autumn
-    wisps.update(dt, fox.position, shrineOn ? 1 : 0.15);
-    emberTrail.update(dt, fox.position, gliding ? 0.95 : shrineOn ? 0.8 : 0.45);
+    if (fxEnabled) {
+      wisps.update(dt, fox.position, shrineOn ? 0.55 : 0.08);
+      emberTrail.update(dt, fox.position, gliding ? 0.55 : shrineOn ? 0.4 : 0.22);
+    } else {
+      // Silhouette pass: park FX far offscreen
+      wisps.update(dt, new THREE.Vector3(0, -50, 0), 0);
+      emberTrail.update(dt, new THREE.Vector3(0, -50, 0), 0);
+    }
     autumnFX.update(dt);
     sky.update(dt);
     distant.update(dt);

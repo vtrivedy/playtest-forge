@@ -160,6 +160,17 @@ try {
   console.log('[probe]', JSON.stringify(info));
 
   await page.screenshot({ path: path.join(outDir, 'shot-start.png') });
+  // Hero silhouette check — FX off, then restore
+  await page.evaluate(() => {
+    // @ts-expect-error playtest hook
+    window.__gameHooks?.setFxEnabled?.(false);
+  });
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: path.join(outDir, 'shot-silhouette.png') });
+  await page.evaluate(() => {
+    // @ts-expect-error playtest hook
+    window.__gameHooks?.setFxEnabled?.(true);
+  });
   await play(page);
   await page.screenshot({ path: path.join(outDir, 'shot-mid.png') });
 

@@ -124,7 +124,7 @@ export async function createFox(): Promise<FoxActor> {
           // Emission only on ember tips / wisps — body stays lit by scene, not bloom-orb
           if (n.includes('ember') || n.includes('wisp') || n.includes('flame') || n.includes('tip')) {
             mat.emissive = mat.emissive ?? new THREE.Color(0xff3a00);
-            mat.emissiveIntensity = 0.32;
+            mat.emissiveIntensity = 0.22;
             mat.toneMapped = true;
           } else if (n.includes('eye')) {
             mat.emissiveIntensity = Math.min(mat.emissiveIntensity ?? 0.3, 0.35);
@@ -139,7 +139,7 @@ export async function createFox(): Promise<FoxActor> {
     const box = new THREE.Box3().setFromObject(root);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const targetLen = 1.85;
+    const targetLen = 2.4; // ~1.3× prior — readable at gameplay cam
     const s = targetLen / Math.max(size.x, size.y, size.z, 0.001);
     root.scale.setScalar(s);
     box.setFromObject(root);
