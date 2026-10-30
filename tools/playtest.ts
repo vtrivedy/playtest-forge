@@ -32,21 +32,19 @@ type Step = { down: string[]; ms: number; tap?: boolean };
 
 const SCRIPTS: Record<string, Step[]> = {
   shrine: [
+    { down: ['KeyW'], ms: 700 },
+    { down: ['KeyW', 'Space'], ms: 90, tap: true },
     { down: ['KeyW'], ms: 500 },
-    { down: ['KeyW', 'Space'], ms: 90, tap: true }, // short hop (variable jump)
-    { down: ['KeyW'], ms: 400 },
-    { down: ['KeyW', 'Space'], ms: 140, tap: true },
-    { down: ['KeyW'], ms: 350 },
     { down: ['KeyW', 'ShiftLeft'], ms: 70, tap: true },
-    { down: ['KeyW'], ms: 500 },
-    { down: ['KeyW', 'Space'], ms: 1000 }, // long hold → glide
-    { down: ['KeyW'], ms: 600 },
-    { down: ['KeyA', 'KeyW'], ms: 250 },
-    { down: ['KeyD', 'KeyW'], ms: 250 },
+    { down: ['KeyW'], ms: 800 },
+    { down: ['KeyW', 'Space'], ms: 120, tap: true },
+    { down: ['KeyW'], ms: 700 },
     { down: ['KeyW', 'ShiftLeft'], ms: 70, tap: true },
     { down: ['KeyW'], ms: 900 },
-    { down: ['KeyW', 'Space'], ms: 120, tap: true },
-    { down: ['KeyW'], ms: 800 },
+    { down: ['KeyW', 'Space'], ms: 900 }, // glide
+    { down: ['KeyW'], ms: 1100 },
+    { down: ['KeyW', 'Space'], ms: 100, tap: true },
+    { down: ['KeyW'], ms: 1200 },
   ],
   wander: [
     { down: ['KeyW'], ms: 600 },

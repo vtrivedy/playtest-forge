@@ -61,10 +61,10 @@ async function boot() {
   foxActor.group.position.y += foxActor.feetOffset;
 
   const cam = createFollowCamera({
-    fov: 52,
-    distance: 8.2,
-    height: 4.4,
-    lookAtHeight: 0.7,
+    fov: 50,
+    distance: 6.4,
+    height: 2.8,
+    lookAtHeight: 0.85,
     yAt: world.yAt,
   });
   cam.resize(innerWidth, innerHeight);
@@ -311,7 +311,7 @@ async function boot() {
 
     // Wisps / autumn
     wisps.update(dt, fox.position, shrineOn ? 1 : 0.15);
-    emberTrail.update(dt, fox.position, gliding ? 1.2 : shrineOn ? 1 : 0.65);
+    emberTrail.update(dt, fox.position, gliding ? 0.95 : shrineOn ? 0.8 : 0.45);
     autumnFX.update(dt);
     sky.update(dt);
     world.setGrassSat(shrineOn ? 1 : colorField.sample(fox.position));

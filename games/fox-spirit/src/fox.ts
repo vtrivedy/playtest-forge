@@ -128,7 +128,7 @@ export async function createFox(): Promise<FoxActor> {
     const box = new THREE.Box3().setFromObject(root);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const targetLen = 1.35;
+    const targetLen = 1.85;
     const s = targetLen / Math.max(size.x, size.y, size.z, 0.001);
     root.scale.setScalar(s);
     box.setFromObject(root);
@@ -138,7 +138,7 @@ export async function createFox(): Promise<FoxActor> {
     root.position.y -= box.min.y; // feet on origin
     const group = new THREE.Group();
     group.add(root);
-    const foxLight = new THREE.PointLight(0xff6622, 0.55, 6);
+    const foxLight = new THREE.PointLight(0xff6622, 0.35, 5);
     foxLight.position.set(0, 0.4, -0.2);
     group.add(foxLight);
     const feetOffset = 0.02;
