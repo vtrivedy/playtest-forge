@@ -48,6 +48,20 @@ for (let i = 0; i < 100; i++) {
 }
 assert(maxNdc < 0.8, `Jump framing should remain inside safe frame: ${maxNdc}`);
 
+// Final floor protection can move a compressed lens after the spring was guarded.
+const raised = createFollowCamera({
+  scenery: world,
+  surfaceAt: (x, z) => Math.hypot(x, z) > 1 && Math.hypot(x, z) < 2 ? 4 : 0,
+});
+post.visible = true;
+raised.resize(1920, 1080);
+tick(raised, frame());
+for (const y of [0, 1.25]) {
+  const ndc = new THREE.Vector3(0, y, 0).project(raised.camera);
+  assert(Math.abs(ndc.y) < 0.85, `Final raised lens must frame feet and ears: ${ndc.y}`);
+}
+post.visible = false;
+
 // A steady diagonal must not cause camera-relative steering to spiral.
 const diagonal = createFollowCamera();
 const d = frame();

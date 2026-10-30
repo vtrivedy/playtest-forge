@@ -343,28 +343,28 @@ export function createFollowCamera(opts: {
    * Hard framing guard: keep the fox (chest/feet) inside a safe angular window from the lens.
    * Ground-locked framing + a boom pulled in against a wall can otherwise lose the fox off the top.
    */
-  function guardFraming(p: THREE.Vector3, lens: THREE.Vector3) {
+  function guardFraming(p: THREE.Vector3, lens: THREE.Vector3, lookAt = look) {
     const halfV = THREE.MathUtils.degToRad(camera.fov * 0.5);
-    const dh = Math.max(0.5, Math.hypot(look.x - lens.x, look.z - lens.z));
+    const dh = Math.max(0.5, Math.hypot(lookAt.x - lens.x, lookAt.z - lens.z));
     const fh = Math.max(0.3, Math.hypot(p.x - lens.x, p.z - lens.z));
-    const lookA = Math.atan2(look.y - lens.y, dh);
-    const top = Math.atan2(p.y + 0.95 - lens.y, fh);
+    const lookA = Math.atan2(lookAt.y - lens.y, dh);
+    const top = Math.atan2(p.y + 1.25 - lens.y, fh);
     const feet = Math.atan2(p.y - lens.y, fh);
     const up = halfV * 0.6;
     const down = halfV * 0.78;
     let a = lookA;
     if (top - a > up) a = top - up;
     if (a - feet > down) a = feet + down;
-    if (a !== lookA) look.y = lens.y + Math.tan(a) * dh;
+    if (a !== lookA) lookAt.y = lens.y + Math.tan(a) * dh;
     // horizontal: fox within 70 % of the half-width
     const halfH = Math.atan(Math.tan(halfV) * camera.aspect) * 0.7;
-    const yawLook = Math.atan2(look.x - lens.x, look.z - lens.z);
+    const yawLook = Math.atan2(lookAt.x - lens.x, lookAt.z - lens.z);
     const yawFox = Math.atan2(p.x - lens.x, p.z - lens.z);
     const off = wrap(yawFox - yawLook);
     if (Math.abs(off) > halfH) {
       const ny = yawLook + (off - Math.sign(off) * halfH);
-      look.x = lens.x + Math.sin(ny) * dh;
-      look.z = lens.z + Math.cos(ny) * dh;
+      lookAt.x = lens.x + Math.sin(ny) * dh;
+      lookAt.z = lens.z + Math.cos(ny) * dh;
     }
   }
 
@@ -648,6 +648,9 @@ export function createFollowCamera(opts: {
         if (Number.isFinite(floor) && outPos.y < floor + params.clearance * 0.8) outPos.y = floor + params.clearance * 0.8;
       }
 
+      // The final floor guarantee can raise the lens after compression / landing dip.
+      // Guard the actual rendered pose too; authored cinematics keep their own composition.
+      if (shotW === 0) guardFraming(p, outPos, outLook);
       camera.position.copy(outPos);
       camera.lookAt(outLook);
       // ---- trauma shake: small rotational wobble, squared falloff
