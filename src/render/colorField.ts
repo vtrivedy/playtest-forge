@@ -329,7 +329,9 @@ export class ColorField {
    */
   patchMaterial(mat: THREE.MeshStandardMaterial): void {
     const field = this;
-    mat.onBeforeCompile = (shader) => {
+    const prev = mat.onBeforeCompile;
+    mat.onBeforeCompile = (shader, renderer) => {
+      prev.call(mat, shader, renderer); // keep material-specific patches (e.g. ground blend)
       shader.uniforms.uFox = { value: field.fox.clone() };
       shader.uniforms.uAura = { value: field.auraRadius };
       shader.uniforms.uTrailRadius = { value: field.trailRadius };
