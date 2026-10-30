@@ -1,10 +1,11 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Bucket, PAL, trs } from './russetKit';
 
 /** Poly Haven rock_moss_set_01 (CC0): reuse scanned silhouettes, with the realm's quiet palette. */
 export async function loadRubbleKit() {
-  const gltf = await new GLTFLoader().loadAsync('/assets/library/models/nature/rock_moss_set_01.glb');
+  const gltf = await new GLTFLoader().loadAsync('/assets/library/models/ruins/moss_rubble.glb');
   const shapes: THREE.BufferGeometry[] = [];
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse(object => {
@@ -40,4 +41,26 @@ export async function loadRubbleKit() {
     },
     dispose() { for (const shape of shapes) shape.dispose(); },
   };
+}
+
+/** CC0 Quaternius Column: the carved support under checkpoint lamps. */
+export async function loadLanternColumn(): Promise<THREE.BufferGeometry> {
+  const gltf = await new GLTFLoader().loadAsync('/assets/library/models/ruins/quaternius_column.glb');
+  const parts: THREE.BufferGeometry[] = [];
+  gltf.scene.updateMatrixWorld(true);
+  gltf.scene.traverse(object => {
+    if (!(object instanceof THREE.Mesh)) return;
+    const g = object.geometry.clone().applyMatrix4(object.matrixWorld);
+    g.deleteAttribute('uv');
+    parts.push(g.index ? g.toNonIndexed() : g);
+  });
+  const g = mergeGeometries(parts)!;
+  for (const part of parts) part.dispose();
+  g.computeBoundingBox();
+  const box = g.boundingBox!;
+  const centre = box.getCenter(new THREE.Vector3());
+  const height = box.max.y - box.min.y;
+  g.translate(-centre.x, -box.min.y, -centre.z);
+  g.scale(1.9 / height, 1.9 / height, 1.9 / height);
+  return g;
 }

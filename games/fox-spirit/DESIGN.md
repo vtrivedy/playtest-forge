@@ -238,3 +238,22 @@ Integrated boot repair: standalone tree extraction can leave an existing cell
 with zero geometries. Skip empty cells in nature-kit build before calling Three's
 mergeGeometries; its empty input dereferences the nonexistent first geometry.
 This preserves all populated batches and is required for the integrated GPU run.
+### Landing support transfer — 13:35
+At travel speed, hold the contact clip only for the first50ms, then resume authored strides. Carry the remaining absorption with a damped pelvis translation spring, driven by pre-contact vertical speed, so fixed feet do not trail behind a moving body for300ms. Stationary landings keep the full authored recovery. Expose squash and spring frequency; report spring displacement and planted residual separately. Graft only the landing impulse idea from b59448c; retain the selected movement controller.
+
+### Rendered pad contact calibration — 14:05
+Derive each pad from the actual core mesh vertices weighted at least65% to its paw bone. Average its lowest15mm band in bind pose, retain that point in paw-local space, and pin that point rather than the wrist/MTP landmark. Lower the visual rig by the mean pad offset so the forelegs remain reachable, then solve to pad-derived wrist targets while preserving paw rotation. Report the contact landmark explicitly. Keep independent capture joint telemetry and rendered-pad checks separate. No controller or fox-look changes.
+
+### Brake intent pose — 14:10
+Use input release/opposition and measured deceleration only to drive a restrained nose-up, rump-down brace. Do not graft the competing movement controller. A dedicated authored skid has forepaws ahead, hind feet beneath the rump, a quick load and a held recovery. Blend a small brake-load layer onto moving gaits so the animal braces before it has already stopped. Expose load amplitude and retain per-frame brake telemetry. Capture this as a separate pass after landing/pad contact.
+
+## Listening Crown extension
+Design: `docs/design/wellspring-summit.md`. From the Wellspring west arch, a permanent stair reaches a compact cliff ruin. Two existing hearth columns reach a heat-fed crown bowl. A two-second element inlet latches permanent heat and an inward wind route to the summit; dash-through Shade or strong stroke are both valid. No new inputs, ability, collectible, or World 1 gate. Safe stairs remain available. Tunable seal time, saved latch, and `__game.crown` state support GPU verification.
+
+Foliage extraction: standalone trees remove only geometry appended by their own placement. Empty material cells never reach mergeGeometries.
+
+### Arrival lantern support
+Replace the lantern's plain stacked rectangular support with the CC0 Quaternius
+Column asset, scaled to the same 1.9 m support height and collision footprint.
+Keep the lamp, light, checkpoint and all site positions. Batch its fluted shaft,
+base and capital into the existing weathered stone bucket; no parallel old stem.

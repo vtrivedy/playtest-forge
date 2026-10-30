@@ -1,4 +1,4 @@
-import { loadRubbleKit } from './russetRubble';
+import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
@@ -283,7 +283,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
-  const [nature, rubble] = await Promise.all([loadNatureKit(), loadRubbleKit()]);
+  const [nature, rubble, lanternColumn] = await Promise.all([loadNatureKit(), loadRubbleKit(), loadLanternColumn()]);
   // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
   // yaw picked to keep foliage out of the route's jump arcs
   const TREE_HUES: Array<[THREE.Color, THREE.Color]> = [
@@ -1831,12 +1831,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   for (let i = 0; i < cpSites.length; i++) {
     const [x, y0, z] = cpSites[i]!;
     const y = y0 === 0 ? groundRaw(x, z) : y0;
-    lanternPost(bk('stone', x, z), lanternB, x, y, z, 220 + i);
+    lanternPost(bk('stone', x, z), lanternB, lanternColumn, x, y, z, 220 + i);
     col.add(cylCollider({ x, z, r: 0.45, top: y + 2.6, bottom: y - 1, tag: 'lantern' }));
     const lampLight = new THREE.PointLight(0xffbf72, 3.5, 7, 2);
     lampLight.position.set(x, y + 2.1, z); group.add(lampLight);
     checkpoints.push({ pos: new THREE.Vector3(x - 1.6, y, z), lit: false });
   }
+  lanternColumn.dispose();
   const lanternMesh = lanternB.toMesh(lanternMat, { cast: false });
   if (lanternMesh) group.add(lanternMesh);
 
