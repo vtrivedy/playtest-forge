@@ -6,6 +6,12 @@ import type { Cue, VoiceOptions } from './synthesis';
 export const audioSettings = { volume: 0.55, muted: false };
 export type GameAudio = ReturnType<typeof createGameAudio>;
 export function createGameAudio() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('fox-audio') ?? 'null');
+    if (saved && Number.isFinite(saved.volume)) audioSettings.volume = Math.max(0, Math.min(1, saved.volume));
+    if (saved && typeof saved.muted === 'boolean') audioSettings.muted = saved.muted;
+  } catch { /* Storage may be disabled. */ }
+  let savedSettings = JSON.stringify(audioSettings);
   let ctx: AudioContext | undefined, master: GainNode, compressor: DynamicsCompressorNode;
   let noise: AudioBuffer, pressed: ReturnType<typeof ambience>, warm: ReturnType<typeof ambience>, glide: GainNode;
   let enabled = false, restored = 0, stepClock = 0, natureClock = 4, leafClock = 1;
@@ -15,7 +21,7 @@ export function createGameAudio() {
   let activeVoices: { until: number; cost: number }[] = [];
   const log: { cue: Cue; at: number; surface?: Surface }[] = [];
   const surfaceCounts = { leaf: 0, stone: 0, wood: 0 };
-  const costs: Record<Cue, number> = { jump: 2, dash: 9, footstep: 2, land: 3, shrine: 25, ember: 3, bird: 2, cricket: 9, bridge: 3, checkpoint: 2, hazard: 1, respawn: 1, glide: 1, fire: 2 };
+  const costs: Record<Cue, number> = { jump: 2, dash: 9, footstep: 2, land: 3, shrine: 26, ember: 3, bird: 2, cricket: 9, bridge: 3, checkpoint: 2, hazard: 1, respawn: 1, glide: 1, fire: 2 };
   function reserve(cost: number, duration: number) {
     if (!ctx) return false;
     activeVoices = activeVoices.filter(v => v.until > ctx!.currentTime);
@@ -41,6 +47,11 @@ export function createGameAudio() {
   document.addEventListener('visibilitychange', visible);
   window.addEventListener('keydown', key);
   function syncSettings() {
+    const serialized = JSON.stringify(audioSettings);
+    if (serialized !== savedSettings) {
+      savedSettings = serialized;
+      try { localStorage.setItem('fox-audio', serialized); } catch { /* Storage may be disabled. */ }
+    }
     if (!ctx) return;
     const volume = Number.isFinite(audioSettings.volume) ? Math.max(0, Math.min(1, audioSettings.volume)) : 0;
     master.gain.setTargetAtTime(audioSettings.muted ? 0 : volume, ctx.currentTime, 0.035);
@@ -59,6 +70,7 @@ export function createGameAudio() {
     if (name === 'footstep' || name === 'land') stepClock = 0.22;
   }
   function swell(duration = 4.5) {
+    duration = Number.isFinite(duration) ? Math.max(1, Math.min(8, duration)) : 4.5;
     pendingShrine = false;
     if (!ctx || ctx.state !== 'running' || ctx.currentTime - shrineAt < 0.5) return;
     if (!reserve(costs.shrine, Math.max(1, Math.min(8, duration)) * 1.5 + 0.5)) return;
