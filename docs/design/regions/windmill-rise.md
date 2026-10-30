@@ -46,7 +46,7 @@ From the hub realm gate / arrival meadow, three still sails sit left of the dist
 
 ### Rule-derived alternate solutions
 
-The shrine checks H2 output, not a quest order: a player can time an aura ignition just after the Shade passes and finish the 2 s feed before its return. This opportunistic solution must remain valid if timing permits. A player who frees the Shade first can return later; no reset should recreate it. Do not add a bespoke solution trigger.
+The inlet takes heat from any hearth whose column holds the dish, so geometry decides, not a named switch. The Shade gates H2 by drain, not by script. A player who frees the Shade lights H2, but H2's column does not hold the dish, which teaches where the dish is. The fox's altitude doesn't matter: HE lit for 2 s latches whether the fox rides past the dish or waits on the shelf. The route rides up because that is the way back. Do not add a bespoke solution trigger.
 
 ### Optional paths and secrets
 

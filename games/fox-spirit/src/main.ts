@@ -568,6 +568,8 @@ async function boot() {
     liftReady: false,
     pressT: 0,
     stuckT: 0,
+    /** seconds spent holding still for an element (lift, seal, root, wash); a hang is a stall, not a wait */
+    waitT: 0,
     bestD: Infinity,
     assists: 0,
     /** false = honest run: a stall stops the bot instead of teleporting it */
@@ -987,7 +989,9 @@ async function boot() {
       if (onGround && auto.pressT > 0.1) auto.phase = 'run';
     }
     const reach = wp.label === 'channel' || wp.label?.startsWith('wash:') || wp.label?.startsWith('lift:') ? 0.28 : 0.9;
-    if (d < reach && wp.y - (pos.y - foxActor.feetOffset) < 1.0 && (onGround || auto.phase === 'run')) {
+    // drop/lift waypoints are consumed only standing at their own height (never from above, mid-fall)
+    const level = wp.label?.startsWith('drop:') || wp.label?.startsWith('lift:') ? Math.abs(wp.y - (pos.y - foxActor.feetOffset)) < 1.0 && onGround : true;
+    if (d < reach && wp.y - (pos.y - foxActor.feetOffset) < 1.0 && level && (onGround || auto.phase === 'run')) {
       auto.idx += 1;
       auto.stuckT = 0;
       auto.bestD = Infinity;
@@ -1022,6 +1026,14 @@ async function boot() {
       auto.dashQueued = false;
     }
     // stuck → count an assist and hop to the waypoint (reported in state), or stop on honest runs
+    auto.waitT = waitBridge ? auto.waitT + dt : 0;
+    if (auto.waitT > 25 && !auto.allowAssist) {
+      auto.stalled = `${auto.idx}:wait-after-${prevLabel ?? ''}`;
+      auto.active = false;
+      auto.wish.set(0, 0, 0);
+      auto.space = false;
+      return;
+    }
     if (d < auto.bestD - 0.3 || waitBridge) {
       auto.bestD = d;
       auto.stuckT = 0;
@@ -1412,7 +1424,7 @@ async function boot() {
       // keep leaves riding a burning column, near the fox only (shared leaf pool)
       if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
     }
-    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); const h = updrafts.hearths.find((x) => x.spot.id === q.source); return !!h && heatFeeds(h, q.pos, updrafts.tun.radius); })) latchSeedwell(i);
+    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); return updrafts.hearths.some((h) => heatFeeds(h, q.pos, updrafts.tun.radius)); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
