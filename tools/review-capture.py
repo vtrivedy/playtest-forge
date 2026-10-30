@@ -7,6 +7,7 @@ Requires the target ref to contain the gait gym commit. No local browser runs.
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from uuid import uuid4
 from pathlib import Path
 import json
 import re
@@ -59,7 +60,7 @@ def main():
                 print(sheet)
         return
     shots = args.shots.split(',')
-    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe'}:
+    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe', 'fox'}:
         parser.error('Unknown shot')
     # Exact remote branch name; immutable SHA inputs are also accepted.
     remote = subprocess.check_output(['git', 'ls-remote', '--heads', 'origin', f'refs/heads/{args.ref}'], cwd=ROOT, text=True).splitlines()
@@ -71,7 +72,7 @@ def main():
     else:
         ref = subprocess.check_output(['git', 'rev-parse', '--verify', f'{args.ref}^{{commit}}'], cwd=ROOT, text=True).strip()
     print(f'Reviewing remote ref {args.ref} at immutable commit {ref}', flush=True)
-    destination = args.out or Path('/workspace/siyu/playtest-forge-artifacts/sprint2/capture') / f"{re.sub(r'[^a-zA-Z0-9_.-]', '_', args.ref)}-{datetime.now():%Y%m%d-%H%M%S}"
+    destination = args.out.resolve() if args.out else Path('/workspace/siyu/playtest-forge-artifacts/sprint2/capture') / f"{re.sub(r'[^a-zA-Z0-9_.-]', '_', args.ref)}-{datetime.now():%Y%m%d-%H%M%S}-{uuid4().hex[:6]}"
     destination.mkdir(parents=True, exist_ok=True)
     (destination / 'review.json').write_text(json.dumps({'ref': args.ref, 'commit': ref, 'shots': args.shots}, indent=2))
 
@@ -90,7 +91,7 @@ def main():
                 raise ValueError('Fetched capture belongs to a different commit or shot')
         except Exception as error:
             sheet_error = str(error)
-        print(f"{shot}: exit={result.returncode}; sheet={sheet}; files={folder}", flush=True)
+        print(f"{shot}: exit={result.returncode or (1 if sheet_error else 0)}; sheet={sheet}; files={folder}; error={sheet_error}", flush=True)
         return {'shot': shot, 'exit': result.returncode or (1 if sheet_error else 0), 'sheetError': sheet_error, 'path': str(folder), 'sheet': str(sheet) if sheet else None}
 
     with ThreadPoolExecutor(max_workers=min(3, len(shots))) as pool:

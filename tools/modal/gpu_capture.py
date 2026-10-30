@@ -1,8 +1,8 @@
 """Real-GPU Russetvale capture. No local browser or permanent deployment.
 
 modal run tools/modal/gpu_capture.py --ref main --shots all
---shots probe | perf | route | orbit | fox | all (or comma-separated); --fetch-only RUN_ID
-Design/operating notes: /tmp/sol-gpu/DESIGN.md during initial implementation.
+--shots probe | perf | route | orbit | fox | gait | stills | all (or comma-separated); --fetch-only RUN_ID
+Gait requires 60 fps. Usage and review workflow: tools/CAPTURE.md.
 """
 from pathlib import Path
 import modal
@@ -91,6 +91,8 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid capture dimensions, fps or duration')
     if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills'}:
         raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills or comma-separated')
+    if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
+        raise ValueError('Gait requires --fps 60')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:40]}-{shots.replace(",", "_")}-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:10]}'
     destination = Path(out) if out else ROOT.parent / 'playtest-forge-artifacts/gpu' / re.sub(r'[^a-zA-Z0-9_.-]', '_', ref)
     destination.mkdir(parents=True, exist_ok=True)
