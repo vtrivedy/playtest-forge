@@ -19,3 +19,6 @@ The named briefs `_style-update-1105.md` and `_studio-roles-note.md` were not av
 
 ## Query cost refinement
 CPU-only stress test: a97,792-triangle merged mesh costs ~14ms/update with three direct raycasts on the stream worker. To avoid spending the frame budget on scenery queries, partition large single-material static meshes into8m local-space chunks for ray queries only. Reuse the source position attribute and build index lists; bound each chunk by its actual triangles (including triangles crossing cell edges). These proxies never enter the scene or upload GPU buffers. Source visibility still controls collision. Keep small or multi-material meshes on the direct query path; both use identical triangle hit semantics.
+
+## Column framing refinement
+A CPU reproduction using a2.6m lantern-column collider found the existing3m terrain lift still creates a~44° downward view even after geometry compression. Cap terrain boom lift at0.9m: gentle grades retain clearance, while tall obstructions shorten the boom instead of climbing above the fox. Validate the near-column elevation and review on GPU before accepting the framing.

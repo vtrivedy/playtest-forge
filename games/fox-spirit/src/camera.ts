@@ -254,7 +254,9 @@ export function createFollowCamera(opts: {
       // a raise at boom fraction t needs need/t at the camera end to clear it
       if (need > 0) lift = Math.max(lift, need / t);
     }
-    const maxLift = 3;
+    // Step over gentle grades; tall columns should shorten the boom, not turn
+    // the chase view into a steep overhead shot that hides the fox's legs.
+    const maxLift = 0.9;
     if (lift < maxLift) {
       boom.lift = lift;
       return boom;

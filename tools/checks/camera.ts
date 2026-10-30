@@ -49,6 +49,18 @@ for (let i = 0; i < 100; i++) {
 }
 assert(maxNdc < 0.8, `Jump framing should remain inside safe frame: ${maxNdc}`);
 
+// A tall gameplay column must pull the camera in instead of lifting it overhead.
+const pillarWorld = new THREE.Group();
+const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 2.6, 12), new THREE.MeshStandardMaterial());
+pillar.position.set(Math.sin(0.34) * 2.1, 1.3, Math.cos(0.34) * 2.1);
+pillarWorld.add(pillar);
+const pillarCam = createFollowCamera({ scenery: pillarWorld,
+  surfaceAt: (x, z) => Math.hypot(x - pillar.position.x, z - pillar.position.z) < 0.45 ? 2.6 : 0,
+});
+tick(pillarCam, frame());
+const columnPitch = Math.atan2(pillarCam.camera.position.y - 0.62, Math.hypot(pillarCam.camera.position.x, pillarCam.camera.position.z));
+assert(columnPitch < Math.PI / 5, `Column must avoid steep overhead pitch: ${THREE.MathUtils.radToDeg(columnPitch)}`);
+
 // Final floor protection can move a compressed lens after the spring was guarded.
 const raised = createFollowCamera({
   scenery: world,
