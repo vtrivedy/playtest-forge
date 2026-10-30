@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createWater } from '../games/fox-spirit/src/chem/water';
 import { CollisionWorld } from '../games/fox-spirit/src/collision';
+// Simulation checks do not load or judge the world's image assets.
+THREE.TextureLoader.prototype.load = function () { return new THREE.Texture(); };
 const water = createWater(new THREE.Scene(), new CollisionWorld(() => -2));
 let t = 0;
 function step(seconds: number, supply: number) { for (let i = 0; i < Math.round(seconds * 120); i++) { t += 1 / 120; water.update(1 / 120, t, () => supply); } }
