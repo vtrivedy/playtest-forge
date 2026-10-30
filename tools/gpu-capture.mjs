@@ -424,7 +424,13 @@ try {
       await shot(`still-${name}`);
     }
     for (const [name, pose] of Object.entries(poses)) await poseStill(name, pose);
-    await H('poseHero', { anim: 'idle', fx: true }); await advance(2); await shot('still-hero');
+    // Keep the staged hero clear of the arrival hearth added at (5.6,74.2).
+    const heroY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
+    if (!Number.isFinite(heroY) || heroY < -24) throw Error('Hero still has no safe surface');
+    await H('teleport', 6, heroY, 78, Math.PI); await advance(60, false);
+    const hero = await H('getFoxPos');
+    await H('photo', [hero.x + 3.5, hero.y + 0.7, hero.z - 4], [hero.x, hero.y + 0.5, hero.z], 30);
+    await advance(3); await shot('still-hero');
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }

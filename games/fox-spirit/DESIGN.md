@@ -158,3 +158,9 @@ latches/restoration or bypasses a failed move. Regional success means reaching M
 with no assists/deaths, not winning the realm. The default full route remains an
 unassisted restoration test. This lets level streams review later regions while
 earlier crossings are under repair, without hiding those failures.
+
+### Capture hero staging — 14:15 ET
+The relocated arrival hearth occludes the old poseHero location in review stills.
+Use the same collision-checked open meadow (6,78) and three-quarter lens as the
+fox review shot, with the actual idle actor. Keep gameplay routes unchanged;
+this is an explicitly staged character review, not traversal evidence.
