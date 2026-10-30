@@ -41,7 +41,7 @@ export class AuthoredLocomotion {
     this.leanSpring.value=0;this.leanSpring.velocity=0;
     this.pitchSpring.value=0;this.pitchSpring.velocity=0;
     for(const spring of this.tailSprings){spring.value=0;spring.velocity=0;}
-    this.previousSpeed=this.input.speed;
+    this.previousSpeed=this.input.speed;this.terrainOffset=0;
   }
   private yaw = 0;
   private pitch = 0;
@@ -55,11 +55,14 @@ export class AuthoredLocomotion {
   readonly footfalls: THREE.Vector3[]=[];
   private previousSpeed=0;
   private armScale = 1;
+  private rootPosition: THREE.Vector3;
+  private terrainOffset=0;
   private spine?: THREE.Object3D;
   private tailBone?: THREE.Object3D;
   private overlays: { bone: THREE.Object3D; rotation: THREE.Quaternion }[] = [];
   constructor(private root: THREE.Object3D, private group: THREE.Group,
     private actions: Map<string, THREE.AnimationAction>) {
+    this.rootPosition=root.position.clone();
     root.updateWorldMatrix(true, true);
     const arm = root.getObjectByName('SpiritFox_Armature');
     this.armScale = arm ? arm.getWorldScale(v()).x : root.getWorldScale(v()).x;
@@ -84,6 +87,7 @@ export class AuthoredLocomotion {
   beforeMixer() {
     for (let i=this.overlays.length-1;i>=0;i--) {const o=this.overlays[i];o.bone.quaternion.copy(o.rotation);}
     this.overlays.length=0;
+    this.root.position.copy(this.rootPosition);
   }
   fadeSeconds = .16;
   private weights = new Map<string,number>([['idle',1]]);
@@ -142,6 +146,16 @@ export class AuthoredLocomotion {
     this.pitch=this.pitchSpring.step(THREE.MathUtils.clamp(slope+acceleration*.002,-.4,.4),dt,this.params.springFrequency,this.params.springDamping);
     this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
     this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(this.pitch,0,this.lean)));
+    this.root.updateWorldMatrix(true,true);
+    // The actor pivot was centred on the whole silhouette (including the tail). Terrain height must
+    // be sampled under the rendered rig origin, otherwise downhill leaves the forelegs beyond reach.
+    const rigOrigin=this.root.getWorldPosition(v());
+    const rigGround=this.input.groundAt(rigOrigin.x,rigOrigin.z,this.group.position.y+.8);
+    const actorGround=this.input.groundAt(this.group.position.x,this.group.position.z,this.group.position.y+.8);
+    const terrainTarget=this.input.grounded && Number.isFinite(rigGround) && Number.isFinite(actorGround)
+      ? THREE.MathUtils.clamp(rigGround-actorGround,-.3,.3) : 0;
+    this.terrainOffset=THREE.MathUtils.damp(this.terrainOffset,terrainTarget,25,dt);
+    this.root.position.y+=this.terrainOffset;
     let tailTarget=THREE.MathUtils.clamp(-this.turn*this.params.tailLag,-.25,.25);
     for(let i=0;i<this.tails.length;i++) {
       const bone=this.tails[i]; const spring=this.tailSprings[i];

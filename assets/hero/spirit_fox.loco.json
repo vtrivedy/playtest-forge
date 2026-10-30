@@ -22,6 +22,28 @@
         "duty": 0.65,
         "sweep": 1.0
       }
+    ],
+    "measured": [
+      {
+        "meanStanceSpeed": 2.1466440624660916,
+        "stanceSpeedCV": 0.00020985828180830837,
+        "stanceHeightRange": 0.00031967461109161377
+      },
+      {
+        "meanStanceSpeed": 2.1466321415371366,
+        "stanceSpeedCV": 0.00021297964320425496,
+        "stanceHeightRange": 0.0003222227096557617
+      },
+      {
+        "meanStanceSpeed": 2.146051393614875,
+        "stanceSpeedCV": 0.0006686665408560802,
+        "stanceHeightRange": 0.00048530101776123047
+      },
+      {
+        "meanStanceSpeed": 2.146011789639791,
+        "stanceSpeedCV": 0.0006521457733503975,
+        "stanceHeightRange": 0.0004847198724746704
+      }
     ]
   },
   "trot": {
@@ -47,10 +69,32 @@
         "duty": 0.48,
         "sweep": 1.3
       }
+    ],
+    "measured": [
+      {
+        "meanStanceSpeed": 6.018548309803009,
+        "stanceSpeedCV": 0.0003443280906957022,
+        "stanceHeightRange": 0.0006747543811798096
+      },
+      {
+        "meanStanceSpeed": 6.018621921539307,
+        "stanceSpeedCV": 0.0003394774910885829,
+        "stanceHeightRange": 0.0006919503211975098
+      },
+      {
+        "meanStanceSpeed": 6.017934083938599,
+        "stanceSpeedCV": 0.0007136756288724255,
+        "stanceHeightRange": 0.0007744431495666504
+      },
+      {
+        "meanStanceSpeed": 6.017512232065201,
+        "stanceSpeedCV": 0.0007148332104134393,
+        "stanceHeightRange": 0.0007918626070022583
+      }
     ]
   },
   "run": {
-    "stride": 4.7399305555555555,
+    "stride": 4.569930555555556,
     "contacts": [
       {
         "phase": 0.55,
@@ -65,12 +109,34 @@
       {
         "phase": 0.0,
         "duty": 0.36,
-        "sweep": 1.768
+        "sweep": 1.6456
       },
       {
         "phase": 0.08,
         "duty": 0.36,
-        "sweep": 1.768
+        "sweep": 1.6456
+      }
+    ],
+    "measured": [
+      {
+        "meanStanceSpeed": 13.053559511899948,
+        "stanceSpeedCV": 1.512228247789894e-06,
+        "stanceHeightRange": 1.3262033462524414e-06
+      },
+      {
+        "meanStanceSpeed": 13.037854582071304,
+        "stanceSpeedCV": 0.0026936457294239845,
+        "stanceHeightRange": 0.0038129836320877075
+      },
+      {
+        "meanStanceSpeed": 13.057423148836408,
+        "stanceSpeedCV": 6.474200924786679e-05,
+        "stanceHeightRange": 0.00010083615779876709
+      },
+      {
+        "meanStanceSpeed": 13.057542954172407,
+        "stanceSpeedCV": 6.332526737153555e-05,
+        "stanceHeightRange": 0.00010947883129119873
       }
     ]
   }

@@ -147,11 +147,11 @@ def gallop_pose(t, st=1.0):
     p = copy(GALLOP_BASE)
     # spine: gathered (arched) just before hind touchdown, extended in the suspension after hind push-off
     flex = math.cos(2 * math.pi * (t - 0.96))                      # +1 gathered, -1 extended
-    wrot(p, "Torso", (1, 0, 0), 7 * flex * st)
-    wrot(p, "Torso2", (1, 0, 0), 4 * flex * st)
-    pitch = 2.5 * math.sin(2 * math.pi * (t - 0.2)) * st             # front rises as the forelegs load
+    wrot(p, "Torso", (1, 0, 0), 4.5 * flex * st)
+    wrot(p, "Torso2", (1, 0, 0), 2.5 * flex * st)
+    pitch = 1.5 * math.sin(2 * math.pi * (t - 0.2)) * st             # front rises as the forelegs load
     wrot(p, "Body", (1, 0, 0), -pitch)
-    wloc(p, "Body", (0, 0, 0.06 * st * math.cos(2 * math.pi * (t - 0.32)) - 0.28))
+    wloc(p, "Body", (0, 0, 0.06 * st * math.cos(2 * math.pi * (t - 0.32)) - 0.38))
     wrot(p, "Neck1", (1, 0, 0), pitch * 0.7 - 6 * flex * st + 20)   # gaze stays level (stoic)
     wrot(p, "Head", (1, 0, 0), -2.5 * math.sin(2 * math.pi * (t - 0.3)) - 14)
     for e in EARS: wrot(p, e, (1, 0, 0), 14 + 3 * math.sin(2 * math.pi * t))
@@ -161,12 +161,10 @@ def gallop_pose(t, st=1.0):
         s_ = key[0]; stance, u = leg_phase(t, td, duty)
         if "hind" in key:
             L_ = HIND[s_]
-            P = paw_path(stance, u, L_["foot"], 0.42 * st, 0.62 * st, 0.34, early=0.75)
+            P = paw_path(stance, u, L_["foot"], 0.391 * st, 0.577 * st, 0.34, early=0.75)
             mt = rest_ang(L_["mt"]) + math.radians((-6 + 40 * u ** 2) if stance else (34 + 16 * math.sin(math.pi * u) - 40 * ease_io2(u)))
             J = P - Vector((math.cos(mt), math.sin(mt))) * L_["c"]
             hip = posed_yz(L_["th"])[0]
-            if (J - hip).length < 0.9:  # long shin: never fold the hock up into the hip (keeps the stifle under)
-                J = hip + (J - hip).normalized() * 0.9
             a1, a2 = ik2(hip, J, L_["a"], L_["b"])
             pw = rest_ang(L_["paw"]) + math.radians((38 * max(0, (u - 0.55) / 0.45) ** 1.5) if stance else 30 * (1 - ease_io2(u)) + 28 * math.sin(math.pi * u))
             set_chain(p, [L_["th"], L_["sh"], L_["mt"], L_["paw"]], [a1, a2, mt, pw])

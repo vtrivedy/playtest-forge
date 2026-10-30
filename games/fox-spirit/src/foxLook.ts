@@ -17,13 +17,13 @@ export const FOX_LOOK = {
   rimPower: 3.0,
   rimColor: [1.0, 0.45, 0.12] as [number, number, number],
   eyeGlow: 0.65,
-  /** flame licks: height multiplier, brightness, how far they stream back with speed */
+  /** spirit wisps (thin curling flame off the back and tail): height multiplier, brightness, stream-back with speed */
   lickScale: 1.0,
   lickIntensity: 1.0,
   lickStream: 0.35,
   /** embers per second at rest / extra per m/s of speed; size in metres */
-  emberRate: 14,
-  emberRateSpeed: 4,
+  emberRate: 3,
+  emberRateSpeed: 2,
   emberSize: 0.022,
 };
 
@@ -86,8 +86,12 @@ ${NOISE_GLSL}`,
   vec3 q = vRest * uStroke.y;
   float clump = fxNoise(q * vec3(5.0, 4.0, 1.6)) * 0.65 + fxNoise(q * vec3(13.0, 9.0, 3.5)) * 0.35;
   diffuseColor.rgb *= 1.0 + uStroke.x * (clump - 0.5) * 2.0;
-  float lum = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-  diffuseColor.rgb = mix(vec3(lum), diffuseColor.rgb, uSatVal.x) * uTint * uSatVal.y;
+  // grade only the saturated fur (rust / umber); cream bib, muzzle and ear insides keep their warm white
+  vec3 c = diffuseColor.rgb;
+  float sat = (max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b))) / max(1e-4, max(c.r, max(c.g, c.b)));
+  float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  vec3 graded = mix(vec3(lum), c, uSatVal.x) * uTint;
+  diffuseColor.rgb = mix(c, graded, smoothstep(0.25, 0.55, sat)) * uSatVal.y;
 }`,
       )
       .replace(
@@ -127,10 +131,9 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.transparent = true;
         mat.depthWrite = false;
         mesh.castShadow = false;
-        if (isGlow) {
-          mat.opacity = Math.min(mat.opacity ?? 1, 0.55);
-          mat.side = THREE.FrontSide;
-        }
+        // translucent: the brush dissolves into soft flame instead of an opaque fan over the rump
+        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.55 : 0.78);
+        if (isGlow) mat.side = THREE.FrontSide;
       } else if (n.includes('eye')) {
         mat.color.setHex(0xffffff);
         mat.emissive = new THREE.Color(0xffc060);
@@ -192,15 +195,15 @@ void main() {
   float y = vUv.y;
   float n = fxNoise(vec3(vUv.x * 3.0, y * 2.5 - uTime * 2.6, vSeed * 7.0));
   float n2 = fxNoise(vec3(vUv.x * 7.0, y * 6.0 - uTime * 4.1, vSeed * 3.0 + 5.0));
-  float x = vUv.x - 0.5 + (n - 0.5) * 0.55 * y + (n2 - 0.5) * 0.12 * y;
+  float x = vUv.x - 0.5 + (n - 0.5) * 0.8 * y + (n2 - 0.5) * 0.15 * y + sin(y * 5.0 + uTime * 1.7 + vSeed) * 0.12 * y;
   // teardrop: wide low, licking to a point; ragged top
   float width = 0.34 * pow(1.0 - y, 1.1) * smoothstep(0.0, 0.22, y) + 0.015;
   float body = 1.0 - smoothstep(width * 0.35, width, abs(x));
   body *= 1.0 - smoothstep(0.55, 1.0, y + (n2 - 0.5) * 0.5);
   float core = (1.0 - smoothstep(0.0, width * 0.55, abs(x))) * (1.0 - smoothstep(0.1, 0.6, y));
   vec3 col = mix(vec3(0.8, 0.18, 0.03), vec3(1.0, 0.45, 0.08), smoothstep(0.0, 0.8, body));
-  col = mix(col, vec3(1.0, 0.68, 0.3), core * 0.6);
-  float a = body * vAlpha * uIntensity;
+  col = mix(col, vec3(1.0, 0.62, 0.22), core * 0.45);
+  float a = body * vAlpha * uIntensity * 0.55;
   if (a < 0.003) discard;
   gl_FragColor = vec4(col * a, a);
 }`;
@@ -238,13 +241,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const body = skinned.find((m) => matName(m) === 'foxfur');
   const tail = skinned.find((m) => matName(m) === 'foxtailfur');
   const R = FOX_RIG;
-  // [mesh, bones, min rest normal.y, licks, lick height m, lick width m, lean back]
+  // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — calm at idle: nothing on the ears / head
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
-    [body, [...R.ear('l').slice(3), ...R.ear('r').slice(3)], -1, 4, 0.22, 0.06, 0.4],
-    [body, [R.neck[2], R.head], 0.55, 3, 0.16, 0.06, 0.6],
-    [body, [R.neck[0], R.neck[1], R.spine[3]], 0.6, 4, 0.14, 0.06, 0.7],
-    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.1, 0.05, 0.8],
-    [tail, R.tail.slice(3), 0.0, 5, 0.22, 0.08, 0.9],
+    [body, [R.spine[3], R.neck[0]], 0.65, 2, 0.16, 0.035, 0.7],
+    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.18, 0.035, 0.8],
+    [tail, R.tail.slice(3), 0.0, 5, 0.26, 0.05, 0.9],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
@@ -310,9 +311,10 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const anchorPos = (a: Anchor, out: THREE.Vector3) => a.mesh.getVertexPosition(a.index, out).applyMatrix4(a.mesh.matrixWorld);
   const anchorMeshes = [...new Set([...licks.map((l) => l.a.mesh), ...emberPool.map((a) => a.mesh)])];
 
-  // Anchors are skinned surface points: resolve them at render time (world matrices + bone palette current),
-  // never from the sim step (manual-step captures advance many steps per render; real play lags a frame).
-  lickMesh.onBeforeRender = () => {
+  // Anchors are skinned surface points: resolve them after the final bone pose of this step with fresh world
+  // matrices + bone palette (render-time hooks run after three.js uploads attributes = one render late).
+  const anchorNow = () => {
+    group.updateWorldMatrix(true, true);
     for (const m of anchorMeshes) m.skeleton.update();
     const L = FOX_LOOK;
     licks.forEach((lk, i) => {
@@ -375,6 +377,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       }
       (eg.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
       (eg.getAttribute('aHeat') as THREE.BufferAttribute).needsUpdate = true;
+      anchorNow();
     },
   };
 }

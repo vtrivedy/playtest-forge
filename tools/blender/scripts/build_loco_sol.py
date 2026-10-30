@@ -1,7 +1,7 @@
 """Bake role-based locomotion onto the current hero; no mesh rebuild.
 blender -b -P tools/blender/scripts/build_loco_sol.py -- /tmp/source-fox-v3.glb
 """
-import bpy, math, os, sys, json, hashlib
+import bpy, math, os, sys, json, hashlib, statistics
 from mathutils import Vector, Quaternion, Euler
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -77,11 +77,10 @@ for name,hz,duty,sweep,lift,phases in specs:
 metadata = {}
 for name,hz,duty,sweep,lift,phases in specs:
     if name=='run':
-        contacts=[{'phase':LEGS[key][0], 'duty':LEGS[key][1], 'sweep':(1.462 if 'fore' in key else 1.768)} for key in ['L_fore','R_fore','L_hind','R_hind']]
+        contacts=[{'phase':LEGS[key][0], 'duty':LEGS[key][1], 'sweep':(1.462 if 'fore' in key else 1.6456)} for key in ['L_fore','R_fore','L_hind','R_hind']]
     else:
         contacts=[{'phase':phases[key], 'duty':duty, 'sweep':sweep} for key in ['L_fore','R_fore','L_hind','R_hind']]
     metadata[name]={'stride':sum(c['sweep']/c['duty'] for c in contacts)/4,'contacts':contacts}
-with open(f'{ROOT}/assets/hero/spirit_fox.loco.json','w') as f: json.dump(metadata,f,indent=2)
 # Quiet turn steps and a low braced stop, authored as dedicated clips.
 for name,direction in [('turn_left',1),('turn_right',-1)]:
     poses=[]
@@ -134,6 +133,37 @@ for name,act in SRC_ACTIONS.items():
     for fc in act.fcurves:
         for key in fc.keyframe_points:
             key.co.x *= 60/SOURCE_FPS; key.handle_left.x *= 60/SOURCE_FPS; key.handle_right.x *= 60/SOURCE_FPS
+# Quantitative bake evidence: per-foot stance speed and height, derived from the actual evaluated bones.
+# Metadata timing is authored once above and consumed directly by the runtime.
+original_action=arm.animation_data.action
+channel_hash=hashlib.sha256()
+for name,data in metadata.items():
+    act=bpy.data.actions[name]; arm.animation_data.action=act
+    n=round(act.frame_range[1]); samples=[]
+    for frame in range(n+1):
+        sc.frame_set(frame); bpy.context.view_layer.update()
+        samples.append([arm.pose.bones[bn].head.copy() for bn in ['FrontPaw.L','FrontPaw.R','BackPaw.L','BackPaw.R']])
+    measured=[]
+    for i,contact in enumerate(data['contacts']):
+        speeds=[]; heights=[]
+        for frame in range(n):
+            phase=(frame/n-contact['phase'])%1
+            next_phase=((frame+1)/n-contact['phase'])%1
+            if phase<contact['duty']:
+                heights.append(samples[frame][i].z)
+                if next_phase<contact['duty'] and next_phase>phase:
+                    speeds.append((samples[frame+1][i].y-samples[frame][i].y)*FPS)
+        mean=statistics.mean(speeds) if speeds else 0
+        measured.append({'meanStanceSpeed':mean,'stanceSpeedCV':statistics.pstdev(speeds)/max(.001,abs(mean)) if speeds else 0,
+                         'stanceHeightRange':max(heights)-min(heights) if heights else 0})
+    data['measured']=measured
+    for fc in act.fcurves:
+        channel_hash.update(fc.data_path.encode())
+        for key in fc.keyframe_points: channel_hash.update(f'{key.co.x:.6f},{key.co.y:.6f}'.encode())
+    print('MEASURED',name,json.dumps(measured))
+arm.animation_data.action=original_action
+print('CHANNEL_SHA256',channel_hash.hexdigest())
+with open(f'{ROOT}/assets/hero/spirit_fox.loco.json','w') as f: json.dump(metadata,f,indent=2)
 for src,dst in ROLE.items():
     if dst in arm.data.bones: arm.data.bones[dst].name=src
 for act in bpy.data.actions:
