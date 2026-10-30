@@ -298,3 +298,6 @@ piers. Retain the arch ring, span, height and footprint; intact and snapped sour
 variants share the same material and preserve small authored leans. Remove the
 stacked-box pier construction. Source geometry stays alive while region builders
 use the kit. Keep sacred glyphs and all gameplay collision unchanged.
+Hero still staging correction: use (0,70); the former (6,78) photo lens lay inside
+the H-a shelf and clipped its face into the foreground. Record the changed stage
+in capture provenance. This does not change the live third-person camera.
