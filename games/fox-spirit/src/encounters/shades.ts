@@ -38,12 +38,19 @@ type ShadeActor = {
 async function animalGeometry(): Promise<THREE.BufferGeometry> {
   const gltf = await new GLTFLoader().loadAsync('/assets/library/animals/quaternius_deer.glb');
   const mixer = new THREE.AnimationMixer(gltf.scene);
+  const headLow = gltf.animations.find(c => c.name === 'Idle_Headlow')!;
+  const lowAction = mixer.clipAction(headLow).play();
+  mixer.setTime(headLow.duration * 0.4);
+  const memoryNeck = ['Neck1', 'Neck2', 'Neck3', 'Head'].map(name => {
+    const bone = gltf.scene.getObjectByName(name)!;
+    return { bone, q: bone.quaternion.clone() };
+  });
+  lowAction.stop();
   const clip = gltf.animations.find(c => c.name === 'Gallop')!;
   mixer.clipAction(clip).play();
   mixer.setTime(clip.duration * 0.32);
-  // A caught memory, with the head sunk slightly into the shoulders rather than hunting.
-  const neck = gltf.scene.getObjectByName('Neck3');
-  if (neck) neck.rotation.x += 0.22;
+  // Keep the authored mid-stride legs, but borrow the animal's own lowered-head pose.
+  for (const { bone, q } of memoryNeck) bone.quaternion.copy(q);
   gltf.scene.updateMatrixWorld(true);
   const parts: THREE.BufferGeometry[] = [];
   const v = new THREE.Vector3();
@@ -118,11 +125,11 @@ function inkMaterial(): THREE.ShaderMaterial {
         if (n < cut) discard;
         float rim = pow(1.0 - abs(dot(vN, vV)), 2.2);
         // pressed ink: near-black umber core, a thin paper-pale rim like dried wash at the edge
-        vec3 core = vec3(0.012, 0.008, 0.005);
-        vec3 edge = vec3(0.13, 0.09, 0.055);
+        vec3 core = vec3(0.0015, 0.0009, 0.0005);
+        vec3 edge = vec3(0.045, 0.022, 0.009);
         vec3 col = mix(core, edge, rim * 0.32 + smoothstep(cut, cut + 0.06, n) * 0.0);
         col = mix(col, edge * 0.8, 1.0 - smoothstep(cut, cut + 0.05, n));
-        col = mix(col, vec3(0.16, 0.078, 0.033), n * 0.12);
+        col = mix(col, vec3(0.055, 0.018, 0.006), rim * n * 0.18);
         gl_FragColor = vec4(col, 0.98 - rim * 0.18);
         #include <colorspace_fragment>
         #include <fog_fragment>
@@ -287,7 +294,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       return ev;
     },
     state() {
-      return shades.map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 4.5 ? 72 : 0 }));
+      return shades.map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 4.5 ? 72 : 0 }));
     },
   };
   if (gui) {

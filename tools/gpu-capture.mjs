@@ -214,35 +214,42 @@ try {
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
     if (!actors.length) throw Error('No Shade encounter authored');
     save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
-    let contactDirection = null;
     const camera = async () => {
-      const [x,y,z] = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
-      const centre = await page.evaluate(() => {
-        const p=window.__gameHooks.debug.world.shadeSpots[0].patrol;
-        return [p.reduce((a,q)=>a+q[0],0)/p.length,p.reduce((a,q)=>a+q[2],0)/p.length];
-      });
-      let dx=x-centre[0],dz=z-centre[1];const d=Math.hypot(dx,dz)||1;
-      const dir=contactDirection??[dx/d,dz/d];
-      await H('photo', [x + dir[0]*7, y + 3.2, z + dir[1]*7], [x, y + 1.2, z], 48);
+      const actor = await page.evaluate(() => window.__gameHooks.shades.state().actors[0]);
+      const [x,y,z] = actor.pos;
+      const direction = await page.evaluate(({x,y,z,heading}) => {
+        const col=window.__gameHooks.debug.world.collision;
+        // Prefer the animal's profile; reject lenses behind kiln masonry.
+        for(const turn of [0,Math.PI,.5,-.5,Math.PI+.5,Math.PI-.5]){
+          const a=heading+Math.PI/2+turn,dx=Math.sin(a),dz=Math.cos(a);let clear=true;
+          for(let d=.7;d<7;d+=.2)if(col.blocked(x+dx*d,z+dz*d,y+1.2+2*d/7)){clear=false;break;}
+          if(clear)return [dx,dz];
+        }
+        return [Math.cos(heading),-Math.sin(heading)];
+      }, {x,y,z,heading:actor.heading??0});
+      await H('photo', [x + direction[0]*7, y + 3.2, z + direction[1]*7], [x, y + 1.2, z], 48);
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(([x,y,z]) => {
       const col = window.__gameHooks.debug.world.collision;
       const patrol=window.__gameHooks.debug.world.shadeSpots[0].patrol;
       for(let px=-117;px<=-107;px+=.25)for(let pz=-29;pz<=-19;pz+=.25){
+        if(Math.hypot(px+112,pz+24)>4.8)continue;
         if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2)continue;
         if(patrol.every(q=>Math.hypot(q[0]-px,q[2]-pz)>2.1))return [px,y,pz];
       }
       throw Error('No safe patrol observer position');
     }, start);
-    await H('teleport', ...safePosition, Math.PI);
+    const observerYaw = Math.atan2(start[0]-safePosition[0],start[2]-safePosition[2]);
+    await H('teleport', ...safePosition, observerYaw);
     const probe = await H('shadesProbe');
     if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
     save('shade-drain-probe.json', probe);
     await camera();
     await video('shade-patrol', 180, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 45, 90, 135, 179] });
+    if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
     await H('photoOff');
-    await advance(2);
+    await advance(30);
     await shot('shade-chase');
     await H('setKeys', []);
     let p = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
@@ -260,7 +267,6 @@ try {
       throw Error('No 3m wall-free contact direction');
     }, p);
     save('shade-contact-setup.json', contactSetup);
-    contactDirection = contactSetup.direction;
     await H('teleport', ...contactSetup.pos, Math.PI);
     await camera();
     await video('shade-contact', 90, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 89] });
@@ -279,18 +285,39 @@ try {
     await H('teleport', ...dashSetup.pos, dashSetup.yaw);
     await H('setStick', ...dashSetup.direction);
     await H('setKeys', ['ShiftLeft']);
-    contactDirection = [-dashSetup.direction[0],-dashSetup.direction[1]];
     await camera();
     await video('shade-free', 210, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
       await camera();
     }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 120, 180, 209] });
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
-    if (freed.frees !== 1 || !freed.actors[0].freed || freed.wisps !== 2) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
+    if (freed.frees !== 1 || !freed.actors[0].freed || freed.hits !== contact.hits || freed.wisps < contact.wisps) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
     await advance(360, false);
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
     await shot('shade-after-free');
     save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    // Separate live third-person take: same encounter and controller, actual keyboard events.
+    await boot(quality, true);
+    const live = await page.evaluate(() => {
+      const actor=window.__gameHooks.shades.state().actors[0];
+      const [x,y,z]=actor.pos,col=window.__gameHooks.debug.world.collision;
+      for(let k=0;k<128;k++){
+        const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+        for(let r=.1;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+        if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],yaw:Math.atan2(-dx,-dz)};
+      }throw Error('No clear live dash approach');
+    });
+    await H('teleport', ...live.pos, live.yaw);
+    await H('advance', 1, 0, true);
+    await page.keyboard.down('w');
+    await page.keyboard.down('Shift');
+    await video('shade-play', 180, async i => {
+      if(i===12){await page.keyboard.up('w');await page.keyboard.up('Shift');}
+    }, undefined, {traceEveryFrame:true,keyFrames:[0,6,12,24,45,90,179]});
+    const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
+    if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
+    save('shade-live-acceptance.json',{label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
+
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');

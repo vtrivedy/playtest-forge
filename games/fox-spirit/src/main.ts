@@ -333,6 +333,7 @@ async function boot() {
     return s > 1 ? 1 : 0;
   };
   const shadeContact = new ShadeContact();
+  let shadeKnockbackFloor: number | null = null;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number) {
@@ -696,6 +697,7 @@ async function boot() {
   function handleEvents(events: ReturnType<typeof world.update>) {
     for (const e of events) {
       if (e.type === 'seedwell') {
+        shadeContact.wisps = 3;
         const s = world.seedwells[e.index]!;
         colorField.restore(s.pos, s.radius, 3.2);
         autumnFX.swirl(s.pos, 40, 1.6);
@@ -711,6 +713,7 @@ async function boot() {
       } else if (e.type === 'bridge') {
         audio.play('bridge');
       } else if (e.type === 'checkpoint') {
+        shadeContact.wisps = 3;
         audio.play('checkpoint');
       } else if (e.type === 'wellspring') {
         if (!shrineOn && restore.phase === 'idle') triggerFlood();
@@ -1132,8 +1135,14 @@ async function boot() {
     shadeContact.update(dt, (dx, dz) => {
       const beforeX = fox.position.x, beforeZ = fox.position.z;
       const fy = fox.position.y - foxActor.feetOffset;
-      if (!col.blocked(fox.position.x + dx, fox.position.z, fy)) fox.position.x += dx;
-      if (!col.blocked(fox.position.x, fox.position.z + dz, fy)) fox.position.z += dz;
+      const safe = (x: number, z: number) => {
+        if (col.blocked(x, z, fy)) return false;
+        // A hit on safe ground must not add an unavoidable >6 m drop to its wisp cost.
+        if (shadeKnockbackFloor !== null && col.groundAt(x, z, fy + 0.2).y < shadeKnockbackFloor) return false;
+        return true;
+      };
+      if (safe(fox.position.x + dx, fox.position.z)) fox.position.x += dx;
+      if (safe(fox.position.x, fox.position.z + dz)) fox.position.z += dz;
       return Math.hypot(fox.position.x - beforeX, fox.position.z - beforeZ);
     });
     for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
@@ -1145,6 +1154,7 @@ async function boot() {
         hud.setPrompt('The Keeping loosens. A memory returns.');
         hud.hidePromptSoon(3);
       } else if (shadeContact.hit(fox.position, e.pos, shades.tun.knockback, shades.tun.invulnerability)) {
+        shadeKnockbackFloor = grounded ? fox.position.y - foxActor.feetOffset - 6 : null;
         vel.y = Math.max(vel.y, 4.2);
         grounded = false;
         cam.shake(0.2);
