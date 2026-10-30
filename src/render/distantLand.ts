@@ -49,74 +49,184 @@ function rng(seed: number) {
   };
 }
 
-/** One floating-island variant: lumpy top, jagged inverted spire, ruin silhouettes. */
+/** Smooth periodic wobble around the rim (no per-vertex jitter → no crystal spikes). */
+function rimNoise(a: number, seed: number): number {
+  return (
+    0.08 * Math.sin(a * 3 + seed) + 0.05 * Math.sin(a * 7 + seed * 2.3) + 0.03 * Math.sin(a * 13 + seed * 0.7)
+  );
+}
+
+/**
+ * One floating-island variant (unit scale): lumpy top, craggy stepped underside with hanging
+ * spires, small tree silhouettes, and — on ruin islands — a broken colonnade and an arch whose
+ * proportions match the near ruins, so the far tier reads as the same shrine culture.
+ */
 function islandVariant(rand: () => number, ruins: boolean): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
+  const seed = rand() * 10;
 
   // top plate
-  const top = new THREE.CylinderGeometry(1, 0.9, 0.35, 14, 1);
+  const top = new THREE.CylinderGeometry(1, 0.96, 0.22, 28, 1);
   const tp = top.attributes.position as THREE.BufferAttribute;
   for (let i = 0; i < tp.count; i++) {
-    const k = 0.82 + rand() * 0.3;
+    const a = Math.atan2(tp.getZ(i), tp.getX(i));
+    const k = 1 + rimNoise(a, seed);
     tp.setX(i, tp.getX(i) * k);
     tp.setZ(i, tp.getZ(i) * k);
-    if (tp.getY(i) > 0) tp.setY(i, tp.getY(i) + rand() * 0.18);
+    if (tp.getY(i) > 0) tp.setY(i, tp.getY(i) + 0.04 * Math.sin(a * 2 + seed));
   }
   parts.push(top.toNonIndexed());
 
-  // underside spire — inverted jagged cone, sometimes double-lobed
-  const lobes = rand() > 0.55 ? 2 : 1;
-  for (let l = 0; l < lobes; l++) {
-    const h = 1.6 + rand() * 1.6;
-    const cone = new THREE.ConeGeometry(0.9 - l * 0.3, h, 10, 3);
-    cone.rotateX(Math.PI);
-    const cp = cone.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < cp.count; i++) {
-      const j = 0.75 + rand() * 0.5;
-      cp.setX(i, cp.getX(i) * j);
-      cp.setZ(i, cp.getZ(i) * j);
+  // craggy underside: stepped strata rings narrowing to lobed spires
+  {
+    const prof: Array<[number, number]> = [
+      [0, 1],
+      [0.12, 0.97],
+      [0.2, 0.84],
+      [0.42, 0.78],
+      [0.52, 0.6],
+      [0.9, 0.5],
+      [1.05, 0.32],
+      [1.6, 0.2],
+      [2.3, 0.06],
+      [2.7, 0],
+    ];
+    const depthK = 0.8 + rand() * 0.7;
+    const seg = 26;
+    const rings = prof.map(([d, r], j) =>
+      Array.from({ length: seg }, (_, i) => {
+        const a = (i / seg) * Math.PI * 2;
+        const lobe = 0.5 + 0.5 * Math.sin(a * 2 + seed * 1.7);
+        const jag = 1 + rimNoise(a * (1 + j * 0.15), seed + j) * 1.6;
+        const dd = d * depthK * (0.65 + lobe * 0.7) * (j > 4 ? 0.8 + lobe * 0.4 : 1);
+        return new THREE.Vector3(Math.cos(a) * r * jag, -0.11 - dd, Math.sin(a) * r * jag);
+      }),
+    );
+    const pos: number[] = [];
+    for (let j = 0; j < rings.length - 1; j++) {
+      for (let i = 0; i < seg; i++) {
+        const i2 = (i + 1) % seg;
+        const a = rings[j]![i]!;
+        const b = rings[j]![i2]!;
+        const c = rings[j + 1]![i]!;
+        const d = rings[j + 1]![i2]!;
+        pos.push(a.x, a.y, a.z, c.x, c.y, c.z, b.x, b.y, b.z, b.x, b.y, b.z, c.x, c.y, c.z, d.x, d.y, d.z);
+      }
     }
-    cone.translate(l * (rand() - 0.5) * 0.9, -h / 2 - 0.1, l * (rand() - 0.5) * 0.6);
-    parts.push(cone.toNonIndexed());
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    parts.push(g);
+    // a couple of extra hanging spires off-centre
+    const extra = 1 + Math.floor(rand() * 2);
+    for (let l = 0; l < extra; l++) {
+      const h = 0.8 + rand() * 1.2;
+      const cone = new THREE.ConeGeometry(0.22 + rand() * 0.15, h, 7, 2);
+      cone.rotateX(Math.PI);
+      const a = rand() * Math.PI * 2;
+      cone.translate(Math.cos(a) * 0.55, -0.4 - h / 2, Math.sin(a) * 0.55);
+      parts.push(cone.toNonIndexed());
+    }
   }
 
-  // tree / rock nubs on top
-  const nubs = 2 + Math.floor(rand() * 4);
-  for (let i = 0; i < nubs; i++) {
+  // small trees: leaning trunk + clumped crown; some bare
+  const trees = 2 + Math.floor(rand() * 3);
+  for (let i = 0; i < trees; i++) {
     const a = rand() * Math.PI * 2;
-    const r = rand() * 0.7;
-    const s = 0.18 + rand() * 0.25;
+    const r = 0.2 + rand() * 0.6;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    const h = 0.18 + rand() * 0.22;
+    const lean = (rand() - 0.5) * 0.5;
+    const trunk = new THREE.CylinderGeometry(0.008, 0.02, h, 5);
+    trunk.translate(0, h / 2, 0);
+    trunk.rotateZ(lean);
+    trunk.translate(x, 0.1, z);
+    parts.push(trunk.toNonIndexed());
+    const tx = x - Math.sin(lean) * h;
+    const ty = 0.1 + Math.cos(lean) * h;
+    if (rand() < 0.7) {
+      for (let k = 0; k < 4; k++) {
+        const cr = 0.05 + rand() * 0.06;
+        const clump = new THREE.IcosahedronGeometry(cr, 1);
+        clump.scale(1.2, 0.75, 1.2);
+        clump.translate(tx + (rand() - 0.5) * 0.14, ty + (rand() - 0.2) * 0.06, z + (rand() - 0.5) * 0.14);
+        parts.push(clump.toNonIndexed());
+      }
+    } else {
+      for (let k = 0; k < 3; k++) {
+        const bl = 0.06 + rand() * 0.06;
+        const br = new THREE.CylinderGeometry(0.003, 0.008, bl, 4);
+        br.translate(0, bl / 2, 0);
+        br.rotateZ((rand() - 0.5) * 1.6);
+        br.translate(tx, ty - 0.02, z);
+        parts.push(br.toNonIndexed());
+      }
+    }
+  }
+  // boulders
+  for (let i = 0; i < 3; i++) {
+    const a = rand() * Math.PI * 2;
+    const r = rand() * 0.8;
+    const s = 0.04 + rand() * 0.06;
     const nub = new THREE.IcosahedronGeometry(s, 0);
-    nub.scale(1, 1.4 + rand(), 1);
-    nub.translate(Math.cos(a) * r, 0.3 + s, Math.sin(a) * r);
+    nub.scale(1.3, 0.8, 1);
+    nub.translate(Math.cos(a) * r, 0.1 + s * 0.5, Math.sin(a) * r);
     parts.push(nub.toNonIndexed());
   }
 
   if (ruins) {
-    // broken colonnade + an arch — reads as the shrine culture in silhouette
-    const pillars = 2 + Math.floor(rand() * 4);
+    // broken colonnade: drums of varied height, one fallen lintel still bridging a pair
+    const n = 3 + Math.floor(rand() * 3);
     const baseA = rand() * Math.PI * 2;
-    for (let i = 0; i < pillars; i++) {
-      const a = baseA + i * 0.5;
-      const ph = 0.5 + rand() * 1.0;
-      const p = new THREE.BoxGeometry(0.07, ph, 0.07);
-      p.translate(Math.cos(a) * 0.55, 0.25 + ph / 2, Math.sin(a) * 0.55);
-      parts.push(p);
+    const hs: number[] = [];
+    const ps: Array<[number, number]> = [];
+    for (let i = 0; i < n; i++) {
+      const a = baseA + i * 0.32;
+      const px = Math.cos(a) * 0.5;
+      const pz = Math.sin(a) * 0.5;
+      const ph = i === 1 || i === 2 ? 0.42 + rand() * 0.12 : 0.12 + rand() * 0.3;
+      const col = new THREE.CylinderGeometry(0.03, 0.034, ph, 7);
+      const cp = col.attributes.position as THREE.BufferAttribute;
+      for (let k = 0; k < cp.count; k++) if (cp.getY(k) > 0 && i !== 1 && i !== 2) cp.setY(k, cp.getY(k) - (cp.getX(k) + 0.03) * 0.8);
+      col.translate(px, 0.1 + ph / 2, pz);
+      parts.push(col.toNonIndexed());
+      const plinth = new THREE.BoxGeometry(0.085, 0.03, 0.085);
+      plinth.translate(px, 0.115, pz);
+      parts.push(plinth.toNonIndexed());
+      hs.push(ph);
+      ps.push([px, pz]);
     }
-    if (rand() > 0.35) {
-      const arch = new THREE.TorusGeometry(0.32, 0.07, 4, 10, Math.PI);
-      const legH = 0.7;
-      arch.translate(0, 0.25 + legH, 0);
-      const l1 = new THREE.BoxGeometry(0.13, legH, 0.13).translate(-0.32, 0.25 + legH / 2, 0);
-      const l2 = new THREE.BoxGeometry(0.13, legH, 0.13).translate(0.32, 0.25 + legH / 2, 0);
-      const g = mergeGeometries([arch.toNonIndexed(), l1.toNonIndexed(), l2.toNonIndexed()])!;
+    if (n >= 3) {
+      const [x1, z1] = ps[1]!;
+      const [x2, z2] = ps[2]!;
+      const lin = new THREE.BoxGeometry(Math.hypot(x2 - x1, z2 - z1) + 0.09, 0.045, 0.06);
+      lin.rotateY(-Math.atan2(z2 - z1, x2 - x1));
+      lin.translate((x1 + x2) / 2, 0.1 + Math.min(hs[1]!, hs[2]!) + 0.02, (z1 + z2) / 2);
+      parts.push(lin.toNonIndexed());
+    }
+    if (rand() > 0.3) {
+      // arch: two piers + a thick ring, sometimes snapped on one side
+      const span = 0.17;
+      const legH = 0.32 + rand() * 0.12;
+      const broken = rand() < 0.45;
+      const ring = new THREE.TorusGeometry(span + 0.03, 0.035, 5, 12, broken ? Math.PI * 0.62 : Math.PI);
+      ring.scale(1, 1, 1.6);
+      ring.translate(0, 0.1 + legH, 0);
+      const l1 = new THREE.BoxGeometry(0.07, legH, 0.08).translate(-span - 0.03, 0.1 + legH / 2, 0);
+      const l2h = broken ? legH * 0.55 : legH;
+      const l2 = new THREE.BoxGeometry(0.07, l2h, 0.08).translate(span + 0.03, 0.1 + l2h / 2, 0);
+      const g = mergeGeometries([ring.toNonIndexed(), l1.toNonIndexed(), l2.toNonIndexed()])!;
       g.rotateY(rand() * Math.PI);
-      g.translate((rand() - 0.5) * 0.5, 0, (rand() - 0.5) * 0.5);
+      g.translate((rand() - 0.5) * 0.4, 0, (rand() - 0.5) * 0.4);
       parts.push(g);
     }
   }
 
-  const merged = mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)))!;
+  const merged = mergeGeometries(parts.map((p) => (p.index ? p.toNonIndexed() : p)).map((p) => {
+    p.deleteAttribute('uv');
+    p.deleteAttribute('normal');
+    return p;
+  }))!;
   merged.computeVertexNormals();
   return merged;
 }

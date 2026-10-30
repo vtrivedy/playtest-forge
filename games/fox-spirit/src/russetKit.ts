@@ -323,49 +323,54 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
   const rough = s.rough ?? 0.55;
   const seed = s.seed ?? 1;
   const over = s.overhang ?? 0.7 * rough;
-  let geo: THREE.BufferGeometry;
-  if (s.round) {
-    const r = s.w / 2;
-    const radial = Math.max(24, Math.round((Math.PI * 2 * r) / 0.8));
-    geo = new THREE.CylinderGeometry(r, r * 0.94, h, radial, Math.max(3, Math.round(h / 0.5)), false);
-  } else {
-    geo = new THREE.BoxGeometry(
-      s.w,
-      h,
-      s.d,
-      Math.max(3, Math.round(s.w / 0.8)),
-      Math.max(3, Math.round(h / 0.5)),
-      Math.max(3, Math.round(s.d / 0.8)),
-    );
-  }
-  geo = merged(geo);
-  const p = geo.attributes.position as THREE.BufferAttribute;
   const hw = s.w / 2;
   const hd = s.d / 2;
-  const hh = h / 2;
-  const v = new THREE.Vector3();
-  const dir = new THREE.Vector3();
-  for (let i = 0; i < p.count; i++) {
-    v.fromBufferAttribute(p, i);
-    const yWorld = v.y + hh + s.bottom;
-    const isTop = v.y > hh - 0.01;
-    // outward direction + tangential coordinate along the face
-    let u = 0;
-    if (s.round) {
-      const rad = Math.hypot(v.x, v.z);
-      if (rad > (s.w / 2) * 0.86) {
-        dir.set(v.x / rad, 0, v.z / rad);
-        u = Math.atan2(v.z, v.x) * (s.w / 2);
-      } else dir.set(0, 0, 0);
-    } else {
-      dir.set(Math.abs(v.x) > hw - 0.01 ? Math.sign(v.x) : 0, 0, Math.abs(v.z) > hd - 0.01 ? Math.sign(v.z) : 0);
-      u = Math.abs(v.x) > hw - 0.01 ? v.z + Math.sign(v.x) * 50 : v.x + Math.sign(v.z) * 120;
-      if (dir.lengthSq() > 0) dir.normalize();
+  // rim ring: perimeter samples (local, centred) with outward direction and arc-length u
+  const ring: Array<{ x: number; z: number; nx: number; nz: number; u: number }> = [];
+  if (s.round) {
+    const R = hw;
+    const n = Math.max(24, Math.round((Math.PI * 2 * R) / 0.85));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      ring.push({ x: Math.cos(a) * R, z: Math.sin(a) * R, nx: Math.cos(a), nz: Math.sin(a), u: a * R });
     }
-    const onSide = dir.lengthSq() > 0;
-    const below = s.top - yWorld; // depth under the walk surface
-    if (onSide) {
+  } else {
+    const corners: Array<[number, number, number, number]> = [
+      [-hw, hd, 0, 1],
+      [hw, hd, 1, 0],
+      [hw, -hd, 0, -1],
+      [-hw, -hd, -1, 0],
+    ];
+    let u = 0;
+    for (let e = 0; e < 4; e++) {
+      const [x0, z0, nx, nz] = corners[e]!;
+      const [x1, z1] = corners[(e + 1) % 4]!;
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      const m = Math.max(2, Math.round(len / 0.85));
+      for (let k = 0; k < m; k++) {
+        const t = k / m;
+        ring.push({ x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, nx, nz, u: u + len * t });
+      }
+      u += len;
+    }
+  }
+  const ny = Math.max(3, Math.round(h / 0.65));
+  const N = ring.length;
+  const P: THREE.Vector3[][] = [];
+  for (let i = 0; i < N; i++) {
+    const q = ring[i]!;
+    const col: THREE.Vector3[] = [];
+    for (let j = 0; j <= ny; j++) {
+      const yWorld = s.bottom + (h * j) / ny;
+      const below = s.top - yWorld;
+      const v = new THREE.Vector3(q.x, yWorld, q.z);
+      if (s.round) {
+        const taper = 0.94 + 0.06 * (j / ny);
+        v.x *= taper;
+        v.z *= taper;
+      }
       // jointed facets: irregular-width vertical columns, each its own depth, lean and one fracture
+      const u = q.u;
       const ci = Math.floor(u / 1.8 + vnoise3(u * 0.11, seed, 1.7) * 1.3);
       const d0 = (hash3(ci, seed, 1) - 0.42) * rough * 1.25;
       const lean = (hash3(ci, seed, 2) - 0.5) * rough * 0.16 * below;
@@ -381,43 +386,85 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
       // the very lip stays near the collider edge (feet never hang over air)
       const lipK = THREE.MathUtils.smoothstep(below, 0.05, 0.9);
       off = THREE.MathUtils.lerp(Math.min(0.12, Math.max(-0.22, off * 0.3)), off, lipK);
-      v.addScaledVector(dir, off);
-      if (isTop) v.y -= vnoise3(u * 0.9, 3.3, seed) * 0.22; // chipped rim
-    } else if (isTop) {
-      v.y += (vnoise3(v.x * 0.8 + seed, 0, v.z * 0.8) - 0.5) * 0.05;
+      v.x += q.nx * off;
+      v.z += q.nz * off;
+      if (j === ny) v.y -= vnoise3(u * 0.9, 3.3, seed) * 0.22; // chipped rim
+      // eroded corners: angular, stepped with height, varied per corner
+      if (!s.round && Math.abs(v.x) > hw * 0.5 && Math.abs(v.z) > hd * 0.5) {
+        const kx = (Math.abs(v.x) - hw * 0.5) / (hw * 0.5);
+        const kz = (Math.abs(v.z) - hd * 0.5) / (hd * 0.5);
+        const step = Math.floor((yWorld + seed) / 1.7);
+        const ch = hash3(Math.sign(v.x), Math.sign(v.z), seed);
+        const depthK = 0.12 + ch * 0.22 + (hash3(step, ch * 9, seed) - 0.5) * 0.12 * Math.min(1, below / 1.2);
+        const cut = Math.max(0, Math.min(kx, kz)) * Math.min(hw, hd) * depthK;
+        v.x -= Math.sign(v.x) * cut;
+        v.z -= Math.sign(v.z) * cut;
+      }
+      col.push(v);
     }
-    if (isTop && s.roughTop) {
-      const k = Math.floor(v.x / 1.3 + vnoise3(v.z * 0.3, seed, 0) * 2) * 7 + Math.floor(v.z / 1.3);
-      v.y += (hash3(k, seed, 9) - 0.6) * s.roughTop + (vnoise3(v.x * 0.5, seed, v.z * 0.5) - 0.5) * s.roughTop * 0.6;
-    }
-    // eroded corners: angular, stepped with height, varied per corner
-    if (!s.round && Math.abs(v.x) > hw * 0.5 && Math.abs(v.z) > hd * 0.5) {
-      const kx = (Math.abs(v.x) - hw * 0.5) / (hw * 0.5);
-      const kz = (Math.abs(v.z) - hd * 0.5) / (hd * 0.5);
-      const step = Math.floor((yWorld + seed) / 1.7);
-      const ch = hash3(Math.sign(v.x), Math.sign(v.z), seed);
-      const depthK = 0.12 + ch * 0.22 + (hash3(step, ch * 9, seed) - 0.5) * 0.12 * Math.min(1, below / 1.2);
-      const cut = Math.max(0, Math.min(kx, kz)) * Math.min(hw, hd) * depthK;
-      v.x -= Math.sign(v.x) * cut;
-      v.z -= Math.sign(v.z) * cut;
-    }
-    p.setXYZ(i, v.x, v.y, v.z);
+    P.push(col);
   }
-  const flat = geo.toNonIndexed();
-  geo.dispose();
-  flat.computeVertexNormals();
-  const topC = s.topColor === undefined ? PAL.soilTop : s.topColor;
-  const wq = new THREE.Vector3();
-  const m = trs(s.x, s.bottom + hh, s.z, s.yaw ?? 0);
+  const m = trs(s.x, 0, s.z, s.yaw ?? 0);
   const nm = new THREE.Matrix3().getNormalMatrix(m);
-  const wn = new THREE.Vector3();
-  paint(flat, (q, n, out) => {
-    wq.copy(q).applyMatrix4(m);
-    wn.copy(n).applyMatrix3(nm).normalize();
-    rockColor(wq, wn, s.top, seed, topC, out);
-  });
-  b.add(flat, m);
-  flat.dispose();
+  const topC = s.topColor === undefined ? PAL.soilTop : s.topColor;
+  const W = (v: THREE.Vector3) => v.clone().applyMatrix4(m);
+  const n = new THREE.Vector3();
+  const e1 = new THREE.Vector3();
+  const e2 = new THREE.Vector3();
+  const ca = new THREE.Color();
+  const cb = new THREE.Color();
+  const cc = new THREE.Color();
+  const emit = (a: THREE.Vector3, bb: THREE.Vector3, c: THREE.Vector3, outward: THREE.Vector3) => {
+    const A = W(a);
+    let B = W(bb);
+    let C = W(c);
+    e1.subVectors(B, A);
+    e2.subVectors(C, A);
+    n.crossVectors(e1, e2);
+    if (n.lengthSq() < 1e-10) return;
+    n.normalize();
+    if (n.dot(outward) < 0) {
+      n.negate();
+      [B, C] = [C, B];
+    }
+    b.tri(A, B, C, n, rockColor(A, n, s.top, seed, topC, ca), rockColor(B, n, s.top, seed, topC, cb), rockColor(C, n, s.top, seed, topC, cc));
+  };
+  const out = new THREE.Vector3();
+  for (let i = 0; i < N; i++) {
+    const i2 = (i + 1) % N;
+    const q = ring[i]!;
+    const q2 = ring[i2]!;
+    out.set(q.nx + q2.nx, 0, q.nz + q2.nz).normalize().applyMatrix3(nm);
+    for (let j = 0; j < ny; j++) {
+      emit(P[i]![j]!, P[i2]![j]!, P[i2]![j + 1]!, out);
+      emit(P[i]![j]!, P[i2]![j + 1]!, P[i]![j + 1]!, out);
+    }
+  }
+  // top: chipped rim band → inset rings (relief for crags) → flat cap triangulated in-plane
+  const up = new THREE.Vector3(0, 1, 0);
+  const minHalf = Math.min(hw, hd);
+  const nRings = s.roughTop ? Math.max(2, Math.floor(minHalf / 1.0)) : 1;
+  let prev = P.map((c) => c[ny]!);
+  for (let k = 1; k <= nRings; k++) {
+    const inset = Math.min(minHalf * 0.85, s.roughTop ? k * (minHalf * 0.85) / nRings : 0.9);
+    const kx = Math.max(0.12, 1 - inset / hw);
+    const kz = Math.max(0.12, 1 - inset / hd);
+    const cur = prev.map((v, i) => {
+      const r = ring[i]!;
+      let y = s.top;
+      if (s.roughTop) y += (hash3(Math.floor(r.u / 1.4), k, seed) - 0.55) * s.roughTop + (vnoise3(r.x * 0.5, seed, r.z * 0.5) - 0.5) * s.roughTop * 0.6;
+      return new THREE.Vector3(v.x * kx, y, v.z * kz);
+    });
+    for (let i = 0; i < N; i++) {
+      const i2 = (i + 1) % N;
+      emit(prev[i]!, prev[i2]!, cur[i2]!, up);
+      emit(prev[i]!, cur[i2]!, cur[i]!, up);
+    }
+    prev = cur;
+  }
+  const contour = prev.map((v) => new THREE.Vector2(v.x, v.z));
+  if (THREE.ShapeUtils.isClockWise(contour)) contour.reverse(), prev.reverse();
+  for (const [a, bb, c] of THREE.ShapeUtils.triangulateShape(contour, [])) emit(prev[a!]!, prev[bb!]!, prev[c!]!, up);
 }
 
 /**
@@ -1459,7 +1506,7 @@ function crownCluster(
   const subs = R > 1.4 ? 3 + Math.floor(r() * 3) : 2;
   // small dark inner mass: body for distant crowns, buried well inside the sprays
   if (R > 1.4) {
-    const core = new THREE.IcosahedronGeometry(R * 0.34, 1);
+    const core = new THREE.IcosahedronGeometry(R * 0.34, 0);
     core.scale(1, 0.7, 1);
     bark.add(core, trs(c.x, c.y, c.z), tmp.copy(hue).multiplyScalar(0.28));
     core.dispose();
@@ -1468,8 +1515,8 @@ function crownCluster(
   const out = new THREE.Vector3();
   for (let si = 0; si < subs; si++) {
     const sc = c.clone().add(new THREE.Vector3((r() - 0.5) * R * 1.0, (r() - 0.25) * R * 0.55, (r() - 0.5) * R * 1.0));
-    // twig from the branch into the clump
-    if (R > 0.9) {
+    // twig from the branch into the clump (the first few carry the clump; the rest hang off them)
+    if (R > 0.9 && si < 3) {
       const mid = from.clone().lerp(sc, 0.5).add(new THREE.Vector3(0, R * 0.12, 0));
       taperedTube(bark, new THREE.CatmullRomCurve3([from.clone(), mid, sc]), Math.min(0.14, R * 0.05), 0.025, 3, 4, barkColor, 0, 0.05);
     }

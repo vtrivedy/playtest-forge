@@ -455,9 +455,11 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const n2 = fbm3(x * 0.03 + 9, 1, z * 0.03, 2);
         const amberK = z < 12 && z > -50 ? smooth01(12, -4, z) : 0;
         // umber soil with golden dry-grass swathes in the open meadow
-        c.copy(PAL.soilUmber).lerp(PAL.grassDry, smooth01(0.42, 0.7, n2) * (1 - amberK) * 0.85);
-        c.lerp(PAL.grassGold, smooth01(0.62, 0.8, n1) * (1 - amberK) * 0.35);
-        let leafy = 0.3 + (n1 - 0.5) * 0.5 + amberK * 0.55;
+        const grass = smooth01(0.44, 0.66, n2) * (1 - amberK);
+        c.copy(PAL.soilUmber).lerp(PAL.grassDry, grass * 0.9);
+        c.lerp(PAL.grassGold, grass * smooth01(0.5, 0.75, n1) * 0.55);
+        const nBig = fbm3(x * 0.022 + 5, 2, z * 0.022, 2);
+        let leafy = 0.3 + (n1 - 0.5) * 0.45 + (nBig - 0.5) * 0.7 + amberK * 0.55 - grass * 0.2;
         // drifts under every tree canopy
         let tree = 0;
         for (const [tx, tz, th] of TREE_SPOTS) {
@@ -544,6 +546,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const c = sp((tr.s0 + tr.s1) / 2, 0);
     const len = tr.s1 - tr.s0;
     col.add(boxCollider({ x: c.x, z: c.z, w: tr.w, d: len, yaw: T_YAW, top: tr.top, bottom: -4, tag: `terrace${i}` }));
+    // visual skirt only reaches just under the terrace it stands on (the rest is buried)
+    const under = terraces.slice(0, i).filter((o) => o.s0 < tr.s1 && o.s1 > tr.s0).reduce((m, o) => Math.max(m, o.top), -2.5);
     slab({
       x: c.x,
       z: c.z,
@@ -551,7 +555,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       w: tr.w,
       d: len,
       top: tr.top,
-      bottom: -4,
+      bottom: under - 1.5,
       rough: 0.7,
       seed: 10 + i,
       topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45),
@@ -1224,7 +1228,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       w: rw.hw * 2,
       d: rw.z0 - ZB,
       top: rw.top,
-      bottom: i === 0 ? -4 : rows[i - 1]!.top - 3,
+      bottom: i === 0 ? -4 : rows[i - 1]!.top - 1.5,
       rough: 0.8,
       seed: 130 + i,
       topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.3),
@@ -1273,20 +1277,52 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       boulder(bk('rock', bx, face), bx, lo.top + 0.4 + tr() * 0.6, face + 0.6 + tr() * 1.4, 0.35 + tr() * 0.45, 1960 + k * 5 + q, 0.7);
     }
   }
-  // fractured spurs on the flanks: tall jointed rock that breaks the stepped profile
-  const spurs: Array<{ x: number; z: number; w: number; d: number; yaw: number; top: number }> = [
-    { x: 20.2, z: -86, w: 6.5, d: 10, yaw: 0.25, top: 31 },
-    { x: 18.6, z: -72.6, w: 4.2, d: 4.6, yaw: -0.35, top: 20.6 },
-    { x: -19.6, z: -82, w: 5.6, d: 8.2, yaw: -0.2, top: 27.2 },
-    { x: -18.2, z: -94, w: 5, d: 6, yaw: 0.4, top: 34.5 },
+  // fractured spurs on the flanks: clusters of tall jointed columns break the stepped profile
+  const spurs: Array<{ x: number; z: number; r: number; top: number; n: number }> = [
+    { x: 20.4, z: -86, r: 3.4, top: 31, n: 3 },
+    { x: 18.8, z: -72.4, r: 2.2, top: 21, n: 2 },
+    { x: -19.8, z: -82, r: 2.8, top: 27.2, n: 3 },
+    { x: -18.4, z: -94, r: 2.6, top: 34.5, n: 2 },
   ];
   for (let k = 0; k < spurs.length; k++) {
     const sp2 = spurs[k]!;
-    slab({ ...sp2, bottom: -6, rough: 1.15, seed: 1990 + k, topColor: null, overhang: 1.1, roughTop: 1.4 });
-    col.add(boxCollider({ x: sp2.x, z: sp2.z, w: sp2.w * 0.9, d: sp2.d * 0.9, yaw: sp2.yaw, top: sp2.top - 0.4, bottom: -6, tag: 'spur' }));
     const tr = rng(2050 + k);
-    shrub(bk('leaf', sp2.x, sp2.z, false), tr, sp2.x + (tr() - 0.5) * 2, sp2.top, sp2.z + (tr() - 0.5) * 2, 0.7 + tr() * 0.4, [PAL.maple, PAL.russet, PAL.amber][k % 3]!);
-    for (let q = 0; q < 4; q++) hangingRoot(bk('bark', sp2.x, sp2.z), tr, sp2.x + (tr() - 0.5) * sp2.w * 0.8, sp2.top - 0.3, sp2.z + (tr() - 0.5) * sp2.d * 0.8, 2 + tr() * 4, new THREE.Vector2(0, 0), 0.08 + tr() * 0.08);
+    for (let q = 0; q < sp2.n; q++) {
+      const a = (q / sp2.n) * Math.PI * 2 + tr() * 1.5;
+      const d = q === 0 ? 0 : sp2.r * (0.55 + tr() * 0.3);
+      const cx = sp2.x + Math.cos(a) * d;
+      const cz = sp2.z + Math.sin(a) * d;
+      const w = 2.2 + tr() * 1.6;
+      const dd = 2.0 + tr() * 1.6;
+      const top = sp2.top - q * (2.2 + tr() * 2.4);
+      const yaw = tr() * Math.PI;
+      slab({ x: cx, z: cz, w, d: dd, yaw, top, bottom: -6, rough: 1.0, seed: 1990 + k * 7 + q, topColor: null, overhang: 0.7, roughTop: 0.9 });
+      col.add(boxCollider({ x: cx, z: cz, w: w * 0.85, d: dd * 0.85, yaw, top: top - 0.35, bottom: -6, tag: 'spur' }));
+      if (q === 0) shrub(bk('leaf', cx, cz, false), tr, cx + (tr() - 0.5), top, cz + (tr() - 0.5), 0.6 + tr() * 0.4, [PAL.maple, PAL.russet, PAL.amber][k % 3]!);
+      for (let h2 = 0; h2 < 2; h2++) hangingRoot(bk('bark', cx, cz), tr, cx + (tr() - 0.5) * w * 0.7, top - 0.3, cz + (tr() - 0.5) * dd * 0.7, 2 + tr() * 4, new THREE.Vector2(0, 0), 0.07 + tr() * 0.07);
+    }
+  }
+  // foliage spilling over the row lips: hanging sprays soften the long shelf edges
+  {
+    const dr = rng(2101);
+    const drapeHues = [PAL.russet, PAL.maple, PAL.amber, PAL.leafBrown, PAL.crimson, PAL.copper];
+    for (let i = 0; i < rows.length; i++) {
+      const rw = rows[i]!;
+      for (let x = -rw.hw + 0.8; x < rw.hw - 0.8; x += 0.55 + dr() * 0.7) {
+        if (Math.abs(x) < 8.4) continue; // stair lanes
+        if (fbm3(x * 0.25, i * 3.1, 2, 2) < 0.42) continue;
+        const lb = bk('leaf', x, rw.z0, false);
+        const hue = drapeHues[Math.floor(dr() * drapeHues.length)]!;
+        const n = 2 + Math.floor(dr() * 3);
+        for (let k = 0; k < n; k++) {
+          const sz = 0.8 + dr() * 0.9;
+          const c = hue.clone().offsetHSL(0, (dr() - 0.5) * 0.1, (dr() - 0.5) * 0.12).multiplyScalar(0.75 + dr() * 0.25);
+          // card hangs down the face: rolled upside down so the twig end sits on the lip
+          pushLeaf(lb, x + (dr() - 0.5) * 0.5, rw.top - sz * 0.38 - dr() * 0.3, rw.z0 + 0.12 + dr() * 0.18, sz, (dr() - 0.5) * 0.5, -0.12 - dr() * 0.25, Math.PI + (dr() - 0.5) * 0.6, c, new THREE.Vector3(0, 0.4, 1).normalize(), dr() < 0.6 ? LEAF_CELL.spray : LEAF_CELL.sparse, dr() < 0.5);
+        }
+        if (dr() < 0.35) shrub(bk('leaf', x, rw.z0, false), dr, x, rw.top, rw.z0 - 0.6, 0.4 + dr() * 0.4, hue);
+      }
+    }
   }
   // the hill's mass continues below to the ground (one chunky base)
   slab({ x: 0, z: -88, w: 40, d: 20, top: 16, bottom: -4, rough: 1.0, seed: 140, topColor: null });
@@ -1447,7 +1483,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // Wen's pond
   const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x3a3024, colorShallow: 0x7a6a50 });
   pond.mesh.position.set(POND.x, POND.water, POND.z);
-  (pond.material.uniforms.uSky!.value as THREE.Color).set(0x8a7a62);
+  (pond.material.uniforms.uSky!.value as THREE.Color).set(0x5e5244);
   {
     // Wen's dock
     const a = { x: -6, z: 72 };
@@ -1949,7 +1985,13 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
         float gLm = vLeafy + (gNoise(vGPos.xz * 0.16) - 0.5) * 0.5 + (gNoise(vGPos.xz * 0.63 + 7.0) - 0.5) * 0.22;
         float gVis = smoothstep(0.96 - gLm, 1.04 - gLm, gLeaf.a) * step(0.03, gLeaf.a);`)
       .replace('#include <color_fragment>', `
-        vec3 gLeafCol = gLeaf.rgb * gLeafHue(gLeaf.a) * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
+        // regional drift of the litter's dominant hue: maple-red hollows, gold swathes, brown elsewhere
+        float gReg = gNoise(vGPos.xz * 0.028 + 11.0) * 0.7 + gNoise(vGPos.xz * 0.07 + 3.0) * 0.3;
+        vec3 gHue = gLeafHue(gLeaf.a);
+        float gTake = step(fract(gLeaf.a * 5.37), 0.72);
+        gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.70, 0.20, 0.12) : vec3(0.66, 0.27, 0.12), smoothstep(0.58, 0.74, gReg) * gTake);
+        gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.76, 0.60, 0.29) : vec3(0.82, 0.50, 0.17), smoothstep(0.42, 0.28, gReg) * gTake);
+        vec3 gLeafCol = gLeaf.rgb * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
         diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);`);
   };
   mat.needsUpdate = true;

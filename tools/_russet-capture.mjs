@@ -42,7 +42,7 @@ const SHOTS = {
   amberwood: { fox: [-13, 10.6, -26.2], yaw: Math.PI },
   // close masonry + hill face (not in the brief's five, used for look passes)
   'shrine-close': { fox: [-3, 38, -80.5], yaw: Math.PI, photo: [[6.5, 40.2, -78.5], [0, 40, -89], 50] },
-  'hill-face': { fox: [6.4, 22.4, -74.5], yaw: Math.PI, photo: [[22, 20, -48], [0, 26, -80], 55] },
+  'hill-face': { fox: [6.4, 22.4, -74.5], yaw: Math.PI, photo: [[6, 30, -50], [0, 27, -82], 55] },
   'hill-play': { fox: [6.4, 22.4, -71.5], yaw: Math.PI },
 };
 
