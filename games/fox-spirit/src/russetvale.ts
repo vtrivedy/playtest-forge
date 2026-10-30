@@ -723,10 +723,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       }
     }
     foot = Math.max(Math.min(a.y, b.y) - 8, Math.min(foot, Math.min(a.y, b.y)) - 0.3);
-    // treads sit up to one riser above the straight ramp (feet sank into the step behind): lift the ramp
-    // by half a riser along the climb so the fox stands on the treads, never inside them
-    const half = (b.y - a.y) / Math.max(2, Math.round(Math.abs(b.y - a.y) / 0.3)) / 2;
-    col.add(boxCollider({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, w: width, d: len, yaw, top: a.y + half, top1: b.y + half, bottom: Math.min(a.y, b.y) - 1, tag: 'stair' }));
+    col.add(boxCollider({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, w: width, d: len, yaw, top: a.y, top1: b.y, bottom: Math.min(a.y, b.y) - 1, tag: 'stair' }));
     stairFlight(bk('stone', a.x, a.z), a, b, width, seed, { open, foot, rock: bk('rock', a.x, a.z), ...o });
     // leaves bank up at the foot of the flight and along the foot of open cheek walls
     drifts.push({ x: a.x - Math.sin(yaw) * 0.9, y: a.y, z: a.z - Math.cos(yaw) * 0.9, r: width * 0.6, n: 34 });
