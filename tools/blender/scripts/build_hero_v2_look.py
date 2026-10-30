@@ -71,7 +71,15 @@ if nose_ids:
     for i in nose_ids: bm.verts[i].co = nc + (bm.verts[i].co - nc) * 0.62 + Vector((0, 0.004, 0))
 # delete the old thin tail beyond the root (rebuilt as plume)
 kill = [v for v in bm.verts if sum(x for k, x in v[dl].items() if gname[k] in ("Tail2", "Tail3", "Tail4", "Tail5", "Tail6", "Tail7", "Tail8")) > 0.5]
+old_boundaries = {e for e in bm.edges if e.is_boundary}
 bmesh.ops.delete(bm, geom=kill, context="VERTS")
+# Close only the opening created by removing the stock tail; otherwise a black triangular
+# hole remains above the new brush root in the chase and back review views.
+cut_edges = [e for e in bm.edges if e.is_boundary and e not in old_boundaries]
+if cut_edges:
+    caps = bmesh.ops.holes_fill(bm, edges=cut_edges, sides=0)["faces"]
+    for face in caps: face.smooth = True
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
 bm.to_mesh(me); bm.free(); me.update()
 
 # ---------------------------------------------------------------- 2. region colours (rest pose rules)

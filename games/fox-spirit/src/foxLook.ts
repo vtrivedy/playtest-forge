@@ -65,6 +65,7 @@ float fxNoise(vec3 x) {
 }`;
 
 function patchFur(mat: THREE.MeshStandardMaterial) {
+  const shell = mat.name.toLowerCase().includes("shell");
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, furUniforms);
     shader.vertexShader = shader.vertexShader
@@ -97,14 +98,16 @@ ${NOISE_GLSL}`,
       .replace(
         '#include <opaque_fragment>',
         `{
-  float fres = pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), uRim.y);
+  float facing = saturate(dot(normal, normalize(vViewPosition)));
+  ${shell ? "if (facing > 0.48) discard;" : ""}
+  float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.35, 0.8, fxNoise(vRest * vec3(40.0, 22.0, 9.0)));
   outgoingLight += uRimColor * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
 }
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => 'fox-fur';
+  mat.customProgramCacheKey = () => shell ? 'fox-fur-edge-shell' : 'fox-fur';
   mat.needsUpdate = true;
 }
 
@@ -192,7 +195,8 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.emissiveIntensity = 0;
       } else if (n.includes('fur')) {
         mat.color.setHex(0xffffff);
-        mat.roughness = 0.62;
+        mat.roughness = 0.85;
+        mat.normalScale.setScalar(0.35);
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
         patchFur(mat);
