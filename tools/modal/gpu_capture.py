@@ -8,7 +8,7 @@ from pathlib import Path
 import modal
 
 ROOT = Path(__file__).resolve().parents[2] if modal.is_local() else Path('/tmp/game')
-app = modal.App('russetvale-gpu-capture')
+app = modal.App('russetvale-capture-review')
 results = modal.Volume.from_name('russetvale-gpu-captures', create_if_missing=True)
 image = (
     modal.Image.from_registry('node:22-bookworm-slim', add_python='3.12')
