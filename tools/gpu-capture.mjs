@@ -857,6 +857,26 @@ try {
       await shot(`flow-${seg.name}-end`);
     }
   }
+  if (wants('reach')) {
+    await boot(quality,true); await H('forceRestore'); await advance(660,false);
+    await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
+    const points=[{x:40,y:38,z:-90},{x:76,y:38,z:-90},{x:112,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:173,y:30,z:-116,dash:true},{x:187,y:30,z:-118},{x:187,y:35.8,z:-118,wait:true},{x:200,y:36,z:-118,jump:true}];
+    let phase=0,age=0,reached=false;
+    await video('reach-first-crossing',65*fps,async()=>{
+      const st=await H('state'),p=points[phase];age+=1/fps;
+      const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
+      if(d<.8&&st.pos[1]>=p.y-.4&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
+      const q=points[phase],vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
+      await H('setStick',len>.2?vx/len*Math.min(1,len):0,len>.2?vz/len*Math.min(1,len):0);
+      const keys=q.jump?['Space']:[];if(q.dash&&age<.06)keys.push('ShiftLeft');await H('setKeys',keys);
+    },st=>reached||st.deaths>0||age>12,{keyFrames:[0,10*fps,20*fps,25*fps]});
+    await H('setKeys',[]);await H('setStick',null);await advance(30);await shot('reach-end');
+    const end=await H('state');save('reach-acceptance.json',{phase,reached,end});
+    // Staged architecture views are separate from the real summit-to-basin traversal above.
+    await H('teleport',150,38,-96,Math.PI/2);await H('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reach-overview');
+    await H('teleport',187,end.reach.raftHeight,-118,Math.PI/2);await H('photo',[172,43,-99],[194,34,-121],52);await advance(2);await shot('reach-ferry-and-bell');
+    if(!reached||!end.reach.restored||end.deaths)report.failures.push('Reach first crossing incomplete');
+  }
   if (wants('crown')) {
     await boot(quality, true);
     await H('forceRestore'); await advance(660, false);

@@ -229,3 +229,6 @@ populated foliage and gameplay remain on the same path. Verify with GPU boot
 and region stills before considering the startup regression repaired.
 ### Fox leg and fur follow-up — driver 14:10
 After validating clear review cameras, broaden the forearm and upper rear-leg coat without moving rig joints. Replace the abrupt black sock boundary with a longer rust → umber → charcoal transition; preserve compact dark paws and the authored gait contract. Remove the cream nape stripe by restricting the chest blaze to forward-facing surfaces. Compare fixed concept cameras and both gameplay grades before claiming an improvement.
+
+## World 2 first slice — Ashwater Reach
+Design: `docs/design/world-2.md`. A flood-open east causeway leads to a drowned autumn orchard. Reuse water-front parcels: arriving water fills a basin, raises a ferry by6m, and feeds a shrine at its upper notch. An occupied ferry holds its height when water ends; retained height never feeds the shrine. Permanent restoration keeps the ferry high. Existing inputs only, no pickup gate. Expose fill/drain/warning/latch times and __game.reach; GPU verify the continuous summit approach, real water solve, safe landing and return.
