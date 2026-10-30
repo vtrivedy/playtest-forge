@@ -1415,7 +1415,7 @@ async function boot() {
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
-    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn);
+    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn, dashing, shades.drains(new THREE.Vector3(187,30,-118)));
     crown.update(dt, (p, r) => {
       autumnFX.swirl(p, 40, 1.6);
       audio.play('shrine');
@@ -1429,6 +1429,7 @@ async function boot() {
     }
 
     if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
+    if (reach.submergedAt(fox.position, fox.position.y - foxActor.feetOffset)) handleEvents([{type:'hazard',kind:'ink'}]);
     restore.update(dt);
     zone = world.zoneAt(fox.position.x, fox.position.z);
 

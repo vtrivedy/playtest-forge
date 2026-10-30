@@ -92,3 +92,16 @@ First slice only: causeway + flood gate, source/front, one rising ferry, one wat
 - [ ] Opus critique after ~15:30; no visual-quality approval from build alone.
 
 Kill tests: color stays because arriving water sustained the upper basin notch; restoration changes the route and ferry height. The player can solve by sustained aura or a dash stroke and choose when to board. Falling costs seconds, not an irreversible puzzle state.
+
+## Revision after Opus critique15:35 — reversible water is the world state
+
+This supersedes the one-way ferry ending above. The shrine makes the source permanent; it does **not** lock water HIGH. A visible sluice with linked handles on the source bank and bell ledge toggles LOW/HIGH when dashed, using the existing brush action. It can always be reversed.
+
+- **HIGH:** three timber bodies float by the same fill fraction. Ferry + two timber stepping stones connect to the bell. The high arrival view shows the submerged lane and its low doorway beneath the water, plus a second bell islet that is jump/glide/air-dash reachable.
+- **LOW:** timber settles on permanent cradles, and the sunken lane / ferryman's niche becomes accessible. The niche is deliberately under the high-water line: drain after filling to discover it. A dash-fed steam vent in the shallow low-water puddle provides a short updraft back toward the bell ledge, a traversal payoff and return shortcut. It uses existing updraft/glide; high water suppresses the vent.
+- **Tension:** one Shade crosses the basin and drinks its fill down while present. Free it with dash, time the refill between passes, or keep the source supplied. Restoration protects permanent access; it does not erase the low/high choice.
+- **Timing:** fill the6m basin in≤3s once water arrives. The choice, boarding, changing routes and draining for the secret are the play; waiting is not the centerpiece.
+- **Identity:** still dark teal-umber water, warm copper rims, cool shaded surfaces, low mist over the water and half-submerged maple silhouettes. No cyan or neon. Pale fixed basin piers and high-water marks make motion legible.
+- **Reveal:** the bell ledge looks across a second aqueduct to a lower orchard islet; the first slice ends in a reachable place with another view, not a door to future content.
+
+Acceptance now includes one arrival frame showing source, bell and a low-only destination; three visible buoyant bodies rising; `__game.reach.level`; HIGH→LOW→HIGH real dash input, a low-lane traversal / shortcut, and a recovery checkpoint within10s of a boarding miss. Retaining an occupied float never counts as water at the shrine inlet.
