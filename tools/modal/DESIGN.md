@@ -1,0 +1,6 @@
+# Sol hero mesh experiment
+
+Generate a separate, unrigged candidate from the top-row standing three-quarter fox in the locked turnaround. Preserve natural quadruped proportions, rust fur, cream bib, dark legs, quiet face and flowing tail. TRELLIS image-large on a temporary A100 job is the first attempt; Hunyuan3D-2 is the fallback if generation fails. Output baked color at 2048 or lower and at most roughly 30k triangles, below 10 MB. No adoption or game edits. Review orthographic front/side/back and three-quarter Blender renders against the input and current blockout. Static asset work does not modify playable behavior; validate GLB import and render rather than game movement metrics.
+
+## Visual review update
+TRELLIS fails: opaque torn wisp sheets and lost eyes. Hunyuan preserves the face and fur better but turns the tail into a solid lobe and grows antlers above the ears. Keep both raw exports. Make a separate conservative Blender cleanup variant: trim only the high ear-wisp geometry, reduce/taper the exaggerated tail volume with continuous deformation, preserve UVs and texture, and render/review it before recommending. No rigging, adoption or GPU reroll.

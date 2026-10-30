@@ -1,0 +1,25 @@
+{
+  "file": "assets/hero/candidates/sol/fox_hunyuan_seed42.glb",
+  "triangles": 28000,
+  "vertices": 21833,
+  "bounds_blender": [
+    [
+      -0.2716219127178192,
+      -0.9941284656524658,
+      -0.6932136416435242
+    ],
+    [
+      0.2744133174419403,
+      1.000462532043457,
+      0.6911649107933044
+    ]
+  ],
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048
+    }
+  ],
+  "bytes": 4578820
+}

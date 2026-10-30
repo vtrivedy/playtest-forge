@@ -1,0 +1,145 @@
+[
+  {
+    "t": 1793337166599,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 0,
+    "grounded": true,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337167707,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 0,
+    "grounded": true,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337168166,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 0,
+    "grounded": true,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337169271,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 0,
+    "grounded": true,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337170677,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337171195,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337171606,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337171713,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337172225,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337172342,
+    "lastJumpApex": 0,
+    "lastTimeToApex": 0,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337173446,
+    "lastJumpApex": 0.455,
+    "lastTimeToApex": 0.05,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337173915,
+    "lastJumpApex": 0.591,
+    "lastTimeToApex": 0.1,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  },
+  {
+    "t": 1793337175020,
+    "lastJumpApex": 0.591,
+    "lastTimeToApex": 0.1,
+    "lastAirTime": 0,
+    "dashesUsed": 0,
+    "jumps": 1,
+    "grounded": false,
+    "gliding": false,
+    "status": "playing"
+  }
+]

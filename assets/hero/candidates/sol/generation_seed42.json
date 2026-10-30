@@ -1,0 +1,13 @@
+{
+  "model": "microsoft/TRELLIS-image-large",
+  "seed": 42,
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "raw_triangles": 195820,
+  "final_triangles": 25522,
+  "texture_size": 2048,
+  "bytes": 4668300,
+  "gpu_job_seconds": 115.6,
+  "trellis_commit": "193e0502b5cb3eb5997ec457d5340e95d09b158e",
+  "source_sha256": "6eedee42330996a0cfa5620abb4c4e43638bace0b8576b9d9a7433fde452136e",
+  "glb_sha256": "19d2dd123f0f414aa55c8d5bd681739b3e6fd502aaa5ee114e3f67183609276a"
+}

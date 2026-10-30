@@ -1,0 +1,44 @@
+[
+  {
+    "file": "fox_hunyuan_clean_seed42.glb",
+    "triangles": 27056,
+    "bytes": 4640532,
+    "textures": [
+      [
+        2048,
+        2048
+      ]
+    ],
+    "skins": 0,
+    "animations": 0,
+    "sha256": "33928eb1aa84300b4a02f462bf568e30043480f1e05c17a7a9cef4b0fccbfb85"
+  },
+  {
+    "file": "fox_hunyuan_seed42.glb",
+    "triangles": 28000,
+    "bytes": 4578820,
+    "textures": [
+      [
+        2048,
+        2048
+      ]
+    ],
+    "skins": 0,
+    "animations": 0,
+    "sha256": "f560319247ee6491861ada0aab3b53276720db31ff9bb73c5380d734b59f1988"
+  },
+  {
+    "file": "fox_trellis_seed42.glb",
+    "triangles": 25522,
+    "bytes": 4668300,
+    "textures": [
+      [
+        2048,
+        2048
+      ]
+    ],
+    "skins": 0,
+    "animations": 0,
+    "sha256": "19d2dd123f0f414aa55c8d5bd681739b3e6fd502aaa5ee114e3f67183609276a"
+  }
+]
