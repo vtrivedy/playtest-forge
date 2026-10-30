@@ -96,3 +96,7 @@ Sepia limestone and umber roots, burnt copper bowl, muted rust maple. Restoratio
 - Inspect visuals, patch the worst failure, capture a second time. No approval claim from design or build alone.
 
 Kill tests: color stays because the bowl received sustained heat. Restoration adds a permanent return flight. No collectible gate. The critical visual relationship is hearth → lifted leaves → bowl, then bowl → wind → home.
+
+### Flood boundary
+
+The Crown is a separate color region beyond the valley's reach. It shares the fox's temporary aura, trail and dash strokes, but only its own inlet restores its masonry and reactors. Russetvale's global flood must not solve this next space remotely. Its small region mask uses the same ColorField implementation. This is a region boundary, not a new immunity rule for objects in Russetvale. The entry landing stays level until it clears the hill's nested collision boxes; only then does the stair descend.

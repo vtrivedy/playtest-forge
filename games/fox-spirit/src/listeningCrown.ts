@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
+import { createColorField } from '../../../src/render';
 import type { Realm } from './russetvale';
 import { boxCollider } from './collision';
 import { Bucket, PAL, rockSlab, stairFlight, ruinArch, hearthBrazier, kilnBowl, stoneBlock, trs, hangingRoot, rng } from './russetKit';
@@ -14,6 +15,10 @@ export function createListeningCrown(scene: THREE.Scene, world: Realm) {
   scene.add(group);
   const stone = new Bucket(), rock = new Bucket(), roots = new Bucket();
   const col = world.collision;
+  // This ruin is beyond the valley's flood. It owns a region field with the same
+  // temporary fox sources, so returning after World 1 still leaves a real puzzle.
+  const field = createColorField({ auraRadius: 3.4, trailLife: 3, trailRadius: 2.6, bounds: { minX: -65, maxX: -20, minZ: -135, maxZ: -100 }, maskSize: 128 });
+  const materials: THREE.MeshStandardMaterial[] = [];
   const tun = { latchTime: 2, restoreRadius: 25 };
   const bowl = new THREE.Vector3(-45, 35, -112);
   const saveKey = 'fox-spirit:listening-crown:latched';
@@ -40,9 +45,10 @@ export function createListeningCrown(scene: THREE.Scene, world: Realm) {
     stairFlight(stone, { x: ax, y: ay, z: az }, { x: bx, y: by, z: bz }, 3.4, seed, { open: [true, true] });
     col.add(boxCollider({ x: (ax + bx) / 2, z: (az + bz) / 2, w: 3.4, d: len + 0.4, yaw, top: ay, top1: by, bottom: Math.min(ay, by) - 1, tag: 'crown-stair' }));
   }
-  stair([-10, 38, -87], [-21, 31, -90], 820);
-  stair([-21, 31, -90], [-32, 24, -94], 821);
-  shelf(-21, -90, 31, 5, 5, 822);
+  // The first landing clears every nested hill collider before descending.
+  shelf(-19, -88, 38, 7, 5, 822);
+  stair([-11, 38, -88], [-19, 38, -88], 820);
+  stair([-20, 38, -88], [-32, 24, -94], 821);
   stair([-39, 24, -99], [-49, 29, -104], 823);
   stair([-49, 29, -110], [-54, 34, -118], 824);
   // Split crown: open silhouette, bowl held over the upper hearth's rising leaves.
@@ -61,12 +67,15 @@ export function createListeningCrown(scene: THREE.Scene, world: Realm) {
   for (const h of hearths) hearthBrazier(stone, h.x, h.y, h.z, 860 + hearths.indexOf(h));
   world.hearthSpots.push(...hearths);
   world.windSpots.push({ id: 'crown-home', source: [-49, 34.7, -119], radius: 3.4,
-    path: [[-46, 41, -114], [-33, 41, -107], [-19, 40.5, -97], [-8, 40, -88]] });
+    path: [[-46, 41, -114], [-33, 41, -107], [-23, 40.5, -97], [-19, 40, -88]] });
   world.shadeSpots.push({ id: 'crown-shade', speed: 1.5,
     patrol: [[-47, 29, -107], [-42, 29, -107], [-42, 29, -111], [-47, 29, -111]] });
   // Reuse the realm's textured PBR materials and mask patching.
   for (const [bucket, name] of [[rock, 'rv-rock'], [stone, 'rv-stone'], [roots, 'rv-bark']] as const) {
-    const material = world.materials.find(m => m.name === name)!;
+    const material = world.materials.find(m => m.name === name)!.clone();
+    material.userData.cfRestoredChroma = name === 'rv-stone' ? 0.5 : 0.75;
+    field.patchMaterial(material);
+    materials.push(material);
     const mesh = bucket.toMesh(material, { cast: true, receive: true, boxUV: name === 'rv-rock' ? 4 : 1.6 });
     if (mesh) group.add(mesh);
   }
@@ -77,10 +86,23 @@ export function createListeningCrown(scene: THREE.Scene, world: Realm) {
   function applyRestore() {
     for (const h of updrafts.hearths) if (h.spot.id.startsWith('crown-')) h.reactor.restored = true;
     for (const c of wind.currents) if (c.spot.id === 'crown-home') c.reactor.restored = true;
-    if (inlet) inlet.inlets[0]!.latched = true;
+    if (inlet) { inlet.inlets[0]!.latched = true; inlet.inlets[0]!.seal = 1; }
+    if (!field.restores.length) field.restore(bowl, 30, 3.2);
   }
   return {
     bowl,
+    contains(p: THREE.Vector3) { return p.x < -25 && p.z < -99; },
+    supplyAt(p: THREE.Vector3) { return field.sample(p); },
+    init(renderer: THREE.WebGLRenderer) { field.initMask(renderer); },
+    sync(dt: number, source: ReturnType<typeof createColorField>) {
+      // Only this region's permanent wavefront ages here; source lifetimes stay owned by the main field.
+      field.trail = []; field.strokes = []; field.update(dt);
+      field.setFox(source.fox);
+      field.trail = source.trail.map(t => ({ ...t }));
+      field.strokes = source.strokes.map(t => ({ ...t }));
+      field.renderMask(dt);
+      for (const m of materials) field.syncMaterial(m);
+    },
     attach(u: typeof updrafts, w: WindSystem, gui: GUI) {
       updrafts = u; wind = w;
       inlet = createInlets(scene, [{ seedwell: 0, source: 'crown-high', pos: bowl,
@@ -91,18 +113,15 @@ export function createListeningCrown(scene: THREE.Scene, world: Realm) {
       if (restored) applyRestore();
     },
     update(dt: number, onRestore: (center: THREE.Vector3, radius: number) => void) {
-      if (!inlet || restored) return;
+      if (!inlet) return;
       const latched = inlet.update(dt, q => {
         const h = updrafts.hearths.find(h => h.spot.id === q.source);
         return !!h && heatFeeds(h, q.pos, updrafts.tun.radius);
       });
-      if (latched.length) {
+      if (!restored && latched.length) {
         restored = true; applyRestore(); onRestore(bowl, tun.restoreRadius);
         try { localStorage.setItem(saveKey, '1'); } catch { /* play without persistence */ }
       }
-    },
-    restoreSaved(onRestore: (center: THREE.Vector3, radius: number) => void) {
-      if (restored) onRestore(bowl, tun.restoreRadius);
     },
     state() {
       const q = inlet?.inlets[0];

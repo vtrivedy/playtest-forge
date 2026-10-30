@@ -219,6 +219,7 @@ async function boot() {
     maskSize: 512,
   });
   colorField.initMask(renderer);
+  crown.init(renderer);
   colorField.groundAt = (x, z) => col.highestAt(x, z);
   // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
   const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75 };
@@ -396,7 +397,7 @@ async function boot() {
   const drainedAt = (q: THREE.Vector3) => colorDrains.some((f) => f(q));
   colorDrains.push(shades.drains);
   const supplyAt = (q: THREE.Vector3) => {
-    if (!drainedAt(q)) return colorField.sample(q);
+    if (!drainedAt(q)) return crown.contains(q) ? crown.supplyAt(q) : colorField.sample(q);
     return colorField.strokeAt(q) > 1 ? 1 : 0;
   };
   const shadeContact = new ShadeContact();
@@ -404,7 +405,7 @@ async function boot() {
   const wind = createWind(scene, world.windSpots, { gui });
   const windF: WindForce = { k: 0, tx: 0, ty: 0, tz: 0, px: 0, py: 0, pz: 0 };
   crown.attach(updrafts, wind, gui);
-  crown.restoreSaved((p, r) => colorField.restore(p, r, 0.05));
+
   const water = createWater(scene, world.collision, gui);
   world.waterWashedAt = water.washedAt;
   world.waterInkAt = water.inkAt;
@@ -1384,6 +1385,7 @@ async function boot() {
     }
     colorField.update(dt);
     if (colorField.globalColor >= 0.99) water.restoreAll();
+    crown.sync(dt, colorField);
     water.update(dt, simClock, supplyAt, drainedAt);
     updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     wind.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
@@ -1403,7 +1405,6 @@ async function boot() {
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
     crown.update(dt, (p, r) => {
-      colorField.restore(p, r, 3.2);
       autumnFX.swirl(p, 40, 1.6);
       audio.play('shrine');
       hud.setPrompt('The crown breathes · follow the leaves home');
