@@ -158,3 +158,8 @@ latches/restoration or bypasses a failed move. Regional success means reaching M
 with no assists/deaths, not winning the realm. The default full route remains an
 unassisted restoration test. This lets level streams review later regions while
 earlier crossings are under repair, without hiding those failures.
+
+Flume encounter placement correction: patrol along a narrow return loop sampled
+from the real Reed Falls channel, preserving its authored height. A grounding
+query may adjust feet only to a nearby surface, never to the valley floor below
+an elevated aqueduct. Keep the brief's 2.2 m/s patrol speed.

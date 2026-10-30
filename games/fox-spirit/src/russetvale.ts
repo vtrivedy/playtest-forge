@@ -1782,7 +1782,17 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x: p.x + 2.2, z: p.z + 1.7, w: 3.2, d: 3.2, top: 34, bottom: 33.3, round: true, rough: 0.35, seed: 367, topColor: PAL.stone });
   }
   // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
-  shadeSpots.push({ id: 'shade-flume', speed: 1.1, patrol: [[102, 4.7, 24], [98, 4.5, 26], [96, 0, 29], [104, 0, 30]] });
+  {
+    const channel = new THREE.CatmullRomCurve3([[100, 6, 18], [104, 5.2, 22.7627], [94, 4, 23.7627], [92, 3.2, 17], [95, 2.3, 10]].map(p => new THREE.Vector3(...p as [number, number, number])), false, 'centripetal');
+    const patrol: ShadeSpot['patrol'] = [];
+    for (const side of [1, -1]) for (let j = 0; j <= 8; j++) {
+      const t = 0.25 + (side === 1 ? j : 8 - j) / 8 * 0.2;
+      const p = channel.getPoint(t), tangent = channel.getTangent(t);
+      p.x += tangent.z * 0.12 * side; p.z -= tangent.x * 0.12 * side;
+      patrol.push([p.x, p.y, p.z]);
+    }
+    shadeSpots.push({ id: 'shade-flume', patrol });
+  }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 

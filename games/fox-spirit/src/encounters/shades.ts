@@ -281,7 +281,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           s.heading = Math.atan2(tmp.x, tmp.z);
           // drift: a slow bob, as if the ink were suspended in water
           const gy = groundAt(s.pos.x, s.pos.z, s.pos.y + 2);
-          if (Number.isFinite(gy)) s.pos.y = gy;
+          if (Number.isFinite(gy) && Math.abs(gy - s.pos.y) < 1) s.pos.y = gy;
           // Sweep the fox segment so a fast dash cannot skip a narrow animal between frames.
           // Teleport/reset hooks explicitly clear the previous endpoint.
           let nearest = fox;
