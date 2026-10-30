@@ -52,7 +52,9 @@ export async function captureReed({ H, advance, shot, video, save, page, fps, re
       if (st.pos[1] >= 15.7) change('aqueduct-landing', frame);
       else if (frame - phaseAt > 8 * fps) { failure = 'HP ride did not reach aqueduct'; finished = true; }
     } else if (!finished && phase === 'aqueduct-landing') {
-      keys = ['Space']; const aim = await steer(95.8, 19.8, st, 0.5); stick = aim.stick;
+      // Release glide to settle onto the nearby deck instead of hovering in
+      // HP's outer lift. The deck is less than two metres below the ride exit.
+      keys = []; const aim = await steer(95.8, 19.8, st, 0.5); stick = aim.stick;
       if (hpAirborne && st.grounded && st.pos[1] >= 14.8) change('falls-lip', frame);
       else if (frame - phaseAt > 6 * fps) { failure = 'could not land on aqueduct'; finished = true; }
     } else if (!finished && phase === 'falls-lip') {
