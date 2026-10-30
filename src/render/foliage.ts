@@ -20,7 +20,8 @@ function buildBladeGeometry(height = 0.48, baseW = 0.042, tipW = 0.003, segs = 8
     for (let i = 0; i <= segs; i++) {
       const v = i / segs;
       const w = THREE.MathUtils.lerp(baseW, tipW, Math.pow(v, 1.35));
-      const lean = Math.sin(v * Math.PI * 0.7) * 0.15 + v * v * 0.06;
+      // Nearly straight — slight tip sway only (was banana/claw curl)
+      const lean = Math.sin(v * Math.PI * 0.5) * 0.025 + v * v * 0.012;
       const y = v * height;
       const lx0 = -w * 0.5 + lean;
       const lx1 = w * 0.5 + lean;
@@ -60,6 +61,8 @@ export function createWindGrass(
     bladeHeight?: number;
     bladeBaseW?: number;
     bladeTipW?: number;
+    /** Clear grass near |x| < this (path corridor), metres */
+    pathClearHalfW?: number;
     ySampler?: (x: number, z: number) => number;
   } = {},
 ): WindFoliage {
@@ -67,13 +70,14 @@ export function createWindGrass(
   const radius = opts.radius ?? 10;
   const center = opts.center ?? new THREE.Vector3();
   const ySampler = opts.ySampler ?? (() => 0);
+  const pathClear = opts.pathClearHalfW ?? 0;
 
-  // Wider blades so density reads as a carpet, not pin stakes
+  // Fine straight blades; path cleared, denser toward rim
   const geo = buildBladeGeometry(
-    opts.bladeHeight ?? 0.32,
-    opts.bladeBaseW ?? 0.09,
-    opts.bladeTipW ?? 0.01,
-    8,
+    opts.bladeHeight ?? 0.22,
+    opts.bladeBaseW ?? 0.028,
+    opts.bladeTipW ?? 0.004,
+    6,
   );
 
   const mat2 = new THREE.ShaderMaterial({
@@ -156,20 +160,29 @@ export function createWindGrass(
   const dummy = new THREE.Object3D();
   let placed = 0;
   // denser near center, thinner at rim
-  for (let i = 0; i < count * 4 && placed < count; i++) {
+  for (let i = 0; i < count * 5 && placed < count; i++) {
     const a = Math.random() * Math.PI * 2;
-    const r = Math.pow(Math.random(), 0.65) * radius;
+    // Bias toward edges (pow < 1 clusters center; pow > 1 pushes rim)
+    const r = Math.pow(Math.random(), 0.45) * radius;
     const x = center.x + Math.cos(a) * r;
     const z = center.z + Math.sin(a) * r;
+    if (pathClear > 0 && Math.abs(x - center.x) < pathClear && Math.abs(z - center.z) < radius * 0.85) {
+      // keep path sparse: only ~8% chance of a short tuft
+      if (Math.random() > 0.08) continue;
+    }
     const y = ySampler(x, z);
     if (y < -0.2) continue;
     dummy.position.set(x, y, z);
     dummy.rotation.y = Math.random() * Math.PI * 2;
-    // slight lean variety
-    dummy.rotation.x = (Math.random() - 0.5) * 0.15;
-    dummy.rotation.z = (Math.random() - 0.5) * 0.12;
-    const sx = 1.0 + Math.random() * 0.7;
-    const sy = 0.7 + Math.random() * 0.45; // ankle–knee, never torso
+    // Clump lean variety — small, not claw curls
+    dummy.rotation.x = (Math.random() - 0.5) * 0.08;
+    dummy.rotation.z = (Math.random() - 0.5) * 0.1;
+    const sx = 0.75 + Math.random() * 0.55;
+    // Varied height clumps: short path tufts vs taller edge grass
+    const onPath = pathClear > 0 && Math.abs(x - center.x) < pathClear * 1.4;
+    const sy = onPath
+      ? 0.35 + Math.random() * 0.35
+      : 0.55 + Math.random() * 0.7;
     dummy.scale.set(sx, sy, sx);
     dummy.updateMatrix();
     mesh.setMatrixAt(placed++, dummy.matrix);

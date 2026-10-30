@@ -85,6 +85,31 @@ async function boot() {
   foxActor.group.position.copy(world.spawnPos);
   foxActor.group.position.y += foxActor.feetOffset;
 
+  // Soft contact shadow — grounds the hero without relying on shadow maps alone
+  const contactShadow = (() => {
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 128;
+    const ctx = c.getContext('2d')!;
+    const g = ctx.createRadialGradient(64, 64, 8, 64, 64, 60);
+    g.addColorStop(0, 'rgba(40,20,10,0.55)');
+    g.addColorStop(0.45, 'rgba(40,20,10,0.22)');
+    g.addColorStop(1, 'rgba(40,20,10,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 128, 128);
+    const tex = new THREE.CanvasTexture(c);
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.85,
+    });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.renderOrder = 1;
+    scene.add(mesh);
+    return mesh;
+  })();
+
   const cam = createFollowCamera({
     fov: 48,
     distance: 3.2,
@@ -181,6 +206,10 @@ async function boot() {
   let gliding = false;
   let shrineOn = false;
   let fxEnabled = true;
+  let turntableMode = false;
+  let turntableYaw = 0;
+  let turntableAnim: import('./fox').FoxAnimState = 'idle';
+
   let embersGot = 0;
   let elapsed = 0;
   let status: 'playing' | 'won' = 'playing';
@@ -200,6 +229,10 @@ async function boot() {
       forceRestore: () => void;
       setFxEnabled: (on: boolean) => void;
       getFoxPos: () => { x: number; y: number; z: number };
+      getAnim: () => string;
+      hasClips: boolean;
+      runTurntable: (opts?: { anim?: string; fx?: boolean }) => void;
+      stopTurntable: () => void;
     };
   };
   win.__gameHooks = {
@@ -224,6 +257,25 @@ async function boot() {
     getFoxPos() {
       const p = foxActor.group.position;
       return { x: p.x, y: p.y, z: p.z };
+    },
+    getAnim() {
+      return foxActor.getAnim();
+    },
+    hasClips: foxActor.hasClips,
+    runTurntable(opts) {
+      turntableMode = true;
+      turntableYaw = 0;
+      turntableAnim = (opts?.anim as import('./fox').FoxAnimState) || 'idle';
+      if (opts?.fx === false) {
+        fxEnabled = false;
+        post.bloom.strength = 0;
+        wisps.points.visible = false;
+        emberTrail.points.visible = false;
+      }
+      foxActor.setAnim(turntableAnim);
+    },
+    stopTurntable() {
+      turntableMode = false;
     },
   };
 
@@ -274,6 +326,34 @@ async function boot() {
     jumpFeel.sampleJumpEdge(spaceDown, dt, feel.jumpBuffer);
 
     const fox = foxActor.group;
+    if (turntableMode) {
+      turntableYaw += dt * 0.7;
+      // Open meadow south of shrine — clear of grass carpet for silhouette judgment
+      const tx = 0;
+      const tz = 10;
+      fox.position.set(tx, world.yAt(tx, tz) + foxActor.feetOffset, tz);
+      fox.rotation.y = turntableYaw; // model spins; camera fixed (classic turntable)
+      vel.set(0, 0, 0);
+      foxActor.setAnim(turntableAnim);
+      foxActor.update(dt, elapsed, turntableAnim === 'glide');
+      const orbitR = 3.6;
+      const orbitH = 1.25;
+      // Camera south of fox, looking north — same gameplay angle as concept profile
+      cam.camera.position.set(tx, fox.position.y + orbitH, tz + orbitR);
+      cam.camera.lookAt(tx, fox.position.y + 0.4, tz);
+      {
+        const gyShadow = world.yAt(tx, tz);
+        contactShadow.position.set(tx, gyShadow + 0.03, tz);
+        contactShadow.scale.set(1, 1, 1);
+        (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
+      }
+      world.setGrassSat(0.15);
+      sky.update(dt);
+      post.render();
+      requestAnimationFrame(tick);
+      return;
+    }
+
     const gy = world.yAt(fox.position.x, fox.position.z);
     const onIsland = gy > -0.5;
     const feetY = fox.position.y - foxActor.feetOffset;
@@ -352,7 +432,25 @@ async function boot() {
     }
     if (fox.position.y < -8) respawn();
 
-    foxActor.updateTail(elapsed, gliding);
+    // Animation state from locomotion
+    {
+      const speed = Math.hypot(vel.x, vel.z);
+      let anim: import('./fox').FoxAnimState = 'idle';
+      if (!grounded) {
+        if (gliding) anim = 'glide';
+        else if (vel.y > 0.6) anim = 'jump_up';
+        else if (vel.y > -0.4) anim = 'jump_apex';
+        else anim = 'jump_fall';
+      } else if (dashT > 0) {
+        anim = 'dash';
+      } else if (speed > 1.2) {
+        anim = 'run';
+      } else {
+        anim = 'idle';
+      }
+      foxActor.setAnim(anim);
+      foxActor.update(dt, elapsed, gliding);
+    }
 
     // Color field
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
@@ -409,6 +507,14 @@ async function boot() {
     restore.update(dt);
     world.update(dt, elapsed, fox.position);
 
+    {
+      const gyShadow = world.yAt(fox.position.x, fox.position.z);
+      contactShadow.position.set(fox.position.x, gyShadow + 0.03, fox.position.z);
+      const air = Math.max(0, fox.position.y - foxActor.feetOffset - gyShadow);
+      const k = Math.max(0.15, 1 - air * 0.35);
+      contactShadow.scale.set(k, k, 1);
+      (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.85 * k;
+    }
     cam.update(dt, fox.position, fox.rotation.y, { lookAhead: grounded ? 1.4 : 0.6 });
     audio.update(dt, speed > 1.2, grounded, gliding);
 

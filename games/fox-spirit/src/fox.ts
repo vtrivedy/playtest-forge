@@ -1,92 +1,146 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+export type FoxAnimState =
+  | 'idle'
+  | 'run'
+  | 'jump_up'
+  | 'jump_apex'
+  | 'jump_fall'
+  | 'land'
+  | 'glide'
+  | 'dash'
+  | 'burst';
+
 export type FoxActor = {
   group: THREE.Group;
   /** Approximate feet offset below group origin */
   feetOffset: number;
+  /** World-space height of the scaled mesh (for camera / shadows) */
+  height: number;
   setFacing: (yaw: number) => void;
   squash: (x: number, y: number, z: number) => void;
   relaxScale: (dt: number) => void;
-  updateTail: (t: number, gliding: boolean) => void;
+  /** Advance mixer + secondary motion. Call every frame. */
+  update: (dt: number, t: number, gliding: boolean) => void;
+  /** Crossfade to a named clip (must exist on the GLB). */
+  setAnim: (name: FoxAnimState, fadeS?: number) => void;
+  /** Currently playing clip name (best-effort). */
+  getAnim: () => string;
+  /** True when GLB clips are driving the skeleton. */
+  hasClips: boolean;
 };
+
+function tuneMaterials(root: THREE.Object3D) {
+  root.traverse((c) => {
+    if (!(c as THREE.Mesh).isMesh) return;
+    const mesh = c as THREE.Mesh;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    const mats = mesh.material;
+    const list = Array.isArray(mats) ? mats : mats ? [mats] : [];
+    for (const raw of list) {
+      const mat = raw as THREE.MeshStandardMaterial;
+      if (!mat?.isMeshStandardMaterial) continue;
+      const n = (mat.name || mesh.name || '').toLowerCase();
+
+      if (n.includes('embertail') || (n.includes('ember') && n.includes('tail')) || n === 'embertail') {
+        // Big bushy ember tip — glow, but not a bloom orb
+        mat.color.setHex(0xffffff); // respect authored tail_col map
+        mat.emissive = new THREE.Color(0xff6a22);
+        mat.emissiveIntensity = 0.55;
+        mat.roughness = 0.45;
+        mat.transparent = true;
+        mat.opacity = 0.95;
+        mat.depthWrite = true;
+        mat.toneMapped = true;
+      } else if (n.includes('emberwisp') || n.includes('wisp') || n.includes('fur tuft') || n === 'furtufts') {
+        mat.color.setHex(0xffffff);
+        mat.emissive = new THREE.Color(0xff5520);
+        mat.emissiveIntensity = 0.35;
+        mat.transparent = true;
+        mat.opacity = 0.9;
+        mat.toneMapped = true;
+      } else if (n.includes('eye')) {
+        mat.color.setHex(0xffffff);
+        mat.emissive = new THREE.Color(0xffe08a);
+        mat.emissiveIntensity = Math.min(mat.emissiveIntensity || 0.5, 0.65);
+      } else if (n.includes('nose')) {
+        mat.color.setHex(0xffffff);
+        if (mat.emissive) mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 0;
+      } else if (n.includes('foxfur') || n.includes('fur') || n === 'cube') {
+        // Keep fox_fur_col texture (russet + white belly + black socks). Only gentle warm tint.
+        mat.color.setHex(0xffe0c8);
+        mat.roughness = 0.62;
+        if (mat.emissive) mat.emissive.setHex(0x000000);
+        mat.emissiveIntensity = 0;
+        mat.map && (mat.map.colorSpace = THREE.SRGBColorSpace);
+      } else {
+        // Unknown: don't nuke albedo maps
+        if (mat.map) {
+          mat.color.setHex(0xffffff);
+          mat.map.colorSpace = THREE.SRGBColorSpace;
+        }
+        if (mat.emissive && mat.emissiveIntensity > 0.8) {
+          mat.emissiveIntensity = 0.4;
+        }
+      }
+    }
+  });
+}
 
 function proceduralFox(): FoxActor {
   const group = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: 0xc45a1a,
-    emissive: 0x000000,
-    emissiveIntensity: 0,
-    roughness: 0.55,
-  });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xc45a1a, roughness: 0.55 });
   const bellyMat = new THREE.MeshStandardMaterial({ color: 0xf0e2cc, roughness: 0.65 });
   const sockMat = new THREE.MeshStandardMaterial({ color: 0x2a1c14, roughness: 0.7 });
   const emberMat = new THREE.MeshStandardMaterial({
     color: 0xff6a1a,
     emissive: 0xff3a00,
-    emissiveIntensity: 1.1,
+    emissiveIntensity: 0.7,
     roughness: 0.25,
   });
-  const flameMat = new THREE.MeshStandardMaterial({
-    color: 0xff8a2a,
-    emissive: 0xff5500,
-    emissiveIntensity: 0.9,
-    roughness: 0.3,
-    transparent: true,
-    opacity: 0.92,
-  });
 
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.22, 0.5, 6, 12), bodyMat);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.18, 0.55, 6, 12), bodyMat);
   body.rotation.z = Math.PI / 2;
   body.castShadow = true;
-  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), bellyMat);
-  belly.position.set(0.02, -0.08, 0.08);
-  belly.scale.set(1.1, 0.85, 1.2);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 14), bodyMat);
-  head.position.set(0.4, 0.1, 0);
-  head.scale.set(1.05, 0.95, 0.9);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 12), bellyMat);
+  belly.position.set(0.02, -0.08, 0.06);
+  belly.scale.set(1.15, 0.8, 1.25);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 14, 14), bodyMat);
+  head.position.set(0.42, 0.12, 0);
+  head.scale.set(1.0, 0.9, 0.85);
   head.castShadow = true;
-  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 6), bellyMat);
+  const snout = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.2, 6), bellyMat);
   snout.rotation.z = -Math.PI / 2;
-  snout.position.set(0.55, 0.05, 0);
-  const earL = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 5), bodyMat);
-  earL.position.set(0.38, 0.3, 0.08);
-  earL.rotation.x = -0.25;
+  snout.position.set(0.58, 0.08, 0);
+  const earL = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.22, 5), bodyMat);
+  earL.position.set(0.38, 0.32, 0.07);
   const earR = earL.clone();
-  earR.position.z = -0.08;
-  const emberL = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), emberMat);
-  emberL.position.set(0.38, 0.4, 0.08);
-  const emberR = emberL.clone();
-  emberR.position.z = -0.08;
-  const legFL = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.14, 3, 6), sockMat);
-  legFL.position.set(0.18, -0.28, 0.1);
+  earR.position.z = -0.07;
+  const legFL = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.22, 3, 6), sockMat);
+  legFL.position.set(0.2, -0.32, 0.09);
   const legFR = legFL.clone();
-  legFR.position.z = -0.1;
+  legFR.position.z = -0.09;
   const legBL = legFL.clone();
-  legBL.position.set(-0.18, -0.28, 0.1);
+  legBL.position.set(-0.2, -0.32, 0.09);
   const legBR = legFL.clone();
-  legBR.position.set(-0.18, -0.28, -0.1);
-  const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.55, 5, 10), bodyMat);
-  tail.position.set(-0.5, 0.12, 0);
-  tail.rotation.z = 0.55;
-  tail.name = 'tail';
-  const tailFlame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.55, 7), flameMat);
-  tailFlame.position.set(-0.85, 0.35, 0);
-  tailFlame.rotation.z = 2.4;
-  tailFlame.name = 'tailFlame';
-  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), emberMat);
-  tip.position.set(-1.0, 0.48, 0);
-  group.add(
-    body, belly, head, snout, earL, earR, emberL, emberR,
-    legFL, legFR, legBL, legBR, tail, tailFlame, tip,
-  );
-  const foxLight = new THREE.PointLight(0xff6622, 0.22, 3.2);
-  foxLight.position.set(-0.85, 0.45, 0);
-  group.add(foxLight);
+  legBR.position.set(-0.2, -0.32, -0.09);
+  const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.7, 5, 10), bodyMat);
+  tail.position.set(-0.55, 0.15, 0);
+  tail.rotation.z = 0.7;
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), emberMat);
+  tip.position.set(-1.05, 0.55, 0);
+  group.add(body, belly, head, snout, earL, earR, legFL, legFR, legBL, legBR, tail, tip);
 
+  let anim = 'idle';
+  const feetOffset = 0.38;
   return {
     group,
-    feetOffset: 0.35,
+    feetOffset,
+    height: 0.7,
+    hasClips: false,
     setFacing(yaw) {
       group.rotation.y = yaw;
     },
@@ -98,9 +152,19 @@ function proceduralFox(): FoxActor {
       group.scale.y += (1 - group.scale.y) * Math.min(1, 12 * dt);
       group.scale.z += (1 - group.scale.z) * Math.min(1, 12 * dt);
     },
-    updateTail(t, gliding) {
-      tail.rotation.z = 0.55 + Math.sin(t * 3.2) * 0.12 + (gliding ? 0.2 : 0);
-      tailFlame.rotation.z = 2.4 + Math.sin(t * 5.0) * 0.15;
+    update(_dt, t, gliding) {
+      tail.rotation.z = 0.7 + Math.sin(t * 3.2) * 0.12 + (gliding ? 0.2 : 0);
+      const gait = Math.sin(t * 10);
+      legFL.rotation.x = gait * 0.55;
+      legBR.rotation.x = gait * 0.55;
+      legFR.rotation.x = -gait * 0.55;
+      legBL.rotation.x = -gait * 0.55;
+    },
+    setAnim(name) {
+      anim = name;
+    },
+    getAnim() {
+      return anim;
     },
   };
 }
@@ -110,85 +174,84 @@ export async function createFox(): Promise<FoxActor> {
   try {
     const gltf = await new GLTFLoader().loadAsync('/assets/hero/spirit_fox.glb');
     const root = gltf.scene;
-    // Orient: many Blender exports face +Y or -Z; normalize to +Z forward, Y up
-    root.traverse((c) => {
-      if ((c as THREE.Mesh).isMesh) {
-        c.castShadow = true;
-        c.receiveShadow = true;
-        const mats = (c as THREE.Mesh).material;
-        const list = Array.isArray(mats) ? mats : mats ? [mats] : [];
-        for (const raw of list) {
-          const mat = raw as THREE.MeshStandardMaterial;
-          if (!mat || !mat.isMeshStandardMaterial) continue;
-          const n = (mat.name || c.name || '').toLowerCase();
-          // Emission only on ember tips / wisps — body stays lit by scene, not bloom-orb
-          if (n.includes('ember') || n.includes('wisp') || n.includes('flame') || n.includes('tip') || n.includes('tail')) {
-            mat.color.setHex(0xff8a30);
-            mat.emissive = new THREE.Color(0xff4a10);
-            mat.emissiveIntensity = 0.28;
-            mat.toneMapped = true;
-          } else if (n.includes('eye')) {
-            mat.emissiveIntensity = Math.min(mat.emissiveIntensity ?? 0.3, 0.4);
-          } else if (n.includes('belly') || n.includes('chest') || n.includes('under') || n.includes('sock') || n.includes('white') || n.includes('cream')) {
-            // Cream underbelly for silhouette contrast vs parchment ground
-            mat.color.setHex(0xf5e6d0);
-            mat.roughness = 0.62;
-            if (mat.emissive) mat.emissive.setHex(0x000000);
-            mat.emissiveIntensity = 0;
-          } else if (n.includes('fur') || n.includes('body') || n.includes('fox') || n.includes('skin') || n.includes('coat')) {
-            // Bright russet — high value so hero separates from ground
-            mat.color.setHex(0xe06028);
-            mat.roughness = 0.55;
-            mat.emissive = new THREE.Color(0x4a1808);
-            mat.emissiveIntensity = 0.08; // tiny fill so dark side isn't a mud blob
-          } else {
-            // Default body: lift dark GLB albedo into readable russet
-            const c0 = mat.color;
-            const lum = 0.2126 * c0.r + 0.7152 * c0.g + 0.0722 * c0.b;
-            if (lum < 0.35) {
-              mat.color.setHex(0xd45822);
-              mat.roughness = Math.min(mat.roughness ?? 0.7, 0.6);
-            }
-            if (mat.emissive) mat.emissive.setHex(0x000000);
-            mat.emissiveIntensity = 0;
-          }
-        }
-      }
-    });
-    const box = new THREE.Box3().setFromObject(root);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const targetLen = 3.0; // ~1.6× — trailer mid-frame fill
-    const s = targetLen / Math.max(size.x, size.y, size.z, 0.001);
+    tuneMaterials(root);
+
+    // Scale by height so the slender quadruped proportions stay — not max-axis (was puffing width)
+    const box0 = new THREE.Box3().setFromObject(root);
+    const size0 = new THREE.Vector3();
+    box0.getSize(size0);
+    const targetHeight = 1.05; // ~keyart fox at gameplay scale
+    const s = targetHeight / Math.max(size0.y, 0.001);
     root.scale.setScalar(s);
-    box.setFromObject(root);
+
+    const box = new THREE.Box3().setFromObject(root);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    root.position.sub(center);
-    root.position.y -= box.min.y; // feet on origin
+    root.position.x -= center.x;
+    root.position.z -= center.z;
+    root.position.y -= box.min.y;
+
     const group = new THREE.Group();
     group.add(root);
-    // Soft tip glow only — never wrap the whole body in bloom
-    const foxLight = new THREE.PointLight(0xff8844, 0.55, 5.5);
-    foxLight.position.set(0.15, 0.7, 0.35); // soft key on body + rim toward camera
+
+    // Soft key — low intensity so silhouette still reads with FX off
+    const foxLight = new THREE.PointLight(0xff8844, 0.35, 4.5);
+    foxLight.position.set(0.2, 0.55, 0.4);
     group.add(foxLight);
-    const feetOffset = 0.02;
+
+    const mixer = new THREE.AnimationMixer(root);
+    const actions = new Map<string, THREE.AnimationAction>();
+    for (const clip of gltf.animations) {
+      const act = mixer.clipAction(clip);
+      act.enabled = true;
+      // Loop continuous states; one-shots clamp
+      const once = /jump_|land|burst|dash/.test(clip.name);
+      act.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
+      if (once) act.clampWhenFinished = true;
+      actions.set(clip.name, act);
+    }
+
+    let current = '';
+    const play = (name: string, fade = 0.18) => {
+      if (!actions.has(name)) return;
+      if (current === name) return;
+      const next = actions.get(name)!;
+      const prev = current ? actions.get(current) : undefined;
+      next.reset().fadeIn(fade).play();
+      prev?.fadeOut(fade);
+      current = name;
+    };
+
+    // Prefer idle bind if present so legs aren't frozen mid-clip before first update
+    if (actions.has('idle')) play('idle', 0);
+    else if (actions.has('run')) play('run', 0);
+
+    const height = targetHeight;
     return {
       group,
-      feetOffset,
+      feetOffset: 0.02,
+      height,
+      hasClips: actions.size > 0,
       setFacing(yaw) {
         group.rotation.y = yaw;
       },
       squash(x, y, z) {
-        group.scale.set(x, y, z);
+        // Don't squash the skinned mesh (destroys silhouette) — pulse light instead
+        foxLight.intensity = 0.35 * y;
+        void x;
+        void z;
       },
       relaxScale(dt) {
-        group.scale.x += (1 - group.scale.x) * Math.min(1, 12 * dt);
-        group.scale.y += (1 - group.scale.y) * Math.min(1, 12 * dt);
-        group.scale.z += (1 - group.scale.z) * Math.min(1, 12 * dt);
+        foxLight.intensity += (0.35 - foxLight.intensity) * Math.min(1, 8 * dt);
       },
-      updateTail(t, _gliding) {
-        root.rotation.z = Math.sin(t * 2.5) * 0.03;
+      update(dt, _t, _gliding) {
+        mixer.update(dt);
+      },
+      setAnim(name, fadeS = 0.18) {
+        play(name, fadeS);
+      },
+      getAnim() {
+        return current || 'none';
       },
     };
   } catch (err) {
