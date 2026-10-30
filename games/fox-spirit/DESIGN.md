@@ -265,3 +265,5 @@ attempt, preventing mixed sheets. Verify durable success against route interval,
 size/fps, and matching report/tool hashes. Order route evidence chronologically
 with endpoint last and state labels. Save structured route acceptance with an
 explicit stall/budget/death/assist reason. Existing play failures remain failures.
+
+World showcase review: settle the real gameplay camera for300ms while stationary at each disclosed cut; use slightly closer default chase framing (3.8m,1.5m height) so the creature stays readable through scenery. Add a small impact/brake head nod and pelvis-load tail lift, leaving FOX-owned tail appearance intact. Expose look and load spring tunables.

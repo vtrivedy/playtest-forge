@@ -401,7 +401,7 @@ try {
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
       if(segment.turn){const angle=local/fps*2;stick=[(tn[0]*Math.cos(angle)+td[0]*Math.sin(angle))*.45,(tn[1]*Math.cos(angle)+td[1]*Math.sin(angle))*.45];}
-      if(local===0 && segment.reset){const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...segment.reset,yaw);await H('photoOff');}
+      if(local===0 && segment.reset){const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...segment.reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
       await H('setStick',...stick);
       await H('setKeys',segment.jump && local<Math.round(.25*fps)?['Space']:[]);
     },undefined,{traceEveryFrame:true,keyFrames});

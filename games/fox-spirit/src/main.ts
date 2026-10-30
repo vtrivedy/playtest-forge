@@ -312,6 +312,11 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
+    folder.add(params,'headLead',0,.5,.01);
+    folder.add(params,'headFrequency',1,6,.1);
+    folder.add(params,'headDamping',.4,1.5,.05);
+    folder.add(params,'headStabilize',0,1,.05);
+    folder.add(params,'tailLoad',0,.4,.01);
     folder.add(params,'brakeSquat',0,.08,.002);
     folder.add(params,'brakePitch',0,.2,.005);
     folder.add(params,'landSquash',0,.2,.005);

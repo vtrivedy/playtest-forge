@@ -104,10 +104,10 @@ export function createFollowCamera(opts: {
   params?: Partial<CameraTunables>;
 } = {}): FollowCamera {
   const params: CameraTunables = {
-    distance: 4.6,
-    height: 1.75,
+    distance: 3.8,
+    height: 1.5,
     lookHeight: 0.62,
-    airDistance: 5.4,
+    airDistance: 4.8,
     glideDistance: 6.4,
     fov: 54,
     runFov: 3,
