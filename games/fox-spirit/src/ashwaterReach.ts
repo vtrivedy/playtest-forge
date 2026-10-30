@@ -4,7 +4,7 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { createColorField } from '../../../src/render';
 import { boxCollider } from './collision';
 import type { Realm } from './russetvale';
-import { Bucket, PAL, rockSlab, stairFlight, ruinArch, stoneBlock, trs, kilnBowl, hangingRoot, rng } from './russetKit';
+import { Bucket, PAL, rockSlab, stairFlight, ruinArch, stoneBlock, trs, kilnBowl, hangingRoot, hangingSpire, rng } from './russetKit';
 import { waterSpots, type createWater } from './chem/water';
 import { createInlets } from './chem/inlet';
 import { loadNatureKit } from './russetNature';
@@ -28,6 +28,12 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   if (restored) fill = seal = 1;
   function shelf(x: number, y: number, z: number, w: number, d: number, seed: number) {
     rockSlab(rock, { x, z, top: y, bottom: y - 6, w, d, seed, rough: 0.45, topColor: PAL.stone, overhang: 0.5 });
+    // Existing walkable shelf, with a long eroded visual underside instead of a flat box.
+    for (let k = 0; k < (w > 25 ? 3 : 2); k++) {
+      const a = seed * 0.7 + k * 2.4;
+      hangingSpire(rock, x + Math.cos(a) * w * 0.14, y - 5.5, z + Math.sin(a) * d * 0.14,
+        Math.min(w, d) * (0.24 + k * 0.025), 19 + seed % 13 + k * 6, seed * 10 + k);
+    }
     col.add(boxCollider({ x, z, w: w - 0.4, d: d - 0.4, top: y, bottom: y - 6, tag: 'reach-stone' }));
   }
   function bridge(a: [number, number, number], b: [number, number, number], width: number, seed: number) {
@@ -42,6 +48,8 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     shelf(x,38,-90,9,9,920+x);
     ruinArch(stone,x,38,-90,Math.PI/2,{span:4.7,pillarH:3.2,broken:x===76?.45:0,seed:940+x});
   }
+  // The deck remains exactly where it was; ruined arches give its span a structural read.
+  for (const x of [58, 94, 130]) ruinArch(stone, x, 10.8, -90, 0, { span: 30, pillarH: 9, broken: x === 94 ? 0.18 : 0, seed: 4800 + x });
   shelf(150,38,-96,18,24,951);
   bridge([154,38,-102],[160,38,-108],3.4,952);
   bridge([160,38,-108],[174,30,-130],3.4,957);

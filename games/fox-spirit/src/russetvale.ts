@@ -2051,11 +2051,14 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       const yaw = lr() * Math.PI * 2;
       if (kind < 0.62) {
         // low leaf-carpet mounds (key art's creeper cover), not topiary puffballs
-        nature.place('bush_red', x, g - 0.1 * size, z, { yaw, scale: 0.6 + size * 0.9, squash: 0.35 + lr() * 0.25, hue, hue2: shrubHues[Math.floor(lr() * shrubHues.length)]!, cast: size > 0.8 });
+        const scale = 0.4 + size * 0.4;
+        const lowHue = PAL.leafBrown.clone().lerp(hue, 0.35 + lr() * 0.2);
+        nature.place('bush_red', x, g - 0.025, z, { yaw, scale, squash: 0.2 / (nature.height('bush_red') * scale),
+          gaps: 0.32, hue: lowHue, hue2: PAL.russet, cast: false });
       } else if (kind < 0.85) {
-        nature.place('fern', x, g - 0.05, z, { yaw, scale: 0.06 + size * 0.08, hue: BRACKEN[0], hue2: BRACKEN[1], cast: false });
+        nature.place('fern', x, g - 0.05, z, { yaw, scale: (0.14 + Math.min(size, 1.4) * 0.055) / nature.height('fern'), hue: BRACKEN[0], hue2: BRACKEN[1], cast: false });
       } else {
-        nature.place('grass_wispy', x, g - 0.05, z, { yaw, scale: 0.6 + size * 0.7, hue: TUSSOCK[0], hue2: TUSSOCK[1], cast: false });
+        nature.place('grass_wispy', x, g - 0.05, z, { yaw, scale: (0.16 + Math.min(size, 1.4) * 0.05) / nature.height('grass_wispy'), hue: TUSSOCK[0], hue2: TUSSOCK[1], cast: false });
       }
     };
     const placeShrub = (x: number, z: number, size: number) => {

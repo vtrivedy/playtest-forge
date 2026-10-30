@@ -4,7 +4,7 @@ import { createColorField } from '../../../src/render';
 import type { Realm } from './russetvale';
 import { boxCollider, cylCollider } from './collision';
 import { loadNatureKit } from './russetNature';
-import { Bucket, PAL, rockSlab, stairFlight, ruinArch, hearthBrazier, kilnBowl, stoneBlock, trs, hangingRoot, rng } from './russetKit';
+import { Bucket, PAL, rockSlab, stairFlight, ruinArch, hearthBrazier, kilnBowl, stoneBlock, trs, hangingRoot, hangingSpire, rng } from './russetKit';
 import { createInlets, heatFeeds } from './chem/inlet';
 import type { createUpdrafts } from './chem/updraft';
 import type { WindSystem } from './chem/wind';
@@ -32,6 +32,7 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
   // Broad, permanent shelves. No collision disappears when heat runs out.
   function shelf(x: number, z: number, y: number, w: number, d: number, seed: number) {
     rockSlab(rock, { x, z, top: y, bottom: y - 5.5, w, d, seed, rough: 0.4, topColor: PAL.stone, overhang: 0.7 });
+    hangingSpire(rock, x, y - 5.1, z, Math.min(w, d) * 0.38, 17 + seed % 11, seed * 10);
     col.add(boxCollider({ x, z, w: w - 0.6, d: d - 0.6, top: y, bottom: y - 5.5, tag: 'crown-shelf' }));
   }
   shelf(-33, -96, 24, 18, 17, 810);
