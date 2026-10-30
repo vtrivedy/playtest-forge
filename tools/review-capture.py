@@ -58,11 +58,19 @@ def main():
             if sheet:
                 print(sheet)
         return
-    # Pin once so branches moving during the review cannot produce mismatched shots.
-    sha = subprocess.check_output(['git', 'ls-remote', 'origin', args.ref], cwd=ROOT, text=True).split()
-    if not sha:
-        sha = [subprocess.check_output(['git', 'rev-parse', f'{args.ref}^{{commit}}'], cwd=ROOT, text=True).strip()]
-    ref = sha[0]
+    shots = args.shots.split(',')
+    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe'}:
+        parser.error('Unknown shot')
+    # Exact remote branch name; immutable SHA inputs are also accepted.
+    remote = subprocess.check_output(['git', 'ls-remote', '--heads', 'origin', f'refs/heads/{args.ref}'], cwd=ROOT, text=True).splitlines()
+    matches = [line.split()[0] for line in remote if line.split()[1] == f'refs/heads/{args.ref}']
+    if len(matches) == 1:
+        ref = matches[0]
+    elif re.fullmatch(r'[0-9a-fA-F]{40}', args.ref):
+        ref = args.ref
+    else:
+        ref = subprocess.check_output(['git', 'rev-parse', '--verify', f'{args.ref}^{{commit}}'], cwd=ROOT, text=True).strip()
+    print(f'Reviewing remote ref {args.ref} at immutable commit {ref}', flush=True)
     destination = args.out or Path('/workspace/siyu/playtest-forge-artifacts/sprint2/capture') / f"{re.sub(r'[^a-zA-Z0-9_.-]', '_', args.ref)}-{datetime.now():%Y%m%d-%H%M%S}"
     destination.mkdir(parents=True, exist_ok=True)
     (destination / 'review.json').write_text(json.dumps({'ref': args.ref, 'commit': ref, 'shots': args.shots}, indent=2))
@@ -74,13 +82,17 @@ def main():
         print(f'Starting {shot}: {folder}', flush=True)
         with (folder / 'modal.log').open('w') as log:
             result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
-        sheet = contact_sheet(folder)
+        sheet, sheet_error = None, None
+        try:
+            sheet = contact_sheet(folder)
+            metadata = json.loads((folder / 'run.json').read_text())
+            if metadata['commit'] != ref or metadata['shots'] != shot:
+                raise ValueError('Fetched capture belongs to a different commit or shot')
+        except Exception as error:
+            sheet_error = str(error)
         print(f"{shot}: exit={result.returncode}; sheet={sheet}; files={folder}", flush=True)
-        return {'shot': shot, 'exit': result.returncode, 'path': str(folder), 'sheet': str(sheet) if sheet else None}
+        return {'shot': shot, 'exit': result.returncode or (1 if sheet_error else 0), 'sheetError': sheet_error, 'path': str(folder), 'sheet': str(sheet) if sheet else None}
 
-    shots = args.shots.split(',')
-    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe'}:
-        parser.error('Unknown shot')
     with ThreadPoolExecutor(max_workers=min(3, len(shots))) as pool:
         results = list(pool.map(capture, shots))
     (destination / 'results.json').write_text(json.dumps(results, indent=2))
