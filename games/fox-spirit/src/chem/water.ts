@@ -13,7 +13,7 @@ export const waterSpots: WaterSpot[] = [{
   path: [new THREE.Vector3(57, 0, 36), new THREE.Vector3(62.034, 0, 32.736)], width: 2.2, wash: true,
 }, {
   id: 'reed-falls', lip: new THREE.Vector3(100, 15, 18), foot: new THREE.Vector3(100, 10, 18), width: 1.8,
-  probes: [new THREE.Vector3(100, 15, 18), new THREE.Vector3(100, 12.5, 18), new THREE.Vector3(100, 10, 18)],
+  probes: [new THREE.Vector3(100, 15, 18), new THREE.Vector3(100, 13.8, 18)],
   path: [[100, 6, 18], [104, 5.2, 22.7627], [94, 4, 23.7627], [92, 3.2, 17], [95, 2.3, 10]].map(p => new THREE.Vector3(p[0], p[1], p[2])),
 }, {
   id: 'pond-grotto', lip: new THREE.Vector3(-30, 3, 62), foot: new THREE.Vector3(-30, 0, 62), width: 2.4, channel: false, gate: true,

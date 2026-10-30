@@ -44,10 +44,13 @@ export function createReedmarshRegion(
   slab(92.5, 20, 3, 10, 9, 8.25, 921);
   slab(107.5, 20, 3, 10, 9, 8.25, 926);
   slab(100, 24, 12, 2, 9, 8.25, 927);
-  slab(100, 16, 12, 2, 9, 8.25, 928);
+  // Catch directly below the falls lip; leave HP and the stair approach open.
+  slab(100, 18, 4.2, 2.2, 9, 8.25, 928);
   slab(89, 20, 5, 10, 5, 4.25, 922);
   slab(111, 20, 5, 10, 5, 4.25, 923);
-  slab(100, 12.5, 18, 5, 5, 4.25, 924);
+  // Separate wings catch misses without roofing over the island or stair.
+  slab(91.5, 12.5, 3, 5, 5, 4.25, 924);
+  slab(105.5, 12.5, 7, 5, 5, 4.25, 929);
   slab(100, 27.5, 18, 5, 5, 4.25, 925);
   // Small, clear steps at the west edge let a caught fox return to HP y6.
   for (let i = 0; i < 8; i++) slab(90.5 + i * 0.55, 16.7, 1.1, 2, 5 + (i + 1) * 0.5, 4.5, 930 + i);
