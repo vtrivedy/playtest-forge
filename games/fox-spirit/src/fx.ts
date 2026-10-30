@@ -118,7 +118,7 @@ export function createEmberTrail(scene: THREE.Scene, count = 48): EmberTrail {
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const mat = new THREE.PointsMaterial({
-    size: 0.42,
+    size: 0.22,
     map: tex,
     vertexColors: true,
     transparent: true,
@@ -140,8 +140,8 @@ export function createEmberTrail(scene: THREE.Scene, count = 48): EmberTrail {
       t += dt;
       trail.push(fox.clone());
       if (trail.length > 28) trail.shift();
-      mat.opacity = 0.55 + intensity * 0.45;
-      mat.size = 0.28 + intensity * 0.28;
+      mat.opacity = 0.35 + intensity * 0.3;
+      mat.size = 0.14 + intensity * 0.12;
       const pos = geo.getAttribute('position') as THREE.BufferAttribute;
       for (let i = 0; i < count; i++) {
         const ph = phases[i]!;

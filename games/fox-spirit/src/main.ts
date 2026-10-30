@@ -14,6 +14,8 @@ import {
   createPaintedSky,
   applyLookdevLights,
   applyHeightFog,
+  matchFogToSky,
+  createDistantLand,
   createFoxWisps,
   createAutumnParticles,
 } from '../../../src/render';
@@ -43,15 +45,33 @@ async function boot() {
   const { renderer, backend } = forge;
 
   const scene = new THREE.Scene();
-  applyLookdevLights(scene);
-  applyHeightFog(scene, { density: 0.012, color: new THREE.Color(0xd4c0a0) });
+  const lights = applyLookdevLights(scene);
+  // Low warm sun ahead-left of the shrine path (back-lights the north view, like key art)
+  const sunDir = new THREE.Vector3(-0.3, 0.17, -0.94).normalize();
+  lights.rim.position.copy(sunDir).multiplyScalar(20);
+  lights.rim.intensity = 0.8;
+  const fog = applyHeightFog(scene, { density: 0.0075 });
   const sky = createPaintedSky(scene, {
-    zenith: new THREE.Color(0xb89268),
-    horizon: new THREE.Color(0xe8d4b0),
-    nadir: new THREE.Color(0x6a5040),
-    sunColor: new THREE.Color(0xffd9a0),
-    cloudAmount: 0.72,
-    sunBloom: 0.3,
+    zenith: new THREE.Color(0x7f7aa6),
+    mid: new THREE.Color(0xe2a060),
+    horizon: new THREE.Color(0xf6c894),
+    nadir: new THREE.Color(0xb49a8a),
+    mist: new THREE.Color(0xe0c2a2),
+    sunDir,
+    sunColor: new THREE.Color(0xffc985),
+    sunSize: 0.035,
+    sunBloom: 0.32,
+    horizonGlow: 0.7,
+    godRays: 0.4,
+    mistHeight: 0.07,
+    cloudAmount: 0.6,
+  });
+  matchFogToSky(scene, fog, sky.params.mist);
+  const distant = createDistantLand(scene, {
+    silhouette: new THREE.Color(0x5e4a44),
+    haze: sky.params.mist,
+    sunDir,
+    sunColor: sky.params.sunColor,
   });
 
   const world = await createWorld(scene);
@@ -81,15 +101,15 @@ async function boot() {
   for (const m of world.materials) colorField.patchMaterial(m);
 
   const post = createPostStack(renderer, scene, cam.camera, {
-    bloomStrength: 0.22,
-    bloomThreshold: 0.9,
+    bloomStrength: 0.14,
+    bloomThreshold: 0.94,
     vignette: 0.34,
     grain: 0.06,
     enableGTAO: false,
   });
 
-  const wisps = createFoxWisps(scene, 24); // sparse orbital
-  const emberTrail = createEmberTrail(scene, 52);
+  const wisps = createFoxWisps(scene, 8); // tip-only drift, not body orb
+  const emberTrail = createEmberTrail(scene, 28);
   const autumnFX = createAutumnParticles(scene, 180, 110);
   const leafKick = createLeafKick(scene);
 
@@ -341,7 +361,9 @@ async function boot() {
     emberTrail.update(dt, fox.position, gliding ? 0.95 : shrineOn ? 0.8 : 0.45);
     autumnFX.update(dt);
     sky.update(dt);
-    world.setGrassSat(shrineOn ? 1 : colorField.sample(fox.position));
+    distant.update(dt);
+    // Grass stays sepia until restore; fox aura must NOT paint every blade yellow
+    world.setGrassSat(shrineOn ? 1 : Math.min(0.12, colorField.sample(fox.position) * 0.15));
 
     // Embers pickup
     for (const e of embers) {

@@ -25,11 +25,23 @@ export function createFoxWisps(scene: THREE.Scene, count = 56): FoxWisps {
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
+  const cnv = document.createElement('canvas');
+  cnv.width = 64; cnv.height = 64;
+  const ctx = cnv.getContext('2d')!;
+  const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(255,230,180,1)');
+  grd.addColorStop(0.35, 'rgba(255,140,40,0.7)');
+  grd.addColorStop(1, 'rgba(255,60,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, 64, 64);
+  const sprite = new THREE.CanvasTexture(cnv);
+  sprite.colorSpace = THREE.SRGBColorSpace;
   const mat = new THREE.PointsMaterial({
-    size: 0.16,
+    size: 0.11,
+    map: sprite,
     vertexColors: true,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.75,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
     sizeAttenuation: true,

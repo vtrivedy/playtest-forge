@@ -7,26 +7,33 @@ export type WindFoliage = {
   dispose: () => void;
 };
 
-/** Single curved, tapered grass blade (pivot at root). */
-function buildBladeGeometry(height = 0.62, baseW = 0.055, tipW = 0.006, segs = 7): THREE.BufferGeometry {
+/** Crossed pair of curved tapered blades (volume from every angle; pivot at root). */
+function buildBladeGeometry(height = 0.48, baseW = 0.042, tipW = 0.003, segs = 8): THREE.BufferGeometry {
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
 
-  for (let i = 0; i <= segs; i++) {
-    const v = i / segs;
-    // ease-out taper + slight S-curve lean in local X
-    const w = THREE.MathUtils.lerp(baseW, tipW, v * v * (3 - 2 * v));
-    const lean = Math.sin(v * Math.PI * 0.55) * 0.11 + v * v * 0.04;
-    const y = v * height;
-    positions.push(-w * 0.5 + lean, y, 0);
-    positions.push(w * 0.5 + lean, y, 0);
-    uvs.push(0, v, 1, v);
-    if (i < segs) {
-      const a = i * 2;
-      indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  const addStrip = (yaw: number) => {
+    const vBase = positions.length / 3;
+    const cy = Math.cos(yaw);
+    const sy = Math.sin(yaw);
+    for (let i = 0; i <= segs; i++) {
+      const v = i / segs;
+      const w = THREE.MathUtils.lerp(baseW, tipW, Math.pow(v, 1.35));
+      const lean = Math.sin(v * Math.PI * 0.7) * 0.15 + v * v * 0.06;
+      const y = v * height;
+      const lx0 = -w * 0.5 + lean;
+      const lx1 = w * 0.5 + lean;
+      positions.push(lx0 * cy, y, lx0 * sy, lx1 * cy, y, lx1 * sy);
+      uvs.push(0, v, 1, v);
+      if (i < segs) {
+        const a = vBase + i * 2;
+        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
     }
-  }
+  };
+  addStrip(0);
+  addStrip(Math.PI / 2);
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -58,17 +65,17 @@ export function createWindGrass(
   const center = opts.center ?? new THREE.Vector3();
   const ySampler = opts.ySampler ?? (() => 0);
 
-  const geo = buildBladeGeometry(0.58, 0.05, 0.005, 7);
+  const geo = buildBladeGeometry(0.42, 0.038, 0.0025, 8);
 
   const mat2 = new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
     depthWrite: true,
     uniforms: {
       uTime: { value: 0 },
-      uColor: { value: new THREE.Color(opts.color ?? 0xb8732a) },
-      uTip: { value: new THREE.Color(opts.tipColor ?? 0xe8b84a) },
-      uMono: { value: new THREE.Color(opts.monoColor ?? 0x7a684e) },
-      uTipMono: { value: new THREE.Color(opts.tipMono ?? 0xa89070) },
+      uColor: { value: new THREE.Color(opts.color ?? 0x8a5a28) },
+      uTip: { value: new THREE.Color(opts.tipColor ?? 0xc9a04a) },
+      uMono: { value: new THREE.Color(opts.monoColor ?? 0x5c4e3c) },
+      uTipMono: { value: new THREE.Color(opts.tipMono ?? 0x8a7a60) },
       uSat: { value: 0 },
       uPush: { value: new THREE.Vector3(9999, 0, 9999) },
       uPushR: { value: 1.15 },
@@ -82,9 +89,12 @@ export function createWindGrass(
       varying float vH;
       varying vec2 vUv;
       varying vec3 vWorld;
+      attribute vec3 instanceColor;
+      varying vec3 vInst;
       void main() {
         vH = uv.y;
         vUv = uv;
+        vInst = instanceColor;
         vec3 p = position;
         float h2 = vH * vH;
         float phase = instanceMatrix[3].x * 0.85 + instanceMatrix[3].z * 0.62;
@@ -114,16 +124,18 @@ export function createWindGrass(
       varying float vH;
       varying vec2 vUv;
       varying vec3 vWorld;
+      varying vec3 vInst;
       void main() {
         float sat = clamp(uSat, 0.0, 1.0);
         vec3 root = mix(uMono, uColor, sat);
         vec3 tip  = mix(uTipMono, uTip, sat);
-        vec3 col = mix(root, tip, smoothstep(0.12, 0.92, vH));
-        col *= 0.7 + vH * 0.5;
-        float edge = 1.0 - abs(vUv.x - 0.5) * 1.35;
-        col *= 0.82 + 0.18 * clamp(edge, 0.0, 1.0);
-        float tipFade = 1.0 - smoothstep(0.9, 1.0, vH) * 0.4;
-        if (tipFade < 0.15) discard;
+        vec3 col = mix(root, tip, smoothstep(0.08, 0.88, vH));
+        col *= vInst;
+        col *= 0.65 + vH * 0.55;
+        float edge = 1.0 - abs(vUv.x - 0.5) * 1.6;
+        col *= 0.78 + 0.22 * clamp(edge, 0.0, 1.0);
+        // soft tip / root alpha discard so cards don't read as cards
+        if (vH < 0.02 || (vH > 0.93 && edge < 0.35)) discard;
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
@@ -155,6 +167,18 @@ export function createWindGrass(
   }
   mesh.count = placed;
   mesh.instanceMatrix.needsUpdate = true;
+  // per-blade warm/cool variance (multiplies tip/root in shader via instanceColor)
+  if (placed > 0) {
+    const ic = new Float32Array(placed * 3);
+    for (let i = 0; i < placed; i++) {
+      const warm = 0.85 + Math.random() * 0.25;
+      const cool = 0.9 + Math.random() * 0.12;
+      ic[i * 3] = warm;
+      ic[i * 3 + 1] = cool;
+      ic[i * 3 + 2] = 0.8 + Math.random() * 0.2;
+    }
+    mesh.instanceColor = new THREE.InstancedBufferAttribute(ic, 3);
+  }
   scene.add(mesh);
 
   const pushTmp = new THREE.Vector3(9999, 0, 9999);
