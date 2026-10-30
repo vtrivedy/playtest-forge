@@ -65,7 +65,7 @@ export function createWindGrass(
   const center = opts.center ?? new THREE.Vector3();
   const ySampler = opts.ySampler ?? (() => 0);
 
-  const geo = buildBladeGeometry(0.42, 0.038, 0.0025, 8);
+  const geo = buildBladeGeometry(0.55, 0.045, 0.003, 8);
 
   const mat2 = new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
@@ -74,8 +74,8 @@ export function createWindGrass(
       uTime: { value: 0 },
       uColor: { value: new THREE.Color(opts.color ?? 0x8a5a28) },
       uTip: { value: new THREE.Color(opts.tipColor ?? 0xc9a04a) },
-      uMono: { value: new THREE.Color(opts.monoColor ?? 0x5c4e3c) },
-      uTipMono: { value: new THREE.Color(opts.tipMono ?? 0x8a7a60) },
+      uMono: { value: new THREE.Color(opts.monoColor ?? 0x3f3528) },
+      uTipMono: { value: new THREE.Color(opts.tipMono ?? 0xb09a78) },
       uSat: { value: 0 },
       uPush: { value: new THREE.Vector3(9999, 0, 9999) },
       uPushR: { value: 1.15 },

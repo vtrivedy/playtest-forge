@@ -124,7 +124,7 @@ export async function createFox(): Promise<FoxActor> {
           // Emission only on ember tips / wisps — body stays lit by scene, not bloom-orb
           if (n.includes('ember') || n.includes('wisp') || n.includes('flame') || n.includes('tip')) {
             mat.emissive = mat.emissive ?? new THREE.Color(0xff3a00);
-            mat.emissiveIntensity = 0.55;
+            mat.emissiveIntensity = 0.32;
             mat.toneMapped = true;
           } else if (n.includes('eye')) {
             mat.emissiveIntensity = Math.min(mat.emissiveIntensity ?? 0.3, 0.35);
@@ -150,7 +150,7 @@ export async function createFox(): Promise<FoxActor> {
     const group = new THREE.Group();
     group.add(root);
     // Soft tip glow only — never wrap the whole body in bloom
-    const foxLight = new THREE.PointLight(0xff6622, 0.18, 2.8);
+    const foxLight = new THREE.PointLight(0xff6622, 0.1, 2.2);
     foxLight.position.set(-0.55, 0.55, 0); // near tail tip
     group.add(foxLight);
     const feetOffset = 0.02;

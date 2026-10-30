@@ -134,7 +134,7 @@ export function createDistantLand(scene: THREE.Scene, opts: Partial<DistantLandO
     haze: new THREE.Color(0xdcc0a4),
     sunDir: new THREE.Vector3(-0.3, 0.18, -0.94),
     sunColor: new THREE.Color(0xffd9a0),
-    hazeFar: 340,
+    hazeFar: 420,
     mistFloor: -18,
     mistLayers: 3,
     seed: 7,
@@ -190,7 +190,7 @@ export function createDistantLand(scene: THREE.Scene, opts: Partial<DistantLandO
         // aerial perspective — never fully gone so the far tier still silhouettes
         float a = 1.0 - exp(-pow(dist / uHazeFar, 1.4) * 1.6);
         vec3 haze = uHaze + uSunColor * 0.2 * pow(max(dot(v, normalize(uSunDir)), 0.0), 4.0);
-        col = mix(col, haze, clamp(a, 0.0, 0.88));
+        col = mix(col, haze, clamp(a, 0.0, 0.72));
         // undersides sink into the cloud-sea mist
         float sink = smoothstep(uMistFloor + 14.0, uMistFloor - 6.0, vWorld.y);
         col = mix(col, haze, sink);
@@ -272,7 +272,7 @@ export function createDistantLand(scene: THREE.Scene, opts: Partial<DistantLandO
         vec2 p = vec2(vUv.x * 24.0 + uTime * 0.05, vUv.y * 2.2);
         float n = fbm(p);
         float body = smoothstep(0.0, 0.35, vUv.y) * smoothstep(1.0, 0.45, vUv.y);
-        float alpha = smoothstep(0.3, 0.75, n) * body * 0.55;
+        float alpha = smoothstep(0.35, 0.8, n) * body * 0.4;
         vec3 v = normalize(vWorld - cameraPosition);
         float fwd = pow(max(dot(v, normalize(uSunDir)), 0.0), 3.0);
         vec3 col = uHaze * (0.96 + 0.08 * n) + uSunColor * fwd * 0.22;

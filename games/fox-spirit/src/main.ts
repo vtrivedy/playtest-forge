@@ -56,19 +56,19 @@ async function boot() {
     mid: new THREE.Color(0xe2a060),
     horizon: new THREE.Color(0xf6c894),
     nadir: new THREE.Color(0xb49a8a),
-    mist: new THREE.Color(0xe0c2a2),
+    mist: new THREE.Color(0xe6bf98),
     sunDir,
     sunColor: new THREE.Color(0xffc985),
-    sunSize: 0.035,
-    sunBloom: 0.32,
-    horizonGlow: 0.7,
+    sunSize: 0.005,
+    sunBloom: 0.22,
+    horizonGlow: 0.5,
     godRays: 0.4,
     mistHeight: 0.07,
     cloudAmount: 0.6,
   });
   matchFogToSky(scene, fog, sky.params.mist);
   const distant = createDistantLand(scene, {
-    silhouette: new THREE.Color(0x5e4a44),
+    silhouette: new THREE.Color(0x4a3a3c),
     haze: sky.params.mist,
     sunDir,
     sunColor: sky.params.sunColor,
@@ -363,7 +363,7 @@ async function boot() {
     sky.update(dt);
     distant.update(dt);
     // Grass stays sepia until restore; fox aura must NOT paint every blade yellow
-    world.setGrassSat(shrineOn ? 1 : Math.min(0.12, colorField.sample(fox.position) * 0.15));
+    world.setGrassSat(shrineOn ? 1 : Math.min(0.22, colorField.sample(fox.position) * 0.25));
 
     // Embers pickup
     for (const e of embers) {

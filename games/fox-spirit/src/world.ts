@@ -206,12 +206,12 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Wind grass (golden) — sync uSat from ColorField in main
   const grass = createWindGrass(scene, {
-    count: 3600,
-    radius: 26,
+    count: 4200,
+    radius: 27,
     color: 0x8a4e1e,       // rust root (restored)
-    tipColor: 0xc9963a,    // muted gold tip (not neon yellow)
-    monoColor: 0x524636,   // desaturated sepia root
-    tipMono: 0x7a6c54,     // warm parchment tip
+    tipColor: 0xc9963a,    // muted gold tip
+    monoColor: 0x3a3228,   // dark sepia root (readable against parchment ground)
+    tipMono: 0xb59a72,     // lighter parchment tip for silhouette
     ySampler: (x, z) => {
       const h = yAt(x, z);
       return h > 0.3 && h < 5 ? h : -10;

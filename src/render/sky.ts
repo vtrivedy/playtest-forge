@@ -50,7 +50,7 @@ export function createPaintedSky(scene: THREE.Scene, overrides: Partial<SkyParam
     mist: new THREE.Color(overrides.mist ?? 0xdcc0a4),
     sunDir: (overrides.sunDir ?? new THREE.Vector3(0.45, 0.55, 0.35)).clone().normalize(),
     sunColor: new THREE.Color(overrides.sunColor ?? 0xffd9a0),
-    sunSize: overrides.sunSize ?? 0.04,
+    sunSize: overrides.sunSize ?? 0.006,
     sunBloom: overrides.sunBloom ?? 0.35,
     horizonGlow: overrides.horizonGlow ?? 0.6,
     godRays: overrides.godRays ?? 0.35,
@@ -130,7 +130,7 @@ export function createPaintedSky(scene: THREE.Scene, overrides: Partial<SkyParam
         // forward-scatter glow along the horizon under the sun
         float sd = 1.0 - dot(d, s);
         float band = exp(-abs(h - s.y * 0.35) * 9.0);
-        col += uSunColor * uHorizonGlow * band * pow(sunSide, 3.0) * 0.55;
+        col += uSunColor * uHorizonGlow * band * pow(sunSide, 4.0) * 0.4;
 
         // painted god-ray fan (angular streaks around the sun axis, above mist)
         vec3 up = abs(s.y) > 0.95 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
@@ -157,11 +157,11 @@ export function createPaintedSky(scene: THREE.Scene, overrides: Partial<SkyParam
         float m1 = smoothstep(uMistHeight + 0.05 * fbm(vec2(az * 3.0, 1.7) + uTime * 0.004), -0.02, h);
         float m2 = smoothstep(uMistHeight * 2.4 + 0.08 * fbm(vec2(az * 1.7 + 4.0, 0.3) - uTime * 0.003), uMistHeight * 0.5, h);
         vec3 mistLit = uMist + uSunColor * 0.18 * pow(sunSide, 2.0);
-        col = mix(col, mistLit, clamp(m2 * 0.35 + m1 * 0.75, 0.0, 0.9));
+        col = mix(col, mistLit, clamp(m2 * 0.25 + m1 * 0.6, 0.0, 0.8));
 
         // sun disc + bloom on top of mist (disc can exceed 1.0 to feed bloom)
         float sun = smoothstep(uSunSize * 2.5, uSunSize * 0.15, sd);
-        float bloom = exp(-sd * (8.0 / max(0.05, uSunBloom))) * uSunBloom;
+        float bloom = exp(-sd * (18.0 / max(0.05, uSunBloom))) * uSunBloom;
         col += uSunColor * (sun * 1.6 + bloom);
 
         // paper grain
