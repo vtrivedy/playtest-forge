@@ -257,3 +257,9 @@ Replace the lantern's plain stacked rectangular support with the CC0 Quaternius
 Column asset, scaled to the same 1.9 m support height and collision footprint.
 Keep the lamp, light, checkpoint and all site positions. Batch its fluted shaft,
 base and capital into the existing weathered stone bucket; no parallel old stem.
+
+### Showcase review settings — 15:12 ET
+Let the review helper forward explicit size/fps to the existing Modal renderer,
+so the real-World1 locomotion showcase can use the driver's 720p milestone
+budget without hand-building another launcher. Default reviews stay1080p60;
+gait keeps its60fps requirement in the shared harness.
