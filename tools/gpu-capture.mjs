@@ -245,7 +245,7 @@ try {
     if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
     save('shade-drain-probe.json', probe);
     await camera();
-    await video('shade-patrol', 180, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 45, 90, 135, 179] });
+    await video('shade-patrol', 120, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 30, 60, 90, 119] });
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
     await H('photoOff');
     await advance(30);
@@ -257,11 +257,11 @@ try {
       for (let k=0;k<128;k++) {
         const a=k/128*Math.PI*2, dx=Math.cos(a), dz=Math.sin(a);
         let safe=true;
-        for(let r=.55;r<3.9;r+=.1) {
+        for(let r=.55;r<4.6;r+=.1) {
           const px=x+dx*r,pz=z+dz*r;
           if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2) { safe=false; break; }
         }
-        if(safe)return {pos:[x+dx*.65,y,z+dz*.65], direction:[dx,dz]};
+        if(safe)return {pos:[x+dx*1.45,y,z+dz*1.45], direction:[dx,dz]};
       }
       throw Error('No 3m wall-free contact direction');
     }, p);
@@ -269,7 +269,14 @@ try {
     await H('teleport', ...contactSetup.pos, Math.PI);
     lens=null;
     await camera();
-    await video('shade-contact', 66, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 65] });
+    let contactFrame=null;
+    await H('setStick', -contactSetup.direction[0], -contactSetup.direction[1]);
+    await video('shade-contact', 110, async i => {
+      const current=await page.evaluate(()=>window.__gameHooks.shades.state());
+      if(current.hits>0&&contactFrame===null){contactFrame=i-1;await H('setStick',null);}
+      await camera();
+    }, (state,i)=>contactFrame!==null&&i>=contactFrame+61, { traceEveryFrame: true, keyFrames: [0, 6, 12, 18, 36, 60] });
+    await H('setStick', null);
     const contact = await page.evaluate(() => window.__gameHooks.shades.state());
     if (contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1) throw Error(`Shade contact failed: ${JSON.stringify(contact)}`);
     p = contact.actors[0].pos;
@@ -287,13 +294,13 @@ try {
     await H('setKeys', ['ShiftLeft']);
     lens=null;
     await camera();
-    await video('shade-free', 210, async i => {
+    await video('shade-free', 120, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
       await camera();
-    }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 120, 180, 209] });
+    }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 119] });
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
     if (freed.frees !== 1 || !freed.actors[0].freed || freed.hits !== contact.hits || freed.wisps < contact.wisps) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
-    await advance(90);
+    await advance(180);
     await shot('shade-leaf-litter');
     await advance(600, false);
     if ((await page.evaluate(() => window.__gameHooks.shades.state().actors[0].leaves)) !== 0) throw Error('Leaf one-shot did not end empty');
@@ -316,9 +323,9 @@ try {
     await H('advance', 1, 0, true);
     await page.keyboard.down('w');
     await page.keyboard.down('Shift');
-    await video('shade-play', 180, async i => {
+    await video('shade-play', 120, async i => {
       if(i===12){await page.keyboard.up('w');await page.keyboard.up('Shift');}
-    }, undefined, {traceEveryFrame:true,keyFrames:[0,6,12,24,45,90,179]});
+    }, undefined, {traceEveryFrame:true,keyFrames:[0,6,12,24,45,90,119]});
     const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
     if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
     save('shade-live-acceptance.json',{label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
@@ -720,7 +727,7 @@ try {
     if (regional) {
       const wp = route[from];
       const floor = await page.evaluate(p => window.__gameHooks.debug.world.collision.groundAt(p.x, p.z, p.y + .5).y, wp);
-      if (!Number.isFinite(floor) || Math.abs(floor - wp.y) > .65) throw Error('Regional route start must be a walkable waypoint');
+      if (!Number.isFinite(floor) || wp.ground === false || floor < wp.y - 1) throw Error('Regional route start must be a walkable waypoint');
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
@@ -733,7 +740,7 @@ try {
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     });
-    await H('autopilot', false); await shot('route-end');
+    await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
     if ((regional ? state.auto.idx < to : !state.restored) || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {

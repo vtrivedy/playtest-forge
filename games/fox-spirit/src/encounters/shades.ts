@@ -33,6 +33,8 @@ type ShadeActor = {
   leafSeeds: Array<{ p: THREE.Vector3; velocity: THREE.Vector3; phase: number; landed: THREE.Vector3 | null }>;
   releaseAge: number;
   debug: THREE.Group;
+  poolSampleAt: THREE.Vector3;
+  poolRadius: number;
 };
 
 /** Bake the licensed library animal in one authored gallop pose. No live skeleton or hero code. */
@@ -123,9 +125,10 @@ function inkMaterial(): THREE.ShaderMaterial {
         float n = n3(vP * 4.0 + vec3(0.0, -uTime * 0.9, uSeed));
         float rim = pow(1.0 - abs(dot(vN, vV)), 2.2);
         // feet and silhouette bleed into the wash; freeing eats the whole body
-        float cut = mix(0.0, 0.62, 1.0 - smoothstep(0.05, 0.7, vY)) + (1.0 - uPresence) * 1.1;
+        float cut = mix(0.0, 0.62, 1.0 - smoothstep(0.05, 0.7, vY));
         cut += smoothstep(0.45, 0.95, rim) * 0.24;
         if (n < cut) discard;
+        if (uPresence < 0.999 && vY + (n - 0.5) * 0.5 < (1.0 - uPresence) * 3.9) discard;
         // pressed ink: near-black umber core, a thin paper-pale rim like dried wash at the edge
         vec3 core = vec3(0.0015, 0.0009, 0.0005);
         vec3 edge = vec3(0.045, 0.022, 0.009);
@@ -146,10 +149,10 @@ function inkMaterial(): THREE.ShaderMaterial {
 function poolMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uRadius: { value: 3 } },
-    vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    vertexShader: /* glsl */ `attribute float aValid; varying float vValid; varying vec2 vUv; void main() { vValid = aValid; vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: /* glsl */ `
       uniform float uTime, uPresence;
-      varying vec2 vUv;
+      varying vec2 vUv; varying float vValid;
       ${NOISE}
       void main() {
         vec2 q = vUv - 0.5;
@@ -158,7 +161,7 @@ function poolMaterial(): THREE.ShaderMaterial {
         float a = (1.0 - smoothstep(0.55 + n * 0.25, 1.0, r)) * 0.55 * uPresence;
         // faint ring at the drain edge so the reach reads in play
         a += smoothstep(0.86, 0.93, r) * (1.0 - smoothstep(0.93, 1.0, r)) * 0.25 * uPresence;
-        gl_FragColor = vec4(vec3(0.05, 0.04, 0.035), a);
+        gl_FragColor = vec4(vec3(0.05, 0.04, 0.035), a * smoothstep(0.2, 0.8, vValid));
       }`,
     transparent: true,
     depthWrite: false,
@@ -186,7 +189,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
   const leafColor = new THREE.Color();
   const inkColor = new THREE.Color(0x514334);
   const autumnColors = [0xa8441f, 0xb86c2d, 0xc9a04a, 0x9f3821].map(c => new THREE.Color(c));
-  const poolGeo = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2);
+  const poolGeo = new THREE.PlaneGeometry(2, 2, 16, 16).rotateX(-Math.PI / 2);
   const shades: ShadeActor[] = spots.map((s, i) => {
     const curve = new THREE.CatmullRomCurve3(s.patrol.map(([x, y, z]) => new THREE.Vector3(x, y, z)), true, 'centripetal');
     const mat = inkMaterial();
@@ -204,7 +207,9 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     wash.renderOrder = 2;
     group.add(wash);
     scene.add(group);
-    const pool = new THREE.Mesh(poolGeo, poolMaterial());
+    const poolGeometry = poolGeo.clone();
+    poolGeometry.setAttribute('aValid', new THREE.BufferAttribute(new Float32Array(poolGeometry.attributes.position!.count).fill(1), 1));
+    const pool = new THREE.Mesh(poolGeometry, poolMaterial());
     pool.renderOrder = 1;
     scene.add(pool);
     const leaves = new THREE.InstancedMesh(leafGeo, leafMat.clone(), 72);
@@ -224,7 +229,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: new THREE.Vector3(), heading: 0, group, mat, fringe, pool, presence: 1, freed: false };
+    return { poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: new THREE.Vector3(), heading: 0, group, mat, fringe, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
@@ -304,7 +309,23 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         s.mat.uniforms.uPresence!.value = s.presence;
         s.fringe.uniforms.uTime!.value = t;
         s.fringe.uniforms.uPresence!.value = s.presence;
-        s.pool.position.set(s.pos.x, s.pos.y + 0.04, s.pos.z);
+        if (!s.freed && (s.poolSampleAt.distanceToSquared(s.pos) > 0.0144 || s.poolRadius !== tun.drainRadius)) {
+          const positions = s.pool.geometry.attributes.position!;
+          const valid = s.pool.geometry.attributes.aValid!;
+          for (let k=0;k<positions.count;k++) {
+            const x=s.pos.x+positions.getX(k)*tun.drainRadius;
+            const z=s.pos.z+positions.getZ(k)*tun.drainRadius;
+            const floor=groundAt(x,z,s.pos.y+0.1);
+            const onGround=Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<0.6;
+            valid.setX(k,onGround?1:0);
+            positions.setY(k,onGround?(floor-s.pos.y+0.04)/tun.drainRadius:0);
+          }
+          positions.needsUpdate=true;
+          valid.needsUpdate=true;
+          s.poolSampleAt.copy(s.pos);
+          s.poolRadius=tun.drainRadius;
+        }
+        s.pool.position.copy(s.pos);
         s.pool.scale.setScalar(tun.drainRadius);
         const pm = s.pool.material as THREE.ShaderMaterial;
         pm.uniforms.uTime!.value = t;

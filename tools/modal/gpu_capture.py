@@ -38,9 +38,10 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         completed = out / 'run.json'
         if completed.exists():
             metadata = json.loads(completed.read_text())
-            if metadata['ref'] == ref and metadata['shots'] == shots:
+            if metadata['ref'] != ref or metadata['shots'] != shots:
+                raise ValueError('Run ID belongs to another capture')
+            if metadata.get('status', 'success') == 'success':
                 return metadata
-            raise ValueError('Run ID belongs to another capture')
         gpu = run(['nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'], capture_output=True).stdout.strip() if backend != 'swiftshader' else 'CPU / SwiftShader (explicit fallback)'
         (out / 'nvidia-smi.txt').write_text(gpu + '\n')
         print('GPU:', gpu, flush=True)
@@ -74,7 +75,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
                 print(line, end='', flush=True)
             if proc.wait():
                 raise subprocess.CalledProcessError(proc.returncode, command)
-        metadata = {'ref': ref, 'commit': sha, 'gpu': gpu, 'shots': shots, 'runId': run_id,
+        metadata = {'status': 'success', 'ref': ref, 'commit': sha, 'gpu': gpu, 'shots': shots, 'runId': run_id,
                     'buildSeconds': round(built-started, 2), 'captureSeconds': round(time.monotonic()-built, 2),
                     'backend': backend, 'size': size, 'quality': quality, 'fps': fps,
                     'captureToolSha': json.loads((out / 'report.json').read_text())['captureToolSha'],
@@ -82,7 +83,16 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         (out / 'run.json').write_text(json.dumps(metadata, indent=2))
         return metadata
     except Exception as exc:
-        (out / 'failure.json').write_text(json.dumps({'error': str(exc), 'ref': ref, 'elapsedSeconds': round(time.monotonic() - started, 2)}, indent=2))
+        failure = {'error': str(exc), 'ref': ref, 'elapsedSeconds': round(time.monotonic() - started, 2)}
+        (out / 'failure.json').write_text(json.dumps(failure, indent=2))
+        if 'sha' in locals():
+            metadata = {**failure, 'status': 'failed', 'commit': sha, 'shots': shots, 'runId': run_id,
+                        'backend': backend, 'size': size, 'quality': quality, 'fps': fps,
+                        'gpu': locals().get('gpu'), 'routeFrom': route_from, 'routeTo': route_to}
+            report_file = out / 'report.json'
+            if report_file.exists():
+                metadata['captureToolSha'] = json.loads(report_file.read_text()).get('captureToolSha')
+            (out / 'run.json').write_text(json.dumps(metadata, indent=2))
         raise
     finally:
         if repo is not None:

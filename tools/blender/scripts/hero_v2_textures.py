@@ -113,7 +113,7 @@ out = fill.copy(); out.putalpha(a)
 out.save(f"{OUT}/cards_col.png", optimize=True); emi.save(f"{OUT}/cards_emit.png", optimize=True)
 
 # ---------------- tail strip: u around, v along (row 0 = image top = tip in Blender v=1)
-TW, TH = 256, 1024
+TW, TH = 512, 1024
 tc = Image.new("RGB", (TW, TH)); te = Image.new("RGB", (TW, TH))
 # the body's *rendered* burnt orange (its bake is darkened by streaks + AO; an unbaked match reads pale beige)
 TAIL = [(0, (178, 88, 34)), (0.4, (184, 92, 36)), (0.6, (192, 100, 40)), (0.78, (206, 116, 50)), (1, (216, 134, 66))]
@@ -127,14 +127,14 @@ for y in range(TH):
         pe[x, y] = lerp((0, 0, 0), ramp(TAIL, v), e)
 d = ImageDraw.Draw(tc); de = ImageDraw.Draw(te)
 rnd = random.Random(99)
-for s in range(900):  # long strands along v
-    x = rnd.uniform(0, TW); y = rnd.uniform(0, TH); L = rnd.uniform(40, 160)
+for s in range(2200):  # fine low-contrast directional paint along the brush
+    x = rnd.uniform(0, TW); y = rnd.uniform(0, TH); L = rnd.uniform(20, 95)
     v = 1 - y / TH
-    k = rnd.uniform(0.7, 1.25)
+    k = rnd.uniform(0.86, 1.1)
     c = tuple(min(255, int(ch * k)) for ch in ramp(TAIL, v))
     for dx in (0, TW, -TW):
-        d.line([(x + dx, y), (x + dx + rnd.uniform(-6, 6), y + L)], fill=c, width=rnd.choice([1, 2, 2, 3]))
-tc = tc.filter(ImageFilter.GaussianBlur(0.8))
+        d.line([(x + dx, y), (x + dx + rnd.uniform(-6, 6), y + L)], fill=c, width=rnd.choice([1, 1, 2]))
+tc = tc.filter(ImageFilter.GaussianBlur(0.45))
 # alpha = long strand mask along v (used by the tail fur shells with alpha-clip; core ignores alpha)
 am = Image.new("L", (TW, TH), 0); da = ImageDraw.Draw(am)
 for s in range(2600):
@@ -154,6 +154,6 @@ for x in range(TW):
         ep[x, y] = int(255 * max(0.0, min(1.0, (edge + 0.13 - v) / 0.26)))
 env = env.filter(ImageFilter.GaussianBlur(2))
 core = tc.copy(); core.putalpha(env); core.save(f"{OUT}/tail_core.png", optimize=True)
-tc.putalpha(ImageChops.multiply(am, env))
+tc.putalpha(am)  # brush shells continue to the tapered tip; only loose wisps dissolve
 tc.save(f"{OUT}/tail_col.png", optimize=True); te.save(f"{OUT}/tail_emit.png", optimize=True)
 print("textures ok")

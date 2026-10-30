@@ -103,8 +103,8 @@ for v in me.vertices:
     leg = min(1, front_leg + back_leg)
     legmask.append(leg)
     c = PAL["rust"]
-    c = mix(c, PAL["dorsal"], smooth(0.05, 0.85, n.z) * 0.85)           # broad dark rust saddle over the back / haunches (painted mass)
-    c = mix(c, PAL["belly"], smooth(-0.3, -0.85, n.z) * 0.55)           # warm pale underside (not pink)
+    c = mix(c, PAL["dorsal"], smooth(-0.12, 0.7, n.z) * 0.88)           # broad dark rust saddle over the back / haunches (painted mass)
+    c = mix(c, PAL["belly"], smooth(-0.15, -0.8, n.z) * 0.75)           # warm pale underside (not pink)
     # cream: throat + bib tapering down the chest, muzzle, cheeks, inner ears (no belly/rump patches)
     if v.index in cream_vs and leg < 0.3:
         if wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"]) > 0.3:
@@ -147,10 +147,10 @@ for v in me.vertices:
     cols.append(c)
     # shell-fur length (model units; fox ~3.3 tall): long ruff/cheeks, short face/lower legs, none on paws/eyes
     neck = wsum(w, "Neck1", "Neck2", "Neck3", "Torso3")
-    L = 0.045 + 0.045 * min(1, neck) + 0.02 * wsum(w, "Back", "BackLeg.L", "BackLeg.R")  # short: long shells read as raised chips
-    if w.get("Head", 0) > 0.4: L = 0.016 + 0.05 * smooth(0.2, 0.6, abs(n.x)) * (1 - smooth(-0.3, -0.7, n.y))
-    L = max(L, 0.07 * jaw)  # throat fur hangs over the jaw / bib crease
-    if ear > 0.3: L = 0.012
+    L = 0.018 + 0.022 * min(1, neck) + 0.012 * wsum(w, "Back", "BackLeg.L", "BackLeg.R")  # short: long shells read as raised chips
+    if w.get("Head", 0) > 0.4: L = 0.008 + 0.02 * smooth(0.2, 0.6, abs(n.x)) * (1 - smooth(-0.3, -0.7, n.y))
+    L = max(L, 0.028 * jaw)  # throat fur hangs over the jaw / bib crease
+    if ear > 0.3: L = 0.005
     L *= 1 - 0.75 * leg * (1 - smooth(0.7, 1.2, co.z))
     if v.index in eye_vs or v.index in nose_vs or (d < 0.075): L = 0.0  # keep shells off the (enlarged) eyes and lids
     if co.z < 0.2: L = 0.0
@@ -188,7 +188,7 @@ for o in sc.objects: o.select_set(o is fox)
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
 bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.006)
 bpy.ops.object.mode_set(mode="OBJECT")
-BAKE = 1024
+BAKE = 2048
 img_c = bpy.data.images.new("fox_fur_col", BAKE, BAKE); img_n = bpy.data.images.new("fox_fur_nrm", BAKE, BAKE)
 img_n.colorspace_settings.name = "Non-Color"
 bake = bpy.data.materials.new("BakeFur"); bake.use_nodes = True
@@ -207,7 +207,7 @@ def streak(scale):
     nz.inputs["Detail"].default_value = 8; nz.inputs["Roughness"].default_value = 0.62
     L_.new(tc.outputs["Object"], mp.inputs["Vector"]); L_.new(mp.outputs["Vector"], nz.inputs["Vector"])
     return nz
-body_s = streak((150, 10, 150)); leg_s = streak((150, 150, 12))
+body_s = streak((65, 7, 65)); leg_s = streak((65, 65, 8))
 sm = node("ShaderNodeMix", data_type="FLOAT"); L_.new(mask.outputs["Color"], sm.inputs["Factor"])
 L_.new(body_s.outputs["Fac"], sm.inputs[2]); L_.new(leg_s.outputs["Fac"], sm.inputs[3])
 cr = node("ShaderNodeValToRGB"); cr.color_ramp.elements[0].position = 0.3; cr.color_ramp.elements[0].color = (0.8, 0.76, 0.72, 1)
@@ -339,7 +339,7 @@ fox.data.color_attributes.remove(fox.data.color_attributes["Region"])
 fox.data.color_attributes.remove(fox.data.color_attributes["Glow"])
 tail_c, tcore_c = load("tail_col.png"), load("tail_core.png")
 # tail core: alpha-clipped so the fur ends in flame-tongue shapes (the flame cards take over from there)
-M_TAIL = pbr("FoxTailFur", tcore_c, None, rough=0.85, spec=0.2, alpha_mode="MASK", clip=0.5)
+M_TAIL = pbr("FoxTailFur", tail_c, None, rough=0.9, spec=0.15)
 cards_c = load("cards_col.png")
 tf_c, tf_e = load("tail_flame.png"), load("tail_flame_emit.png")
 # fur-to-flame locks over the plume's outer half: unlit burnt-orange strands at the root, glowing only where
@@ -417,8 +417,8 @@ def at(s):
             if i + 1 < len(chain) and t > 0.5: w[chain[i + 1]] = 0.5 * (t - 0.5) * 2 * 0.5
             tot = sum(w.values()); return p, tan, {k: x / tot for k, x in w.items()}
         d -= L
-S_FUR = 0.8  # fur tube ends here (alpha-eroded over ~0.5..0.75 in flame-tongue shapes, see tail_core.png)
-RPROF = [(0, 0.16), (0.1, 0.3), (0.3, 0.44), (0.5, 0.47), (0.66, 0.4), (0.8, 0.2)]
+S_FUR = 1.0  # continuous brush; sparse translucent wisps emerge from its tapered tip
+RPROF = [(0, 0.16), (0.1, 0.3), (0.3, 0.44), (0.5, 0.47), (0.66, 0.4), (0.8, 0.27), (0.92, 0.12), (1.0, 0.012)]
 def radius(s):
     for (a, ra), (b, rb) in zip(RPROF, RPROF[1:]):
         if s <= b:
@@ -491,7 +491,7 @@ vs_ = [ring_s[min(i // SEG, RINGS)] for i in range(len(tme.vertices))]  # arc fr
 tlen, tflow = [], []
 for v, s_ in zip(tme.vertices, vs_):
     _, tan, _ = at(min(1.0, s_ + 0.03))
-    L = (0.06 + 0.15 * smooth(0.0, 0.4, s_)) * (1 - smooth(0.6, 0.74, s_))  # no shells past the flame line
+    L = (0.025 + 0.045 * smooth(0.0, 0.4, s_)) * (1 - smooth(0.88, 1.0, s_))  # no shells past the flame line
     tlen.append(L)
     t = tan - v.normal * tan.dot(v.normal); tflow.append(t.normalized() if t.length > 1e-4 else Vector())
 tail_shell = shells(tail, tlen, tflow, M_TSHELL, "SpiritFox_TailShell")
@@ -558,46 +558,36 @@ def fxb(s): return "FxPlumeA" if s < 0.55 else "FxPlumeB" if s < 0.78 else "FxPl
 # breaks up into amber flame toward its tip, so the tail dissolves gradually (concept) instead of ending
 # in a separate fire jet. Tips flicker on the FX bones.
 TF = ["tf0", "tf1", "tf2", "tf3"]
-for j in range(40):
-    s = 0.6 + 0.24 * (j / 39)  # fur -> flame only over the outer third
+for j in range(12):
+    s = 0.78 + 0.18 * (j / 11)  # fur -> flame only over the outer third
     p, tan, w, side, up = frame(s)
     th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
     off = side * math.cos(th) + up * math.sin(th)
     k = smooth(0.6, 0.84, s)
-    h = (0.75 + 0.55 * k) * rnd.uniform(0.85, 1.15)
+    h = (0.24 + 0.18 * k) * rnd.uniform(0.85, 1.15)
     root = p + off * radius(min(s, S_FUR)) * (0.8 - 0.35 * k)
     lean = (tan * 1.0 + rise(off) * (0.22 + 0.12 * k) + up * 0.1).normalized()
     card("tflame", root, lean, off, h * rnd.uniform(0.5, 0.62), h, TF[j % 4], w, cross=(j % 4 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.7))
 # soft flame tongues from the dissolve line out past the old tip: the brush's outer silhouette, amber-rust
 PL = ["plume0", "plume1", "plume2", "plume3"]
-for j in range(26):
-    s = 0.74 + 0.28 * (j / 25) ** 0.9  # soft wisps peel off the tip only
+for j in range(8):
+    s = 0.88 + 0.13 * (j / 7) ** 0.9  # soft wisps peel off the tip only
     p, tan, w, side, up = frame(min(s, 1.0))
     if s > 1: p = p + tan * (s - 1) * total
     th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
     off = side * math.cos(th) + up * math.sin(th)
     k = smooth(0.74, 1.0, s)
-    h = (0.6 + 0.45 * k) * rnd.uniform(0.85, 1.15)  # low trailing tongues: no bonfire over the rump from the chase cam
+    h = (0.23 + 0.18 * k) * rnd.uniform(0.85, 1.15)  # low trailing tongues: no bonfire over the rump from the chase cam
     wd = h * rnd.uniform(0.65, 0.85)
     root = p + off * radius(min(s, S_FUR)) * (0.75 - 0.5 * k)
     lean = (tan * 1.0 + rise(off) * (0.2 + 0.12 * k) + up * (0.08 + 0.08 * k)).normalized()  # a trailing plume, not an upright fan
     card("fx", root, lean, off, wd, h, PL[j % 4], w, cross=(j % 3 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.8))
-for j in range(4):  # tip: a few broad, soft tongues licking up and back (small pale-gold heart in the texture)
+for j in range(2):  # tip: a few broad, soft tongues licking up and back (small pale-gold heart in the texture)
     s = 0.9 + 0.035 * j
     p, tan, w, side, up = frame(s)
     lean = (tan * 1.0 + up * (0.06 + 0.03 * j) + side * rnd.uniform(-0.35, 0.35)).normalized()
-    card("fx", p - tan * 0.12, lean, side, 0.6, 0.95 + 0.08 * j, PL[(j + 1) % 4], w, cross=True, wts_top={"FxPlumeC": 1.0})
-# leaf-ember flakes drifting off the plume (sparse, shrinking with distance, scattered up and back)
-FL = ["flake0", "flake1", "flake2"]
-for j in range(22):
-    d = (j + rnd.uniform(0, 1)) / 22
-    s = 0.62 + 0.8 * d
-    p, tan, w, side, up = frame(min(s, 1.0))
-    if s > 1: p = p + tan * (s - 1) * total
-    pos = p + up * rnd.uniform(0.25, 0.6 + 0.9 * d) + side * rnd.uniform(-0.5, 0.5) * (0.7 + d) + Vector((0, 0.15 * d, 0.2 * d))
-    sz = rnd.uniform(0.08, 0.14) * (1 - 0.4 * d)
-    fac = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.3, 0.3))).normalized()
-    card("fx", pos, Vector((rnd.uniform(-1, 1), rnd.uniform(-0.3, 1), rnd.uniform(-1, 1))), fac, sz, sz * 1.3, FL[j % 3], {"FxPlumeC": 1.0})
+    card("fx", p - tan * 0.12, lean, side, 0.16, 0.32 + 0.06 * j, PL[(j + 1) % 4], w, cross=True, wts_top={"FxPlumeC": 1.0})
+# Rising embers are emitted from skinned body anchors in foxLook.ts.
 # silhouette flame-licks (concept's wispy fur edges): sparse fur locks whose tips curl like flame, on the
 # shoulders only (cheek and bib cards read as chips / white fangs in engine) (no haunch licks: lying flat on the rump they read as paper patches in
 # engine). Tips ride the ruff / neck FX bones so the edges lick in play.
