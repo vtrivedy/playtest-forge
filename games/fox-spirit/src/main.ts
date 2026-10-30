@@ -464,6 +464,9 @@ async function boot() {
       photo = null;
       cam.snapBehind(yaw);
     },
+    route() {
+      return world.route;
+    },
     lightSeedwells() {
       for (const s of world.seedwells) {
         const p = s.pos;

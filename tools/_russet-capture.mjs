@@ -83,7 +83,11 @@ console.log('fps', (await fps()).toFixed(1));
 if (has('auto')) {
   // full critical-path run with the bot, through real physics
   const t0 = Date.now();
-  await page.evaluate(() => window.__gameHooks.autopilot(true, 0));
+  const from = Number(arg('from', '0'));
+  if (from > 0) {
+    await page.evaluate((i) => { const w = window.__gameHooks.route()[i]; window.__gameHooks.teleport(w.x, w.y, w.z); }, from);
+  }
+  await page.evaluate((i) => window.__gameHooks.autopilot(true, i), from);
   let last = '';
   let shotN = 0;
   const maxMs = Number(arg('maxmin', '40')) * 60000;

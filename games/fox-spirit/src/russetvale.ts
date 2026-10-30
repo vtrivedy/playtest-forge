@@ -290,12 +290,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-6.4, 17.2, -71.5, { ground: false });
   W(6.4, 22.4, -71.5, { ground: false });
   W(6.4, 22.4, -74.5, { ground: false });
-  W(2.0, 24.2, -74.5, { ground: false, act: 'jump' });
-  W(-2.3, 24.6, -74.5, { ground: false });
+  W(1.8, 24.2, -74.5, { ground: false, act: 'jump' });
+  W(-2.1, 24.6, -74.5, { ground: false });
   W(-6.4, 27.6, -74.5, { ground: false });
   W(-6.4, 27.6, -77.5, { ground: false });
-  W(-2.6, 29.2, -77.5, { ground: false, act: 'jump' });
-  W(2.8, 29.8, -77.5, { ground: false });
+  W(-2.1, 29.3, -77.5, { ground: false, act: 'jump' });
+  W(2.5, 29.8, -77.5, { ground: false });
   W(6.4, 32.8, -77.5, { ground: false });
   W(6.4, 32.8, -80.5, { ground: false });
   W(-6.4, 38, -80.5, { ground: false });
@@ -1027,12 +1027,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // switchback flights
   flight({ x: 6.6, z: -68.7, y: 12 }, { x: -6.6, z: -68.7, y: 17.2 }, 2.4, 150);
   flight({ x: -6.6, z: -71.5, y: 17.2 }, { x: 6.6, z: -71.5, y: 22.4 }, 2.4, 151);
-  // broken flight 3 (3.5 m gap)
-  flight({ x: 6.6, z: -74.5, y: 22.4 }, { x: 1.75, z: -74.5, y: 24.2 }, 2.4, 152);
-  flight({ x: -1.75, z: -74.5, y: 24.6 }, { x: -6.6, z: -74.5, y: 27.6 }, 2.4, 153);
-  // broken flight 4 (4.5 m gap)
-  flight({ x: -6.6, z: -77.5, y: 27.6 }, { x: -2.25, z: -77.5, y: 29.2 }, 2.4, 154);
-  flight({ x: 2.25, z: -77.5, y: 29.8 }, { x: 6.6, z: -77.5, y: 32.8 }, 2.4, 155);
+  // broken flight 3 (3.0 m gap, near-level)
+  flight({ x: 6.6, z: -74.5, y: 22.4 }, { x: 1.5, z: -74.5, y: 24.3 }, 2.4, 152);
+  flight({ x: -1.5, z: -74.5, y: 24.4 }, { x: -6.6, z: -74.5, y: 27.6 }, 2.4, 153);
+  // broken flight 4 (3.6 m gap, near-level)
+  flight({ x: -6.6, z: -77.5, y: 27.6 }, { x: -1.8, z: -77.5, y: 29.4 }, 2.4, 154);
+  flight({ x: 1.8, z: -77.5, y: 29.6 }, { x: 6.6, z: -77.5, y: 32.8 }, 2.4, 155);
   flight({ x: 6.6, z: -80.5, y: 32.8 }, { x: -6.6, z: -80.5, y: 38 }, 2.6, 156);
   // ruins on the rows (arches, columns) — key-art silhouette
   ruinArch(bk('stone', -12, -71), -12, 17.2, -71.6, 0, { span: 3.2, pillarH: 3.8, seed: 160, pointed: true });
