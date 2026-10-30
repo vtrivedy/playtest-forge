@@ -255,11 +255,11 @@ try {
       for (let k=0;k<128;k++) {
         const a=k/128*Math.PI*2, dx=Math.cos(a), dz=Math.sin(a);
         let safe=true;
-        for(let r=.55;r<3.9;r+=.1) {
+        for(let r=.55;r<4.6;r+=.1) {
           const px=x+dx*r,pz=z+dz*r;
           if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2) { safe=false; break; }
         }
-        if(safe)return {pos:[x+dx*.65,y,z+dz*.65], direction:[dx,dz]};
+        if(safe)return {pos:[x+dx*1.45,y,z+dz*1.45], direction:[dx,dz]};
       }
       throw Error('No 3m wall-free contact direction');
     }, p);
@@ -267,7 +267,14 @@ try {
     await H('teleport', ...contactSetup.pos, Math.PI);
     lens=null;
     await camera();
-    await video('shade-contact', 66, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 65] });
+    let contactFrame=null;
+    await H('setStick', -contactSetup.direction[0], -contactSetup.direction[1]);
+    await video('shade-contact', 110, async i => {
+      const current=await page.evaluate(()=>window.__gameHooks.shades.state());
+      if(current.hits>0&&contactFrame===null){contactFrame=i-1;await H('setStick',null);}
+      await camera();
+    }, (state,i)=>contactFrame!==null&&i>=contactFrame+61, { traceEveryFrame: true, keyFrames: [0, 6, 12, 18, 36, 60] });
+    await H('setStick', null);
     const contact = await page.evaluate(() => window.__gameHooks.shades.state());
     if (contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1) throw Error(`Shade contact failed: ${JSON.stringify(contact)}`);
     p = contact.actors[0].pos;
