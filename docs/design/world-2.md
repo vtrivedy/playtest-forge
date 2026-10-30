@@ -22,7 +22,7 @@ The orchard was flooded when its aqueduct stopped breathing. Ferrymen's stone bo
 
 ## Layout
 
-World coordinates: +x east, −z north. First slice centered (190,−118), floor y30. Wellspring summit is (0,−89), y38.
+World coordinates: +x east, −z north. First slice centered (120,−118), floor y30. The causeway is66m with a LOW-only lower fork beside the basin. Wellspring summit is (0,−89), y38.
 
 ```
 W1 summit [S] == east causeway == [G] flood-open arch
@@ -107,3 +107,5 @@ This supersedes the one-way ferry ending above. The shrine makes the source perm
 Acceptance now includes one arrival frame showing source, bell and a low-only destination; three visible buoyant bodies rising; `__game.reach.level`; HIGH→LOW→HIGH real dash input, a low-lane traversal / shortcut, and a recovery checkpoint within10s of a boarding miss. Retaining an occupied float never counts as water at the shrine inlet.
 
 Closing the sluice for HIGH sends water down the short flume again: a1.8s transit delay before the2.5s rise gives the fox time to board after restoration. LOW drains in1.67s after its1s warning. This keeps the ferry re-boardable after a fall; the source-bank checkpoint avoids replaying the long causeway.
+
+Spatial revision16:45: shortened causeway136→66m, basin shifted70m toward the summit; a lower fork joins the sunken lane when LOW. Four orchard trunks and a timber roofline cross the waterline. Shared pond shader supplies translucent cool water, soft sky reflection and a pale shoreline instead of the rejected opaque orange reflector. HUD names Ashwater Reach and shows LOW/HIGH.

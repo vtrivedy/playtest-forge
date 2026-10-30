@@ -99,6 +99,7 @@ const HITSTOP_COOLDOWN_S = 0.35;
 
 async function boot() {
   const hud = createHud();
+  const realmTitle=document.getElementById('title-card');
   hud.setStatus('Loading Russetvale…');
   const audio = createGameAudio();
 
@@ -1476,7 +1477,7 @@ async function boot() {
     }
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
-    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn, dashing, shades.drains(new THREE.Vector3(187,30,-118)));
+    reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn, dashing, shades.drains(new THREE.Vector3(117,30,-118)));
     crown.update(dt, (p, r) => {
       autumnFX.swirl(p, 40, 1.6);
       audio.play('shrine');
@@ -1492,7 +1493,8 @@ async function boot() {
     if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
     if (reach.submergedAt(fox.position, fox.position.y - foxActor.feetOffset)) handleEvents([{type:'hazard',kind:'ink'}]);
     restore.update(dt);
-    zone = world.zoneAt(fox.position.x, fox.position.z);
+    zone = reach.contains(fox.position) ? `Ashwater Reach · ${reach.state().level.toUpperCase()}` : world.zoneAt(fox.position.x, fox.position.z);
+    if(realmTitle)realmTitle.textContent=reach.contains(fox.position)?'ASHWATER REACH · THE DROWNED ORCHARD':'RUSSETVALE · EMBER WELLSPRING';
     if (scene.fog instanceof THREE.FogExp2) scene.fog.density = THREE.MathUtils.damp(scene.fog.density, fog.density * (zone.includes('Reedmarsh') ? reedLook.fogScale : 1), 2, dt);
 
     // through a dash, keep the last estimate (the dash is short and gravity-free)
@@ -1597,7 +1599,7 @@ async function boot() {
     const lit = world.seedwells.filter((q) => q.lit).length;
     hud.setStatus(
       shrineOn
-        ? `AUTUMN RESTORED · ${elapsed.toFixed(1)}s`
+        ? (reach.contains(fox.position) ? `ASHWATER REACH · ${reach.state().level.toUpperCase()}` : `AUTUMN RESTORED · ${elapsed.toFixed(1)}s`)
         : `${zone} · Seedwells ${lit}/3 · ${backend}`,
     );
 
