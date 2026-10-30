@@ -3,7 +3,7 @@
   "private": false,
   "version": "0.1.0",
   "type": "module",
-  "description": "UHQ three.js Spyro-inspired creature platformer forge \u2014 agents design, build, playtest",
+  "description": "UHQ three.js Spyro-inspired creature platformer forge — agents design, build, playtest",
   "license": "MIT",
   "scripts": {
     "dev": "vite --config games/creature-island/vite.config.ts",
@@ -14,7 +14,9 @@
     "playtest:sol": "tsx tools/playtest.ts --game smoke-sol --port 5175 --seconds 25",
     "dev:fox": "vite --config games/fox-spirit/vite.config.ts --port 5180",
     "playtest:fox": "tsx tools/playtest.ts --game fox-spirit --port 5180 --seconds 30 --script shrine",
-    "playtest:fox-feel": "tsx tools/playtest.ts --game fox-spirit --port 5180 --seconds 12 --script feel-probe"
+    "playtest:fox-feel": "tsx tools/playtest.ts --game fox-spirit --port 5180 --seconds 12 --script feel-probe",
+    "dev:lookdev": "vite --config games/lookdev/vite.config.ts",
+    "playtest:lookdev": "tsx tools/playtest.ts --game lookdev --port 5190 --seconds 22"
   },
   "devDependencies": {
     "@playwright/mcp": "^0.0.83",
