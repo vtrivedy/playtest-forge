@@ -49,9 +49,10 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
   // The first landing clears every nested hill collider before descending.
   shelf(-19, -88, 38, 7, 5, 822);
   stair([-11, 38, -88], [-19, 38, -88], 820);
-  stair([-20, 38, -88], [-32, 24, -94], 821);
-  stair([-39, 24, -99], [-49, 29, -104], 823);
-  stair([-49, 29, -110], [-54, 34, -118], 824);
+  stair([-22, 38, -88], [-39, 24, -96], 821);
+  stair([-41, 24, -99], [-49, 29, -101.5], 823);
+  stair([-49, 29, -109], [-57, 34, -113], 824);
+  stair([-57, 34, -113], [-53, 34, -116], 825);
   // Split crown: open silhouette, bowl held over the upper hearth's rising leaves.
   ruinArch(stone, -48, 34, -121, 0.12, { span: 5.2, pillarH: 3.2, broken: 0.35, seed: 830 });
   ruinArch(stone, -51, 34, -117, 1.4, { span: 3.8, pillarH: 2.3, broken: 0.6, seed: 831 });
@@ -97,11 +98,11 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
   let inlet: ReturnType<typeof createInlets> | null = null;
   let updrafts: ReturnType<typeof createUpdrafts>;
   let wind: WindSystem;
-  function applyRestore() {
+  function applyRestore(duration = 3.2) {
     for (const h of updrafts.hearths) if (h.spot.id.startsWith('crown-')) h.reactor.restored = true;
     for (const c of wind.currents) if (c.spot.id === 'crown-home') c.reactor.restored = true;
     if (inlet) { inlet.inlets[0]!.latched = true; inlet.inlets[0]!.seal = 1; }
-    if (!field.restores.length) field.restore(bowl, 30, 3.2);
+    if (!field.restores.length) field.restore(bowl, 30, duration);
   }
   return {
     bowl,
@@ -124,7 +125,7 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
       const folder = gui.addFolder('Listening Crown');
       folder.add(tun, 'latchTime', 0.5, 5, 0.1).onChange((v: number) => { inlet!.inlets[0]!.latchTime = v; });
       folder.close();
-      if (restored) applyRestore();
+      if (restored) applyRestore(0.05);
     },
     update(dt: number, onRestore: (center: THREE.Vector3, radius: number) => void) {
       if (!inlet) return;

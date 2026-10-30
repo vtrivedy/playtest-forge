@@ -814,9 +814,9 @@ try {
     await H('teleport', -10, 38, -87, -Math.PI / 2);
     await advance(2); await shot('crown-entry');
     const points = [
-      {x:-19,z:-88,y:38}, {x:-32,z:-94,y:24}, {x:-37,z:-101,y:24},
+      {x:-19,z:-88,y:38}, {x:-22,z:-88,y:38}, {x:-39,z:-96,y:24}, {x:-37,z:-101,y:24},
       {x:-37,z:-101,y:30,jump:true}, {x:-43,z:-108,y:29},
-      {x:-45,z:-112,y:29}, {x:-45,z:-112,y:41,jump:true},
+      {x:-45,z:-112,y:29,dash:true}, {x:-45,z:-112,y:41,jump:true},
       {x:-19,z:-88,y:38,jump:true,land:true}, {x:-12,z:-91,y:38,land:true},
     ];
     let phase=0, age=0, reached=false;
@@ -826,17 +826,33 @@ try {
       const dx=p.x-st.pos[0], dz=p.z-st.pos[2], d=Math.hypot(dx,dz);
       if (d<0.85 && st.pos[1]>=p.y-0.5 && (!p.land || st.grounded) && age>.25) {
         if(phase===points.length-1) reached=true;
-        else { phase++; age=0; }
+        else { phase++; age=0; console.log('CROWN PHASE', phase, JSON.stringify(st.pos)); }
       }
       const target=points[phase], vx=target.x-st.pos[0], vz=target.z-st.pos[2], len=Math.hypot(vx,vz);
       const mag = Math.min(1,len / 1.2);
       await H('setStick',len>.2?vx/len*mag:0,len>.2?vz/len*mag:0);
-      await H('setKeys',target.jump && !(target.land && len<1.2)?['Space']:[]);
+      const keys=target.jump && !(target.land && len<1.2)?['Space']:[];
+      if(target.dash && age<.06) keys.push('ShiftLeft');
+      await H('setKeys',keys);
     }, st => reached || st.deaths>0, {keyFrames:[0,3*fps,6*fps,9*fps,12*fps], traceEveryFrame:true});
     await H('setKeys',[]); await H('setStick',null); await shot('crown-end');
     const st=await H('state');
     save('crown-acceptance.json',{reached,phase,restored:st.crown.restored,deaths:st.deaths,end:st});
     if (!reached || !st.crown.restored || st.deaths || !st.grounded) report.failures.push('Crown round trip did not finish restored, grounded, and without deaths');
+    // Prove the permanent walking fallback in both directions, with no jumping or staged movement.
+    const walkOut = [[-19,38,-88],[-22,38,-88],[-39,24,-96],[-41,24,-99],[-49,29,-101.5],[-49,29,-109],[-57,34,-113],[-53,34,-116]];
+    const walk = [...walkOut, ...walkOut.slice(0,-1).reverse(),[-12,38,-91]];
+    let walkIdx=0;
+    await video('crown-walking-fallback', 50*fps, async () => {
+      const q=await H('state'), p=walk[walkIdx], dx=p[0]-q.pos[0], dz=p[2]-q.pos[2], d=Math.hypot(dx,dz);
+      if(d<.55 && q.pos[1]>=p[1]-.5 && q.grounded && walkIdx<walk.length-1) walkIdx++;
+      const target=walk[walkIdx], vx=target[0]-q.pos[0], vz=target[2]-q.pos[2], len=Math.hypot(vx,vz);
+      await H('setKeys',[]); await H('setStick',len>.2?vx/len*Math.min(.65,len):0,len>.2?vz/len*Math.min(.65,len):0);
+    }, q => q.deaths>0 || walkIdx===walk.length-1 && q.grounded && Math.hypot(q.pos[0]+12,q.pos[2]+91)<.7, {keyFrames:[0,5*fps,10*fps,15*fps]});
+    await H('setStick',null); await advance(30); await shot('crown-walk-end');
+    const walkEnd=await H('state'); save('crown-walk-acceptance.json',{walkIdx,of:walk.length,grounded:walkEnd.grounded,deaths:walkEnd.deaths,end:walkEnd.pos});
+    if(walkIdx!==walk.length-1 || walkEnd.deaths) report.failures.push('Crown permanent walking fallback incomplete');
+
   }
   if (wants('route')) {
     await boot(quality, true);
