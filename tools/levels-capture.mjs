@@ -1,5 +1,5 @@
 /** Windmill Rise acceptance. One labelled staged start; all subsequent motion is live controller input. */
-export async function captureLevels({ boot, H, advance, shot, video, save, page, fps, quality, report }) {
+export async function captureLevels({ H, advance, shot, video, save, page, fps, report }) {
   const initial = await H('state');
   const hearth = initial.chem.hearths.find(h => h.id === 'H2');
   if (!hearth) throw Error('Levels capture requires H2');
@@ -13,10 +13,12 @@ export async function captureLevels({ boot, H, advance, shot, video, save, page,
     for (let j = 0; j < steps; j++) path.push(a.map((v, k) => v + (b[k] - v) * j / steps));
   }
   path.push(controls.at(-1));
-  // Dash east along the inner side of the bowl, remaining on the 12.4 m ledge.
+  // Dash north along the bowl's west side, toward the ledge centre. Authored
+  // stopping distance stays on the ledge even after the stroke ends.
   const ledgeY = await page.evaluate(() => window.__gameHooks.debug.world.hearthSpots.find(h => h.id === 'H2').y);
-  const stagedStart = [hx - 3.8, ledgeY, hz - 1.4];
-  await H('teleport', ...stagedStart, Math.PI / 2);
+  const stagedStart = [hx - 1.4, ledgeY, hz + 3];
+  const sealPoint = [hx - 1.3, hz - 1.2];
+  await H('teleport', ...stagedStart, Math.PI);
   await H('setStick', 0, 0); await H('setKeys', []); await advance(8);
   await shot('levels-00-staged-cold-start');
   const timeline = [], transitions = [];
@@ -41,12 +43,17 @@ export async function captureLevels({ boot, H, advance, shot, video, save, page,
     if (st.deaths > initial.deaths) { phaseChange('failed-respawn', frame); finished = true; await H('setStick', 0, 0); await H('setKeys', []); return; }
     let keys = [];
     if (phase === 'dash') {
-      await H('setStick', 1, 0);
+      await H('setStick', 0, -1);
       if (!dashSent) { keys = ['ShiftLeft']; dashSent = true; }
-      if (st.pos[0] >= hx + 0.7 || frame > fps * 0.5) phaseChange('seal', frame);
+      if (st.pos[2] <= hz - 0.8 || frame > fps * 0.4) phaseChange('seal', frame);
     } else if (phase === 'seal') {
-      await H('setStick', 0, 0);
-      if (st.seedwells[0].lit) { latchedAt = st.t; phaseChange('takeoff', frame); }
+      // Hold a stable point with normal input; do not rely on authored coast
+      // stopping exactly at the dash endpoint. Jump only after regaining the ledge.
+      await aim(...sealPoint, 0.45);
+      if (st.seedwells[0].lit && latchedAt === null) latchedAt = st.t;
+      if (latchedAt !== null && st.grounded && Math.abs(st.pos[1] - ledgeY) < 0.25
+        && Math.hypot(st.pos[0] - sealPoint[0], st.pos[2] - sealPoint[1]) < 0.65
+        && Math.hypot(st.vel[0], st.vel[2]) < 2.5) phaseChange('takeoff', frame);
       else if (frame - phaseAt > 10 * fps) { phaseChange('failed-latch', frame); finished = true; }
     } else if (phase === 'takeoff') {
       keys = ['Space'];
@@ -89,6 +96,7 @@ export async function captureLevels({ boot, H, advance, shot, video, save, page,
   };
   save('levels-acceptance.json', acceptance); save('levels-timeline.json', timeline);
   if (!acceptance.passed) report?.failures.push(`Windmill Rise keyboard route failed: phase=${phase}, SW1=${acceptance.sw1Latched}, arena=${landedArena}, end=${end.pos}`);
-  console.log('LEVELS', JSON.stringify(acceptance));
+  const { game: _game, ...consoleSummary } = acceptance;
+  console.log('LEVELS', JSON.stringify(consoleSummary));
   return acceptance;
 }
