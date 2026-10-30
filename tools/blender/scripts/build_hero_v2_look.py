@@ -54,7 +54,7 @@ for v in snout:
 for sgn in (1, -1):
     ev = [bm.verts[i] for i in eye_ids if bm.verts[i].co.x * sgn > 0]
     ec = sum((v.co for v in ev), Vector()) / len(ev)
-    for v in ev: v.co = ec + (v.co - ec) * Vector((1.2, 1.12, 1.22))
+    for v in ev: v.co = ec + (v.co - ec) * Vector((1.26, 1.14, 1.2))  # wider almond, lid height kept
 # rounder, bigger paws: spread + push the toes forward, flat sole
 paw_groups = [g for g in gname.values() if "Paw" in g]
 for pg in paw_groups:
@@ -79,9 +79,9 @@ bm.to_mesh(me); bm.free(); me.update()
 # ---------------------------------------------------------------- 2. region colours (rest pose rules)
 # warm burnt orange (yellower than vermilion: ACES + warm fog push it red in engine); sock/paw authored a
 # notch light because the streak * AO bake darkens them (lands near the concept's (102, 62, 38) umber)
-PAL = dict(rust=(210, 116, 46), dorsal=(180, 90, 34), belly=(230, 156, 92), cream=(238, 222, 192),
+PAL = dict(rust=(210, 116, 46), dorsal=(158, 74, 28), belly=(230, 156, 92), cream=(238, 222, 192),
            umber=(124, 74, 42), sock=(92, 58, 37), paw=(68, 45, 31), earback=(70, 40, 26), nose=(22, 15, 13),
-           amber=(236, 156, 40), pupil=(30, 14, 8), liner=(70, 36, 20), earin=(236, 214, 186))
+           amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(236, 214, 186))
 mat_names = [m.name for m in me.materials]
 MI = {n: i for i, n in enumerate(mat_names)}
 eye_vs, nose_vs, cream_vs, grey_vs = set(), set(), set(), set()
@@ -105,7 +105,7 @@ for v in me.vertices:
     leg = min(1, front_leg + back_leg)
     legmask.append(leg)
     c = PAL["rust"]
-    c = mix(c, PAL["dorsal"], smooth(0.35, 0.95, n.z) * 0.45)           # slightly deeper topline
+    c = mix(c, PAL["dorsal"], smooth(0.2, 0.95, n.z) * 0.7)            # darker rust saddle along the spine / haunches
     c = mix(c, PAL["belly"], smooth(-0.3, -0.85, n.z) * 0.55)           # warm pale underside (not pink)
     # cream: throat + bib tapering down the chest, muzzle, cheeks, inner ears (no belly/rump patches)
     if v.index in cream_vs and leg < 0.3:
@@ -142,7 +142,7 @@ for v in me.vertices:
         e = eyeL if co.x > 0 else eyeR
         dyx = abs((co - e).xy.length) / 0.07
         c = mix(PAL["amber"], PAL["pupil"], 1 - smooth(0.12, 0.35, dyx))
-    elif d < 0.07: c = mix(c, PAL["liner"], 1 - smooth(0.02, 0.07, d))
+    elif d < 0.085: c = mix(c, PAL["liner"], 1 - smooth(0.025, 0.085, d))  # strong dark lid rim: watchful, not round
     if v.index in nose_vs: c = PAL["nose"]
     cols.append(c)
     # shell-fur length (model units; fox ~3.3 tall): long ruff/cheeks, short face/lower legs, none on paws/eyes
@@ -566,7 +566,7 @@ for j in range(150):
     off = side * math.cos(th) + up * math.sin(th)
     _, _, w2 = at(min(1.0, s + 0.1))
     h = (0.3 + 0.2 * smooth(0.05, 0.4, s)) * rnd.uniform(0.85, 1.15)  # small, narrow locks: big ones read as flat leaves
-    card("tuft", p + off * radius(s) * 0.86, (tan + off * 0.14).normalized(), off, h * 0.4, h, "rusttuft", w, wts_top=w2)
+    card("tuft", p + off * radius(s) * 0.86, (tan + off * 0.14).normalized(), off, h * 0.32, h, "rusttuft", w, wts_top=w2)
 def fxb(s): return "FxPlumeA" if s < 0.55 else "FxPlumeB" if s < 0.78 else "FxPlumeC"
 # fur -> flame: translucent locks rooted on the brush over its outer half. Each is dense fur at the root and
 # breaks up into amber flame toward its tip, so the tail dissolves gradually (concept) instead of ending
@@ -594,13 +594,13 @@ for j in range(56):
     h = (0.85 + 0.65 * k) * rnd.uniform(0.85, 1.15)
     wd = h * rnd.uniform(0.65, 0.85)
     root = p + off * radius(min(s, S_FUR)) * (0.75 - 0.5 * k)
-    lean = (tan * 1.0 + rise(off) * (0.2 + 0.12 * k) + up * (0.12 + 0.2 * k)).normalized()  # stream back, rise at the tip
+    lean = (tan * 1.0 + rise(off) * (0.2 + 0.12 * k) + up * (0.08 + 0.08 * k)).normalized()  # a trailing plume, not an upright fan
     card("fx", root, lean, off, wd, h, PL[j % 4], w, cross=(j % 3 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.8))
 for j in range(4):  # tip: a few broad, soft tongues licking up and back (small pale-gold heart in the texture)
     s = 0.9 + 0.035 * j
     p, tan, w, side, up = frame(s)
-    lean = (tan * 1.0 + up * (0.16 + 0.04 * j) + side * rnd.uniform(-0.35, 0.35)).normalized()
-    card("fx", p - tan * 0.12, lean, side, 0.7, 1.05 + 0.08 * j, PL[(j + 1) % 4], w, cross=True, wts_top={"FxPlumeC": 1.0})
+    lean = (tan * 1.0 + up * (0.06 + 0.03 * j) + side * rnd.uniform(-0.35, 0.35)).normalized()
+    card("fx", p - tan * 0.12, lean, side, 0.6, 0.95 + 0.08 * j, PL[(j + 1) % 4], w, cross=True, wts_top={"FxPlumeC": 1.0})
 # leaf-ember flakes drifting off the plume (sparse, shrinking with distance, scattered up and back)
 FL = ["flake0", "flake1", "flake2"]
 for j in range(22):
@@ -634,9 +634,9 @@ for s in "LR":
     e1, e4 = bh(f"Ear1.{s}"), bt(f"Ear4.{s}")
     d = (e4 - e1).normalized()
     out_ = Vector((1 if s == "L" else -1, 0, 0))
-    for k, (ln, wd, back, rect) in enumerate(((0.56, 0.28, 1.4, "curl0"), (0.42, 0.2, 2.0, "curl1"))):
+    for k, (ln, wd, back, rect) in enumerate(((0.4, 0.3, 1.6, "curl0"), (0.32, 0.24, 2.2, "curl1"))):  # short licks, not antennae
         upv = (d + Vector((0, back, 0)) + out_ * 0.1 * k).normalized()  # rise off the tip, sweep back
-        card("fx", e4 - d * (0.24 + 0.06 * k), upv, out_, wd, ln, rect, {f"Ear4.{s}": 1.0}, cross=(k == 0), wts_top={f"FxEar.{s}": 1.0})
+        card("fx", e4 - d * (0.2 + 0.06 * k), upv, out_, wd, ln, rect, {f"Ear4.{s}": 1.0}, wts_top={f"FxEar.{s}": 1.0})
 # shoulders / nape: two faint heat-shimmer wisps lying back (no flame ridge)
 for j, (x_, t_) in enumerate(((0.07, 0.25), (-0.06, 0.55))):
     base = bh("Neck1").lerp(bh("Neck2"), t_) + Vector((x_, 0.05, 0.2))
