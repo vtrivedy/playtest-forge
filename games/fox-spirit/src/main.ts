@@ -312,6 +312,8 @@ async function boot() {
     folder.add(params, 'springDamping', .4, 1.5, .05);
     folder.add(params, 'debug');
   }
+  FOX_LOOK.emberRate=3;
+  FOX_LOOK.emberRateSpeed=2;
   const fFoxLook=gui.addFolder('Fox look');
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);

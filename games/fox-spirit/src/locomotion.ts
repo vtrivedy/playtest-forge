@@ -26,10 +26,10 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 5.5,
     plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
-    maxCorrection: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
+    maxCorrection: 0, maxSlideMS: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
-  private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D;
-    planted: boolean; anchor: THREE.Vector3; clearance: number; dot: THREE.Mesh }[] = [];
+  private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
+    planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; dot: THREE.Mesh }[] = [];
   private debugGroup = new THREE.Group();
   private phase = 0;
   private lastActive = '';
@@ -72,17 +72,17 @@ export class AuthoredLocomotion {
     chains.push(...[FOX_RIG.hindleg('l'),FOX_RIG.hindleg('r')].map(l=>[l.thigh,l.shin,l.paw]));
     for (const [upper, lower, paw] of chains) {
       const a=root.getObjectByName(upper), b=root.getObjectByName(lower), c=root.getObjectByName(paw);
-      if (!a || !b || !c) continue;
+      if (!a || !b || !c) throw new Error(`FOX rig is missing locomotion chain ${upper}/${lower}/${paw}`);
       const dot = new THREE.Mesh(new THREE.SphereGeometry(.025,6,4), new THREE.MeshBasicMaterial({color:0xffcc44, depthTest:false}));
       this.debugGroup.add(dot);
-      this.feet.push({upper:a,lower:b,paw:c,planted:false,anchor:v(),clearance:c.getWorldPosition(v()).y-floor,dot});
+      this.feet.push({upper:a,lower:b,paw:c,hock:upper.startsWith('thigh') ? root.getObjectByName(upper.replace('thigh','hind_foot')) : undefined,planted:false,anchor:v(),previousSolved:v(),clearance:c.getWorldPosition(v()).y-floor,dot});
     }
     this.debugGroup.name='LocomotionContactDebug';
     group.add(this.debugGroup);
   }
   /** Undo last frame's additive layer before the mixer supplies the next authored pose. */
   beforeMixer() {
-    for (const o of this.overlays) o.bone.quaternion.copy(o.rotation);
+    for (let i=this.overlays.length-1;i>=0;i--) {const o=this.overlays[i];o.bone.quaternion.copy(o.rotation);}
     this.overlays.length=0;
   }
   fadeSeconds = .16;
@@ -151,13 +151,21 @@ export class AuthoredLocomotion {
     }
     if(active==='idle' || active==='skid') overlay(this.tailBone,new THREE.Vector3(1,0,0),-.20);
     this.root.updateWorldMatrix(true,true);
+    if(this.tailBone && this.input.grounded) {
+      const base=this.tailBone.getWorldPosition(v()); let lift=0;
+      for(const bone of this.tails.slice(1)) {
+        const p=bone.getWorldPosition(v()); const ground=this.input.groundAt(p.x,p.z,this.group.position.y+.6);
+        if(Number.isFinite(ground))lift=Math.max(lift,Math.atan2(Math.max(0,ground+.07-p.y),Math.max(.2,p.distanceTo(base))));
+      }
+      if(lift>0) {overlay(this.tailBone,new THREE.Vector3(1,0,0),Math.min(.45,lift));this.root.updateWorldMatrix(true,true);}
+    }
     const gait=this.metrics.gait as Gait;
     const data=GAITS[gait];
     const action=this.actions.get(gait);
     const phase=this.phase;
     this.metrics.phase=phase;
     this.footfalls.length=0;
-    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxCorrection=0;
+    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;
     const locomoting=['run','walk','trot'].includes(active);
     this.debugGroup.visible=this.params.debug;
     this.feet.forEach((foot,i)=>{
@@ -180,13 +188,23 @@ export class AuthoredLocomotion {
         delta.clampLength(0,this.params.maxCorrection).multiplyScalar(this.params.plantStrength);
         this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,delta.length());
         // Save both joints so correction cannot accumulate when a clip doesn't key that bone.
-        for (const bone of [foot.upper,foot.lower,foot.paw]) this.overlays.push({bone,rotation:bone.quaternion.clone()});
+        for (const bone of [foot.upper,foot.lower,foot.paw,foot.hock]) if(bone) this.overlays.push({bone,rotation:bone.quaternion.clone()});
         const padRotation=foot.paw.getWorldQuaternion(q());
-        this.solve(foot.upper,foot.lower,foot.paw,paw.add(delta));
+        const target=paw.add(delta);
+        if(foot.hock) {
+          const hockRotation=foot.hock.getWorldQuaternion(q());
+          const hockPosition=foot.hock.getWorldPosition(v());
+          const metatarsus=foot.paw.getWorldPosition(v()).sub(hockPosition);
+          this.solve(foot.upper,foot.lower,foot.hock,target.clone().sub(metatarsus),1);
+          foot.hock.quaternion.copy(foot.hock.parent!.getWorldQuaternion(q()).invert().multiply(hockRotation));
+          foot.hock.updateWorldMatrix(false,true);
+        } else this.solve(foot.upper,foot.lower,foot.paw,target,-1);
         const padParent=foot.paw.parent!.getWorldQuaternion(q());
         foot.paw.quaternion.copy(padParent.invert().multiply(padRotation));
         foot.paw.updateWorldMatrix(false,true);
         const corrected=foot.paw.getWorldPosition(v());
+        if(foot.planted)this.metrics.maxSlideMS=Math.max(this.metrics.maxSlideMS,corrected.distanceTo(foot.previousSolved)/step);
+        foot.previousSolved.copy(corrected);
         this.metrics.maxResidual=Math.max(this.metrics.maxResidual,corrected.distanceTo(foot.anchor));
         this.metrics.stanceFeet++;
       }
@@ -196,13 +214,15 @@ export class AuthoredLocomotion {
     });
     if (!locomoting) this.metrics.gait=active;
   }
-  private solve(upper:THREE.Object3D, lower:THREE.Object3D, paw:THREE.Object3D,target:THREE.Vector3) {
+  private solve(upper:THREE.Object3D, lower:THREE.Object3D, paw:THREE.Object3D,target:THREE.Vector3,poleSign:number) {
     const a=upper.getWorldPosition(v()), b=lower.getWorldPosition(v()), c=paw.getWorldPosition(v());
     const l1=a.distanceTo(b),l2=b.distanceTo(c); if(l1<.001||l2<.001)return;
     const direction=target.clone().sub(a).normalize();
     const distance=THREE.MathUtils.clamp(a.distanceTo(target),Math.abs(l1-l2)+.0001,l1+l2-.0001);
-    const bend=b.clone().sub(a).addScaledVector(direction,-b.clone().sub(a).dot(direction));
-    if(bend.lengthSq()<1e-8) bend.crossVectors(new THREE.Vector3(1,0,0).applyQuaternion(this.group.quaternion),direction);
+    // Anatomical pole: fore elbow backward, hind stifle forward, always in the actor's sagittal plane.
+    const pole=new THREE.Vector3(0,0,poleSign).applyQuaternion(this.group.quaternion);
+    const bend=pole.addScaledVector(direction,-pole.dot(direction));
+    if(bend.lengthSq()<1e-8)return;
     bend.normalize();
     const along=(l1*l1+distance*distance-l2*l2)/(2*distance);
     const joint=a.clone().addScaledVector(direction,along).addScaledVector(bend,Math.sqrt(Math.max(0,l1*l1-along*along)));
