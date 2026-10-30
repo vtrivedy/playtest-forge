@@ -20,10 +20,16 @@ export function createGameAudio() {
   const key = (e: KeyboardEvent) => {
     if (e.code === 'KeyM' && !e.repeat && !(e.target as HTMLElement)?.closest('input,textarea,[contenteditable]')) {
       audioSettings.muted = !audioSettings.muted;
+      syncSettings();
     }
   };
   document.addEventListener('visibilitychange', visible);
   window.addEventListener('keydown', key);
+  function syncSettings() {
+    if (!ctx) return;
+    const volume = Number.isFinite(audioSettings.volume) ? Math.max(0, Math.min(1, audioSettings.volume)) : 0;
+    master.gain.setTargetAtTime(audioSettings.muted ? 0 : volume, ctx.currentTime, 0.035);
+  }
   function play(name: Cue, opts: VoiceOptions = {}) {
     if (!ctx || ctx.state !== 'running' || disposed) return;
     const t = ctx.currentTime;
@@ -44,6 +50,7 @@ export function createGameAudio() {
   }
   return {
     settings: audioSettings,
+    syncSettings,
     async resume() {
       if (disposed) return;
       if (!ctx) {
@@ -71,7 +78,7 @@ export function createGameAudio() {
       restored += (Math.max(0, Math.min(1, localRestore)) - restored) * (1 - Math.exp(-step / 2));
       if (!ctx || ctx.state !== 'running') return;
       const t = ctx.currentTime;
-      master.gain.setTargetAtTime(audioSettings.muted ? 0 : Math.max(0, Math.min(1, audioSettings.volume)), t, 0.035);
+      syncSettings();
       pressed.gain.setTargetAtTime(enabled ? Math.cos(restored * Math.PI / 2) : 0, t, 0.4);
       warm.gain.setTargetAtTime(enabled ? Math.sin(restored * Math.PI / 2) : 0, t, 0.4);
       glide.gain.setTargetAtTime(gliding && !grounded ? 0.075 : 0, t, 0.09);

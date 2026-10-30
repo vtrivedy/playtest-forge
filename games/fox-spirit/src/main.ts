@@ -272,8 +272,8 @@ async function boot() {
   fFeel.add(feel, 'dashSpeed', 10, 30, 0.5).listen();
   fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
   const fAudio = gui.addFolder('Audio');
-  fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume');
-  fAudio.add(audio.settings, 'muted').name('Mute (M)').listen();
+  fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
+  fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
   fAudio.close();
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
