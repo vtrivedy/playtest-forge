@@ -229,3 +229,8 @@ populated foliage and gameplay remain on the same path. Verify with GPU boot
 and region stills before considering the startup regression repaired.
 ### Fox leg and fur follow-up — driver 14:10
 After validating clear review cameras, broaden the forearm and upper rear-leg coat without moving rig joints. Replace the abrupt black sock boundary with a longer rust → umber → charcoal transition; preserve compact dark paws and the authored gait contract. Remove the cream nape stripe by restricting the chest blaze to forward-facing surfaces. Compare fixed concept cameras and both gameplay grades before claiming an improvement.
+
+### Review-helper shot parity — 14:45 ET
+Expose the landed flow, Crown, and showcase shots through the one-command
+review helper. These use the same GPU harness and report verification already
+used by direct Modal invocation; do not maintain a helper-only capture path.
