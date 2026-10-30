@@ -82,7 +82,7 @@ async function main() {
     for (let i = 0; i < angles.length; i++) {
       await page.waitForTimeout(i === 0 ? 400 : 1400);
       const file = path.join(outDir, `yaw-${String(angles[i]).padStart(3, '0')}.png`);
-      await page.screenshot({ path: file });
+      await page.screenshot({ path: file, timeout: 60_000, animations: 'disabled' });
       console.log('wrote', file);
     }
 
@@ -95,7 +95,7 @@ async function main() {
     await page.waitForTimeout(500);
     for (let i = 0; i < 4; i++) {
       await page.waitForTimeout(200);
-      await page.screenshot({ path: path.join(outDir, `run-frame-${i}.png`) });
+      await page.screenshot({ path: path.join(outDir, `run-frame-${i}.png`), timeout: 60_000, animations: 'disabled' });
     }
 
     // Side-by-side note file

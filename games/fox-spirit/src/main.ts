@@ -111,10 +111,10 @@ async function boot() {
   })();
 
   const cam = createFollowCamera({
-    fov: 48,
-    distance: 3.2,
-    height: 1.45,
-    lookAtHeight: 0.65,
+    fov: 46,
+    distance: 2.85,
+    height: 1.05,
+    lookAtHeight: 0.55,
     yAt: world.yAt,
   });
   cam.resize(innerWidth, innerHeight);

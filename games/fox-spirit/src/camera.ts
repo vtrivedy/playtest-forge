@@ -60,8 +60,14 @@ export function createFollowCamera(opts: {
       const t = pullDuration > 0 ? Math.min(1, pullTime / pullDuration) : 1;
       pull = THREE.MathUtils.lerp(pullStart, pullGoal, t * t * (3 - 2 * t));
       const extra = Math.max(0, frame.pullBack ?? pull);
-      // Keep a stable world-relative orbit so camera-relative steering never chases itself.
-      desired.set(target.x, target.y + height + extra * 0.35, target.z + distance + extra);
+      // World-relative chase with a slight lateral bias so the fox reads as a
+      // slender quadruped (profile of legs/snout/tail) instead of a pure rear blob.
+      const side = distance * 0.38;
+      desired.set(
+        target.x + side,
+        target.y + height + extra * 0.28,
+        target.z + distance + extra,
+      );
       const ahead = frame.lookAhead ?? 1.1;
       aim.set(target.x + Math.sin(facingY) * ahead, target.y + lookHeight, target.z + Math.cos(facingY) * ahead);
       if (!initialized) {
