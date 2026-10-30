@@ -258,7 +258,7 @@ if (mode === 'shots') {
     for (const [k, f] of Object.entries(want)) {
       if (!got[k] && f(st)) {
         await advance(0); // render the triggering state itself (no extra sim step)
-        got[k] = { t: st.t, zone: st.zone, anim: st.anim, camera: { foxNdc: st.camera.foxNdc, landingNdc: st.camera.landingNdc, occlusion: st.camera.occlusion } };
+        got[k] = { t: st.t, zone: st.zone, gait: st.gait, camera: { foxNdc: st.camera.foxNdc, landingNdc: st.camera.landingNdc, occlusion: st.camera.occlusion } };
         await shot(`moments/${k}`);
       }
     }

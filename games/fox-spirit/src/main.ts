@@ -26,7 +26,9 @@ import {
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
-import type { FoxAnimState } from './fox';
+import type { LocoInput } from './locomotion/locomotion';
+import { DEFAULT_MOVE, createMoveState, groundMove } from './locomotion/controller';
+import { createLocoPanel } from './locomotion/panel';
 import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
 import { createEmberTrail } from './fx';
@@ -153,7 +155,8 @@ async function boot() {
   lights.key.shadow.mapSize.set(quality.shadowMapSize, quality.shadowMapSize);
   lights.key.castShadow = quality.shadows;
   scene.add(lights.key.target);
-  const foxActor = await createFox();
+  const foxActor = await createFox((x, z, refY) => col.groundAt(x, z, refY).y);
+  scene.add(foxActor.loco.debug);
   scene.add(foxActor.group);
   foxActor.group.position.copy(world.spawnPos);
   foxActor.group.position.y += foxActor.feetOffset;
@@ -297,6 +300,8 @@ async function boot() {
   fFeel.add(feel, 'glideForward', 4, 12, 0.1).listen();
   fFeel.add(feel, 'dashSpeed', 10, 30, 0.5).listen();
   fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
+  const move = { ...DEFAULT_MOVE };
+  createLocoPanel(gui, foxActor.loco, move);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
@@ -361,14 +366,13 @@ async function boot() {
   let glideHoldT = 0;
   let airT = 0;
   let jumpedThisAir = false;
-  let landT = 0;
   let hitstop = 0;
   let lastHitstop = -1;
   let shrineOn = false;
   let fxEnabled = true;
   let turntableMode = false;
   let turntableYaw = 0;
-  let turntableAnim: FoxAnimState = 'idle';
+  let turntableTread = 0;
   let embersGot = 0;
   let airDashUsed = false;
   let prevFeet = world.spawnPos.y;
@@ -407,8 +411,15 @@ async function boot() {
   let kickCooldown = 0;
   /** Manual clock: the harness advances sim time explicitly (deterministic captures on slow GPUs) */
   let manual = false;
-  /** When set, step() keeps this clip instead of picking from locomotion (run-strip captures). */
-  let harnessAnimLock: FoxAnimState | null = null;
+  /** Staged stills: the fox strides in place at this speed (0 = stand) */
+  let harnessTread = 0;
+  const treadFor = (anim?: string) => (anim === 'run' ? 5 : anim === 'walk' ? 1.1 : anim === 'gallop' ? 8 : 0);
+  const moveState = createMoveState(Math.PI);
+  /** Jump wind-up: a few frames of crouch before takeoff (−1 = none) */
+  let windupT = -1;
+  /** Analog stick override for harness input (x right, y forward, |v| ≤ 1) */
+  let stick: { x: number; y: number } | null = null;
+  const locoIn: LocoInput = { vel: new THREE.Vector3(), grounded: true, gliding: false, dashing: false, skidding: false, windup: 0 };
   let visualDt = 0;
 
   const setFx = (on: boolean) => {
@@ -430,7 +441,8 @@ async function boot() {
     __gameHooks?: Record<string, unknown>;
   };
   win.__gameHooks = {
-    hasClips: foxActor.hasClips,
+    loco: foxActor.loco,
+    move,
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
     fx: { autumnFX, emberMotes },
@@ -442,7 +454,7 @@ async function boot() {
       vel.set(0, 0, 0);
       photo = null;
       cam.snapBehind(Math.PI);
-      foxActor.setAnim('idle');
+      foxActor.loco.snap();
     },
     /** Staged: start the restore sequence from wherever the fox stands (real play uses the trigger). */
     forceRestore() {
@@ -464,8 +476,8 @@ async function boot() {
     setFxEnabled(on: boolean) {
       setFx(on);
     },
-    getAnim() {
-      return foxActor.getAnim();
+    getGait() {
+      return foxActor.loco.snapshot();
     },
     setFeelPreset(name: 'spring' | 'brisk') {
       usePreset(name === 'brisk' ? 'brisk' : 'spring');
@@ -474,14 +486,13 @@ async function boot() {
     runTurntable(opts?: { anim?: string; fx?: boolean }) {
       turntableMode = true;
       turntableYaw = 0;
-      turntableAnim = (opts?.anim as FoxAnimState) || 'idle';
-      harnessAnimLock = turntableAnim;
+      turntableTread = treadFor(opts?.anim);
       setFx(opts?.fx !== false);
-      foxActor.setAnim(turntableAnim);
     },
     stopTurntable() {
       turntableMode = false;
-      harnessAnimLock = null;
+      harnessTread = 0;
+      foxActor.loco.state.treadmill = 0;
     },
     poseHero(opts?: { anim?: string; fx?: boolean }) {
       // Open meadow path north of the portal — clear of trees for anatomy judgment
@@ -491,11 +502,11 @@ async function boot() {
       foxActor.group.position.set(x, gy + foxActor.feetOffset, z);
       foxActor.group.rotation.y = Math.PI * 0.72; // 3/4 toward south-east cam
       vel.set(0, 0, 0);
-      const anim = (opts?.anim as FoxAnimState) || 'run';
-      harnessAnimLock = anim;
-      foxActor.setAnim(anim);
-      // Advance a few mixer frames so run pose isn't T-pose
-      for (let i = 0; i < 8; i++) foxActor.update(1 / 30, i / 30, false);
+      harnessTread = treadFor(opts?.anim ?? 'run');
+      foxActor.loco.snap();
+      // stride a few frames so the still lands mid-gait
+      foxActor.loco.state.treadmill = harnessTread;
+      for (let i = 0; i < 20; i++) foxActor.update(1 / 60, locoIn);
       setFx(opts?.fx !== false);
       // Staged still: photo framing, not the traversal camera
       const fx = foxActor.group.position;
@@ -510,6 +521,8 @@ async function boot() {
       foxActor.group.rotation.y = yaw;
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
+      moveState.heading = yaw;
+      foxActor.loco.snap();
       photo = null;
       cam.snapBehind(yaw);
     },
@@ -543,6 +556,10 @@ async function boot() {
       for (let i = 0; i < frames; i++) step(dt);
       if (render) draw();
       return win.__gameHooks!.state && (win.__gameHooks!.state as () => unknown)();
+    },
+    /** Analog stick for the next advance() calls: x right, y forward (camera-relative), |v| ≤ 1; null = keys */
+    setStick(x: number | null, y = 0) {
+      stick = x === null ? null : { x, y };
     },
     /** Drag-orbit equivalent (radians) for keyboard steering tests */
     orbit(dYaw: number) {
@@ -622,7 +639,8 @@ async function boot() {
         vel: [vel.x, vel.y, vel.z],
         foxYaw: foxActor.group.rotation.y,
         airT,
-        anim: foxActor.getAnim(),
+        gait: foxActor.loco.state.gait,
+        loco: foxActor.loco.snapshot(),
         grounded,
         gliding,
         preset: feelPreset,
@@ -857,6 +875,7 @@ async function boot() {
     right.crossVectors(forward, UP).normalize();
     wish.set(0, 0, 0);
     if (ix || iz) wish.addScaledVector(right, ix).addScaledVector(forward, -iz).normalize();
+    if (stick) wish.set(0, 0, 0).addScaledVector(right, stick.x).addScaledVector(forward, stick.y);
 
     // ground probe (one-way surfaces; previous feet height catches fast falls)
     let feetY = fox.position.y - foxActor.feetOffset;
@@ -904,7 +923,6 @@ async function boot() {
         if (jumpedThisAir) jumpStats.lastDist = Number(Math.hypot(fox.position.x - takeoff.x, fox.position.z - takeoff.z).toFixed(2));
         if (airT > 0.12) {
           cam.land(impact);
-          landT = 0.1 + 0.28 * impact;
           if (impact > 0.75) cam.shake(0.18 * impact);
           audio.play('land', { strength: impact, surface: surfaceOf(probe.collider?.tag) });
         }
@@ -916,7 +934,16 @@ async function boot() {
       airT += dt;
     }
 
-    const jv = jumpFeel.tryJump(feel.jumpVelocity * groundBounce, fox.position.y);
+    // grounded jumps crouch for a few frames first (anticipation); coyote jumps launch at once
+    let jv: number | null = null;
+    if (windupT >= 0) {
+      windupT += dt;
+      if (windupT >= move.jumpWindup) {
+        windupT = -1;
+        jv = jumpFeel.tryJump(feel.jumpVelocity * groundBounce, fox.position.y);
+      }
+    } else if (grounded && move.jumpWindup > 0 && jumpFeel.buffer > 0 && jumpFeel.coyote > 0) windupT = 0;
+    else jv = jumpFeel.tryJump(feel.jumpVelocity * groundBounce, fox.position.y);
     if (jv !== null) {
       vel.y = jv;
       grounded = false;
@@ -983,7 +1010,9 @@ async function boot() {
     }
     wasGliding = gliding;
 
-    if (!dashing) {
+    if (!grounded) moveState.skidding = false;
+    if (!dashing && grounded) groundMove(moveState, move, wish, feel.moveSpeed, fox.rotation.y, vel, dt);
+    else if (!dashing) {
       const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward : feel.moveSpeed);
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
@@ -1010,48 +1039,25 @@ async function boot() {
     }
 
     const faceShrine = restore.inputLocked && wish.lengthSq() <= 0.01;
-    if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
+    if (grounded && !dashing && !faceShrine && (wish.lengthSq() > 0.0001 || Math.hypot(vel.x, vel.z) > 0.05)) {
+      // on the ground the body faces its (turn-rate-limited) travel heading — no instant pivots
+      fox.rotation.y = moveState.heading;
+    } else if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
       const yaw = faceShrine ? restore.faceYaw : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
       fox.rotation.y += d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
     }
 
-    // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
+    locoIn.vel.copy(vel);
+    locoIn.grounded = grounded;
+    locoIn.gliding = gliding;
+    locoIn.dashing = dashing;
+    locoIn.skidding = grounded && moveState.skidding;
+    locoIn.windup = windupT >= 0 ? Math.min(1, windupT / move.jumpWindup) : 0;
+    foxActor.loco.state.treadmill = harnessTread;
+    foxActor.update(dt, locoIn);
     const speed = Math.hypot(vel.x, vel.z);
-    landT -= dt;
-    {
-      let anim: FoxAnimState = 'idle';
-      let fade = 0.16;
-      let rate = 1;
-      if (harnessAnimLock) {
-        anim = harnessAnimLock;
-        fade = 0.05;
-        rate = harnessAnimLock === 'run' ? 1 : 1;
-      } else {
-        const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
-        if (dashing) {
-          anim = 'dash';
-          fade = 0.05;
-        } else if (!grounded && !offLedge) {
-          fade = 0.1;
-          if (gliding) anim = 'glide';
-          else if (vel.y > 2.2) anim = 'jump_up';
-          else if (vel.y > -1.6) anim = 'jump_apex';
-          else anim = 'jump_fall';
-        } else if (landT > 0 && (speed < 3.5 || landT > 0.16)) {
-          anim = 'land';
-          fade = 0.05;
-        } else if (speed > 1.2) {
-          anim = 'run';
-          // stride follows ground speed (clip authored near full run speed)
-          rate = THREE.MathUtils.clamp(speed / 8.4, 0.55, 1.45);
-        }
-      }
-      foxActor.setAnim(anim, fade);
-      foxActor.setTimeScale(rate);
-      foxActor.update(dt, elapsed, gliding || harnessAnimLock === 'glide');
-    }
 
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
     colorField.update(dt);
@@ -1217,7 +1223,7 @@ async function boot() {
         gliding,
         extra: {
           preset: feelPreset,
-          anim: foxActor.getAnim(),
+          gait: foxActor.loco.state.gait,
           lastJumpDist: jumpStats.lastDist,
           lastLandImpact: jumpStats.lastImpact,
           lastDashDist: jumpStats.lastDashDist,
@@ -1245,8 +1251,10 @@ async function boot() {
       fox.position.set(tx, ty + foxActor.feetOffset, tz);
       fox.rotation.y = turntableYaw; // model spins; camera fixed (classic turntable)
       vel.set(0, 0, 0);
-      foxActor.setAnim(turntableAnim);
-      foxActor.update(rawDt, elapsed, turntableAnim === 'glide');
+      foxActor.loco.state.treadmill = turntableTread;
+      locoIn.vel.set(0, 0, 0);
+      locoIn.grounded = true;
+      foxActor.update(rawDt, locoIn);
       cam.camera.position.set(tx, fox.position.y + 1.25, tz + 3.6);
       cam.camera.lookAt(tx, fox.position.y + 0.4, tz);
       contactShadow.position.set(tx, ty + 0.03, tz);
