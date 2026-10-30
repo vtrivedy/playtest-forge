@@ -44,6 +44,16 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
                 raise ValueError('Run ID belongs to another capture')
             if metadata.get('status', 'success') == 'success':
                 return metadata
+        # A retry must not blend its PNGs/report with an interrupted attempt.
+        prior_files = [p for p in out.iterdir() if not p.name.startswith('attempt-')]
+        if prior_files:
+            attempt = 1
+            while (out / f'attempt-{attempt:03d}').exists():
+                attempt += 1
+            history = out / f'attempt-{attempt:03d}'
+            history.mkdir()
+            for old_file in prior_files:
+                old_file.rename(history / old_file.name)
         gpu = run(['nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'], capture_output=True).stdout.strip() if backend != 'swiftshader' else 'CPU / SwiftShader (explicit fallback)'
         (out / 'nvidia-smi.txt').write_text(gpu + '\n')
         print('GPU:', gpu, flush=True)
@@ -80,6 +90,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         metadata = {'status': 'success', 'ref': ref, 'commit': sha, 'gpu': gpu, 'shots': shots, 'runId': run_id,
                     'buildSeconds': round(built-started, 2), 'captureSeconds': round(time.monotonic()-built, 2),
                     'backend': backend, 'size': size, 'quality': quality, 'fps': fps,
+                    'routeFrom': route_from, 'routeTo': route_to,
                     'captureToolSha': json.loads((out / 'report.json').read_text())['captureToolSha'],
                     'totalSeconds': round(time.monotonic()-started, 2)}
         (out / 'run.json').write_text(json.dumps(metadata, indent=2))
@@ -114,8 +125,8 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'crown', 'flow', 'showcase'}:
-        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, water, shade, turntable, updraft, wind, growth, levels, windgap, marshmouth, crown, flow, showcase or comma-separated')
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'crown', 'flow', 'showcase', 'reach'}:
+        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, water, shade, turntable, updraft, wind, growth, levels, windgap, marshmouth, crown, flow, showcase, reach or comma-separated')
     if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
         raise ValueError('Gait requires --fps 60')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:40]}-{shots.replace(",", "_")}-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:10]}'
