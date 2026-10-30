@@ -239,7 +239,6 @@ export function createEmberMotes(scene: THREE.Scene, opts: { maxMotes?: number; 
       if (!m || !m.alive) return;
       m.alive = false;
       if (quiet) {
-        flash(m.pos, 0.45 * m.scale, 0.5);
         for (let k = 0; k < Math.round(8 * m.scale); k++) {
           const a = Math.random() * Math.PI * 2;
           tmpV.set(Math.cos(a) * 0.35, rand(0.6, 1.3), Math.sin(a) * 0.35);
