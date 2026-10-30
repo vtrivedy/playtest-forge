@@ -17,8 +17,8 @@ import type { Hud } from './hud';
 export const IGNITE_S = 1.0;
 /** Player input is held until the ignition has landed */
 const LOCK_S = IGNITE_S + 0.5;
-/** Fox stands this far from the basin centre (trigger fires at 5.2 m) */
-const STAND_DIST = 4.9;
+/** Where the fox stops, relative to the basin centre: end of the summit path, at the plinth's south face */
+const STAND: [number, number] = [-0.9, 3.75];
 const FLOOD_S = 6;
 
 /**
@@ -110,6 +110,8 @@ export type RestoreCinematic = {
   begin: (fox: THREE.Vector3) => void;
   /** While locked: slow walk toward the stand point, as a wish vector (length ≤ 1) */
   walkWish: (fox: THREE.Vector3, out: THREE.Vector3) => THREE.Vector3;
+  /** While locked and standing: yaw that faces the basin */
+  readonly faceYaw: number;
   /** Undo the restore (harness: replay the event from a clean sepia world) */
   reset: () => void;
   update: (dt: number) => void;
@@ -231,21 +233,23 @@ export function createRestoreCinematic(opts: {
       if (phase !== 'idle') return;
       phase = 'approach';
       age = 0;
-      approach.set(fox.x - S.x, 0, fox.z - S.z);
-      if (approach.lengthSq() < 1e-4) approach.set(0, 0, 1);
-      approach.normalize();
+      // fixed stand + approach frame: the lens is authored once, wherever the fox crossed the trigger
+      stand.set(S.x + STAND[0], fox.y, S.z + STAND[1]);
+      approach.set(STAND[0], 0, STAND[1]).normalize();
       // fox's right while facing the basin
       right.set(approach.z, 0, -approach.x);
-      stand.copy(S).addScaledVector(approach, STAND_DIST).setY(fox.y);
       const keys: CameraPathKey[] = SHOT.map((k) => ({ t: k.t, pos: keyPoint(k.frame, k.pos), look: keyPoint(k.frame, k.look), fov: k.fov }));
       opts.camera.playPath({ keys, blendInS: 0.7, blendOutS: 1.4, lockS: LOCK_S });
+    },
+    get faceYaw() {
+      return Math.atan2(-approach.x, -approach.z);
     },
     walkWish(fox, out) {
       out.set(stand.x - fox.x, 0, stand.z - fox.z);
       const d = out.length();
       if (d < 0.12) return out.set(0, 0, 0);
-      // slow, easing walk (≈ 1–2 m/s): the fox steps up to the basin, it doesn't run into it
-      return out.multiplyScalar(Math.min(0.24, d * 0.3) / d);
+      // easing walk (≈ 1–2.5 m/s): the fox steps up to the basin, it doesn't run into it
+      return out.multiplyScalar(Math.min(0.3, d * 0.36) / d);
     },
     reset() {
       if (region) {

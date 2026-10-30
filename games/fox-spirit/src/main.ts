@@ -414,7 +414,7 @@ async function boot() {
   win.__gameHooks = {
     hasClips: foxActor.hasClips,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField },
+    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group },
     fx: { autumnFX, emberMotes },
     teleportToShrine() {
       const p = world.wellspringPos;
@@ -991,8 +991,9 @@ async function boot() {
       }
     }
 
-    if (wish.lengthSq() > 0.01 && dt > 0) {
-      const yaw = Math.atan2(wish.x, wish.z);
+    const faceShrine = restore.inputLocked && wish.lengthSq() <= 0.01;
+    if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
+      const yaw = faceShrine ? restore.faceYaw : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
       fox.rotation.y += d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
