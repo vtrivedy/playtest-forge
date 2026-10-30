@@ -55,13 +55,15 @@ def run_stream(stream: str, model: str, branch: str, brief: str, duration: int):
     out = Path('/streams') / stream
     out.mkdir(parents=True, exist_ok=True)
     shutil.chown(out, user='agent', group='agent')
+    out.chmod(0o700)
     repo = Path('/home/agent/game')
     auth = Path('/home/agent/.codex/auth.json')
     ask = Path('/tmp/fox-git-askpass')
     state = dict(registry[stream])
     start = time.monotonic()
     proc = None
-    gate = threading.Lock()
+    thread = None
+    gate = threading.RLock()
     done = threading.Event()
     log_path = out / 'agent.log'
     def interrupted(*_):
@@ -81,24 +83,28 @@ def run_stream(stream: str, model: str, branch: str, brief: str, duration: int):
     def emit(message):
         for value in sensitive:
             message = message.replace(value, '[REDACTED]')
-        with gate:
-            with log_path.open('a') as log:
-                log.write(message.rstrip() + '\n')
+        try:
+            with gate:
+                fd = os.open(log_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o644)
+                with os.fdopen(fd, 'a') as log:
+                    log.write(message.rstrip() + '\n')
+        except OSError:
+            print('LOG_WRITE_FAILED', flush=True)
     def save(**updates):
-        state.update(updates)
-        registry[stream] = state
-        # Atomic replacement avoids following a symlink created by an agent.
-        status_temp = out / f'.status-{os.getpid()}.json'
-        fd = os.open(status_temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, 'w') as handle:
-            json.dump(state, handle, indent=2)
-        os.replace(status_temp, out / 'status.json')
+        import tempfile
         with gate:
+            state.update(updates)
+            snapshot = state.copy()
+            registry[stream] = snapshot
+            fd, temp_name = tempfile.mkstemp(prefix='.status-', dir=out)
+            with os.fdopen(fd, 'w') as handle:
+                json.dump(snapshot, handle, indent=2)
+            os.replace(temp_name, out / 'status.json')
             volume.commit()
             try:
                 volume.reload()
             except Exception:
-                pass  # An agent may briefly hold an artifact open; retry next heartbeat.
+                emit('RELOAD_DEFERRED: an artifact may still be open; retry next heartbeat')
     env = {key: os.environ[key] for key in ('PATH', 'LANG', 'TERM', 'GH_TOKEN',
            'CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN') if key in os.environ}
     env.update(GIT_ASKPASS=str(ask), GIT_TERMINAL_PROMPT='0', CODEX_HOME='/home/agent/.codex',
@@ -108,14 +114,14 @@ def run_stream(stream: str, model: str, branch: str, brief: str, duration: int):
             os.killpg(pid, sig)
         except ProcessLookupError:
             pass
-    def command(args, check=True, install=False):
+    def command(args, check=True, install=False, timeout=240):
         child_env = env
         if install:
             child_env = {key: value for key, value in env.items() if key in {'PATH', 'LANG', 'TERM', 'HOME', 'USER'}}
         child = subprocess.Popen(['runuser', '-u', 'agent', '--', *args], cwd=repo if repo.exists() else '/home/agent',
                                  env=child_env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
         try:
-            output, _ = child.communicate(timeout=240)
+            output, _ = child.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
             kill_group(child.pid, signal.SIGKILL)
             child.stdout.close()
@@ -127,22 +133,22 @@ def run_stream(stream: str, model: str, branch: str, brief: str, duration: int):
             raise RuntimeError(f'{args[0]} exited {result.returncode}')
         return result
     def push():
-        head = command(['git', 'rev-parse', 'HEAD'], check=False)
+        head = command(['git', 'rev-parse', 'HEAD'], check=False, timeout=20)
         if head.returncode:
             return
         sha = head.stdout.strip()
-        result = command(['git', 'push', 'origin', f'{sha}:refs/heads/{branch}'], check=False)
+        result = command(['git', 'push', 'origin', f'{sha}:refs/heads/{branch}'], check=False, timeout=20)
         if result.returncode == 0:
             state.update(last_push=sha, last_push_at=time.time())
             emit(f'BACKUP_PUSH {branch} {sha}')
         else:
-            rescue = f'{branch}-rescue-{int(time.time())}'
-            result = command(['git', 'push', 'origin', f'{sha}:refs/heads/{rescue}'], check=False)
+            rescue = f'{branch}-rescue-{int(state["created"])}'
+            result = command(['git', 'push', 'origin', f'{sha}:refs/heads/{rescue}'], check=False, timeout=20)
             if result.returncode == 0:
                 state.update(rescue_branch=rescue, last_push=sha, last_push_at=time.time())
                 emit(f'RESCUE_PUSH {rescue} {sha}')
             else:
-                command(['git', 'bundle', 'create', str(out / 'unpushed.bundle'), '--all'])
+                command(['git', 'bundle', 'create', str(out / 'unpushed.bundle'), '--all'], timeout=30)
                 emit('BACKUP_PUSH_FAILED; committed history preserved in unpushed.bundle')
     def terminate():
         if proc is not None:
@@ -192,7 +198,9 @@ def run_stream(stream: str, model: str, branch: str, brief: str, duration: int):
             shutil.chown(auth, user='agent', group='agent')
         shutil.chown(auth.parent, user='agent', group='agent')
         save(status='starting')
+        setup_stop_check()
         command(['git', 'clone', '--single-branch', '--branch', 'main', REPO, str(repo)])
+        setup_stop_check()
         command(['git', 'config', 'user.name', 'Fox Remote Agent'])
         command(['git', 'config', 'user.email', 'fox-agent@users.noreply.github.com'])
         found = command(['git', 'ls-remote', '--exit-code', '--heads', 'origin', branch], check=False)
@@ -231,7 +239,7 @@ Your task follows:\n{brief}'''
             emit(line)
         code = proc.wait()
         done.set()
-        thread.join(timeout=250)
+        thread.join(timeout=90)
         state.update(status='stopped' if (state.get('stop_reason') or stop_requested()) else ('complete' if code == 0 else 'failed'), exit_code=code)
     except BaseException:
         emit(traceback.format_exc())
@@ -239,6 +247,8 @@ Your task follows:\n{brief}'''
         raise
     finally:
         done.set()
+        if thread is not None:
+            thread.join(timeout=90)
         for cleanup in (terminate, lambda: push() if (repo / '.git').exists() else None,
                         lambda: auth.unlink(missing_ok=True), lambda: ask.unlink(missing_ok=True)):
             try:
@@ -246,7 +256,14 @@ Your task follows:\n{brief}'''
             except Exception as exc:
                 emit(f'CLEANUP_ERROR {type(exc).__name__}')
         # Keep checkout until container teardown; a failed final push must not delete commits.
-        save(ended=time.time())
+        try:
+            save(ended=time.time())
+        except Exception as exc:
+            emit(f'FINAL_SAVE_ERROR {type(exc).__name__}')
+        finally:
+            volume.commit()
+            if registry.get(f'branch:{branch}') == stream:
+                registry.pop(f'branch:{branch}', None)
 
 
 @app.local_entrypoint()
@@ -310,4 +327,6 @@ def main(stream: str = '', model: str = 'sol', branch: str = '', brief: str = ''
     except BaseException:
         if call is None:
             registry[stream] = {**entry, 'status': 'launch-failed'}
+            if registry.get(branch_key) == stream:
+                registry.pop(branch_key, None)
         raise
