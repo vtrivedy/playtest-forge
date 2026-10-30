@@ -144,7 +144,7 @@ for v in me.vertices:
         e = eyeL if co.x > 0 else eyeR
         dyx = abs((co - e).xy.length) / 0.07
         c = mix(PAL["amber"], PAL["pupil"], 1 - smooth(0.12, 0.35, dyx))
-    elif d < 0.085: c = mix(c, PAL["liner"], 1 - smooth(0.025, 0.085, d))  # strong dark lid rim: watchful, not round
+    elif d < 0.12: c = mix(c, PAL["liner"], 1 - smooth(0.03, 0.12, d))  # strong dark lid rim: watchful, not round
     if v.index in nose_vs: c = PAL["nose"]
     cols.append(c)
     # shell-fur length (model units; fox ~3.3 tall): long ruff/cheeks, short face/lower legs, none on paws/eyes
@@ -154,7 +154,7 @@ for v in me.vertices:
     L = max(L, 0.07 * jaw)  # throat fur hangs over the jaw / bib crease
     if ear > 0.3: L = 0.012
     L *= 1 - 0.75 * leg * (1 - smooth(0.7, 1.2, co.z))
-    if v.index in eye_vs or v.index in nose_vs or (d < 0.05): L = 0.0
+    if v.index in eye_vs or v.index in nose_vs or (d < 0.075): L = 0.0  # keep shells off the (enlarged) eyes and lids
     if co.z < 0.2: L = 0.0
     furlen.append(L)
     # spirit inner glow (under the fur): faint heat at the shoulders / nape only (concept has no flame ridge,
@@ -175,7 +175,7 @@ for it in range(7):  # soft painted transitions (bib / saddle / socks blend, no 
 ca = me.color_attributes.new("Region", "BYTE_COLOR", "POINT")
 for i, c in enumerate(cols): ca.data[i].color_srgb = (c[0] / 255, c[1] / 255, c[2] / 255, 1)
 # fur length: relax steps (head short -> ruff long made a dark shell ledge under the jaw = "collar")
-for it in range(4):
+for it in range(10):
     furlen = [0.0 if L <= 0 else (L * 2 + sum(furlen[j] for j in adj[i]) / len(adj[i])) / 3 if adj[i] else L for i, L in enumerate(furlen)]
 for it in range(2):
     glow = [(g * 2 + sum(glow[j] for j in adj[i]) / len(adj[i])) / 3 if adj[i] else g for i, g in enumerate(glow)]

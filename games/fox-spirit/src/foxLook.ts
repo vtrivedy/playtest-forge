@@ -137,6 +137,7 @@ export function applyFoxLook(root: THREE.Object3D) {
       } else if (n.includes('eye')) {
         mat.color.setHex(0xffffff);
         mat.emissive = new THREE.Color(0xffa040); // faint amber: a watchful glint, not a lamp
+        mat.emissiveMap = mat.map; // glow follows the iris: slit pupil and lid stay dark
         eyeMats.push(mat);
       } else if (n.includes('nose')) {
         mat.color.setHex(0xffffff);
