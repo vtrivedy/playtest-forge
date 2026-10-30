@@ -498,6 +498,9 @@ async function boot() {
           yaw: cam.getYaw(),
           occlusion: occlusion.strength,
           photo: !!photo,
+          foxNdc: cam.debug.fox,
+          landingNdc: cam.debug.landing,
+          internals: cam.debug.internals(),
         },
         fx: { enabled: fxEnabled, bloom: post.bloom.strength, bloomParam: post.params.bloomStrength, grain: post.params.grain },
       };
@@ -903,8 +906,10 @@ async function boot() {
       grounded,
       gliding,
       dashing,
+      airTime: airT,
       landing: landingValid ? landing : null,
     });
+    occlusion.update(rawDt, cam.camera, renderer, feetPos, foxActor.height);
     audio.update(dt, speed > 1.2, grounded, gliding);
   }
   const feetPos = new THREE.Vector3();
@@ -958,7 +963,6 @@ async function boot() {
         cam.camera.updateProjectionMatrix();
       }
     }
-    occlusion.update(dt, cam.camera, renderer, feetPos, foxActor.height);
     // keep film grain off the hero
     heroNdc.set(fox.position.x, fox.position.y - foxActor.feetOffset + foxActor.height * 0.45, fox.position.z).project(cam.camera);
     const heroR = THREE.MathUtils.clamp(0.9 / Math.max(0.5, cam.camera.position.distanceTo(fox.position)), 0.05, 0.4);

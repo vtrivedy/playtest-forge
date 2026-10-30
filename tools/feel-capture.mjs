@@ -167,6 +167,59 @@ if (mode === 'shots') {
     console.log(name, JSON.stringify(result[name]));
   }
   save('presets', result);
+} else if (mode === 'framing') {
+  // UNASSISTED full route; sample the traversal camera every 2 sim frames
+  await boot();
+  await H('autopilot', true, 0, { assist: false });
+  const acc = { frames: 0, air: 0, landingInFrame: 0, foxHigh: 0, foxLow: 0, foxOff: 0, pops: 0, maxCamSpeed: 0, occluded: 0, dist: [], events: [], misses: [], shotFrames: 0 };
+  let prev = null;
+  let st;
+  for (let i = 0; i < 60 * 200; i++) {
+    st = await advance(2, false);
+    const c = st.camera.pos;
+    const p = st.pos;
+    const [fx, fy] = st.camera.foxNdc;
+    acc.frames++;
+    acc.dist.push(Math.hypot(c[0] - p[0], c[2] - p[2]));
+    if (Math.abs(fx) > 1 || Math.abs(fy) > 1) acc.foxOff++;
+    else if (fy > 0.45) acc.foxHigh++;
+    else if (fy < -0.75) acc.foxLow++;
+    if (st.camera.occlusion > 0.5) acc.occluded++;
+    if (!st.grounded && st.camera.landingNdc) {
+      acc.air++;
+      const [lx, ly] = st.camera.landingNdc;
+      if (Math.abs(lx) < 0.95 && Math.abs(ly) < 0.95) acc.landingInFrame++;
+      else if (acc.misses.length < 40) acc.misses.push(`t=${st.t.toFixed(2)} ${st.anim} fox=${p.map((q) => q.toFixed(1))} land=${lx.toFixed(2)},${ly.toFixed(2)} ${st.camera.internals}`);
+    }
+    if (prev) {
+      const v = Math.hypot(c[0] - prev[0], c[1] - prev[1], c[2] - prev[2]) / (2 / 60);
+      acc.maxCamSpeed = Math.max(acc.maxCamSpeed, v);
+      const inShot = !/shot=0\.00/.test(st.camera.internals);
+      if (v > 26 && !inShot) acc.pops++;
+      if (inShot) acc.shotFrames++;
+      if (((v > 26 && !inShot) || Math.abs(fx) > 1 || Math.abs(fy) > 1) && acc.events.length < 60) {
+        acc.events.push(`t=${st.t.toFixed(2)} wp=${st.auto.idx} ${st.anim} v=${v.toFixed(0)} fox=${p.map((q) => q.toFixed(1))} cam=${c.map((q) => q.toFixed(1))} ndc=${fx.toFixed(2)},${fy.toFixed(2)} g=${st.grounded} ${st.camera.internals}`);
+      }
+    }
+    prev = c;
+    if (!st.auto.active || st.restored) break;
+  }
+  acc.dist.sort((a, b) => a - b);
+  const r = {
+    label: 'UNASSISTED framing — full route from spawn, traversal camera sampled every 2 frames',
+    reached: `${st.auto.idx}/${st.auto.of}`, restored: st.restored, stalled: st.auto.stalled || null, simSeconds: Number(st.t.toFixed(1)),
+    landingInFramePct: Number((100 * acc.landingInFrame / Math.max(1, acc.air)).toFixed(1)),
+    foxHighPct: Number((100 * acc.foxHigh / acc.frames).toFixed(1)),
+    foxLowPct: Number((100 * acc.foxLow / acc.frames).toFixed(1)),
+    foxOffscreenPct: Number((100 * acc.foxOff / acc.frames).toFixed(2)),
+    occlusionCutPct: Number((100 * acc.occluded / acc.frames).toFixed(1)),
+    camDist: { p10: acc.dist[Math.floor(acc.dist.length * 0.1)].toFixed(2), p50: acc.dist[Math.floor(acc.dist.length * 0.5)].toFixed(2), p90: acc.dist[Math.floor(acc.dist.length * 0.9)].toFixed(2) },
+    traversalPops: acc.pops, shotFrames: acc.shotFrames, maxCamSpeed: Number(acc.maxCamSpeed.toFixed(1)),
+    events: acc.events,
+    landingMisses: acc.misses,
+  };
+  save(`framing-${arg('tag', 'now')}`, r);
+  console.log(JSON.stringify(r));
 } else if (mode === 'video') {
   // UNASSISTED traversal from spawn, rendered every 2nd 60 Hz step → 30 fps video
   const seconds = Number(arg('seconds', '14'));
