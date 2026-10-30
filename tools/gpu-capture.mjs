@@ -432,13 +432,13 @@ try {
     const board=[.868243,-.496139];
     const segments=[
       {name:'Reedmarsh boardwalk walk',seconds:2,stick:board.map(v=>v*.18),reset:[62.5,.3,32.5]},
-      {name:'Windmill terrace trot',seconds:2,stick:tn.map(v=>v*.45),reset:sp(8,-5,2)},
-      {name:'Windmill terrace gallop',seconds:2,stick:tn,reset:sp(8,-8,2)},
-      {name:'Windmill carved turns',seconds:3,turn:true,reset:sp(5,0,2)},
-      {name:'Windmill jump and recovery',seconds:2,stick:tn.map(v=>v*.45),jump:true,reset:sp(5,0,2)},
+      {name:'Meadow path trot',seconds:2,stick:[0,-.45],reset:[0,null,82]},
+      {name:'Meadow clearing gallop',seconds:2,stick:[0,-1],reset:[0,null,88]},
+      {name:'Meadow carved turns',seconds:3,turn:true,reset:[0,null,80]},
+      {name:'Meadow jump and recovery',seconds:2,stick:[0,-.45],jump:true,reset:[0,null,80]},
       {name:'Windmill entrance ascent',seconds:3,stick:td.map(v=>v*.18),reset:sp(-6,0,.1+1.9*.5/6.9)},
       {name:'Windmill slope jump and land',seconds:3,stick:td.map(v=>v*.18),jump:true,reset:sp(-4,0,.1+1.9*2.5/6.9)},
-      {name:'Windmill dash',seconds:1,stick:tn,dash:true,reset:sp(8,-8,2)},
+      {name:'Meadow dash',seconds:1,stick:[0,-1],dash:true,reset:[0,null,86]},
       {name:'Windmill brake and settle',seconds:2,stick:[0,0]},
     ];
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
@@ -448,8 +448,8 @@ try {
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
-      if(segment.turn){const angle=local/fps*2;stick=[(tn[0]*Math.cos(angle)+td[0]*Math.sin(angle))*.45,(tn[1]*Math.cos(angle)+td[1]*Math.sin(angle))*.45];}
-      if(local===0 && segment.reset){const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...segment.reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
+      if(segment.turn){const angle=local/fps*2;stick=[Math.sin(angle)*.45,-Math.cos(angle)*.45];}
+      if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
       await H('setStick',...stick);
       await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
     },undefined,{traceEveryFrame:true,keyFrames});
@@ -461,7 +461,7 @@ try {
     const landed=air>=0?rows.slice(air+1).find(row=>row.state.grounded):null;
     const pos=landed?.state.pos;
     const terraceS=pos ? (pos[0]+48)*td[0]+(pos[2]-52)*td[1] : null;
-    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Windmill Rise',camera:'standard gameplay',slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
+    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'standard gameplay',slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
     if(!acceptance.landedOnIncline || acceptance.deaths)throw Error('World showcase did not complete safely with an incline landing');
   }

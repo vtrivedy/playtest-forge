@@ -326,3 +326,5 @@ wash; enlarge a smaller set of mesh-sampled maple leaves so the memory release
 reads apart from ambient litter. Clear post-latch edge capture replaces the
 kiln-obscured release view. Preserve authored patrol and sad frozen-motion premise.
 World showcase review: settle the real gameplay camera for300ms while stationary at each disclosed cut; use slightly closer default chase framing (3.8m,1.5m height) so the creature stays readable through scenery. Add a small impact/brake head nod and pelvis-load tail lift, leaving FOX-owned tail appearance intact. Expose look and load spring tunables.
+
+Final visibility correction: use the already-authored Arrival Meadow clearing for trot, gallop, turns, flat jump and dash. Its ground-cover exclusion keeps the fox and leaf-textured ground visible; no scenery is hidden or removed for capture. Retain Reedmarsh boardwalk walk and Windmill entrance ascent/jump/landing. Query the actual floor at staged meadow starts. Keep20seconds and the standard gameplay camera.

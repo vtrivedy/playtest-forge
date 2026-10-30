@@ -116,7 +116,7 @@ export function createFollowCamera(opts: {
     lookAhead: 1.6,
     recenterRate: 1.25,
     recenterDelay: 1.2,
-    sideBias: 0.22,
+    sideBias: 0.55,
     jumpTrack: 0.45,
     landingBias: 0.42,
     clearance: 0.55,
