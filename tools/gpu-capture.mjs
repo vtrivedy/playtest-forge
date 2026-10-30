@@ -423,6 +423,25 @@ try {
 
 
   }
+  if(wants('feel')) {
+    await boot(quality,true);
+    await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
+    const y=await page.evaluate(()=>window.__gameHooks.debug.world.collision.highestAt(-1,80));
+    await H('teleport',-1,y,80,Math.PI);await H('photoOff');await advance(30);
+    const initial=await H('state');
+    await video('feel',60*fps,async i=>{
+      const st=await H('state'),t=i/fps,angle=t*.85;
+      const target=[-1+Math.sin(angle+.6)*3,80+Math.cos(angle+.6)*3];
+      const dx=target[0]-st.pos[0],dz=target[1]-st.pos[2],d=Math.hypot(dx,dz)||1;
+      const speed=Math.min(.65,d/2);
+      await H('setStick',dx/d*speed,dz/d*speed);
+      const phase=t%10;
+      await H('setKeys',phase<.35?['Space']:phase>5&&phase<5.06?['ShiftLeft']:[]);
+    },undefined,{keyFrames:Array.from({length:12},(_,i)=>i*5*fps)});
+    await H('setKeys',[]);await H('setStick',null);
+    const end=await H('state');
+    save('feel-acceptance.json',{label:'60s scripted live-input movement loop, one staged start, no resets/forced poses; not human fun approval',seconds:60,initial,end,deaths:end.deaths-initial.deaths});
+  }
   if (wants('showcase')) {
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
