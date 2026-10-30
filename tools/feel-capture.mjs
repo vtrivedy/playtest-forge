@@ -220,6 +220,33 @@ if (mode === 'shots') {
   };
   save(`framing-${arg('tag', 'now')}`, r);
   console.log(JSON.stringify(r));
+} else if (mode === 'moments') {
+  // UNASSISTED stills: run the route from spawn and grab the first frame of each situation
+  await boot();
+  await H('autopilot', true, 0, { assist: false });
+  const want = {
+    occluded: (st) => st.camera.occlusion > 0.85,
+    'marsh-hop-apex': (st) => st.anim === 'jump_apex' && st.zone.startsWith('C'),
+    'drop-tilt': (st) => !st.grounded && st.camera.landingNdc && st.pos[1] > 15 && st.anim === 'jump_fall',
+    glide: (st) => st.gliding && st.t > 50,
+    land: (st) => st.anim === 'land',
+    dash: (st) => st.anim === 'dash',
+    'occluded-late': (st) => st.camera.occlusion > 0.85 && st.t > 60,
+  };
+  const got = {};
+  let st;
+  for (let i = 0; i < 60 * 130 && Object.keys(got).length < Object.keys(want).length; i++) {
+    st = await advance(1, false);
+    for (const [k, f] of Object.entries(want)) {
+      if (!got[k] && f(st)) {
+        st = await advance(1);
+        got[k] = { t: st.t, zone: st.zone, anim: st.anim, camera: { foxNdc: st.camera.foxNdc, landingNdc: st.camera.landingNdc, occlusion: st.camera.occlusion } };
+        await shot(`moments/${k}`);
+      }
+    }
+    if (!st.auto.active) break;
+  }
+  save('moments/index', { label: 'UNASSISTED stills — first frame of each situation on the bot run from spawn', got });
 } else if (mode === 'video') {
   // UNASSISTED traversal from spawn, rendered every 2nd 60 Hz step → 30 fps video
   const seconds = Number(arg('seconds', '14'));

@@ -44,7 +44,7 @@ export function createOcclusionFader(
           `#include <clipping_planes_fragment>
           if (uOccStrength > 0.001) {
             float occR = length(gl_FragCoord.xy - uOccFox.xy) / uOccFox.w;
-            float occNear = uOccFox.z - (-vViewPosition.z);
+            float occNear = uOccFox.z - vViewPosition.z; // vViewPosition = -mvPosition → +depth
             float occCut = uOccStrength * (1.0 - smoothstep(0.6, 1.0, occR)) * smoothstep(0.7, 1.6, occNear);
             // 4x4 Bayer stipple — no sorting, no blending, keeps a ghost of the occluder
             vec2 occP = mod(floor(gl_FragCoord.xy), 4.0);
