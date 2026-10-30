@@ -40,6 +40,13 @@ export type LocoParams = {
   gallopFlex: number;
   /** 0..1 how much the head cancels body pitch/roll */
   headStabilize: number;
+  /** Neck-base forward drop (rad) per gait — real foxes carry the head low and forward on the move */
+  neckIdle: number;
+  neckWalk: number;
+  neckTrot: number;
+  neckGallop: number;
+  /** Extra head nose-down per rad of neck drop */
+  headDip: number;
   /** Head/neck yaw into the turn (rad per rad/s) */
   headLook: number;
   /** Crouch spring (jump wind-up, landing absorb) */
@@ -96,9 +103,14 @@ export const DEFAULT_LOCO: LocoParams = {
   maxRoll: 0.28,
   spineBend: 0.16,
   maxBend: 0.45,
-  gallopFlex: 0.2,
+  gallopFlex: 0.32,
   headStabilize: 0.75,
   headLook: 0.12,
+  neckIdle: 0.12,
+  neckWalk: 0.5,
+  neckTrot: 0.6,
+  neckGallop: 0.72,
+  headDip: 0.25,
   crouchStiffness: 220,
   crouchDamping: 18,
   landCrouch: 0.16,
@@ -118,7 +130,7 @@ export const DEFAULT_LOCO: LocoParams = {
   airPoseRate: 20,
   bodyRate: 12,
   terrainRate: 7,
-  maxSlopePitch: 0.3,
+  maxSlopePitch: 0.24,
   debug: false,
 };
 
@@ -222,6 +234,9 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     look: 0,
     air: 0,
     brake: 0,
+    airVy: 0,
+    carry: 0,
+    idleT: 0,
     /** Treadmill speed for staged stills (group stays put, feet cycle) */
     treadmill: 0,
     clock: 0,
@@ -390,13 +405,13 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     }
     state.freq = freq;
     state.duty = duty;
-    const moving = speed > p.idleSpeed && grounded && !input.skidding;
+    const moving = speed > p.idleSpeed && grounded;
     if (moving) state.phase = (state.phase + freq * dt) % 1;
     state.gait = !grounded ? 'air' : !moving ? 'idle' : weights.gallop > 0.5 ? 'gallop' : weights.trot > 0.5 ? 'trot' : 'walk';
 
     // --- crouch spring: landing absorb, wind-up, takeoff stretch ---
     if (grounded && !prevGrounded) {
-      const impact = THREE.MathUtils.clamp(-input.vel.y / 14, 0.15, 1);
+      const impact = THREE.MathUtils.clamp(-state.airVy / 12, 0.2, 1);
       state.crouchVel -= p.landCrouch * impact * 16;
     }
     if (!grounded && prevGrounded && input.vel.y > 1) state.crouchVel += p.takeoffStretch * 18;
@@ -408,6 +423,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     state.crouch += state.crouchVel * dt;
     state.crouch = THREE.MathUtils.clamp(state.crouch, -0.3, 0.15);
 
+    if (!grounded) state.airVy = input.vel.y;
     state.air = THREE.MathUtils.damp(state.air, grounded ? 0 : 1, grounded ? 18 : 8, dt);
 
     // --- body height + slope: shoulders/hips follow the low-passed ground under them (not the paws, which lag a
@@ -519,17 +535,31 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     // --- leg IK ---
     for (const id of LEG_IDS) solveLeg(legs[id]);
 
-    // --- head: stabilise against body pitch/roll, look into the turn ---
-    state.look = THREE.MathUtils.damp(state.look, THREE.MathUtils.clamp(state.yawRate * p.headLook, -0.5, 0.5), 6, dt);
+    // --- neck carry: a fox runs with its neck stretched forward and low, the head level or below the back ---
+    let carryT = p.neckIdle;
+    if (moving) carryT = weights.walk * p.neckWalk + weights.trot * p.neckTrot + weights.gallop * p.neckGallop;
+    if (!grounded || input.dashing) carryT = p.neckGallop;
+    state.carry = THREE.MathUtils.damp(state.carry, carryT, 4, dt);
+    const leftW = _v.set(1, 0, 0).applyQuaternion(bodyQ);
+    rotateBoneAxis(rig.neck[0], leftW, state.carry * 0.65);
+    rotateBoneAxis(rig.neck[1], leftW, state.carry * 0.35);
+    // --- head: stabilise against body pitch/roll, look into the turn; idle: slow glances around ---
+    state.idleT = moving || !grounded ? 0 : state.idleT + dt;
+    const glance = state.idleT > 1.5 ? 0.32 * Math.sin(state.clock * 0.45) + 0.12 * Math.sin(state.clock * 1.3 + 1) : 0;
+    state.look = THREE.MathUtils.damp(state.look, THREE.MathUtils.clamp(state.yawRate * p.headLook, -0.5, 0.5) + glance, 3, dt);
     {
       const cur = rig.head.getWorldQuaternion(_q);
       const lookQ = _q2.setFromAxisAngle(UP, state.look + state.bend * 0.5);
-      const desired = new THREE.Quaternion().copy(groupQ).premultiply(lookQ).multiply(headRestQ);
+      // head level-to-slightly-down while running (eyes on the ground ahead)
+      const dip = _q.clone().setFromAxisAngle(leftW, state.carry * p.headDip);
+      const desired = new THREE.Quaternion().copy(groupQ).premultiply(lookQ).premultiply(dip).multiply(headRestQ);
+      rig.head.getWorldQuaternion(cur);
       // remove part of the body's pitch from the head and let the rest through
       const stab = new THREE.Quaternion().copy(cur).slerp(desired, p.headStabilize);
       const delta = stab.multiply(cur.clone().invert());
-      const part = new THREE.Quaternion().slerp(delta, 1 / (rig.neck.length + 1));
-      for (const b of rig.neck) rotateBoneWorld(b, part);
+      // the correction lives in the upper neck + skull so the lowered neck base keeps its carry
+      const part = new THREE.Quaternion().slerp(delta, 0.5);
+      rotateBoneWorld(rig.neck[rig.neck.length - 1], part);
       rotateBoneWorld(rig.head, part);
     }
 
@@ -613,7 +643,8 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       for (const id of LEG_IDS) if (legs[id].mode === 'plant') legs[id].foot.addScaledVector(vel, -dt);
     }
 
-    if (!grounded) {
+    // a dash is a bound: paws leave the ground and stretch fore/aft like a leap
+    if (!grounded || input.dashing) {
       for (const id of LEG_IDS) {
         const L = legs[id];
         if (L.mode === 'plant' || L.mode === 'step') {
@@ -645,21 +676,6 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
         L.contact = true;
         footfalls.push({ leg: id, pos: L.foot.clone(), strength: 1 });
       }
-    }
-
-    if (input.skidding) {
-      // brace: fores dig in ahead, hinds tuck under; paws slide with the body (that's the skid)
-      for (const id of LEG_IDS) {
-        const L = legs[id];
-        neutralFoot(L.rig, groupPos, yaw, _v2);
-        const f = _v.set(Math.sin(yaw), 0, Math.cos(yaw));
-        _v2.addScaledVector(f, L.rig.fore ? 0.22 : 0.06);
-        _v2.y = plantY(L, _v2.x, _v2.z);
-        L.foot.lerp(_v2, 1 - Math.exp(-20 * dt));
-        L.mode = 'plant';
-        L.contact = true;
-      }
-      return;
     }
 
     let stepping = 0;

@@ -52,6 +52,8 @@ export function createLocoPanel(gui: GUI, loco: Locomotion, move: MoveParams) {
   fb.add(p, 'gallopFlex', 0, 0.4, 0.005);
   fb.add(p, 'headStabilize', 0, 1, 0.01);
   fb.add(p, 'headLook', 0, 0.5, 0.005);
+  for (const k of ['neckIdle', 'neckWalk', 'neckTrot', 'neckGallop'] as const) fb.add(p, k, -0.3, 1.2, 0.01);
+  fb.add(p, 'headDip', 0, 1, 0.01);
   fb.add(p, 'bodyRate', 1, 30, 0.5);
   const fc = f.addFolder('Crouch / jump');
   fc.add(p, 'crouchStiffness', 20, 600, 5);
