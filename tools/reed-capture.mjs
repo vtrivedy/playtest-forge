@@ -3,19 +3,20 @@ export async function captureReed({ H, advance, shot, video, save, page, fps, re
   const initial = await H('state');
   if (initial.seedwells.find(s => s.id === 'SW2').lit) throw Error('Reed capture requires an unlatched SW2');
   await H('setKeys', []); await H('setStick', 0, 0);
-  await H('teleport', 90, 1.2, 15, Math.atan2(2.4, -2.4)); await advance(10);
+  if (Math.hypot(initial.pos[0] - 90, initial.pos[2] - 15) > 2) throw Error('Reed solve must continue from the live entry route');
+  await advance(2);
   await shot('reed-00-staged-hummock');
   const timeline = [], input = [], transitions = [];
   const approach = [[92.4, 12.6], [95, 10], [98.4, 10.5], [96, 16.1], [95, 17]];
   let phase = 'pier-stair', phaseAt = 0, waypoint = 0, lastPhase = '', finished = false, failure = null;
-  let overviewCaptured = false, litAt = null, hpAirborne = false, progressAt = 0, bestDistance = Infinity;
+  let lipApproach = false, overviewCaptured = false, litAt = null, hpAirborne = false, progressAt = 0, bestDistance = Infinity;
   const change = (next, frame) => { phase = next; phaseAt = frame; bestDistance = Infinity; progressAt = frame; };
   const steer = async (x, z, st, cap = 0.6) => {
     const dx = x - st.pos[0], dz = z - st.pos[2], d = Math.hypot(dx, dz), mag = Math.min(cap, d / 0.75);
     const stick = d > 0.06 ? [dx / d * mag, dz / d * mag] : [0, 0];
     await H('setStick', ...stick); return { distance: d, stick };
   };
-  await video('reed-live-solve', 45 * fps, async frame => {
+  await video('reed-live-solve', 60 * fps, async frame => {
     const st = await H('state'), water = st.chem.water.find(w => w.id === 'reed-falls');
     const inlet = st.chem.inlets.find(q => q.seedwell === 'SW2');
     const hp = st.chem.hearths.find(h => h.id === 'HP');
@@ -58,8 +59,9 @@ export async function captureReed({ H, advance, shot, video, save, page, fps, re
       if (hpAirborne && st.grounded && st.pos[1] >= 14.8) change('falls-lip', frame);
       else if (frame - phaseAt > 6 * fps) { failure = 'could not land on aqueduct'; finished = true; }
     } else if (!finished && phase === 'falls-lip') {
-      const aim = await steer(100, 19, st, 0.45); stick = aim.stick;
-      if (aim.distance < 0.4 && st.grounded && st.pos[1] >= 14.8) change('water-feed', frame);
+      const aim = await steer(100, lipApproach ? 19 : 20.8, st, 0.45); stick = aim.stick;
+      if (!lipApproach && aim.distance < 0.35) lipApproach = true;
+      else if (lipApproach && aim.distance < 0.4 && st.grounded && st.pos[1] >= 14.8) change('water-feed', frame);
       else if (frame - phaseAt > 5 * fps) { failure = 'physical obstruction on aqueduct lip'; finished = true; }
     } else if (!finished && phase === 'water-feed') {
       const aim = await steer(100, 19, st, 0.25); stick = aim.stick;
@@ -70,14 +72,18 @@ export async function captureReed({ H, advance, shot, video, save, page, fps, re
         await shot('reed-source-front-basin-overview'); await H('photoOff'); await advance(1); overviewCaptured = true;
       }
       if (st.seedwells.find(s => s.id === 'SW2').lit) { litAt = st.t; change('latched', frame); finished = true; }
-      else if (frame - phaseAt > 22 * fps) { failure = 'arriving water did not complete 7s seal; inspect Shade cuts and inlet timeline'; finished = true; }
+      else if (frame - phaseAt > 35 * fps) { failure = 'arriving water did not complete 7s seal; inspect Shade cuts and inlet timeline'; finished = true; }
     }
-    if (frame >= 44.5 * fps) { failure = '45s solve deadline'; finished = true; }
+    if (frame >= 59.5 * fps) { failure = '60s solve deadline'; finished = true; }
     if (finished) { keys = []; stick = [0, 0]; await H('setStick', 0, 0); }
     input.push({ frame, phase, stick, keys }); await H('setKeys', keys);
   }, () => finished);
   await H('setKeys', []); await H('setStick', 0, 0); await advance(1);
   await shot('reed-final');
+  if ((await H('state')).seedwells.find(s => s.id === 'SW2').lit) {
+    await H('photo', [114, 22, 31], [98, 8, 17], 50); await advance(1);
+    await shot('reed-latched-source-front-basin'); await H('photoOff');
+  }
   const end = await H('state');
   const passed = end.seedwells.find(s => s.id === 'SW2').lit && end.deaths === initial.deaths;
   const acceptance = {

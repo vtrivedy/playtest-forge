@@ -99,14 +99,16 @@ try {
       // stand in the probe ring to supply colour → ignite
       await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI);
       await H('photo', ...lens);
+      let litFrames = 0;
       for (const [i, n] of [15, 30, 45, 90, 180].entries()) {
-        await advance(i === 0 ? 15 : 15);
+        await advance(n - litFrames);
+        litFrames = n;
         await capture(`${String(i + 1).padStart(2, '0')}-lit-${n}f`);
       }
       // walk away, wait hold → gutter → cold (hold ~3 s + gutter ~0.8 s)
       await H('teleport', hx - 14, hy, hz + 18, Math.PI);
       await H('photo', ...lens);
-      for (const [i, n] of [60, 120, 180, 240].entries()) {
+      for (const [i, n] of [60, 120, 180, 240, 300, 360, 420].entries()) {
         await advance(60);
         await capture(`${String(i + 6).padStart(2, '0')}-decay-${n}f`);
       }
@@ -146,7 +148,7 @@ print('contact', len(ims))
         note: 'SwiftShader smoke only — judge glow on Modal GPU / q=high with real GPU',
       };
       fs.writeFileSync(path.join(outDir, 'check.json'), JSON.stringify(check, null, 2));
-      fs.writeFileSync(path.join(outDir, 'game.json'), JSON.stringify(await H('state'), null, 2));
+      fs.writeFileSync(path.join(outDir, 'game.json'), JSON.stringify(await page.evaluate(() => (window as unknown as { __game?: unknown }).__game), null, 2));
       console.log(JSON.stringify(check));
     }
   } else if (effect) {

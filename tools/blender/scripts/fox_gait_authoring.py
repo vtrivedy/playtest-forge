@@ -89,7 +89,7 @@ def make(name, frames):
 
 def ease_io2(u): return u * u * (3 - 2 * u)
 LEGS = {  # side, hind?, touchdown phase, duty factor (rotary gallop: hind pair, then fore pair)
-    "L_hind": (0.00, 0.36), "R_hind": (0.08, 0.36), "R_fore": (0.46, 0.32), "L_fore": (0.55, 0.32)}
+    "L_hind": (0.00, 0.32), "R_hind": (0.08, 0.32), "R_fore": (0.46, 0.28), "L_fore": (0.55, 0.28)}
 def leg_phase(t, td, duty):
     ph = (t - td) % 1.0
     return (True, ph / duty) if ph < duty else (False, (ph - duty) / (1 - duty))
@@ -165,12 +165,12 @@ def gallop_pose(t, st=1.0):
         s_ = key[0]; stance, u = leg_phase(t, td, duty)
         if "hind" in key:
             L_ = HIND[s_]
-            P = paw_path(stance, u, L_["foot"], 0.391 * st, 0.577 * st, 0.70, early=1.0, duty=duty)
+            P = paw_path(stance, u, L_["foot"], 0.391 * st * ((1.462/.28*.32)/1.6456), 0.577 * st * ((1.462/.28*.32)/1.6456), 0.70, early=1.0, duty=duty)
             mt = rest_ang(L_["mt"]) + math.radians((-6 + 40 * u ** 2) if stance else (34 + 16 * math.sin(math.pi * u) - 40 * ease_io2(u)))
             J = P - Vector((math.cos(mt), math.sin(mt))) * L_["c"]
             hip = posed_yz(L_["th"])[0]
             a1, a2 = ik2(hip, J, L_["a"], L_["b"])
-            pw = rest_ang(L_["paw"]) + math.radians((38 * max(0, (u - 0.55) / 0.45) ** 1.5) if stance else 30 * (1 - ease_io2(u)) + 28 * math.sin(math.pi * u))
+            pw = rest_ang(L_["paw"]) + math.radians((38 * max(0, (u - 0.55) / 0.45) ** 1.5) if stance else 12 * (1 - ease_io2(u)) + 18 * math.sin(math.pi * u))
             set_chain(p, [L_["th"], L_["sh"], L_["mt"], L_["paw"]], [a1, a2, mt, pw])
         else:
             L_ = FORE[s_]
@@ -180,7 +180,7 @@ def gallop_pose(t, st=1.0):
             # The authored paw arc is the constraint through stance AND swing. FK angle interpolation
             # can cross the +/-pi branch and flip the forepaw above the shoulder on a normalized rig.
             a1, a2 = ik2(sh, P, L_["a"], L_["b"], pole=1)
-            pw = rest_ang(L_["paw"]) + math.radians((42 * max(0, (u - 0.5) / 0.5) ** 1.5) if stance else 42 * (1 - ease_io2(u)) + 45 * math.sin(math.pi * min(1, u * 1.3)))
+            pw = rest_ang(L_["paw"]) + math.radians((42 * max(0, (u - 0.5) / 0.5) ** 1.5) if stance else 15 * (1 - ease_io2(u)) + 20 * math.sin(math.pi * min(1, u * 1.3)))
             set_chain(p, [L_["up"], L_["lo"], L_["paw"]], [a1, a2, pw])
     apply_dict(p)
     return p

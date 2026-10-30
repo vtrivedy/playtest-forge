@@ -1,9 +1,11 @@
+import { captureFinale } from './finale-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
 import { captureWindGap } from './windgap-capture.mjs';
 import { captureMarshMouth } from './marshmouth-capture.mjs';
 import { captureReed } from './reed-capture.mjs';
+import { captureReedEntry } from './reed-entry-capture.mjs';
 import { captureReedAftermath } from './reed-aftermath-capture.mjs';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -425,6 +427,25 @@ try {
 
 
   }
+  if(wants('feel')) {
+    await boot(quality,true);
+    await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
+    const y=await page.evaluate(()=>window.__gameHooks.debug.world.collision.highestAt(-1,80));
+    await H('teleport',-1,y,80,Math.PI);await H('photoOff');await advance(30);
+    const initial=await H('state');
+    await video('feel',60*fps,async i=>{
+      const st=await H('state'),t=i/fps,angle=t*.85;
+      const target=[-1+Math.sin(angle+.6)*3,80+Math.cos(angle+.6)*3];
+      const dx=target[0]-st.pos[0],dz=target[1]-st.pos[2],d=Math.hypot(dx,dz)||1;
+      const speed=Math.min(.65,d/2);
+      await H('setStick',dx/d*speed,dz/d*speed);
+      const phase=t%10;
+      await H('setKeys',phase<.35?['Space']:phase>5&&phase<5.06?['ShiftLeft']:[]);
+    },undefined,{keyFrames:Array.from({length:12},(_,i)=>i*5*fps)});
+    await H('setKeys',[]);await H('setStick',null);
+    const end=await H('state');
+    save('feel-acceptance.json',{label:'60s scripted live-input movement loop, one staged start, no resets/forced poses; not human fun approval',seconds:60,initial,end,deaths:end.deaths-initial.deaths});
+  }
   if (wants('showcase')) {
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
@@ -434,13 +455,13 @@ try {
     const board=[.868243,-.496139];
     const segments=[
       {name:'Reedmarsh boardwalk walk',seconds:2,stick:board.map(v=>v*.18),reset:[62.5,.3,32.5]},
-      {name:'Windmill terrace trot',seconds:2,stick:tn.map(v=>v*.45),reset:sp(8,-5,2)},
-      {name:'Windmill terrace gallop',seconds:2,stick:tn,reset:sp(8,-8,2)},
-      {name:'Windmill carved turns',seconds:3,turn:true,reset:sp(5,0,2)},
-      {name:'Windmill jump and recovery',seconds:2,stick:tn.map(v=>v*.45),jump:true,reset:sp(5,0,2)},
+      {name:'Meadow path trot',seconds:2,stick:[0,-.45],reset:[0,null,82]},
+      {name:'Meadow clearing gallop',seconds:2,stick:[0,-1],reset:[0,null,88]},
+      {name:'Meadow carved turns',seconds:3,turn:true,reset:[0,null,80]},
+      {name:'Meadow jump and recovery',seconds:2,stick:[0,-.45],jump:true,reset:[0,null,80]},
       {name:'Windmill entrance ascent',seconds:3,stick:td.map(v=>v*.18),reset:sp(-6,0,.1+1.9*.5/6.9)},
       {name:'Windmill slope jump and land',seconds:3,stick:td.map(v=>v*.18),jump:true,reset:sp(-4,0,.1+1.9*2.5/6.9)},
-      {name:'Windmill dash',seconds:1,stick:tn,dash:true,reset:sp(8,-8,2)},
+      {name:'Meadow dash',seconds:1,stick:[0,-1],dash:true,reset:[0,null,86]},
       {name:'Windmill brake and settle',seconds:2,stick:[0,0]},
     ];
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
@@ -450,11 +471,11 @@ try {
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
-      if(segment.turn){const angle=local/fps*2;stick=[(tn[0]*Math.cos(angle)+td[0]*Math.sin(angle))*.45,(tn[1]*Math.cos(angle)+td[1]*Math.sin(angle))*.45];}
-      if(local===0 && segment.reset){const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...segment.reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
+      if(segment.turn){const angle=local/fps*2;stick=[Math.sin(angle)*.45,-Math.cos(angle)*.45];}
+      if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
       await H('setStick',...stick);
       await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
-    },undefined,{traceEveryFrame:true,keyFrames});
+    },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);}});
     await H('setKeys',[]);await H('setStick',null);
     const result=report.videos.showcase;
     const slope=segments.find(segment=>segment.name==='Windmill slope jump and land');
@@ -463,7 +484,7 @@ try {
     const landed=air>=0?rows.slice(air+1).find(row=>row.state.grounded):null;
     const pos=landed?.state.pos;
     const terraceS=pos ? (pos[0]+48)*td[0]+(pos[2]-52)*td[1] : null;
-    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Windmill Rise',camera:'standard gameplay',slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
+    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'standard gameplay',slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
     if(!acceptance.landedOnIncline || acceptance.deaths)throw Error('World showcase did not complete safely with an incline landing');
   }
@@ -658,6 +679,44 @@ try {
     const summary = { hearth: h0, A: {}, B: {}, C: {}, K: {} };
     const lens = [[hx - 6, hy + 8, hz + 11], [hx + 2, hy + 3, hz - 1], 50];
     await H('teleport', hx - 12, hy, hz + 16, Math.PI); await H('photo', ...lens); await advance(30); await shot('updraft-still-cold');
+    // Same fixed-step lifecycle as tools/fx-capture.ts, on the hardware renderer.
+    // Contact sheet records actual cumulative steps (not wall-clock elapsed time).
+    const lifecycle = [];
+    const lifeShot = async (name, frame) => {
+      await shot(`updraft-fx-${name}`);
+      lifecycle.push({ name, frame, hearth: hearth(await H('state')), game: await page.evaluate(() => window.__game) });
+    };
+    await lifeShot('00-cold', 0);
+    await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI);
+    await H('photo', ...lens);
+    let lifeFrame = 0;
+    for (const target of [15, 30, 45, 90, 180]) {
+      await advance(target - lifeFrame); lifeFrame = target;
+      await lifeShot(`lit-${target}f`, target);
+    }
+    await H('teleport', hx - 14, hy, hz + 18, Math.PI); await H('photo', ...lens);
+    for (const target of [60, 120, 180, 210, 240, 300, 360, 420]) {
+      await advance(target + 180 - lifeFrame); lifeFrame = target + 180;
+      await lifeShot(`decay-${target}f`, lifeFrame);
+    }
+    const sheet = await context.newPage();
+    try {
+      await sheet.setViewportSize({ width: 1600, height: 900 });
+      const cards = lifecycle.map(f => `<figure><figcaption>${f.name} ${f.hearth.state} heat=${f.hearth.heat}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, `updraft-fx-${f.name}.png`)).toString('base64')}"></figure>`).join('');
+      await sheet.setContent(`<style>*{box-sizing:border-box}body{margin:0;background:#211b16;color:#eadfc8;font:14px sans-serif;display:grid;grid-template-columns:repeat(4,1fr)}figure{margin:0}figcaption{height:26px;padding:5px}img{display:block;width:100%}</style>${cards}`);
+      await sheet.evaluate(() => Promise.all([...document.images].map(im => im.decode())));
+      await sheet.screenshot({ path: path.join(out, 'updraft-fx-contact.png'), fullPage: true });
+    } finally { await sheet.close(); }
+    save('updraft-fx-check.json', {
+      effect: 'hearth-updraft', method: 'fx-capture lifecycle / fixed 60Hz / hardware GPU',
+      ok: lifecycle[0].hearth.heat === 0 && lifecycle.some(f => f.hearth.heat >= 0.99) && lifecycle.at(-1).hearth.heat === 0,
+      frames: lifecycle,
+    });
+    // Distance affordance lens: identical lit staging, camera 20m from column axis.
+    await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(30);
+    await H('photo', [hx - 12, hy + 6, hz + 16], [hx, hy + 3, hz], 50);
+    await advance(1); await shot('updraft-fx-distance-20m');
+    await H('teleport', hx - 14, hy, hz + 18, Math.PI); await advance(480, false);
     const runFrom = [hx - 1.4, hy, hz + 9];
     for (const variant of ['A', 'B']) {
       await H('photoOff');
@@ -765,8 +824,15 @@ try {
   }
   if (wants('reed')) {
     await boot(quality, true);
-    const reed = await captureReed({ H, advance, shot, video, save, page, fps, report });
-    if (reed.passed) await captureReedAftermath({ H, advance, shot, video, save, page, fps, report });
+    const opts = { H, advance, shot, video, save, page, fps, report };
+    const mouth = await captureMarshMouth(opts, 'aura', 1);
+    if (mouth.passed) {
+      const entry = await captureReedEntry(opts);
+      if (entry.passed) {
+        const reed = await captureReed(opts);
+        if (reed.passed) await captureReedAftermath(opts);
+      }
+    }
   }
   if (wants('marshmouth')) {
     for (const variant of ['aura', 'dash']) for (let trial = 1; trial <= 3; trial++) {
@@ -910,53 +976,73 @@ try {
       await shot(`flow-${seg.name}-end`);
     }
   }
+  const RH=(fn,...args)=>{if(fn==='teleport')args[0]-=70;if(fn==='photo'){args[0]=[args[0][0]-70,...args[0].slice(1)];args[1]=[args[1][0]-70,...args[1].slice(1)];}return H(fn,...args);};
+  if (wants('reachsafe')) {
+    await boot(quality,true);await RH('forceRestore');await advance(660,false);
+    // Explicit staged setup for a supply-loss stress test; basin/float/seal states stay simulated.
+    await RH('teleport',171,30,-130,Math.PI/2);await advance(20,false);
+    await RH('teleport',173,30,-116,Math.PI/2);await advance(60,false);
+    await RH('teleport',188,30,-129,Math.PI/2);await RH('photo',[170,44,-103],[188,33,-123],52);
+    await video('reach-retained-supply-loss',8*fps,async i=>{
+      if(i===3*fps)await page.evaluate(()=>window.__gameHooks.chem.colorDrains.push(p=>p.x>100&&p.x<108));
+    },undefined,{keyFrames:[0,2*fps,4*fps,6*fps]});
+    const held=await RH('state');save('reach-retention-acceptance.json',held);
+    if(!held.reach.retained||held.reach.restored||held.reach.seal>0||!held.grounded)report.failures.push('Occupied float retention or no-false-latch test failed');
+    const t0=held.t;
+    await RH('photoOff');await RH('setStick',-1,0);
+    await video('reach-boarding-recovery',8*fps,async()=>{},st=>st.deaths>held.deaths&&Math.hypot(st.pos[0]-101,st.pos[2]+130)<3);
+    await RH('setStick',null);await shot('reach-recovered-bank');
+    const recovered=await RH('state'),seconds=recovered.t-t0;
+    save('reach-recovery-acceptance.json',{seconds,deathsBefore:held.deaths,deathsAfter:recovered.deaths,end:recovered});
+    if(recovered.deaths!==held.deaths+1||seconds>10||Math.hypot(recovered.pos[0]-101,recovered.pos[2]+130)>3)report.failures.push('Reach boarding recovery exceeded safe checkpoint contract');
+  }
   if (wants('reachview')) {
-    await boot(quality,true);await H('forceRestore');await advance(660,false);
+    await boot(quality,true);await RH('forceRestore');await advance(660,false);
     // Staged source hold uses real colour supply; no basin, seal or float state is assigned.
-    await H('teleport',173,30,-116,Math.PI/2);await advance(900,false);
-    await H('teleport',150,38,-96,Math.PI/2);await H('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
-    await H('teleport',201,36,-121,-Math.PI/2);await H('setStick',-1,0);await H('setKeys',['ShiftLeft']);await advance(1);await H('setKeys',[]);await H('setStick',null);await advance(260,false);
-    await H('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
-    save('reachview-state.json',await H('state'));
+    await RH('teleport',173,30,-116,Math.PI/2);await advance(900,false);
+    await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
+    await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
+    await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
+    save('reachview-state.json',await RH('state'));
   }
   if (wants('reach')) {
-    await boot(quality,true); await H('forceRestore'); await advance(660,false);
+    await boot(quality,true); await RH('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
-    const points=[{x:40,y:38,z:-90},{x:76,y:38,z:-90},{x:112,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:173,y:30,z:-116,dash:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}];
+    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:173,y:30,z:-116,dash:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false;
     await video('reach-first-crossing',65*fps,async()=>{
-      const st=await H('state'),p=points[phase];age+=1/fps;
+      const st=await RH('state'),p=points[phase];age+=1/fps;
       const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
       if(d<.8&&st.pos[1]>=p.y-.4&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
       const q=points[phase],vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
-      await H('setStick',len>.2?vx/len*Math.min(1,len):0,len>.2?vz/len*Math.min(1,len):0);
-      const keys=q.jump?['Space']:[];if(q.dash&&len<3&&!painted){keys.push('ShiftLeft');painted=true;}await H('setKeys',keys);
+      await RH('setStick',len>.2?vx/len*Math.min(1,len):0,len>.2?vz/len*Math.min(1,len):0);
+      const keys=q.jump?['Space']:[];if(q.dash&&len<3&&!painted){keys.push('ShiftLeft');painted=true;}await RH('setKeys',keys);
     },st=>reached&&st.reach.restored||st.deaths>0||age>12,{keyFrames:[0,10*fps,20*fps,25*fps]});
-    await H('setKeys',[]);await H('setStick',null);await advance(30);await shot('reach-end');
-    const end=await H('state');save('reach-acceptance.json',{phase,reached,end});
+    await RH('setKeys',[]);await RH('setStick',null);await advance(30);await shot('reach-end');
+    const end=await RH('state');save('reach-acceptance.json',{phase,reached,end});
     if(reached&&end.reach.restored){
-      await H('photo',[167,48,-99],[190,32,-121],52);
+      await RH('photo',[167,48,-99],[190,32,-121],52);
       let cycle=0,cycleAge=0,cyclePaint=false;
       const lowSeen={value:false};
       await video('reach-level-cycle',30*fps,async()=>{
-        const st=await H('state');cycleAge+=1/fps;
-        const targets=[[201,36,-121],[201,36,-121],[181,30,-128],[181,30,-128],[173,30,-124],[173,30,-124]];
+        const st=await RH('state');cycleAge+=1/fps;
+        const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
         const p=targets[cycle],dx=p[0]-st.pos[0],dz=p[2]-st.pos[2],d=Math.hypot(dx,dz);
         const ready=cycle===1?st.reach.fill<.02:cycle===3?cycleAge>1.2:cycle===5?st.reach.fill>.99:d<.8&&st.pos[1]>=p[1]-.5;
         if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;cycle++;cycleAge=0;cyclePaint=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
         const t=targets[cycle],vx=t[0]-st.pos[0],vz=t[2]-st.pos[2],len=Math.hypot(vx,vz);
-        await H('setStick',len>.25?vx/len*Math.min(.8,len):0,len>.25?vz/len*Math.min(.8,len):0);
+        await RH('setStick',len>.25?vx/len*Math.min(.8,len):0,len>.25?vz/len*Math.min(.8,len):0);
         const keys=cycle===2||cycle===3&&cycleAge>.3?['Space']:[];
         if([0,3,4].includes(cycle)&&len<2.8&&!cyclePaint){keys.push('ShiftLeft');cyclePaint=true;}
-        await H('setKeys',keys);
+        await RH('setKeys',keys);
       },st=>cycle===5&&st.reach.level==='high'&&st.reach.fill>.99||st.deaths>end.deaths||cycleAge>10,{keyFrames:[0,4*fps,8*fps,12*fps,16*fps]});
-      await H('setKeys',[]);await H('setStick',null);await shot('reach-cycle-end');
-      const cy=await H('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,end:cy});
+      await RH('setKeys',[]);await RH('setStick',null);await shot('reach-cycle-end');
+      const cy=await RH('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,end:cy});
       if(cycle!==5||!lowSeen.value||cy.reach.fill<.99)report.failures.push('Reach reversible water cycle incomplete');
     }
     // Staged architecture views are separate from the real summit-to-basin traversal above.
-    await H('teleport',150,38,-96,Math.PI/2);await H('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reach-overview');
-    await H('teleport',187,end.reach.raftHeight,-118,Math.PI/2);await H('photo',[172,43,-99],[194,34,-121],52);await advance(2);await shot('reach-ferry-and-bell');
+    await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reach-overview');
+    await RH('teleport',187,end.reach.raftHeight,-118,Math.PI/2);await RH('photo',[172,43,-99],[194,34,-121],52);await advance(2);await shot('reach-ferry-and-bell');
     if(!reached||!end.reach.restored||end.deaths)report.failures.push('Reach first crossing incomplete');
   }
   if (wants('crown')) {
@@ -1009,6 +1095,7 @@ try {
     if(walkIdx!==walk.length-1 || walkEnd.deaths) report.failures.push('Crown permanent walking fallback incomplete');
 
   }
+  if (wants('finale')) await captureFinale({H,boot,video,shot,save,getPage:()=>page,fps,out,execFileSync,fs,path});
   if (wants('route')) {
     await boot(quality, true);
     const route = await H('route');

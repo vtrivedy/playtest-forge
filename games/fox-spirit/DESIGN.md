@@ -331,6 +331,7 @@ depending on whether the earlier staged SW1 dash happened to latch the Seedwell.
 No progression or freed state is forced; missing actor or missed contact fails.
 World showcase review: settle the real gameplay camera for300ms while stationary at each disclosed cut; use slightly closer default chase framing (3.8m,1.5m height) so the creature stays readable through scenery. Add a small impact/brake head nod and pelvis-load tail lift, leaving FOX-owned tail appearance intact. Expose look and load spring tunables.
 
+Final visibility correction: use the already-authored Arrival Meadow clearing for trot, gallop, turns, flat jump and dash. Its ground-cover exclusion keeps the fox and leaf-textured ground visible; no scenery is hidden or removed for capture. Retain Reedmarsh boardwalk walk and Windmill entrance ascent/jump/landing. Query the actual floor at staged meadow starts. Keep20seconds and the standard gameplay camera.
 ### Driver 16:05 — ground cover and distant platform silhouettes
 The showcase red carpet is dense `bush_red` dressing under the fox, separate from
 the ColorField. Keep walkable ground cover at 0.18–0.23 m, open coherent gaps and
@@ -341,10 +342,46 @@ existing hanging-spire/ruin kit. Keep every platform top, collider and route fix
 Add arched structural silhouettes below the thin causeway so it reads as an old
 aqueduct rather than a screen-space line. No new traversal or gate is added.
 
-Driver16:45 / Opus re-critique closure: darker ink core with a warm ash rim for
-sepia-on-sepia separation. Ground wash samples up/down stairs and suppresses
-steep faces. Release consumes antlers-to-feet over1.2s;48 leaves start warm-sepia,
-colorize while falling, and scatter mostly along the patrol rather than across
-the stair edge. An oblique exterior lens retains the whole settling arc. Keep
-the original caught-mid-motion premise and chemistry ownership; no new gait/IK
-system or deleting another stream's heat-column meshes.
+### Final camera/feel verification
+Track85% of jump rise with faster airborne focus so the fox stays in frame; pull the gameplay boom back up to15% at gallop speed. Retain a60-second scripted live-input loop in the authored meadow clearing, one initial placement and no resets, mixing jumps and dashes. It is controller verification, not a claim of observed human fun.
+
+### Final locomotion read correction — 16:50
+Author a longer rotary gallop with23% combined suspension (hind duty.32,fore.28), matched stance sweeps and a slower physical cadence. Keep the paw below the elbow and limit carpal fold. Carry tail segments in a shallow backward stream rather than the imported curl. Air pose reaches forelegs and gathers hind legs. Turn roll belongs in spine/shoulders; cap total flat-ground pelvis drop to10cm. Showcase now uses a disclosed side/three-quarter cinematic lens on the clear real-world lanes; remote-camera owns gameplay follow camera.
+### Color mask overlap correction
+Render mask sources with per-pixel MAX blending, matching gameplay's strongest-
+source rule. Additive blending saturated dozens of overlapping trail stamps
+while idle, turning a feathered aura into a hard disc. Keep sources, radius,
+lifetime and CPU supply evaluation unchanged. Let permanently restored ground
+recover full authored chroma and a mild warm lift; temporary ground stays muted.
+
+### Far scenery composition
+The generic distant-land layer is distinct from the dressed satellite islets.
+Reduce its repeated shapes from22 to14, move its depth range to300–600m and
+reduce its scale range to10–30m. Lower it mostly into the cloud sea. This removes
+large crisp saucer shapes behind the hero while retaining the two dressed
+nearer island silhouettes. Scenery only; no playable world geometry changes.
+
+### Near-plane ruin-face fade
+The normal-camera showcase can brush the near face of a stair cheek even while
+the fox remains visible. Reuse the existing ordered near-camera dither on rock
+and stone faces over0.3–1.25m. Keep terrain/ground caps opaque, geometry/collision
+unchanged, and landing surfaces beyond that near plane fully visible. Recheck
+actual showcase cuts, especially the windmill stair approach.
+
+
+### Final occluder correction
+Clear the full fox silhouette when a world face blocks the camera: remove the
+28% retained ghost, enlarge the protected ellipse, and include near-depth faces
+that touch the body. Keep a dithered outer edge. Remove the ineffective global
+near-face fade on stone/rock; ground and collision remain unchanged. Retest the
+normal-camera showcase, including stair approach frames239 and1079–1199.
+
+### Sprint final delivery — driver17:10
+At17:30 pin the settled main once. Record three20-second live-input chapters
+(Arrival Meadow, Windmill Rise, Reedmarsh shrine approach) at720p30 with normal
+camera, explicit staged chapter starts, no forced solves, retained state/deaths.
+Lanternhollow hub is not implemented; disclose Arrival Meadow substitution.
+Also capture a six-second close run and six concept-angle hero stills. Assemble
+a50-second trailer on Modal from that run, best20-second loco showcase,12seconds
+of summit-r4 restoration and12seconds of Reach. List every source commit and
+staging limitation; this is editorial footage, not a claimed continuous clear.

@@ -35,11 +35,16 @@ for a in list(bpy.data.actions):
     a.name = a.name.split('_SpiritFox')[0]
 init_solver(base)
 # Ground clips use linear stance sweep, smooth lifted recovery, no per-frame body scale.
+def stream_tail(p,t):
+    apply_dict(p)
+    angles=[math.radians(10-i*1.5+2*math.sin(2*math.pi*t-i*.45)) for i in range(8)]
+    set_chain(p,TAILS,angles)
+
 def gait_pose(t, phases, duty, sweep, lift, kind):
     p = copy(base)
     for bn in LEG_BONES: p[bn][1] = Quaternion()
     if kind == 'gallop':
-        return gallop_pose(t, st=1.7)
+        p=gallop_pose(t,st=1.7); stream_tail(p,t); return p
     bob = .018 if kind == 'walk' else .035
     wloc(p, 'Body', (0, 0, (-.18 if kind == 'walk' else -.24) + bob * math.cos(4 * math.pi * t)))
     wrot(p, 'Body', (0, 1, 0), (1.4 if kind == 'walk' else 2.2) * math.sin(2*math.pi*t))
@@ -64,6 +69,7 @@ def gait_pose(t, phases, duty, sweep, lift, kind):
             joint = target - Vector((math.cos(mt),math.sin(mt)))*l['c']
             a,b = ik2(posed_yz(l['th'])[0],joint,l['a'],l['b'])
             set_chain(p,[l['th'],l['sh'],l['mt'],l['paw']],[a,b,mt,rest_ang(l['paw'])])
+    stream_tail(p,t)
     return p
 specs = [('walk',1.4,.65,1.0,.23,{'L_hind':0,'L_fore':.25,'R_hind':.5,'R_fore':.75}),
          ('trot',2.2,.48,1.3,.34,{'L_hind':0,'R_fore':0,'R_hind':.5,'L_fore':.5}),
@@ -77,7 +83,7 @@ for name,hz,duty,sweep,lift,phases in specs:
 metadata = {}
 for name,hz,duty,sweep,lift,phases in specs:
     if name=='run':
-        contacts=[{'phase':LEGS[key][0], 'duty':LEGS[key][1], 'sweep':(1.462 if 'fore' in key else 1.6456)} for key in ['L_fore','R_fore','L_hind','R_hind']]
+        contacts=[{'phase':LEGS[key][0], 'duty':LEGS[key][1], 'sweep':(1.462 if 'fore' in key else 1.462/.28*.32)} for key in ['L_fore','R_fore','L_hind','R_hind']]
     else:
         contacts=[{'phase':phases[key], 'duty':duty, 'sweep':sweep} for key in ['L_fore','R_fore','L_hind','R_hind']]
     metadata[name]={'stride':sum(c['sweep']/c['duty'] for c in contacts)/4,'contacts':contacts}
@@ -109,10 +115,11 @@ def action_pose(body_drop=0, fore=(0,0), hind=(0,0), pitch=0):
         joint=target-Vector((math.cos(mt),math.sin(mt)))*h['c']
         aa,bb=ik2(posed_yz(h['th'])[0],joint,h['a'],h['b'])
         set_chain(p,[h['th'],h['sh'],h['mt'],h['paw']],[aa,bb,mt,rest_ang(h['paw'])])
+    stream_tail(p,0)
     return p
-load=action_pose(-.28,(0,0),(0,0),-3)
+load=action_pose(-.42,(0,0),(0,0),-3)
 push=action_pose(.06,(-.16,.35),(.25,-.04),-6)
-tuck=action_pose(-.03,(.25,.72),(-.38,.8),-2)
+tuck=action_pose(-.03,(-.40,.35),(-.55,1.0),-2)
 reach=action_pose(-.08,(-.38,.12),(-.1,.42),7)
 absorb=action_pose(-.28,(-.08,0),(.08,0),4)
 def authored_action(name,keys,n):
@@ -129,7 +136,7 @@ def authored_action(name,keys,n):
 brace=action_pose(-.25,(-.30,0),(.16,0),-8)
 authored_action('skid',[(0,base),(.15,brace),(.7,brace),(1,base)],24)
 authored_action('jump_up',[(0,load),(.3,push),(1,tuck)],12)
-authored_action('jump_apex',[(0,tuck),(.5,action_pose(-.02,(.23,.68),(-.36,.76),0)),(1,tuck)],30)
+authored_action('jump_apex',[(0,tuck),(.5,action_pose(-.02,(-.38,.36),(-.53,.98),0)),(1,tuck)],30)
 authored_action('jump_fall',[(0,tuck),(.35,reach),(1,reach)],24)
 authored_action('land',[(0,base),(.22,absorb),(1,base)],18)
 authored_action('dash',[(0,action_pose(-.25,(-.35,.20),(.25,.20),-3)),(.5,action_pose(-.28,(-.38,.23),(.30,.23),-4)),(1,action_pose(-.25,(-.35,.20),(.25,.20),-3))],18)

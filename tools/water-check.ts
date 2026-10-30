@@ -73,3 +73,18 @@ assert.equal(reedTrial(2.5), null, 'Brief pass through falls is a near miss, nev
 const dashLatch = reedTrial(6);
 assert(dashLatch !== null && dashLatch > 11.4 && dashLatch < 11.8, 'Six-second stroke feeds a seven-second seal after 4s travel');
 console.log('Reed near-miss and dash-duration latch: PASS', dashLatch);
+
+// The authored Reed patrol must leave a real solve window while the source is
+// sustained. This catches permanently-on-flume layouts that block every slug.
+const { REED_SHADE_PATROL } = await import('../games/fox-spirit/src/regionReedmarsh');
+const patrol = new THREE.CatmullRomCurve3(REED_SHADE_PATROL.patrol.map(p => new THREE.Vector3(...p)), true, 'centripetal');
+const liveWater = createWater(new THREE.Scene(), new CollisionWorld(() => -2));
+const liveInlet = createInlets(new THREE.Scene(), [{seedwell:1, source:'reed-falls',pos:new THREE.Vector3(),sealAt:new THREE.Vector3(),pillar:new THREE.Vector3(),latchTime:7}],new THREE.MeshStandardMaterial());
+let patrolLatch: number | null = null;
+for (let tick=0; tick<45*60; tick++) {
+  const now=tick/60, shade=patrol.getPointAt((now*REED_SHADE_PATROL.speed/patrol.getLength())%1);
+  liveWater.update(1/60,now,()=>now>=7?1:0,p=>Math.hypot(p.x-shade.x,p.z-shade.z)<3&&Math.abs(p.y-shade.y)<4);
+  if(liveInlet.update(1/60,()=>liveWater.arriving('reed-falls')).length) {patrolLatch=now;break;}
+}
+assert(patrolLatch!==null,'Authored Shade patrol must permit a real seven-second water latch');
+console.log('Authored Reed patrol water window: PASS',patrolLatch);
