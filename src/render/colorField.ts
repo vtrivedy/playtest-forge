@@ -257,8 +257,10 @@ export class ColorField {
         varying float vStrength;
         varying float vNoise;
         varying float vInner;
+        varying vec2 vWorld;
         void main() {
           vUv = uv;
+          vWorld = (instanceMatrix * vec4(position, 1.0)).xz;
           vStrength = aStrength;
           vNoise = aNoise;
           vInner = aInner;
@@ -277,12 +279,15 @@ export class ColorField {
           vec2 u = f*f*(3.-2.*f);
           return mix(a,b,u.x) + (c-a)*u.y*(1.-u.x) + (d-b)*u.x*u.y;
         }
+        varying vec2 vWorld;
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
-          float n = noise(p * 4.0 + uTime) * vNoise;
+          // world-space brush noise (two octaves, slow drift): neighbouring stamps share one ragged,
+          // organic edge instead of each repeating the same disc outline
+          float n = ((noise(vWorld * 0.55 + uTime * 0.07) - 0.5) * 1.6 + (noise(vWorld * 2.1 - uTime * 0.05) - 0.5) * 0.7) * (vNoise + 0.12);
           float d = length(p) + n;
-          float soft = 1.0 - smoothstep(vInner, 1.0, d);
-          float ink = soft * soft * vStrength;
+          float soft = 1.0 - smoothstep(vInner * 0.8, 1.0, d);
+          float ink = soft * soft * (3.0 - 2.0 * soft) * vStrength;
           gl_FragColor = vec4(ink, ink, ink, 1.0);
         }`,
     });
@@ -537,8 +542,11 @@ export class ColorField {
               float behind = rad + n - d;
               cfRim = max(cfRim, uRestoreRim[i] * smoothstep(-edge * 0.4, edge * 0.3, behind) * (1.0 - smoothstep(edge * 0.4, edge * 2.6, behind)));
             }
-            float ad = distance(p, uFox);
-            s = max(s, pow(1.0 - clamp(ad / uAura, 0.0, 1.0), 1.15));
+            // aura: feathered and brush-broken, not a clean sphere
+            float an = (noise21(p.xz * 0.6 + uTime * 0.08) - 0.5) * 0.35 + (noise21(p.xz * 2.3) - 0.5) * 0.15;
+            float ad = distance(p, uFox) / uAura + an;
+            float af = 1.0 - smoothstep(0.15, 1.0, ad);
+            s = max(s, af * af);
             // the mask RT already carries the trail; the analytic loop is the no-RT fallback
             for (int i = 0; i < 24; i++) {
               if (i >= uTrailCount || uUseMaskMap > 0.5) break;
