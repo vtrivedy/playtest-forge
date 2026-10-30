@@ -107,8 +107,8 @@ if cut_edges:
 # Five broad throat/cheek tufts, rooted in the surface and tapered downward into a soft ruff.
 bm.normal_update()
 ruff_verts = []
-candidates = [v for v in bm.verts if sum(x for k,x in v[dl].items() if gname[k] in ("Neck1","Neck2","Neck3","Torso3")) > 0.35 and v.normal.y < -0.2]
-for x,z in [(-.22,2.12),(.22,2.12),(-.2,1.88),(.2,1.88),(0,1.8)]:
+candidates = [v for v in bm.verts if sum(x for k,x in v[dl].items() if gname[k] in ("Neck1","Neck2","Neck3","Torso3","Head")) > 0.35 and v.normal.y < -0.2]
+for x,z in [(-.22,2.36),(.22,2.36),(-.2,1.88),(.2,1.88),(0,1.8)]:
     if not candidates: break
     root = min(candidates, key=lambda v:(v.co-Vector((x,-1.04,z))).length_squared)
     weights0 = dict(root[dl]); base = root.co-root.normal*.055
@@ -199,7 +199,7 @@ for v in me.vertices:
         if n.y > -0.1: c = mix(c, PAL["earback"], min(1, ear) * (0.7 + 0.3 * tipt))
         else: c = mix(c, PAL["earin"], min(1, ear) * 0.75 * (1 - tipt)); c = mix(c, PAL["earback"], tipt * 0.7)
     # eye liner ring + amber eyes with slit pupils
-    d, _, _ = ekd.find(co)
+    _, _, d = ekd.find(co)
     if v.index in eye_vs:
         e = eyeL if co.x > 0 else eyeR
         dyx = abs((co - e).xy.length) / 0.07
@@ -229,7 +229,7 @@ for e in me.edges:
 for it in range(7):  # soft painted transitions (bib / saddle / socks blend, no cutout edges)
     new = []
     for i, c in enumerate(cols):
-        if i in eye_vs or i in nose_vs or not adj[i]: new.append(c); continue
+        if i in eye_vs or i in nose_vs or ekd.find(me.vertices[i].co)[2] < 0.09 or not adj[i]: new.append(c); continue
         s = [cols[j] for j in adj[i]]
         new.append(tuple((c[k] * 2 + sum(x[k] for x in s) / len(s)) / 3 for k in range(3)))
     cols = new
@@ -273,8 +273,8 @@ def streak(scale):
 body_s = streak((65, 7, 65)); leg_s = streak((65, 65, 8))
 sm = node("ShaderNodeMix", data_type="FLOAT"); L_.new(mask.outputs["Color"], sm.inputs["Factor"])
 L_.new(body_s.outputs["Fac"], sm.inputs[2]); L_.new(leg_s.outputs["Fac"], sm.inputs[3])
-cr = node("ShaderNodeValToRGB"); cr.color_ramp.elements[0].position = 0.3; cr.color_ramp.elements[0].color = (0.8, 0.76, 0.72, 1)
-cr.color_ramp.elements[1].position = 0.7; cr.color_ramp.elements[1].color = (1.08, 1.05, 1.0, 1)
+cr = node("ShaderNodeValToRGB"); cr.color_ramp.elements[0].position = 0.3; cr.color_ramp.elements[0].color = (0.95, 0.94, 0.93, 1)
+cr.color_ramp.elements[1].position = 0.7; cr.color_ramp.elements[1].color = (1.02, 1.015, 1.0, 1)
 L_.new(sm.outputs[0], cr.inputs["Fac"])
 big = node("ShaderNodeTexNoise"); big.inputs["Scale"].default_value = 2.5
 bigr = node("ShaderNodeMapRange"); bigr.inputs["To Min"].default_value = 0.9; bigr.inputs["To Max"].default_value = 1.08
@@ -291,7 +291,7 @@ m2 = node("ShaderNodeVectorMath", operation="SCALE"); L_.new(m1.outputs[2], m2.i
 m3 = node("ShaderNodeVectorMath", operation="SCALE"); L_.new(m2.outputs[0], m3.inputs[0]); L_.new(aom.outputs[0], m3.inputs["Scale"])
 emis = node("ShaderNodeEmission"); L_.new(m3.outputs[0], emis.inputs["Color"])
 bsdf = node("ShaderNodeBsdfPrincipled")
-bump = node("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.2; bump.inputs["Distance"].default_value = 0.02
+bump = node("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.05; bump.inputs["Distance"].default_value = 0.02
 L_.new(sm.outputs[0], bump.inputs["Height"]); L_.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
 L_.new(emis.outputs[0], out.inputs["Surface"])
 tex = node("ShaderNodeTexImage", image=img_c); N_.active = tex
@@ -416,8 +416,6 @@ M_FX = pbr("SpiritWispFX", fx_c, None, emit_img=fx_c, emit_str=1.4, rough=0.6, a
 M_GLOW = pbr("SpiritWispGlow", glow_c, None, emit_img=glow_c, emit_str=0.5, rough=0.8, alpha_mode="BLEND", spec=0.0)
 M_TGLOW = pbr("SpiritWispTailGlow", tglow_c, None, emit_img=tglow_c, emit_str=1.1, rough=0.8, alpha_mode="BLEND", spec=0.0)
 for m_ in (M_FX, M_GLOW, M_TGLOW): m_.use_backface_culling = False
-SHELL_CLIPS = (0.2, 0.38, 0.55)
-M_SHELL = [pbr(f"FoxFurShell{k + 1}", fur_sh, None, rough=0.9, alpha_mode="MASK", spec=0.15, clip=c_) for k, c_ in enumerate(SHELL_CLIPS)]
 TAIL_CLIPS = (0.18, 0.32, 0.46, 0.6)
 M_TSHELL = [pbr(f"FoxTailFurShell{k + 1}", tail_c, None, rough=0.9, alpha_mode="MASK", spec=0.15, clip=c_) for k, c_ in enumerate(TAIL_CLIPS)]
 
@@ -456,7 +454,8 @@ for i, v in enumerate(me.vertices):
     if throat[i] > 0.4: base = Vector((0, 0.25, -1))  # throat fur hangs down over the crease
     t = base - n * base.dot(n)
     flows.append(t.normalized() if t.length > 1e-4 else Vector())
-fur_shell = shells(fox, furlen, flows, M_SHELL, "SpiritFox_FurShell")
+# The matte painted coat and modeled ruff carry body fur; layered body masks produced pale crust.
+# Tail shells remain for the brush silhouette.
 
 
 # ---------------------------------------------------------------- 6. flame-plume tail: fur root third -> translucent flame
@@ -604,6 +603,6 @@ glow_body = glow_shell(fox, furlen, glow, 0.3, M_GLOW, "SpiritFox_Glow")
 glow_tail = glow_shell(tail, tlen, [smooth(0.45, 0.6, s_) for s_ in vs_], 0.3, M_TGLOW, "SpiritFox_TailGlow")
 
 # Spirit wisps and embers are generated at animated surface anchors by foxLook.ts.
-for o in (fur_shell, tail_shell, glow_body, glow_tail):
+for o in (tail_shell, glow_body, glow_tail):
     o.parent = arm
-print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, fur_shell, tail_shell, glow_body, glow_tail]})
+print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, tail_shell, glow_body, glow_tail]})
