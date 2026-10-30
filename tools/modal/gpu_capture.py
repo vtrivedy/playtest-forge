@@ -1,8 +1,19 @@
-"""Real-GPU Russetvale capture. No local browser or permanent deployment.
+"""NVIDIA EGL capture on Modal; no local browser or permanent deployment.
 
-modal run tools/modal/gpu_capture.py --ref main --shots all
---shots probe | perf | route | orbit | all (or comma-separated); --fetch-only RUN_ID
-Design/operating notes: /tmp/sol-gpu/DESIGN.md during initial implementation.
+    modal run --detach tools/modal/gpu_capture.py --ref main --shots all
+
+Default: A10, 1920x1080, q=high, 60 fps silent H.264. The simulation advances
+at 60 Hz and screenshots are encoded in order, independently of wall time.
+Perf covers low/med/high, five look poses, sepia/restored; GPU-synchronized
+render-only batches exclude simulation, browser presentation and encoding.
+Video hides wall-timed HUD overlays, preserving the vignette and world effects.
+
+--shots probe|perf|route|orbit|all (or comma-separated)
+--backend egl|vulkan|gl|swiftshader; gl uses headed Chromium under Xvfb.
+--cube-only isolates the backend with a minimal three.js scene.
+Explicit CPU fallback: --backend swiftshader --size 1280x720 --fps 30
+--fetch-only RUN_ID recovers a completed/failed run from the durable volume.
+Results: ../playtest-forge-artifacts/gpu/<ref>/; use --out to override.
 """
 from pathlib import Path
 import modal

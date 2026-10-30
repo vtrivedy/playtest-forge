@@ -47,7 +47,7 @@ const server = http.createServer((req, res) => {
 });
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
-const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, perf: {}, shots: {}, videos: {}, failures: [] };
+const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, perf: {}, shots: {}, videos: {}, stagingWarnings: [], failures: [] };
 let browser;
 try {
   const headed = backend === 'gl';
@@ -121,7 +121,9 @@ try {
     if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error('WebGL context lost after warmup');
     return H('state');
   }
-  async function shot(name) {
+  const cleanUI = () => page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+  async function shot(name, cinematic = false) {
+    if (cinematic) await cleanUI();
     await page.screenshot({ path: path.join(out, `${name}.png`), animations: 'disabled' });
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
   }
@@ -137,17 +139,19 @@ try {
       await boot(q);
       if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
       for (const [name, pose] of Object.entries(poses)) {
+        const beforePose = await H('state');
         await H('teleport', ...pose.fox, Math.PI);
         if (pose.photo) await H('photo', ...pose.photo);
         await advance(90, false); await advance(2);
         const st = await H('state');
+        if (st.deaths > beforePose.deaths) report.stagingWarnings.push(`${q}-${state}-${name}: staging caused ${st.deaths - beforePose.deaths} respawn(s); actual pose recorded. Existing look-capture pose preserved for comparison.`);
         if (st.restored !== (state === 'restored')) throw Error(`Unexpected restoration at ${state}-${name}`);
         await H('perf', 8); // shader/cache warmup excluded
         const samples = [];
         for (let i = 0; i < 9; i++) samples.push(await H('perf', 4));
         const sorted = [...samples].sort((a, b) => a.msPerFrame - b.msPerFrame);
         const median = sorted[Math.floor(sorted.length / 2)];
-        report.perf[`${q}-${state}-${name}`] = { ...median, fps: Number((1000 / median.msPerFrame).toFixed(2)), samples, method: 'median of 9 perf(4) GPU-synchronized render-only batches; simulation paused' };
+        report.perf[`${q}-${state}-${name}`] = { ...median, samples, staging: { requested: pose, actual: st.pos, deathsBefore: beforePose.deaths, deathsAfter: st.deaths, camera: st.camera }, method: 'median of 9 perf(4) GPU-synchronized render-only batches; simulation paused' };
         console.log('PERF', q, state, name, JSON.stringify(median));
         await shot(`${q}-${state}-${name}`);
         save('perf.json', report.perf);
@@ -155,6 +159,9 @@ try {
     }
   }
   async function video(name, frameCount, beforeFrame, stop) {
+    // Game HUD timers and CSS animations use wall time. Hide those for a repeatable
+    // cinematic export; preserve the authored vignette and all in-world restoration FX.
+    await cleanUI();
     const started = Date.now(), trace = [], frames = [], start = await H('state');
     const output = path.join(out, `${name}.mp4`);
     const encoder = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-vcodec', 'mjpeg', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output], { stdio: ['pipe', 'ignore', 'inherit'] });
@@ -166,7 +173,7 @@ try {
       for (let i = 0; i < frameCount; i++) {
         await beforeFrame(i);
         state = await advance(60 / fps);
-        if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
+        if (state.look.quality !== quality || state.look.pixelRatio !== (quality === 'low' ? 0.5 : 1)) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
         const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
         if (encoderError) throw encoderError;
         if (!encoder.stdin.write(jpeg)) await once(encoder.stdin, 'drain');
@@ -185,7 +192,7 @@ try {
     const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
     const stream = probe.streams[0];
     if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
-    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
+    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: 60, stepsPerVideoFrame: 60 / fps, seed: 42, ui: 'Cinematic: HUD hidden, vignette and in-world effects preserved', trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
     return state;
   }
@@ -205,11 +212,19 @@ try {
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
     await H('teleport', 0, 38, -84, Math.PI);
     const n = Number(arg('orbit-seconds', '20')) * fps;
-    await video('restored-orbit-staged', n, async i => {
-      const a = -0.65 + i / (n - 1) * Math.PI * 0.7;
-      await H('photo', [Math.sin(a) * 125, 66 + Math.sin(i / n * Math.PI) * 12, -18 + Math.cos(a) * 125], [0, 15, -25], 52);
-    });
-    await shot('orbit-end');
+    for (const shotSpec of [
+      { name: 'restored-orbit-staged', radius: 125, centreZ: -18, height: 66, look: [0, 15, -25] },
+      { name: 'restored-shrine-orbit-staged', radius: 70, centreZ: -84, height: 61, look: [0, 36, -80] },
+    ]) {
+      await video(shotSpec.name, n, async i => {
+        const a = -0.65 + i / (n - 1) * Math.PI * 0.7;
+        await H('photo', [Math.sin(a) * shotSpec.radius, shotSpec.height + Math.sin(i / n * Math.PI) * 8, shotSpec.centreZ + Math.cos(a) * shotSpec.radius], shotSpec.look, 52);
+      });
+      await shot(`${shotSpec.name}-end`, true);
+    }
+    await H('poseHero', { anim: 'idle', fx: true });
+    await advance(2);
+    await shot('hero-restored-staged', true);
   }
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
 finally {
