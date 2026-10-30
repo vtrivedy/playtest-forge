@@ -36,6 +36,7 @@ import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
 import { createUpdrafts, type Hearth, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
+import { createGrowth, type Root } from './chem/growth';
 import type { ColorStroke } from '../../../src/render/colorField';
 
 /**
@@ -333,6 +334,29 @@ async function boot() {
     },
   });
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
+  // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
+  let frontFxT = 0;
+  const growth = createGrowth(scene, world.rootSpots, world.collision, {
+    gui,
+    onIgnite: (r) => {
+      const byDash = r.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
+      if (byDash) rootStruck.add(r);
+      r.flare = byDash ? 1.6 : 1;
+      const k = r.spot.knot;
+      emberMotes.burst(k.clone().setY(k.y + 0.6), { count: byDash ? 40 : 20, speed: [0.8, 2.4], lift: 0.6, buoyancy: 0.5, life: [0.8, 1.6], flash: byDash ? 1.2 : 0.7, size: [0.03, 0.08], heat: 0.6 });
+      autumnFX.swirl(k.clone().setY(k.y + 0.2), byDash ? 30 : 18, 1.4);
+      audio.play('checkpoint');
+      if (byDash) cam.shake(0.12);
+    },
+    onFront: (_r, p, dt) => {
+      frontFxT -= dt;
+      if (frontFxT > 0) return;
+      frontFxT = 0.12;
+      emberMotes.burst(p.clone().setY(p.y + 0.1), { count: 4, speed: [0.3, 1.1], lift: 0.5, buoyancy: 0.4, life: [0.6, 1.2], flash: 0.5, size: [0.025, 0.06], heat: 0.55 });
+    },
+    onWither: (_r, p) => autumnFX.swirl(p.clone().setY(p.y - 0.2), 6, 0.6),
+  });
+  const rootStruck = new Set<Root>();
   /**
    * Colour drains (world-1.md §1.2): encounters register predicates here (Shades: within 3 m). Inside a drain
    * reactors read aura/trail and spent strokes (≤ 1) as 0, and an unsupplied reactor skips its hold.
@@ -348,6 +372,7 @@ async function boot() {
   function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
     for (const h of updrafts.hearths) if (Math.hypot(h.base.x - sw.pos.x, h.base.z - sw.pos.z) <= sw.radius) h.reactor.restored = true;
+    growth.restore(sw.id);
     const inlet = inlets.inlets.find((q) => q.seedwell === i);
     if (inlet) inlet.latched = true;
     const ev = world.latchSeedwell(i);
@@ -541,7 +566,7 @@ async function boot() {
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
-    chem: { updrafts, inlets, colorDrains, supplyAt },
+    chem: { updrafts, inlets, growth, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
     /** Fox look tunables (live; see foxLook.ts) */
     foxLook: FOX_LOOK,
@@ -708,7 +733,7 @@ async function boot() {
       return {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
-        chem: { ...updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        chem: { ...updrafts.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         audio: audio.debug(),
@@ -901,7 +926,7 @@ async function boot() {
     const prevLabel = route[auto.idx - 1]?.label;
     // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
     const waitSeedwell = (prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit;
-    const waitBridge = (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell;
+    const waitBridge = (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
@@ -1185,13 +1210,21 @@ async function boot() {
         dashStruck.add(h);
         if (h.reactor.state !== 'cold') hearthStruck(h);
       }
+      // a dash along a lit knot re-flares it (the stroke supplies the heat)
+      for (const r of growth.roots) {
+        if (rootStruck.has(r) || !r.reactor.probes.some((q) => colorField.strokeAt(q) > 1)) continue;
+        rootStruck.add(r);
+        if (r.reactor.state !== 'cold') r.flare = 1.6;
+      }
       if (!dashing) {
         dashStroke = null;
         dashStruck.clear();
+        rootStruck.clear();
       }
     }
     colorField.update(dt);
     updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
+    growth.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), grounded ? (probe.collider?.tag ?? 'terrain') : null, drainedAt);
     // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
     colorField.glows.length = 0;
     hearthLeafT += dt;
@@ -1332,7 +1365,7 @@ async function boot() {
       deaths,
       backend,
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
-      chem: { updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
+      chem: { updraft: updrafts.state(), growth: growth.state().roots, inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [
         `zone=${zone}`,
         `seedwells=${world.seedwells.map((q) => `${q.id}:${q.lit ? 1 : 0}`).join(',')}`,
