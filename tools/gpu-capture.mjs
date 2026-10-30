@@ -601,6 +601,92 @@ try {
     console.log('WIND', JSON.stringify(summary));
     await H('setKeys', []);
   }
+  if (wants('growth')) {
+    // Growth element acceptance (docs/design/world-1.md §1.3, §1.5): Creek Root bridge over the creek gorge.
+    // X: stand by the cold knot, follow the growth front across (never ahead of it), watch hold → warning → wither.
+    // R: stop mid-bridge past the hold: the occupied root must be retained (no fall), then wither once off it.
+    // D: dash along the knot from cold, walk away: grown + lit time.
+    await boot(quality, true);
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+    const rootOf = st => st.chem.growth.roots.find(r => r.id === 'creek');
+    const r0 = rootOf(await H('state'));
+    const [kx, ky, kz] = r0.knot;
+    const path = await page.evaluate(() => window.__gameHooks.chem.growth.roots.find(r => r.spot.id === 'creek').curve.getSpacedPoints(48).map(p => [p.x, p.y, p.z]));
+    const summary = { root: r0, X: {}, R: {}, D: {} };
+    const side = [[kx - 7.5, ky + 3.4, kz + 1.5], [kx + 0.8, ky - 0.6, kz - 7], 50];
+    const high = [[kx - 6, ky + 9, kz + 6], [kx + 0.8, ky - 1.5, kz - 6.5], 50];
+    const start = [kx + 1.3, ky, kz + 1.4];
+    await H('teleport', start[0] - 6, ky, start[2] + 6, Math.PI); await H('photo', ...high); await advance(30); await shot('growth-still-cold');
+    // steer: world-space stick toward the path, holding ≥ gap m behind the front; stop = hold position
+    const nearest = (x, z) => { let bi = 0, bd = Infinity; path.forEach(([px, , pz], i) => { const d = (px - x) ** 2 + (pz - z) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+    const segLen = r0.length / (path.length - 1);
+    async function follow(st, gap, holdAtS = Infinity) {
+      const r = rootOf(st), [x, , z] = st.pos;
+      const i = nearest(x, z), foxS = i * segLen;
+      const onIt = Math.hypot(path[i][0] - x, path[i][2] - z) < 0.9 && i > 0;
+      if (!onIt && i === 0) { const [tx, , tz] = path[1]; const d = Math.hypot(tx - x, tz - z); if (r.front < gap + 1.2) return H('setStick', 0, 0); return H('setStick', (tx - x) / d, (tz - z) / d); }
+      if (foxS >= holdAtS) return H('setStick', 0, 0);
+      if (foxS > r.front - gap && r.front < r.length) return H('setStick', 0, 0);
+      const j = Math.min(path.length - 1, i + 3), [tx, , tz] = j === path.length - 1 && i >= path.length - 3 ? [path.at(-1)[0] + 0.3, 0, path.at(-1)[2] - 2.5] : path[j];
+      const d = Math.hypot(tx - x, tz - z) || 1;
+      return H('setStick', (tx - x) / d * 0.75, (tz - z) / d * 0.75);
+    }
+    for (const variant of ['X', 'R']) {
+      await H('teleport', ...start, Math.PI); await H('photo', ...side); await advance(20);
+      const tl = [], keyFrames = [0];
+      let crossed = -1, onBridge = -1, mark = {};
+      const name = variant === 'X' ? 'growth-cross' : 'growth-retain';
+      await video(name, (variant === 'X' ? 16 : 20) * fps, async i => {
+        const st = await H('state'), r = rootOf(st);
+        tl.push({ i, t: st.t, pos: st.pos, grounded: st.grounded, heat: r.heat, state: r.state, front: r.front, wither: r.wither, retained: r.retained, cols: r.collidersOn, deaths: st.deaths });
+        const tag = (k, cond) => { if (cond && mark[k] === undefined) { mark[k] = i; keyFrames.push(i); } };
+        tag('lit', r.heat > 0.5); tag('third', r.grown > 0.34); tag('twoThirds', r.grown > 0.67); tag('grown', r.grown >= 1);
+        tag('warn', r.state === 'guttering'); tag('wither', r.wither > 0.5); tag('witherHalf', r.wither > r.length * 0.5);
+        if (onBridge < 0 && r.retained) { onBridge = i; keyFrames.push(i); }
+        if (crossed < 0 && st.pos[2] < path.at(-1)[2] - 0.5 && st.grounded) { crossed = i; keyFrames.push(i); }
+        if (variant === 'X') await follow(st, 1.4);
+        else if (mark.grown === undefined || i - mark.grown < 8 * fps) await follow(st, 1.4, r0.length * 0.5);
+        else await follow(st, 0);
+      }, (st, i) => variant === 'X' ? crossed > 0 && rootOf(st).front === 0 && i - crossed > 30 : crossed > 0 && rootOf(st).front === 0 && i - crossed > 30, { keyFrames, label: (f, st) => st ? `${name} f${f} heat=${rootOf(st).heat.toFixed(2)} ${rootOf(st).state} front=${rootOf(st).front.toFixed(1)} wither=${rootOf(st).wither.toFixed(1)}${rootOf(st).retained ? ' RETAINED' : ''}` : `${name} f${f}` });
+      await H('setStick', null);
+      const lit = tl.find(r => r.heat > 0), grown = tl.find(r => r.front >= r0.length - 0.01), warn = tl.find(r => r.state === 'guttering'), gone = tl.find(r => warn && r.t > warn.t && r.front === 0);
+      const offBridge = tl.filter(r => !r.retained && r.grounded && r.pos[1] < ky - 1.5);
+      summary[variant] = {
+        growS: lit && grown ? Number((grown.t - lit.t).toFixed(2)) : null,
+        holdS: grown && warn ? Number((warn.t - grown.t).toFixed(2)) : null,
+        warnS: warn ? Number(((tl.find(r => r.t > warn.t && r.wither > 0)?.t ?? NaN) - warn.t).toFixed(2)) : null,
+        witherS: gone ? Number((gone.t - (tl.find(r => r.wither > 0)?.t ?? gone.t)).toFixed(2)) : null,
+        maxRetainedS: Number((tl.filter(r => r.retained).length / fps).toFixed(2)),
+        fellIntoGorge: offBridge.length > 0, crossedAtFrame: crossed, deaths: tl.at(-1)?.deaths,
+        minLeadM: Math.min(...tl.filter(r => r.retained && r.front < r0.length).map(r => r.front - nearest(r.pos[0], r.pos[2]) * segLen)),
+      };
+      save(`${name}-timeline.json`, tl);
+      await H('photoOff'); await advance(240, false);
+    }
+    { // D: dash along the cold knot, keep going; lit/grown timeline
+      await H('teleport', kx + 5, ky, kz + 0.4, -Math.PI / 2); await advance(30);
+      const tl = [];
+      for (let i = 0; i < 12 * 60; i++) {
+        const st = await H('state'), r = rootOf(st);
+        await H('setStick', i < 200 ? -1 : 0, 0);
+        if (i === 14) await H('setKeys', ['ShiftLeft']); else if (i === 16) await H('setKeys', []);
+        await H('advance', 1, 1 / 60, false);
+        tl.push({ t: st.t, heat: r.heat, state: r.state, supply: r.supply, front: r.front });
+      }
+      await H('setStick', null);
+      const lit = tl.filter(r => r.heat > 0);
+      summary.D = { litS: lit.length ? Number((lit.at(-1).t - lit[0].t).toFixed(2)) : 0, grew: Math.max(...tl.map(r => r.front)), suppliedS: Number((tl.filter(r => r.supply >= 0.3).length / 60).toFixed(2)) };
+      await advance(400, false);
+    }
+    // lit + grown stills, then the debug view of colliders/probes
+    await H('teleport', kx + 1.2, ky, kz + 1.1, Math.PI); await advance(6 * 60, false);
+    await H('photo', ...high); await advance(2); await shot('growth-still-grown');
+    await H('photo', ...side); await advance(2); await shot('growth-still-grown-side');
+    await page.evaluate(() => document.body.classList.add('debug-on')); await advance(2); await shot('growth-still-debug');
+    await page.evaluate(() => document.body.classList.remove('debug-on')); await H('photoOff');
+    save('growth-acceptance.json', summary);
+    console.log('GROWTH', JSON.stringify(summary));
+  }
   if (wants('route')) {
     await boot(quality, true);
     save('route-waypoints.json', await H('route'));

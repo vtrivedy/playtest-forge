@@ -38,6 +38,7 @@ import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
 import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
+import type { RootSpot } from './chem/growth';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -90,6 +91,8 @@ export type Realm = {
   shadeSpots: ShadeSpot[];
   /** Wind currents (world-1.md §1.3 wind; §3.3 beat 6 wind river) */
   windSpots: WindSpot[];
+  /** Growth-element placements: root knots and their authored bridge splines (chem/growth.ts) */
+  rootSpots: RootSpot[];
   /** An inlet's seal filled: light the Seedwell (permanent colour, checkpoint, its route) */
   latchSeedwell: (index: number) => RealmEvent[];
   respawnPos: () => THREE.Vector3;
@@ -126,6 +129,19 @@ function insideIsland(x: number, z: number, margin = 0): boolean {
 const POND = { x: -18, z: 70, rx: 15, rz: 9, floor: -0.75, water: -0.22 };
 const MARSH = { x: 78, z: 22, rx: 30, rz: 26, floor: -2, ink: -1.45 };
 
+/**
+ * Creek gorge (world-1.md §3.3 beat 7): an E–W cut across the Amberwood floor between the checkpoint and
+ * the canopy climb. Walls are sheer (taller than a step), so only the Creek Root (chem/growth.ts) or the
+ * tapered ends cross it. Recovery: the bed is ≤ 4 m down and walks out at either end in ≤ 10 s.
+ */
+export const CREEK = { x0: -6, x1: 22, taper: 7, zS: -3.2, zN: -11.6, bed: -3.4 };
+
+/** 0..1 how far the creek cut lowers the ground at (x, z) (0 outside the walls) */
+export function creekK(x: number, z: number): number {
+  if (z >= CREEK.zS || z <= CREEK.zN) return 0;
+  return smooth01(CREEK.x0 - CREEK.taper, CREEK.x0, x) * smooth01(CREEK.x1 + CREEK.taper, CREEK.x1, x);
+}
+
 function marshE(x: number, z: number): number {
   return ((x - MARSH.x) / MARSH.rx) ** 2 + ((z - MARSH.z) / MARSH.rz) ** 2;
 }
@@ -148,6 +164,14 @@ function groundRaw(x: number, z: number): number {
   // marsh basin
   const me = marshE(x, z);
   h = THREE.MathUtils.lerp(h, MARSH.floor + (fbm3(x * 0.15, 1, z * 0.15, 2) - 0.5) * 0.3, smooth01(1.0, 0.8, me));
+  // creek gorge: sheer-walled cut with a pebbly bed that dips toward the water line
+  const ck = creekK(x, z);
+  if (ck > 0) {
+    const mid = (CREEK.zS + CREEK.zN) / 2;
+    const across = Math.abs(z - mid) / ((CREEK.zS - CREEK.zN) / 2);
+    const bed = CREEK.bed + across * across * 0.45 + (fbm3(x * 0.4, 3, z * 0.4, 2) - 0.5) * 0.25;
+    h = THREE.MathUtils.lerp(h, bed, ck);
+  }
   return h;
 }
 
@@ -419,7 +443,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-40, 0, -18);
   W(-14, 0, -6);
   W(0, 0, -1.5, { label: 'cp-amber' });
-  W(9, 0, -9);
+  // Creek Root: wake the knot, wait for the bridge, cross the gorge behind it
+  W(4.6, 0, -0.9, { label: 'grow:creek' });
+  W(5.9, 0, -7.4, { ground: false });
+  W(6.9, 0, -13.6, { ground: false });
   // D · Amberwood canopy climb
   W(11.6, 0, -12.4, { act: 'jump' });
   W(12, 1.5, -14, { ground: false, act: 'jump' });
@@ -487,6 +514,14 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       for (let i = 0; i <= nx; i++) {
         let x = x0 + i * step;
         let z = z0 + j * step;
+        // creek gorge: pull the grid rows either side of each wall onto the wall line so the cut reads sheer
+        if (x > CREEK.x0 - CREEK.taper - step && x < CREEK.x1 + CREEK.taper + step) {
+          for (const [wz, dir] of [[CREEK.zS, 1], [CREEK.zN, -1]] as const) {
+            const d = (z - wz) * dir;
+            if (d >= 0 && d < step) z = wz + dir * 0.04;
+            else if (d < 0 && d > -step) z = wz - dir * 0.14;
+          }
+        }
         const th = Math.atan2(z, x);
         const R = outlineR(th);
         const d = Math.hypot(x, z);
@@ -529,6 +564,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         c.lerp(PAL.bankDamp, bank * 0.9);
         leafy *= 1 - bank * 0.85;
         c.lerp(PAL.rockGrey, rimK * 0.7);
+        // creek bed: damp dark pebbles, few leaves
+        const ck = creekK(x, z);
+        c.lerp(PAL.bankDamp, ck * 0.85);
+        leafy *= 1 - ck * 0.7;
         c.multiplyScalar(0.92 + vnoise3(x * 1.7, 5, z * 1.7) * 0.16);
         leafyArr.push(THREE.MathUtils.clamp(leafy, 0, 1));
         cols.push(c.r, c.g, c.b);
@@ -798,6 +837,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
 
   // ==================================================================== CHEMISTRY placements (world-1.md §3.3)
   const hearthSpots: HearthSpot[] = [];
+  const rootSpots: RootSpot[] = [];
   {
     // H-a meadow step: a 5 m shelf with no ramp beside the opening path; the hearth at its foot is the way up
     const sx = 13;
@@ -1076,6 +1116,69 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const SW3P = new THREE.Vector3(-10, 17.5, -36);
   boulderStep(12, -14, 1.8, 1.5, 91);
   boulderStep(9.5, -16.5, 1.6, 3.0, 92);
+  // creek gorge walls: fractured rock faces under each rim (visual; the sheer drop is in groundRaw)
+  {
+    const span = CREEK.x1 - CREEK.x0 + CREEK.taper * 2 - 2;
+    const n = Math.ceil(span / 2.6);
+    for (const [wz, dir] of [[CREEK.zS, 1], [CREEK.zN, -1]] as const) {
+      for (let k = 0; k < n; k++) {
+        const x = CREEK.x0 - CREEK.taper + 1 + ((k + 0.5) * span) / n + (vnoise3(k * 1.37 + 0.5, wz, 2.5) - 0.5) * 0.6;
+        const deep = creekK(x, wz - dir * 0.5);
+        if (deep < 0.12) continue;
+        let rim = Infinity;
+        for (let dx = -1.6; dx <= 1.6; dx += 0.8) rim = Math.min(rim, groundRaw(x + dx, wz + dir * 0.3));
+        rockSlab(bk('rock', x, wz), {
+          x,
+          z: wz + dir * 0.75,
+          yaw: (vnoise3(k * 1.37 + 0.5, wz + 3, 2.5) - 0.5) * 0.08,
+          w: 3.3,
+          d: 1.7,
+          top: rim - 0.12,
+          bottom: groundRaw(x, (CREEK.zS + CREEK.zN) / 2) - 0.5,
+          rough: 0.32,
+          seed: 950 + k + (dir > 0 ? 0 : 50),
+          topColor: null,
+        });
+      }
+    }
+    // pebbles + mossy rocks along the bed
+    for (let k = 0; k < 16; k++) {
+      const x = CREEK.x0 - CREEK.taper * 0.5 + vnoise3(k * 1.37 + 0.5, 7, 2.5) * (CREEK.x1 - CREEK.x0 + CREEK.taper);
+      const z = CREEK.zN + 0.9 + vnoise3(k * 1.37 + 0.5, 8, 2.5) * (CREEK.zS - CREEK.zN - 1.8);
+      if (creekK(x, z) < 0.5) continue;
+      boulder(bk('rock', x, z), x, groundRaw(x, z) - 0.1, z, 0.25 + vnoise3(k * 1.37 + 0.5, 9, 2.5) * 0.45, 980 + k, 0.55);
+    }
+  }
+  // the creek: a still, held-breath ribbon of water along the bed
+  {
+    const len = CREEK.x1 - CREEK.x0 + CREEK.taper;
+    const w = createStylizedWater(scene, { size: 6, y: CREEK.bed + 0.18, colorDeep: 0x2e2a22, colorShallow: 0x6a5c46 });
+    w.mesh.scale.set(len / 6, 1, 0.62);
+    w.mesh.position.set((CREEK.x0 + CREEK.x1) / 2, CREEK.bed + 0.18, (CREEK.zS + CREEK.zN) / 2);
+    (w.material.uniforms.uSky!.value as THREE.Color).set(0x5a4e40);
+  }
+  // Creek Root (world-1.md §1.3 Growth, §3.3 beat 7): a knot on the south bank that grows a 10 m root
+  // bridge north over the gorge while its heat ≥ 0.5 (chem/growth.ts owns the root, its colliders and look)
+  {
+    const g = (x: number, z: number) => groundRaw(x, z);
+    const rimS = g(6, CREEK.zS + 0.3);
+    const rimN = g(6.4, CREEK.zN - 0.4);
+    rootSpots.push({
+      id: 'creek',
+      knot: new THREE.Vector3(5.6, g(5.6, -1.2), -1.2),
+      // walk-surface centreline, knot → far bank
+      path: [
+        [5.8, g(5.8, -1.9) + 0.25, -1.9],
+        [6.1, rimS + 0.55, -3.4],
+        [5.8, Math.max(rimS, rimN) + 0.85, -7.4],
+        [6.5, rimN + 0.5, -11.4],
+        [6.9, g(6.9, -13.4) + 0.08, -13.4],
+      ],
+      segments: 3,
+      width: 1.5,
+      restoredBy: 'SW3',
+    });
+  }
   // leaning branch ramp
   {
     const a = { x: 8.2, z: -17.8, y: 3.0 };
@@ -2089,6 +2192,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     inletSpots,
     shadeSpots,
     windSpots,
+    rootSpots,
     latchSeedwell(i) {
       const s = seedwells[i]!;
       if (s.lit) return [];
