@@ -368,6 +368,50 @@ try {
 
 
   }
+  if (wants('showcase')) {
+    await boot(quality,true,'&gym=gait');
+    await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
+    const gym=await page.evaluate(()=>window.__gameHooks.gym);
+    if(!gym)throw Error('Showcase requires gait gym');
+    const ramp=Math.tan(Math.PI/12);
+    const segments=[
+      {name:'walk',seconds:2,stick:[.18,0],reset:[580,0,0]},
+      {name:'trot',seconds:2,stick:[.45,0]},
+      {name:'gallop',seconds:3,stick:[1,0]},
+      {name:'left turn',seconds:1,stick:[0,-1]},
+      {name:'right turn',seconds:1,stick:[1,0]},
+      {name:'jump and land',seconds:2,stick:[.45,0],jump:true,reset:[610,0,0]},
+      {name:'slope ascent',seconds:3,stick:[.6,0],reset:[653,0,0]},
+      {name:'slope jump and land',seconds:2,stick:[.45,0],jump:true,reset:[658,3*ramp,0]},
+      {name:'slope descent',seconds:3,stick:[.6,0],reset:[673,12*ramp,0]},
+      {name:'brake',seconds:1,stick:[0,0]},
+    ];
+    let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
+    const at=i=>segments.find(segment=>i<segment.end);
+    const keyFrames=segments.flatMap(segment=>[segment.start+Math.round(fps*.25),segment.end-1]);
+    save('showcase-script.json',{label:'20 seconds, live controller input, staged segment resets, fixed side-follow lens, no forced poses',segments,gym});
+    await video('showcase',cursor,async i=>{
+      const segment=at(i),local=i-segment.start;
+      if(local===0){if(segment.reset)await H('teleport',...segment.reset,Math.PI/2);await H('setStick',...segment.stick);}
+      await H('setKeys',segment.jump && local<Math.round(.25*fps)?['Space']:[]);
+    },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{
+      if(state.deaths)throw Error(`Showcase course death at ${i}`);
+      await page.evaluate(([x,y,z])=>{
+        const h=window.__gameHooks,ground=h.debug.world.collision.highestAt(x,z);
+        h.photo([x,ground+1.6,z+6],[x,ground+.85+Math.max(0,y-ground)*.25,z],42);
+      },state.pos);
+    }});
+    await H('setKeys',[]);await H('setStick',null);
+    const result=report.videos.showcase;
+    const slope=segments.find(segment=>segment.name==='slope jump and land');
+    const rows=result.trace.filter(row=>row.frame>=slope.start && row.frame<slope.end);
+    const air=rows.findIndex(row=>!row.state.grounded);
+    const landed=air>=0?rows.slice(air+1).find(row=>row.state.grounded):null;
+    const p=landed?.state.pos;
+    const acceptance={seconds:cursor/fps,frames:cursor,slopeJumpAirborne:air>=0,slopeLanding:p??null,landedOnIncline:!!p && p[0]>655 && p[0]<667,deaths:(await H('state')).deaths};
+    save('showcase-acceptance.json',acceptance);save('showcase.json',result);
+    if(!acceptance.landedOnIncline)throw Error('Showcase did not land on the actual incline');
+  }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
     await boot(quality, true, '&gym=gait');
