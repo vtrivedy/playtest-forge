@@ -141,3 +141,11 @@ after advancing the simulation so empty-state stills match their diagnostics.
 Water completion slice: S1 pond-grotto falls at (−30,62) uses the same reactor and opens its frozen sheet collider only while flowing. The grotto floor remains solid; the fox can relight from either side. Full flood restores all water. A slow authored flume Shade patrol uses the existing encounters public drain predicate; water already past it runs out normally. Original procedural assets only (CREDITS.md).
 ### Fox pass 7 — 2026-10-30 13:20 ET
 Preserve the published quadruped rig and locomotion ownership. Refine the existing CC0 scaffold toward the concept: reduce ear height, retain a continuous soft brush through the tail tip, reduce detached flame cards, and strengthen coherent saddle/chest values. Keep the reference scene cameras and lights fixed. Verify with Modal concept comparisons, in-game close/chase frames and state logs; request cross-model critique before claiming the milestone. Use quick headless Blender exports because Blender MCP has no live connection; all renders remain remote.
+
+### Regional route review
+`--route-from N --route-to M` captures real traversal of a waypoint interval after
+an explicit staged start on a validated walkable surface. It never forces element
+latches/restoration or bypasses a failed move. Regional success means reaching M
+with no assists/deaths, not winning the realm. The default full route remains an
+unassisted restoration test. This lets level streams review later regions while
+earlier crossings are under repair, without hiding those failures.

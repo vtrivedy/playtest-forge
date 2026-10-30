@@ -46,6 +46,8 @@ def main():
     parser.add_argument('--out', type=Path)
     parser.add_argument('--shots', default='gait,route,stills')
     parser.add_argument('--route-seconds', type=int, default=120)
+    parser.add_argument('--route-from', type=int, default=0)
+    parser.add_argument('--route-to', type=int, default=-1)
     parser.add_argument('--gpu', default='A10', choices=['A10','L4'], help='Hardware GPU pool')
     parser.add_argument('--sheet-only', type=Path, help='Build a sheet for an existing capture directory')
     args = parser.parse_args()
@@ -85,7 +87,7 @@ def main():
     def capture(shot):
         folder = destination / shot
         folder.mkdir(parents=True, exist_ok=True)
-        command = ['modal', 'run', '--detach', 'tools/modal/gpu_capture.py', '--ref', ref, '--shots', shot, '--route-seconds', str(args.route_seconds), '--gpu', args.gpu, '--out', str(folder)]
+        command = ['modal', 'run', '--detach', 'tools/modal/gpu_capture.py', '--ref', ref, '--shots', shot, '--route-seconds', str(args.route_seconds), '--gpu', args.gpu, '--route-from', str(args.route_from), '--route-to', str(args.route_to), '--out', str(folder)]
         print(f'Starting {shot}: {folder}', flush=True)
         with (folder / 'modal.log').open('w') as log:
             result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
