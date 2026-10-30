@@ -4,6 +4,7 @@ import { captureLevels } from './levels-capture.mjs';
 import { captureWindGap } from './windgap-capture.mjs';
 import { captureMarshMouth } from './marshmouth-capture.mjs';
 import { captureReed } from './reed-capture.mjs';
+import { captureReedAftermath } from './reed-aftermath-capture.mjs';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -764,7 +765,8 @@ try {
   }
   if (wants('reed')) {
     await boot(quality, true);
-    await captureReed({ H, advance, shot, video, save, page, fps, report });
+    const reed = await captureReed({ H, advance, shot, video, save, page, fps, report });
+    if (reed.passed) await captureReedAftermath({ H, advance, shot, video, save, page, fps, report });
   }
   if (wants('marshmouth')) {
     for (const variant of ['aura', 'dash']) for (let trial = 1; trial <= 3; trial++) {
