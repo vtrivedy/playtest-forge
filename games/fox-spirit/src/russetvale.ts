@@ -240,6 +240,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   group.name = 'russetvale';
   scene.add(group);
   const r = rng(20261030);
+  const waterVisuals: ReturnType<typeof createStylizedWater>[] = [];
 
   const terrainY = (x: number, z: number) => (insideIsland(x, z) ? groundRaw(x, z) : -1000);
   const col = new CollisionWorld(terrainY);
@@ -1154,6 +1155,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   {
     const len = CREEK.x1 - CREEK.x0 + CREEK.taper;
     const w = createStylizedWater(scene, { size: 6, y: CREEK.bed + 0.18, colorDeep: 0x2e2a22, colorShallow: 0x6a5c46 });
+    waterVisuals.push(w);
     w.mesh.scale.set(len / 6, 1, 0.62);
     w.mesh.position.set((CREEK.x0 + CREEK.x1) / 2, CREEK.bed + 0.18, (CREEK.zS + CREEK.zN) / 2);
     (w.material.uniforms.uSky!.value as THREE.Color).set(0x5a4e40);
@@ -1831,6 +1833,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // Wen's pond
   const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x393c30, colorShallow: 0x827657 });
+  waterVisuals.push(pond);
   pond.mesh.position.set(POND.x, POND.water, POND.z);
   pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
   (pond.material.uniforms.uSky!.value as THREE.Color).set(0xb5a17a);
@@ -2276,6 +2279,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
+      for (const water of waterVisuals) water.update(t);
       const ev: RealmEvent[] = [];
       // checkpoints
       for (let i = 0; i < checkpoints.length; i++) {

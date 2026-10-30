@@ -166,3 +166,10 @@ world-scaled surfaces. Stone combines softened scan values with damp seams and
 moss on upward faces; timber uses grain and dark joints. Preserve restoration
 color, atmospheric values and the full-route harness. Review matched remote GPU
 stills and water frames before landing; record concrete failures and retest.
+
+### Water appearance follow-up
+Animate the existing pond/creek water shaders from the realm tick (their time
+uniform currently stays at zero). Add soft warm-sky Fresnel reflection to live
+flume/fall surfaces, retaining wet/dry masks, front/tail timing, gates and colliders.
+The marsh hazard stays dark ink, with restrained moving sky reflection. Verify
+frozen/flowing/warning states and retain water acceptance telemetry on GPU.
