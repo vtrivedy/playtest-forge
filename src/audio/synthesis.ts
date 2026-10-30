@@ -107,3 +107,18 @@ export function ambience(ctx: BaseAudioContext, out: AudioNode, noise: AudioBuff
   }
   return { gain: bus.gain, stop() { for (const s of sources) s.stop(); for (const n of nodes) n.disconnect(); } };
 }
+
+export function mixBus(ctx: BaseAudioContext) {
+  const master = ctx.createGain(), limiter = ctx.createDynamicsCompressor();
+  master.gain.value = 0;
+  limiter.threshold.value = -18; limiter.knee.value = 12; limiter.ratio.value = 3;
+  limiter.attack.value = 0.008; limiter.release.value = 0.25;
+  master.connect(limiter).connect(ctx.destination);
+  return master;
+}
+export function glideBed(ctx: BaseAudioContext, out: AudioNode, noise: AudioBuffer) {
+  const source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), gain = ctx.createGain();
+  source.buffer = noise; source.loop = true; filter.type = 'bandpass'; filter.frequency.value = 1500; filter.Q.value = 0.5;
+  gain.gain.value = 0; source.connect(filter).connect(gain).connect(out); source.start();
+  return { gain: gain.gain, filter, stop() { source.stop(); source.disconnect(); filter.disconnect(); gain.disconnect(); } };
+}

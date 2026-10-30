@@ -22,11 +22,10 @@ try {
   for (const name of ['footstep-leaf', 'footstep-stone', 'footstep-wood', 'land', 'jump', 'dash', 'ember', 'ember-streak', 'shrine', 'bird', 'cricket', 'bridge', 'checkpoint', 'hazard', 'respawn', 'fire', 'glide', 'ambience-sepia', 'ambience-restored', 'ambience-crossfade']) {
     const rendered = await page.evaluate(async name => {
       const modulePath = new URL('./src/audio/synthesis.ts', location.origin + '/@fs/' + window.__audioRoot + '/').pathname;
-      const { cue, noiseBuffer, ambience, breath } = await import(modulePath);
+      const { cue, noiseBuffer, ambience, breath, mixBus, glideBed } = await import(modulePath);
       const duration = name.startsWith('ambience') ? 14 : name === 'shrine' ? 9 : name === 'bridge' ? 4 : 3;
-      const ctx = new OfflineAudioContext(1, duration * 24000, 24000), master = ctx.createGain(), limiter = ctx.createDynamicsCompressor();
-      master.gain.value = 0.55; limiter.threshold.value = -18; limiter.knee.value = 12; limiter.ratio.value = 3;
-      limiter.attack.value = 0.008; limiter.release.value = 0.25; master.connect(limiter).connect(ctx.destination);
+      const ctx = new OfflineAudioContext(1, duration * 24000, 24000), master = mixBus(ctx);
+      master.gain.value = 0.55;
       const noise = noiseBuffer(ctx, 8);
       if (name.startsWith('ambience')) {
         const p = ambience(ctx, master, noise, false), w = ambience(ctx, master, noise, true);
@@ -34,7 +33,7 @@ try {
           for (let i = 0; i <= 100; i++) { p.gain.setValueAtTime(Math.cos(i / 100 * Math.PI / 2), i / 10); w.gain.setValueAtTime(Math.sin(i / 100 * Math.PI / 2), i / 10); }
         } else (name.endsWith('sepia') ? p : w).gain.setValueAtTime(1, 0);
         if (!name.endsWith('sepia')) { cue(ctx, master, noise, 'bird', 7); cue(ctx, master, noise, 'cricket', 11); breath(ctx, master, noise, 4, 1.5, 2100, 0.018, 700, 0.25); }
-      } else if (name === 'glide') breath(ctx, master, noise, 0.1, 2.6, 1500, 0.075, 1500, 0.2);
+      } else if (name === 'glide') { const air = glideBed(ctx, master, noise); air.gain.setTargetAtTime(0.075, 0.1, 0.09); air.gain.setTargetAtTime(0, 2.3, 0.09); }
       else cue(ctx, master, noise, name.startsWith('footstep') ? 'footstep' : name.startsWith('ember') ? 'ember' : name, 0.1, { surface: name.startsWith('footstep') ? name.slice(9) : undefined, streak: name.endsWith('streak') ? 6 : 0 });
       const buffer = await ctx.startRendering(), data = buffer.getChannelData(0);
       let peak = 0, sum = 0; const bytes = new Uint8Array(data.length * 2), view = new DataView(bytes.buffer);
@@ -83,7 +82,7 @@ try {
   if (!stagedCoverage.stone.audio.surfaceCounts.stone) throw Error('Stone steps never exercised');
   await page.waitForTimeout(800);
   await page.evaluate(() => { window.__gameHooks.teleportToShrine(); window.__gameHooks.forceRestore(); });
-  await page.waitForTimeout(8000);
+  await page.waitForFunction(() => { const a = window.__gameHooks.state().audio; return a.warmGain > a.pressedGain && a.restored > 0.65; }, null, { timeout: 60000 });
   await page.screenshot({ path: path.join(out, 'audio-restoration.png') });
   const restored = await page.evaluate(() => ({ game: window.__game, state: window.__gameHooks.state() }));
   if (restored.state.audio.counts.shrine < 1 || restored.state.audio.warmGain <= restored.state.audio.pressedGain) throw Error('Restoration did not crossfade the live beds');

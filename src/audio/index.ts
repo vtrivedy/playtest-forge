@@ -1,4 +1,4 @@
-import { ambience, breath, cue, noiseBuffer, random } from './synthesis';
+import { ambience, breath, cue, noiseBuffer, random, mixBus, glideBed } from './synthesis';
 import type { Surface } from './surfaces';
 export { surfaceOf } from './surfaces';
 import type { Cue, VoiceOptions } from './synthesis';
@@ -12,8 +12,9 @@ export function createGameAudio() {
     if (saved && typeof saved.muted === 'boolean') audioSettings.muted = saved.muted;
   } catch { /* Storage may be disabled. */ }
   let savedSettings = JSON.stringify(audioSettings);
-  let ctx: AudioContext | undefined, master: GainNode, compressor: DynamicsCompressorNode;
-  let noise: AudioBuffer, pressed: ReturnType<typeof ambience>, warm: ReturnType<typeof ambience>, glide: GainNode;
+  let ctx: AudioContext | undefined, master: GainNode;
+  let noise: AudioBuffer, pressed: ReturnType<typeof ambience>, warm: ReturnType<typeof ambience>;
+  let glide: ReturnType<typeof glideBed>;
   let enabled = false, restored = 0, stepClock = 0, natureClock = 4, leafClock = 1;
   let fireClock = 0.5;
   let lastPickup = -10, streak = 0, shrineAt = -10, pendingShrine = false;
@@ -31,8 +32,6 @@ export function createGameAudio() {
   const counts: Partial<Record<Cue, number>> = {};
   let disposed = false, wasGliding = false;
   let queued: { name: Cue; opts: VoiceOptions } | undefined;
-  let airFilter: BiquadFilterNode;
-  let airSource: AudioBufferSourceNode | undefined;
   const visible = () => {
     if (!ctx) return;
     if (document.hidden) void ctx.suspend();
@@ -84,19 +83,10 @@ export function createGameAudio() {
     async resume() {
       if (disposed) return;
       if (!ctx) {
-        ctx = new AudioContext(); master = ctx.createGain(); master.gain.value = 0;
-        compressor = ctx.createDynamicsCompressor(); compressor.threshold.value = -18; compressor.knee.value = 12;
-        compressor.ratio.value = 3; compressor.attack.value = 0.008; compressor.release.value = 0.25;
-        master.connect(compressor).connect(ctx.destination);
+        ctx = new AudioContext(); master = mixBus(ctx);
         noise = noiseBuffer(ctx, 8);
         pressed = ambience(ctx, master, noise, false); warm = ambience(ctx, master, noise, true);
-        glide = ctx.createGain(); glide.gain.value = 0; glide.connect(master);
-        // Long-lived filtered air, independently faded from ambience.
-        const air = ctx.createBufferSource(), filter = ctx.createBiquadFilter();
-        air.buffer = noise; air.loop = true; filter.type = 'bandpass'; filter.frequency.value = 1500; filter.Q.value = 0.5;
-        air.connect(filter).connect(glide); air.start(); airFilter = filter;
-        air.onended = () => { air.disconnect(); filter.disconnect(); };
-        airSource = air;
+        glide = glideBed(ctx, master, noise);
       }
       await ctx.resume();
       if (queued) { const q = queued; queued = undefined; play(q.name, q.opts); }
@@ -116,7 +106,7 @@ export function createGameAudio() {
       if (glideOn && !wasGliding) play('glide');
       wasGliding = glideOn;
       glide.gain.setTargetAtTime(glideOn ? 0.04 + Math.min(16, speed) * 0.004 : 0, t, 0.09);
-      airFilter.frequency.setTargetAtTime(900 + Math.min(16, speed) * 85, t, 0.15);
+      glide.filter.frequency.setTargetAtTime(900 + Math.min(16, speed) * 85, t, 0.15);
       if (pendingShrine) swell();
       if (moving && grounded && !dashing && stepClock <= 0) {
         play('footstep', { surface }); stepClock = Math.max(0.16, 1.9 / Math.max(2, speed)) * (0.92 + rng() * 0.16);
@@ -135,7 +125,7 @@ export function createGameAudio() {
     debug() { return { state: ctx?.state ?? 'locked', masterGain: ctx ? master.gain.value : 0, pressedGain: ctx ? pressed.gain.value : 0, warmGain: ctx ? warm.gain.value : 0, glideGain: ctx ? glide.gain.value : 0, restored, enabled, ...audioSettings, counts: { ...counts }, voices: activeVoices.filter(v => v.until > (ctx?.currentTime ?? 0)).reduce((sum, v) => sum + v.cost, 0), surfaceCounts: { ...surfaceCounts }, log: [...log] }; },
     dispose() {
       disposed = true; document.removeEventListener('visibilitychange', visible); window.removeEventListener('keydown', key);
-      if (ctx) { pressed.stop(); warm.stop(); airSource?.stop(); void ctx.close(); }
+      if (ctx) { pressed.stop(); warm.stop(); glide.stop(); void ctx.close(); }
     },
   };
 }
