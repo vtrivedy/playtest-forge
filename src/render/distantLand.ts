@@ -138,7 +138,7 @@ function islandVariant(rand: () => number, kind: 'arch' | 'colonnade' | 'tower' 
     const z = Math.sin(a) * r;
     const h = 0.18 + rand() * 0.22;
     const lean = (rand() - 0.5) * 0.5;
-    const trunk = new THREE.CylinderGeometry(0.008, 0.02, h, 5);
+    const trunk = new THREE.CylinderGeometry(0.012, 0.03, h, 5);
     trunk.translate(0, h / 2, 0);
     trunk.rotateZ(lean);
     trunk.translate(x, 0.1, z);
@@ -146,11 +146,13 @@ function islandVariant(rand: () => number, kind: 'arch' | 'colonnade' | 'tower' 
     const tx = x - Math.sin(lean) * h;
     const ty = 0.1 + Math.cos(lean) * h;
     if (rand() < 0.7) {
-      for (let k = 0; k < 4; k++) {
-        const cr = 0.05 + rand() * 0.06;
+      // broad, ragged crown: clumps spill sideways and down the trunk (no ball-on-a-stick)
+      for (let k = 0; k < 8; k++) {
+        const cr = 0.035 + rand() * 0.05;
         const clump = new THREE.IcosahedronGeometry(cr, 1);
-        clump.scale(1.2, 0.75, 1.2);
-        clump.translate(tx + (rand() - 0.5) * 0.14, ty + (rand() - 0.2) * 0.06, z + (rand() - 0.5) * 0.14);
+        clump.scale(1.3, 0.7, 1.3);
+        const drop = rand() * rand() * h * 0.55;
+        clump.translate(tx + (rand() - 0.5) * 0.3 * (1 - drop / h), ty - drop + (rand() - 0.3) * 0.05, z + (rand() - 0.5) * 0.3 * (1 - drop / h));
         parts.push(clump.toNonIndexed());
       }
     } else {
