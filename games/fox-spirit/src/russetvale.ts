@@ -40,7 +40,8 @@ import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
 import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
-import type { RootSpot } from './chem/growth';
+import type { RootSpot, PadSpot } from './chem/growth';
+import { createReedmarshRegion, reedRuinGround, type ReedmarshRegion } from './regionReedmarsh';
 import { waterSpots } from './chem/water';
 import type { ShadeSpot } from './encounters/shades';
 export type { ShadeSpot } from './encounters/shades';
@@ -72,6 +73,7 @@ export type RealmEvent =
   | { type: 'seedwell'; index: number }
   | { type: 'bridge' }
   | { type: 'checkpoint'; index: number }
+  | { type: 'page'; id: 'reed-ruin' }
   | { type: 'wellspring' }
   | { type: 'hazard'; kind: 'ink' | 'fall' };
 
@@ -97,6 +99,8 @@ export type Realm = {
   windSpots: WindSpot[];
   /** Growth-element placements: root knots and their authored bridge splines (chem/growth.ts) */
   rootSpots: RootSpot[];
+  padSpots: PadSpot[];
+  reedRegion: ReedmarshRegion;
   /** An inlet's seal filled: light the Seedwell (permanent colour, checkpoint, its route) */
   latchSeedwell: (index: number) => RealmEvent[];
   respawnPos: () => THREE.Vector3;
@@ -176,7 +180,7 @@ function groundRaw(x: number, z: number): number {
     const bed = CREEK.bed + across * across * 0.45 + (fbm3(x * 0.4, 3, z * 0.4, 2) - 0.5) * 0.25;
     h = THREE.MathUtils.lerp(h, bed, ck);
   }
-  return h;
+  return reedRuinGround(x, z, h);
 }
 
 // ---------------------------------------------------------------- trees (x, z, height, crown hue)
@@ -282,6 +286,18 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   weatheredSurface(M.stone);
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
+  M.sail.onBeforeCompile = shader => {
+    shader.vertexShader = 'varying vec2 vSailLocal;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvSailLocal = position.xy;');
+    shader.fragmentShader = 'varying vec2 vSailLocal;\n' + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      float sailAlong = max(abs(vSailLocal.x), abs(vSailLocal.y));
+      float sailAcross = min(abs(vSailLocal.x), abs(vSailLocal.y));
+      float sailRib = 1.0 - smoothstep(0.025, 0.065, abs(fract(sailAlong) - 0.5));
+      float sailWarp = 1.0 - smoothstep(0.03, 0.075, abs(fract(sailAcross * 3.0) - 0.5));
+      diffuseColor.rgb *= 1.0 - max(sailRib, sailWarp) * 0.48;
+      diffuseColor.rgb *= 0.93 + 0.07 * sin(sailAlong * 44.0);`);
+  };
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
   const [nature, rubble, lanternColumn] = await Promise.all([loadNatureKit(), loadRubbleKit(), loadLanternColumn()]);
   // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
@@ -780,7 +796,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       // pressed-sepia sailcloth, a little torn on one blade
       const sail = new THREE.PlaneGeometry(1.4, k === 2 ? 4.2 : 5.8, 2, 4);
       const sp2 = sail.attributes.position as THREE.BufferAttribute;
-      for (let v = 0; v < sp2.count; v++) sp2.setZ(v, 0.08 + Math.sin(sp2.getY(v) * 0.9) * 0.08);
+      for (let v = 0; v < sp2.count; v++) sp2.setZ(v, -0.035 + Math.sin(sp2.getY(v) * 0.9) * 0.025);
       sail.translate(0.78, k === 2 ? 4.6 : 3.9, 0);
       sailB.add(sail, new THREE.Matrix4().makeRotationZ(a), PAL.sail.clone().offsetHSL(0, 0, (k % 2) * -0.05));
       sail.dispose();
@@ -833,6 +849,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // ==================================================================== CHEMISTRY placements (world-1.md §3.3)
   const hearthSpots: HearthSpot[] = [];
   const rootSpots: RootSpot[] = [];
+  const padSpots: PadSpot[] = [];
   {
     // H-a meadow step: a 5 m shelf with no ramp beside the opening path; the hearth at its foot is the way up
     const sx = 13;
@@ -866,7 +883,23 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // ==================================================================== REEDMARSH
   const inkGeo = new THREE.CircleGeometry(1, 64);
   inkGeo.rotateX(-Math.PI / 2);
-  const inkMat = new THREE.MeshStandardMaterial({ name: 'rv-ink', color: 0x1f1914, roughness: 0.18, metalness: 0.0 });
+  const inkMat = new THREE.MeshStandardMaterial({ name: 'rv-ink', color: 0x1f1914, roughness: 0.48, metalness: 0.0 });
+  const inkTime = { value: 0 };
+  inkMat.onBeforeCompile = shader => {
+    shader.uniforms.uInkTime = inkTime;
+    shader.vertexShader = 'varying vec3 vInkWorld;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvInkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = 'uniform float uInkTime; varying vec3 vInkWorld;\n' + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
+      vec3 inkRipple = vec3(sin(vInkWorld.x * 1.7 + sin(vInkWorld.z * 0.7) - uInkTime * 0.6), 0.0, cos(vInkWorld.z * 2.1 + sin(vInkWorld.x * 0.8) - uInkTime * 0.8)) * 0.035;
+      normal = normalize(normal + (viewMatrix * vec4(inkRipple, 0.0)).xyz);`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
+      float inkFresnel = pow(1.0 - abs(dot(normal, geometryViewDir)), 4.0);
+      outgoingLight += vec3(0.035, 0.025, 0.014) * inkFresnel;
+      // Material-local shoulder keeps reflected lamps warm without white disks.
+      outgoingLight /= vec3(1.0) + outgoingLight * 2.5;
+      #include <opaque_fragment>`);
+  };
   const ink = new THREE.Mesh(inkGeo, inkMat);
   ink.scale.set(MARSH.rx * 0.97, 1, MARSH.rz * 0.97);
   ink.position.set(MARSH.x, MARSH.ink, MARSH.z);
@@ -960,18 +993,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   hummock(98, 30, 2.6, 0.3, 54);
   hummock(84, 36, 3.2, 0.4, 55);
 
-  // ghost-ink stepping stones: faint sketches until the fox's colour touches them
-  type Ghost = { c: Collider; mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial; solid: number };
-  const ghosts: Ghost[] = [];
-  for (const [x, z] of [[73.5, 25], [77.5, 22.5], [81.5, 20], [85.5, 17.5]] as const) {
-    const c = col.add(cylCollider({ x, z, r: 1.15, top: 0.25, bottom: -2.5, tag: 'ghost' }));
-    const gb = new Bucket();
-    rockSlab(gb, { x: 0, z: 0, w: 2.3, d: 2.3, top: 0.25, bottom: -2.2, round: true, rough: 0.2, seed: x, topColor: PAL.stone });
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, transparent: true, opacity: 0.3, color: 0xe8dcc4 });
-    const mesh = gb.toMesh(mat)!;
-    mesh.position.set(x, 0, z);
-    group.add(mesh);
-    ghosts.push({ c, mesh, mat, solid: 0 });
+  // Lily pads are the same Growth reactor as Creek Root: color unfolds a
+  // temporary support, and an occupied chain stays until stable ground.
+  for (const [i, [x, z]] of [[73.5, 25], [77.5, 22.5], [81.5, 20], [85.5, 17.5]].entries()) {
+    padSpots.push({ id: `reed-pad-${i}`, x: x!, z: z!, top: 0.25, sunk: MARSH.ink - 0.15, r: 1.35, restoredBy: 'SW2' });
   }
   // stair from the H2 hummock onto the SW2 ruin island
   flight({ x: 90.0, z: 15.0, y: 1.2 }, { x: 92.4, z: 12.6, y: 2.0 }, 2.2, 21);
@@ -982,6 +1007,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   archAt(bk('stone', 99, 6), 99.5, 2, 6.5, 0.8, { span: 2.6, pillarH: 3, seed: 71, broken: 0.6 });
   ruinColumn(bk('stone', 91, 5), 91, 2, 6.5, 2.2, 72);
   ruinColumn(bk('stone', 100, 13), 99.5, 2, 13.5, 3.4, 73);
+
+  const reedRegion = createReedmarshRegion(group, col, M.stone);
 
   // reeds: rooted stands of bent, tapering blades (some cattails), clustered by a noise mask
   // so the ink keeps open water between them; copper/tan when restored
@@ -1645,7 +1672,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const mkSeedwell = (id: SeedwellState['id'], name: string, p: THREE.Vector3, radius: number, seed: number, ox = 0, oz = 0) => {
     const g = glowMat(`rv-glow-${id}`);
     const gb = new Bucket();
-    seedwell(bk('stone', p.x, p.z), gb, p.x + ox, p.y, p.z + oz, seed);
+    seedwell(bk('stone', p.x, p.z), gb, lanternColumn, p.x + ox, p.y, p.z + oz, seed);
     const m = gb.toMesh(g, { cast: false });
     if (m) group.add(m);
     patchable.push(g);
@@ -1763,7 +1790,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x, z, w: 14, d: 14, top: y, bottom: -4, round: true, rough: 0.65, seed: 360, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.5) });
     const sb = bk('stone', x, z);
     archAt(sb, x, y, z - 2, 0, { span: 3.2, pillarH: 4.4, broken: 0.25, seed: 361 });
-    seedwell(sb, new Bucket(), x, y, z - 2, 362);
+    seedwell(sb, new Bucket(), lanternColumn, x, y, z - 2, 362);
     hearthSpots.push({ id: 'islet-return', x: x + 3.5, y, z: z + 1.5, height: 12 });
     litterPatch(bk('litter', x, z, false), rng(363), x, z, 5.5, 60, () => y);
   }
@@ -1817,7 +1844,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
   const lanternMat = glowMat('rv-glow-lanterns');
-  lanternMat.emissiveIntensity = 0.65;
+  lanternMat.color.set(0x8a6040);
+  lanternMat.emissive.set(0xffb46a);
+  lanternMat.emissiveIntensity = 0.28;
   patchable.push(lanternMat);
   const checkpoints: Realm['checkpoints'] = [];
   const lanternB = new Bucket();
@@ -1837,7 +1866,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     lampLight.position.set(x, y + 2.1, z); group.add(lampLight);
     checkpoints.push({ pos: new THREE.Vector3(x - 1.6, y, z), lit: false });
   }
-  lanternColumn.dispose();
   const lanternMesh = lanternB.toMesh(lanternMat, { cast: false });
   if (lanternMesh) group.add(lanternMesh);
 
@@ -1849,7 +1877,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const pz = 92 + Math.sin(a) * 5.4;
     if (pz > 94) continue; // keep the camera side open
     const h = 1.6 + ((k * 53) % 7) * 0.25;
-    stoneBlock(bk('stone', px, pz), trs(px, groundRaw(px, pz) + h / 2 - 0.1, pz, -a, 1, 1, 1, 0.06, 0.05), 0.8, h, 0.55, 240 + k, 0.16);
+    bk('stone', px, pz).add(lanternColumn, trs(px, groundRaw(px, pz) - 0.1, pz, -a, 0.55 / 0.61, h / 1.9, 0.55 / 0.61, 0.06, 0.05), PAL.stone);
   }
   {
     const y = groundRaw(0, 85);
@@ -2132,13 +2160,30 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     ];
     const sr = rng(1111);
     for (let i = 0; i < sats.length; i++) {
-      const [x, y, z, rad, ruins] = sats[i]!;
+      const [baseX, baseY, baseZ, baseRad, ruins] = sats[i]!;
+      const hero = i === 0 || i === 2;
+      const depth = hero ? 1 : 1.32 + (i % 3) * 0.16;
+      const x = baseX * depth, z = baseZ * depth;
+      const y = hero ? baseY + (i === 0 ? 9 : -6) : baseY - 12 + Math.sin(i * 2.4) * 19;
+      const rad = baseRad * (hero ? 1.35 : 0.62 + (i % 3) * 0.1);
+      const slopeX = Math.sin(i * 2.1) * 0.12, slopeZ = Math.cos(i * 1.7) * 0.09;
+      const topAt = (px: number, pz: number) => {
+        const dx = px - x, dz = pz - z;
+        const d = Math.hypot(dx, dz) / rad;
+        return y + (1 - d * d) * rad * 0.12 + dx * slopeX + dz * slopeZ
+          + Math.sin(dx * 0.23 + i) * Math.cos(dz * 0.17) * rad * 0.035;
+      };
       const ob = new Bucket();
       const sb = new Bucket();
       const lb = new Bucket();
       const bkb = new Bucket();
-      const outl = (th: number) => rad * (1 + 0.12 * Math.sin(th * 3 + i) + 0.06 * Math.sin(th * 7 + i * 2));
-      islandUnderside(ob, x, z, y, outl, rad * 2.6, 50 + i, 48);
+      const outl = (th: number) => rad * (1 + 0.24 * Math.sin(th * 3 + i) + 0.12 * Math.sin(th * 7 + i * 2));
+      islandUnderside(ob, x, z, y, outl, rad * (2.6 + (i % 3) * 0.55), 50 + i, 48);
+      for (let k = 0; k < (hero ? 4 : 2); k++) {
+        const a = k * 2.39996 + i;
+        hangingSpire(ob, x + Math.cos(a) * rad * 0.4, y - rad * 0.8, z + Math.sin(a) * rad * 0.4,
+          rad * (0.2 + k * 0.045), rad * (2.8 + k * 0.55), 5100 + i * 10 + k);
+      }
       // top cap
       const cap = new THREE.CircleGeometry(1, 32);
       cap.rotateX(-Math.PI / 2);
@@ -2149,7 +2194,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const th = Math.atan2(pz, px);
         const d = Math.hypot(px, pz);
         const R = outl(th) * d;
-        cp.setXYZ(v, x + Math.cos(th) * R, y + (1 - d * d) * rad * 0.12 + 0.1, z + Math.sin(th) * R);
+        cp.setXYZ(v, x + Math.cos(th) * R, topAt(x + Math.cos(th) * R, z + Math.sin(th) * R) + 0.1, z + Math.sin(th) * R);
       }
       cap.computeVertexNormals();
       ob.add(cap, undefined, PAL.grassDry.clone().lerp(PAL.moss, 0.4));
@@ -2159,17 +2204,17 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         hangingRoot(bkb, sr, x + Math.cos(th) * outl(th) * 0.9, y - 1, z + Math.sin(th) * outl(th) * 0.9, 6 + sr() * 12, new THREE.Vector2(-Math.cos(th), -Math.sin(th)), 0.3);
       }
       if (ruins) {
-        ruinArch(sb, x - rad * 0.2, y + rad * 0.1, z, sr() * 3, { span: 3.6, pillarH: 5 + sr() * 3, seed: 900 + i, broken: sr() * 0.6, pointed: sr() < 0.5 });
-        ruinColumn(sb, x + rad * 0.35, y + rad * 0.08, z + rad * 0.2, 4 + sr() * 4, 950 + i, 0.6);
-        ruinColumn(sb, x + rad * 0.1, y + rad * 0.1, z - rad * 0.35, 2 + sr() * 5, 970 + i, 0.55);
+        ruinArch(sb, x - rad * 0.2, topAt(x - rad * 0.2, z), z, sr() * 3, { span: 3.6, pillarH: 5 + sr() * 3, seed: 900 + i, broken: sr() * 0.6, pointed: sr() < 0.5 });
+        ruinColumn(sb, x + rad * 0.35, topAt(x + rad * 0.35, z + rad * 0.2), z + rad * 0.2, 4 + sr() * 4, 950 + i, 0.6);
+        ruinColumn(sb, x + rad * 0.1, topAt(x + rad * 0.1, z - rad * 0.35), z - rad * 0.35, 2 + sr() * 5, 970 + i, 0.55);
       }
-      kitTree(x + rad * 0.3, y + rad * 0.08, z - rad * 0.3, 7 + sr() * 5, i, 1200 + i, { cast: false, collide: false });
+      kitTree(x + rad * 0.3, topAt(x + rad * 0.3, z - rad * 0.3), z - rad * 0.3, 7 + sr() * 5, i, 1200 + i, { cast: false, collide: false });
       // overgrown cap: red leaf-carpet, bracken and tussocks spilling toward the rim
       for (let k = 0; k < 10 + Math.floor(rad); k++) {
         const th = sr() * Math.PI * 2;
         const d = 0.25 + sr() * 0.65;
         const R = outl(th) * d;
-        const py = y + (1 - d * d) * rad * 0.12 + 0.1;
+        const py = topAt(x + Math.cos(th) * R, z + Math.sin(th) * R) + 0.1;
         const kind = sr();
         const v = kind < 0.55 ? 'bush_red' : kind < 0.8 ? 'fern' : 'grass_wispy';
         nature.place(v, x + Math.cos(th) * R, py - 0.1, z + Math.sin(th) * R, {
@@ -2233,6 +2278,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   for (const [x, y, z, seed] of [[55.6, -0.1, 35.3, 440], [95, -1.9, 20, 441], [105, -1.9, 20, 442]] as const) {
     rubble.place(bk('rock', x, z), x, y, z, 1.05, seed, 1.4);
   }
+  // Shallow CC0 fragments nest in the existing terrace ruin bases, away from landings.
+  for (const [s, t, y, seed] of [[3, 12, 2, 460], [19, -12, 6, 461], [30, -11, 10, 462], [70, 8, 22, 463], [79, -7, 22, 464]] as const) {
+    const p = sp(s, t);
+    rubble.place(bk('rock', p.x, p.z), p.x, y - 0.12, p.z, 1.05, seed, 0.55);
+  }
+  for (let k = 0; k < 3; k++) {
+    const a = k / 3 * Math.PI * 2 + 0.5;
+    const x = SW1P.x + Math.cos(a) * 2.6, z = SW1P.z + Math.sin(a) * 2.6;
+    rubble.place(bk('rock', x, z), x, SW1P.y - 0.08, z, 0.65, 470 + k, 0.45);
+  }
   rubble.dispose();
 
   // ==================================================================== merge buckets
@@ -2282,6 +2337,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     shadeSpots,
     windSpots,
     rootSpots,
+    padSpots,
+    reedRegion,
     latchSeedwell(i) {
       const s = seedwells[i]!;
       if (s.lit) return [];
@@ -2290,7 +2347,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       // seedwell doubles as checkpoint
       checkpoints.push({ pos: s.pos.clone().add(new THREE.Vector3(0, 0, 2.6)), lit: true });
       lastCheckpoint = checkpoints.length - 1;
-      if (s.id === 'SW2') inkActive = false;
+      if (s.id === 'SW2') { inkActive = false; reedRegion.restore(); }
       // SW3's permanent route up the hill base is the root bridge (world-1.md §3.6)
       if (s.id === 'SW3' && !bridgeGrowing) {
         bridgeGrowing = true;
@@ -2312,6 +2369,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     },
     setFlood(k, pulse = 0) {
       flood = k;
+      if (k >= 0.99) { inkActive = false; reedRegion.restore(); }
       const arr = loneCol.array as Float32Array;
       for (let i = 0; i < arr.length; i++) arr[i] = loneFaded[i]! + (loneFull[i]! - loneFaded[i]!) * k;
       loneCol.needsUpdate = true;
@@ -2320,7 +2378,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     },
     update(dt, t, fox, feetY, colorAt) {
       for (const water of waterVisuals) water.update(t);
+      inkTime.value = t;
       const ev: RealmEvent[] = [];
+      if (reedRegion.visit(fox, feetY)) ev.push({ type: 'page', id: 'reed-ruin' });
       // checkpoints
       for (let i = 0; i < checkpoints.length; i++) {
         const c = checkpoints[i]!;
@@ -2333,7 +2393,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         }
       }
       const litCount = checkpoints.filter((c) => c.lit).length;
-      lanternMat.emissiveIntensity = 0.65 + Math.min(1, litCount) * 0.9;
+      lanternMat.emissiveIntensity = 0.28 + Math.min(1, litCount) * 0.32;
 
       // seedwells
       for (let i = 0; i < seedwells.length; i++) {
@@ -2357,17 +2417,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       if (!inkActive && ink.position.y > MARSH.floor - 1.2) {
         ink.position.y -= dt * 0.35;
         inkMat.roughness = Math.min(0.9, inkMat.roughness + dt * 0.2);
-      }
-
-      // ghost-ink stones: solid while touched by colour (aura/trail/restored)
-      for (const g of ghosts) {
-        const c = Math.max(colorAt(new THREE.Vector3(g.c.x, 0.3, g.c.z)), inkActive ? 0 : 1);
-        g.c.enabled = c > 0.4;
-        g.solid += ((g.c.enabled ? 1 : 0) - g.solid) * Math.min(1, dt * 6);
-        g.mat.opacity = 0.22 + g.solid * 0.78;
-        g.mat.transparent = g.solid < 0.98;
-        g.mat.depthWrite = g.solid > 0.6;
-        g.mat.color.setRGB(0.92 - g.solid * 0.12, 0.86 - g.solid * 0.14, 0.77 - g.solid * 0.17);
       }
 
       // windmills: turn while in colour before SW1, for good after
@@ -2502,7 +2551,7 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
         vec3 gHue = gLeafHue(gLeaf.a);
         float gTake = step(fract(gLeaf.a * 5.37), 0.72);
         gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.70, 0.20, 0.12) : vec3(0.66, 0.27, 0.12), smoothstep(0.58, 0.74, gReg) * gTake);
-        gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.76, 0.60, 0.29) : vec3(0.82, 0.50, 0.17), smoothstep(0.42, 0.28, gReg) * gTake);
+        gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.76, 0.60, 0.29) : vec3(0.82, 0.50, 0.17), (1.0 - smoothstep(0.28, 0.42, gReg)) * gTake);
         vec3 gLeafCol = gLeaf.rgb * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
         diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);
         // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of
