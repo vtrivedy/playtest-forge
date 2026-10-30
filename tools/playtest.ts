@@ -160,39 +160,24 @@ try {
   console.log('[probe]', JSON.stringify(info));
 
   await page.screenshot({ path: path.join(outDir, 'shot-start.png') });
-  // Hero silhouette check — FX off, then restore
-  await page.evaluate(() => {
-    // @ts-expect-error playtest hook
-    window.__gameHooks?.setFxEnabled?.(false);
-  });
-  await page.waitForTimeout(250);
-  await page.screenshot({ path: path.join(outDir, 'shot-silhouette.png') });
-  await page.evaluate(() => {
-    // @ts-expect-error playtest hook
-    window.__gameHooks?.setFxEnabled?.(true);
-  });
   await play(page);
   await page.screenshot({ path: path.join(outDir, 'shot-mid.png') });
 
-  // SwiftShader under ColorField+post is ~5–8× slow; if shrine not reached, force the money shot
-  const reached = await page.evaluate(() => {
-    const g = (window as unknown as { __game?: { status?: string } }).__game;
-    return g?.status === 'won';
-  });
-  if (!reached && scriptName === 'shrine') {
+  // SwiftShader under ColorField+post is ~5–8× slow; ensure shrine money shot
+  if (scriptName === 'shrine') {
     await page.evaluate(() => {
       const h = (window as unknown as {
-        __gameHooks?: { teleportToShrine: () => void; forceRestore: () => void };
+        __gameHooks?: { teleportToShrine: () => void };
       }).__gameHooks;
       h?.teleportToShrine();
     });
-    await page.waitForTimeout(600); // settle cam on fox at shrine
-    // Hero silhouette — FX off, before restore pull-back
+    await page.waitForTimeout(700); // settle cam on fox at shrine
+    // Hero silhouette — FX/bloom off (judge mesh first)
     await page.evaluate(() => {
       // @ts-expect-error playtest hook
       window.__gameHooks?.setFxEnabled?.(false);
     });
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(280);
     await page.screenshot({ path: path.join(outDir, 'shot-silhouette.png') });
     await page.evaluate(() => {
       // @ts-expect-error playtest hook
