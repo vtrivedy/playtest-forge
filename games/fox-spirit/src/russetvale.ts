@@ -82,6 +82,7 @@ export type Realm = {
   checkpoints: Array<{ pos: THREE.Vector3; lit: boolean }>;
   /** Heat-element placements (visuals + lift live in chem/updraft.ts) */
   hearthSpots: HearthSpot[];
+  waterInkAt?: (x: number, z: number) => boolean;
   waterWashedAt?: (x: number, z: number) => boolean;
   /** Seedwell inlets: each latches only from an element's output (world-1.md §1.4) */
   inletSpots: InletSpot[];
@@ -1594,7 +1595,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   }
   // Water's HP launch is on the near aqueduct pier; direct fox colour cannot fill SW2.
-  hearthSpots.push({ id: 'HP', x: 97, y: 6, z: 18, height: 10 });
+  hearthSpots.push({ id: 'HP', x: 95, y: 6, z: 18, height: 10 });
   inletSpots.push({ seedwell: 1, source: 'reed-falls', pos: new THREE.Vector3(95, 2.3, 10), sealAt: new THREE.Vector3(95, 2.78, 10), pillar: new THREE.Vector3(95, 2, 10), latchTime: 7 });
   kiln(2, 'HK', 1.68, -1.56, 4.5);
 
@@ -1638,7 +1639,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
   const lanternMat = glowMat('rv-glow-lanterns');
-  lanternMat.emissiveIntensity = 0.05;
+  lanternMat.emissiveIntensity = 0.65;
   patchable.push(lanternMat);
   const checkpoints: Realm['checkpoints'] = [];
   const lanternB = new Bucket();
@@ -1654,6 +1655,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const y = y0 === 0 ? groundRaw(x, z) : y0;
     lanternPost(bk('stone', x, z), lanternB, x, y, z, 220 + i);
     col.add(cylCollider({ x, z, r: 0.45, top: y + 2.6, bottom: y - 1, tag: 'lantern' }));
+    const lampLight = new THREE.PointLight(0xffbf72, 3.5, 7, 2);
+    lampLight.position.set(x, y + 2.1, z); group.add(lampLight);
     checkpoints.push({ pos: new THREE.Vector3(x - 1.6, y, z), lit: false });
   }
   const lanternMesh = lanternB.toMesh(lanternMat, { cast: false });
@@ -1678,9 +1681,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     archAt(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
   }
   // Wen's pond
-  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x3a3024, colorShallow: 0x7a6a50 });
+  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x393c30, colorShallow: 0x827657 });
   pond.mesh.position.set(POND.x, POND.water, POND.z);
-  (pond.material.uniforms.uSky!.value as THREE.Color).set(0x5e5244);
+  pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
+  (pond.material.uniforms.uSky!.value as THREE.Color).set(0xb5a17a);
   {
     // Wen's dock
     const a = { x: -6, z: 72 };
@@ -2135,7 +2139,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         }
       }
       const litCount = checkpoints.filter((c) => c.lit).length;
-      lanternMat.emissiveIntensity = 0.05 + Math.min(1, litCount) * 0.9;
+      lanternMat.emissiveIntensity = 0.65 + Math.min(1, litCount) * 0.9;
 
       // seedwells
       for (let i = 0; i < seedwells.length; i++) {
@@ -2195,7 +2199,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       if (!wellLit) wsGlow.emissiveIntensity = 0.06 + flood;
 
       // hazards
-      if (inkActive && !realm.waterWashedAt?.(fox.x, fox.z) && marshE(fox.x, fox.z) < 0.9 && feetY < MARSH.ink + 0.15) ev.push({ type: 'hazard', kind: 'ink' });
+      if (inkActive && ((realm.waterInkAt?.(fox.x, fox.z) && feetY < 0.2) || (!realm.waterWashedAt?.(fox.x, fox.z) && marshE(fox.x, fox.z) < 0.9 && feetY < MARSH.ink + 0.15))) ev.push({ type: 'hazard', kind: 'ink' });
       if (feetY < -24) ev.push({ type: 'hazard', kind: 'fall' });
       void flood;
       return ev;

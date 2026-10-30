@@ -7,8 +7,8 @@ import { boxCollider, type CollisionWorld } from '../collision';
 export type WaterSpot = { id: string; lip: THREE.Vector3; foot: THREE.Vector3; path: THREE.Vector3[]; width: number; wash?: boolean; probes?: THREE.Vector3[] };
 type Parcel = { head: number; tail: number; live: boolean };
 export const waterSpots: WaterSpot[] = [{
-  id: 'marsh-mouth', lip: new THREE.Vector3(57, 3.5, 36), foot: new THREE.Vector3(57, -1.3, 36),
-  path: [new THREE.Vector3(57, -1.3, 36), new THREE.Vector3(62.034, -1.3, 32.736)], width: 2.2, wash: true,
+  id: 'marsh-mouth', lip: new THREE.Vector3(57, 3.5, 36), foot: new THREE.Vector3(57, 0, 36),
+  path: [new THREE.Vector3(57, 0, 36), new THREE.Vector3(62.034, 0, 32.736)], width: 2.2, wash: true,
 }, {
   id: 'reed-falls', lip: new THREE.Vector3(100, 15, 18), foot: new THREE.Vector3(100, 10, 18), width: 1.8,
   probes: [new THREE.Vector3(100, 15, 18), new THREE.Vector3(100, 12.5, 18), new THREE.Vector3(100, 10, 18)],
@@ -30,17 +30,17 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   block(55.8, 1.25, 35.6, 1.5, 3.1, 1.4, 0.2, true);
   block(56.4, 3.05, 36, 2.1, 0.55, 1.4, 0, true);
   // Reed aqueduct: two piers, a reachable launch at y6, and the lip walk at y15.
-  for (const x of [97, 103]) block(x, 6.4, 20, 1.5, 16.4, 1.8, 0, true);
-  block(100, 14.65, 20, 8, 0.7, 3.8, 0, true);
-  block(97, 5.65, 18, 5, 0.7, 4.2, 0, true);
+  for (const x of [95, 105]) block(x, 6.4, 20, 1.2, 16.4, 1.2, 0, true);
+  block(100, 14.65, 20, 11.2, 0.7, 3.8, 0, true);
+  block(95, 5.65, 18, 5, 0.7, 4.2, 0, true);
   for (let i = 0; i < 10; i++) {
     const f = (i + 1) / 10, top = 2 + f * 4;
-    block(95 + f * 2, (2 + top) / 2, 11 + f * 5.1, 2.4, top - 2 + 0.05, 0.8, 0, true);
+    block(91 + f * 3.5, (2 + top) / 2, 10 + f * 6.1, 2.4, top - 2 + 0.05, 0.8, 0, true);
   }
   const foamColor = new THREE.Color();
   const waters = waterSpots.map(spot => {
     const reactor = new Reactor(spot.id, 'water', spot.probes ?? [spot.lip.clone(), spot.foot.clone().setY(0.6)], tun);
-    const glass = new THREE.MeshPhysicalMaterial({ color: 0xb17b39, roughness: 0.22, metalness: 0, transmission: 0.25, thickness: 1.3, transparent: true, opacity: 0.88, emissive: 0x8f4818, emissiveIntensity: 0.18, side: THREE.DoubleSide });
+    const glass = new THREE.MeshPhysicalMaterial({ color: 0xc7c6af, roughness: 0.22, metalness: 0, transmission: 0, thickness: 0.3, transparent: true, opacity: 0.88, emissive: 0x775832, emissiveIntensity: 0.18, side: THREE.DoubleSide });
     const animation = { uWaterTime: { value: 0 }, uWaterFlow: { value: 0 } };
     glass.onBeforeCompile = shader => {
       Object.assign(shader.uniforms, animation);
@@ -77,7 +77,12 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
       else { bed.updateMatrix(); masonry.push(bed.geometry.clone().applyMatrix4(bed.matrix)); }
       stamp.position.copy(p); stamp.rotation.set(-Math.PI / 2, 0, -yaw); stamp.scale.setScalar(0); stamp.updateMatrix(); surface.setMatrixAt(i, stamp.matrix);
       const collider = boxCollider({ x: p.x, z: p.z, w: spot.width, d: length / cells + 0.04, yaw, top: p.y - 0.05, bottom: p.y - 0.4, tag: 'water-washed' });
-      collider.enabled = false; collision.add(collider);
+      collider.enabled = true;
+      if (i % 4 === 0) {
+        const mid = curve.getPointAt(Math.min(1, (d + length / cells * 1.5) / length));
+        collider.x = mid.x; collider.z = mid.z; collider.hz *= 4; collider.top0 = collider.top1 = mid.y - 0.05;
+        collision.add(collider);
+      }
       bed.visible = !spot.wash;
       if (!spot.wash) {
         for (const side of [-1, 1]) block(p.x + Math.cos(yaw) * side * spot.width * 0.53, p.y + 0.1, p.z - Math.sin(yaw) * side * spot.width * 0.53, 0.2, 0.48, length / cells + 0.03, yaw);
@@ -89,7 +94,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   });
   const masonryMesh = new THREE.Mesh(mergeGeometries(masonry), stone); masonryMesh.castShadow = true; masonryMesh.receiveShadow = true; scene.add(masonryMesh);
   masonry.forEach(g => g.dispose());
-  if (gui) { const f = gui.addFolder('Water'); f.add(tun, 'speed', 2, 16, 0.5); f.add(tun, 'igniteTime', 0.1, 2, 0.05); f.add(tun, 'holdTime', 0, 10, 0.1); f.add(tun, 'gutterTime', 0.2, 5, 0.1); f.close(); }
+  if (gui) { const f = gui.addFolder('Water'); f.add(tun, 'threshold', 0.05, 0.9, 0.05); f.add(tun, 'speed', 2, 16, 0.5); f.add(tun, 'igniteTime', 0.1, 2, 0.05); f.add(tun, 'holdTime', 0, 10, 0.1); f.add(tun, 'gutterTime', 0.2, 5, 0.1); f.close(); }
   return {
     tun, waters,
     arriving(id: string) { return waters.some(w => w.spot.id === id && w.arriving); },
@@ -99,29 +104,40 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         w.reactor.update(dt, supply, drainedAt);
         const flowing = w.reactor.heat >= 1 - 1e-6 && w.reactor.state !== 'guttering' && w.reactor.state !== 'cold';
         if (flowing && !w.flowing) w.parcels.push({ head: 0, tail: 0, live: true });
-        if (!flowing && w.flowing) { const p = w.parcels.at(-1); if (p) p.live = false; }
+        if (!flowing && w.flowing) for (const p of w.parcels) p.live = false;
         w.flowing = flowing;
-        for (const p of w.parcels) { p.head += tun.speed * dt; if (!p.live) p.tail += tun.speed * dt; }
-        w.parcels = w.parcels.filter(p => p.tail < w.length + 1);
-        let blocked = Infinity;
-        for (const s of w.samples) if (drainedAt?.(s.p)) { blocked = s.d; break; }
+        const warning = w.reactor.state === 'holding' ? THREE.MathUtils.clamp(1 - w.reactor.holdLeft / 0.8, 0, 1) : 0;
+        const travel = tun.speed * dt;
+        for (const p of w.parcels) { p.head += travel; if (!p.live) p.tail += travel; }
+        // A Shade cuts a moving slug, leaving the water already downstream to run out.
+        // New water cannot cross the cut. Releasing the drain starts a fresh front there.
+        if (!w.reactor.restored && drainedAt) for (const s of w.samples) {
+          if (!drainedAt(s.p)) continue;
+          for (const p of [...w.parcels]) if (p.tail <= s.d && p.head > s.d) {
+            if (p.head - s.d > travel + 1e-6) w.parcels.push({ head: p.head, tail: s.d + travel, live: false });
+            p.head = s.d;
+          }
+        }
+        w.parcels = w.parcels.filter(p => p.tail < w.length + 1 && p.tail <= p.head);
         for (const s of w.samples) {
-          s.wet = s.d < blocked && w.parcels.some(p => s.d <= p.head && s.d >= p.tail);
-          s.bed.visible = !w.spot.wash || s.wet; s.collider.enabled = !w.spot.wash || s.wet;
+          s.wet = w.parcels.some(p => s.d <= p.head && s.d >= p.tail);
+          s.bed.visible = !w.spot.wash || s.wet; s.collider.enabled = true;
           w.stamp.position.copy(s.p); w.stamp.position.y += 0.06 + Math.sin(s.d * 3 - time * 7) * 0.018;
-          w.stamp.rotation.set(-Math.PI / 2, 0, -s.yaw); w.stamp.scale.setScalar(s.wet ? 1 : 0); w.stamp.updateMatrix();
+          w.stamp.rotation.set(-Math.PI / 2, 0, -s.yaw); w.stamp.scale.setScalar(s.wet || w.spot.wash ? 1 : 0); w.stamp.updateMatrix();
           w.surface.setMatrixAt(s.index, w.stamp.matrix);
           const foam = Math.pow(Math.max(0, Math.sin(s.d * 4 - time * 9)), 12);
-          w.surface.setColorAt(s.index, foamColor.setRGB(0.34 + foam * 0.18, 0.43 + foam * 0.17, 0.38 + foam * 0.15));
+          if (s.wet) { foamColor.setRGB(0.34 + foam * 0.18, 0.43 + foam * 0.17, 0.38 + foam * 0.15); foamColor.lerp(new THREE.Color(0xb09b67), warning * 0.55); }
+          else foamColor.set(0x261f18);
+          w.surface.setColorAt(s.index, foamColor);
         }
         w.surface.instanceMatrix.needsUpdate = true;
         if (w.surface.instanceColor) w.surface.instanceColor.needsUpdate = true;
-        w.arriving = blocked > w.length && w.parcels.some(p => p.head >= w.length && p.tail < w.length);
+        w.arriving = w.parcels.some(p => p.head >= w.length && p.tail < w.length);
         w.animation.uWaterTime.value = time; w.animation.uWaterFlow.value = flowing ? 1 : 0;
-        w.glass.color.set(0xb17b39).lerp(foamColor.set(0x81988a), w.reactor.heat);
+        w.glass.color.set(0xc7c6af).lerp(foamColor.set(0x81988a), w.reactor.heat);
         w.glass.roughness = flowing ? 0.18 : 0.25;
         w.glass.opacity = 0.88 - 0.36 * w.reactor.heat;
-        w.glass.emissiveIntensity = 0.12 + w.reactor.heat * 0.28;
+        w.glass.emissiveIntensity = 0.12 + w.reactor.heat * 0.18 + warning * (0.12 + Math.sin(time * 12) * 0.07);
         w.light.intensity = 2 + w.reactor.heat * 3;
         const fallBottom = flowing ? w.spot.path[0]!.y : w.spot.foot.y;
         w.fall.scale.y = (w.spot.lip.y - fallBottom) / (w.spot.lip.y - w.spot.foot.y);
@@ -129,6 +145,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         w.fall.scale.x = 1 + (flowing ? Math.sin(time * 9) * 0.035 : 0);
       }
     },
+    inkAt(x: number, z: number) { return waters.some(w => w.spot.wash && w.samples.some(s => !s.wet && Math.hypot(s.p.x - x, s.p.z - z) < w.spot.width * 0.48)); },
     washedAt(x: number, z: number) { return waters.some(w => w.spot.wash && w.samples.some(s => s.wet && Math.hypot(s.p.x - x, s.p.z - z) < w.spot.width * 0.48)); },
     state() { return waters.map(w => ({ id: w.spot.id, state: w.reactor.state, heat: w.reactor.heat, flowing: w.flowing, arriving: w.arriving, length: w.length, wetMeters: w.samples.filter(s => s.wet).length * w.length / w.samples.length, fronts: w.parcels.map(p => ({ head: p.head, tail: p.tail })) })); },
   };

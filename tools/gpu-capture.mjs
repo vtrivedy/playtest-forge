@@ -357,8 +357,8 @@ try {
     await H('photo', ...lens); await advance(10); await shot('water-frozen');
     const timeline = [];
     await video('water-cycle', 12 * fps, async i => {
-      if (i === 0) await H('teleport', 56, 0.3, 37, Math.PI);
-      if (i === Math.round(1.4 * fps)) await H('teleport', 49, 0, 44, Math.PI);
+      if (i === 0) { await H('teleport', 56, 0.3, 37, Math.PI); await H('photo', ...lens); }
+      if (i === Math.round(1.4 * fps)) { await H('teleport', 49, 0, 44, Math.PI); await H('photo', ...lens); }
       if ([Math.round(0.3 * fps), Math.round(0.8 * fps), 2 * fps, 6 * fps, 8 * fps, 11 * fps].includes(i)) {
         await shot(`water-${i}`);
         timeline.push({ frame: i, state: (await H('state')).chem.water });

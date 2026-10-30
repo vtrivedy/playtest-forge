@@ -40,7 +40,7 @@ export function createInlets(scene: THREE.Scene, spots: InletSpot[], ash: THREE.
   const bedGeo = new THREE.CircleGeometry(0.56, 20);
   const sealGeo = new THREE.RingGeometry(0.55, 1.15, 64, 1);
   const inlets: Inlet[] = spots.map((s) => {
-    const bed = ash.clone();
+    const bed = s.source === 'reed-falls' ? new THREE.MeshStandardMaterial({ color: 0x737e6a, roughness: 0.24, metalness: 0.08, emissive: 0x665537 }) : ash.clone();
     bed.emissiveIntensity = 0.03;
     const mesh = new THREE.Mesh(bedGeo, bed);
     mesh.rotation.x = -Math.PI / 2;

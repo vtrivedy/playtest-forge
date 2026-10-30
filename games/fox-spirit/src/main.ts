@@ -351,6 +351,7 @@ async function boot() {
   const windF: WindForce = { k: 0, tx: 0, ty: 0, tz: 0, px: 0, py: 0, pz: 0 };
   const water = createWater(scene, world.collision, gui);
   world.waterWashedAt = water.washedAt;
+  world.waterInkAt = water.inkAt;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {

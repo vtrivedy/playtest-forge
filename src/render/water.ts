@@ -40,7 +40,7 @@ export function createStylizedWater(
         p.z += w1 + w2;
         vec4 wpos = modelMatrix * vec4(p, 1.0);
         vWorld = wpos.xyz;
-        vN = normalize(mat3(modelMatrix) * normalize(vec3(-cos(p.x*0.35+uTime*1.1)*0.35*0.08, 1.0, 0.0)));
+        vN = normalize(mat3(modelMatrix) * normalize(vec3(-cos(p.x*0.35+uTime*1.1)*0.35*0.08, sin(p.y*0.28+uTime*0.9)*0.28*0.06, 1.0)));
         gl_Position = projectionMatrix * viewMatrix * wpos;
       }`,
     fragmentShader: /* glsl */ `
@@ -57,9 +57,15 @@ export function createStylizedWater(
         col = mix(col, uSky, fres * 0.65);
         // radial fade into sky mist — no hard square edge at the horizon
         float r = length(vLocal);
-        col = mix(col, uSky, smoothstep(0.25, 0.85, r));
+        // Broad soft sky reflections, with small travelling highlights instead of a flat grey rim.
+        float ripple = sin(vWorld.x * 3.1 + vWorld.z * 1.7 - uTime * 2.5) + sin(vWorld.x * 1.3 - vWorld.z * 2.9 + uTime * 1.8);
+        float glint = pow(max(0.0, ripple * 0.5), 14.0);
+        col += uSky * glint * 0.12;
+        col = mix(col, uShallow, smoothstep(0.7, 1.0, r) * 0.25);
         float alpha = mix(0.72, 0.92, fres) * smoothstep(1.0, 0.7, r);
         gl_FragColor = vec4(col, alpha);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
       }`,
   });
 
