@@ -1749,6 +1749,32 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       ],
     });
   }
+  // S2: a readable side branch in the restored river, ending at a quiet fox shrine.
+  // Its source shares SW1's restore radius; the fork obeys the same wind rules.
+  windSpots.push({ id: 'wind-islet-fork', source: [-112, 21, -24], radius: 1.5,
+    path: [[-60, 27.8, -45], [-66, 27, -57], [-72, 25.5, -75], [-70, 20, -95]] });
+  {
+    const x = -70, z = -98, y = 16;
+    col.add(cylCollider({ x, z, r: 7, top: y, bottom: -10, tag: 'old-fox-islet' }));
+    slab({ x, z, w: 14, d: 14, top: y, bottom: -4, round: true, rough: 0.65, seed: 360, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.5) });
+    const sb = bk('stone', x, z);
+    archAt(sb, x, y, z - 2, 0, { span: 3.2, pillarH: 4.4, broken: 0.25, seed: 361 });
+    seedwell(sb, new Bucket(), x, y, z - 2, 362);
+    hearthSpots.push({ id: 'islet-return', x: x + 3.5, y, z: z + 1.5, height: 12 });
+    litterPatch(bk('litter', x, z, false), rng(363), x, z, 5.5, 60, () => y);
+  }
+  // S4: three curls on one dash line invite a thermal-chain experiment. The
+  // last column reaches a stone perch beside mill 3's roof; there is no pickup trail.
+  {
+    const p = sp(73.5, -4.6);
+    for (let i = 0; i < 3; i++) {
+      const x = p.x + 4.2, z = p.z - 1.7 + i * 1.7;
+      hearthSpots.push({ id: `mill-cap-${i}`, x, y: 22, z, height: 6 + i * 3 });
+      col.add(cylCollider({ x, z, r: 0.82, top: 23, bottom: 21, tag: 'hearth' }));
+    }
+    col.add(cylCollider({ x: p.x + 2.2, z: p.z + 1.7, r: 1.6, top: 34, bottom: 33.3, tag: 'mill-cap-perch' }));
+    slab({ x: p.x + 2.2, z: p.z + 1.7, w: 3.2, d: 3.2, top: 34, bottom: 33.3, round: true, rough: 0.35, seed: 367, topColor: PAL.stone });
+  }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
