@@ -163,6 +163,17 @@ try {
   await play(page);
   await page.screenshot({ path: path.join(outDir, 'shot-mid.png') });
 
+  // UNASSISTED result: read before any pose / teleport / forced restore touches the game.
+  const unassisted = {
+    label: 'UNASSISTED — scripted keyboard input from spawn, no teleports or forced events',
+    game: await page.evaluate(() => (window as unknown as { __game?: unknown }).__game ?? null),
+    hooks: await page.evaluate(() => {
+      const h = (window as unknown as { __gameHooks?: { state?: () => unknown } }).__gameHooks;
+      return h?.state?.() ?? null;
+    }),
+  };
+
+  // ---- STAGED captures below: everything after this line is posed, teleported or forced.
   // Hero anatomy money shot — open path, run clip, FX off
   await page.evaluate(() => {
     const h = (window as unknown as {
@@ -171,12 +182,12 @@ try {
     h?.poseHero?.({ anim: 'run', fx: false });
   });
   await page.waitForTimeout(450);
-  await page.screenshot({ path: path.join(outDir, 'shot-hero.png') });
+  await page.screenshot({ path: path.join(outDir, 'staged-hero.png') });
   await page.evaluate(() => {
     (window as unknown as { __gameHooks?: { setFxEnabled?: (on: boolean) => void } }).__gameHooks?.setFxEnabled?.(true);
   });
 
-  // SwiftShader under ColorField+post is ~5–8× slow; ensure shrine money shot
+  // SwiftShader under ColorField+post is ~5–8× slow; the shrine money shot is teleported, not earned
   if (scriptName === 'shrine') {
     await page.evaluate(() => {
       const h = (window as unknown as {
@@ -191,7 +202,7 @@ try {
       window.__gameHooks?.setFxEnabled?.(false);
     });
     await page.waitForTimeout(280);
-    await page.screenshot({ path: path.join(outDir, 'shot-silhouette.png') });
+    await page.screenshot({ path: path.join(outDir, 'staged-silhouette.png') });
     await page.evaluate(() => {
       // @ts-expect-error playtest hook
       window.__gameHooks?.setFxEnabled?.(true);
@@ -202,13 +213,17 @@ try {
   } else {
     await page.waitForTimeout(400);
   }
-  await page.screenshot({ path: path.join(outDir, 'shot-end.png') });
+  await page.screenshot({ path: path.join(outDir, 'staged-end.png') });
 
-  const metrics = await page.evaluate(() => (window as unknown as { __game?: unknown }).__game ?? null);
+  const staged = {
+    label: 'STAGED — posed hero, teleported to shrine, forced restore; not a traversal result',
+    game: await page.evaluate(() => (window as unknown as { __game?: unknown }).__game ?? null),
+  };
+  const metrics = { unassisted, staged };
   fs.writeFileSync(
     path.join(outDir, 'metrics.json'),
     JSON.stringify(
-      { game, script: scriptName, seconds, metrics, finishedAt: new Date().toISOString() },
+      { game, script: scriptName, seconds, ...metrics, finishedAt: new Date().toISOString() },
       null,
       2,
     ),
@@ -224,7 +239,7 @@ try {
     .sort((a, b) => b.m - a.m);
   if (videos[0]) fs.renameSync(path.join(outDir, videos[0].f), path.join(outDir, 'playtest.webm'));
 
-  console.log(JSON.stringify({ ok: true, outDir, script: scriptName, metrics }, null, 2));
+  console.log(JSON.stringify({ ok: true, outDir, script: scriptName, unassisted: unassisted.game, staged: staged.label }, null, 2));
 } finally {
   if (vite?.pid) {
     try {

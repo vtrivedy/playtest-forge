@@ -137,6 +137,12 @@ if (mode === 'shots') {
   await H('setKeys', ['KeyW', 'Space']); await advance(26, false); await advance(1);
   await shot('after/chasm-airborne');
   await H('setKeys', []);
+  // occluder: lone maple trunk between lens and fox on the summit
+  await H('teleport', 8.5, 38, -89.4, 0);
+  await H('setKeys', []);
+  await advance(90, false); await advance(1);
+  console.log('occlusion', JSON.stringify((await H('state')).camera));
+  await shot('after/occluded-trunk');
   // silhouette / FX-off truthfulness
   await H('teleport', 6, 0, 70, Math.PI);
   await advance(60, false);
@@ -256,6 +262,9 @@ if (mode === 'shots') {
   fs.mkdirSync(frames, { recursive: true });
   await boot();
   await H('autopilot', true, 0, { assist: false });
+  // --skip: fast-forward the same unassisted run without rendering (no teleport)
+  const skip = Number(arg('skip', '0'));
+  for (let t = 0; t < skip; t += 5) await advance(Math.min(5, skip - t) * 60, false);
   const n = Math.round(seconds * 30);
   for (let i = 0; i < n; i++) {
     await advance(2);
@@ -268,7 +277,7 @@ if (mode === 'shots') {
   const st = await H('state');
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', '30', '-i', `${frames}/%04d.jpg`, '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '24', `${out}/${tag}-unassisted.mp4`]);
   fs.rmSync(frames, { recursive: true, force: true });
-  save(`${tag}-unassisted`, { label: 'UNASSISTED video — spawn start, bot input, 60 Hz sim, 30 fps render', end: st });
+  save(`${tag}-unassisted`, { label: `UNASSISTED video — spawn start (fast-forwarded ${skip}s unrendered), bot input, 60 Hz sim, 30 fps render`, end: st });
 }
 
 fs.writeFileSync(`${out}/capture-errors-${mode}.json`, JSON.stringify(errors, null, 2));
