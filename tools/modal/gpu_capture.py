@@ -25,6 +25,7 @@ if modal.is_local():
     image = image.add_local_file(ROOT / 'tools/windgap-capture.mjs', '/opt/browser/windgap-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/marshmouth-capture.mjs', '/opt/browser/marshmouth-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/reed-capture.mjs', '/opt/browser/reed-capture.mjs')
+    image = image.add_local_file(ROOT / 'tools/reed-aftermath-capture.mjs', '/opt/browser/reed-aftermath-capture.mjs')
 
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)
