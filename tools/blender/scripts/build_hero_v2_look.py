@@ -23,6 +23,11 @@ head_c = (bh("Head") + bt("Head")) / 2
 for v in bm.verts:
     w = {gname[k]: x for k, x in v[dl].items()}
     n = v.normal; co = v.co
+    # Give the coat volume around the forearm and upper hind limb without moving IK joints.
+    fore_coat = wsum(w, "FrontUpperLeg.L", "FrontUpperLeg.R", "FrontLowerLeg.L", "FrontLowerLeg.R")
+    hind_coat = wsum(w, "BackLeg.L", "BackLeg.R", "BackUpperLeg.L", "BackUpperLeg.R")
+    limb_coat = max(fore_coat, hind_coat * 0.75) * smooth(0.18, 0.5, co.z)
+    v.co += Vector((n.x, n.y, 0)) * 0.055 * limb_coat
     neck = wsum(w, "Neck1", "Neck2") + 0.7 * w.get("Neck3", 0) + 0.55 * w.get("Torso3", 0)
     push = 0.055 * neck
     if n.y < 0 or n.z < 0:  # chest bib bulges forward / down: a deep keel of a chest, not a barrel
@@ -65,8 +70,8 @@ for pg in paw_groups:
     for v in vs:
         k = smooth(0.24, 0.02, v.co.z)
         d = v.co - c
-        v.co.x = c.x + d.x * (1 + 0.12 * k)
-        v.co.y = c.y + d.y * (1 - (0.22 if d.y < 0 else 0.1) * k)
+        v.co.x = c.x + d.x * (1 + 0.32 * k)
+        v.co.y = c.y + d.y * (1 + (0.12 if d.y < 0 else 0.0) * k)
         v.co.z = max(v.co.z, GROUND + 0.005)
 nose_ids = set(i for p in me.polygons if me.materials[p.material_index].name == "Black" for i in p.vertices)
 if nose_ids:
@@ -129,6 +134,7 @@ for v in me.vertices:
         elif co.y < CHEST_Y:
             half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
             k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
+            k *= smooth(0.25, -0.4, n.y)  # throat faces forward; never paint a cream nape stripe
         else:
             k = 0.0
         c = mix(c, PAL["cream"], k)
@@ -137,13 +143,13 @@ for v in me.vertices:
     jaw *= min(1.0, w.get("Head", 0) + wsum(w, "Neck2", "Neck3")) * (1 if leg < 0.2 else 0)
     c = mix(c, PAL["cream"], jaw)
     throat.append(max(jaw, smooth(0.1, 0.5, min(1.0, wsum(w, "Neck2", "Neck3", "Head"))) * smooth(-0.2, -0.6, n.z)))
-    if v.index in grey_vs: c = PAL["sock"]
+    if v.index in grey_vs: c = mix(c, PAL["umber"], 0.5)
     # legs: burnt orange to the knee/elbow, then umber -> dark sock -> darkest paws
     if leg > 0.05:
         top = 1.22 if front_leg >= back_leg else 1.12  # umber up to the elbow / hock
-        lt = leg * (1 - smooth(top - 0.08, top + 0.1, co.z))
+        lt = leg * (1 - smooth(top - 0.28, top + 0.24, co.z))
         c = mix(c, PAL["umber"], lt)
-        c = mix(c, PAL["sock"], leg * (1 - smooth(top - 0.22, top - 0.02, co.z)))  # dark sock to the elbow / hock
+        c = mix(c, PAL["sock"], leg * (1 - smooth(top - 0.55, top - 0.08, co.z)))  # dark sock to the elbow / hock
         c = mix(c, PAL["paw"], leg * (1 - smooth(0.06, 0.26, co.z)))
     # ears: dark backs + tips, pale inner
     ear = wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"])
