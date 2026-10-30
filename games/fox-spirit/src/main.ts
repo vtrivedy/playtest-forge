@@ -200,7 +200,12 @@ async function boot() {
     maskSize: 512,
   });
   colorField.initMask(renderer);
-  for (const m of world.materials) colorField.patchMaterial(m);
+  // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
+  const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75 };
+  for (const m of world.materials) {
+    m.userData.cfRestoredChroma = RESTORED_CHROMA[m.name] ?? 1;
+    colorField.patchMaterial(m);
+  }
 
   const post = createPostStack(renderer, scene, cam.camera, {
     bloomStrength: BLOOM,
@@ -244,6 +249,19 @@ async function boot() {
       shrineOn = true;
       status = 'won';
       hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
+    },
+    // the Wellspring calls the summit's loose embers home: they rise and dissolve as the fox steps up
+    gatherEmbers: (c, r) => {
+      const got = world.takeEmbersNear(c, r);
+      for (const g of got) {
+        embersGot += g.value;
+        emberMotes.collect(g.index, true);
+      }
+      if (got.length) {
+        feelMetrics.gemsCollected = embersGot;
+        hud.setEmbers(embersGot);
+        audio.play('ember');
+      }
     },
     camera: cam,
     audio,
@@ -414,7 +432,7 @@ async function boot() {
   win.__gameHooks = {
     hasClips: foxActor.hasClips,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField },
+    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
     fx: { autumnFX, emberMotes },
     teleportToShrine() {
       const p = world.wellspringPos;
@@ -991,8 +1009,9 @@ async function boot() {
       }
     }
 
-    if (wish.lengthSq() > 0.01 && dt > 0) {
-      const yaw = Math.atan2(wish.x, wish.z);
+    const faceShrine = restore.inputLocked && wish.lengthSq() <= 0.01;
+    if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
+      const yaw = faceShrine ? restore.faceYaw : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
       fox.rotation.y += d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));

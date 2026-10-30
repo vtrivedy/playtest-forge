@@ -33,6 +33,8 @@ const fps = Number(arg('fps', '30'));
 const sub = Number(arg('sub', '2'));
 const seconds = Number(arg('seconds', '7.6'));
 const showHud = flag('hud');
+/** Fast iteration: simulate every frame but only render + save the checkpoint stills (no MP4) */
+const stillsOnly = flag('stills');
 const outDir = path.resolve(root, arg('out', '../playtest-forge-artifacts/money-shot/latest'));
 const framesDir = path.join(outDir, 'frames');
 fs.rmSync(framesDir, { recursive: true, force: true });
@@ -43,7 +45,7 @@ const url = `http://127.0.0.1:${port}/?q=${quality}`;
 const CHECKPOINTS: Array<[string, number]> = [
   ['01-sepia', 0.6],
   ['02-ignition', 1.2],
-  ['03-mid-front', 2.6],
+  ['03-mid-front', 3.1],
   ['04-pullback', 4.4],
   ['05-settled', 6.0],
 ];
@@ -132,9 +134,11 @@ try {
   let next = 0;
   const t0 = Date.now();
   for (let f = 0; f < total; f++) {
-    s = f === 0 ? await advance(0, 1 / 60, true) : await advance(sub, 1 / (fps * sub), true);
+    s = f === 0 ? await advance(0, 1 / 60, !stillsOnly) : await advance(sub, 1 / (fps * sub), !stillsOnly);
     const file = path.join(framesDir, `${String(f).padStart(5, '0')}.png`);
-    await page.screenshot({ path: file, timeout: 120_000 });
+    const due = next < CHECKPOINTS.length && s.restore.age >= CHECKPOINTS[next]![1] - 1e-6;
+    if (stillsOnly && due) s = await advance(0, 1 / 60, true);
+    if (!stillsOnly || due) await page.screenshot({ path: file, timeout: 120_000 });
     const row = {
       f,
       age: Number(s.restore.age.toFixed(4)),
@@ -177,11 +181,10 @@ try {
     JSON.stringify({ seed, quality, viewport: [W, H], fps, substeps: sub, frames: total, walkInS: walkFrames / 60, checkpoints: Object.fromEntries(Object.entries(checkpoints).map(([k, v]) => [k, (v as { state: unknown }).state])), returnCheck }, null, 2),
   );
   await browser.close();
-
   const mp4 = path.join(outDir, 'money-shot.mp4');
-  const ff = spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(framesDir, '%05d.png'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4], { stdio: 'inherit' });
+  const ff = stillsOnly ? { status: 0 } : spawnSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(framesDir, '%05d.png'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mp4], { stdio: 'inherit' });
   if (ff.status !== 0) throw new Error('ffmpeg failed');
-  console.log(`wrote ${mp4}`);
+  if (!stillsOnly) console.log(`wrote ${mp4}`);
 } finally {
   if (vite?.pid) {
     try {

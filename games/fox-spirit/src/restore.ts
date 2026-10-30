@@ -16,9 +16,9 @@ import type { Hud } from './hud';
  */
 export const IGNITE_S = 1.0;
 /** Player input is held until the ignition has landed */
-const LOCK_S = IGNITE_S + 0.5;
-/** Fox stands this far from the basin centre (trigger fires at 5.2 m) */
-const STAND_DIST = 4.9;
+const LOCK_S = IGNITE_S + 0.9;
+/** Where the fox stops, relative to the basin centre: end of the summit path, at the plinth's south face */
+const STAND: [number, number] = [-0.9, 3.75];
 const FLOOD_S = 6;
 
 /**
@@ -79,20 +79,26 @@ const frontRadius = monotoneCurve(FRONT);
 
 /**
  * Camera keys relative to the shrine. `fox` keys live in the approach frame (x = fox's right while facing
- * the basin, y = up, z = back along the approach): the opening is solved for a profile-leaning three-quarter
- * fox at ~18 % frame height on the left third with the basin upper-right. `world` keys are authored for this
- * hill (offsets in world axes): crane out over the south-west stair face, then pull back over the valley
- * looking north-east so fox, dome and maple stay on the left while the front runs out through Amberwood.
+ * the basin, y = up, z = back along the approach): the opening is a low south-east three-quarter with the fox
+ * at ~20 % frame height on the left third and the basin upper-right through the arch. `world` keys (offsets in
+ * world axes) orbit round the fox's front as it turns to the stairs, settle behind its shoulder looking down the
+ * hill (restored summit against the still-sepia valley), then pull back west and up so fox, dome and arches
+ * stay anchored while the front runs out through the valley trees.
  */
 const SHOT: Array<{ t: number; frame: 'fox' | 'world'; pos: [number, number, number]; look: [number, number, number]; fov: number }> = [
-  { t: 0, frame: 'fox', pos: [3.6, 1.12, 5.85], look: [-3.86, 1.41, 0.24], fov: 52 },
-  { t: IGNITE_S, frame: 'fox', pos: [3.46, 1.15, 5.72], look: [-3.86, 1.41, 0.24], fov: 52 },
-  { t: 1.6, frame: 'fox', pos: [3.7, 1.4, 6.3], look: [-3.4, 1.2, 0.8], fov: 53 },
-  { t: 2.7, frame: 'world', pos: [-12, 2.5, 18], look: [2, -8, 6], fov: 54 },
-  { t: 3.7, frame: 'world', pos: [-18, 5.5, 27], look: [4, -10, 10], fov: 54 },
-  { t: 5.0, frame: 'world', pos: [-22, 8.5, 34], look: [7, -11, 13], fov: 52 },
-  { t: 6.0, frame: 'world', pos: [-23, 8.8, 35.5], look: [7, -11, 13], fov: 52 },
+  { t: 0, frame: 'fox', pos: [5.8, 1.0, 6.6], look: [-1.5, 1.6, 1.2], fov: 50 },
+  { t: IGNITE_S, frame: 'fox', pos: [5.5, 1.05, 6.3], look: [-1.5, 1.6, 1.2], fov: 50 },
+  { t: 1.4, frame: 'fox', pos: [5.4, 1.15, 6.4], look: [-1.5, 1.5, 1.4], fov: 50 },
+  { t: 2.2, frame: 'world', pos: [-3, 2.6, 9.5], look: [-1, 0.4, 3.0], fov: 52 },
+  { t: 3.0, frame: 'world', pos: [-5.7, 2.1, 0.8], look: [1, -2, 11], fov: 52 },
+  { t: 3.5, frame: 'world', pos: [-6.6, 2.6, -0.5], look: [1.2, -2.3, 10.5], fov: 52 },
+  { t: 4.6, frame: 'world', pos: [-13, 7, -6], look: [2.5, -3.2, 9], fov: 52 },
+  { t: 5.4, frame: 'world', pos: [-15.5, 8.6, -7.8], look: [3, -4, 10], fov: 52 },
+  { t: 6.0, frame: 'world', pos: [-15.9, 8.8, -8.1], look: [3, -4, 10], fov: 52 },
 ];
+/** Fox stance: turned a little toward the lens while it faces the basin, then toward the valley once lit */
+const FACE_OFFSET = -0.75;
+const VALLEY_YAW = -0.85;
 
 export type RestorePhase = 'idle' | 'approach' | 'ignited';
 
@@ -110,6 +116,8 @@ export type RestoreCinematic = {
   begin: (fox: THREE.Vector3) => void;
   /** While locked: slow walk toward the stand point, as a wish vector (length ≤ 1) */
   walkWish: (fox: THREE.Vector3, out: THREE.Vector3) => THREE.Vector3;
+  /** While locked and standing: the fox's yaw (basin, then the valley once lit) */
+  readonly faceYaw: number;
   /** Undo the restore (harness: replay the event from a clean sepia world) */
   reset: () => void;
   update: (dt: number) => void;
@@ -131,6 +139,8 @@ export function createRestoreCinematic(opts: {
   setFlood: (k: number, pulse: number) => void;
   /** Gameplay state flips here (restored flag, status, HUD text) */
   onIgnite: () => void;
+  /** Collect the loose embers within r of c (they home into the fox) */
+  gatherEmbers?: (c: THREE.Vector3, r: number) => void;
   camera: FollowCamera;
   audio: GameAudio;
   hud: Hud;
@@ -231,21 +241,24 @@ export function createRestoreCinematic(opts: {
       if (phase !== 'idle') return;
       phase = 'approach';
       age = 0;
-      approach.set(fox.x - S.x, 0, fox.z - S.z);
-      if (approach.lengthSq() < 1e-4) approach.set(0, 0, 1);
-      approach.normalize();
+      // fixed stand + approach frame: the lens is authored once, wherever the fox crossed the trigger
+      stand.set(S.x + STAND[0], fox.y, S.z + STAND[1]);
+      approach.set(STAND[0], 0, STAND[1]).normalize();
       // fox's right while facing the basin
       right.set(approach.z, 0, -approach.x);
-      stand.copy(S).addScaledVector(approach, STAND_DIST).setY(fox.y);
+      opts.gatherEmbers?.(S, 9);
       const keys: CameraPathKey[] = SHOT.map((k) => ({ t: k.t, pos: keyPoint(k.frame, k.pos), look: keyPoint(k.frame, k.look), fov: k.fov }));
       opts.camera.playPath({ keys, blendInS: 0.7, blendOutS: 1.4, lockS: LOCK_S });
+    },
+    get faceYaw() {
+      return floodAge > 0.3 ? VALLEY_YAW : Math.atan2(-approach.x, -approach.z) + FACE_OFFSET;
     },
     walkWish(fox, out) {
       out.set(stand.x - fox.x, 0, stand.z - fox.z);
       const d = out.length();
       if (d < 0.12) return out.set(0, 0, 0);
-      // slow, easing walk (≈ 1–2 m/s): the fox steps up to the basin, it doesn't run into it
-      return out.multiplyScalar(Math.min(0.24, d * 0.3) / d);
+      // easing walk (≈ 1–2.5 m/s): the fox steps up to the basin, it doesn't run into it
+      return out.multiplyScalar(Math.min(0.3, d * 0.36) / d);
     },
     reset() {
       if (region) {

@@ -393,6 +393,7 @@ export class ColorField {
         value: new THREE.Vector4(field.bounds.minX, field.bounds.maxX, field.bounds.minZ, field.bounds.maxZ),
       };
       shader.uniforms.uTime = { value: 0 };
+      shader.uniforms.uRestoredChroma = { value: (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1 };
 
       (mat.userData as { colorFieldShader?: typeof shader }).colorFieldShader = shader;
 
@@ -421,6 +422,7 @@ export class ColorField {
           uniform float uTrailRadius;
           uniform float uTrailLife;
           uniform float uGlobalColor;
+          uniform float uRestoredChroma;
           uniform float uTrail[96];
           uniform int uTrailCount;
           uniform vec3 uRestorePos[4];
@@ -521,7 +523,8 @@ export class ColorField {
           // slight chroma boost near mask edge for painterly bleed
           float edgeBoost = smoothstep(0.15, 0.55, cm) * (1.0 - smoothstep(0.55, 0.95, cm));
           vec3 washed = inkWash(outgoingLight, vWorldPosCF, vWorldNormalCF);
-          vec3 chroma = outgoingLight * (1.0 + edgeBoost * 0.12);
+          // restored hue strength per material: stone/rock come back as warm-grey stone, not orange paint
+          vec3 chroma = mix(dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)) * vec3(1.04, 0.98, 0.88), outgoingLight, uRestoredChroma) * (1.0 + edgeBoost * 0.12);
           float bleed = smoothstep(0.0, 0.35, cm);
           outgoingLight = mix(washed, chroma, mix(cm, bleed, 0.35));
           // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
@@ -545,6 +548,7 @@ export class ColorField {
     u.uTrailRadius!.value = this.trailRadius;
     u.uTrailLife!.value = this.trailLife;
     u.uGlobalColor!.value = this.globalColor;
+    if (u.uRestoredChroma) u.uRestoredChroma.value = (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1;
     u.uTime!.value = this.time;
     (u.uBounds!.value as THREE.Vector4).set(
       this.bounds.minX,

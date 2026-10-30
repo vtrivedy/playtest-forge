@@ -87,6 +87,8 @@ export type Realm = {
   setFlood: (k: number, pulse?: number) => void;
   /** Harness: un-light the Wellspring so the restore event can be replayed from sepia */
   resetWellspring: () => void;
+  /** Take every uncollected ember within r (xz) of c — the Wellspring calls the summit's embers home */
+  takeEmbersNear: (c: THREE.Vector3, r: number) => Array<{ index: number; value: number }>;
 };
 
 // ---------------------------------------------------------------- island shape
@@ -1882,6 +1884,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     resetWellspring() {
       wellLit = false;
       realm.setFlood(0);
+    },
+    takeEmbersNear(c, r) {
+      const got: Array<{ index: number; value: number }> = [];
+      for (let i = 0; i < emberSpots.length; i++) {
+        const e = emberSpots[i]!;
+        if (emberTaken[i] || Math.hypot(e.p.x - c.x, e.p.z - c.z) > r || Math.abs(e.p.y - c.y) > 4) continue;
+        emberTaken[i] = true;
+        got.push({ index: i, value: e.value });
+      }
+      return got;
     },
     setFlood(k, pulse = 0) {
       flood = k;

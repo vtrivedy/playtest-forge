@@ -25,7 +25,8 @@ export type EmberMotes = {
   /** Current (bobbing) world position of a mote. */
   positionOf: (id: number) => THREE.Vector3;
   /** Consume a mote: flash + sparks that streak into the homing target. */
-  collect: (id: number) => void;
+  /** quiet: the mote dissolves upward in place (no streaks homing into the fox, no flash on the hero) */
+  collect: (id: number, quiet?: boolean) => void;
   /** Loose sparks flying outward (restore money shot). */
   burst: (origin: THREE.Vector3, opts?: EmberBurstOptions) => void;
   /** target = where collect sparks home (fox chest). */
@@ -233,10 +234,19 @@ export function createEmberMotes(scene: THREE.Scene, opts: { maxMotes?: number; 
     positionOf(id) {
       return motes[id]!.pos;
     },
-    collect(id) {
+    collect(id, quiet = false) {
       const m = motes[id];
       if (!m || !m.alive) return;
       m.alive = false;
+      if (quiet) {
+        flash(m.pos, 0.45 * m.scale, 0.5);
+        for (let k = 0; k < Math.round(8 * m.scale); k++) {
+          const a = Math.random() * Math.PI * 2;
+          tmpV.set(Math.cos(a) * 0.35, rand(0.6, 1.3), Math.sin(a) * 0.35);
+          spawnSpark(m.pos, tmpV, { maxLife: rand(0.9, 1.6), size: rand(0.03, 0.05), drag: 1.2, buoyancy: 0.5, heat: 0.6 });
+        }
+        return;
+      }
       flash(m.pos, 0.9 * m.scale, 0.35);
       for (let k = 0; k < Math.round(16 * m.scale); k++) {
         const a = Math.random() * Math.PI * 2;
