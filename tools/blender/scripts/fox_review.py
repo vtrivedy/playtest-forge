@@ -41,13 +41,63 @@ if arm and arm.animation_data:
     else:
         for pb in arm.pose.bones: pb.matrix_basis.identity()
 bpy.context.view_layer.update()
-# spirit flame / glow cards are light in the game (emissive over additive-ish blend): drop their dark albedo
-for m in {s.material for o in fox for s in o.material_slots if s.material and "spiritwisp" in s.material.name.lower()}:
-    b = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
-    if not b: continue
-    for l in list(b.inputs["Base Color"].links): m.node_tree.links.remove(l)
-    b.inputs["Base Color"].default_value = (0, 0, 0, 1)
-    b.inputs["Emission Strength"].default_value *= 2.0
+# Review material parity with foxLook.ts. Cameras, lights and reference planes stay locked.
+# Cycles alpha approximates the runtime's stable dither; game captures remain authoritative.
+for m in {slot.material for o in fox for slot in o.material_slots if slot.material}:
+    if not m.use_nodes: continue
+    nt = m.node_tree
+    bs = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if not bs: continue
+    name = m.name.lower()
+    if "spiritwisp" in name:
+        glow = "glow" in name
+        opacity = 0.12 if glow else 0.24 if "tailflame" in name else 0.32
+        strength = 0.3 if glow else min(bs.inputs["Emission Strength"].default_value, 0.5)
+        bs.inputs["Emission Strength"].default_value = strength
+        alpha = bs.inputs["Alpha"]
+        old = alpha.links[0].from_socket if alpha.links else None
+        mul = nt.nodes.new("ShaderNodeMath"); mul.operation = "MULTIPLY"
+        mul.inputs[1].default_value = opacity
+        if old: nt.links.new(old, mul.inputs[0])
+        else: mul.inputs[0].default_value = alpha.default_value
+        nt.links.new(mul.outputs[0], alpha)
+    if "fur" in name:
+        bs.inputs["Roughness"].default_value = 0.85
+        for n in nt.nodes:
+            if n.type == "NORMAL_MAP": n.inputs["Strength"].default_value = 0.28
+    if "fur" in name and "shell" in name:
+        geom = nt.nodes.new("ShaderNodeNewGeometry")
+        dot = nt.nodes.new("ShaderNodeVectorMath"); dot.operation = "DOT_PRODUCT"
+        nt.links.new(geom.outputs["Normal"], dot.inputs[0]); nt.links.new(geom.outputs["Incoming"], dot.inputs[1])
+        absolute = nt.nodes.new("ShaderNodeMath"); absolute.operation = "ABSOLUTE"
+        nt.links.new(dot.outputs["Value"], absolute.inputs[0])
+        fade = nt.nodes.new("ShaderNodeMapRange"); fade.interpolation_type = "SMOOTHSTEP"
+        fade.inputs["From Min"].default_value = 0.25; fade.inputs["From Max"].default_value = 0.65
+        fade.inputs["To Min"].default_value = 1; fade.inputs["To Max"].default_value = 0
+        nt.links.new(absolute.outputs[0], fade.inputs["Value"])
+        alpha = bs.inputs["Alpha"]; old = alpha.links[0].from_socket if alpha.links else None
+        mul = nt.nodes.new("ShaderNodeMath"); mul.operation = "MULTIPLY"
+        if old: nt.links.new(old, mul.inputs[0])
+        else: mul.inputs[0].default_value = alpha.default_value
+        nt.links.new(fade.outputs[0], mul.inputs[1]); nt.links.new(mul.outputs[0], alpha)
+    if name.startswith("foxtailfur"):
+        uv = nt.nodes.new("ShaderNodeTexCoord"); separate = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(uv.outputs["UV"], separate.inputs[0])
+        fade = nt.nodes.new("ShaderNodeMapRange"); fade.interpolation_type = "SMOOTHSTEP"
+        fade.inputs["From Min"].default_value = 0.92; fade.inputs["From Max"].default_value = 1
+        fade.inputs["To Min"].default_value = 1; fade.inputs["To Max"].default_value = 0
+        nt.links.new(separate.outputs["Y"], fade.inputs["Value"])
+        alpha = bs.inputs["Alpha"]; old = alpha.links[0].from_socket if alpha.links else None
+        mul = nt.nodes.new("ShaderNodeMath"); mul.operation = "MULTIPLY"
+        if old: nt.links.new(old, mul.inputs[0])
+        else: mul.inputs[0].default_value = alpha.default_value
+        nt.links.new(fade.outputs[0], mul.inputs[1]); nt.links.new(mul.outputs[0], alpha)
+        heat = nt.nodes.new("ShaderNodeMapRange"); heat.interpolation_type = "SMOOTHSTEP"
+        heat.inputs["From Min"].default_value = 0.72; heat.inputs["From Max"].default_value = 1
+        heat.inputs["To Min"].default_value = 0; heat.inputs["To Max"].default_value = 0.12
+        nt.links.new(separate.outputs["Y"], heat.inputs["Value"])
+        bs.inputs["Emission Color"].default_value = (1.0, 0.72, 0.42, 1)
+        nt.links.new(heat.outputs[0], bs.inputs["Emission Strength"])
 
 def world_pts(objs):
     dg = bpy.context.evaluated_depsgraph_get()

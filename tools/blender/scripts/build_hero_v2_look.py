@@ -23,6 +23,11 @@ head_c = (bh("Head") + bt("Head")) / 2
 for v in bm.verts:
     w = {gname[k]: x for k, x in v[dl].items()}
     n = v.normal; co = v.co
+    # Give the coat volume around the forearm and upper hind limb without moving IK joints.
+    fore_coat = wsum(w, "FrontUpperLeg.L", "FrontUpperLeg.R", "FrontLowerLeg.L", "FrontLowerLeg.R")
+    hind_coat = wsum(w, "BackLeg.L", "BackLeg.R", "BackUpperLeg.L", "BackUpperLeg.R")
+    limb_coat = max(fore_coat, hind_coat * 0.75) * smooth(0.18, 0.5, co.z)
+    v.co += Vector((n.x, n.y, 0)) * 0.055 * limb_coat
     neck = wsum(w, "Neck1", "Neck2") + 0.7 * w.get("Neck3", 0) + 0.55 * w.get("Torso3", 0)
     push = 0.055 * neck
     if n.y < 0 or n.z < 0:  # chest bib bulges forward / down: a deep keel of a chest, not a barrel
@@ -65,8 +70,8 @@ for pg in paw_groups:
     for v in vs:
         k = smooth(0.24, 0.02, v.co.z)
         d = v.co - c
-        v.co.x = c.x + d.x * (1 + 0.12 * k)
-        v.co.y = c.y + d.y * (1 - (0.22 if d.y < 0 else 0.1) * k)
+        v.co.x = c.x + d.x * (1 + 0.32 * k)
+        v.co.y = c.y + d.y * (1 + (0.12 if d.y < 0 else 0.0) * k)
         v.co.z = max(v.co.z, GROUND + 0.005)
 nose_ids = set(i for p in me.polygons if me.materials[p.material_index].name == "Black" for i in p.vertices)
 if nose_ids:
@@ -129,6 +134,7 @@ for v in me.vertices:
         elif co.y < CHEST_Y:
             half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
             k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
+            k *= smooth(0.25, -0.4, n.y)  # throat faces forward; never paint a cream nape stripe
         else:
             k = 0.0
         c = mix(c, PAL["cream"], k)
@@ -137,13 +143,13 @@ for v in me.vertices:
     jaw *= min(1.0, w.get("Head", 0) + wsum(w, "Neck2", "Neck3")) * (1 if leg < 0.2 else 0)
     c = mix(c, PAL["cream"], jaw)
     throat.append(max(jaw, smooth(0.1, 0.5, min(1.0, wsum(w, "Neck2", "Neck3", "Head"))) * smooth(-0.2, -0.6, n.z)))
-    if v.index in grey_vs: c = PAL["sock"]
+    if v.index in grey_vs: c = mix(c, PAL["umber"], 0.5)
     # legs: burnt orange to the knee/elbow, then umber -> dark sock -> darkest paws
     if leg > 0.05:
         top = 1.22 if front_leg >= back_leg else 1.12  # umber up to the elbow / hock
-        lt = leg * (1 - smooth(top - 0.08, top + 0.1, co.z))
+        lt = leg * (1 - smooth(top - 0.28, top + 0.24, co.z))
         c = mix(c, PAL["umber"], lt)
-        c = mix(c, PAL["sock"], leg * (1 - smooth(top - 0.22, top - 0.02, co.z)))  # dark sock to the elbow / hock
+        c = mix(c, PAL["sock"], leg * (1 - smooth(top - 0.55, top - 0.08, co.z)))  # dark sock to the elbow / hock
         c = mix(c, PAL["paw"], leg * (1 - smooth(0.06, 0.26, co.z)))
     # ears: dark backs + tips, pale inner
     ear = wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"])
@@ -476,7 +482,7 @@ tail = new_obj("SpiritFox_Tail")
 bmt = bmesh.new(); uvl = bmt.loops.layers.uv.new("UVMap"); dft = bmt.verts.layers.deform.new()
 RINGS, SEG = 28, 20
 prev_side = Vector((1, 0, 0))
-rings, ring_s = [], []
+rings, ring_s, arc_values = [], [], []
 for r in range(RINGS + 1):
     s = S_FUR * r / RINGS
     p, tan, w = at(s)
@@ -489,7 +495,7 @@ for r in range(RINGS + 1):
         rr = radius(s) * lob * (1.0 - 0.12 * max(0, -math.sin(th)))  # slightly flatter underside
         v = bmt.verts.new(p + (side * math.cos(th) + up * math.sin(th)) * rr)
         for bn, x in w.items(): v[dft][gidx(tail, bn)] = x
-        ring.append(v)
+        ring.append(v); arc_values.append(s)
     rings.append(ring); ring_s.append(s)
 for r in range(RINGS):
     for k in range(SEG):
@@ -499,10 +505,39 @@ for r in range(RINGS):
         f.smooth = True
 f = bmt.faces.new(rings[0][::-1])  # close the root (no see-through hole from behind); the tip end is clipped away
 for lp in f.loops: lp[uvl].uv = (0.5, 0.0)
+# Broad overlapping fur lobes follow the brush, rather than a radial fan of transparent cards.
+for j in range(9):
+    start = 0.42 + 0.44 * j / 8
+    end = min(0.995, start + 0.22)
+    angle = j * 2.39996
+    local_rings = []
+    for step in range(8):
+        t = step / 7; s = start + (end - start) * t
+        p, tan, w = at(s)
+        side = (Vector((1, 0, 0)) - tan * tan.x).normalized()
+        up = side.cross(tan).normalized()
+        outward = side * math.cos(angle) + up * math.sin(angle)
+        centre = p + outward * radius(s) * (0.65 + 0.44 * smooth(0, 1, t))
+        width = 0.003 + 0.085 * math.sin(math.pi * t) ** 0.75
+        ring = []
+        for k in range(8):
+            th = k / 8 * 2 * math.pi
+            v = bmt.verts.new(centre + (side * math.cos(th) + up * math.sin(th)) * width)
+            for bn, weight in w.items(): v[dft][gidx(tail, bn)] = weight
+            ring.append(v); arc_values.append(s)
+        local_rings.append(ring)
+    for r in range(7):
+        for k in range(8):
+            f = bmt.faces.new((local_rings[r][k], local_rings[r][(k+1)%8], local_rings[r+1][(k+1)%8], local_rings[r+1][k]))
+            for lp, uv in zip(f.loops, [(k/8,start+(end-start)*r/7),((k+1)/8,start+(end-start)*r/7),((k+1)/8,start+(end-start)*(r+1)/7),(k/8,start+(end-start)*(r+1)/7)]): lp[uvl].uv = uv
+            f.smooth = True
+    for ring in [local_rings[0][::-1], local_rings[-1]]:
+        f = bmt.faces.new(ring)
+        for lp in f.loops: lp[uvl].uv = (0.5, start if ring[0] in local_rings[0] else end)
 bmt.normal_update(); bmt.to_mesh(tail.data); bmt.free()
 tail.data.materials.append(M_TAIL)
 tme = tail.data
-vs_ = [ring_s[min(i // SEG, RINGS)] for i in range(len(tme.vertices))]  # arc fraction per vertex (ring order kept)
+vs_ = arc_values  # arc fraction follows both the continuous core and overlapping fur lobes
 tlen, tflow = [], []
 for v, s_ in zip(tme.vertices, vs_):
     _, tan, _ = at(min(1.0, s_ + 0.03))
@@ -526,99 +561,7 @@ def glow_shell(src, lengths, keep, frac, mat, name):
 glow_body = glow_shell(fox, furlen, glow, 0.3, M_GLOW, "SpiritFox_Glow")
 glow_tail = glow_shell(tail, tlen, [smooth(0.45, 0.6, s_) for s_ in vs_], 0.3, M_TGLOW, "SpiritFox_TailGlow")
 
-# ---------------------------------------------------------------- 7. cards: fur locks, flame plume, flakes
-UV = {  # atlas rects (u0, v0, u1, v1) in Blender UV (v up)
-    "rusttuft": (0.75, 0.5, 1.0, 1.0),  # cards_col.png
-    "plume0": (0.0, 0.5, 0.25, 1.0), "plume1": (0.25, 0.5, 0.5, 1.0), "plume2": (0.5, 0.5, 0.75, 1.0), "plume3": (0.75, 0.5, 1.0, 1.0),
-    "flake0": (0.5, 0.25, 0.75, 0.5), "flake1": (0.75, 0.25, 1.0, 0.5), "flake2": (0.5, 0.0, 0.75, 0.25),
-    "rustlickL": (0.0, 0.5, 0.25, 1.0), "rustlickR": (0.25, 0.5, 0.5, 1.0),  # cards_col.png
-    "tf0": (0.0, 0.0, 0.25, 1.0), "tf1": (0.25, 0.0, 0.5, 1.0), "tf2": (0.5, 0.0, 0.75, 1.0), "tf3": (0.75, 0.0, 1.0, 1.0),  # tail_flame.png
-}
-cards = {"tuft": new_obj("SpiritFox_Fur"), "tflame": new_obj("SpiritFox_TailFlame"), "fx": new_obj("SpiritFox_SpiritFX")}
-cbm = {k: bmesh.new() for k in cards}
-for k, b_ in cbm.items(): b_.loops.layers.uv.new("UVMap"); b_.verts.layers.deform.new()
-def card(kind, base, up, facing, w, h, rect, wts, cross=False, wts_top=None):
-    b_ = cbm[kind]; uvl_ = b_.loops.layers.uv.active; df = b_.verts.layers.deform.active; o = cards[kind]
-    up = up.normalized(); side = up.cross(facing).normalized()
-    if side.length < 1e-4: side = up.orthogonal().normalized()
-    sides = [side] + ([up.cross(side).normalized()] if cross else [])
-    u0, v0, u1, v1 = UV[rect]
-    for sd in sides:
-        ps = [base - sd * w / 2, base + sd * w / 2, base + sd * w / 2 + up * h, base - sd * w / 2 + up * h]
-        vs = [b_.verts.new(p) for p in ps]
-        for i, v in enumerate(vs):
-            ww = wts if (i < 2 or not wts_top) else wts_top
-            for bn, x in ww.items(): v[df][gidx(o, bn)] = x
-        f = b_.faces.new(vs)
-        for lp, uv in zip(f.loops, [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]): lp[uvl_].uv = uv
-def frame(s):
-    p, tan, w = at(s); side = Vector((1, 0, 0)); side = (side - tan * side.dot(tan)).normalized()
-    return p, tan, w, side, side.cross(tan).normalized()
-def rise(off):
-    """flame never licks downward (no tongues into the ground; fire rises): fold the under-side offsets up"""
-    return Vector((off.x, off.y, max(off.z, -0.25 + 0.5 * off.z))).normalized()
-def mixw(a, b, t):
-    out = {k: x * (1 - t) for k, x in a.items()}
-    for k, x in b.items(): out[k] = out.get(k, 0) + x * t
-    return out
-body_v = [(v.co.copy(), v.normal.copy(), weights(v)) for v in me.vertices]
-def pick(cond, n):
-    cand = [x for x in body_v if cond(*x)]
-    rnd.shuffle(cand); return cand[:n]
-def topw(w):
-    it = sorted(w.items(), key=lambda kv: -kv[1])[:3]; s = sum(x for _, x in it) or 1
-    return {k: x / s for k, x in it}
-def fxb(s): return "FxPlumeA" if s < 0.55 else "FxPlumeB" if s < 0.78 else "FxPlumeC"
-# fur -> flame: translucent locks rooted on the brush over its outer half. Each is dense fur at the root and
-# breaks up into amber flame toward its tip, so the tail dissolves gradually (concept) instead of ending
-# in a separate fire jet. Tips flicker on the FX bones.
-TF = ["tf0", "tf1", "tf2", "tf3"]
-for j in range(12):
-    s = 0.78 + 0.18 * (j / 11)  # fur -> flame only over the outer third
-    p, tan, w, side, up = frame(s)
-    th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
-    off = side * math.cos(th) + up * math.sin(th)
-    k = smooth(0.6, 0.84, s)
-    h = (0.24 + 0.18 * k) * rnd.uniform(0.85, 1.15)
-    root = p + off * radius(min(s, S_FUR)) * (0.8 - 0.35 * k)
-    lean = (tan * 1.0 + rise(off) * (0.22 + 0.12 * k) + up * 0.1).normalized()
-    card("tflame", root, lean, off, h * rnd.uniform(0.5, 0.62), h, TF[j % 4], w, cross=(j % 4 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.7))
-# soft flame tongues from the dissolve line out past the old tip: the brush's outer silhouette, amber-rust
-PL = ["plume0", "plume1", "plume2", "plume3"]
-for j in range(8):
-    s = 0.88 + 0.13 * (j / 7) ** 0.9  # soft wisps peel off the tip only
-    p, tan, w, side, up = frame(min(s, 1.0))
-    if s > 1: p = p + tan * (s - 1) * total
-    th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
-    off = side * math.cos(th) + up * math.sin(th)
-    k = smooth(0.74, 1.0, s)
-    h = (0.23 + 0.18 * k) * rnd.uniform(0.85, 1.15)  # low trailing tongues: no bonfire over the rump from the chase cam
-    wd = h * rnd.uniform(0.65, 0.85)
-    root = p + off * radius(min(s, S_FUR)) * (0.75 - 0.5 * k)
-    lean = (tan * 1.0 + rise(off) * (0.2 + 0.12 * k) + up * (0.08 + 0.08 * k)).normalized()  # a trailing plume, not an upright fan
-    card("fx", root, lean, off, wd, h, PL[j % 4], w, cross=(j % 3 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.8))
-for j in range(2):  # tip: a few broad, soft tongues licking up and back (small pale-gold heart in the texture)
-    s = 0.9 + 0.035 * j
-    p, tan, w, side, up = frame(s)
-    lean = (tan * 1.0 + up * (0.06 + 0.03 * j) + side * rnd.uniform(-0.35, 0.35)).normalized()
-    card("fx", p - tan * 0.12, lean, side, 0.16, 0.32 + 0.06 * j, PL[(j + 1) % 4], w, cross=True, wts_top={"FxPlumeC": 1.0})
-# Rising embers are emitted from skinned body anchors in foxLook.ts.
-# silhouette flame-licks (concept's wispy fur edges): sparse fur locks whose tips curl like flame, on the
-# shoulders only (cheek and bib cards read as chips / white fangs in engine) (no haunch licks: lying flat on the rump they read as paper patches in
-# engine). Tips ride the ruff / neck FX bones so the edges lick in play.
-def licks(cond, n, rect_l, rect_r, size, dirf, fxw):
-    for co, nrm, w in pick(cond, n):
-        dirn = dirf(co, nrm).normalized()
-        h = size * rnd.uniform(0.8, 1.2)
-        rect = rect_l if (co.x > 0) == (rnd.random() < 0.7) else rect_r
-        wt = topw(w)
-        card("tuft", co - nrm * 0.02, dirn, nrm, h * 0.42, h, rect, wt, wts_top=mixw(wt, fxw(co), 0.6))
-licks(lambda co, n, w: wsum(w, "Torso3", "Neck1") > 0.5 and n.z > 0.55 and abs(n.x) > 0.25, 6,
-      "rustlickL", "rustlickR", 0.24, lambda co, n: Vector((n.x * 0.6, 1, 0.45)), lambda co: {"FxNeck": 1.0})
-for k, o in cards.items():
-    cbm[k].to_mesh(o.data); cbm[k].free()
-    o.data.materials.append({"tuft": M_TUFT, "tflame": M_TFLAME}.get(k, M_FX))
-    for p in o.data.polygons: p.use_smooth = False
+# Spirit wisps and embers are generated at animated surface anchors by foxLook.ts.
 for o in (fur_shell, tail_shell, glow_body, glow_tail):
     o.parent = arm
-print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, fur_shell, tail_shell, glow_body, glow_tail] + list(cards.values())})
+print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, fur_shell, tail_shell, glow_body, glow_tail]})

@@ -9,7 +9,7 @@ export async function captureWindGap({ H, advance, shot, video, save, page, fps,
     return spots.map(w => ({ ...w, distance: Math.hypot(w.source[0] - ex, w.source[2] - ez) })).sort((a, b) => a.distance - b.distance)[0];
   }, expectedSource);
   if (!windSpot || windSpot.distance > 3) throw Error('Wind-gap capture requires the terrace current at sp(38.8,2.5)');
-  const start = toWorld(37, 2.5);
+  const start = toWorld(38.15, 2.5);
   await H('setKeys', []); await H('setStick', 0, 0);
   await H('teleport', start[0], 14, start[1], Math.atan2(dx, dz));
   await advance(12);
@@ -59,7 +59,7 @@ export async function captureWindGap({ H, advance, shot, video, save, page, fps,
   const crossing = timeline.filter(r => r.terrace.s >= 40.5 && r.terrace.s <= 60.5);
   const passed = phase === 'landed-far-terrace' && end.grounded && terrace.s >= 60.45 && end.pos[1] >= 13.8 && end.deaths === initial.deaths;
   const acceptance = {
-    provenance: 'One STAGED start at sp(37,2.5), y14. Live world-stick approach, natural aura wake, held jump/glide thereafter. No forced element, movement, restore or intermediate teleport.',
+    provenance: 'One STAGED start at sp(38.15,2.5), y14. Live world-stick approach, natural aura wake, held jump/glide thereafter. No forced element, movement, restore or intermediate teleport.',
     current: windSpot, phase, transitions, passed, end: end.pos, terrace, deaths: end.deaths - initial.deaths,
     crossingFrames: crossing.length, crossingSeconds: crossing.length / fps,
     minimumGapFeetY: crossing.length ? Math.min(...crossing.map(r => r.pos[1])) : null,

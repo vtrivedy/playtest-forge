@@ -1,3 +1,4 @@
+import { leafAtlas } from '../russetTextures';
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
 import { Reactor, type ReactorTunables, type SupplyFn } from './reactor';
@@ -83,9 +84,9 @@ function threadMaterial(): THREE.ShaderMaterial {
 }
 
 /** Curling autumn leaves riding the current: each point is a turning maple-ish leaf, lit warm on one face. */
-function leafMaterial(): THREE.ShaderMaterial {
+function leafMaterial(map: THREE.Texture): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uScale: { value: 520 } },
+    uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 }, uScale: { value: 520 }, uMap: { value: map } },
     vertexShader: /* glsl */ `
       attribute float seed;
       uniform float uTime, uScale;
@@ -103,6 +104,7 @@ function leafMaterial(): THREE.ShaderMaterial {
       }`,
     fragmentShader: /* glsl */ `
       uniform float uOpacity;
+      uniform sampler2D uMap;
       varying float vSpin;
       varying float vTone;
       varying float vFlip;
@@ -111,20 +113,18 @@ function leafMaterial(): THREE.ShaderMaterial {
         float c = cos(vSpin), s = sin(vSpin);
         vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
         r.x /= vFlip;
-        // broad maple-ish blade: shallow lobes on an ovate outline, a stem notch, soft at the edge
-        r.y *= 0.85;
-        float ang = atan(r.y, r.x);
-        float rad = 0.33 + 0.03 * cos(ang * 5.0) + 0.05 * sin(ang) - 0.06 * smoothstep(0.9, 1.0, -sin(ang));
-        float d = length(r) - rad;
-        float a = 1.0 - smoothstep(-0.03, 0.02, d);
-        if (a < 0.05) discard;
-        float vein = smoothstep(0.03, 0.0, abs(r.x)) * 0.25;
+        if (abs(r.x) > 0.5 || abs(r.y) > 0.5) discard;
+        // painted maple from the shared leaf atlas (top-left cell), spun and tumbling edge-on
+        vec4 leaf = texture2D(uMap, (r + 0.5) * 0.5 + vec2(0.0, 0.5));
+        float a = leaf.a;
+        if (a < 0.1) discard;
+        float vein = 0.0;
         vec3 rust = vec3(0.52, 0.17, 0.06);
         vec3 amber = vec3(0.86, 0.44, 0.14);
         vec3 ochre = vec3(0.78, 0.58, 0.24);
         vec3 col = mix(mix(rust, amber, smoothstep(0.0, 0.6, vTone)), ochre, smoothstep(0.7, 1.0, vTone));
         col *= (0.7 + 0.45 * vFlip) - vein;
-        col = pow(col, vec3(2.2)); // authored in sRGB; the pass below re-encodes
+        col = pow(col, vec3(2.2)) * (0.55 + 0.6 * dot(leaf.rgb, vec3(0.333))); // authored in sRGB; painted value kept
         gl_FragColor = vec4(col, a * uOpacity);
         #include <colorspace_fragment>
       }`,
@@ -147,6 +147,7 @@ export type WindSystem = {
 export function createWind(scene: THREE.Scene, spots: WindSpot[], opts: { gui?: GUI } = {}): WindSystem {
   const tun: WindTunables = { ...WIND_DEFAULTS };
   const N_LEAF = 90;
+  const windLeaf = leafAtlas(256);
   const currents: Current[] = spots.map((spot) => {
     const curve = new THREE.CatmullRomCurve3(spot.path.map(([x, y, z]) => new THREE.Vector3(x, y, z)), false, 'centripetal');
     const length = curve.getLength();
@@ -183,7 +184,7 @@ export function createWind(scene: THREE.Scene, spots: WindSpot[], opts: { gui?: 
       leafSeed[i] = rnd();
     }
     geo.setAttribute('seed', new THREE.BufferAttribute(leafSeed, 1));
-    const leaves = new THREE.Points(geo, leafMaterial());
+    const leaves = new THREE.Points(geo, leafMaterial(windLeaf));
     leaves.frustumCulled = false;
     scene.add(leaves);
     const debug = new THREE.Line(new THREE.BufferGeometry().setFromPoints(samples), new THREE.LineBasicMaterial({ color: 0x66ccff, depthTest: false }));

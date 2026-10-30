@@ -768,25 +768,30 @@ function core(b: Bucket, m: THREE.Matrix4, w: number, h: number, d: number): voi
 }
 
 /** Coursed square pier from y0 to y1 (local), alternating whole / split courses. */
-function pier(b: Bucket, base: THREE.Matrix4, x: number, z: number, w: number, y0: number, y1: number, seed: number, ch = 0.52, brokenTop = false): void {
-  const n = Math.max(1, Math.round((y1 - y0) / ch));
-  const hh = (y1 - y0) / n;
-  const r = rng(seed * 977 + 1);
-  for (let i = 0; i < n; i++) {
-    const yc = y0 + hh * (i + 0.5);
-    const last = brokenTop && i === n - 1;
-    if (i % 2 === 0) {
-      if (last && r() < 0.6) {
-        stoneBlock(b, base.clone().multiply(trs(x - w * 0.22, yc, z)), w * 0.56, hh, w, seed + i, 0.6);
-      } else stoneBlock(b, base.clone().multiply(trs(x, yc, z)), w, hh * (0.97 + r() * 0.03), w, seed + i, last ? 0.6 : 0.05);
-    } else {
-      for (const s of [-1, 1]) {
-        if (last && s === 1) continue;
-        stoneBlock(b, base.clone().multiply(trs(x, yc, z + (s * w) / 4)), w, hh, w / 2, seed + i * 3 + s, last ? 0.6 : 0.03);
-      }
-    }
+let carvedSupport: THREE.BufferGeometry | null = null;
+let snappedSupport: THREE.BufferGeometry | null = null;
+
+/** The world loads one licensed CC0 source before any region assembles its architecture. */
+export function setRuinSupportGeometry(geometry: THREE.BufferGeometry): void {
+  carvedSupport = geometry;
+  snappedSupport?.dispose();
+  snappedSupport = geometry.clone();
+  const p = snappedSupport.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const edge = 1.43 + Math.sin(p.getX(i) * 37) * 0.035 + Math.cos(p.getZ(i) * 29) * 0.025;
+    p.setY(i, Math.min(p.getY(i), edge));
   }
-  core(b, base.clone().multiply(trs(x, (y0 + y1) / 2 - (brokenTop ? hh * 0.5 : 0), z)), w * 0.9, (y1 - y0) * 0.98 - (brokenTop ? hh : 0), w * 0.9);
+  snappedSupport.computeVertexNormals();
+}
+
+function pier(b: Bucket, base: THREE.Matrix4, x: number, z: number, w: number, y0: number, y1: number, seed: number, brokenTop = false): void {
+  const source = brokenTop ? snappedSupport : carvedSupport;
+  if (!source) throw new Error('Load CC0 ruin supports before assembling the world');
+  const r = rng(seed * 6007 + 3);
+  const height = y1 - y0;
+  const m = base.clone().multiply(trs(x, y0, z, r() * 6.28, w / 0.61, height / (brokenTop ? 1.49 : 1.9), w / 0.61,
+    (r() - 0.5) * 0.018, (r() - 0.5) * 0.018));
+  b.add(source, m, stoneTint(r));
 }
 
 /** Point on an arch intrados (t 0..1 left→right) + outward normal; pointed arches use two centres. */
@@ -880,7 +885,7 @@ export function ruinArch(
     stoneBlock(b, base.clone().multiply(trs(px, 0.18, 0)), bw * 1.3, 0.36, bw * 1.3, seed + side * 3, 0.15);
     const snapped = side === 1 && broken > 0;
     const top = snapped ? 0.36 + ph * (1 - broken * 0.75) : springY;
-    pier(b, base, px, 0, bw, 0.36, top, seed * 7 + side * 50, 0.54, snapped);
+    pier(b, base, px, 0, bw, 0.36, top, seed * 7 + side * 50, snapped);
     if (!snapped) stoneBlock(b, base.clone().multiply(trs(px - side * 0.06, springY + 0.11, 0)), bw * 1.18, 0.22, bw * 1.12, seed + side * 9, 0.1);
   }
   const ringBase = base.clone().multiply(trs(0, springY + 0.22, 0));
@@ -1171,9 +1176,9 @@ export function domedShrine(stone: Bucket, glow: Bucket, x: number, y: number, z
   const entY = 4.42;
   for (const [cx, cz] of [[-pc, -pc], [pc, -pc], [-pc, pc], [pc, pc]] as const) {
     stoneBlock(stone, at(cx, 1.3, cz), pw + 0.16, 0.2, pw + 0.16, seed + 30 + cx * 7 + cz * 3, 0.1);
-    pier(stone, M, cx, cz, pw, 1.4, springY, seed * 11 + Math.round(cx * 7 + cz * 3), 0.42);
+    pier(stone, M, cx, cz, pw, 1.4, springY, seed * 11 + Math.round(cx * 7 + cz * 3));
     stoneBlock(stone, at(cx, springY + 0.08, cz), pw + 0.14, 0.16, pw + 0.14, seed + 40 + cx * 5 + cz, 0.08);
-    pier(stone, M, cx, cz, pw, springY + 0.16, entY, seed * 13 + Math.round(cx * 5 + cz * 9), 0.42);
+    pier(stone, M, cx, cz, pw, springY + 0.16, entY, seed * 13 + Math.round(cx * 5 + cz * 9));
   }
   // --- arches on all four faces + spandrel blocks up to the entablature
   const R = pc - pw / 2; // clear half-span
@@ -1297,7 +1302,7 @@ export function domedShrine(stone: Bucket, glow: Bucket, x: number, y: number, z
 }
 
 /** Seedwell: octagonal carved basin of fitted wedge blocks, three standing glyph stones. */
-export function seedwell(stone: Bucket, glow: Bucket, x: number, y: number, z: number, seed: number): void {
+export function seedwell(stone: Bucket, glow: Bucket, column: THREE.BufferGeometry, x: number, y: number, z: number, seed: number): void {
   const r = rng(seed * 811 + 5);
   setSite(y, y + 3);
   // basin ring: 8 wedge blocks, fitted
@@ -1325,7 +1330,7 @@ export function seedwell(stone: Bucket, glow: Bucket, x: number, y: number, z: n
     const sz = z + Math.sin(a) * 2.6;
     const h = 2.1 + r() * 0.8;
     const yaw = Math.atan2(x - sx, z - sz);
-    stoneBlock(stone, trs(sx, y + h / 2 - 0.1, sz, yaw, 1, 1, 1, (r() - 0.5) * 0.1, (r() - 0.5) * 0.1), 0.75, h, 0.45, seed * 7 + k, 0.2);
+    stone.add(column, trs(sx, y - 0.1, sz, yaw, 0.45 / 0.61, h / 1.9, 0.45 / 0.61, (r() - 0.5) * 0.1, (r() - 0.5) * 0.1), stoneTint(r));
     const leaf = leafShape(0.26, 0.4);
     glow.add(leaf, trs(sx + Math.sin(yaw) * 0.24, y + h * 0.62, sz + Math.cos(yaw) * 0.24, yaw), PAL.amber);
     leaf.dispose();
