@@ -54,7 +54,7 @@ for v in snout:
 for sgn in (1, -1):
     ev = [bm.verts[i] for i in eye_ids if bm.verts[i].co.x * sgn > 0]
     ec = sum((v.co for v in ev), Vector()) / len(ev)
-    for v in ev: v.co = ec + (v.co - ec) * Vector((1.26, 1.14, 1.2))  # wider almond, lid height kept
+    for v in ev: v.co = ec + (v.co - ec) * Vector((1.5, 1.3, 1.38))  # concept: large almond eyes (watchful, not round)
 # compact oval paws (turnaround: neat dark paws barely longer than the leg is wide), flat sole
 paw_groups = [g for g in gname.values() if "Paw" in g]
 for pg in paw_groups:
@@ -250,7 +250,7 @@ img_s = bpy.data.images.new("fox_fur_strand", BAKE, BAKE); img_s.colorspace_sett
 for n_ in list(N_):
     if n_.type not in ("OUTPUT_MATERIAL", "TEX_IMAGE"): N_.remove(n_)
 tc2 = node("ShaderNodeTexCoord")
-mp2 = node("ShaderNodeMapping"); mp2.inputs["Scale"].default_value = (32, 7, 26)  # big soft clumps stretched along the body (painterly, not per-pixel hair)
+mp2 = node("ShaderNodeMapping"); mp2.inputs["Scale"].default_value = (95, 9, 75)  # thin strands laid along the body (discs read as scales, fine dots as sandpaper)
 vor = node("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 1.0; vor.inputs["Randomness"].default_value = 1.0
 L_.new(tc2.outputs["Object"], mp2.inputs["Vector"]); L_.new(mp2.outputs["Vector"], vor.inputs["Vector"])
 fall = node("ShaderNodeMapRange", interpolation_type="SMOOTHSTEP"); fall.inputs["From Min"].default_value = 0.0
