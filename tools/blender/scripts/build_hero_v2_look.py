@@ -67,8 +67,8 @@ bmesh.ops.delete(bm, geom=kill, context="VERTS")
 bm.to_mesh(me); bm.free(); me.update()
 
 # ---------------------------------------------------------------- 2. region colours (rest pose rules)
-PAL = dict(rust=(206, 106, 42), dorsal=(170, 80, 30), belly=(226, 150, 88), cream=(242, 228, 204),
-           umber=(122, 66, 34), sock=(64, 42, 30), paw=(46, 32, 25), earback=(70, 40, 26), nose=(22, 15, 13),
+PAL = dict(rust=(206, 106, 42), dorsal=(170, 80, 30), belly=(226, 150, 88), cream=(236, 218, 186),
+           umber=(132, 74, 40), sock=(102, 62, 38), paw=(74, 48, 33), earback=(70, 40, 26), nose=(22, 15, 13),
            amber=(236, 156, 40), pupil=(30, 14, 8), liner=(70, 36, 20), earin=(236, 214, 186))
 mat_names = [m.name for m in me.materials]
 MI = {n: i for i, n in enumerate(mat_names)}
@@ -85,7 +85,7 @@ eyeL = Vector(map(lambda *a: sum(a) / len(a), *[c for c in eye_cos if c.x > 0]))
 eyeR = Vector(map(lambda *a: sum(a) / len(a), *[c for c in eye_cos if c.x < 0]))
 def mix(a, b, t): return tuple(a[i] + (b[i] - a[i]) * t for i in range(3))
 CHEST_Y = bh("FrontUpperLeg.L").y + 0.12  # in front of this = chest / throat; behind = belly
-cols, legmask, furlen = [], [], []
+cols, legmask, furlen, glow = [], [], [], []
 for v in me.vertices:
     w = weights(v); co, n = v.co, v.normal
     front_leg = wsum(w, *[f"Front{b}.{s}" for b in ("UpperLeg", "LowerLeg", "Paw") for s in "LR"])
@@ -137,6 +137,12 @@ for v in me.vertices:
     if v.index in eye_vs or v.index in nose_vs or (d < 0.05): L = 0.0
     if co.z < 0.2: L = 0.0
     furlen.append(L)
+    # spirit inner glow (under the fur): spine ridge strongest, tail root, faint amber in the chest cavity
+    spine = wsum(w, "Back", "Torso", "Torso2", "Torso3") + 0.6 * wsum(w, "Neck1", "Neck2", "Tail1")
+    g = min(1, spine) * smooth(0.35, 0.85, n.z) * 0.7
+    g += 0.6 * w.get("Tail1", 0) * smooth(-0.2, 0.5, n.z)
+    g += 0.15 * min(1, neck) * smooth(0.2, 0.7, -n.y) * smooth(0.95, 1.3, co.z)  # chest: soft, low
+    glow.append(min(1.0, g * (1 - leg) * (0 if ear > 0.2 or w.get("Head", 0) > 0.5 else 1)))
 # soften region borders (not eyes / nose)
 adj = [[] for _ in me.vertices]
 for e in me.edges:
@@ -150,6 +156,10 @@ for it in range(3):
     cols = new
 ca = me.color_attributes.new("Region", "BYTE_COLOR", "POINT")
 for i, c in enumerate(cols): ca.data[i].color_srgb = (c[0] / 255, c[1] / 255, c[2] / 255, 1)
+for it in range(2):
+    glow = [(g * 2 + sum(glow[j] for j in adj[i]) / len(adj[i])) / 3 if adj[i] else g for i, g in enumerate(glow)]
+ga = me.color_attributes.new("Glow", "BYTE_COLOR", "POINT")
+for i, g in enumerate(glow): ga.data[i].color = (g, g, g, 1)
 ma = me.color_attributes.new("Mask", "BYTE_COLOR", "POINT")
 for i, l in enumerate(legmask): ma.data[i].color = (l, 0, 0, 1)
 
@@ -239,6 +249,26 @@ px_c = px_c.reshape(-1, 4); px_c[:, 3] = px_s.reshape(-1, 4)[:, 0]
 img_sh = bpy.data.images.new("fox_fur_shell", BAKE, BAKE, alpha=True)
 img_sh.pixels.foreach_set(px_c.ravel())
 img_sh.filepath_raw = f"{TEX}/fox_fur_shell.png"; img_sh.file_format = "PNG"; img_sh.save()
+# inner-glow mask -> RGBA ember texture (alpha = mask broken up by the fur-clump strands)
+for n_ in list(N_):
+    if n_.type not in ("OUTPUT_MATERIAL", "TEX_IMAGE"): N_.remove(n_)
+gcol = node("ShaderNodeVertexColor", layer_name="Glow"); em3 = node("ShaderNodeEmission")
+L_.new(gcol.outputs["Color"], em3.inputs["Color"]); L_.new(em3.outputs[0], out.inputs["Surface"])
+img_g = bpy.data.images.new("fox_glow_mask", BAKE // 2, BAKE // 2); img_g.colorspace_settings.name = "Non-Color"
+tex.image = img_g; N_.active = tex
+sc.render.engine = "CYCLES"
+bpy.ops.object.bake(type="EMIT", use_clear=True)
+sc.render.engine = eng
+GB = BAKE // 2
+px_g = np.empty(GB * GB * 4, dtype=np.float32); img_g.pixels.foreach_get(px_g)
+gm = px_g.reshape(-1, 4)[:, 0]
+strand = px_s.reshape(BAKE, BAKE, 4)[::2, ::2, 0].ravel()
+ga_ = np.clip(gm * (0.45 + 0.55 * strand) * 1.1, 0, 0.85)
+ember_lo, ember_hi = np.array(srgb((214, 82, 18))), np.array(srgb((250, 160, 52)))  # amber, never white
+rgb = ember_lo[None, :] + (ember_hi - ember_lo)[None, :] * np.clip(gm, 0, 1)[:, None] ** 1.5
+img_gl = bpy.data.images.new("fox_glow", GB, GB, alpha=True)
+img_gl.pixels.foreach_set(np.concatenate([rgb, ga_[:, None]], axis=1).astype(np.float32).ravel())
+img_gl.filepath_raw = f"{TEX}/fox_glow.png"; img_gl.file_format = "PNG"; img_gl.save()
 print("BAKED fur")
 
 # ---------------------------------------------------------------- 4. game materials
@@ -275,7 +305,7 @@ def pbr(name, col=None, nrm=None, emit_img=None, emit_col=None, emit_str=0.0, ro
     return m
 fur_c, fur_n, fur_sh = load("fox_fur_col.jpg"), load("fox_fur_nrm.jpg", True), load("fox_fur_shell.png")
 M_FUR = pbr("FoxFur", fur_c, fur_n, rough=0.85, spec=0.2)
-M_EYE = pbr("FoxEye", fur_c, None, emit_img=fur_c, emit_str=0.9, rough=0.15, spec=0.6)
+M_EYE = pbr("FoxEye", fur_c, None, emit_img=fur_c, emit_str=0.6, rough=0.15, spec=0.6)
 M_NOSE = pbr("FoxNose", fur_c, None, rough=0.3, spec=0.5)
 fox.data.materials.clear()
 for m_ in (M_FUR, M_EYE, M_NOSE): fox.data.materials.append(m_)
@@ -284,11 +314,18 @@ for p in me.polygons:
     p.material_index = 1 if vs <= eye_vs else 2 if vs <= nose_vs else 0
 fox.data.color_attributes.remove(fox.data.color_attributes["Mask"])
 fox.data.color_attributes.remove(fox.data.color_attributes["Region"])
+fox.data.color_attributes.remove(fox.data.color_attributes["Glow"])
 tail_c = load("tail_col.png")
 M_TAIL = pbr("FoxTailFur", tail_c, None, rough=0.85, spec=0.2)
 cards_c, cards_e = load("cards_col.png"), load("cards_emit.png")
 M_TUFT = pbr("FoxFurCards", cards_c, None, rough=0.9, alpha_mode="MASK", spec=0.15)
-M_FLAME = pbr("EmberWisps", cards_c, None, emit_img=cards_e, emit_str=1.6, rough=0.6, alpha_mode="BLEND", spec=0.0)
+M_FLAME = pbr("EmberWisps", cards_c, None, emit_img=cards_e, emit_str=1.3, rough=0.6, alpha_mode="BLEND", spec=0.0)
+# spirit FX: names contain "wisp" so the game's tuneMaterials keeps them soft-emissive (not the fur branch)
+fx_c, glow_c, tglow_c = load("spirit_fx.png"), load("fox_glow.png"), load("tail_glow.png")
+M_FX = pbr("SpiritWispFX", fx_c, None, emit_img=fx_c, emit_str=2.2, rough=0.6, alpha_mode="BLEND", spec=0.0)
+M_GLOW = pbr("SpiritWispGlow", glow_c, None, emit_img=glow_c, emit_str=0.8, rough=0.8, alpha_mode="BLEND", spec=0.0)
+M_TGLOW = pbr("SpiritWispTailGlow", tglow_c, None, emit_img=tglow_c, emit_str=1.3, rough=0.8, alpha_mode="BLEND", spec=0.0)
+for m_ in (M_FX, M_GLOW, M_TGLOW, M_FLAME): m_.use_backface_culling = False
 SHELL_CLIPS = (0.2, 0.38, 0.55)
 M_SHELL = [pbr(f"FoxFurShell{k + 1}", fur_sh, None, rough=0.9, alpha_mode="MASK", spec=0.15, clip=c_) for k, c_ in enumerate(SHELL_CLIPS)]
 TAIL_CLIPS = (0.18, 0.32, 0.46, 0.6)
@@ -403,13 +440,30 @@ for v in tme.vertices:
     t = tan - v.normal * tan.dot(v.normal); tflow.append(t.normalized() if t.length > 1e-4 else Vector())
 tail_shell = shells(tail, tlen, tflow, M_TSHELL, "SpiritFox_TailShell")
 
+# ---------------------------------------------------------------- 6b. spirit inner glow: thin emissive shells UNDER the fur shells
+def glow_shell(src, lengths, keep, frac, mat, name):
+    o = src.copy(); o.data = src.data.copy(); o.name = name; sc.collection.objects.link(o)
+    o.modifiers.clear(); md = o.modifiers.new("Armature", "ARMATURE"); md.object = arm; o.parent = arm
+    bm_ = bmesh.new(); bm_.from_mesh(o.data); bm_.verts.ensure_lookup_table(); bm_.normal_update()
+    kill_ = [f for f in bm_.faces if max(keep[v.index] for v in f.verts) < 0.03]
+    for v in bm_.verts: v.co = v.co + v.normal * (lengths[v.index] * frac + 0.006)
+    bmesh.ops.delete(bm_, geom=kill_, context="FACES")
+    bm_.to_mesh(o.data); bm_.free()
+    o.data.materials.clear(); o.data.materials.append(mat)
+    for p in o.data.polygons: p.material_index = 0
+    return o
+glow_body = glow_shell(fox, furlen, glow, 0.3, M_GLOW, "SpiritFox_Glow")
+tkeep = [smooth(0.15, 0.3, (v.co - spine[0]).dot((spine[-1] - spine[0]).normalized()) / (spine[-1] - spine[0]).length) for v in tme.vertices]
+glow_tail = glow_shell(tail, tlen, tkeep, 0.3, M_TGLOW, "SpiritFox_TailGlow")
+
 # ---------------------------------------------------------------- 7. cards: fur clumps, cheek fluff, ember wisps, leaves
 UV = {  # atlas rects (u0, v0, u1, v1) in Blender UV (v up)
     "flame0": (0.0, 0.5, 0.25, 1.0), "flame1": (0.25, 0.5, 0.5, 1.0), "flame2": (0.0, 0.0, 0.25, 0.5), "flame3": (0.25, 0.0, 0.5, 0.5),
     "cream": (0.5, 0.5, 0.75, 1.0), "rusttuft": (0.75, 0.5, 1.0, 1.0),
+    "sheet": (0.0, 0.0, 0.5, 1.0), "spark": (0.5, 0.5, 1.0, 1.0), "sparks": (0.5, 0.0, 1.0, 0.5),  # spirit_fx.png
     "leaf0": (0.5, 0.25, 0.75, 0.5), "leaf1": (0.75, 0.25, 1.0, 0.5), "leaf2": (0.5, 0.0, 0.75, 0.25), "leaf3": (0.75, 0.0, 1.0, 0.25),
 }
-cards = {"tuft": new_obj("SpiritFox_Fur"), "flame": new_obj("SpiritFox_Wisps")}
+cards = {"tuft": new_obj("SpiritFox_Fur"), "flame": new_obj("SpiritFox_Wisps"), "fx": new_obj("SpiritFox_SpiritFX")}
 cbm = {k: bmesh.new() for k in cards}
 for k, b_ in cbm.items(): b_.loops.layers.uv.new("UVMap"); b_.verts.layers.deform.new()
 def card(kind, base, up, facing, w, h, rect, wts, cross=False, wts_top=None):
@@ -431,7 +485,8 @@ FL = ["flame0", "flame1", "flame2", "flame3"]
 for s in "LR":
     e1, e4 = bh(f"Ear1.{s}"), bt(f"Ear4.{s}")
     d = (e4 - e1).normalized()
-    card("flame", e4 - d * 0.22, (d + Vector((0, 0.6, 0.1))).normalized(), Vector((0, -1, 0)), 0.16, 0.3, FL[(s == "R")], {f"Ear4.{s}": 1.0}, cross=True)
+    card("flame", e4 - d * 0.26, (d + Vector((0, 0.6, 0.1))).normalized(), Vector((0, -1, 0)), 0.22, 0.46, FL[(s == "R")], {f"Ear4.{s}": 1.0}, cross=True)
+    card("flame", e4 - d * 0.4, (d + Vector((0, 1.0, 0.3))).normalized(), Vector((0, -1, 0)), 0.16, 0.32, FL[2 + (s == "R")], {f"Ear3.{s}": 0.5, f"Ear4.{s}": 0.5}, cross=True)
 # two crown embers between the ears
 for j in range(2):
     p = bh("Head").lerp(bh("Neck3"), 0.3 + 0.4 * j) + Vector((rnd.uniform(-0.05, 0.05), 0.04, 0.16))
@@ -458,17 +513,57 @@ for j in range(140):
     h = (0.4 + 0.4 * smooth(0.05, 0.55, s) - 0.22 * smooth(0.85, 1.0, s)) * rnd.uniform(0.85, 1.15)
     card("tuft", base, (tan * 0.8 + off * 0.5).normalized(), off, h * 0.6, h, "cream" if s > 0.84 else "rusttuft", w, wts_top=w2)
 # ember tongues licking off the tail tip + a few drifting leaves
-for j in range(8):
-    s = 0.74 + 0.26 * (j / 7)
-    p, tan, w = at(s); th = rnd.uniform(-0.3, math.pi + 0.3)
+for j in range(16):
+    s = 0.45 + 0.55 * (j / 15)
+    p, tan, w = at(s); th = rnd.uniform(0.15, math.pi - 0.15)  # top + flanks (above the lock tips)
     side = Vector((1, 0, 0)); up = side.cross(tan).normalized()
     off = (side * math.cos(th) + up * math.sin(th))
     _, _, w2 = at(min(1.0, s + 0.12))
-    h = 0.3 + 0.35 * (s - 0.74) / 0.26
-    card("flame", p + off * radius(s) * 0.9, (tan * 0.7 + off * 0.3 + Vector((0, 0, 0.5))).normalized(), off, h * 0.5, h, FL[j % 4], w, cross=True, wts_top=w2)
-for j in range(3):
-    p, tan, w = at(0.94 + 0.02 * j)
-    card("flame", p, (tan + Vector((rnd.uniform(-.3, .3), 0, 0.5 + 0.2 * j))).normalized(), Vector((1, 0, 0)), 0.38, 0.62, FL[j % 4], w, cross=True)
+    h = (0.45 + 0.6 * smooth(0.45, 1.0, s)) * rnd.uniform(0.85, 1.15)
+    # streaming back off the plume (concept), not upright campfire tongues
+    card("flame", p + off * (radius(s) * 0.8 + 0.22), (tan * 1.0 + off * 0.3 + Vector((0, 0, 0.22))).normalized(), off, h * 0.42, h, FL[j % 4], w, cross=True, wts_top=w2)
+for j in range(5):
+    p, tan, w = at(0.9 + 0.025 * j)
+    card("flame", p, (tan + Vector((rnd.uniform(-.35, .35), 0, 0.15 + 0.1 * j))).normalized(), Vector((1, 0, 0)), 0.4, 0.85, FL[j % 4], w, cross=True)
+# translucent flame sheets licking off the top of the plume (the concept's "tail dissolves into flame")
+for j in range(10):
+    s = 0.38 + 0.6 * (j / 9)
+    p, tan, w = at(s); side = Vector((1, 0, 0)); up = side.cross(tan).normalized()
+    _, _, w2 = at(min(1.0, s + 0.15))
+    h = (0.7 + 0.5 * smooth(0.38, 1.0, s)) * rnd.uniform(0.9, 1.1)
+    lat = side * rnd.uniform(-0.35, 0.35) * radius(s)
+    card("fx", p + up * (radius(s) * 0.8 + 0.12) + lat, (tan * 1.0 + up * 0.35 + Vector((0, 0, 0.15))).normalized(), side, h * 0.6, h, "sheet", w, cross=True, wts_top=w2)
+# back / ruff: small low wisps along the spine ridge, leaning back (spirit read on the topline, silhouette kept)
+# shoulders/ruff and rump get the flames; mid-back only a faint translucent sheet (no dorsal spike row)
+ridge = [(i, v) for i, v in enumerate(me.vertices) if glow[i] > 0.4 and v.normal.z > 0.75]
+ys = sorted(v.co.y for _, v in ridge)
+y0, y1 = (ys[0], ys[-1]) if ys else (0, 1)
+def ridge_pick(t0, t1, n):
+    c = [x for x in ridge if t0 <= (x[1].co.y - y0) / max(1e-6, y1 - y0) <= t1]; rnd.shuffle(c); return c[:n]
+for zone, nfl, nsh in (((0.0, 0.3), 1, 2), ((0.35, 0.65), 0, 2), ((0.75, 1.0), 0, 2)):
+    for k, (i, v) in enumerate(ridge_pick(*zone, nfl + nsh)):
+        w = topw(weights(v)); base = v.co + v.normal * furlen[i] * 0.5
+        if k < nfl:
+            h = rnd.uniform(0.18, 0.24)
+            card("flame", base, Vector((rnd.uniform(-0.2, 0.2), 0.8, 1)).normalized(), Vector((1, 0, 0)), h * 0.5, h, FL[i % 4], w, cross=True)
+        else:  # translucent sheet lying back along the topline: a heat ripple, not a spike
+            h = rnd.uniform(0.38, 0.52)
+            card("fx", base - Vector((0, 0.08, 0)), Vector((rnd.uniform(-0.15, 0.15), 1, 0.42)).normalized(), Vector((0, 0, 1)), h * 0.75, h, "sheet", w, cross=True)
+# drifting sparks: tail tip + a few above the ruff/crown (tiny, cheap)
+for j in range(11):
+    s = rnd.uniform(0.7, 1.2)
+    p, tan, w = at(min(s, 1.0))
+    if s > 1: p = p + tan * (s - 1) * total
+    off = Vector((rnd.uniform(-1, 1), rnd.uniform(-0.2, 0.8), rnd.uniform(0.1, 1))).normalized()
+    sz = rnd.uniform(0.045, 0.085)
+    card("fx", p + off * (radius(min(s, 1)) + rnd.uniform(0.45, 1.1)), Vector((0, 0.3, 1)), off, sz, sz * 1.4, "spark", w, cross=True)
+for j in range(2):
+    p, tan, w = at(rnd.uniform(0.85, 1.0))
+    card("fx", p + Vector((rnd.uniform(-0.5, 0.5), rnd.uniform(0.3, 0.8), rnd.uniform(0.8, 1.3))), Vector((0, 0.2, 1)), Vector((1, 0, 0)), 0.3, 0.3, "sparks", w, cross=True)
+for j in range(4):
+    p = bh("Neck3").lerp(bh("Head"), rnd.uniform(0, 1)) + Vector((rnd.uniform(-0.35, 0.35), rnd.uniform(0.0, 0.4), rnd.uniform(0.45, 0.9)))
+    sz = rnd.uniform(0.06, 0.1)
+    card("fx", p, Vector((0, 0.3, 1)), Vector((1, 0, 0)), sz, sz * 1.4, "spark", {"Neck3": 1.0}, cross=True)
 for j in range(8):
     s = rnd.uniform(0.7, 1.12)
     p, tan, w = at(min(s, 1.0))
@@ -478,8 +573,8 @@ for j in range(8):
     card("flame", base, Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-1, 1))), off, 0.11, 0.11, f"leaf{j % 4}", w)
 for k, o in cards.items():
     cbm[k].to_mesh(o.data); cbm[k].free()
-    o.data.materials.append(M_TUFT if k == "tuft" else M_FLAME)
+    o.data.materials.append(M_TUFT if k == "tuft" else M_FX if k == "fx" else M_FLAME)
     for p in o.data.polygons: p.use_smooth = False
-for o in (fur_shell, tail_shell):
+for o in (fur_shell, tail_shell, glow_body, glow_tail):
     o.parent = arm
-print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, fur_shell, tail_shell] + list(cards.values())})
+print("LOOK done", {o.name: len(o.data.polygons) for o in [fox, tail, fur_shell, tail_shell, glow_body, glow_tail] + list(cards.values())})

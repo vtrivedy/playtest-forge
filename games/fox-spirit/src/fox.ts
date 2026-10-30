@@ -58,6 +58,16 @@ function tuneMaterials(root: THREE.Object3D) {
         mat.opacity = 0.95;
         mat.depthWrite = true;
         mat.toneMapped = true;
+      } else if (n.includes('spiritwisp') || n.includes('spirit_wisp')) {
+        // Opus spirit FX maps are already amber — don't recolor to red
+        mat.color.setHex(0xffffff);
+        mat.emissive = new THREE.Color(0xffffff);
+        mat.emissiveIntensity = Math.min(mat.emissiveIntensity || 0.7, 0.75);
+        mat.transparent = true;
+        mat.depthWrite = false;
+        mat.toneMapped = true;
+        if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+        if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
       } else if (n.includes('emberwisp') || n.includes('wisp') || n.includes('fur tuft') || n === 'furtufts') {
         mat.color.setHex(0xffffff);
         mat.emissive = new THREE.Color(0xff5520);
