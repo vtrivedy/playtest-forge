@@ -1,6 +1,7 @@
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
+import { captureWindGap } from './windgap-capture.mjs';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -580,6 +581,10 @@ try {
     }
     save('updraft-acceptance.json', summary);
     console.log('UPDRAFT', JSON.stringify(summary));
+  }
+  if (wants('windgap')) {
+    await boot(quality, true);
+    await captureWindGap({ H, advance, shot, video, save, page, fps, report });
   }
   if (wants('levels')) {
     await boot(quality, true);
