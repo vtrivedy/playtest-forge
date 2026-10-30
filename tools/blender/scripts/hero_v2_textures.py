@@ -77,7 +77,7 @@ def tuft(x0, y0, w, h, base, tip, seed, strands=110):
     col.alpha_composite(rgb.filter(ImageFilter.GaussianBlur(0.8)), (x0, y0))
 
 tuft(512, 0, 256, 512, (232, 204, 160), (252, 240, 214), 3)        # warm cream lock (clean, no pink)
-tuft(768, 0, 256, 512, (212, 112, 44), (246, 166, 80), 4)          # burnt-orange lock (body orange) -> warm gold tips
+tuft(768, 0, 256, 512, (204, 106, 42), (226, 132, 58), 4)          # burnt-orange lock: body orange, barely warmer tips (no beige)
 
 def maple(x0, y0, w, seed):
     rnd = random.Random(seed)
