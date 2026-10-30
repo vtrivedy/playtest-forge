@@ -345,6 +345,7 @@ async function boot() {
   fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
   fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'furShells');
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickStream', 0, 1, 0.01);

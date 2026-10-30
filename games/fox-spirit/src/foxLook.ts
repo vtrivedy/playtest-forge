@@ -17,6 +17,8 @@ export const FOX_LOOK = {
   rimPower: 3.0,
   rimColor: [1.0, 0.45, 0.12] as [number, number, number],
   eyeGlow: 0.18,
+  /** layered shell fur on body + tail (off = smooth painted coat, silhouette from cards only) */
+  furShells: true,
   /** spirit wisps (thin curling flame off the back and tail): height multiplier, brightness, stream-back with speed */
   lickScale: 1.0,
   lickIntensity: 1.0,
@@ -42,6 +44,7 @@ const furUniforms: FurUniforms = {
   uRimColor: { value: new THREE.Color() },
 };
 const eyeMats: THREE.MeshStandardMaterial[] = [];
+const shellMeshes: THREE.Object3D[] = [];
 
 /** Push FOX_LOOK into the shared uniforms (cheap; call per frame). */
 function syncLook() {
@@ -52,6 +55,7 @@ function syncLook() {
   furUniforms.uRim.value.set(L.rimStrength, L.rimPower, 0, 0);
   furUniforms.uRimColor.value.setRGB(...L.rimColor);
   for (const m of eyeMats) m.emissiveIntensity = L.eyeGlow;
+  for (const m of shellMeshes) m.visible = L.furShells;
 }
 
 const NOISE_GLSL = /* glsl */ `
@@ -143,6 +147,7 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       } else if (n.includes('fur')) {
+        if (n.includes('shell')) shellMeshes.push(mesh);
         mat.color.setHex(0xffffff);
         mat.roughness = 0.62;
         mat.emissive.setHex(0x000000);
