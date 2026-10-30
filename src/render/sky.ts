@@ -1,18 +1,30 @@
 import * as THREE from 'three';
 
 export type SkyParams = {
-  /** Top zenith */
+  /** Top zenith (cool violet in key art) */
   zenith: THREE.Color;
-  /** Horizon */
+  /** Mid-sky band between horizon and zenith (amber) */
+  mid: THREE.Color;
+  /** Horizon (warm peach) */
   horizon: THREE.Color;
   /** Below-horizon / ground bounce */
   nadir: THREE.Color;
+  /** Low layered mist the horizon dissolves into — match scene fog */
+  mist: THREE.Color;
   sunDir: THREE.Vector3;
   sunColor: THREE.Color;
   sunSize: number;
   sunBloom: number;
+  /** Warm forward-scatter glow hugging the horizon under the sun */
+  horizonGlow: number;
+  /** Soft painted god rays fanning from the sun (0 = off) */
+  godRays: number;
+  /** Height of the mist band above the horizon (dir.y units) */
+  mistHeight: number;
   cloudAmount: number;
   cloudScale: number;
+  /** Paper / pigment grain amount (painterly) */
+  grain: number;
   time: number;
 };
 
@@ -23,37 +35,55 @@ export type PaintedSky = {
   dispose: () => void;
 };
 
-/** Fullscreen-ish skydome with painted gradient + soft sun + cheap clouds. */
+/**
+ * Painted skydome: three-stop gradient (peach horizon → amber → cool violet zenith),
+ * low sun disc with forward-scatter horizon glow, painted god-ray fan, drifting
+ * watercolor clouds and a layered mist band at the horizon that matches scene fog.
+ * Dome follows the camera so it always sits inside the far plane.
+ */
 export function createPaintedSky(scene: THREE.Scene, overrides: Partial<SkyParams> = {}): PaintedSky {
   const params: SkyParams = {
-    zenith: new THREE.Color(overrides.zenith ?? 0xb89268),
-    horizon: new THREE.Color(overrides.horizon ?? 0xe8d4b0),
-    nadir: new THREE.Color(overrides.nadir ?? 0x6a5040),
-    sunDir: (overrides.sunDir ?? new THREE.Vector3(0.45, 0.55, 0.35)).normalize(),
+    zenith: new THREE.Color(overrides.zenith ?? 0x8a86a8),
+    mid: new THREE.Color(overrides.mid ?? 0xe0a868),
+    horizon: new THREE.Color(overrides.horizon ?? 0xf4c89a),
+    nadir: new THREE.Color(overrides.nadir ?? 0x9a8478),
+    mist: new THREE.Color(overrides.mist ?? 0xdcc0a4),
+    sunDir: (overrides.sunDir ?? new THREE.Vector3(0.45, 0.55, 0.35)).clone().normalize(),
     sunColor: new THREE.Color(overrides.sunColor ?? 0xffd9a0),
     sunSize: overrides.sunSize ?? 0.04,
     sunBloom: overrides.sunBloom ?? 0.35,
+    horizonGlow: overrides.horizonGlow ?? 0.6,
+    godRays: overrides.godRays ?? 0.35,
+    mistHeight: overrides.mistHeight ?? 0.08,
     cloudAmount: overrides.cloudAmount ?? 0.72,
     cloudScale: overrides.cloudScale ?? 1.2,
+    grain: overrides.grain ?? 0.03,
     time: 0,
   };
 
   const uniforms = {
     uZenith: { value: params.zenith },
+    uMid: { value: params.mid },
     uHorizon: { value: params.horizon },
     uNadir: { value: params.nadir },
-    uSunDir: { value: params.sunDir },
+    uMist: { value: params.mist },
+    uSunDir: { value: params.sunDir.clone() },
     uSunColor: { value: params.sunColor },
     uSunSize: { value: params.sunSize },
     uSunBloom: { value: params.sunBloom },
+    uHorizonGlow: { value: params.horizonGlow },
+    uGodRays: { value: params.godRays },
+    uMistHeight: { value: params.mistHeight },
     uCloudAmount: { value: params.cloudAmount },
     uCloudScale: { value: params.cloudScale },
+    uGrain: { value: params.grain },
     uTime: { value: 0 },
   };
 
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
+    fog: false,
     uniforms,
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -63,8 +93,9 @@ export function createPaintedSky(scene: THREE.Scene, overrides: Partial<SkyParam
         gl_Position = projectionMatrix * viewMatrix * w;
       }`,
     fragmentShader: /* glsl */ `
-      uniform vec3 uZenith, uHorizon, uNadir, uSunDir, uSunColor;
-      uniform float uSunSize, uSunBloom, uCloudAmount, uCloudScale, uTime;
+      uniform vec3 uZenith, uMid, uHorizon, uNadir, uMist, uSunDir, uSunColor;
+      uniform float uSunSize, uSunBloom, uHorizonGlow, uGodRays, uMistHeight;
+      uniform float uCloudAmount, uCloudScale, uGrain, uTime;
       varying vec3 vDir;
 
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
@@ -82,32 +113,72 @@ export function createPaintedSky(scene: THREE.Scene, overrides: Partial<SkyParam
 
       void main() {
         vec3 d = normalize(vDir);
+        vec3 s = normalize(uSunDir);
         float h = d.y;
-        vec3 col = mix(uHorizon, uZenith, smoothstep(0.0, 0.75, max(h, 0.0)));
-        col = mix(uNadir, col, smoothstep(-0.35, 0.05, h));
+        float az = atan(d.z, d.x);
 
-        // soft sun disc + bloom
-        float sd = 1.0 - dot(d, normalize(uSunDir));
-        float sun = smoothstep(uSunSize * 2.5, uSunSize * 0.15, sd);
-        float bloom = exp(-sd * (8.0 / max(0.05, uSunBloom))) * uSunBloom;
-        col += uSunColor * (sun * 1.4 + bloom);
+        // three-stop painted gradient; sun side of the sky runs warmer
+        float sunSide = 0.5 + 0.5 * dot(normalize(d.xz + 1e-4), normalize(s.xz + 1e-4));
+        float hp = max(h, 0.0);
+        vec3 col = mix(uHorizon, uMid, smoothstep(0.0, 0.22, hp));
+        col = mix(col, uZenith, smoothstep(0.12 + 0.18 * sunSide, 0.85, hp));
+        col = mix(col, uMid * 1.05, (1.0 - smoothstep(0.0, 0.35, hp)) * sunSide * 0.35);
 
-        // cheap drifting clouds on upper hemisphere
-        if (h > 0.02) {
-          vec2 uv = d.xz / max(0.15, d.y) * uCloudScale;
+        // below horizon → cloud-sea mist, then nadir
+        col = mix(uNadir, col, smoothstep(-0.45, 0.0, h));
+
+        // forward-scatter glow along the horizon under the sun
+        float sd = 1.0 - dot(d, s);
+        float band = exp(-abs(h - s.y * 0.35) * 9.0);
+        col += uSunColor * uHorizonGlow * band * pow(sunSide, 3.0) * 0.55;
+
+        // painted god-ray fan (angular streaks around the sun axis, above mist)
+        vec3 up = abs(s.y) > 0.95 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+        vec3 t1 = normalize(cross(s, up));
+        vec3 t2 = cross(t1, s);
+        float ang = atan(dot(d, t2), dot(d, t1));
+        float rays = noise(vec2(ang * 7.0, uTime * 0.04)) * 0.6 + noise(vec2(ang * 17.0 + 3.1, uTime * 0.03)) * 0.4;
+        rays = smoothstep(0.42, 0.9, rays);
+        float rayFall = exp(-sd * 3.2) * smoothstep(0.0, 0.03, sd);
+        col += uSunColor * rays * rayFall * uGodRays * 0.6 * smoothstep(-0.05, 0.08, h);
+
+        // drifting watercolor clouds on upper hemisphere, lit from the sun side
+        if (h > 0.0) {
+          vec2 uv = d.xz / max(0.18, d.y) * uCloudScale;
           uv += vec2(uTime * 0.01, uTime * 0.006);
           float c = fbm(uv);
-          float clouds = smoothstep(0.55, 0.78, c) * uCloudAmount * smoothstep(0.02, 0.35, h);
-          col = mix(col, mix(col, vec3(1.0, 0.96, 0.92), 0.85), clouds);
+          float clouds = smoothstep(0.52, 0.8, c) * uCloudAmount * smoothstep(0.03, 0.4, h);
+          vec3 cloudCol = mix(mix(uMid, uHorizon, 0.5), vec3(1.0, 0.94, 0.86), 0.45);
+          cloudCol = mix(cloudCol * vec3(0.86, 0.84, 0.95), cloudCol + uSunColor * 0.25, pow(sunSide, 2.0));
+          col = mix(col, cloudCol, clouds * 0.8);
         }
+
+        // layered horizon mist: two wavy bands so far land sinks into haze
+        float m1 = smoothstep(uMistHeight + 0.05 * fbm(vec2(az * 3.0, 1.7) + uTime * 0.004), -0.02, h);
+        float m2 = smoothstep(uMistHeight * 2.4 + 0.08 * fbm(vec2(az * 1.7 + 4.0, 0.3) - uTime * 0.003), uMistHeight * 0.5, h);
+        vec3 mistLit = uMist + uSunColor * 0.18 * pow(sunSide, 2.0);
+        col = mix(col, mistLit, clamp(m2 * 0.35 + m1 * 0.75, 0.0, 0.9));
+
+        // sun disc + bloom on top of mist (disc can exceed 1.0 to feed bloom)
+        float sun = smoothstep(uSunSize * 2.5, uSunSize * 0.15, sd);
+        float bloom = exp(-sd * (8.0 / max(0.05, uSunBloom))) * uSunBloom;
+        col += uSunColor * (sun * 1.6 + bloom);
+
+        // paper grain
+        col *= 1.0 + (fbm(d.xy * 90.0 + d.z * 37.0) - 0.5) * uGrain * 2.0;
 
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
 
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), mat);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(400, 48, 24), mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = -1000;
+  // dome centred on the camera — keeps r=400 inside far plane from any spawn
+  mesh.onBeforeRender = (_r, _s, camera) => {
+    mesh.position.copy(camera.position);
+    mesh.updateMatrixWorld();
+  };
   scene.add(mesh);
   // keep env subtle if no HDRI
   scene.background = null;
@@ -119,14 +190,20 @@ export function createPaintedSky(scene: THREE.Scene, overrides: Partial<SkyParam
       params.time += dt;
       uniforms.uTime.value = params.time;
       uniforms.uZenith.value = params.zenith;
+      uniforms.uMid.value = params.mid;
       uniforms.uHorizon.value = params.horizon;
       uniforms.uNadir.value = params.nadir;
+      uniforms.uMist.value = params.mist;
       uniforms.uSunDir.value.copy(params.sunDir).normalize();
       uniforms.uSunColor.value = params.sunColor;
       uniforms.uSunSize.value = params.sunSize;
       uniforms.uSunBloom.value = params.sunBloom;
+      uniforms.uHorizonGlow.value = params.horizonGlow;
+      uniforms.uGodRays.value = params.godRays;
+      uniforms.uMistHeight.value = params.mistHeight;
       uniforms.uCloudAmount.value = params.cloudAmount;
       uniforms.uCloudScale.value = params.cloudScale;
+      uniforms.uGrain.value = params.grain;
     },
     dispose() {
       mesh.geometry.dispose();

@@ -17,8 +17,11 @@ export type { PostStack, PostStackOptions } from './postStack';
 export { createPaintedSky, applyLookdevLights } from './sky';
 export type { PaintedSky, SkyParams } from './sky';
 
-export { applyHeightFog, syncFog } from './atmosphere';
+export { applyHeightFog, syncFog, matchFogToSky } from './atmosphere';
 export type { HeightFogParams } from './atmosphere';
+
+export { createDistantLand } from './distantLand';
+export type { DistantLand, DistantLandOptions } from './distantLand';
 
 export { createStylizedWater } from './water';
 export type { StylizedWater } from './water';

@@ -16,13 +16,14 @@ export type HeightFogParams = {
  */
 export function applyHeightFog(scene: THREE.Scene, params: Partial<HeightFogParams> = {}): HeightFogParams {
   const p: HeightFogParams = {
-    color: new THREE.Color(params.color ?? 0xc4a882),
-    density: params.density ?? 0.02,
+    color: new THREE.Color(params.color ?? 0xdcc0a4),
+    density: params.density ?? 0.008,
     height: params.height ?? 2,
     heightFalloff: params.heightFalloff ?? 0.08,
     horizonStrength: params.horizonStrength ?? 0.4,
   };
-  // Exp2 fog reads well with floating islands; color matches cool horizon.
+  // Exp2 fog frames near/mid depth; far depth is the sky mist + distant-land
+  // aerial perspective, so keep density low and colour = sky mist.
   scene.fog = new THREE.FogExp2(p.color.getHex(), p.density);
   return p;
 }
@@ -32,4 +33,13 @@ export function syncFog(scene: THREE.Scene, p: HeightFogParams): void {
     scene.fog.color.copy(p.color);
     scene.fog.density = p.density;
   }
+}
+
+/**
+ * Point fog at the sky's horizon mist so geometry dissolves into the painted
+ * horizon instead of a flat cream wall. Call after createPaintedSky.
+ */
+export function matchFogToSky(scene: THREE.Scene, p: HeightFogParams, mist: THREE.Color): void {
+  p.color.copy(mist);
+  syncFog(scene, p);
 }
