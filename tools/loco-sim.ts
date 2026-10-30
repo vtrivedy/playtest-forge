@@ -48,6 +48,7 @@ let skateMax = 0;
 const skateLeg: Record<string, number> = {};
 let slips: number[] = [];
 let pitchMax = 0;
+let torsoRest: number | null = null;
 const plantAge: Record<string, number> = {};
 const badAges: number[] = [];
 let skateSum = 0;
@@ -76,7 +77,14 @@ function stepSim(wish: THREE.Vector3, jump = false) {
   const gnd = y <= gy + 1e-4 && vy <= 0;
   loco.update(dt, { vel: new THREE.Vector3(vel.x, vy, vel.z), grounded: gnd, gliding: false, dashing: false, skidding: gnd && ms.skidding, windup: 0 });
   t += dt;
-  pitchMax = Math.max(pitchMax, Math.abs(loco.state.pitch));
+  {
+    // capture-stream torso metric: pelvis head → spine_04 head, vs idle
+    const a = group.getObjectByName('pelvis')!.getWorldPosition(new THREE.Vector3());
+    const b = group.getObjectByName('spine_04')!.getWorldPosition(new THREE.Vector3());
+    const tp = Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z));
+    if (torsoRest === null) torsoRest = tp;
+    pitchMax = Math.max(pitchMax, Math.abs(tp - torsoRest));
+  }
   for (const id of LEG_IDS) {
     const L = loco.legs[id];
     const head = L.rig.foot.getWorldPosition(new THREE.Vector3());
@@ -121,7 +129,7 @@ for (const [name, dur, wish, jump] of segs) {
   pitchMax = 0;
   for (let i = 0; i < n; i++) stepSim(wish, !!jump && i === 10);
   const st = loco.snapshot();
-  gaitLog.push(`${name.padEnd(8)} gait=${st.gait.padEnd(6)} speed=${st.speed.toFixed(2)} freq=${st.freq} duty=${st.duty} pitch=${st.pitch} roll=${st.roll} bend=${st.bend} skate=${LEG_IDS.map((k) => k + ':' + (skateLeg[k] * 1000).toFixed(0)).join(' ')}mm pitchMax=${pitchMax.toFixed(2)} bad=${slips.filter((d) => d > 0.005).length}/${slips.length} yaw=${group.rotation.y.toFixed(2)} contacts=${Object.values(st.contacts).map((c) => (c ? 1 : 0)).join('')}`);
+  gaitLog.push(`${name.padEnd(8)} gait=${st.gait.padEnd(6)} speed=${st.speed.toFixed(2)} freq=${st.freq} duty=${st.duty} pitch=${st.pitch} roll=${st.roll} bend=${st.bend} skate=${LEG_IDS.map((k) => k + ':' + (skateLeg[k] * 1000).toFixed(0)).join(' ')}mm torsoErrMaxDeg=${(pitchMax * 57.3).toFixed(1)} bad=${slips.filter((d) => d > 0.005).length}/${slips.length} yaw=${group.rotation.y.toFixed(2)} contacts=${Object.values(st.contacts).map((c) => (c ? 1 : 0)).join('')}`);
   void ikBefore;
 }
 console.log(gaitLog.join('\n'));
@@ -150,4 +158,12 @@ if (process.argv.includes('--switchback')) {
     stepSim(W(dx / d, dz / d)); frames++;
   }
   console.log(`switchback: reached ${idx}/${pts.length} in ${(frames / 60).toFixed(1)} s`);
+}
+if (process.argv.includes('--airtrace')) {
+  for (let i = 0; i < 50; i++) {
+    stepSim(W(0, 0.45), i === 5);
+    const L = loco.legs.LF;
+    const sh = L.rig.chain[0].getWorldPosition(new THREE.Vector3());
+    console.log(i, L.mode, 'tgt rel y', (L.foot.y - sh.y).toFixed(2), 'tgt dist', L.foot.distanceTo(sh).toFixed(2), 'minR', L.rig.minReach.toFixed(2), 'err', (L.err * 1000).toFixed(0), 'wrist rel shoulder y', (L.solved.y - sh.y).toFixed(2), 'z', (L.solved.x - sh.x).toFixed(2));
+  }
 }

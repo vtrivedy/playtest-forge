@@ -274,6 +274,8 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
   debug.add(velArrow);
 
   const groupPos = new THREE.Vector3();
+  /** Group displacement since last frame */
+  const groupDelta = new THREE.Vector3();
   const groupQ = new THREE.Quaternion();
   const bodyQ = new THREE.Quaternion();
 
@@ -331,7 +333,10 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     const p = params;
     resetToRest(rig);
     model.updateMatrixWorld(true);
+    groupDelta.copy(groupPos);
     model.getWorldPosition(groupPos);
+    groupDelta.sub(groupPos).negate();
+    if (groupDelta.lengthSq() > 4) groupDelta.set(0, 0, 0);
     model.getWorldQuaternion(groupQ);
     const yaw = model.rotation.y;
     if (!initialised) {
@@ -613,6 +618,8 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
           }
         }
         if (L.mode === 'air') {
+          // airborne paws ride with the body and ease into the pose relative to it
+          L.foot.add(groupDelta);
           airFoot(L, input, _v2);
           L.foot.lerp(_v2, 1 - Math.exp(-p.airPoseRate * dt));
           L.foot.y = Math.max(L.foot.y, plantY(L, L.foot.x, L.foot.z));
@@ -720,11 +727,11 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       z = fore ? 0.28 : -0.32;
     } else if (input.vel.y > 1.5) {
       // rising: fores folded up under the chest, hinds stretched back from the push
-      y = fore ? 0.3 : 0.1;
-      z = fore ? -0.04 : -0.38;
+      y = fore ? 0.2 : 0.1;
+      z = fore ? -0.18 : -0.38;
     } else if (input.vel.y > -2) {
-      y = fore ? 0.28 : 0.24;
-      z = fore ? 0.04 : 0.08;
+      y = fore ? 0.18 : 0.24;
+      z = fore ? -0.14 : 0.08;
     } else {
       // falling: fores reach down and forward for the catch, hinds tuck
       y = fore ? 0.02 : 0.2;
@@ -770,7 +777,10 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       _v3.copy(js[i]).sub(base);
       js[i].addScaledVector(_plane, -_v3.dot(_plane));
     }
-    fabrik(js, L.rig.lengths, target, _plane, 10);
+    // pole bias: a near-straight seed gives FABRIK no bend side, so nudge the elbow back / stifle forward
+    _v3.set(0, 0, L.rig.fore ? -1 : 1).applyQuaternion(bodyQ);
+    js[1].addScaledVector(_v3, L.rig.reach * 0.12);
+    fabrik(js, L.rig.lengths, target, _plane, 12);
     applyChain(chain, L.rig.foot, js);
     // paw: keep its rest orientation relative to the heading, flex back while swinging
     const pawQ = _q2.copy(groupQ).multiply(footRestQ[L.rig.id]);
