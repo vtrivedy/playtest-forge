@@ -861,7 +861,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       }
     }
   };
-  plankWalk({ x: 55.2, z: 37.5 }, { x: 66, z: 30.5 }, 0.3, 2.0);
+  // Marsh Mouth water washes the missing six metres of boardwalk into a shallow stone crossing.
+  plankWalk({ x: 55.2, z: 37.5 }, { x: 57, z: 36 }, 0.3, 2.0);
+  plankWalk({ x: 62.034, z: 32.736 }, { x: 66, z: 30.5 }, 0.3, 2.0);
 
   /** Marsh tussock: a low peat mound with a flat walkable crown that slumps into the ink. */
   const hummock = (x: number, z: number, rr: number, top: number, seed: number) => {
@@ -1555,7 +1557,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   mkSeedwell('SW3', 'Maple Seedwell', SW3P, 30, 203);
 
   // Kiln inlets: a hearth beside each Seedwell whose updraft rises through a bowl hung over it.
-  // SW1 is the Kiln (world-1.md §3.4). SW2 / SW3 use heat until water (§3.5) and growth (§3.6) ship.
+  // SW1 uses heat; SW2 is fed only by arriving flume water.
   const inletSpots: InletSpot[] = [];
   const kiln = (si: number, id: string, dx: number, dz: number, bowlUp: number, side = 1) => {
     const sw = seedwells[si]!;
@@ -1591,8 +1593,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       hearthSpots.push({ id, x: hx, y: 15, z: hz, height: 9.5 });
     }
   }
-  // HP sits on the island's approach so arriving across the stones brushes it
-  kiln(1, 'HP', 0.8, 2.6, 4.5, -1);
+  // Water's HP launch is on the near aqueduct pier; direct fox colour cannot fill SW2.
+  hearthSpots.push({ id: 'HP', x: 97, y: 6, z: 18, height: 10 });
+  inletSpots.push({ seedwell: 1, source: 'reed-falls', pos: new THREE.Vector3(95, 2.3, 10), sealAt: new THREE.Vector3(95, 2.78, 10), pillar: new THREE.Vector3(95, 2, 10), latchTime: 7 });
   kiln(2, 'HK', 1.68, -1.56, 4.5);
 
   // SW1 Kiln Shade: circles H2 inside its drain reach, pulled in on the Seedwell side so it never leaves
