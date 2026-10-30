@@ -67,7 +67,8 @@ export function createReedmarshRegion(
     new THREE.Vector3(63, 1.1, -12),
     new THREE.Vector3(52, 2.2, -24),
     new THREE.Vector3(40, 4.6, -36),
-    new THREE.Vector3(29, 7.8, -47),
+    new THREE.Vector3(35, 7.8, -48),
+    new THREE.Vector3(32, 9.8, -56),
     new THREE.Vector3(18, 12, -58),
     new THREE.Vector3(14.5, 12, -58),
   ];

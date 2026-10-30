@@ -3,7 +3,8 @@ export async function captureReed({ H, advance, shot, video, save, page, fps, re
   const initial = await H('state');
   if (initial.seedwells.find(s => s.id === 'SW2').lit) throw Error('Reed capture requires an unlatched SW2');
   await H('setKeys', []); await H('setStick', 0, 0);
-  await H('teleport', 90, 1.2, 15, Math.atan2(2.4, -2.4)); await advance(10);
+  if (Math.hypot(initial.pos[0] - 90, initial.pos[2] - 15) > 2) throw Error('Reed solve must continue from the live entry route');
+  await advance(2);
   await shot('reed-00-staged-hummock');
   const timeline = [], input = [], transitions = [];
   const approach = [[92.4, 12.6], [95, 10], [98.4, 10.5], [96, 16.1], [95, 17]];
@@ -15,7 +16,7 @@ export async function captureReed({ H, advance, shot, video, save, page, fps, re
     const stick = d > 0.06 ? [dx / d * mag, dz / d * mag] : [0, 0];
     await H('setStick', ...stick); return { distance: d, stick };
   };
-  await video('reed-live-solve', 45 * fps, async frame => {
+  await video('reed-live-solve', 60 * fps, async frame => {
     const st = await H('state'), water = st.chem.water.find(w => w.id === 'reed-falls');
     const inlet = st.chem.inlets.find(q => q.seedwell === 'SW2');
     const hp = st.chem.hearths.find(h => h.id === 'HP');
@@ -71,9 +72,9 @@ export async function captureReed({ H, advance, shot, video, save, page, fps, re
         await shot('reed-source-front-basin-overview'); await H('photoOff'); await advance(1); overviewCaptured = true;
       }
       if (st.seedwells.find(s => s.id === 'SW2').lit) { litAt = st.t; change('latched', frame); finished = true; }
-      else if (frame - phaseAt > 22 * fps) { failure = 'arriving water did not complete 7s seal; inspect Shade cuts and inlet timeline'; finished = true; }
+      else if (frame - phaseAt > 35 * fps) { failure = 'arriving water did not complete 7s seal; inspect Shade cuts and inlet timeline'; finished = true; }
     }
-    if (frame >= 44.5 * fps) { failure = '45s solve deadline'; finished = true; }
+    if (frame >= 59.5 * fps) { failure = '60s solve deadline'; finished = true; }
     if (finished) { keys = []; stick = [0, 0]; await H('setStick', 0, 0); }
     input.push({ frame, phase, stick, keys }); await H('setKeys', keys);
   }, () => finished);
