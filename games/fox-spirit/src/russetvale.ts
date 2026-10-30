@@ -407,7 +407,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(29.5, 8.5, 10);
   WS(36.5, -1.2, 10);
   WS(36.5, -8.8, 14);
-  WS(35.7, -4, 14);
+  WS(36.4, -4, 14);
   WS(38.8, 2.5, 14);
   WS(39.7, 2.5, 14, { act: 'glide', label: 'wind-gap' });
   WS(62.3, 0.6, 14);
