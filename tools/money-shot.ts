@@ -12,7 +12,8 @@
  * meta.json and money-shot.mp4 (ffmpeg, H.264, fps).
  */
 import { chromium } from 'playwright';
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+import { createServer, type ViteDevServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,21 +61,11 @@ type State = {
   look: { grade: number; quality: string };
 };
 
-let vite: ChildProcess | undefined;
+let vite: ViteDevServer | undefined;
 try {
-  vite = spawn('npx', ['vite', '--config', 'games/fox-spirit/vite.config.ts', '--host', '127.0.0.1', '--port', String(port)], {
-    cwd: root,
-    stdio: 'ignore',
-    detached: true,
-  });
-  for (let t = Date.now(); Date.now() - t < 45_000; ) {
-    try {
-      await fetch(url);
-      break;
-    } catch {
-      await new Promise((r) => setTimeout(r, 250));
-    }
-  }
+  // in-process server, no HMR / file watching: edits landing mid-capture must not reload the page
+  vite = await createServer({ root, configFile: path.join(root, 'games/fox-spirit/vite.config.ts'), server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'error' });
+  await vite.listen();
   const browser = await chromium.launch({
     headless: true,
     args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
@@ -186,11 +177,5 @@ try {
   if (ff.status !== 0) throw new Error('ffmpeg failed');
   if (!stillsOnly) console.log(`wrote ${mp4}`);
 } finally {
-  if (vite?.pid) {
-    try {
-      process.kill(-vite.pid, 'SIGTERM');
-    } catch {
-      /* */
-    }
-  }
+  await vite?.close();
 }
