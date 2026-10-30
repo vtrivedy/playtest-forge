@@ -948,6 +948,25 @@ try {
       await shot(`flow-${seg.name}-end`);
     }
   }
+  if (wants('reachsafe')) {
+    await boot(quality,true);await H('forceRestore');await advance(660,false);
+    // Explicit staged setup for a supply-loss stress test; basin/float/seal states stay simulated.
+    await H('teleport',171,30,-130,Math.PI/2);await advance(20,false);
+    await H('teleport',173,30,-116,Math.PI/2);await advance(60,false);
+    await H('teleport',188,30,-129,Math.PI/2);await H('photo',[170,44,-103],[188,33,-123],52);
+    await video('reach-retained-supply-loss',8*fps,async i=>{
+      if(i===3*fps)await page.evaluate(()=>window.__gameHooks.chem.colorDrains.push(p=>p.x>170&&p.x<178));
+    },undefined,{keyFrames:[0,2*fps,4*fps,6*fps]});
+    const held=await H('state');save('reach-retention-acceptance.json',held);
+    if(!held.reach.retained||held.reach.restored||held.reach.seal>0||!held.grounded)report.failures.push('Occupied float retention or no-false-latch test failed');
+    const t0=held.t;
+    await H('photoOff');await H('setStick',-1,0);
+    await video('reach-boarding-recovery',8*fps,async()=>{},st=>st.deaths>held.deaths&&Math.hypot(st.pos[0]-171,st.pos[2]+130)<3);
+    await H('setStick',null);await shot('reach-recovered-bank');
+    const recovered=await H('state'),seconds=recovered.t-t0;
+    save('reach-recovery-acceptance.json',{seconds,deathsBefore:held.deaths,deathsAfter:recovered.deaths,end:recovered});
+    if(recovered.deaths!==held.deaths+1||seconds>10||Math.hypot(recovered.pos[0]-171,recovered.pos[2]+130)>3)report.failures.push('Reach boarding recovery exceeded safe checkpoint contract');
+  }
   if (wants('reachview')) {
     await boot(quality,true);await H('forceRestore');await advance(660,false);
     // Staged source hold uses real colour supply; no basin, seal or float state is assigned.
