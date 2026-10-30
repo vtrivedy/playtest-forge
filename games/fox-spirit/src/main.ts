@@ -48,7 +48,7 @@ function worldMat(color: number, opts: Partial<THREE.MeshStandardMaterialParamet
 // --- Autumn island (rich chroma under mask; reads sepia until awakened) ---
 const island = new THREE.Group();
 scene.add(island);
-const top = new THREE.Mesh(new THREE.CylinderGeometry(11, 12, 1.4, 48), worldMat(0x6b8f3a));
+const top = new THREE.Mesh(new THREE.CylinderGeometry(11, 12, 1.4, 48), worldMat(0x8a7a32));
 top.receiveShadow = true;
 top.castShadow = true;
 island.add(top);
@@ -484,8 +484,8 @@ function tick() {
     shrineOn = true;
     mask.shrines[0]!.activated = true;
     status = 'won';
-    scene.background = new THREE.Color(0xd4a86a);
-    scene.fog = new THREE.FogExp2(0xd4a86a, 0.014);
+    scene.background = new THREE.Color(0xe0b070);
+    scene.fog = new THREE.FogExp2(0xc48a50, 0.012);
     crystal.material = new THREE.MeshStandardMaterial({
       color: 0xffcc66,
       emissive: 0xff7700,
