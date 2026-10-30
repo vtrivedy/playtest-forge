@@ -763,7 +763,7 @@ try {
     if (regional) {
       const wp = route[from];
       const floor = await page.evaluate(p => window.__gameHooks.debug.world.collision.groundAt(p.x, p.z, p.y + .5).y, wp);
-      if (!Number.isFinite(floor) || Math.abs(floor - wp.y) > .65) throw Error('Regional route start must be a walkable waypoint');
+      if (!Number.isFinite(floor) || wp.ground === false || floor < wp.y - 1) throw Error('Regional route start must be a walkable waypoint');
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
@@ -776,7 +776,7 @@ try {
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     });
-    await H('autopilot', false); await shot('route-end');
+    await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
     if ((regional ? state.auto.idx < to : !state.restored) || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {

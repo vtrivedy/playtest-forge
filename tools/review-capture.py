@@ -91,16 +91,24 @@ def main():
         print(f'Starting {shot}: {folder}', flush=True)
         with (folder / 'modal.log').open('w') as log:
             result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
-        sheet, sheet_error = None, None
+        sheet, sheet_error, transport_warning = None, None, None
+        effective_exit = result.returncode
         try:
             sheet = contact_sheet(folder)
             metadata = json.loads((folder / 'run.json').read_text())
             if metadata['commit'] != ref or metadata['shots'] != shot:
                 raise ValueError('Fetched capture belongs to a different commit or shot')
+            report = json.loads((folder / 'report.json').read_text())
+            if metadata.get('status', 'success') == 'failed' or report.get('failures') or report.get('errors'):
+                effective_exit = effective_exit or 1
+            elif effective_exit and metadata.get('status') == 'success':
+                transport_warning = f'Modal client exited {result.returncode}; durable same-commit/shot capture completed and report passed'
+                effective_exit = 0
         except Exception as error:
             sheet_error = str(error)
-        print(f"{shot}: exit={result.returncode or (1 if sheet_error else 0)}; sheet={sheet}; files={folder}; error={sheet_error}", flush=True)
-        return {'shot': shot, 'exit': result.returncode or (1 if sheet_error else 0), 'sheetError': sheet_error, 'path': str(folder), 'sheet': str(sheet) if sheet else None}
+            effective_exit = effective_exit or 1
+        print(f"{shot}: exit={effective_exit}; sheet={sheet}; files={folder}; error={sheet_error}; transport={transport_warning}", flush=True)
+        return {'shot': shot, 'exit': effective_exit, 'rawClientExit': result.returncode, 'transportWarning': transport_warning, 'sheetError': sheet_error, 'path': str(folder), 'sheet': str(sheet) if sheet else None}
 
     with ThreadPoolExecutor(max_workers=min(3, len(shots))) as pool:
         results = list(pool.map(capture, shots))
