@@ -872,6 +872,26 @@ try {
     },st=>reached&&st.reach.restored||st.deaths>0||age>12,{keyFrames:[0,10*fps,20*fps,25*fps]});
     await H('setKeys',[]);await H('setStick',null);await advance(30);await shot('reach-end');
     const end=await H('state');save('reach-acceptance.json',{phase,reached,end});
+    if(reached&&end.reach.restored){
+      await H('photo',[167,48,-99],[190,32,-121],52);
+      let cycle=0,cycleAge=0,cyclePaint=false;
+      const lowSeen={value:false};
+      await video('reach-level-cycle',30*fps,async()=>{
+        const st=await H('state');cycleAge+=1/fps;
+        const targets=[[201,36,-121],[201,36,-121],[181,30,-128],[181,30,-128],[173,30,-124],[173,30,-124]];
+        const p=targets[cycle],dx=p[0]-st.pos[0],dz=p[2]-st.pos[2],d=Math.hypot(dx,dz);
+        const ready=cycle===1?st.reach.fill<.02:cycle===3?cycleAge>1.2:cycle===5?st.reach.fill>.99:d<.8&&st.pos[1]>=p[1]-.5;
+        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;cycle++;cycleAge=0;cyclePaint=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
+        const t=targets[cycle],vx=t[0]-st.pos[0],vz=t[2]-st.pos[2],len=Math.hypot(vx,vz);
+        await H('setStick',len>.25?vx/len*Math.min(.8,len):0,len>.25?vz/len*Math.min(.8,len):0);
+        const keys=cycle===2||cycle===3&&cycleAge>.3?['Space']:[];
+        if([0,3,4].includes(cycle)&&len<2.8&&!cyclePaint){keys.push('ShiftLeft');cyclePaint=true;}
+        await H('setKeys',keys);
+      },st=>cycle===5&&st.reach.level==='high'&&st.reach.fill>.99||st.deaths>end.deaths||cycleAge>10,{keyFrames:[0,4*fps,8*fps,12*fps,16*fps]});
+      await H('setKeys',[]);await H('setStick',null);await shot('reach-cycle-end');
+      const cy=await H('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,end:cy});
+      if(cycle!==5||!lowSeen.value||cy.reach.fill<.99)report.failures.push('Reach reversible water cycle incomplete');
+    }
     // Staged architecture views are separate from the real summit-to-basin traversal above.
     await H('teleport',150,38,-96,Math.PI/2);await H('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reach-overview');
     await H('teleport',187,end.reach.raftHeight,-118,Math.PI/2);await H('photo',[172,43,-99],[194,34,-121],52);await advance(2);await shot('reach-ferry-and-bell');
