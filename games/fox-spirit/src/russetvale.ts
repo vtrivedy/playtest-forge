@@ -565,6 +565,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // stair flight helper in terrace frame (collider ramp + stone steps)
   type FlightOpts = { crumbleStart?: boolean; crumbleEnd?: boolean };
+  /** Leaf drifts collected while building (stair feet, cheek walls, arch feet); scattered at the end. */
+  const drifts: Array<{ x: number; y: number; z: number; r: number; n: number }> = [];
+  const archAt = (b: Bucket, x: number, y: number, z: number, yaw: number, o: Parameters<typeof ruinArch>[5] = {}) => {
+    ruinArch(b, x, y, z, yaw, o);
+    const span = o.span ?? 3.2;
+    for (const side of [-1, 1]) {
+      const d = span / 2 + 0.45;
+      drifts.push({ x: x + Math.cos(yaw) * side * d, y, z: z - Math.sin(yaw) * side * d, r: 0.9, n: 22 });
+    }
+  };
   const flightT = (s0: number, t0: number, y0: number, s1: number, t1: number, y1: number, width: number, seed: number, o: FlightOpts = {}) => {
     const a = sp(s0, t0);
     const b = sp(s1, t1);
@@ -594,6 +604,17 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     foot = Math.max(Math.min(a.y, b.y) - 8, Math.min(foot, Math.min(a.y, b.y)) - 0.3);
     col.add(boxCollider({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, w: width, d: len, yaw, top: a.y, top1: b.y, bottom: Math.min(a.y, b.y) - 1, tag: 'stair' }));
     stairFlight(bk('stone', a.x, a.z), a, b, width, seed, { open, foot, ...o });
+    // leaves bank up at the foot of the flight and along the foot of open cheek walls
+    drifts.push({ x: a.x - Math.sin(yaw) * 0.9, y: a.y, z: a.z - Math.cos(yaw) * 0.9, r: width * 0.6, n: 34 });
+    for (const side of [0, 1] as const) {
+      if (!open[side]) continue;
+      const k = (side === 0 ? -1 : 1) * (width / 2 + 0.75);
+      for (let t = 0.15; t < 1; t += 2.4 / Math.max(2.4, len)) {
+        const cx = a.x + (b.x - a.x) * t + px * k;
+        const cz = a.z + (b.z - a.z) * t + pz * k;
+        drifts.push({ x: cx, y: col.highestAt(cx, cz), z: cz, r: 0.9, n: 16 });
+      }
+    }
   };
   // R1 entrance stair (0 → 2), straight up the front
   flightT(-6.5, 0, 0.1, 0.4, 0, 2, 3.4, 1);
@@ -703,7 +724,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     for (let i = 0; i < ruinsT.length; i++) {
       const [s, t, y, yo, brk] = ruinsT[i]!;
       const p = sp(s, t);
-      ruinArch(bk('stone', p.x, p.z), p.x, y, p.z, T_YAW + yo, { span: 3, pillarH: 3.6 + (i % 2), seed: 40 + i, broken: brk, pointed: i % 2 === 1 });
+      archAt(bk('stone', p.x, p.z), p.x, y, p.z, T_YAW + yo, { span: 3, pillarH: 3.6 + (i % 2), seed: 40 + i, broken: brk, pointed: i % 2 === 1 });
     }
     const colsT: Array<[number, number, number, number]> = [
       [3, 12, 2, 2.4],
@@ -841,7 +862,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   col.add(cylCollider({ x: SW2P.x, z: SW2P.z, r: 5, top: 2, bottom: -3, tag: 'sw2-island' }));
   slab({ x: SW2P.x, z: SW2P.z, w: 10, d: 10, top: 2, bottom: -2.4, round: true, rough: 0.5, seed: 61, topColor: PAL.stone.clone().lerp(PAL.moss, 0.3) });
   // sunken ruin walls round the island
-  ruinArch(bk('stone', 99, 6), 99.5, 2, 6.5, 0.8, { span: 2.6, pillarH: 3, seed: 71, broken: 0.6 });
+  archAt(bk('stone', 99, 6), 99.5, 2, 6.5, 0.8, { span: 2.6, pillarH: 3, seed: 71, broken: 0.6 });
   ruinColumn(bk('stone', 91, 5), 91, 2, 6.5, 2.2, 72);
   ruinColumn(bk('stone', 100, 13), 99.5, 2, 13.5, 3.4, 73);
 
@@ -1304,6 +1325,29 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       for (let h2 = 0; h2 < 2; h2++) hangingRoot(bk('bark', cx, cz), tr, cx + (tr() - 0.5) * w * 0.7, top - 0.3, cz + (tr() - 0.5) * dd * 0.7, 2 + tr() * 4, new THREE.Vector2(0, 0), 0.07 + tr() * 0.07);
     }
   }
+  // crags along the row lips: jointed rock teeth break the long straight shelf edges
+  {
+    const cr = rng(2151);
+    for (let i = 0; i < rows.length; i++) {
+      const rw = rows[i]!;
+      for (const side of [-1, 1]) {
+        let x = 9.4 + cr() * 1.5;
+        while (x < rw.hw - 1.2) {
+          const w = 1.3 + cr() * 1.2;
+          const h = 0.7 + cr() * 1.1;
+          const px = side * (x + w / 2);
+          const pz = rw.z0 - 0.15 - cr() * 0.4;
+          // keep clear of the ruins standing on the strip behind the lip
+          const ruinX = ([[-12], [12.5], [-11, 10.5], [], []] as number[][])[i]!;
+          if (!ruinX.some((rx) => Math.abs(px - rx) < 2.8)) {
+            slab({ x: px, z: pz, w, d: 1.2 + cr() * 0.8, yaw: (cr() - 0.5) * 0.6, top: rw.top + h, bottom: rw.top - 2.5, rough: 0.8, seed: 2160 + i * 20 + Math.round(x), topColor: null, overhang: 0.2, roughTop: 0.5 });
+            col.add(cylCollider({ x: px, z: pz, r: w * 0.42, top: rw.top + h - 0.25, bottom: rw.top - 1, tag: 'crag' }));
+          }
+          x += w + 1.8 + cr() * 3.5;
+        }
+      }
+    }
+  }
   // foliage spilling over the row lips: hanging sprays soften the long shelf edges
   {
     const dr = rng(2101);
@@ -1339,9 +1383,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   flight({ x: 1.8, z: -77.5, y: 29.6 }, { x: 6.6, z: -77.5, y: 32.8 }, 2.4, 155, { crumbleStart: true });
   flight({ x: 6.6, z: -80.5, y: 32.8 }, { x: -6.6, z: -80.5, y: 38 }, 2.6, 156);
   // ruins on the rows (arches, columns) — key-art silhouette
-  ruinArch(bk('stone', -12, -71), -12, 17.2, -71.6, 0, { span: 3.2, pillarH: 3.8, seed: 160, pointed: true });
-  ruinArch(bk('stone', 12, -74), 12.5, 22.4, -74.6, 0.1, { span: 2.8, pillarH: 3.2, seed: 161, broken: 0.6 });
-  ruinArch(bk('stone', -11, -77), -11, 27.6, -77.6, -0.1, { span: 3, pillarH: 3.6, seed: 162, broken: 0.3 });
+  archAt(bk('stone', -12, -71), -12, 17.2, -71.6, 0, { span: 3.2, pillarH: 3.8, seed: 160, pointed: true });
+  archAt(bk('stone', 12, -74), 12.5, 22.4, -74.6, 0.1, { span: 2.8, pillarH: 3.2, seed: 161, broken: 0.6 });
+  archAt(bk('stone', -11, -77), -11, 27.6, -77.6, -0.1, { span: 3, pillarH: 3.6, seed: 162, broken: 0.3 });
   ruinColumn(bk('stone', 10, -78), 10.5, 27.6, -77.8, 2.6, 163);
   ruinColumn(bk('stone', -10, -81), -8.7, 32.8, -80.9, 3.4, 164);
   ruinColumn(bk('stone', 11, -81), 8.9, 32.8, -80.7, 1.6, 165);
@@ -1352,8 +1396,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const wsGlowB = new Bucket();
   domedShrine(bk('stone', 0, -89), wsGlowB, WSP.x, WSP.y, WSP.z, 1.3, 170);
   col.add(boxCollider({ x: WSP.x, z: WSP.z, w: 6.0, d: 6.0, top: WSP.y + 0.5, bottom: WSP.y - 1, tag: 'shrine-plinth' }));
-  ruinArch(bk('stone', -8, -88), -8.5, 38, -86.5, 0.25, { span: 3.4, pillarH: 4.4, seed: 171, pointed: true });
-  ruinArch(bk('stone', -7, -94), -6.5, 38, -94, -0.3, { span: 3, pillarH: 3.6, seed: 172, broken: 0.5 });
+  archAt(bk('stone', -8, -88), -8.5, 38, -86.5, 0.25, { span: 3.4, pillarH: 4.4, seed: 171, pointed: true });
+  archAt(bk('stone', -7, -94), -6.5, 38, -94, -0.3, { span: 3, pillarH: 3.6, seed: 172, broken: 0.5 });
   ruinColumn(bk('stone', 9, -85), 9, 38, -84.5, 2.2, 173);
   // swept flagstone apron round the plinth (ragged outer edge), broken flags along the
   // worn path from the stair head, leaf drifts banked at the plinth corners and arch feet
@@ -1381,6 +1425,22 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
     const lr2 = rng(177);
     const onSummit = (px: number, pz: number) => col.highestAt(px, pz);
+    // red undergrowth: round the lone maple's roots and along the summit's flanks and back
+    const sumHues = [PAL.maple, PAL.crimson, PAL.russet, PAL.amber];
+    const bushAt = (bx: number, bz: number, size: number) => {
+      const g = col.highestAt(bx, bz);
+      if (Math.abs(g - 38) > 0.6) return;
+      shrub(bk('leaf', bx, bz, false), lr2, bx, g, bz, size, sumHues[Math.floor(lr2() * sumHues.length)]!);
+    };
+    for (let k = 0; k < 9; k++) {
+      const a = (k / 9) * Math.PI * 2 + lr2() * 0.5;
+      const d = 2.2 + lr2() * 1.6;
+      bushAt(8.5 + Math.cos(a) * d, -92.5 + Math.sin(a) * d, 0.6 + lr2() * 0.5);
+    }
+    for (let z = -84; z > -97; z -= 1.6 + lr2() * 1.4) {
+      for (const side of [-1, 1]) if (lr2() < 0.7) bushAt(side * (11.6 + lr2() * 1.6), z, 0.55 + lr2() * 0.5);
+    }
+    for (let x = -12; x < 12; x += 1.8 + lr2() * 1.6) if (Math.abs(x) > 4.6 && lr2() < 0.7) bushAt(x, -96.4 + lr2() * 0.8, 0.6 + lr2() * 0.5);
     for (const [px, pz, rad, n] of [
       [-3.4, -85.6, 1.3, 70], [3.4, -85.6, 1.1, 55], [-3.5, -92.4, 1.4, 70], [3.5, -92.3, 1.2, 60],
       [8.5, -92.5, 3.2, 220], [6.4, -90.5, 1.6, 70], [-8.5, -86.4, 1.4, 60], [-6.6, -94, 1.6, 70], [9, -84.5, 1.0, 40],
@@ -1476,11 +1536,11 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   {
     const y = groundRaw(0, 85);
-    ruinArch(bk('stone', 0, 85), 0, y - 0.1, 85, 0.06, { span: 3.6, pillarH: 4.2, seed: 250, pointed: true });
+    archAt(bk('stone', 0, 85), 0, y - 0.1, 85, 0.06, { span: 3.6, pillarH: 4.2, seed: 250, pointed: true });
     const y2 = groundRaw(10, 64);
-    ruinArch(bk('stone', 10, 64), 10.5, y2 - 0.1, 64, 0.9, { span: 3.2, pillarH: 3.4, seed: 251, broken: 0.55 });
+    archAt(bk('stone', 10, 64), 10.5, y2 - 0.1, 64, 0.9, { span: 3.2, pillarH: 3.4, seed: 251, broken: 0.55 });
     const y3 = groundRaw(-8, 42);
-    ruinArch(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
+    archAt(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
   }
   // Wen's pond
   const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x3a3024, colorShallow: 0x7a6a50 });
@@ -1636,6 +1696,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         }
         litterPatch(bk('litter', x, z, false), thr, x, z, 3.2, 26, (px, pz) => groundAtCover(px, pz));
       }
+    }
+    for (const d of drifts) {
+      litterPatch(bk('litter', d.x, d.z, false), lr, d.x, d.z, d.r, d.n, (px, pz) => {
+        const g = groundAtCover(px, pz);
+        return Math.abs(g - d.y) < 0.45 ? g : NaN;
+      });
     }
     // Amberwood floor: thick leaf fall under each maple
     for (const [x, z] of AMBER_TREES) litterPatch(bk('litter', x, z, false), lr, x, z, 8, 110, (px, pz) => groundAtCover(px, pz));

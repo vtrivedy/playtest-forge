@@ -28,7 +28,8 @@ try {
   const r = await fetch(`http://127.0.0.1:${port}/`);
   if (!r.ok) throw new Error('down');
 } catch {
-  server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
+  // no HMR / file watching: source edits during a long autopilot run must not reload the page
+  server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port, host: '127.0.0.1', strictPort: true, hmr: false, watch: null }, logLevel: 'error' });
   await server.listen();
 }
 
