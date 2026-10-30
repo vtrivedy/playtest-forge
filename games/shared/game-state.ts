@@ -23,7 +23,7 @@ export type GameState = {
   loseCondition?: string;
   notes?: string[];
   feel?: FeelSnapshot;
-  shades?: { wisps: number; hits: number; frees: number; invulnerable: number; knockbackTravel: number; actors: Array<{ id: string; pos: number[]; freed: boolean }> };
+  shades?: { wisps: number; hits: number; frees: number; invulnerable: number; knockbackTravel: number; tun?: Record<string, number | boolean>; actors: Array<{ id: string; pos: number[]; freed: boolean }> };
   /** Game-specific systemic state (e.g. fox-spirit colour chemistry) */
   chem?: unknown;
 };

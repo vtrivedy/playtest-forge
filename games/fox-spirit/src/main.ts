@@ -469,7 +469,7 @@ async function boot() {
       const p = new THREE.Vector3(...shades.state()[0]!.pos as [number, number, number]);
       const weak = supplyAt(p);
       const draining = shades.drains(p);
-      return { p: p.toArray(), draining, weak };
+      return { p: p.toArray(), draining, weak, raw: colorField.sample(p), stroke: colorField.strokeAt(p) };
     },
     hasClips: foxActor.hasClips,
     shades: { state: () => ({ ...shadeContact.state(), actors: shades.state() }), tun: shades.tun, drains: (x: number, y: number, z: number) => shades.drains(new THREE.Vector3(x, y, z)) },
@@ -555,6 +555,7 @@ async function boot() {
       };
     },
     teleport(x: number, y: number, z: number, yaw = Math.PI) {
+      shades.resetSweep();
       foxActor.group.position.set(x, y + foxActor.feetOffset + 0.05, z);
       foxActor.group.rotation.y = yaw;
       prevFeet = y + 0.05;
@@ -648,7 +649,7 @@ async function boot() {
         chem: { ...updrafts.state(), shades: shades.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
-        shades: { ...shadeContact.state(), actors: shades.state() },
+        shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
         audio: audio.debug(),
         restore: { phase: restore.phase, age: restore.age, floodAge: restore.floodAge, frontRadius: restore.frontRadius, inputLocked: restore.inputLocked, path: cam.pathState() },
         auto: {
@@ -741,6 +742,7 @@ async function boot() {
   const clock = new THREE.Clock();
 
   function respawn() {
+    shades.resetSweep();
     shadeContact.respawn();
     const p = world.respawnPos();
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
@@ -1143,6 +1145,8 @@ async function boot() {
         hud.setPrompt('The Keeping loosens. A memory returns.');
         hud.hidePromptSoon(3);
       } else if (shadeContact.hit(fox.position, e.pos, shades.tun.knockback, shades.tun.invulnerability)) {
+        vel.y = Math.max(vel.y, 4.2);
+        grounded = false;
         cam.shake(0.2);
         foxActor.pulse(0.4);
         audio.play('hazard');
@@ -1286,7 +1290,7 @@ async function boot() {
       status,
       score: lit * 250 + (shrineOn ? 1000 : 0),
       lives: shadeContact.wisps,
-      shades: { ...shadeContact.state(), actors: shades.state() },
+      shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
       elapsedSec: Number(elapsed.toFixed(2)),
       deaths,
       backend,

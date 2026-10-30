@@ -214,16 +214,24 @@ try {
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
     if (!actors.length) throw Error('No Shade encounter authored');
     save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
+    let contactDirection = null;
     const camera = async () => {
       const [x,y,z] = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
-      await H('photo', [x + 4.5, y + 3.2, z + 6], [x, y + 1.4, z], 48);
+      const centre = await page.evaluate(() => {
+        const p=window.__gameHooks.debug.world.shadeSpots[0].patrol;
+        return [p.reduce((a,q)=>a+q[0],0)/p.length,p.reduce((a,q)=>a+q[2],0)/p.length];
+      });
+      let dx=x-centre[0],dz=z-centre[1];const d=Math.hypot(dx,dz)||1;
+      const dir=contactDirection??[dx/d,dz/d];
+      await H('photo', [x + dir[0]*7, y + 3.2, z + dir[1]*7], [x, y + 1.2, z], 48);
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(([x,y,z]) => {
       const col = window.__gameHooks.debug.world.collision;
-      for (let k=0;k<64;k++) {
-        const a=k/64*Math.PI*2, px=x+Math.cos(a)*3.6, pz=z+Math.sin(a)*3.6;
-        if (!col.blocked(px,pz,y) && Math.abs(col.groundAt(px,pz,y+.1).y-y)<.2) return [px,y,pz];
+      const patrol=window.__gameHooks.debug.world.shadeSpots[0].patrol;
+      for(let px=-117;px<=-107;px+=.25)for(let pz=-29;pz<=-19;pz+=.25){
+        if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2)continue;
+        if(patrol.every(q=>Math.hypot(q[0]-px,q[2]-pz)>2.1))return [px,y,pz];
       }
       throw Error('No safe patrol observer position');
     }, start);
@@ -233,6 +241,9 @@ try {
     save('shade-drain-probe.json', probe);
     await camera();
     await video('shade-patrol', 180, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 45, 90, 135, 179] });
+    await H('photoOff');
+    await advance(2);
+    await shot('shade-chase');
     await H('setKeys', []);
     let p = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
     const contactSetup = await page.evaluate(([x,y,z]) => {
@@ -249,6 +260,7 @@ try {
       throw Error('No 3m wall-free contact direction');
     }, p);
     save('shade-contact-setup.json', contactSetup);
+    contactDirection = contactSetup.direction;
     await H('teleport', ...contactSetup.pos, Math.PI);
     await camera();
     await video('shade-contact', 90, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 89] });
@@ -267,6 +279,7 @@ try {
     await H('teleport', ...dashSetup.pos, dashSetup.yaw);
     await H('setStick', ...dashSetup.direction);
     await H('setKeys', ['ShiftLeft']);
+    contactDirection = [-dashSetup.direction[0],-dashSetup.direction[1]];
     await camera();
     await video('shade-free', 210, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }

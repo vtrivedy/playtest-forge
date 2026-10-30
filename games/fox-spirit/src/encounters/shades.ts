@@ -19,7 +19,7 @@ type ShadeActor = {
   curve: THREE.CatmullRomCurve3;
   length: number;
   u: number;
-  speed: number;
+  speed?: number;
   pos: THREE.Vector3;
   heading: number;
   group: THREE.Group;
@@ -36,11 +36,14 @@ type ShadeActor = {
 
 /** Bake the licensed library animal in one authored gallop pose. No live skeleton or hero code. */
 async function animalGeometry(): Promise<THREE.BufferGeometry> {
-  const gltf = await new GLTFLoader().loadAsync('/assets/library/fox/quaternius_fox.glb');
+  const gltf = await new GLTFLoader().loadAsync('/assets/library/animals/quaternius_deer.glb');
   const mixer = new THREE.AnimationMixer(gltf.scene);
   const clip = gltf.animations.find(c => c.name === 'Gallop')!;
   mixer.clipAction(clip).play();
   mixer.setTime(clip.duration * 0.32);
+  // A caught memory, with the head sunk slightly into the shoulders rather than hunting.
+  const neck = gltf.scene.getObjectByName('Neck3');
+  if (neck) neck.rotation.x += 0.22;
   gltf.scene.updateMatrixWorld(true);
   const parts: THREE.BufferGeometry[] = [];
   const v = new THREE.Vector3();
@@ -93,9 +96,9 @@ function inkMaterial(): THREE.ShaderMaterial {
       void main() {
         vec3 p = position;
         // wavering: the ink never quite holds still; it boils more toward the feet
-        float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.12 + 0.03;
+        float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.15 + 0.1;
         p += normal * (n3(p * 3.0 + vec3(0.0, uTime * 1.3, uSeed)) - 0.5) * w * 2.0;
-        p.x += sin(uTime * 1.7 + p.y * 2.0 + uSeed) * 0.03;
+        p.x += sin(uTime * 1.7 + p.y * 2.0 + uSeed) * 0.075;
         // freeing: the body lifts and spreads as it comes apart
         p += normal * (1.0 - uPresence) * 0.35;
         vP = p; vY = p.y;
@@ -115,12 +118,12 @@ function inkMaterial(): THREE.ShaderMaterial {
         if (n < cut) discard;
         float rim = pow(1.0 - abs(dot(vN, vV)), 2.2);
         // pressed ink: near-black umber core, a thin paper-pale rim like dried wash at the edge
-        vec3 core = vec3(0.045, 0.035, 0.03);
+        vec3 core = vec3(0.012, 0.008, 0.005);
         vec3 edge = vec3(0.13, 0.09, 0.055);
         vec3 col = mix(core, edge, rim * 0.32 + smoothstep(cut, cut + 0.06, n) * 0.0);
         col = mix(col, edge * 0.8, 1.0 - smoothstep(cut, cut + 0.05, n));
         col = mix(col, vec3(0.16, 0.078, 0.033), n * 0.12);
-        gl_FragColor = vec4(col, 0.96);
+        gl_FragColor = vec4(col, 0.98 - rim * 0.18);
         #include <colorspace_fragment>
         #include <fog_fragment>
       }`,
@@ -160,6 +163,7 @@ export type ShadeSystem = {
   drains: (p: THREE.Vector3) => boolean;
   /** Advance patrols; returns contact/free events for the fox */
   update: (dt: number, t: number, fox: THREE.Vector3, dashing: boolean) => Array<{ type: 'freed' | 'hit'; id: string; pos: THREE.Vector3 }>;
+  resetSweep: () => void;
   state: () => Array<{ id: string; pos: number[]; freed: boolean }>;
 };
 
@@ -202,12 +206,13 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed ?? tun.speed, pos: new THREE.Vector3(), heading: 0, group, mat, pool, presence: 1, freed: false };
+    return { leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: new THREE.Vector3(), heading: 0, group, mat, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
   const sys: ShadeSystem = {
     tun,
+    resetSweep() { previousFox = null; },
     drains(p) {
       for (const s of shades) if (!s.freed && Math.hypot(p.x - s.pos.x, p.z - s.pos.z) < tun.drainRadius && Math.abs(p.y - s.pos.y) < 4) return true;
       return false;
@@ -240,7 +245,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           s.group.visible = s.presence > 0;
           s.pool.visible = s.presence > 0;
         } else {
-          s.u = (s.u + (dt * (spots.find(q => q.id === s.id)?.speed ?? tun.speed)) / s.length) % 1;
+          s.u = (s.u + (dt * (s.speed ?? tun.speed)) / s.length) % 1;
           s.curve.getPointAt(s.u, s.pos);
           s.curve.getTangentAt(s.u, tmp);
           s.heading = Math.atan2(tmp.x, tmp.z);
@@ -248,9 +253,9 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           const gy = groundAt(s.pos.x, s.pos.z, s.pos.y + 2);
           if (Number.isFinite(gy)) s.pos.y = gy;
           // Sweep the fox segment so a fast dash cannot skip a narrow animal between frames.
-          // Teleports are staging/reset operations, never attacks through the whole realm.
+          // Teleport/reset hooks explicitly clear the previous endpoint.
           let nearest = fox;
-          if (previousFox && previousFox.distanceToSquared(fox) < 25) {
+          if (previousFox) {
             const segment = new THREE.Line3(previousFox, fox);
             nearest = segment.closestPointToPoint(s.pos, true, new THREE.Vector3());
           }
@@ -286,7 +291,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     },
   };
   if (gui) {
-    const f = gui.addFolder('Chem › Shade');
+    const f = gui.addFolder('Encounters › Shades');
     f.add(tun, 'drainRadius', 1, 6, 0.1);
     f.add(tun, 'hitRadius', 0.5, 2.5, 0.05);
     f.add(tun, 'knockback', 0, 6, 0.1).name('knockback metres');

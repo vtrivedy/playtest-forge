@@ -89,7 +89,7 @@ are the evidence. Staged resets are explicitly recorded; route remains unassiste
 
 ## Sprint 2 Shade encounter
 The Keeping caught a woodland animal mid-stride. Its enlarged, vertically drawn
-Quaternius CC0 fox silhouette floats in a warm ink wash, wavering without a walk
+Quaternius CC0 deer silhouette floats in a warm ink wash, wavering without a walk
 cycle. SW1's authored loop is the first playable encounter. A 3 m drain suppresses
 weak temporary supply; fresh dash strokes and permanent restoration still win.
 Contact costs one of three wisps, grants one second of grace and pushes the fox

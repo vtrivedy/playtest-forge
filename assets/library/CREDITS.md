@@ -66,6 +66,9 @@ Same Quaternius file already mirrored at `assets/hero/source/fox_quaternius_raw.
 Free downloads work headless with `scene_uuid` and no API key. Realistic / paid animal rigs require `preferences.addons['blenderkit'].preferences.api_key` — **needs Vivek login; do not create accounts**.
 
 ## Shade memory animal (Sprint 2)
-`fox/quaternius_fox.glb` — Quaternius, Ultimate Animated Animals, **CC0 1.0**.
-The Shade encounter bakes its Gallop clip at 32% into a frozen, elongated ink
-silhouette. No new model or texture license. Falling leaf geometry is original code.
+`animals/quaternius_deer.glb` — **Deer by Quaternius**, Ultimate Animated Animals,
+**CC0 1.0**. Pack: https://quaternius.com/packs/ultimateanimatedanimals.html
+Download mirror: https://poly.pizza/m/T6Cs7tmMHJ (retrieved 2026-10-30).
+Binary: https://static.poly.pizza/4b6c2a41-43c7-404c-ae37-e8c4645ff93b.glb
+The encounter bakes Gallop at 32%, lowers the neck slightly, and draws a tall
+warm ink silhouette. Original falling leaf geometry is generated in code.
