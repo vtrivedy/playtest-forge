@@ -136,7 +136,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         const d = (s.p.x - x) ** 2 + (s.p.z - z) ** 2;
         if (d < distance) { distance = d; nearest = s; }
       }
-      if (distance < (w.spot.width * 0.48) ** 2) return nearest.wet;
+      if (distance < (w.spot.width * 0.5) ** 2) return nearest.wet;
     }
     return null;
   }

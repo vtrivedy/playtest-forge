@@ -386,14 +386,17 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // A · Arrival Meadow
   W(0, 0, 90, { label: 'portal' });
   W(0, 0, 80, { label: 'cp-meadow' });
-  W(6, 0, 70);
+  W(4.5, groundRaw(4.5, 74.2), 74.2, { label: 'lift:H-a', act: 'glide' });
+  W(13, groundRaw(13, 75.5) + 5, 75.5, { ground: false, act: 'glide', label: 'meadow-vista' });
+  W(21, 0, 64);
   W(22, 0, 58);
   W(42, 0, 46);
   W(54, 0, 40, { label: 'cp-marsh' });
   // C · Reedmarsh — boardwalk, hummock, ghost-ink stones, SW2 island
   W(56.65, 0.3, 36.3, { ground: false, label: 'wash:marsh-mouth' });
-  W(60.0, -0.05, 34.05, { ground: false });
-  W(62.034, -0.05, 32.736, { ground: false });
+  W(58, -0.05, 35.3516, { ground: false, label: 'channel' });
+  W(60.0, -0.05, 34.0548, { ground: false, label: 'channel' });
+  W(62.034, -0.05, 32.736, { ground: false, label: 'channel' });
   W(64.5, 0.3, 31.4, { ground: false });
   W(68.5, 0.4, 28.2, { ground: false, act: 'jump' });
   W(73.5, 0.25, 25, { ground: false, act: 'jump' });
@@ -733,6 +736,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   flightT(62.3, 0.4, 14, 62.3, 9.8, 18, 2.4, 6);
   // R6 lateral flight on k5 (18 → 22)
   flightT(66, 9.8, 18, 66, 0.4, 22, 2.4, 7);
+
+  // R6 ends at s66, two metres before the y22 terrace starts at s68.
+  // A matching stone apron joins them; without it the fox drops back to y18
+  // and the next terrace becomes a four-metre wall.
+  {
+    const p = sp(67, 0.1);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 3, d: 4, yaw: T_YAW, top: 22, bottom: 21.4, tag: 'r6-landing' }));
+    slab({ x: p.x, z: p.z, w: 3, d: 4, yaw: T_YAW, top: 22, bottom: 21.4, rough: 0.3, seed: 76, topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
+  }
 
   // windmills (towers static, blades animated)
   type Mill = { hub: THREE.Group; pos: THREE.Vector3; spin: number };

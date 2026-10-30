@@ -79,3 +79,6 @@ wonder/challenge: meadow 2 → H0 5 → terrace recovery 3 → wind gap 6
 - [ ] Record jump/air/dash metrics; no skating verdict without locomotion review.
 - [x] Design contains no orb threshold; permanent restore adds a traversal verb.
 - [ ] Review actual GPU images against soft animated realism, fix named failures, capture again.
+
+## R6 transition repair (driver flow review13:36)
+R6 reaches y22 at constant s66, while the y22 terrace begins s68. A fox running toward the next waypoint falls into that two-metre seam and meets a four-metre wall. Add a y22 stone apron covering s65..69, t−1.4..1.6, with matching collider and cap. Its lower edge meets the ramp only after ramp height≥21.48, within0.6m auto-step. Preserve all movement tunables. Verify from cp-mills through R6 and the kiln launch via live input, zero assists.
