@@ -340,3 +340,10 @@ Dress the already shipped Crown/Reach shelf undersides and bridge bays with the
 existing hanging-spire/ruin kit. Keep every platform top, collider and route fixed.
 Add arched structural silhouettes below the thin causeway so it reads as an old
 aqueduct rather than a screen-space line. No new traversal or gate is added.
+
+### Color mask overlap correction
+Render mask sources with per-pixel MAX blending, matching gameplay's strongest-
+source rule. Additive blending saturated dozens of overlapping trail stamps
+while idle, turning a feathered aura into a hard disc. Keep sources, radius,
+lifetime and CPU supply evaluation unchanged. Let permanently restored ground
+recover full authored chroma and a mild warm lift; temporary ground stays muted.
