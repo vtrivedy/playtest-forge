@@ -78,3 +78,13 @@ A nonzero Modal client exit can follow a completed durable capture. The helper
 recovers that case only when the fetched commit/shot match, `run.json` explicitly
 says success, and `report.json` has no failures/errors. It records the raw client
 exit and transport warning. Gameplay failures stay nonzero.
+
+For a 720p milestone from an existing shot, use
+`python3 tools/review-capture.py <ref> --shots showcase --size 1280x720 --fps 30`.
+The same report verification and fetching apply. Gait requires60fps.
+
+Durable recovery verifies commit/shot, size/fps, route bounds, and matching
+run/report capture-tool hashes. Failed Modal retries preserve previous files in
+`attempt-NNN/` before writing fresh root artifacts. Route acceptance records an
+explicit reason in `route-acceptance.json`; sheets put the endpoint last and add
+waypoint/death labels from the captured state.

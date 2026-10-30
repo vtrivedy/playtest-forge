@@ -6,7 +6,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { boxCollider, type CollisionWorld } from '../collision';
 
-export type WaterSpot = { id: string; lip: THREE.Vector3; foot: THREE.Vector3; path: THREE.Vector3[]; width: number; wash?: boolean; probes?: THREE.Vector3[]; channel?: boolean; gate?: boolean };
+export type WaterSpot = { id: string; realm?: string; lip: THREE.Vector3; foot: THREE.Vector3; path: THREE.Vector3[]; width: number; wash?: boolean; probes?: THREE.Vector3[]; channel?: boolean; gate?: boolean };
 type Parcel = { head: number; tail: number; live: boolean };
 export const waterSpots: WaterSpot[] = [{
   id: 'marsh-mouth', lip: new THREE.Vector3(57, 3.5, 36), foot: new THREE.Vector3(57, 0, 36),
@@ -155,7 +155,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   return {
     tun, waters,
     arriving(id: string) { return waters.some(w => w.spot.id === id && w.arriving); },
-    restoreAll() { for (const w of waters) w.reactor.restored = true; },
+    restoreAll() { for (const w of waters) if (!w.spot.realm || w.spot.realm === 'russetvale') w.reactor.restored = true; },
     restoreWithin(pos: THREE.Vector3, radius: number) { for (const w of waters) if (Math.hypot(w.spot.lip.x - pos.x, w.spot.lip.z - pos.z) <= radius) w.reactor.restored = true; },
     update(dt: number, time: number, supply: SupplyFn, drainedAt?: (p: THREE.Vector3) => boolean) {
       for (const w of waters) {

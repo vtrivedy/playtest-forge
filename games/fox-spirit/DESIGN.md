@@ -274,3 +274,9 @@ Water critique correction: reduce the falls' local lamp from 2–5 to 0.8–2 li
 units and give the marsh ink subtle animated normals plus a soft highlight
 shoulder. It remains dark hazard ink; only surface response changes. Restored
 falls acquire a warmer ochre tint. Retest the water crossing and lifecycle.
+### Opus capture audit follow-up — 15:36 ET
+Preserve failed retry files below attempt-N directories before writing a fresh
+attempt, preventing mixed sheets. Verify durable success against route interval,
+size/fps, and matching report/tool hashes. Order route evidence chronologically
+with endpoint last and state labels. Save structured route acceptance with an
+explicit stall/budget/death/assist reason. Existing play failures remain failures.
