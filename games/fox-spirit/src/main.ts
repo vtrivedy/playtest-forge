@@ -1,3 +1,7 @@
+import { createWind, type WindForce } from './chem/wind';
+import { createShades } from './encounters/shades';
+import { ShadeContact } from './encounters/contact';
+import { createWater } from './chem/water';
 import * as THREE from 'three';
 import GUI from 'lil-gui';
 import { publishGame } from '../../shared/game-state';
@@ -112,7 +116,11 @@ async function boot() {
   const sunDir = new THREE.Vector3(-0.3, 0.17, -0.94).normalize();
   lights.rim.position.copy(sunDir).multiplyScalar(20);
   lights.rim.intensity = 1.55;
-  const fog = applyHeightFog(scene, { density: 0.0042 });
+  // late-afternoon key: low (≈27°) and amber, so trunks, ruins and the fox throw long soft shadows
+  lights.key.position.set(14, 9, 11);
+  lights.key.color.set(0xffc58a);
+  // mist pools in the valleys and the void below the realm; summits and landmarks stay legible
+  const fog = applyHeightFog(scene, { density: 0.0042, height: 0, heightFalloff: 0.045 });
   const sky = createPaintedSky(scene, {
     zenith: new THREE.Color(0x7f7aa6),
     mid: new THREE.Color(0xe2a060),
@@ -225,6 +233,8 @@ async function boot() {
     enableGTAO: quality.gtao,
     bloom: quality.bloom,
     smaa: quality.smaa,
+    // soft brush-dab finish toward the key art's painted look (GPU tiers only)
+    painterly: quality.bloom ? 0.55 : 0,
     pixelRatio: renderer.getPixelRatio(),
   });
 
@@ -345,21 +355,32 @@ async function boot() {
     },
   });
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
+  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
   /**
    * Colour drains (world-1.md §1.2): encounters register predicates here (Shades: within 3 m). Inside a drain
    * reactors read aura/trail and spent strokes (≤ 1) as 0, and an unsupplied reactor skips its hold.
    */
   const colorDrains: Array<(p: THREE.Vector3) => boolean> = [];
   const drainedAt = (q: THREE.Vector3) => colorDrains.some((f) => f(q));
+  colorDrains.push(shades.drains);
   const supplyAt = (q: THREE.Vector3) => {
     if (!drainedAt(q)) return colorField.sample(q);
     return colorField.strokeAt(q) > 1 ? 1 : 0;
   };
+  const shadeContact = new ShadeContact();
+  let shadeKnockbackFloor: number | null = null;
+  const wind = createWind(scene, world.windSpots, { gui });
+  const windF: WindForce = { k: 0, tx: 0, ty: 0, tz: 0, px: 0, py: 0, pz: 0 };
+  const water = createWater(scene, world.collision, gui);
+  world.waterWashedAt = water.washedAt;
+  world.waterInkAt = water.inkAt;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
     for (const h of updrafts.hearths) if (Math.hypot(h.base.x - sw.pos.x, h.base.z - sw.pos.z) <= sw.radius) h.reactor.restored = true;
+    wind.restoreNear(sw.pos, sw.radius);
+    water.restoreWithin(sw.pos, sw.radius);
     const inlet = inlets.inlets.find((q) => q.seedwell === i);
     if (inlet) inlet.latched = true;
     const ev = world.latchSeedwell(i);
@@ -394,7 +415,7 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
   let inColumn = false;
-  const baseJumpTrack = cam.params.jumpTrack;
+  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
   let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
   const dashStruck = new Set<Hearth>();
@@ -432,6 +453,7 @@ async function boot() {
   fLook.add(post.params, 'highlightCap', 1, 6, 0.05);
   fLook.add(post.params, 'vignette', 0, 1, 0.01);
   fLook.add(post.params, 'grain', 0, 0.05, 0.001);
+  fLook.add(post.params, 'painterly', 0, 1, 0.01);
   fLook.add(fog, 'density', 0, 0.012, 0.0001).name('fog').onChange(() => syncFog(scene, fog));
   for (const k of ['sepia', 'restored'] as const) {
     const f = fLook.addFolder(`grade ${k}`);
@@ -540,6 +562,13 @@ async function boot() {
     __gameHooks?: Record<string, unknown>;
   };
   win.__gameHooks = {
+    shadesProbe() {
+      const p = new THREE.Vector3(...shades.state()[0]!.pos as [number, number, number]);
+      const weak = supplyAt(p);
+      const draining = shades.drains(p);
+      return { p: p.toArray(), draining, weak, raw: colorField.sample(p), stroke: colorField.strokeAt(p) };
+    },
+    shades: { state: () => ({ ...shadeContact.state(), actors: shades.state() }), tun: shades.tun, drains: (x: number, y: number, z: number) => shades.drains(new THREE.Vector3(x, y, z)) },
     hasClips: foxActor.hasClips,
     foxLook: FOX_LOOK,
     gym: gaitGym ? { slopeDegrees: 15, origin: gaitGym.spawn.toArray() } : null,
@@ -552,7 +581,7 @@ async function boot() {
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
-    chem: { updrafts, inlets, colorDrains, supplyAt },
+    chem: { water, updrafts, inlets, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
     teleportToShrine() {
       const p = world.wellspringPos;
@@ -626,6 +655,7 @@ async function boot() {
       };
     },
     teleport(x: number, y: number, z: number, yaw = Math.PI) {
+      shades.resetSweep();
       foxActor.group.position.set(x, y + foxActor.feetOffset + 0.05, z);
       foxActor.group.rotation.y = yaw;
       foxActor.locomotion?.reset();
@@ -717,9 +747,10 @@ async function boot() {
       return {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
-        chem: { ...updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
+        shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
         audio: audio.debug(),
         restore: { phase: restore.phase, age: restore.age, floodAge: restore.floodAge, frontRadius: restore.frontRadius, inputLocked: restore.inputLocked, path: cam.pathState() },
         auto: {
@@ -767,6 +798,7 @@ async function boot() {
   function handleEvents(events: ReturnType<typeof world.update>) {
     for (const e of events) {
       if (e.type === 'seedwell') {
+        shadeContact.wisps = 3;
         const s = world.seedwells[e.index]!;
         colorField.restore(s.pos, s.radius, 3.2);
         autumnFX.swirl(s.pos, 40, 1.6);
@@ -782,6 +814,7 @@ async function boot() {
       } else if (e.type === 'bridge') {
         audio.play('bridge');
       } else if (e.type === 'checkpoint') {
+        shadeContact.wisps = 3;
         audio.play('checkpoint');
       } else if (e.type === 'wellspring') {
         if (!shrineOn && restore.phase === 'idle') triggerFlood();
@@ -813,6 +846,8 @@ async function boot() {
   const clock = new THREE.Clock();
 
   function respawn() {
+    shades.resetSweep();
+    shadeContact.respawn();
     const p = world.respawnPos();
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
     prevFeet = p.y + 0.1;
@@ -1078,11 +1113,16 @@ async function boot() {
 
     // ember updraft at the feet (chem/updraft.ts): lift factor k, axis for steering/centering
     updrafts.liftAt(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z, lift);
+    wind.forceAt(fox.position, windF);
     const enteredColumn = lift.k > 0.02 && !inColumn && !grounded;
     inColumn = lift.k > 0.02 && !grounded;
     if (enteredColumn) cam.punch(3);
     // ride framing: the lens follows the full rise in a column (normal jumps keep the partial track)
-    cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, inColumn || (gliding && lift.k > 0) ? 1 : baseJumpTrack, 3, dt);
+    const riding = inColumn || (gliding && lift.k > 0);
+    cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, riding ? 1 : baseCam.jumpTrack, 3, dt);
+    // and rides above the fox, pulled in, looking down the column (the source stays in frame, the sun leaves it)
+    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 2.4 : baseCam.height, 2.2, dt);
+    cam.params.glideDistance = THREE.MathUtils.damp(cam.params.glideDistance, riding ? baseCam.glideDistance - 0.9 : baseCam.glideDistance, 2.2, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
     glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
@@ -1092,6 +1132,12 @@ async function boot() {
       // ride the column: vy eases toward the lift target (no snap at the column edge)
       const vTarget = THREE.MathUtils.lerp(-feel.glideSink, updrafts.tun.maxRise, lift.k);
       vel.y = THREE.MathUtils.damp(vel.y, vTarget, updrafts.tun.liftResponse, dt);
+      vel.x *= Math.exp(-feel.glideDrag * dt);
+      vel.z *= Math.exp(-feel.glideDrag * dt);
+    } else if (gliding && windF.k > 0) {
+      // ride the wind: sink mostly held, plus the current's own climb/descent
+      const vTarget = -feel.glideSink * (1 - wind.tun.hold * windF.k) + windF.ty * wind.tun.push * windF.k;
+      vel.y = THREE.MathUtils.damp(vel.y, vTarget, 3, dt);
       vel.x *= Math.exp(-feel.glideDrag * dt);
       vel.z *= Math.exp(-feel.glideDrag * dt);
     } else if (gliding) {
@@ -1125,6 +1171,13 @@ async function boot() {
         const d = Math.hypot(dx, dz);
         if (d > 0.05) desired.add(new THREE.Vector3(dx / d, 0, dz / d).multiplyScalar(updrafts.tun.centerPull * lift.radialK));
       }
+      if (gliding && windF.k > 0) {
+        // the current carries the glider along it and gently back toward its core
+        desired.x += windF.tx * wind.tun.push * windF.k;
+        desired.z += windF.tz * wind.tun.push * windF.k;
+        const pd = Math.hypot(windF.px, windF.pz);
+        if (pd > 0.3) desired.add(new THREE.Vector3(windF.px / pd, 0, windF.pz / pd).multiplyScalar(wind.tun.centerPull * windF.k * Math.min(1, pd / 2)));
+      }
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
       cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
@@ -1157,6 +1210,41 @@ async function boot() {
       const turnStep=d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
       fox.rotation.y += THREE.MathUtils.clamp(turnStep,-4.5*dt,4.5*dt);
     }
+
+    shadeContact.update(dt, (dx, dz) => {
+      const beforeX = fox.position.x, beforeZ = fox.position.z;
+      const fy = fox.position.y - foxActor.feetOffset;
+      const safe = (x: number, z: number) => {
+        if (col.blocked(x, z, fy)) return false;
+        // A hit on safe ground must not add an unavoidable >6 m drop to its wisp cost.
+        if (shadeKnockbackFloor !== null && col.groundAt(x, z, fy + 0.2).y < shadeKnockbackFloor) return false;
+        return true;
+      };
+      if (safe(fox.position.x + dx, fox.position.z)) fox.position.x += dx;
+      if (safe(fox.position.x, fox.position.z + dz)) fox.position.z += dz;
+      return Math.hypot(fox.position.x - beforeX, fox.position.z - beforeZ);
+    });
+    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
+      if (e.type === 'freed') {
+        shadeContact.frees++;
+        hitstop = 0.08;
+        cam.shake(0.12);
+        audio.play('bridge');
+        hud.setPrompt('The Keeping loosens. A memory returns.');
+        hud.hidePromptSoon(3);
+      } else if (shadeContact.hit(fox.position, e.pos, shades.tun.knockback, shades.tun.invulnerability)) {
+        shadeKnockbackFloor = grounded ? fox.position.y - foxActor.feetOffset - 6 : null;
+        vel.y = Math.max(vel.y, 4.2);
+        grounded = false;
+        cam.shake(0.2);
+        foxActor.pulse(0.4);
+        audio.play('hazard');
+        hud.setPrompt(`${shadeContact.wisps} ember wisps · Dash through the ink to free it`);
+        hud.hidePromptSoon(3);
+        if (shadeContact.wisps === 0) { respawn(); deaths++; }
+      }
+    }
+
 
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
     const speed = Math.hypot(vel.x, vel.z);
@@ -1217,7 +1305,9 @@ async function boot() {
       }
     }
     colorField.update(dt);
+    water.update(dt, simClock, supplyAt, drainedAt);
     updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
+    wind.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
     colorField.glows.length = 0;
     hearthLeafT += dt;
@@ -1228,7 +1318,7 @@ async function boot() {
       // keep leaves riding a burning column, near the fox only (shared leaf pool)
       if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
     }
-    for (const i of inlets.update(dt, (q) => { const h = updrafts.hearths.find((x) => x.spot.id === q.source); return !!h && heatFeeds(h, q.pos, updrafts.tun.radius); })) latchSeedwell(i);
+    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); const h = updrafts.hearths.find((x) => x.spot.id === q.source); return !!h && heatFeeds(h, q.pos, updrafts.tun.radius); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
@@ -1351,12 +1441,13 @@ async function boot() {
       title: 'Fox Spirit — Russetvale',
       status,
       score: lit * 250 + (shrineOn ? 1000 : 0),
-      lives: 1,
+      lives: shadeContact.wisps,
+      shades: { ...shadeContact.state(), tun: { ...shades.tun }, actors: shades.state() },
       elapsedSec: Number(elapsed.toFixed(2)),
       deaths,
       backend,
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
-      chem: { updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
+      chem: { water: water.state(), updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [
         `zone=${zone}`,
         `seedwells=${world.seedwells.map((q) => `${q.id}:${q.lit ? 1 : 0}`).join(',')}`,

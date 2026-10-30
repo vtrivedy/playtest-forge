@@ -64,3 +64,25 @@ Same Quaternius file already mirrored at `assets/hero/source/fox_quaternius_raw.
 
 ## BlenderKit note
 Free downloads work headless with `scene_uuid` and no API key. Realistic / paid animal rigs require `preferences.addons['blenderkit'].preferences.api_key` — **needs Vivek login; do not create accounts**.
+
+## Shade memory animal (Sprint 2)
+`animals/quaternius_stag.glb` — **Stag by Quaternius**, Ultimate Animated Animals,
+**CC0 1.0**. Pack: https://quaternius.com/packs/ultimateanimatedanimals.html
+Download mirror: https://poly.pizza/m/tQdzbZ1Cmw (retrieved 2026-10-30).
+Binary: https://static.poly.pizza/a9c69fbc-bf7c-4585-9a49-a82e0be1ac6b.glb
+The encounter bakes Walk at 32%, borrows its authored head-low neck pose, and
+renders a tall wavering ink silhouette with its original antlers. Falling maple
+leaf geometry is original code.
+
+## Quaternius Stylized Nature MegaKit pieces — via Poly Pizza (CC0)
+Packed into `assets/env/quaternius/nature.glb` by `tools/blender/scripts/pack_quaternius_nature.py`
+(textures deduplicated, 512 px WebP). Author: Quaternius (https://quaternius.com/packs/stylizednaturemegakit.html). License: **CC0 1.0**.
+Download: `https://poly.pizza/m/<id>` → `static.poly.pizza/<uuid>.glb`.
+
+| Piece | Poly Pizza id | Use |
+|-------|---------------|-----|
+| twisted_1..5 | 8oraKn9m0x, 7PDBpElkQr, GVTsMmuzv7, 9aWlx82xUf, edSPJNECM7 | Twisted maples (Amberwood, meadow, islets) |
+| tree_1..5 | YWjGDJ9F7g, t9KbsfYdXz, aVOxaHRPWe, QVOop92WmG, qZtx0AHhcy | Rounder medium trees |
+| dead_1..2 | Mcd2zYqyww, MlmK5488ou | Dead trees |
+| bush_red, bush_leafy | EoTERLq3z2, ooG6CkLyE8 | Bushes |
+| fern, grass_wispy | jqcanvH7D6, Msr9zx66VU | Ground cover |

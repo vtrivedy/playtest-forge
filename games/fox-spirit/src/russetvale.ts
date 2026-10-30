@@ -25,11 +25,9 @@ import {
   litterPatch,
   shrub,
   pushLeaf,
-  maple,
   hangingRoot,
   islandUnderside,
   hangingSpire,
-  type MapleOpts,
   setSite,
   paving,
   talus,
@@ -38,6 +36,8 @@ import {
 import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } from './russetTextures';
 import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
+import type { WindSpot } from './chem/wind';
+import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -82,10 +82,14 @@ export type Realm = {
   checkpoints: Array<{ pos: THREE.Vector3; lit: boolean }>;
   /** Heat-element placements (visuals + lift live in chem/updraft.ts) */
   hearthSpots: HearthSpot[];
+  waterInkAt?: (x: number, z: number) => boolean;
+  waterWashedAt?: (x: number, z: number) => boolean;
   /** Seedwell inlets: each latches only from an element's output (world-1.md §1.4) */
   inletSpots: InletSpot[];
   /** Shade patrols (world-1.md §3.8) */
   shadeSpots: ShadeSpot[];
+  /** Wind currents (world-1.md §1.3 wind; §3.3 beat 6 wind river) */
+  windSpots: WindSpot[];
   /** An inlet's seal filled: light the Seedwell (permanent colour, checkpoint, its route) */
   latchSeedwell: (index: number) => RealmEvent[];
   respawnPos: () => THREE.Vector3;
@@ -244,9 +248,41 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   M.rock.color.setScalar(1.25);
   M.rock.normalScale.set(1.1, 1.1);
   for (const m of [M.leaf, M.litter]) leafCutout(m, atlas);
+  for (const m of [M.leaf, M.reed]) nearCameraFade(m);
+  stoneWeathering(M.stone, new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg'));
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
+  const nature = await loadNatureKit();
+  // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
+  // yaw picked to keep foliage out of the route's jump arcs
+  const TREE_HUES: Array<[THREE.Color, THREE.Color]> = [
+    [PAL.maple, PAL.copper],
+    [PAL.russet, PAL.crimson],
+    [PAL.amber, PAL.maple],
+    [PAL.gold, PAL.amber],
+  ];
+  const kitTree = (x: number, y: number, z: number, h: number, ci: number, seed: number, o: { avoid?: NonNullable<PlaceOpts['avoid']>; cast?: boolean; collide?: boolean } = {}) => {
+    const tr = rng(seed * 7919 + 13);
+    const v: NatureVariant = h >= 12 || tr() < 0.6 ? TWISTED[Math.floor(tr() * TWISTED.length)]! : ROUND[Math.floor(tr() * ROUND.length)]!;
+    const scale = (h / nature.height(v)) * (0.9 + tr() * 0.25);
+    let yaw = tr() * Math.PI * 2;
+    if (o.avoid?.length) {
+      let best = Infinity;
+      for (let k = 0; k < 8; k++) {
+        const a = yaw + (k / 8) * Math.PI * 2;
+        const n = nature.blocked(v, x, y, z, { yaw: a, scale, avoid: o.avoid });
+        if (n < best) {
+          best = n;
+          yaw = a;
+        }
+        if (n === 0) break;
+      }
+    }
+    const [hue, hue2] = TREE_HUES[ci % TREE_HUES.length]!;
+    nature.place(v, x, y - 0.15, z, { yaw, scale, hue, hue2, bark: new THREE.Color(0.95, 0.85, 0.78), avoid: o.avoid, cast: o.cast, gaps: 0.3 });
+    if (o.collide !== false) col.add(cylCollider({ x, z, r: nature.trunkR(v) * scale + 0.15, top: y + h * 0.5, bottom: y - 1, tag: 'trunk' }));
+  };
 
   // Spatial buckets: material × 64 m cell, so frustum culling still works on merged meshes.
   const buckets = new Map<string, { b: Bucket; mat: THREE.Material; cast: boolean }>();
@@ -582,12 +618,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   type FlightOpts = { crumbleStart?: boolean; crumbleEnd?: boolean };
   /** Leaf drifts collected while building (stair feet, cheek walls, arch feet); scattered at the end. */
   const drifts: Array<{ x: number; y: number; z: number; r: number; n: number }> = [];
+  // pier feet + outward direction: undergrowth reclaims the ruins from outside the opening
+  const ruinFeet: Array<{ x: number; y: number; z: number; dx: number; dz: number }> = [];
   const archAt = (b: Bucket, x: number, y: number, z: number, yaw: number, o: Parameters<typeof ruinArch>[5] = {}) => {
     ruinArch(b, x, y, z, yaw, o);
     const span = o.span ?? 3.2;
     for (const side of [-1, 1]) {
       const d = span / 2 + 0.45;
       drifts.push({ x: x + Math.cos(yaw) * side * d, y, z: z - Math.sin(yaw) * side * d, r: 0.9, n: 22 });
+      ruinFeet.push({ x: x + Math.cos(yaw) * side * d, y, z: z - Math.sin(yaw) * side * d, dx: Math.cos(yaw) * side, dz: -Math.sin(yaw) * side });
     }
   };
   const flightT = (s0: number, t0: number, y0: number, s1: number, t1: number, y1: number, width: number, seed: number, o: FlightOpts = {}) => {
@@ -823,7 +862,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       }
     }
   };
-  plankWalk({ x: 55.2, z: 37.5 }, { x: 66, z: 30.5 }, 0.3, 2.0);
+  // Marsh Mouth water washes the missing six metres of boardwalk into a shallow stone crossing.
+  plankWalk({ x: 55.2, z: 37.5 }, { x: 57, z: 36 }, 0.3, 2.0);
+  plankWalk({ x: 62.034, z: 32.736 }, { x: 66, z: 30.5 }, 0.3, 2.0);
 
   /** Marsh tussock: a low peat mound with a flat walkable crown that slumps into the ink. */
   const hummock = (x: number, z: number, rr: number, top: number, seed: number) => {
@@ -1219,40 +1260,23 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   let bridgeGrowing = false;
 
   // Amberwood giant maples (20) + the camera/route kept clear of crowns
-  const avoid: NonNullable<MapleOpts['avoid']> = [];
+  const avoid: NonNullable<PlaceOpts['avoid']> = [];
   for (const w of route) {
     if (w.y > 2.5 || (w.z < 10 && w.z > -50)) {
       avoid.push({ x: w.x, y: w.y + 1, z: w.z, r: 3.5 });
       avoid.push({ x: w.x, y: w.y + 3.4, z: w.z + 6.4, r: 3.5 });
     }
   }
-  const crownHues = [PAL.maple, PAL.russet, PAL.amber, PAL.gold];
   for (let i = 0; i < AMBER_TREES.length; i++) {
     const [x, z, h, ci] = AMBER_TREES[i]!;
     const y = groundRaw(x, z);
-    maple(bk('bark', x, z), bk('leaf', x, z), x, y, z, {
-      height: h,
-      trunkR: h * 0.06,
-      leaf: crownHues[ci]!,
-      seed: 300 + i,
-      lean: 0.08,
-      density: 0.8,
-      avoid,
-    });
-    col.add(cylCollider({ x, z, r: h * 0.06 + 0.2, top: y + h * 0.6, bottom: y - 1, tag: 'trunk' }));
+    kitTree(x, y, z, h, ci, 300 + i, { avoid });
   }
-  // crown above the Seedwell maple's hollow (kept off the route by `avoid`)
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2 + 0.4;
-    maple(bk('bark', SW3P.x, SW3P.z), bk('leaf', SW3P.x, SW3P.z), SW3P.x + Math.cos(a) * 2.6, SW3P.y - 2, SW3P.z + Math.sin(a) * 2.6, {
-      height: 10,
-      trunkR: 0.6,
-      lean: 0.45,
-      leaf: crownHues[k % 4]!,
-      seed: 700 + k,
-      density: 0.8,
-      avoid,
-    });
+  // split crown above the Seedwell maple's hollow: three kit maples fanning out of the rim
+  // (kept off the route by `avoid`)
+  for (let k = 0; k < 3; k++) {
+    const a = (k / 3) * Math.PI * 2 + 0.4;
+    kitTree(SW3P.x + Math.cos(a) * 2.4, SW3P.y - 1.5, SW3P.z + Math.sin(a) * 2.4, 11, k, 700 + k, { avoid, collide: false });
   }
 
   // ==================================================================== WELLSPRING HILL
@@ -1487,17 +1511,11 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   }
   // stairs down the summit's front (key art: stair flight to the shrine)
-  // lone maple — keeps a faint russet before the flood, flares after
-  const loneMat = new THREE.MeshStandardMaterial({ name: 'rv-lone-maple', vertexColors: true, roughness: 0.75, side: THREE.DoubleSide });
-  leafCutout(loneMat, atlas);
-  const loneLeaves = new Bucket();
-  const loneBark = bk('bark', 8, -92);
-  maple(loneBark, loneLeaves, 8.5, 38, -92.5, { height: 15, trunkR: 0.9, lean: 0.28, leaf: PAL.maple, seed: 999, crownR: 4.2, density: 2.4 });
-  col.add(cylCollider({ x: 8.5, z: -92.5, r: 1.1, top: 46, bottom: 37, tag: 'lone-trunk' }));
-  const loneMesh = loneLeaves.toMesh(loneMat)!;
-  loneMesh.userData.isOccluder = true;
+  // lone maple (the key-art tree over the shrine stair) — keeps a faint russet before the flood, flares after
+  const loneMesh = nature.standalone('twisted_4', 8.5, 37.8, -92.5, { name: 'rv-lone-maple', yaw: 2.3, scale: 0.9, gaps: 0.36, hue: PAL.maple, hue2: PAL.amber, bark: new THREE.Color(0.9, 0.8, 0.72) });
+  col.add(cylCollider({ x: 8.5, z: -92.5, r: nature.trunkR('twisted_4') * 0.9 + 0.2, top: 46, bottom: 37, tag: 'lone-trunk' }));
   group.add(loneMesh);
-  const loneCol = loneMesh.geometry.attributes.color as THREE.BufferAttribute;
+  const loneCol = loneMesh.geometry.getAttribute('color') as THREE.BufferAttribute;
   const loneFull = Float32Array.from(loneCol.array as Float32Array);
   const loneFaded = Float32Array.from(loneFull);
   {
@@ -1506,7 +1524,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     for (let i = 0; i < loneFaded.length; i += 3) {
       c.setRGB(loneFull[i]!, loneFull[i + 1]!, loneFull[i + 2]!);
       const l = c.r * 0.3 + c.g * 0.59 + c.b * 0.11;
-      c.lerp(sep.clone().multiplyScalar(0.5 + l), 0.55);
+      c.lerp(sep.clone().multiplyScalar(0.3 + l * 0.8), 0.6);
       loneFaded[i] = c.r;
       loneFaded[i + 1] = c.g;
       loneFaded[i + 2] = c.b;
@@ -1540,7 +1558,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   mkSeedwell('SW3', 'Maple Seedwell', SW3P, 30, 203);
 
   // Kiln inlets: a hearth beside each Seedwell whose updraft rises through a bowl hung over it.
-  // SW1 is the Kiln (world-1.md §3.4). SW2 / SW3 use heat until water (§3.5) and growth (§3.6) ship.
+  // SW1 uses heat; SW2 is fed only by arriving flume water.
   const inletSpots: InletSpot[] = [];
   const kiln = (si: number, id: string, dx: number, dz: number, bowlUp: number, side = 1) => {
     const sw = seedwells[si]!;
@@ -1576,8 +1594,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       hearthSpots.push({ id, x: hx, y: 15, z: hz, height: 9.5 });
     }
   }
-  // HP sits on the island's approach so arriving across the stones brushes it
-  kiln(1, 'HP', 0.8, 2.6, 4.5, -1);
+  // Water's HP launch is on the near aqueduct pier; direct fox colour cannot fill SW2.
+  hearthSpots.push({ id: 'HP', x: 95, y: 6, z: 18, height: 10 });
+  inletSpots.push({ seedwell: 1, source: 'reed-falls', pos: new THREE.Vector3(95, 2.3, 10), sealAt: new THREE.Vector3(95, 2.78, 10), pillar: new THREE.Vector3(95, 2, 10), latchTime: 7 });
   kiln(2, 'HK', 1.68, -1.56, 4.5);
 
   // SW1 Kiln Shade: circles H2 inside its drain reach, pulled in on the Seedwell side so it never leaves
@@ -1596,11 +1615,31 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
     shadeSpots.push({ id: 'shade-kiln', patrol });
   }
+  // Wind river (§3.3 beat 6): from the top of H2's column over the Kiln, east above the Amberwood crowns,
+  // down onto the arena's west rim. Woken briefly by colour at the Seedwell; flows for good once SW1 latches
+  // (permanent route 1 up the hill: a plain glide from the column top covers ≈ 50 m of the ≈ 95 m).
+  const windSpots: WindSpot[] = [];
+  {
+    const sw = seedwells[0]!.pos;
+    const h2 = hearthSpots.find((h) => h.id === 'H2')!;
+    windSpots.push({
+      id: 'wind-river',
+      source: [sw.x, sw.y + 1, sw.z],
+      path: [
+        [h2.x, 27.5, h2.z],
+        [-95, 28.5, -28],
+        [-75, 28.5, -37],
+        [-55, 27.5, -48],
+        [-34, 24.5, -61],
+        [-18, 15.5, -65],
+      ],
+    });
+  }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
   const lanternMat = glowMat('rv-glow-lanterns');
-  lanternMat.emissiveIntensity = 0.05;
+  lanternMat.emissiveIntensity = 0.65;
   patchable.push(lanternMat);
   const checkpoints: Realm['checkpoints'] = [];
   const lanternB = new Bucket();
@@ -1616,6 +1655,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const y = y0 === 0 ? groundRaw(x, z) : y0;
     lanternPost(bk('stone', x, z), lanternB, x, y, z, 220 + i);
     col.add(cylCollider({ x, z, r: 0.45, top: y + 2.6, bottom: y - 1, tag: 'lantern' }));
+    const lampLight = new THREE.PointLight(0xffbf72, 3.5, 7, 2);
+    lampLight.position.set(x, y + 2.1, z); group.add(lampLight);
     checkpoints.push({ pos: new THREE.Vector3(x - 1.6, y, z), lit: false });
   }
   const lanternMesh = lanternB.toMesh(lanternMat, { cast: false });
@@ -1640,9 +1681,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     archAt(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
   }
   // Wen's pond
-  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x3a3024, colorShallow: 0x7a6a50 });
+  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x393c30, colorShallow: 0x827657 });
   pond.mesh.position.set(POND.x, POND.water, POND.z);
-  (pond.material.uniforms.uSky!.value as THREE.Color).set(0x5e5244);
+  pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
+  (pond.material.uniforms.uSky!.value as THREE.Color).set(0xb5a17a);
   {
     // Wen's dock
     const a = { x: -6, z: 72 };
@@ -1657,21 +1699,45 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   }
   // meadow + realm maples (medium) and boulders
+  const rockFoot: Array<{ x: number; z: number; r: number }> = [];
   for (let i = 0; i < MEADOW_TREES.length; i++) {
     const [x, z, h, ci] = MEADOW_TREES[i]!;
     const y = groundRaw(x, z);
-    maple(bk('bark', x, z), bk('leaf', x, z), x, y, z, { height: h, trunkR: h * 0.055, leaf: crownHues[ci]!, seed: 500 + i, lean: 0.18, density: 1.1 });
-    col.add(cylCollider({ x, z, r: h * 0.055 + 0.15, top: y + h * 0.6, bottom: y - 1, tag: 'trunk' }));
+    kitTree(x, y, z, h, ci, 500 + i);
   }
   {
+    // rock outcrops in three scales: a half-buried anchor, medium stones leaning on it, pebble spill
     const br = rng(606);
-    for (let i = 0; i < 70; i++) {
+    const clear = (x: number, z: number, m: number) =>
+      insideIsland(x, z, 8) && !routeNear(route, x, z, m) && marshE(x, z) >= 1.15 && !inTerraces(x, z, 4) && Math.hypot(x, z + 58) >= 20 && !(z < -66 && Math.abs(x) < 24);
+    let seed = 0;
+    for (let i = 0; i < 60; i++) {
       const x = (br() * 2 - 1) * 120;
       const z = (br() * 2 - 1) * 95;
-      if (!insideIsland(x, z, 8)) continue;
-      if (routeNear(route, x, z, 4) || marshE(x, z) < 1.15 || inTerraces(x, z, 4) || Math.hypot(x, z + 58) < 20 || (z < -66 && Math.abs(x) < 24)) continue;
-      const y = groundRaw(x, z);
-      boulder(bk('rock', x, z), x, y, z, 0.6 + br() * 1.6, i, 0.6);
+      if (!clear(x, z, 5)) continue;
+      const big = 1.3 + br() * 1.5;
+      boulder(bk('rock', x, z), x, groundRaw(x, z) - big * 0.25, z, big, seed++, 0.6);
+      const nm = 1 + Math.floor(br() * 3);
+      for (let k = 0; k < nm; k++) {
+        const a = br() * Math.PI * 2;
+        const d = big * (0.9 + br() * 0.5);
+        const px = x + Math.cos(a) * d;
+        const pz = z + Math.sin(a) * d;
+        if (!clear(px, pz, 2.5)) continue;
+        const rr = big * (0.3 + br() * 0.25);
+        boulder(bk('rock', px, pz), px, groundRaw(px, pz) - rr * 0.2, pz, rr, seed++, 0.7);
+      }
+      const ns = 3 + Math.floor(br() * 6);
+      for (let k = 0; k < ns; k++) {
+        const a = br() * Math.PI * 2;
+        const d = big * (1.1 + br() * 1.6);
+        const px = x + Math.cos(a) * d;
+        const pz = z + Math.sin(a) * d;
+        if (!clear(px, pz, 1.5)) continue;
+        const rr = 0.12 + br() * 0.25;
+        boulder(bk('rock', px, pz, false), px, groundRaw(px, pz) - rr * 0.3, pz, rr, seed++, 0.6);
+      }
+      rockFoot.push({ x, z, r: big });
     }
   }
 
@@ -1704,11 +1770,28 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
     // shrubs flanking the ground path, carpeting the edges
     const shrubHues = [PAL.maple, PAL.russet, PAL.amber, PAL.crimson, PAL.copper];
+    // ground plants from the CC0 kit: red bush masses, rust bracken, pale dry tussocks
+    const BRACKEN: [THREE.Color, THREE.Color] = [new THREE.Color(0x9a4a1e), new THREE.Color(0xc07a34)];
+    const TUSSOCK: [THREE.Color, THREE.Color] = [new THREE.Color(0xc9a45a), new THREE.Color(0x9a8452)];
+    const plant = (x: number, g: number, z: number, size: number, hue: THREE.Color, kind = lr()) => {
+      // the arrival clearing (spawn → fox review stage (6, 78) → meadow still (6, 70)) stays open meadow
+      const ct = THREE.MathUtils.clamp(((x - 0) * 6 + (z - 90) * -22) / (6 * 6 + 22 * 22), 0, 1);
+      if (Math.hypot(x - 6 * ct, z - 90 + 22 * ct) < 9) return;
+      const yaw = lr() * Math.PI * 2;
+      if (kind < 0.62) {
+        // low leaf-carpet mounds (key art's creeper cover), not topiary puffballs
+        nature.place('bush_red', x, g - 0.1 * size, z, { yaw, scale: 0.6 + size * 0.9, squash: 0.35 + lr() * 0.25, hue, hue2: shrubHues[Math.floor(lr() * shrubHues.length)]!, cast: size > 0.8 });
+      } else if (kind < 0.85) {
+        nature.place('fern', x, g - 0.05, z, { yaw, scale: 0.06 + size * 0.08, hue: BRACKEN[0], hue2: BRACKEN[1], cast: false });
+      } else {
+        nature.place('grass_wispy', x, g - 0.05, z, { yaw, scale: 0.6 + size * 0.7, hue: TUSSOCK[0], hue2: TUSSOCK[1], cast: false });
+      }
+    };
     const placeShrub = (x: number, z: number, size: number) => {
       const g = groundAtCover(x, z);
       if (!Number.isFinite(g)) return;
       if (marshE(x, z) < 0.95) return;
-      shrub(bk('leaf', x, z, false), lr, x, g, z, size, shrubHues[Math.floor(lr() * shrubHues.length)]!);
+      plant(x, g, z, size, shrubHues[Math.floor(lr() * shrubHues.length)]!);
       litterPatch(bk('litter', x, z, false), lr, x, z, size * 2.0, 6, (px, pz) => {
         const gg = groundAtCover(px, pz);
         return Math.abs(gg - g) > 0.5 ? NaN : gg;
@@ -1722,12 +1805,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       if (len < 1) continue;
       const dx = (b.x - a.x) / len;
       const dz = (b.z - a.z) / len;
-      const n = Math.floor(len / (a.ground ? 2.6 : 4.5));
+      // overlapping banks bordering the worn path, broken by the odd gap
+      const n = Math.floor(len / (a.ground ? 1.8 : 4.5));
       for (let k = 0; k < n; k++) {
         const t = (k + lr()) / Math.max(1, n);
         for (const side of [-1, 1]) {
-          if (lr() < 0.3) continue;
-          const off = (a.ground ? 2.4 : 1.6) + lr() * 2.4;
+          if (lr() < 0.15 + 0.5 * (fbm3(a.x * 0.1 + t, side, a.z * 0.1, 1) < 0.4 ? 1 : 0)) continue;
+          const off = (a.ground ? 3.0 : 1.6) + lr() * 2.4;
           const x = a.x + (b.x - a.x) * t - dz * side * off;
           const z = a.z + (b.z - a.z) * t + dx * side * off;
           if (routeNear(route, x, z, 1.8)) continue;
@@ -1747,13 +1831,39 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       if (Math.hypot(x - POND.x, (z - POND.z) * 1.6) < 17) continue;
       if (Math.hypot(x, z + 58) < 17 || (z < -66 && Math.abs(x) < 24)) continue;
       const amberZone = z < 12 && z > -50;
-      if (lr() < (amberZone ? 0.35 : 0.6)) placeShrub(x, z, 0.35 + lr() * 0.6);
-      else {
+      // clumped, not sprinkled: a low-frequency field leaves open clearings between dense patches
+      const dense = fbm3(x * 0.035, 7.3, z * 0.035, 2);
+      if (lr() < (amberZone ? 0.35 : 0.6)) {
+        if (dense < 0.45) continue;
+        const n = 1 + Math.floor((dense - 0.45) * 14 * lr());
+        for (let k = 0; k < n; k++) {
+          const a = lr() * Math.PI * 2;
+          const d = k === 0 ? 0 : 0.8 + lr() * 2.2;
+          // big plant in the middle, smaller ones falling off around it
+          placeShrub(x + Math.cos(a) * d, z + Math.sin(a) * d, k === 0 ? 0.6 + lr() * 0.5 : 0.25 + lr() * 0.4);
+        }
+      } else {
         const g = groundAtCover(x, z);
         if (Number.isFinite(g)) litterPatch(bk('litter', x, z, false), lr, x, z, 3.0, amberZone ? 34 : 14, (px, pz) => {
           const gg = groundAtCover(px, pz);
           return Math.abs(gg - g) > 0.5 ? NaN : gg;
         });
+      }
+    }
+    // open ground between the clumps: dry tussock drifts and loose stones break up the plane
+    for (let i = 0; i < 1400; i++) {
+      const x = (lr() * 2 - 1) * 128;
+      const z = (lr() * 2 - 1) * 100;
+      if (!insideIsland(x, z, 4) || routeNear(route, x, z, 1.6) || marshE(x, z) < 1.05) continue;
+      if (Math.hypot(x - POND.x, (z - POND.z) * 1.6) < 16 || Math.hypot(x, z + 58) < 17 || (z < -66 && Math.abs(x) < 24)) continue;
+      const g = groundAtCover(x, z);
+      if (!Number.isFinite(g) || Math.abs(g - groundRaw(x, z)) > 0.3) continue;
+      const tuft = fbm3(x * 0.07 + 3.1, 2.2, z * 0.07, 2);
+      if (tuft > 0.52 && lr() < 0.8) {
+        plant(x, g, z, 0.2 + lr() * 0.4, shrubHues[0]!, 0.86 + lr() * 0.14);
+      } else if (lr() < 0.25) {
+        const rr = 0.08 + lr() * lr() * 0.35;
+        boulder(bk('rock', x, z, false), x, g - rr * 0.35, z, rr, 4000 + i, 0.55);
       }
     }
     // red thickets: dense bush masses banked against tree roots and the meadow's edges
@@ -1789,9 +1899,30 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
           if (routeNear(route, px, pz, 2.2)) continue;
           const g = groundAtCover(px, pz);
           if (!Number.isFinite(g)) continue;
-          shrub(bk('leaf', px, pz, false), thr, px, g, pz, 0.7 + thr() * 0.6, thHues[Math.floor(thr() * thHues.length)]!);
+          // dense red core, bracken + tussocks at the thicket's fringe
+          plant(px, g, pz, 0.7 + thr() * 0.6, thHues[Math.floor(thr() * thHues.length)]!, d < 1.6 ? thr() * 0.6 : 0.5 + thr() * 0.5);
         }
         litterPatch(bk('litter', x, z, false), thr, x, z, 3.2, 26, (px, pz) => groundAtCover(px, pz));
+      }
+    }
+    for (const f of ruinFeet) {
+      const n = 1 + Math.floor(lr() * 3);
+      for (let k = 0; k < n; k++) {
+        const d = 0.6 + lr() * 1.2;
+        const px = f.x + f.dx * d + (lr() - 0.5) * 0.8;
+        const pz = f.z + f.dz * d + (lr() - 0.5) * 0.8;
+        const g = groundAtCover(px, pz);
+        if (!Number.isFinite(g) || Math.abs(g - f.y) > 0.6 || routeNear(route, px, pz, 1.4)) continue;
+        plant(px, g, pz, 0.3 + lr() * 0.4, shrubHues[Math.floor(lr() * shrubHues.length)]!, lr() * 0.85);
+      }
+    }
+    // bracken and bushes tucked into each outcrop's lee
+    for (const f of rockFoot) {
+      const n = 2 + Math.floor(lr() * 4);
+      for (let k = 0; k < n; k++) {
+        const a = lr() * Math.PI * 2;
+        const d = f.r * (0.9 + lr() * 0.6);
+        placeShrub(f.x + Math.cos(a) * d, f.z + Math.sin(a) * d, 0.4 + lr() * 0.5);
       }
     }
     for (const d of drifts) {
@@ -1852,7 +1983,24 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         ruinColumn(sb, x + rad * 0.35, y + rad * 0.08, z + rad * 0.2, 4 + sr() * 4, 950 + i, 0.6);
         ruinColumn(sb, x + rad * 0.1, y + rad * 0.1, z - rad * 0.35, 2 + sr() * 5, 970 + i, 0.55);
       }
-      maple(bkb, lb, x + rad * 0.3, y + rad * 0.08, z - rad * 0.3, { height: 7 + sr() * 5, trunkR: 0.45, leaf: crownHues[i % 4]!, seed: 1200 + i, density: 0.5, lean: 0.3 });
+      kitTree(x + rad * 0.3, y + rad * 0.08, z - rad * 0.3, 7 + sr() * 5, i, 1200 + i, { cast: false, collide: false });
+      // overgrown cap: red leaf-carpet, bracken and tussocks spilling toward the rim
+      for (let k = 0; k < 10 + Math.floor(rad); k++) {
+        const th = sr() * Math.PI * 2;
+        const d = 0.25 + sr() * 0.65;
+        const R = outl(th) * d;
+        const py = y + (1 - d * d) * rad * 0.12 + 0.1;
+        const kind = sr();
+        const v = kind < 0.55 ? 'bush_red' : kind < 0.8 ? 'fern' : 'grass_wispy';
+        nature.place(v, x + Math.cos(th) * R, py - 0.1, z + Math.sin(th) * R, {
+          yaw: sr() * 6.28,
+          scale: v === 'bush_red' ? 1 + sr() * 1.2 : v === 'fern' ? 0.12 + sr() * 0.1 : 1 + sr(),
+          squash: v === 'bush_red' ? 0.5 : 1,
+          hue: [PAL.maple, PAL.russet, PAL.amber, PAL.crimson][k % 4]!,
+          hue2: PAL.copper,
+          cast: false,
+        });
+      }
       for (const [bb, mat] of [[ob, M.rock], [sb, M.stone], [lb, M.leaf], [bkb, M.bark]] as const) {
         const m = bb.toMesh(mat, { cast: false, receive: false, boxUV: mat === M.rock ? 4 : mat === M.stone ? 1.6 : mat === M.bark ? 2 : undefined });
         if (m) group.add(m);
@@ -1910,6 +2058,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       group.add(m);
     }
   }
+  patchable.push(...nature.build(group));
   console.info(`[russetvale] merged ${buckets.size} buckets, ${verts} verts, ${col.colliders.length} colliders`, JSON.stringify(perMat));
 
   // ==================================================================== runtime
@@ -1939,6 +2088,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     hearthSpots,
     inletSpots,
     shadeSpots,
+    windSpots,
     latchSeedwell(i) {
       const s = seedwells[i]!;
       if (s.lit) return [];
@@ -1989,7 +2139,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         }
       }
       const litCount = checkpoints.filter((c) => c.lit).length;
-      lanternMat.emissiveIntensity = 0.05 + Math.min(1, litCount) * 0.9;
+      lanternMat.emissiveIntensity = 0.65 + Math.min(1, litCount) * 0.9;
 
       // seedwells
       for (let i = 0; i < seedwells.length; i++) {
@@ -2049,7 +2199,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       if (!wellLit) wsGlow.emissiveIntensity = 0.06 + flood;
 
       // hazards
-      if (inkActive && marshE(fox.x, fox.z) < 0.9 && feetY < MARSH.ink + 0.15) ev.push({ type: 'hazard', kind: 'ink' });
+      if (inkActive && ((realm.waterInkAt?.(fox.x, fox.z) && feetY < 0.2) || (!realm.waterWashedAt?.(fox.x, fox.z) && marshE(fox.x, fox.z) < 0.9 && feetY < MARSH.ink + 0.15))) ev.push({ type: 'hazard', kind: 'ink' });
       if (feetY < -24) ev.push({ type: 'hazard', kind: 'fall' });
       void flood;
       return ev;
@@ -2108,6 +2258,55 @@ function leafCutout(mat: THREE.MeshStandardMaterial, atlas: THREE.Texture): void
 }
 
 /**
+ * Masonry weathering: a CC0 rock scan (ambientCG Rock035) as a value-only detail layer, lichen and
+ * moss pooled on up-facing ledges and block tops, and soot/rain streaks down vertical faces, so
+ * ruins read as old stone rather than clean stacked boxes. Hue still comes from the vertex palette.
+ */
+function stoneWeathering(mat: THREE.MeshStandardMaterial, detail: THREE.Texture): void {
+  detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
+  detail.colorSpace = THREE.SRGBColorSpace;
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = (shader, renderer) => {
+    prev.call(mat, shader, renderer);
+    shader.uniforms.uStoneDetail = { value: detail };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vSWPos;
+        varying vec3 vSWN;`)
+      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+        vSWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vSWN = normalize(mat3(modelMatrix) * objectNormal);`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform sampler2D uStoneDetail;
+        varying vec3 vSWPos;
+        varying vec3 vSWN;
+        float swHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+        float swNoise(vec2 p) {
+          vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(swHash(i), swHash(i + vec2(1, 0)), u.x), mix(swHash(i + vec2(0, 1)), swHash(i + vec2(1, 1)), u.x), u.y);
+        }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          vec3 swN = normalize(vSWN);
+          float swL = dot(texture2D(uStoneDetail, vMapUv * 0.37).rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb *= mix(1.0, clamp(swL * 2.2, 0.4, 1.5), 0.8);
+          // rust/ochre lichen blooms on the faces, darker damp seams between them
+          float swLi = swNoise(vSWPos.xz * 1.3 + vSWPos.y * 0.9) * 0.6 + swNoise(vec2(vSWPos.x - vSWPos.z, vSWPos.y) * 4.0) * 0.4;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.58, 0.4, 0.2) * (0.8 + 0.4 * swL), smoothstep(0.58, 0.75, swLi) * 0.55);
+          diffuseColor.rgb *= 1.0 - smoothstep(0.32, 0.18, swLi) * 0.25;
+          float swUp = smoothstep(0.4, 0.85, swN.y);
+          float swM = smoothstep(0.4, 0.68, swNoise(vSWPos.xz * 0.8 + vSWPos.y * 0.37) * 0.7 + swNoise(vSWPos.xz * 3.1) * 0.3);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.34, 0.31, 0.15) * (0.75 + 0.5 * swL), swUp * swM * 0.8);
+          float swV = 1.0 - abs(swN.y);
+          float swS = swNoise(vec2((vSWPos.x + vSWPos.z) * 1.9, vSWPos.y * 0.16));
+          diffuseColor.rgb *= 1.0 - swV * smoothstep(0.45, 0.85, swS) * 0.38;
+        }`);
+  };
+  mat.needsUpdate = true;
+}
+
+/**
  * Ground = packed soil (tinted by vertex colour) with a litter layer on top. The leaf
  * texture's alpha is a per-leaf rank: a leaf shows only where rank > 1 − leafiness, so
  * worn paths thin out leaf by leaf into drifts. Leaves take their own autumn hue from
@@ -2160,7 +2359,13 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
         gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.70, 0.20, 0.12) : vec3(0.66, 0.27, 0.12), smoothstep(0.58, 0.74, gReg) * gTake);
         gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.76, 0.60, 0.29) : vec3(0.82, 0.50, 0.17), smoothstep(0.42, 0.28, gReg) * gTake);
         vec3 gLeafCol = gLeaf.rgb * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
-        diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);`);
+        diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);
+        // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of
+        // dry olive-gold grass where the litter thins, so open ground never reads as one plane
+        float gMac = gNoise(vGPos.xz * 0.045 + 21.0) * 0.65 + gNoise(vGPos.xz * 0.13 + 5.0) * 0.35;
+        diffuseColor.rgb *= mix(vec3(0.6, 0.56, 0.52), vec3(1.18, 1.08, 0.86), smoothstep(0.2, 0.8, gMac));
+        float gGrass = smoothstep(0.52, 0.72, gNoise(vGPos.xz * 0.06 + 40.0)) * (1.0 - gVis);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.2, 1.12, 0.62) + vec3(0.05, 0.045, 0.0), gGrass * 0.7);`);
   };
   mat.needsUpdate = true;
 }

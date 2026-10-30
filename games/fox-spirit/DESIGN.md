@@ -89,3 +89,49 @@ jump/landing and slopes; a quarter-speed segment uses smaller simulation steps,
 not duplicated frames. Side tracking keeps paws large enough to judge contact.
 1080p60 MP4, labelled pose contact sheet, per-frame state and __game snapshots
 are the evidence. Staged resets are explicitly recorded; route remains unassisted.
+
+## Sprint 2 Shade encounter
+The Keeping caught a woodland animal mid-stride. Its enlarged, vertically drawn
+Quaternius CC0 antlered stag silhouette floats in a warm ink wash, wavering without a walk
+cycle. SW1's authored loop is the first playable encounter. A 3 m drain suppresses
+weak temporary supply; fresh dash strokes and permanent restoration still win.
+Contact costs one of three wisps, grants one second of grace and pushes the fox
+3 m over a short eased impulse, through the existing wall checks. Dash through
+the silhouette to free it permanently: ink breaks into falling leaves whose
+sepia warms to copper and russet. No explosion, score pickup or respawn.
+
+Expose patrol speed (2.2 m/s), bob (0.3 m), hit/drain radii, release timing,
+knockback distance and invulnerability in lil-gui. Debug spline and drain off by
+default. Publish actors, wisps, hits, frees and impulse travel on __game.shades.
+GPU review must retain patrol, contact/grace, and a real dash-through release,
+including drain/strong-stroke assertions, then receive an Opus critique and retest.
+### Independent contact evidence for the matched locomotion review
+Capture actual paw-bone world positions after the solver, independently of either
+stream's target/anchor telemetry. Calibrate each paw's standing ground clearance
+from the initial idle, then report horizontal speed during low, grounded contact
+and height error against the collision surface. Keep requested target vs actual
+paw errors separate. These are bone landmarks, not claimed toe-mesh measurements.
+The review must disclose that limitation and exclude staged teleport transitions.
+
+### Encounter review
+The explicit `shade` GPU shot stages the fox near the first live Shade, then records
+patrol, real contact/knockback and a real dash through it. Resets are labelled staged;
+no health or freed flags are forced. Preserve per-second __game/state and key frames.
+
+Driver 12:05 correction: use the licensed antlered stag with long legs and an
+authored lowered-head pose over mid-stride legs. The creature is drifting ink,
+with a dark ground wash that communicates its 3 m drain. Smaller maple leaves
+warm within 0.8 s, settle as colored litter, and fade after a quiet hold.
+
+### Real-fox comparison edit
+A separate three-panel review edit pairs the two game candidates with documented
+walk/trot/run/pounce excerpts. Crop only for readability and label all playback
+changes. Wildlife source playback is uncalibrated and not phase-aligned; use it for
+anatomy, support, gathering and head/tail behavior, never numeric biological timing.
+
+## Sprint 2 Water — implementation contract
+Marsh Mouth (57,36) teaches color → melt → moving front → washed crossing. The amber spill melts in 0.6 s, holds 3 s after supply, then refreezes for 2 s with no new output. Water travels at 8 m/s; both its leading front and trailing end move along the channel. Only wet sections suppress ink and reveal the stone bed. The waterfall at (100,18) has probes at y10–15 and feeds a 32 m flume; only arriving water feeds SW2 for 7 s. Shade drains sever downstream flow, and restored sources stay on. All timings and speed live in the Water GUI and telemetry. No movement changes.
+
+Verification: GPU water shot retains frozen/melt/front/wash/refreeze stills and video, captures __game, and checks front/tail timing and SW2 inlet. Review visuals, apply critique, rerun.
+
+Water review corrections (12:15 ET): the crossing has a permanent shallow stone bed; flowing water removes the ink hazard, never the supporting ground. A local ink skin covers the dry channel. The final 0.8 s of hold warns that the wash is ending. Driver 12:05 changes the frozen look to pale translucent ice with warm inner light. Water already past a Shade drains away at 8 m/s; the Shade cannot erase it instantly. Flume beds and water are batched. No controller/animation edits.

@@ -57,7 +57,7 @@ type State = {
   restored: boolean;
   t: number;
   pos: [number, number, number];
-  anim: string;
+  gait: string;
   restore: { phase: string; age: number; floodAge: number; frontRadius: number; inputLocked: boolean; path: { t: number; w: number; yielding: boolean } | null };
   camera: { pos: number[]; fov: number; foxNdc: [number, number]; yaw: number };
   look: { grade: number; quality: string };
@@ -116,7 +116,7 @@ try {
     if (s.restore.phase !== 'idle') break;
   }
   await page.evaluate(`${H_}.setKeys([])`);
-  if (s.restore.phase === 'idle') throw new Error(`fox never reached the Wellspring trigger: ${JSON.stringify({ pos: s.pos, anim: s.anim, restored: s.restored })}`);
+  if (s.restore.phase === 'idle') throw new Error(`fox never reached the Wellspring trigger: ${JSON.stringify({ pos: s.pos, gait: s.gait, restored: s.restored })}`);
   if (s.restored) throw new Error('restored=true at trigger time — ignition must come later');
   console.log(`trigger after ${(walkFrames / 60).toFixed(2)} s walk at pos ${s.pos.map((v) => v.toFixed(2)).join(',')}`);
 
@@ -144,7 +144,7 @@ try {
       path: s.restore.path,
       grade: Number(s.look.grade.toFixed(3)),
       fox: s.pos.map((v) => Number(v.toFixed(3))),
-      anim: s.anim,
+      gait: s.gait,
       cam: s.camera.pos.map((v) => Number(v.toFixed(3))),
       fov: Number(s.camera.fov.toFixed(2)),
     };
