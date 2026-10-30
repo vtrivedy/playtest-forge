@@ -65,17 +65,18 @@ const SCRIPTS: Record<string, Step[]> = {
   ],
   'feel-probe': [
     // Stand still, short tap jump
-    { down: ['Space'], ms: 70, tap: true },
-    { down: [], ms: 900 },
-    // Full hold jump then glide
-    { down: ['Space'], ms: 1200 },
-    { down: [], ms: 400 },
-    // Run + dash measure
+    { down: ['Space'], ms: 60, tap: true },
+    { down: [], ms: 1100 },
+    // Full hold jump (no glide cut — release after apex)
+    { down: ['Space'], ms: 450 },
+    { down: [], ms: 1100 },
+    // Full hold + glide
+    { down: ['Space'], ms: 1400 },
+    { down: [], ms: 500 },
+    // Run + dash
     { down: ['KeyW'], ms: 400 },
     { down: ['KeyW', 'ShiftLeft'], ms: 60, tap: true },
     { down: ['KeyW'], ms: 500 },
-    { down: ['KeyW', 'Space'], ms: 100, tap: true },
-    { down: ['KeyW'], ms: 600 },
   ],
 };
 

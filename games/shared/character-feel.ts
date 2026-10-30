@@ -5,7 +5,7 @@ export type FeelParams = {
   accel: number;
   turnRate: number;
   jumpVelocity: number;
-  /** Multiply upward velocity when jump is released early (variable height). */
+  /** Multiply upward velocity once when jump is released early (variable height). */
   jumpCut: number;
   gravity: number;
   airControl: number;
@@ -17,14 +17,14 @@ export type FeelParams = {
   jumpBuffer: number;
 };
 
-/** Sol REVIEW: spring (10/24-ish) beat brisk for readable hang time. */
+/** Sol REVIEW: spring beat brisk for readable hang (~2u apex / ~0.43s rise). */
 export const PRESET_SPRING: FeelParams = {
   moveSpeed: 7.5,
   accel: 30,
   turnRate: 11,
-  jumpVelocity: 10,
-  jumpCut: 0.45,
-  gravity: 24,
+  jumpVelocity: 10.2,
+  jumpCut: 0.42,
+  gravity: 22,
   airControl: 0.55,
   glideGravityScale: 0.28,
   glideDrag: 1.8,
@@ -72,20 +72,24 @@ export function emptyFeelMetrics(): FeelMetrics {
   };
 }
 
-/** Edge-triggered jump buffer + coyote + variable cut + apex tracking. */
+/** Edge-triggered jump buffer + coyote + one-shot variable cut + apex tracking. */
 export class JumpFeel {
   buffer = 0;
   coyote = 0;
+  apex = 0;
+  timeToApex = 0;
+  airTime = 0;
+  cutThisJump = false;
+
   private spaceWasDown = false;
   private jumpStartY = 0;
   private jumpClock = 0;
   private rising = false;
   private airClock = 0;
-  apex = 0;
-  timeToApex = 0;
-  airTime = 0;
+  private cutApplied = false;
+  /** Space held after takeoff — required before variable-cut may fire. */
+  private heldAfterTakeoff = false;
 
-  /** Call once per frame with raw Space held state. */
   sampleJumpEdge(spaceDown: boolean, dt: number, bufferWindow: number): void {
     if (spaceDown && !this.spaceWasDown) this.buffer = bufferWindow;
     else this.buffer = Math.max(0, this.buffer - dt);
@@ -125,12 +129,29 @@ export class JumpFeel {
     this.timeToApex = 0;
     this.rising = true;
     this.airClock = 0;
+    this.cutApplied = false;
+    this.cutThisJump = false;
+    this.heldAfterTakeoff = false;
     return jumpVelocity;
   }
 
-  /** Cut upward velocity when Space released mid-rise. */
+  /**
+   * One-shot cut when Space is released after a hold during this jump.
+   * Buffered jumps with no hold keep full height (no same-frame cut).
+   */
   applyCut(spaceDown: boolean, velY: number, cut: number): number {
-    if (this.rising && !spaceDown && velY > 0) return velY * cut;
+    if (spaceDown) this.heldAfterTakeoff = true;
+    if (
+      this.rising &&
+      this.heldAfterTakeoff &&
+      !spaceDown &&
+      velY > 0 &&
+      !this.cutApplied
+    ) {
+      this.cutApplied = true;
+      this.cutThisJump = true;
+      return velY * cut;
+    }
     return velY;
   }
 }

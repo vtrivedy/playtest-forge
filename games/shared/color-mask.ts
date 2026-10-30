@@ -12,7 +12,7 @@ export type ColorMaskState = {
   trailLife: number;
   _accum: number;
   shrines: Array<{ position: THREE.Vector3; radius: number; activated: boolean }>;
-  /** 0 = full mono world (except fox), 1 = ignored when shrines drive permanence */
+  /** 0 = full sepia world (except fox), 1 = ignored when shrines drive permanence */
   globalColor: number;
 };
 
@@ -59,7 +59,7 @@ export function sampleColorMask(state: ColorMaskState, p: THREE.Vector3): number
 }
 
 /**
- * Patch a MeshStandardMaterial to lerp toward grayscale unless the color mask says otherwise.
+ * Patch a MeshStandardMaterial to lerp toward warm sepia unless the color mask says otherwise.
  * Fox should NOT use this — stay fully saturated.
  */
 export function applyColorMaskToMaterial(mat: THREE.MeshStandardMaterial, state: ColorMaskState): void {
@@ -129,9 +129,10 @@ export function applyColorMaskToMaterial(mat: THREE.MeshStandardMaterial, state:
         '#include <opaque_fragment>',
         `
         float cm = colorMaskAt(vWorldPos);
+        // Unrestored = warm sepia / autumn-ink grade (not cold B&W)
         float luma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
-        vec3 mono = vec3(luma);
-        outgoingLight = mix(mono, outgoingLight, cm);
+        vec3 sepia = vec3(luma * 1.05, luma * 0.82, luma * 0.52);
+        outgoingLight = mix(sepia, outgoingLight, cm);
         #include <opaque_fragment>
         `,
       );

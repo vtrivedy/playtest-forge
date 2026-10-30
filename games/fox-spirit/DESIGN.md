@@ -1,9 +1,12 @@
-# Fox Spirit — color awakening feel prototype
+# Fox Spirit — autumn feel prototype
 
-See `docs/vision.md`. Owned by scaffold/feel stream.
+See `docs/vision.md`. Refs: `assets/concept/fox-turnaround.jpg`, `world-keyart.jpg`.
 
 ## Core verb
-Run through an ink world leaving a temporary color splash; awaken the shrine so color floods permanently.
+Stalk through a sepia world leaving temporary autumn color; awaken the shrine so fall floods permanently.
+
+## Hero look
+Burnt-orange fox, cream chest, dark socks, ember-flame tail. Grounded / mysterious — not cute. Particles: embers + falling leaves.
 
 ## Controls
 - WASD move (camera-relative)
@@ -11,14 +14,13 @@ Run through an ink world leaving a temporary color splash; awaken the shrine so 
 - Hold Space while falling = glide
 - Shift = dash
 
-## Feel target (PRESET_SPRING baseline)
-- Apex ≈ 2.0–2.2 units, rise ≈ 0.4 s, air ≈ 0.85–1.0 s (full hold, no glide)
-- Short tap hop clearly shorter than full jump
-- Dash readable burst ~0.2 s
-- Landing squash / takeoff stretch juice
+## Feel target (PRESET_SPRING)
+- Full hold apex ≈ 2.0–2.3 units, rise ≈ 0.4–0.46 s
+- Short tap hop clearly shorter (cut once after hold)
+- Landing squash / takeoff stretch
 
 ## Win
-Activate the shrine (gems optional path juice).
+Activate the shrine. Gems optional path juice.
 
 ## Verify
-`npm run playtest:fox` → playtest-output/fox-spirit/{shot-*.png,playtest.webm,metrics.json,feel-samples.json}
+`npm run playtest:fox` → playtest-output/fox-spirit/
