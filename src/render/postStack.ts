@@ -79,6 +79,10 @@ const fullscreenVert = /* glsl */ `
 const HIGHLIGHT_GLSL = /* glsl */ `
   uniform float uKnee, uCap;
   vec3 compressHighlights(vec3 c) {
+    // HDR overflow must not contaminate bloom's blur pyramid. NaN also fails this comparison.
+    c = vec3(c.r >= 0.0 ? min(c.r, 64.0) : 0.0,
+             c.g >= 0.0 ? min(c.g, 64.0) : 0.0,
+             c.b >= 0.0 ? min(c.b, 64.0) : 0.0);
     float m = max(max(c.r, c.g), c.b);
     if (m <= uKnee) return c;
     float x = m - uKnee;
