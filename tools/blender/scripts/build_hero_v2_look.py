@@ -31,6 +31,9 @@ for v in bm.verts:
     if n.z < -0.3 and co.y < bh("FrontUpperLeg.L").y + 0.25:
         push += 0.1 * min(1, chest) * -n.z  # deeper brisket between / ahead of the forelegs
     hw = w.get("Head", 0)
+    # Taper the lower cheek plane into the throat; a broad jaw made the cream read as a collar.
+    jaw_taper = smooth(head_c.z + 0.06, head_c.z - 0.32, co.z) * hw
+    co.x *= 1 - 0.14 * jaw_taper
     if hw > 0.3 and n.z < -0.3 and co.y > head_c.y - 0.12:
         push += 0.045 * hw * -n.z  # full throat under the jaw (no shadow shelf between cheeks and bib)
     belly = wsum(w, "Torso", "Torso2")
@@ -85,7 +88,7 @@ bm.to_mesh(me); bm.free(); me.update()
 # ---------------------------------------------------------------- 2. region colours (rest pose rules)
 # warm burnt orange (yellower than vermilion: ACES + warm fog push it red in engine); sock/paw authored a
 # notch light because the streak * AO bake darkens them (lands near the concept's (102, 62, 38) umber)
-PAL = dict(rust=(212, 124, 50), dorsal=(146, 70, 28), belly=(226, 168, 112), cream=(242, 228, 202),
+PAL = dict(rust=(212, 124, 50), dorsal=(146, 70, 28), belly=(226, 168, 112), cream=(234, 218, 188),
            umber=(108, 62, 36), sock=(66, 42, 29), paw=(46, 31, 23), earback=(50, 29, 20), nose=(22, 15, 13),
            amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(236, 214, 186))
 mat_names = [m.name for m in me.materials]
@@ -114,11 +117,14 @@ for v in me.vertices:
     c = mix(c, PAL["dorsal"], smooth(-0.12, 0.7, n.z) * 0.88)           # broad dark rust saddle over the back / haunches (painted mass)
     c = mix(c, PAL["belly"], smooth(-0.15, -0.8, n.z) * 0.75)           # warm pale underside (not pink)
     # cream: throat + bib tapering down the chest, muzzle, cheeks, inner ears (no belly/rump patches)
-    if v.index in cream_vs and leg < 0.3:
+    if leg < 0.3:
         if wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"]) > 0.3:
             k = 1.0
         elif w.get("Head", 0) > 0.3:
-            k = 1.0 - smooth(0.05, 0.5, n.z)  # cream cheeks / lower muzzle only; the snout bridge stays rust
+            # Paint a soft oblique cheek boundary from anatomy, never the source polygon IDs.
+            line = (eyeL.z + eyeR.z) * 0.5 - 0.12 + 0.07 * smooth(0.08, 0.38, abs(co.x))
+            line += 0.025 * math.sin(co.y * 12.0)
+            k = (1 - smooth(line - 0.12, line + 0.12, co.z)) * (1 - smooth(0.0, 0.6, n.z))
         elif co.y < CHEST_Y:
             half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
             k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
