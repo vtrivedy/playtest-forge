@@ -43,7 +43,8 @@ def gait_pose(t, phases, duty, sweep, lift, kind):
     bob = .018 if kind == 'walk' else .035
     wloc(p, 'Body', (0, 0, (-.18 if kind == 'walk' else -.24) + bob * math.cos(4 * math.pi * t)))
     wrot(p, 'Body', (0, 1, 0), (1.4 if kind == 'walk' else 2.2) * math.sin(2*math.pi*t))
-    wrot(p, 'Neck1', (1,0,0), 2*math.cos(4*math.pi*t))
+    wrot(p, 'Neck1', (1,0,0), (8 if kind=='walk' else 14)+2*math.cos(4*math.pi*t))
+    wrot(p, 'Head', (1,0,0), -6 if kind=='walk' else -10)
     tail_wave(p, t, amp_yaw=2, amp_pitch=2, speed=1, lift=-12, per=-1)
     apply_dict(p)
     for key, td in phases.items():
@@ -97,9 +98,38 @@ for i in range(25):
     wrot(p,'Neck1',(1,0,0),8*k); tail_wave(p,t,amp_yaw=2,amp_pitch=3,lift=8)
     poses.append(p)
 make('skid',poses)
+# Immediate gameplay takeoff: a 3-frame anatomical gather followed by a readable hind push.
+# The collider stays responsive; the pelvis loads inside the rising capsule, without mesh scaling.
+jump_source=SRC_ACTIONS['jump_up']
+jump_final=sample(jump_source,jump_source.frame_range[1])
+old=bpy.data.actions.get('jump_up')
+if old: bpy.data.actions.remove(old)
+frames=[]
+for i in range(13):
+    t=i/12; k=max(0,min(1,(t-.20)/.6)); k=k*k*(3-2*k)
+    p=blend(base,jump_final,k)
+    load=math.sin(math.pi*min(1,t/.4)) if t<.4 else 0
+    wloc(p,'Body',(0,0,-.16*load))
+    wrot(p,'Neck1',(1,0,0),8*load)
+    frames.append(p)
+make('jump_up',frames)
+# Landing absorbs in the skeleton over .30s, then returns to a quiet stance.
+land_source=SRC_ACTIONS['land']
+land_start=sample(land_source,0)
+old=bpy.data.actions.get('land')
+if old: bpy.data.actions.remove(old)
+frames=[]
+for i in range(19):
+    t=i/18; k=t*t*(3-2*t)
+    p=blend(land_start,base,k)
+    load=math.sin(math.pi*min(1,t/.55))*(1-t) if t<.55 else 0
+    wloc(p,'Body',(0,0,-.16*load))
+    wrot(p,'Neck1',(1,0,0),9*load)
+    frames.append(p)
+make('land',frames)
 # Imported clips were 24fps; preserve their seconds after switching authoring scene to 60fps.
 for name,act in SRC_ACTIONS.items():
-    if name in {'run'}: continue
+    if name in {'run','jump_up','land'}: continue
     if act.name not in bpy.data.actions: continue
     for fc in act.fcurves:
         for key in fc.keyframe_points:

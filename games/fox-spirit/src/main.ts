@@ -1048,7 +1048,9 @@ async function boot() {
       const yaw = faceShrine ? restore.faceYaw : Math.hypot(vel.x, vel.z) > .6 ? Math.atan2(vel.x, vel.z) : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
-      fox.rotation.y += d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
+      const turnStep=d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
+      const maxTurn=(grounded ? 4.5 : 3)*dt;
+      fox.rotation.y += THREE.MathUtils.clamp(turnStep,-maxTurn,maxTurn);
     }
 
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact

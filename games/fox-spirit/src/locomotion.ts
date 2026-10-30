@@ -23,10 +23,10 @@ class Spring {
 
 /** Authored pose is evaluated first; contact correction only moves a two-bone chain. */
 export class AuthoredLocomotion {
-  params = { trotSpeed: 2.6, gallopSpeed: 5.5,
+  params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
-    maxCorrection: 0, maxSlideMS: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
+    maxCorrection: 0, maxSlideMS: 0, earlyReleases: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
     planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; dot: THREE.Mesh }[] = [];
@@ -91,8 +91,8 @@ export class AuthoredLocomotion {
     if (active!==this.lastActive) { for (const foot of this.feet) foot.planted=false; this.lastActive=active; }
     const locomoting=['run','walk','trot'].includes(active);
     const speed=this.input.speed;
-    const walkToTrot=THREE.MathUtils.smoothstep(speed,this.params.trotSpeed-.3,this.params.trotSpeed+.3);
-    const trotToGallop=THREE.MathUtils.smoothstep(speed,this.params.gallopSpeed-.5,this.params.gallopSpeed+.5);
+    const walkToTrot=THREE.MathUtils.smoothstep(speed,this.params.trotSpeed-.2,this.params.trotSpeed+.2);
+    const trotToGallop=THREE.MathUtils.smoothstep(speed,this.params.gallopSpeed-.25,this.params.gallopSpeed+.25);
     const weights = {walk:1-walkToTrot,trot:walkToTrot*(1-trotToGallop),run:trotToGallop};
     let dominant: Gait='walk';
     for (const name of Object.keys(GAITS) as Gait[]) if (weights[name]>weights[dominant]) dominant=name;
@@ -183,6 +183,11 @@ export class AuthoredLocomotion {
         if (!foot.planted) { foot.anchor.copy(paw); if(locomoting && this.input.speed>1) this.footfalls.push(paw.clone().setY(ground)); }
         if(active==='idle')foot.anchor.lerp(paw,1-Math.exp(-5*dt));
         foot.anchor.y=ground+foot.clearance;
+        // A tight turn can pull a planted limb beyond its reach: release into a new contact explicitly.
+        const drift=Math.hypot(foot.anchor.x-paw.x,foot.anchor.z-paw.z);
+        if(foot.planted && drift>.22 && Math.abs(this.turn)>1.2) {
+          foot.anchor.copy(paw).setY(ground+foot.clearance);foot.planted=false;this.metrics.earlyReleases++;
+        }
         const delta=foot.anchor.clone().sub(paw);
         this.metrics.maxPlantError=Math.max(this.metrics.maxPlantError,Math.hypot(delta.x,delta.z));
         delta.clampLength(0,this.params.maxCorrection).multiplyScalar(this.params.plantStrength);
