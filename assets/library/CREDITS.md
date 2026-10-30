@@ -86,3 +86,6 @@ Download: `https://poly.pizza/m/<id>` → `static.poly.pizza/<uuid>.glb`.
 | dead_1..2 | Mcd2zYqyww, MlmK5488ou | Dead trees |
 | bush_red, bush_leafy | EoTERLq3z2, ooG6CkLyE8 | Bushes |
 | fern, grass_wispy | jqcanvH7D6, Msr9zx66VU | Ground cover |
+
+## Sprint 2 Water (2026-10-30)
+Water ice sheets, flume masonry, flow ribbons and ripples are original procedural geometry/shaders authored for this project; no external textures or assets were introduced by this stream.

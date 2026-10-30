@@ -211,6 +211,117 @@ try {
     }
     return state;
   }
+  if (wants('shade')) {
+    await boot(quality, true);
+    const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
+    if (!actors.length) throw Error('No Shade encounter authored');
+    save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
+    let lens = null;
+    const camera = async () => {
+      const actor = await page.evaluate(() => window.__gameHooks.shades.state().actors[0]);
+      const [x,y,z] = actor.pos;
+      if(!lens){
+        const dx=x+112,dz=z+24,d=Math.hypot(dx,dz)||1;
+        lens=[x+dx/d*8,y+3.6,z+dz/d*8];
+      }
+      await H('photo', lens, [x,y+1.2,z],48);
+    };
+    const start = actors[0].pos;
+    const safePosition = await page.evaluate(([x,y,z]) => {
+      const col = window.__gameHooks.debug.world.collision;
+      const patrol=window.__gameHooks.debug.world.shadeSpots[0].patrol;
+      for(let px=-117;px<=-107;px+=.25)for(let pz=-29;pz<=-19;pz+=.25){
+        if(Math.hypot(px+112,pz+24)>4.8)continue;
+        if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2)continue;
+        if(patrol.every(q=>Math.hypot(q[0]-px,q[2]-pz)>2.1))return [px,y,pz];
+      }
+      throw Error('No safe patrol observer position');
+    }, start);
+    const observerYaw = Math.atan2(start[0]-safePosition[0],start[2]-safePosition[2]);
+    await H('teleport', ...safePosition, observerYaw);
+    const probe = await H('shadesProbe');
+    if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
+    save('shade-drain-probe.json', probe);
+    await camera();
+    await video('shade-patrol', 180, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 45, 90, 135, 179] });
+    if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
+    await H('photoOff');
+    await advance(30);
+    await shot('shade-chase');
+    await H('setKeys', []);
+    let p = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
+    const contactSetup = await page.evaluate(([x,y,z]) => {
+      const col = window.__gameHooks.debug.world.collision;
+      for (let k=0;k<128;k++) {
+        const a=k/128*Math.PI*2, dx=Math.cos(a), dz=Math.sin(a);
+        let safe=true;
+        for(let r=.55;r<3.9;r+=.1) {
+          const px=x+dx*r,pz=z+dz*r;
+          if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2) { safe=false; break; }
+        }
+        if(safe)return {pos:[x+dx*.65,y,z+dz*.65], direction:[dx,dz]};
+      }
+      throw Error('No 3m wall-free contact direction');
+    }, p);
+    save('shade-contact-setup.json', contactSetup);
+    await H('teleport', ...contactSetup.pos, Math.PI);
+    lens=null;
+    await camera();
+    await video('shade-contact', 66, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 65] });
+    const contact = await page.evaluate(() => window.__gameHooks.shades.state());
+    if (contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1) throw Error(`Shade contact failed: ${JSON.stringify(contact)}`);
+    p = contact.actors[0].pos;
+    const dashSetup = await page.evaluate(([x,y,z]) => {
+      const col=window.__gameHooks.debug.world.collision;
+      for(let k=0;k<128;k++){
+        const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+        for(let r=.1;r<3.1;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+        if(safe)return {pos:[x+dx*2.7,y,z+dz*2.7], direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
+      }throw Error('No clear dash approach');
+    },p);
+    save('shade-dash-setup.json',dashSetup);
+    await H('teleport', ...dashSetup.pos, dashSetup.yaw);
+    await H('setStick', ...dashSetup.direction);
+    await H('setKeys', ['ShiftLeft']);
+    lens=null;
+    await camera();
+    await video('shade-free', 210, async i => {
+      if (i === 12) { await H('setKeys', []); await H('setStick', null); }
+      await camera();
+    }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 120, 180, 209] });
+    const freed = await page.evaluate(() => window.__gameHooks.shades.state());
+    if (freed.frees !== 1 || !freed.actors[0].freed || freed.hits !== contact.hits || freed.wisps < contact.wisps) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
+    await advance(90);
+    await shot('shade-leaf-litter');
+    await advance(600, false);
+    if ((await page.evaluate(() => window.__gameHooks.shades.state().actors[0].leaves)) !== 0) throw Error('Leaf one-shot did not end empty');
+    if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
+    await advance(0);
+    await shot('shade-after-free');
+    save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    // Separate live third-person take: same encounter and controller, actual keyboard events.
+    await boot(quality, true);
+    const live = await page.evaluate(() => {
+      const actor=window.__gameHooks.shades.state().actors[0];
+      const [x,y,z]=actor.pos,col=window.__gameHooks.debug.world.collision;
+      for(let k=0;k<128;k++){
+        const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+        for(let r=.1;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+        if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],yaw:Math.atan2(-dx,-dz)};
+      }throw Error('No clear live dash approach');
+    });
+    await H('teleport', ...live.pos, live.yaw);
+    await H('advance', 1, 0, true);
+    await page.keyboard.down('w');
+    await page.keyboard.down('Shift');
+    await video('shade-play', 180, async i => {
+      if(i===12){await page.keyboard.up('w');await page.keyboard.up('Shift');}
+    }, undefined, {traceEveryFrame:true,keyFrames:[0,6,12,24,45,90,179]});
+    const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
+    if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
+    save('shade-live-acceptance.json',{label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
+
+  }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
     await boot(quality, true, '&gym=gait');
@@ -308,47 +419,47 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
-  if (selected.split(',').includes('shade')) {
+  if (wants('water')) {
     await boot(quality, true);
-    const actor = () => page.evaluate(() => window.__gameHooks.shades?.state().actors[0]);
-    const first = await actor();
-    if (!first) throw Error('Target ref has no Shade review hook');
-    async function approach(current, distance) {
-      return page.evaluate(([pos, distance]) => {
-        const col = window.__gameHooks.debug.world.collision, [x, y, z] = pos;
-        for (const radius of distance > 1 ? [distance, 2.5, 2, 1.6] : [distance]) for (let i = 0; i < 16; i++) {
-          const a = i / 16 * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a);
-          const safe = (px, pz) => Math.abs(col.groundAt(px, pz, y + .2).y - y) < .25 && !col.blocked(px, pz, y);
-          const px = x + dx * radius, pz = z + dz * radius;
-          if (!safe(px, pz)) continue;
-          if (![[.15,0],[-.15,0],[0,.15],[0,-.15]].every(([sx,sz]) => safe(px + sx, pz + sz))) continue;
-          return { pos: [x + dx * Math.min(distance,radius), y, z + dz * Math.min(distance,radius)], stick: [-dx, -dz], yaw: Math.atan2(-dx, -dz) };
-        }
-        throw Error('No safe Shade approach/knockback lane found');
-      }, [current.pos, distance]);
-    }
-    let lane = { pos: first.pos, stick: [0, 0], yaw: 0 }; // Patrol starts with fox safely at normal spawn.
-    await H('setStick', 0, 0);
-    const keyFrames = Array.from({ length: 24 }, (_, i) => i * fps / 2);
-    save('shade-script.json', { label: 'Staged patrol/contact/dash-free; real encounter state, no forced damage/free', contactAt: 4, dashAt: 7 });
-    await video('shade-staged', 12 * fps, async i => {
-      if (i === 4 * fps || i === 7 * fps) {
-        const current = await actor();
-        lane = await approach(current, i === 4 * fps ? .4 : 3);
-        await H('teleport', ...lane.pos, lane.yaw);
+    await H('teleport', 51, 0, 43, Math.PI);
+    const lens = [[64, 7, 44], [59, 0.5, 34], 48];
+    await H('photo', ...lens); await advance(10); await shot('water-frozen');
+    const timeline = [];
+    await video('water-cycle', 12 * fps, async i => {
+      if (i === 0) { await H('teleport', 56, 0.3, 37, Math.PI); await H('photo', ...lens); }
+      if (i === Math.round(1.4 * fps)) { await H('teleport', 51, 0, 43, Math.PI); await H('photo', ...lens); }
+      if ([Math.round(0.3 * fps), Math.round(0.8 * fps), 2 * fps, 6 * fps, 8 * fps, 11 * fps].includes(i)) {
+        await shot(`water-${i}`);
+        timeline.push({ frame: i, state: (await H('state')).chem.water });
       }
-      await H('setStick', ...(i >= 7 * fps && i < 7.3 * fps ? lane.stick : [0, 0]));
-      await H('setKeys', i === 7 * fps ? ['ShiftLeft'] : []);
-    }, undefined, { keyFrames, label: i => `Shade ${i / fps}s | staged review`,
-      afterStep: async (i, state) => {
-        const current = await actor(), [x, y, z] = current.pos;
-        await H('photo', [x + 7, y + 3.2, z + 8], [x, y + 1.1, z], 46);
-      },
     });
-    await H('setStick', null); await H('setKeys', []); await shot('shade-end');
-    const encounter = await page.evaluate(() => window.__gameHooks.shades.state());
-    save('shade-result.json', { ...encounter, deaths: (await H('state')).deaths, note: 'Patrol at normal spawn; contact and dash start at validated surfaces. Falls after a real hit/dash remain visible outcomes.' });
-    if (!encounter.hits || !encounter.frees) report.failures.push('Shade script did not demonstrate both contact and dash-free; inspect the trace');
+    await H('teleport', 55.8, 0.3, 37.2, Math.PI); await H('photo', ...lens); await H('setStick', 0, 0);
+    await video('water-crossing', 4 * fps, async i => {
+      if (i === fps) await H('setStick', 0.839, -0.544);
+      if (i === Math.round(2.1 * fps)) await H('setStick', 0, 0);
+      if ([fps, Math.round(1.5 * fps), 3 * fps].includes(i)) await shot(`water-crossing-${i}`);
+    });
+    await H('setStick', null);
+    save('water-acceptance.json', { cycle: timeline, crossing: await H('state') });
+    await H('teleport', 95, 2, 10, Math.PI);
+    await H('photo', [113, 15, 37], [98, 8, 19], 52); await advance(2); await shot('water-reed-frozen');
+    await H('teleport', 100, 15, 19.2, Math.PI);
+    await H('photo', [113, 15, 37], [98, 8, 19], 52);
+    await video('water-reed-feed', 14 * fps, async i => {
+      if ([fps, 5 * fps, 10 * fps, 13 * fps].includes(i)) await shot(`water-reed-${i}`);
+    });
+    save('water-reed-result.json', await H('state'));
+    await H('teleport', -30, 0, 65, Math.PI); await H('setStick', 0, 0);
+    await H('photo', [-23, 5, 70], [-30, 1, 61], 48); await advance(2); await shot('water-pond-frozen');
+    await video('water-pond-grotto', 8 * fps, async i => {
+      if (i === 15) { await H('setStick', 0, -1); await H('setKeys', ['ShiftLeft']); }
+      if (i === 40) await H('setKeys', []);
+      if (i === 95) await H('setStick', 0, 0);
+      if ([30, 60, 100, 300].includes(i)) await shot(`water-pond-${i}`);
+    });
+    await H('setStick', null); await H('setKeys', []);
+    save('water-pond-result.json', await H('state'));
+    await H('photo', [-7, 7, 79], [-23, 0, 66], 52); await advance(2); await shot('water-pond-vista');
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
@@ -468,6 +579,122 @@ try {
     }
     save('updraft-acceptance.json', summary);
     console.log('UPDRAFT', JSON.stringify(summary));
+  }
+  if (wants('wind')) {
+    // Wind river acceptance (world-1.md §3.3 beat 6): SW1 latched → ride H2 up, glide into the river, land on the arena rim.
+    await boot(quality, true);
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+    await H('lightSeedwells'); await advance(240, false);
+    const st0 = await H('state');
+    const h2 = st0.chem.hearths.find(h => h.id === 'H2');
+    const [hx, hy, hz] = h2.pos;
+    // stand 1.6 m west of H2 facing east (along the river's first leg)
+    const yawE = Math.atan2(1, 0.45);
+    await H('teleport', hx - 1.6, 20, hz - 0.7, yawE); await advance(30);
+    let phase = 'jump', t0 = 0;
+    const tl = [];
+    await video('wind-river', 26 * fps, async i => {
+      const st = await H('state');
+      tl.push({ i, pos: st.pos, vel: st.vel, gliding: st.gliding, grounded: st.grounded, wind: st.chem.wind[0] });
+      let keys = [];
+      if (phase === 'jump') { keys = ['KeyD', 'Space']; if (i > 4) phase = 'rise'; }
+      else if (phase === 'rise') { keys = ['Space']; if (st.pos[1] > 27 || (st.vel[1] < 0.5 && i > 60)) { phase = 'ride'; t0 = i; } }
+      else if (phase === 'ride') { keys = ['KeyW', 'Space']; if (st.grounded) phase = 'landed'; }
+      await H('setKeys', keys);
+    }, (st, i) => phase === 'landed' && i > 30, { keyFrames: [0, 60, 150, 300, 450, 600, 750, 900] });
+    const end = await H('state');
+    const peak = Math.max(...tl.map(r => r.pos[1]));
+    const landedArena = end.grounded && Math.hypot(end.pos[0], end.pos[2] + 60) < 20 && end.pos[1] > 10;
+    const summary = { end: end.pos, grounded: end.grounded, landedArena, peak, wind: end.chem.wind, rideFrames: tl.length - t0 };
+    save('wind-acceptance.json', summary); save('wind-timeline.json', tl.filter((_, k) => k % 10 === 0));
+    console.log('WIND', JSON.stringify(summary));
+    await H('setKeys', []);
+  }
+  if (wants('growth')) {
+    // Growth element acceptance (docs/design/world-1.md §1.3, §1.5): Creek Root bridge over the creek gorge.
+    // X: stand by the cold knot, follow the growth front across (never ahead of it), watch hold → warning → wither.
+    // R: stop mid-bridge past the hold: the occupied root must be retained (no fall), then wither once off it.
+    // D: dash along the knot from cold, walk away: grown + lit time.
+    await boot(quality, true);
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+    const rootOf = st => st.chem.growth.roots.find(r => r.id === 'creek');
+    const r0 = rootOf(await H('state'));
+    const [kx, ky, kz] = r0.knot;
+    const path = await page.evaluate(() => window.__gameHooks.chem.growth.roots.find(r => r.spot.id === 'creek').curve.getSpacedPoints(48).map(p => [p.x, p.y, p.z]));
+    const summary = { root: r0, X: {}, R: {}, D: {} };
+    const side = [[kx - 7.5, ky + 3.4, kz + 1.5], [kx + 0.8, ky - 0.6, kz - 7], 50];
+    const high = [[kx - 6, ky + 9, kz + 6], [kx + 0.8, ky - 1.5, kz - 6.5], 50];
+    const start = [kx + 1.3, ky, kz + 1.4];
+    await H('teleport', start[0] - 6, ky, start[2] + 6, Math.PI); await H('photo', ...high); await advance(30); await shot('growth-still-cold');
+    // steer: world-space stick toward the path, holding ≥ gap m behind the front; stop = hold position
+    const nearest = (x, z) => { let bi = 0, bd = Infinity; path.forEach(([px, , pz], i) => { const d = (px - x) ** 2 + (pz - z) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+    const segLen = r0.length / (path.length - 1);
+    async function follow(st, gap, holdAtS = Infinity) {
+      const r = rootOf(st), [x, , z] = st.pos;
+      const i = nearest(x, z), foxS = i * segLen;
+      const onIt = Math.hypot(path[i][0] - x, path[i][2] - z) < 0.9 && i > 0;
+      if (!onIt && i === 0) { const [tx, , tz] = path[1]; const d = Math.hypot(tx - x, tz - z); if (r.front < gap + 1.2) return H('setStick', 0, 0); return H('setStick', (tx - x) / d, (tz - z) / d); }
+      if (foxS >= holdAtS) return H('setStick', 0, 0);
+      if (foxS > r.front - gap && r.front < r.length) return H('setStick', 0, 0);
+      const j = Math.min(path.length - 1, i + 3), [tx, , tz] = j === path.length - 1 && i >= path.length - 3 ? [path.at(-1)[0] + 0.3, 0, path.at(-1)[2] - 2.5] : path[j];
+      const d = Math.hypot(tx - x, tz - z) || 1;
+      return H('setStick', (tx - x) / d * 0.75, (tz - z) / d * 0.75);
+    }
+    for (const variant of ['X', 'R']) {
+      await H('teleport', ...start, Math.PI); await H('photo', ...side); await advance(20);
+      const tl = [], keyFrames = [0];
+      let crossed = -1, onBridge = -1, mark = {};
+      const name = variant === 'X' ? 'growth-cross' : 'growth-retain';
+      await video(name, (variant === 'X' ? 16 : 20) * fps, async i => {
+        const st = await H('state'), r = rootOf(st);
+        tl.push({ i, t: st.t, pos: st.pos, grounded: st.grounded, heat: r.heat, state: r.state, front: r.front, wither: r.wither, retained: r.retained, cols: r.collidersOn, deaths: st.deaths });
+        const tag = (k, cond) => { if (cond && mark[k] === undefined) { mark[k] = i; keyFrames.push(i); } };
+        tag('lit', r.heat > 0.5); tag('third', r.grown > 0.34); tag('twoThirds', r.grown > 0.67); tag('grown', r.grown >= 1);
+        tag('warn', r.state === 'guttering'); tag('wither', r.wither > 0.5); tag('witherHalf', r.wither > r.length * 0.5);
+        if (onBridge < 0 && r.retained) { onBridge = i; keyFrames.push(i); }
+        if (crossed < 0 && st.pos[2] < path.at(-1)[2] - 0.5 && st.grounded) { crossed = i; keyFrames.push(i); }
+        if (variant === 'X') await follow(st, 1.4);
+        else if (mark.grown === undefined || i - mark.grown < 8 * fps) await follow(st, 1.4, r0.length * 0.5);
+        else await follow(st, 0);
+      }, (st, i) => variant === 'X' ? crossed > 0 && rootOf(st).front === 0 && i - crossed > 30 : crossed > 0 && rootOf(st).front === 0 && i - crossed > 30, { keyFrames, label: (f, st) => st ? `${name} f${f} heat=${rootOf(st).heat.toFixed(2)} ${rootOf(st).state} front=${rootOf(st).front.toFixed(1)} wither=${rootOf(st).wither.toFixed(1)}${rootOf(st).retained ? ' RETAINED' : ''}` : `${name} f${f}` });
+      await H('setStick', null);
+      const lit = tl.find(r => r.heat > 0), grown = tl.find(r => r.front >= r0.length - 0.01), warn = tl.find(r => r.state === 'guttering'), gone = tl.find(r => warn && r.t > warn.t && r.front === 0);
+      const offBridge = tl.filter(r => !r.retained && r.grounded && r.pos[1] < ky - 1.5);
+      summary[variant] = {
+        growS: lit && grown ? Number((grown.t - lit.t).toFixed(2)) : null,
+        holdS: grown && warn ? Number((warn.t - grown.t).toFixed(2)) : null,
+        warnS: warn ? Number(((tl.find(r => r.t > warn.t && r.wither > 0)?.t ?? NaN) - warn.t).toFixed(2)) : null,
+        witherS: gone ? Number((gone.t - (tl.find(r => r.wither > 0)?.t ?? gone.t)).toFixed(2)) : null,
+        maxRetainedS: Number((tl.filter(r => r.retained).length / fps).toFixed(2)),
+        fellIntoGorge: offBridge.length > 0, crossedAtFrame: crossed, deaths: tl.at(-1)?.deaths,
+        minLeadM: Math.min(...tl.filter(r => r.retained && r.front < r0.length).map(r => r.front - nearest(r.pos[0], r.pos[2]) * segLen)),
+      };
+      save(`${name}-timeline.json`, tl);
+      await H('photoOff'); await advance(240, false);
+    }
+    { // D: dash along the cold knot, keep going; lit/grown timeline
+      await H('teleport', kx + 5, ky, kz + 0.4, -Math.PI / 2); await advance(30);
+      const tl = [];
+      for (let i = 0; i < 12 * 60; i++) {
+        const st = await H('state'), r = rootOf(st);
+        await H('setStick', i < 200 ? -1 : 0, 0);
+        if (i === 14) await H('setKeys', ['ShiftLeft']); else if (i === 16) await H('setKeys', []);
+        await H('advance', 1, 1 / 60, false);
+        tl.push({ t: st.t, heat: r.heat, state: r.state, supply: r.supply, front: r.front });
+      }
+      await H('setStick', null);
+      const lit = tl.filter(r => r.heat > 0);
+      summary.D = { litS: lit.length ? Number((lit.at(-1).t - lit[0].t).toFixed(2)) : 0, grew: Math.max(...tl.map(r => r.front)), suppliedS: Number((tl.filter(r => r.supply >= 0.3).length / 60).toFixed(2)) };
+      await advance(400, false);
+    }
+    // lit + grown stills, then the debug view of colliders/probes
+    await H('teleport', kx + 1.2, ky, kz + 1.1, Math.PI); await advance(6 * 60, false);
+    await H('photo', ...high); await advance(2); await shot('growth-still-grown');
+    await H('photo', ...side); await advance(2); await shot('growth-still-grown-side');
+    await page.evaluate(() => document.body.classList.add('debug-on')); await advance(2); await shot('growth-still-debug');
+    await page.evaluate(() => document.body.classList.remove('debug-on')); await H('photoOff');
+    save('growth-acceptance.json', summary);
+    console.log('GROWTH', JSON.stringify(summary));
   }
   if (wants('route')) {
     await boot(quality, true);

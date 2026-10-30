@@ -189,7 +189,7 @@ export class AuthoredLocomotion {
         const d=GAITS[name].contacts[i]; const p=(phase-d.phase+1)%1;
         return sum+(p<d.duty ? (this.metrics.clipWeights[name] ?? 0) : 0);
       },0);
-      const stance=this.input.grounded && (locomoting ? support>.55 : active==='idle');
+      const stance=this.input.grounded && (locomoting ? support>.55 : (active==='idle' || active==='land'));
       if (stance) {
         const sample=foot.planted ? foot.anchor : paw;
         const ground=this.input.groundAt(sample.x,sample.z,this.group.position.y+.6);

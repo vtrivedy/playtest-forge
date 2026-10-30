@@ -134,7 +134,7 @@ def authored_action(name,keys,n):
 authored_action('jump_up',[(0,load),(.3,push),(1,tuck)],12)
 authored_action('jump_apex',[(0,tuck),(.5,action_pose(-.02,(.23,.68),(-.36,.76),0)),(1,tuck)],30)
 authored_action('jump_fall',[(0,tuck),(.35,reach),(1,reach)],24)
-authored_action('land',[(0,reach),(.22,absorb),(1,base)],18)
+authored_action('land',[(0,base),(.22,absorb),(1,base)],18)
 authored_action('dash',[(0,action_pose(-.25,(-.35,.20),(.25,.20),-3)),(.5,action_pose(-.28,(-.38,.23),(.30,.23),-4)),(1,action_pose(-.25,(-.35,.20),(.25,.20),-3))],18)
 # Imported clips were 24fps; preserve their seconds after switching authoring scene to 60fps.
 for name,act in SRC_ACTIONS.items():

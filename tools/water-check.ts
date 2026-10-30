@@ -45,3 +45,12 @@ assert.equal(flume.arriving, false, 'Drain tail reaches basin after remaining tr
 cutStep(2.1);
 assert.equal(flume.arriving, true, 'Released drain resumes with a travelling front');
 console.log('Shade split/tail/recovery: PASS');
+
+// A restored Reed basin must never colour the distant kiln or maple.
+const { ColorField } = await import('../src/render/colorField');
+const field = new ColorField(); field.fox.set(0, 1000, 0);
+field.restore(new THREE.Vector3(95, 2, 10), 35, 0.2); field.update(0.3);
+assert.equal(field.sample(new THREE.Vector3(95, 2, 10)), 1);
+assert.equal(field.sample(new THREE.Vector3(-112, 20, -24)), 0);
+assert.equal(field.sample(new THREE.Vector3(-10, 17.5, -36)), 0);
+console.log('Restored-region locality: PASS');

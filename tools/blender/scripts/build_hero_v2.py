@@ -57,17 +57,17 @@ def scl(name, sx=1.0, sy=1.0, sz=1.0):
     P[name].scale = (sx, sy, sz); upd()
 
 # neck up, head held level and proud (calm, alert carriage like the turnaround)
-rot_world("Neck1", "X", -38)
+rot_world("Neck1", "X", -31)  # neck slopes into the shoulders (upright read as stiff)
 rot_world("Neck2", "X", -15)
 rot_world("Neck3", "X", -6)
-rot_world("Head", "X", 53)
+rot_world("Head", "X", 46)
 scl("Head", 1.18, 1.12, 1.18)
 # tall ears, more upright
 for s in ("L", "R"):
     sign = 1 if s == "L" else -1
     rot_world(f"Ear1.{s}", "Y", -14 * sign)
     rot_world(f"Ear1.{s}", "X", 6)
-    scl(f"Ear1.{s}", 1.35, 1.9, 1.35)  # big fox ears (turnaround: ears ~= head length)
+    scl(f"Ear1.{s}", 1.25, 1.7, 1.25)  # big fox ears (turnaround: ears ~= head length), not toy-sized
 # slender but solid legs (turnaround: umber-socked, defined joints)
 for s in ("L", "R"):
     scl(f"FrontUpperLeg.{s}", 1.12, 0.97, 1.12)

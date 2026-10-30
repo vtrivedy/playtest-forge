@@ -138,3 +138,11 @@ Water review corrections (12:15 ET): the crossing has a permanent shallow stone 
 
 ### Authored fox action refinement — 13:15
 Jump poses must show an anatomical hind push, all-four gathered paws at apex, then forepaw reach before landing. Author each action on the current hero armature with sagittal IK, preserving bone scale; show loading immediately and launch after50ms for grounded jumps; coyote jumps launch immediately. Dash receives a distinct low extended pose, and the tail plume keeps a visible air gap above the floor. Verify every frame and compare independent bone measurements against planted-only metrics; low planted residual alone does not prove natural swing.
+Stag lookdev r2: a solid sepia-ink core with a thin translucent, wavering back-face
+wash. Only the fringe is translucent; masonry must not show through the torso.
+Capture uses one fixed exterior lens per moment and renders the late lifecycle
+after advancing the simulation so empty-state stills match their diagnostics.
+
+Water completion slice: S1 pond-grotto falls at (−30,62) uses the same reactor and opens its frozen sheet collider only while flowing. The grotto floor remains solid; the fox can relight from either side. Full flood restores all water. A slow authored flume Shade patrol uses the existing encounters public drain predicate; water already past it runs out normally. Original procedural assets only (CREDITS.md).
+### Fox pass 7 — 2026-10-30 13:20 ET
+Preserve the published quadruped rig and locomotion ownership. Refine the existing CC0 scaffold toward the concept: reduce ear height, retain a continuous soft brush through the tail tip, reduce detached flame cards, and strengthen coherent saddle/chest values. Keep the reference scene cameras and lights fixed. Verify with Modal concept comparisons, in-game close/chase frames and state logs; request cross-model critique before claiming the milestone. Use quick headless Blender exports because Blender MCP has no live connection; all renders remain remote.

@@ -24,6 +24,7 @@ type ShadeActor = {
   heading: number;
   group: THREE.Group;
   mat: THREE.ShaderMaterial;
+  fringe: THREE.ShaderMaterial;
   pool: THREE.Mesh;
   /** 1 = present, falls to 0 while freed */
   presence: number;
@@ -95,9 +96,9 @@ const NOISE = /* glsl */ `
 
 function inkMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uFringe: { value: 0 } },
     vertexShader: /* glsl */ `
-      uniform float uTime, uPresence, uSeed;
+      uniform float uTime, uPresence, uSeed, uFringe;
       varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
       ${NOISE}
       void main() {
@@ -107,7 +108,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         p += normal * (n3(p * 3.0 + vec3(0.0, uTime * 1.3, uSeed)) - 0.5) * w * 2.0;
         p.x += sin(uTime * 1.7 + p.y * 2.0 + uSeed) * 0.075;
         // freeing: the body lifts and spreads as it comes apart
-        p += normal * (1.0 - uPresence) * 0.35;
+        p += normal * ((1.0 - uPresence) * 0.35 + uFringe * 0.14);
         vP = p; vY = p.y;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         vN = normalize(normalMatrix * normal);
@@ -115,7 +116,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      uniform float uTime, uPresence, uSeed;
+      uniform float uTime, uPresence, uSeed, uFringe;
       varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
       ${NOISE}
       void main() {
@@ -131,12 +132,13 @@ function inkMaterial(): THREE.ShaderMaterial {
         vec3 col = mix(core, edge, rim * 0.32 + smoothstep(cut, cut + 0.06, n) * 0.0);
         col = mix(col, edge * 0.8, 1.0 - smoothstep(cut, cut + 0.05, n));
         col = mix(col, vec3(0.055, 0.018, 0.006), rim * n * 0.18);
-        gl_FragColor = vec4(col, 0.98 - rim * 0.18);
+        float alpha = uFringe > 0.5 ? smoothstep(0.15, 0.85, rim) * 0.22 * uPresence : 1.0;
+        gl_FragColor = vec4(col, alpha);
         #include <colorspace_fragment>
         #include <fog_fragment>
       }`,
     fog: false,
-    transparent: true,
+    transparent: false,
     depthWrite: true,
   });
 }
@@ -193,6 +195,14 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     const body = new THREE.Mesh(geo, mat);
     body.castShadow = false;
     group.add(body);
+    const fringe = mat.clone();
+    fringe.uniforms.uFringe!.value = 1;
+    fringe.transparent = true;
+    fringe.depthWrite = false;
+    fringe.side = THREE.BackSide;
+    const wash = new THREE.Mesh(geo, fringe);
+    wash.renderOrder = 2;
+    group.add(wash);
     scene.add(group);
     const pool = new THREE.Mesh(poolGeo, poolMaterial());
     pool.renderOrder = 1;
@@ -214,7 +224,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: new THREE.Vector3(), heading: 0, group, mat, pool, presence: 1, freed: false };
+    return { leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: new THREE.Vector3(), heading: 0, group, mat, fringe, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
@@ -292,6 +302,8 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         s.group.rotation.y = s.heading;
         s.mat.uniforms.uTime!.value = t;
         s.mat.uniforms.uPresence!.value = s.presence;
+        s.fringe.uniforms.uTime!.value = t;
+        s.fringe.uniforms.uPresence!.value = s.presence;
         s.pool.position.set(s.pos.x, s.pos.y + 0.04, s.pos.z);
         s.pool.scale.setScalar(tun.drainRadius);
         const pm = s.pool.material as THREE.ShaderMaterial;
