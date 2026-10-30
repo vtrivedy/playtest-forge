@@ -572,7 +572,10 @@ try {
     save('updraft-acceptance.json', summary);
     console.log('UPDRAFT', JSON.stringify(summary));
   }
-  if (wants('levels')) await captureLevels({ boot, H, advance, shot, video, save, page, fps, quality, report });
+  if (wants('levels')) {
+    await boot(quality, true);
+    await captureLevels({ H, advance, shot, video, save, page, fps, quality, report });
+  }
   if (wants('wind')) {
     // Wind river acceptance (world-1.md §3.3 beat 6): SW1 latched → ride H2 up, glide into the river, land on the arena rim.
     await boot(quality, true);

@@ -1,6 +1,5 @@
 /** Windmill Rise acceptance. One labelled staged start; all subsequent motion is live controller input. */
 export async function captureLevels({ boot, H, advance, shot, video, save, page, fps, quality, report }) {
-  await boot(quality, true);
   const initial = await H('state');
   const hearth = initial.chem.hearths.find(h => h.id === 'H2');
   if (!hearth) throw Error('Levels capture requires H2');
@@ -15,7 +14,8 @@ export async function captureLevels({ boot, H, advance, shot, video, save, page,
   }
   path.push(controls.at(-1));
   // Dash east along the inner side of the bowl, remaining on the 12.4 m ledge.
-  const stagedStart = [hx - 3.8, hy, hz - 1.4];
+  const ledgeY = await page.evaluate(() => window.__gameHooks.debug.world.hearthSpots.find(h => h.id === 'H2').y);
+  const stagedStart = [hx - 3.8, ledgeY, hz - 1.4];
   await H('teleport', ...stagedStart, Math.PI / 2);
   await H('setStick', 0, 0); await H('setKeys', []); await advance(8);
   await shot('levels-00-staged-cold-start');
@@ -51,7 +51,7 @@ export async function captureLevels({ boot, H, advance, shot, video, save, page,
     } else if (phase === 'takeoff') {
       keys = ['Space'];
       // Centre the rider in the column after clearing the brazier's collision top.
-      if (st.pos[1] > hy + 1.1) await aim(hx, hz);
+      if (st.pos[1] > hy + 0.15) await aim(hx, hz);
       else await H('setStick', 0, 0);
       if (st.pos[1] >= 27.4) phaseChange('river', frame);
       else if (frame - phaseAt > 8 * fps) { phaseChange('failed-rise', frame); finished = true; }
