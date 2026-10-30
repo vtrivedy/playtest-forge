@@ -10,11 +10,11 @@ Companion docs: [`art-direction.md`](art-direction.md) (look), [`world-1.md`](wo
 
 | # | Question | Proposal |
 |---|----------|----------|
-| G1 | Ember Burst and Pounce Slam share the **JUMP + DASH chord** (ground vs air). Is that OK, or should they get a dedicated third button? | Keep the chord. It honors "move + 2 actions" |
-| G2 | Fall damage: drops over 6 m without gliding cost 1 wisp (`world-1.md` §2.9) | Keep it. Glide always saves, which teaches the glide |
-| G3 | Embers are a **threshold**, never spent (Spyro-style). OK? | Yes. Nothing is ever taken from the player |
-| G4 | Restored ground does **not** refill Spark, so Burst is fed by sepia ground and ash creatures | Keep it. Restoring makes the world gentler and the fox slightly less powerful, a quiet trade |
-| G5 | Lit hearth sockets (Kindle) stay lit permanently | Yes. Saved |
+| G1 | Ember Burst, Pounce Slam and the JUMP + DASH chord are **deleted**: the dash is the brush (a 6 s strong color stroke). OK? | Yes. Honors "move + 2 actions" with no chord |
+| G2 | Fall damage: drops over 6 m without gliding cost 1 wisp | Keep it. Glide always saves, which teaches the glide |
+| G3 | No collectible economy at all in W1 (no embers, motes, seals, upgrade shards). Rewards are places, Lost Kits, pages, the gold wake | Yes. "Collecting little orbs is not cool" |
+| G4 | Any one Seedwell opens a route up Wellspring Hill (no three-Seedwell gate) | Yes. The other two make the valley more alive and the hill easier |
+| G5 | Restorations (latched Seedwells) are saved and can never be undone by enemies | Yes |
 
 ---
 
@@ -23,30 +23,25 @@ Companion docs: [`art-direction.md`](art-direction.md) (look), [`world-1.md`](wo
 | # | Pillar | Means | Kill test |
 |---|--------|-------|-----------|
 | 1 | **Powerful, graceful fox** | Run, jump, dash and glide feel fast, precise and animal. A combo chain (jump → air-dash → glide → updraft) is the core joy | If moving around an empty island isn't fun for 2 minutes, stop and tune |
-| 2 | **Passing vs. caring** | The *ember wake* is temporary color, gone in seconds. *Seedwells* restore color permanently. The player feels the difference | If players can't explain why one place stays colored, the rules are unclear |
+| 2 | **Passing vs. caring** | The fox's color makes the world *breathe* (hearths burn, sails turn, water flows, roots grow) for seconds. A Seedwell, fed by an element, makes it breathe forever. The player feels the difference as routes | If a player can't explain why one hearth stays lit, the rules are unclear |
 | 3 | **Quiet wonder** | Melancholic, beautiful, few words. Payoffs are vistas, not fanfares | No exclamation marks in text. No combo counters |
-| 4 | **Spyro-like structure** | Hub → realms, collectibles leading off the path, secrets, a guardian, backtracking with new abilities | Every realm has ≥ 55 % of embers near the critical path and ≥ 7 secrets |
+| 4 | **Systemic, not scripted** | Four elements obey one color rule; shrines are solved with those rules, and each element appears once outside a shrine first (`world-1.md` §1) | If a puzzle needs a trigger the rules don't explain, cut it. No orbs, no counters |
 
 ---
 
 ## 2. Core loop
 
 ```
- ┌─ explore sepia realm ─▶ ember wake reveals ghost-ink paths, ash motes, sleeping NPCs
- │        │
- │        ▼
- │   collect embers / leaf motes / maple seals  ── thresholds ─▶ Pockets' doors, cosmetics
- │        │
- │        ▼
- │   light 3 Seedwells (permanent local autumn + checkpoint + root-bridge shortcut)
- │        │
- │        ▼
- │   Ash Warden ─▶ Ember Wellspring FLOOD (whole realm restored, new hue, new ability)
- │        │
- └── return to Lanternhollow ─▶ the hub warms one season ─▶ next portal + backtrack secrets
+ see a held-breath thing (cold hearth, still sails, glass waterfall, curled root)
+   → touch it with color: run past (brief) or DASH through it (strong, 6 s)
+   → it acts for seconds: updraft · wind current · flowing water · growing root
+   → use that to move: glide up, ride the wind, cross, ascend
+   → feed a Seedwell from an element for 2 s → it latches: that zone breathes forever
+   → a permanent route + a moving landmark; a Shade drifts in at the new color's edge
+   → any one Seedwell opens Wellspring Hill → the summit hearth feeds the Wellspring → FLOOD
 ```
 
-Session targets for W1: hub 3 min + realm 9 min on the critical path (≈ 12 min). Full clear ≈ 20 min.
+Full rules: [`world-1.md`](world-1.md) §0–§1. Session targets for W1 realm: ≈ 10 min first time on the critical path, ≈ 20 min full clear.
 
 ---
 
@@ -59,11 +54,10 @@ Session targets for W1: hub 3 min + realm 9 min on the critical path (≈ 12 min
 | Move | WASD (camera-relative) | Left stick | Run (analog: walk → stalk → run) | Air control |
 | Camera | Mouse | Right stick | Orbit | Orbit |
 | **JUMP** | Space | A / ✕ | Jump. Releasing early gives a short hop | **Hold while falling = Glide** |
-| **DASH** | Shift / LMB | X / □ | Ground dash | Air-dash (1 per airtime) |
-| JUMP + DASH (within 80 ms) | Space + Shift | A + X | **Ember Burst** (costs 40 Spark) | **Pounce Slam** |
+| **DASH** | Shift / LMB | X / □ | Ground dash. **The brush:** lays a 6 s strong color stroke | Air-dash (1 per airtime), same stroke |
 | Pause / Album | Esc / Tab | Start | | |
 
-That is two action buttons plus one chord. There is no attack button: the dash *is* the attack.
+Two action buttons, no chord. There is no attack button: the dash frees Shades and paints color.
 
 ### 3.2 Movement limits (design-space numbers; `world-1.md` builds to these)
 
@@ -78,52 +72,44 @@ That is two action buttons plus one chord. There is no attack button: the dash *
 | **Jump + air-dash** | **10 m** horizontal, 1.8 m rise | 6 m + 4 m |
 | **Glide** | **3 : 1** (horizontal : drop) | forward 7.5 m/s, sink 2.5 m/s, turn 120°/s. Starts 0.1 s after hold while vy < 0 |
 | Glide from y 30 → y 20 | 30 m | `world-1.md` B: mill-3 apex → SW1 (29 m) |
-| **Ember updraft** (Kindle) | **+6 m rise** above entry height | 6 m/s for 1.0 s while gliding in a Ø3 m column, then glide resumes |
-| Crown pad (Amberwood) | 1.3× jump = 2.34 m rise | soft-bounce leaf mat |
-| Pounce Slam | straight down at 22 m/s | 0.12 s hang at start, 3 m impact ring, 80 ms hit-stop |
+| **Ember updraft** (lit hearth) | **≥ 7 m rise** within 1.6 s | Ø4.4 m column, 9 m tall; glide vy eases toward a 6.5 m/s rise (`world-1.md` §5) |
 | Safe drop | ≤ 6 m with no glide | > 6 m = −1 wisp (§8) |
 | Wall / ledge | Auto ledge-grab-up ≤ 0.6 m above feet | No wall jump in W1 |
 
-**Combo grammar (most expressive chain):** jump → air-dash at apex → glide → updraft → air-dash is **not** refreshed by updrafts (one per airtime). That keeps distances designable.
+**Combo grammar (most expressive chain):** jump → air-dash at apex → glide → updraft / wind current → air-dash is **not** refreshed by updrafts (one per airtime). That keeps distances designable.
 
 ### 3.3 Actions
 
-| Action | Effect | Cost | Teaches |
-|--------|--------|------|---------|
-| **Ember wake** (passive) | Aura 3.0 m + trail (§4) | — | Hub 0:00–0:40 |
-| **Ember Burst** | 6 m ring of full color held **6 s**. Solidifies ghost-ink, wakes ash motes and sepia NPCs, cracks seals, strips **inked** enemies (§7) | 40 Spark | Hub gate (1:30–2:30) |
-| **Pounce Slam** | Plunge + 3 m color ring (2 s). 1 damage to colored enemies. Breaks sealed caps (hub well H1, post-W1) | free | Russetvale meadow Ashlings, then the Warden |
-| **Kindle** (earned at W1 flood) | Burst on a **hearth socket** lights a permanent ember updraft | **Free** on a socket (the socket supplies the fire) | Wellspring spiral preview; S7 backtrack |
+| Action | Effect | Teaches |
+|--------|--------|---------|
+| **Ember wake** (passive) | Aura 2.6 m + trail ≈ 2.5 s. Wakes elements briefly (they hold 3 s after color leaves) | Meadow 0:00–0:40 |
+| **Dash stroke** | Every dash stamps a 4 m stroke of strength 1.5 that lasts 6 s. Beats a Shade's drain. Reactors struck by it flare | Meadow hearth H0 (`world-1.md` §3.3) |
 
 ### 3.4 Resources
 
 | Resource | Max | Gain | Shown as |
 |----------|-----|------|----------|
-| **Wisps** (health) | 3 | Falling-leaf heal from defeated ash creatures (+1, 35 % drop), full at lantern checkpoints and lit Seedwells | The 3 tongues of tail flame. At 1 wisp the tail gutters to smoke |
-| **Spark** (Burst fuel) | 100 | **+1 per meter** run or glided over **unrestored** ground. +20 per ash creature defeated. Restored ground gives 0. Passing a lit lantern or Seedwell tops up to 40 | Brightness of the tail's ember core plus a soft pulse at ≥ 40 |
-| **Embers** (score) | — | Collectibles (§6) | Ensō counter (fades in after a pickup) |
+| **Wisps** (health) | 3 | Full at checkpoints and on each Seedwell latch. A freed Shade drops a falling leaf that heals +1 (35 %) | The 3 tongues of tail flame. At 1 wisp the tail gutters to smoke |
 
-Spark starts at 0. The hub cobbles before the gate give > 40 m of sepia, so the first Burst is guaranteed. The Warden arena keeps a 40 m unrestored loop, so a Burst is always one lap away.
+There is no fuel, no currency and no score. Spark and embers are deleted.
 
 ---
 
-## 4. Trail vs. restore (the color rules)
+## 4. Temporary vs. restored color
 
-| | **Temporary: ember wake** | **Temporary: Burst / Slam** | **Permanent: Seedwell** | **Permanent: Ember Wellspring** |
-|-|---------------------------|-----------------------------|-------------------------|--------------------------------|
-| Source | Fox aura + trail stains | Chord action | Lit Seedwell | Flood after the Warden |
-| Radius | Aura **3.0 m**. Stain 0.5 → 1.6 m, sampled every 0.4 m, 64-sample ring | **6 m** / 3 m | **30–40 m** (`world-1.md` §2.4) | Whole realm (front 40 m/s, ≈ 4 s) |
-| Duration | Stain decays **3.5 s**, edges first | **6 s** / 2 s | Forever (saved) | Forever (saved) |
-| Ghost-ink solid? | Yes, while mask > 0.5 at the platform center. Flashes at < 0.6 s left | Yes, for 6 s | Ghost-ink becomes real geometry | Same |
-| Ash motes / NPCs | Wake while colored | Wake | Wake permanently | All wake |
-| Spark refill | Ground still counts as unrestored | — | **No** | **No** |
-| Ash creatures | Colored = vulnerable (§7) | Strips ink shrouds | Zone enemies crumble (SW2: Blotters) | Remaining ash creatures crumble. Post-flood, lanterns top Spark up to 40, so Burst stays usable |
+Canonical rules live in [`world-1.md`](world-1.md) §1. Summary:
+
+| | **Aura + trail** | **Dash stroke** | **Restored** (Seedwell / flood) |
+|-|------------------|-----------------|--------------------------------|
+| Strength / lasts | ≤ 1 / trail ≈ 2.5 s | 1.5 / 6 s | 1 / forever (saved) |
+| Wakes elements | Yes; they hold 3 s, then gutter 0.8 s | Yes, with a flare | Yes; they never gutter |
+| Survives a Shade | No | Yes | Yes |
+| Latches a Seedwell | **Never** (Seedwells latch only from an element's output for 2 s) | Never | — |
 
 **Readability rules**
-1. Anything that matters to traversal **only while colored** is ghost-ink: a sketched outline, never invisible.
-2. Permanent restoration always shows a **landmark consequence**: windmills turn (SW1), the marsh dries (SW2), branch bridges grow (SW3), and a color river runs toward the Wellspring.
-3. At 3.5 s trail decay and 7.8 m/s, the trail behind a running fox is ≈ 27 m long. Ghost-ink stepping stones are therefore 4–6 m apart, so a moving fox always has the next stone colored.
-4. Stopping is a choice. The trail decays under an idle fox in 3.5 s, but the 3 m aura keeps the stone it stands on solid.
+1. Every element shows its own timer on its body (embers thin, sails slow, water frosts, root leaves brown). No HUD timers.
+2. Every latch shows a **landmark consequence**: the mills turn (SW1), the marsh washes clear (SW2), the root bridge grows (SW3), the valley floods (Wellspring).
+3. Temporary supports warn ≥ 0.8 s before they go and never vanish under planted paws.
 
 ---
 
@@ -133,70 +119,54 @@ The year turns as the game progresses: **Ember → Frost → Pine → Night.** R
 
 | World | Hue (realm) | Realm (working) | Ability gained at flood | Ability's backtrack use | Hub portal seal |
 |-------|-------------|-----------------|-------------------------|------------------------|-----------------|
-| **W1** | **Ember**: rust, crimson, gold | **Russetvale** | **Kindle**: Burst lights hearth sockets → ember updrafts (+6 m) | Hub belltower ledge, Russetvale S7 | Opens after the hub tutorial |
+| **W1** | **Ember**: rust, crimson, gold | **Russetvale** | None yet. W1's elements (heat, wind, water, growth) work everywhere after the flood. Next-world ability TBD | — | Opens after the hub tutorial |
 | W2 | Frost: frost-blue, slate, rime | TBD | Rime Step: glide over cold air vents leaves a short frost bridge (proposal) | W1 marsh sunken ruin depths | Frost glyph (52, −30) |
-| W3 | Pine: deep pine, lichen gold | TBD | Rootcall: slam on root knots grows a climb root (proposal) | W1 Amberwood under-roots | Pine glyph (50, 22) |
+| W3 | Pine: deep pine, lichen gold | TBD | Rootcall: root knots grow climb walls anywhere (proposal) | W1 Amberwood under-roots | Pine glyph (50, 22) |
 | W4 | Night: violet, indigo, starlight | TBD | Starward: glide stars refresh air-dash (proposal) | Hub cloud-sea islets | Night glyph (−52, −30) |
 
-**Hub progression:** each Wellspring restored warms one leaf of the Great Well's stone maple crest **and** one quarter of Lanternhollow. Portal *N+1* opens when Wellspring *N* is restored. Ember totals never gate the main path.
-
-| Ember threshold (cumulative) | Unlock |
-|------------------------------|--------|
-| 150 held | Pockets' low door (Russetvale S4, Lost Kit #3) |
-| 300 | After W1, Pockets moves to the hub cart. He sells nothing and gives the **russet wake tint** (cosmetic) |
-| 500 (W1 100 %) | Album page "Russetvale, kept" (art page) |
+**Hub progression:** each Wellspring restored warms one leaf of the Great Well's stone maple crest **and** one quarter of Lanternhollow. Portal *N+1* opens when Wellspring *N* is restored.
 
 ---
 
-## 6. Collectibles
+## 6. Rewards (no collectibles)
 
-There are no gems and no pigment: everything is ember, leaf or maple.
+Ember motes, leaf motes, ash motes, maple seals and the ember counter are **deleted**. Exploration pays in:
 
-| Item | Value | Look (see `art-direction.md` §8) | Behavior | W1 count |
-|------|-------|----------------------------------|----------|----------|
-| **Ember mote** | 1 | Floating coal of light, 0.08 m bob | Magnet radius 1.5 m. Breadcrumbs guide routes | Hub 55 + realm 165 |
-| **Leaf mote** | 5 | Glowing maple leaf, turning | Magnet 2 m. Marks tops, ends of routes, chimney caps | Hub 4 + realm 18 |
-| **Maple seal** | 25 | Bronze leaf-relief disc | No magnet. Must be touched. Always in a secret or at a hard route's end | Hub 1 + realm 4 |
-| **Ash mote** | 5 | Dull gray cracked cinder | **Inert until colored** (aura or Burst). Then it wakes into a leaf mote and drifts 1 m toward the fox | Realm 9 |
-| **Lost Kit** | — | Sleeping ember kit | Story collectible. Follows to the hub leaf-drift | 3 (H2, S2, S4) |
-| **Pressed page** | — | Torn Album page | Lore. Hollin reads it at the library | 2 (H1 post-W1, S3) |
+| Reward | What | W1 count |
+|--------|------|----------|
+| **Places** | Islets, vistas, the sunset seat, the inside of the hollow maple | — |
+| **Lost Kit** | Sleeping ember kit; follows to the hub leaf-drift | 3 |
+| **Pressed page** | Torn Album page; Hollin reads it at the library | 2 |
+| **Old fox shrine** | Gold wake tint (cosmetic) | 1 |
 
-**W1 totals:** hub **100** + Russetvale **400** = **500 embers** (arithmetic in `world-1.md` §1.4 and §2.6). 100 % W1 = 500 embers + 3 Lost Kits + 2 pressed pages + S7 old fox shrine.
-
-Pickup feel: 0.05 s pull-in, soft chime pitched up a semitone per mote in a chain (resets after 1.5 s), and tail core flicker. No screen pop-ups.
+Secrets are found by knowledge of the rules, sound, silhouettes and moving leaves, never by glints or pickup trails (`world-1.md` §3.8).
 
 ---
 
-## 7. Enemies: ash creatures
+## 7. Encounters: Shades
 
-Ash creatures are animals and things caught mid-motion by The Keeping, hollowed into ash and dried ink (`story.md` §3). They read as **sad, not evil**. Defeating one *frees* it: it crumbles, a leaf falls, and sometimes that leaf heals.
+Shades are animals and things caught mid-motion by The Keeping, hollowed into wavering ink (`story.md` §3). They read as **sad, not evil**. Freeing one: it falls apart into leaves that colorize as they fall.
 
-**Core rule: an ash creature can be hurt only while it is colored** (mask > 0.5 at its center). The aura usually handles this for small ones. **Inked** enemies carry a 1.5 m shroud that forces the mask to 0 until it is broken by an Ember Burst.
-
-| Enemy | HP | Behavior | Threat | Counter | Zones |
-|-------|----|----------|--------|---------|-------|
-| **Ashling** | 1 | Small ash fox-cub or hare shape. Wanders 6 m, lunges 3 m when the fox is within 5 m (0.5 s telegraph) | Contact −1 wisp | Dash or slam. The aura colors it on approach | Meadow, terraces, marsh, Amberwood floor |
-| **Dust Moth** | 1 | Flies a sine path (amplitude 2 m, period 3 s) along glide lines | Knocks the fox out of glide (no damage, cancels glide 0.4 s) | Air-dash through it | Windmill glide line, Amberwood trunks |
-| **Blotter** | 2 | Squat ink toad in ink pools. Spits a blot every 3.5 s, range 10 m | Blot = −1 wisp and paints a 2 m ink stain that **erases trail color** for 4 s | Approach between spits, dash ×2 | Reedmarsh |
-| **Quill Knight** | 3 | **Inked.** Stalks with a quill lance, thrust 4 m (0.6 s telegraph), armored front | −1 wisp | Burst to strip the shroud (6 s), then dash its back or slam | Reedmarsh SW2 guard |
-| **Ash Warden** (guardian) | 3 slams | 6 m hound of ash and ink. Phases in `world-1.md` §2.8 | Pounce −1 wisp, ink pools −1 | Burst after its landing (colored 4 s) → Pounce Slam | Wellspring Hill arena |
-
-Contact damage: −1 wisp, 1.0 s invulnerability (the fox flickers to smoke), 3 m knockback. Ash creatures never chase beyond 12 m of their home.
+| Enemy | Behavior | Threat | Counter |
+|-------|----------|--------|---------|
+| **Shade** | Drifts on an authored spline (2.2 m/s). **3 m drain**: temporary color → 0, unrestored elements in it gutter | Contact −1 wisp, 1.0 s invulnerability, 3 m knockback. Snuffs the element you need | Dash through it (frees it, no respawn), or time your use of the element between passes |
+| *Blight* (later) | Ink roots creep from a blight heart at a restored edge | Re-sepias unrestored ground | Break the heart with an element (burn, flood, root) |
+| *Ash Warden* (later) | Guards the summit hearth | Pounce, ink pools | Use each restored element in the arena, then dash it while colored |
 
 ---
 
 ## 8. Fail states and respawn
 
-There are no lives and no game-over screen. Failing costs time, never collectibles.
+There are no lives and no game-over screen. Failing costs time, never restoration.
 
 | Failure | Result | Respawn point | Transition |
 |---------|--------|---------------|------------|
 | Hit by an ash creature or blot | −1 wisp, invulnerable 1.0 s | — | Smoke flicker |
 | Hard landing (> 6 m drop with no glide) | −1 wisp | In place | Heavy landing, 0.3 s recover |
-| **Fall off the island edge into the cloud sea** | −1 wisp | **Last safe ground** (sampled every 0.5 s while grounded on stable, non-ghost-ink ground ≥ 2 m from an edge) | 0.8 s fade to paper, fox reforms from embers |
+| **Fall off the island edge into the cloud sea** | −1 wisp | **Last safe ground** (sampled every 0.5 s while grounded on stable, non-temporary ground ≥ 2 m from an edge) | 0.8 s fade to paper, fox reforms from embers |
 | Sink in an ink pool | −1 wisp | Last safe ground | 0.6 s ink swallow, then fade |
-| Ghost-ink fades underfoot | Falls (then falls into the cases above) | — | 0.6 s warning flash beforehand |
-| **0 wisps: "the ember gutters"** | All collected items kept. Spark set to 40. Wisps refilled to 3 | **Last lit checkpoint lantern** or lit Seedwell | 1.5 s: tail goes to smoke, paper page turns, fox rises from a leaf-drift |
+| Temporary support (root, lily pad) ends | Never while occupied. Falls to recovery ground ≤ 6 m below | — | ≥ 0.8 s warning first |
+| **0 wisps: "the ember gutters"** | Restorations kept. Wisps refilled to 3 | **Last lit checkpoint lantern** or lit Seedwell | 1.5 s: tail goes to smoke, paper page turns, fox rises from a leaf-drift |
 | Warden fight lost | As above. Warden resets to its current phase start (no full reset after phase 1) | Lantern at (0, −44) | — |
 
 ---
@@ -214,9 +184,9 @@ Third-person, Spyro-follow with modern smoothing. Every value is a lil-gui tunab
 | Look-ahead | 1.2 m along velocity | |
 | Vertical tracking | Locks to the last ground height, follows y on landing. Tracks immediately when > 2 m below the lock or while gliding | Avoids jump-bob |
 | Auto-recenter | After 1.2 s without camera input, at 90°/s behind the fox's heading | Off during manual orbit |
-| Collision | 0.25 m spherecast. Foliage cards and ghost-ink ignored, fading at < 1 m | |
+| Collision | 0.25 m spherecast. Foliage cards and updraft columns ignored, fading at < 1 m | |
 | Framing aid | During the glide-line approach, camera yaw biases 15° toward the authored glide target | `world-1.md` landmarks |
-| Cinematics | Seedwell 2.5 s orbit, flood 6 s rail (skippable after first view) | Input returns at exactly the moment the camera does |
+| Cinematics | Seedwell latch 2 s beat framing the permanent route, flood 6.5 s rail (skippable after first view) | Input returns at exactly the moment the camera does |
 
 ---
 
@@ -224,14 +194,14 @@ Third-person, Spyro-follow with modern smoothing. Every value is a lil-gui tunab
 
 | Area | Feature |
 |------|---------|
-| **Color** | The game is about color, so every color state has a **value + pattern** twin: restored regions carry hue patterns (W1 leaf veins, Frost crystals, Pine needles, Night stars). Ghost-ink solidity also shows as a solid outline. Ash creatures are distinguished by silhouette and value, never by hue alone |
+| **Color** | The game is about color, so every color state has a **value + motion** twin: lit elements *move* (embers rise, sails turn, water runs, roots grow), cold ones are frozen. Restored regions carry hue patterns (W1 leaf veins). Shades are distinguished by silhouette and value, never by hue alone |
 | Colorblind | Simulated protan/deutan/tritan screenshots in every visual review. Wake vs. restore differ in **saturation and value**, not hue |
 | Motion | Reduce-motion option: no camera FOV punch, a gentler flood camera, hit-stop capped at 30 ms, and particle density at 50 % |
 | Flicker | No strobing. Ember flicker is under 3 Hz, and a "steady fire" option disables it |
-| Input | Full remap. **Toggle glide** (tap jump in air to glide, tap again to drop). The chord window is adjustable 50–150 ms, or the chord can be bound to a separate button |
-| Difficulty | "Gentle ember": no fall damage, invulnerability 2 s, ghost-ink lasts 2×, Spark never below 40. Collectibles are unaffected |
-| HUD | Optional minimal HUD (wisps, Spark, ember count) for players who can't read the diegetic tail |
-| Text / audio | Subtitles on by default with speaker name, 3 sizes, a background plate. Every audio cue has a visual twin (the Burst-ready pulse) |
+| Input | Full remap. **Toggle glide** (tap jump in air to glide, tap again to drop) |
+| Difficulty | "Gentle ember": no fall damage, invulnerability 2 s, element hold time 2× |
+| HUD | Optional minimal HUD (wisps, element timers) for players who can't read the diegetic tail and element bodies |
+| Text / audio | Subtitles on by default with speaker name, 3 sizes, a background plate. Every audio cue has a visual twin (hearth ignite = flare) |
 | Camera | Sensitivity, invert X/Y, auto-recenter on/off |
 
 ---
@@ -249,7 +219,8 @@ These are recorded by `tools/playtest.ts` feel-probe into `playtest-output/*/met
 | Short-hop apex | 0.80 m | ±0.10 | "clearly shorter" | Measure |
 | Jump + air-dash distance | 10.0 m | ±0.5 | — | Measure |
 | Glide ratio | 3.0 : 1 | ±0.2 | — | Measure |
-| Updraft rise | 6.0 m | ±0.3 | — | Measure (W1 post-flood) |
+| Updraft rise (gliding, from column entry) | ≥ 7.0 m in ≤ 1.6 s | — | — | Measure (`__game.chem.lastRide`) |
+| Hearth hold after color leaves | 3.0 s | ±0.1 | — | Measure |
 | Run top speed / time to top | 7.8 m/s / 0.13 s | ±0.3 / ±0.03 | — | Measure |
 | Dash distance | 4.0 m | ±0.2 | — | Measure |
 | Input → takeoff latency | ≤ 1 frame (16.7 ms) | — | — | Measure |
@@ -265,18 +236,17 @@ Nothing is "done" without screenshots + `window.__game`.
 
 ```ts
 window.__game = {
-  zone: 'hub' | 'meadow' | 'windmill' | 'reedmarsh' | 'amberwood' | 'wellspring',
-  embers: number,               // was `gems`; rename when code is touched
-  spark: number, wisps: number,
-  seedwells: { id: 'SW1'|'SW2'|'SW3', lit: boolean }[],
+  zone: 'meadow' | 'windmill' | 'reedmarsh' | 'amberwood' | 'wellspring',
+  wisps: number,
+  seedwells: { id: 'SW1'|'SW2'|'SW3', lit: boolean, seal: number /* 0..1 latch fill */ }[],
   restored: boolean,            // Ember Wellspring flood complete
-  abilities: { kindle: boolean },
-  fox: { pos: [x, y, z], state: 'idle'|'run'|'jump'|'dash'|'glide'|'slam'|'burst' },
+  chem: { reactors: { id, kind, heat, restored }[], updraft: Tunables, lastRide: { entryY, peakY, riseTime } },
+  fox: { pos: [x, y, z], state: 'idle'|'run'|'jump'|'dash'|'glide' },
   metrics: { apex, riseTime, airTime, jumpDist, glideRatio, dashDist, fps },
 };
 ```
 
-Required playtest captures: sepia start · wake trail fading · Burst on ghost-ink · each Seedwell · flood (video) · Portal-arrival before and after vista.
+Required playtest captures: sepia start · wake trail fading · hearth lit by wake vs. by dash · glide ride up an updraft (video) · each Seedwell latch · flood (video) · portal-arrival before and after vista.
 
 ---
 
@@ -285,17 +255,16 @@ Required playtest captures: sepia start · wake trail fading · Burst on ghost-i
 | Term | Meaning |
 |------|---------|
 | **Ember wake** | Passive aura + trail. Temporary color |
-| **Ember Burst** | Ground JUMP + DASH. 6 m, 6 s, 40 Spark |
-| **Pounce Slam** | Air JUMP + DASH. Plunge + 3 m ring |
-| **Kindle** | W1 ability. Burst lights hearth sockets → ember updrafts |
-| **Spark** | Burst fuel (0–100) |
+| **Dash stroke** | The 6 s strong color stroke every dash lays. "The brush" |
+| **Reactor / element** | An object that acts while colored: hearth (heat), windmill (wind), glass waterfall (water), root knot / lily pad (growth) |
+| **Updraft** | A lit hearth's ember column; lifts a gliding fox |
+| **Wind current / wind river** | A spline volume that pushes a glider; the wind river is SW1's permanent one |
+| **Latch** | A Seedwell lighting after 2 s of continuous element feed |
+| **Restored** | Inside a latched Seedwell's radius or after the flood; never switches off |
 | **Wisps** | Health (3) |
-| **Embers** | Score total from motes and seals |
-| **Ember / leaf / ash mote, maple seal** | Collectibles worth 1 / 5 / 5 / 25 |
-| **Seedwell** | Local permanent restore point (3 per realm) |
-| **Ember Wellspring** | Realm restore point. Triggers the flood |
-| **Ghost-ink** | Sketched object, solid only while colored |
-| **Ash creatures** | Enemies: Ashling, Dust Moth, Blotter, Quill Knight, Ash Warden |
+| **Seedwell** | Local permanent restore point (3 per realm), fed by an element |
+| **Ember Wellspring** | Realm restore point, fed by the summit hearth. Triggers the flood |
+| **Shade** | Ink silhouette that drains temporary color; freed by a dash |
 | **Lanternhollow** | Hub village |
 | **Russetvale** | W1 realm: Arrival Meadow, Windmill Rise, Reedmarsh, Amberwood, Wellspring Hill |
 | **Ember / Frost / Pine / Night** | World hues, in order |
