@@ -49,7 +49,7 @@ import type { RootSpot } from './chem/growth';
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
 /** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
-export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number };
+export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
 
 export type SeedwellState = {
@@ -1792,6 +1792,28 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       patrol.push([p.x, p.y, p.z]);
     }
     shadeSpots.push({ id: 'shade-flume', patrol });
+  }
+  // Narrow loops on intact flights, never across either broken jump.
+  for (const [id, x0, x1, z, y0, y1] of [
+    ['shade-hill-low', 4.5, -4.5, -68.7, 12.83, 16.37],
+    ['shade-hill-high', 4.5, -4.5, -80.5, 33.63, 37.17],
+  ] as const) {
+    const patrol: ShadeSpot['patrol'] = [];
+    for(const side of [1,-1]) for(let j=0;j<=8;j++) {
+      const f=(side===1?j:8-j)/8;
+      patrol.push([x0+(x1-x0)*f,y0+(y1-y0)*f,z+side*.22]);
+    }
+    shadeSpots.push({id,patrol});
+  }
+  // Restored-edge encounters awaken once; permanent elements remain immune.
+  for(const [id,afterLatch,cx,cy,cz,rx,rz] of [
+    ['shade-edge-kiln','SW1',-112,20,-27,1.5,.3],
+    ['shade-edge-reeds','SW2',95,6,18,1.2,.5],
+    ['shade-edge-maple','SW3',-8,12,-60,1.5,.5],
+  ] as const) {
+    const patrol: ShadeSpot['patrol']=[];
+    for(let j=0;j<16;j++){const a=j/16*Math.PI*2;patrol.push([cx+Math.cos(a)*rx,cy,cz+Math.sin(a)*rz]);}
+    shadeSpots.push({id,afterLatch,patrol});
   }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));

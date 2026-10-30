@@ -404,6 +404,7 @@ async function boot() {
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
+    shades.activateAfterLatch(sw.id);
     for (const h of updrafts.hearths) if (Math.hypot(h.base.x - sw.pos.x, h.base.z - sw.pos.z) <= sw.radius) h.reactor.restored = true;
     wind.restoreNear(sw.pos, sw.radius);
     water.restoreWithin(sw.pos, sw.radius);

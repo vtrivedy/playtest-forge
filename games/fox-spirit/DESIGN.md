@@ -163,3 +163,10 @@ Flume encounter placement correction: patrol along a narrow return loop sampled
 from the real Reed Falls channel, preserving its authored height. A grounding
 query may adjust feet only to a nearby surface, never to the valley floor below
 an elevated aqueduct. Keep the brief's 2.2 m/s patrol speed.
+
+Remaining encounters use authored loops on existing walkable shelves. Two hill
+Shades occupy the first and final intact flights, leaving the broken gaps clear.
+Restored-edge Shades remain dormant until their Seedwell latch, activate once,
+and never respawn after release. Activation adds no new collection loop and does
+not undo permanently restored chemistry. The unavailable SW3 hollow-floor/K1
+geometry remains a level dependency; do not place a creature inside a solid trunk.
