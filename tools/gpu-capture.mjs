@@ -590,7 +590,8 @@ try {
   if (wants('turntable')) {
     // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
-    await H('teleport', ...poses.meadow.fox, Math.PI); await advance(60, false);
+    const turntableY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
+    await H('teleport', 6, turntableY, 78, Math.PI); await advance(60, false);
     const p = await H('getFoxPos'), n = 8 * fps;
     await video('fox-turntable', n, async i => {
       const a = i / n * Math.PI * 2;

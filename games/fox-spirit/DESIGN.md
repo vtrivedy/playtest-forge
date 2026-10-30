@@ -119,3 +119,9 @@ Driver 12:05 correction: use the licensed antlered stag with long legs and an
 authored lowered-head pose over mid-stride legs. The creature is drifting ink,
 with a dark ground wash that communicates its 3 m drain. Smaller maple leaves
 warm within 0.8 s, settle as colored litter, and fade after a quiet hold.
+
+### Real-fox comparison edit
+A separate three-panel review edit pairs the two game candidates with documented
+walk/trot/run/pounce excerpts. Crop only for readability and label all playback
+changes. Wildlife source playback is uncalibrated and not phase-aligned; use it for
+anatomy, support, gathering and head/tail behavior, never numeric biological timing.

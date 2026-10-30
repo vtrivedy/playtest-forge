@@ -84,7 +84,7 @@ def main():
     def capture(shot):
         folder = destination / shot
         folder.mkdir(parents=True, exist_ok=True)
-        command = ['modal', 'run', 'tools/modal/gpu_capture.py', '--ref', ref, '--shots', shot, '--route-seconds', str(args.route_seconds), '--out', str(folder)]
+        command = ['modal', 'run', '--detach', 'tools/modal/gpu_capture.py', '--ref', ref, '--shots', shot, '--route-seconds', str(args.route_seconds), '--out', str(folder)]
         print(f'Starting {shot}: {folder}', flush=True)
         with (folder / 'modal.log').open('w') as log:
             result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
