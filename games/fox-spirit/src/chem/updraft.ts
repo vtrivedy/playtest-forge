@@ -397,7 +397,7 @@ function createShared(): HearthShared {
           // soft heat body: big dim warm puffs that give the column volume at distance
           float d = length(q);
           float g = exp(-d * d * 9.0);
-          gl_FragColor = vec4(vec3(1.0, 0.45, 0.14) * g * vA * 0.42 * vHot, g * vA * 0.4);
+          gl_FragColor = vec4(vec3(1.0, 0.4, 0.1) * g * vA * 0.6 * vHot, g * vA * 0.5);
         } else if (vLeaf > 0.5) {
           // turning maple-ish leaf: rotated lens with a notch, warm rust lit from below
           float c = cos(vSpin), s = sin(vSpin);
@@ -406,14 +406,15 @@ function createShared(): HearthShared {
           float d = length(vec2(r.x * 1.6, r.y)) - 0.42 + 0.08 * cos(atan(r.y, r.x) * 5.0);
           if (d > 0.0) discard;
           vec3 col = mix(vec3(0.55, 0.16, 0.05), vec3(0.95, 0.42, 0.12), 0.5 + 0.5 * sin(vSpin));
-          gl_FragColor = vec4(col * (0.8 + vHot * 0.6), vA * 0.95);
+          col *= 0.8 + vHot * 0.6;
+          gl_FragColor = vec4(pow(col, vec3(2.2)), vA * 0.95); // authored in sRGB
         } else {
           float d = length(q);
           float core = exp(-d * d * 38.0);
           if (core < 0.02) discard;
-          vec3 hot = vec3(1.0, 0.62, 0.26);
-          vec3 cool = vec3(0.9, 0.26, 0.05);
-          gl_FragColor = vec4(mix(cool, hot, vHot * vHot) * 1.7, core * vA);
+          vec3 hot = vec3(1.0, 0.42, 0.1);
+          vec3 cool = vec3(0.75, 0.12, 0.02);
+          gl_FragColor = vec4(mix(cool, hot, vHot * vHot) * 1.5, core * vA);
         }
         #include <colorspace_fragment>
       }`,
@@ -453,7 +454,7 @@ function createShared(): HearthShared {
         float facing = pow(abs(dot(vN, vV)), 2.2);
         float shimmer = 0.75 + 0.25 * sin(vY * 13.0 - uTime * 3.1 + sin(vAng * 2.0 + uTime * 0.7) * 2.0);
         float ends = smoothstep(0.0, 0.14, vY) * pow(1.0 - vY, 1.6);
-        float a = uHeat * facing * ends * shimmer * 0.16;
+        float a = uHeat * facing * ends * shimmer * 0.22;
         gl_FragColor = vec4(vec3(1.0, 0.5, 0.18) * a, a);
         #include <colorspace_fragment>
       }`,
