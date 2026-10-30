@@ -13,7 +13,7 @@ def main():
     (OUT/'COMMIT.txt').write_text(sha+'\n')
     def capture(shot,size,fps):
         with (OUT/f'{shot}.log').open('w') as log:
-            return subprocess.run(['python3','tools/review-capture.py',sha,'--shots',shot,'--size',size,'--fps',str(fps),'--out',str(OUT/'raw'/shot)],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT).returncode
+            return subprocess.run(['python3','tools/review-capture.py',sha,'--shots',shot,'--size',size,'--fps',str(fps),'--out',str(OUT/'raw'/shot)],cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,env=dict(os.environ,FOX_CAPTURE_APP=f'fox-sprint-final-{shot}')).returncode
     with ThreadPoolExecutor(max_workers=2) as pool:
         jobs=[pool.submit(capture,'finale','1280x720',30),pool.submit(capture,'fox','1920x1080',60)]
         codes=[job.result() for job in jobs]
