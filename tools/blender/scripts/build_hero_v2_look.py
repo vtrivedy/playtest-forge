@@ -32,7 +32,7 @@ for v in bm.verts:
         push += 0.1 * min(1, chest) * -n.z  # deeper brisket between / ahead of the forelegs
     hw = w.get("Head", 0)
     if hw > 0.3 and abs(n.x) > 0.45 and co.y > head_c.y - 0.05 and co.z < head_c.z + 0.05:
-        push += 0.05 * hw * abs(n.x)  # cheek fluff
+        push += 0.02 * hw * abs(n.x)  # cheek fluff (slight: a swollen cheek band blunts the face)
     if hw > 0.3 and n.z < -0.3 and co.y > head_c.y - 0.12:
         push += 0.045 * hw * -n.z  # full throat under the jaw (no shadow shelf between cheeks and bib)
     belly = wsum(w, "Torso", "Torso2")
@@ -48,13 +48,13 @@ fmax = max(ey - 0.03 - v.co.y for v in snout)
 for v in snout:
     f = ey - 0.03 - v.co.y; t = f / fmax
     v.co.y = ey - 0.03 - f * 1.42
-    v.co.x *= 1 - 0.30 * t
+    v.co.x *= 1 - 0.42 * t  # narrow, tapered muzzle (concept: fine, intelligent snout)
     v.co.z = zc + (v.co.z - zc) * (1 - 0.16 * t)
 # eyes a touch larger (grounded amber, not cute): grow each eye about its centroid
 for sgn in (1, -1):
     ev = [bm.verts[i] for i in eye_ids if bm.verts[i].co.x * sgn > 0]
     ec = sum((v.co for v in ev), Vector()) / len(ev)
-    for v in ev: v.co = ec + (v.co - ec) * Vector((1.26, 1.14, 1.2))  # wider almond, lid height kept
+    for v in ev: v.co = ec + (v.co - ec) * Vector((1.5, 1.3, 1.38))  # concept: large almond eyes (watchful, not round)
 # compact oval paws (turnaround: neat dark paws barely longer than the leg is wide), flat sole
 paw_groups = [g for g in gname.values() if "Paw" in g]
 for pg in paw_groups:
@@ -79,7 +79,7 @@ bm.to_mesh(me); bm.free(); me.update()
 # ---------------------------------------------------------------- 2. region colours (rest pose rules)
 # warm burnt orange (yellower than vermilion: ACES + warm fog push it red in engine); sock/paw authored a
 # notch light because the streak * AO bake darkens them (lands near the concept's (102, 62, 38) umber)
-PAL = dict(rust=(206, 112, 44), dorsal=(132, 60, 24), belly=(230, 156, 92), cream=(238, 222, 192),
+PAL = dict(rust=(212, 124, 50), dorsal=(146, 70, 28), belly=(226, 168, 112), cream=(242, 228, 202),
            umber=(124, 74, 42), sock=(92, 58, 37), paw=(68, 45, 31), earback=(70, 40, 26), nose=(22, 15, 13),
            amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(236, 214, 186))
 mat_names = [m.name for m in me.materials]
@@ -114,8 +114,8 @@ for v in me.vertices:
         elif w.get("Head", 0) > 0.3:
             k = 1.0 - smooth(0.05, 0.5, n.z)  # cream cheeks / lower muzzle only; the snout bridge stays rust
         elif co.y < CHEST_Y:
-            half = 0.07 + 0.2 * smooth(1.25, 1.95, co.z)  # V-shaped bib: wide at the throat, narrow between the forelegs
-            k = smooth(1.12, 1.4, co.z) * (1 - smooth(half - 0.03, half + 0.05, abs(co.x)))
+            half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
+            k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
         else:
             k = 0.0
         c = mix(c, PAL["cream"], k)
@@ -144,7 +144,7 @@ for v in me.vertices:
         e = eyeL if co.x > 0 else eyeR
         dyx = abs((co - e).xy.length) / 0.07
         c = mix(PAL["amber"], PAL["pupil"], 1 - smooth(0.12, 0.35, dyx))
-    elif d < 0.085: c = mix(c, PAL["liner"], 1 - smooth(0.025, 0.085, d))  # strong dark lid rim: watchful, not round
+    elif d < 0.12: c = mix(c, PAL["liner"], 1 - smooth(0.03, 0.12, d))  # strong dark lid rim: watchful, not round
     if v.index in nose_vs: c = PAL["nose"]
     cols.append(c)
     # shell-fur length (model units; fox ~3.3 tall): long ruff/cheeks, short face/lower legs, none on paws/eyes
@@ -154,7 +154,7 @@ for v in me.vertices:
     L = max(L, 0.07 * jaw)  # throat fur hangs over the jaw / bib crease
     if ear > 0.3: L = 0.012
     L *= 1 - 0.75 * leg * (1 - smooth(0.7, 1.2, co.z))
-    if v.index in eye_vs or v.index in nose_vs or (d < 0.05): L = 0.0
+    if v.index in eye_vs or v.index in nose_vs or (d < 0.075): L = 0.0  # keep shells off the (enlarged) eyes and lids
     if co.z < 0.2: L = 0.0
     furlen.append(L)
     # spirit inner glow (under the fur): faint heat at the shoulders / nape only (concept has no flame ridge,
@@ -175,7 +175,7 @@ for it in range(7):  # soft painted transitions (bib / saddle / socks blend, no 
 ca = me.color_attributes.new("Region", "BYTE_COLOR", "POINT")
 for i, c in enumerate(cols): ca.data[i].color_srgb = (c[0] / 255, c[1] / 255, c[2] / 255, 1)
 # fur length: relax steps (head short -> ruff long made a dark shell ledge under the jaw = "collar")
-for it in range(4):
+for it in range(10):
     furlen = [0.0 if L <= 0 else (L * 2 + sum(furlen[j] for j in adj[i]) / len(adj[i])) / 3 if adj[i] else L for i, L in enumerate(furlen)]
 for it in range(2):
     glow = [(g * 2 + sum(glow[j] for j in adj[i]) / len(adj[i])) / 3 if adj[i] else g for i, g in enumerate(glow)]
@@ -219,7 +219,7 @@ big = node("ShaderNodeTexNoise"); big.inputs["Scale"].default_value = 2.5
 bigr = node("ShaderNodeMapRange"); bigr.inputs["To Min"].default_value = 0.9; bigr.inputs["To Max"].default_value = 1.08
 L_.new(big.outputs["Fac"], bigr.inputs["Value"])
 ao = node("ShaderNodeAmbientOcclusion", samples=16); ao.inputs["Distance"].default_value = 0.35
-aor = node("ShaderNodeMapRange"); aor.inputs["To Min"].default_value = 0.68; aor.inputs["To Max"].default_value = 1.0
+aor = node("ShaderNodeMapRange"); aor.inputs["To Min"].default_value = 0.82; aor.inputs["To Max"].default_value = 1.0
 L_.new(ao.outputs["AO"], aor.inputs["Value"])
 msep = node("ShaderNodeSeparateColor"); L_.new(mask.outputs["Color"], msep.inputs["Color"])
 aom = node("ShaderNodeMix", data_type="FLOAT"); aom.inputs[3].default_value = 1.0   # throat mask (G) -> no AO
@@ -250,7 +250,7 @@ img_s = bpy.data.images.new("fox_fur_strand", BAKE, BAKE); img_s.colorspace_sett
 for n_ in list(N_):
     if n_.type not in ("OUTPUT_MATERIAL", "TEX_IMAGE"): N_.remove(n_)
 tc2 = node("ShaderNodeTexCoord")
-mp2 = node("ShaderNodeMapping"); mp2.inputs["Scale"].default_value = (32, 7, 26)  # big soft clumps stretched along the body (painterly, not per-pixel hair)
+mp2 = node("ShaderNodeMapping"); mp2.inputs["Scale"].default_value = (95, 9, 75)  # thin strands laid along the body (discs read as scales, fine dots as sandpaper)
 vor = node("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 1.0; vor.inputs["Randomness"].default_value = 1.0
 L_.new(tc2.outputs["Object"], mp2.inputs["Vector"]); L_.new(mp2.outputs["Vector"], vor.inputs["Vector"])
 fall = node("ShaderNodeMapRange", interpolation_type="SMOOTHSTEP"); fall.inputs["From Min"].default_value = 0.0
@@ -513,12 +513,12 @@ def glow_shell(src, lengths, keep, frac, mat, name):
 glow_body = glow_shell(fox, furlen, glow, 0.3, M_GLOW, "SpiritFox_Glow")
 glow_tail = glow_shell(tail, tlen, [smooth(0.45, 0.6, s_) for s_ in vs_], 0.3, M_TGLOW, "SpiritFox_TailGlow")
 
-# ---------------------------------------------------------------- 7. cards: fur locks, cheek fluff, flame plume, flakes
+# ---------------------------------------------------------------- 7. cards: fur locks, flame plume, flakes
 UV = {  # atlas rects (u0, v0, u1, v1) in Blender UV (v up)
-    "cream": (0.5, 0.5, 0.75, 1.0), "rusttuft": (0.75, 0.5, 1.0, 1.0),  # cards_col.png
+    "rusttuft": (0.75, 0.5, 1.0, 1.0),  # cards_col.png
     "plume0": (0.0, 0.5, 0.25, 1.0), "plume1": (0.25, 0.5, 0.5, 1.0), "plume2": (0.5, 0.5, 0.75, 1.0), "plume3": (0.75, 0.5, 1.0, 1.0),
     "flake0": (0.5, 0.25, 0.75, 0.5), "flake1": (0.75, 0.25, 1.0, 0.5), "flake2": (0.5, 0.0, 0.75, 0.25),
-    "rustlickL": (0.0, 0.5, 0.25, 1.0), "rustlickR": (0.25, 0.5, 0.5, 1.0), "creamlickL": (0.0, 0.0, 0.25, 0.5), "creamlickR": (0.25, 0.0, 0.5, 0.5),  # cards_col.png
+    "rustlickL": (0.0, 0.5, 0.25, 1.0), "rustlickR": (0.25, 0.5, 0.5, 1.0),  # cards_col.png
     "tf0": (0.0, 0.0, 0.25, 1.0), "tf1": (0.25, 0.0, 0.5, 1.0), "tf2": (0.5, 0.0, 0.75, 1.0), "tf3": (0.75, 0.0, 1.0, 1.0),  # tail_flame.png
 }
 cards = {"tuft": new_obj("SpiritFox_Fur"), "tflame": new_obj("SpiritFox_TailFlame"), "fx": new_obj("SpiritFox_SpiritFX")}
@@ -555,19 +555,15 @@ def pick(cond, n):
 def topw(w):
     it = sorted(w.items(), key=lambda kv: -kv[1])[:3]; s = sum(x for _, x in it) or 1
     return {k: x / s for k, x in it}
-# cheek fluff (cream, sweeps back and out — the turnaround's facial ruff)
-for co, n, w in pick(lambda co, n, w: w.get("Head", 0) > 0.6 and abs(n.x) > 0.6 and co.z < head_c.z and co.y > head_c.y - 0.08, 12):
-    dirn = (Vector((math.copysign(0.6, n.x), 0.7, -0.35))).normalized()
-    card("tuft", co - n * 0.02, dirn, n, 0.12, 0.2, "cream", topw(w))
 # tail fur locks over the fur half: laid flat along the brush (low splay -> no hedgehog spikes end-on), body
 # burnt orange; they hand over to the fur-to-flame locks below
-for j in range(150):
-    s = 0.05 + 0.55 * (j / 149)
+for j in range(90):
+    s = 0.05 + 0.55 * (j / 89)
     p, tan, w, side, up = frame(s); th = j * 2.39996 + rnd.uniform(-0.3, 0.3)  # golden-angle spiral -> even layering
     off = side * math.cos(th) + up * math.sin(th)
     _, _, w2 = at(min(1.0, s + 0.1))
     h = (0.3 + 0.2 * smooth(0.05, 0.4, s)) * rnd.uniform(0.85, 1.15)  # small, narrow locks: big ones read as flat leaves
-    card("tuft", p + off * radius(s) * 0.86, (tan + off * 0.14).normalized(), off, h * 0.32, h, "rusttuft", w, wts_top=w2)
+    card("tuft", p + off * radius(s) * 0.86, (tan + off * 0.14).normalized(), off, h * 0.22, h, "rusttuft", w, wts_top=w2)
 def fxb(s): return "FxPlumeA" if s < 0.55 else "FxPlumeB" if s < 0.78 else "FxPlumeC"
 # fur -> flame: translucent locks rooted on the brush over its outer half. Each is dense fur at the root and
 # breaks up into amber flame toward its tip, so the tail dissolves gradually (concept) instead of ending
@@ -614,7 +610,7 @@ for j in range(22):
     fac = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.3, 0.3))).normalized()
     card("fx", pos, Vector((rnd.uniform(-1, 1), rnd.uniform(-0.3, 1), rnd.uniform(-1, 1))), fac, sz, sz * 1.3, FL[j % 3], {"FxPlumeC": 1.0})
 # silhouette flame-licks (concept's wispy fur edges): sparse fur locks whose tips curl like flame, on the
-# cheek ruff and shoulders (none hanging off the bib: in engine they read as white fangs) (no haunch licks: lying flat on the rump they read as paper patches in
+# shoulders only (cheek and bib cards read as chips / white fangs in engine) (no haunch licks: lying flat on the rump they read as paper patches in
 # engine). Tips ride the ruff / neck FX bones so the edges lick in play.
 def licks(cond, n, rect_l, rect_r, size, dirf, fxw):
     for co, nrm, w in pick(cond, n):
@@ -623,9 +619,6 @@ def licks(cond, n, rect_l, rect_r, size, dirf, fxw):
         rect = rect_l if (co.x > 0) == (rnd.random() < 0.7) else rect_r
         wt = topw(w)
         card("tuft", co - nrm * 0.02, dirn, nrm, h * 0.42, h, rect, wt, wts_top=mixw(wt, fxw(co), 0.6))
-licks(lambda co, n, w: w.get("Head", 0) > 0.55 and abs(n.x) > 0.55 and co.z < head_c.z - 0.02 and co.y > head_c.y - 0.04, 5,
-      "creamlickL", "creamlickR", 0.2, lambda co, n: Vector((math.copysign(0.7, n.x), 0.75, -0.25)),
-      lambda co: {"FxCheek.L" if co.x > 0 else "FxCheek.R": 1.0})
 licks(lambda co, n, w: wsum(w, "Torso3", "Neck1") > 0.5 and n.z > 0.55 and abs(n.x) > 0.25, 6,
       "rustlickL", "rustlickR", 0.24, lambda co, n: Vector((n.x * 0.6, 1, 0.45)), lambda co: {"FxNeck": 1.0})
 for k, o in cards.items():

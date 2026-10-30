@@ -93,7 +93,7 @@ export async function createFox(): Promise<FoxActor> {
 
     // Soft key — low intensity so silhouette still reads with FX off
     const foxLight = new THREE.PointLight(0xff8844, 0.35, 4.5);
-    foxLight.position.set(0.2, 0.55, 0.4);
+    foxLight.position.set(0, 1.6, 0.3); // above the fox: a soft warm wash, never a hot spot on the hip fur
     group.add(foxLight);
 
     const mixer = new THREE.AnimationMixer(root);

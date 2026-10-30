@@ -1332,6 +1332,65 @@ export function seedwell(stone: Bucket, glow: Bucket, x: number, y: number, z: n
   }
 }
 
+/**
+ * Cold hearth (world-1.md §1.3 heat): a squat two-course plinth and a ring of seven fitted wedge stones
+ * around a sunken ash bed at y + 0.92 (the ash, flame and ember column live in chem/updraft.ts).
+ */
+export function hearthBrazier(stone: Bucket, x: number, y: number, z: number, seed: number): void {
+  const r = rng(seed * 613 + 11);
+  setSite(y, y + 1.1);
+  stoneBlock(stone, trs(x, y + 0.12, z, r() * 3), 1.9, 0.26, 1.9, seed, 0.16);
+  stoneBlock(stone, trs(x, y + 0.36, z, 0.4 + r()), 1.45, 0.26, 1.45, seed + 1, 0.14);
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * Math.PI * 2 + 0.06;
+    const a1 = ((i + 1) / n) * Math.PI * 2 - 0.06;
+    const P: THREE.Vector3[] = [];
+    const h = 0.56 + r() * 0.12;
+    for (let c = 0; c < 8; c++) {
+      const a = c & 1 ? a1 : a0;
+      const rr = c & 4 ? 0.98 : 0.66;
+      // outer face leans out a little, like a weathered bowl
+      const top = c & 2;
+      P.push(new THREE.Vector3(x + Math.cos(a) * (rr + (top && c & 4 ? 0.08 : 0)), y + 0.46 + (top ? h : 0), z + Math.sin(a) * (rr + (top && c & 4 ? 0.08 : 0))));
+    }
+    // fire-blackened bowl stones
+    hexBlock(stone, P, bevels(r, 0.3, 0.07), stoneTint(r).multiplyScalar(0.58 + r() * 0.1));
+  }
+}
+
+/** Kiln inlet: a weathered pillar with a cantilevered arm carrying a shallow stone dish over a hearth. */
+export function kilnBowl(stone: Bucket, px: number, py: number, pz: number, bx: number, by: number, bz: number, seed: number): void {
+  const r = rng(seed * 409 + 3);
+  setSite(py, by + 0.6);
+  const top = by + 0.55;
+  const h = top - py;
+  const courses = Math.max(2, Math.round(h / 0.75));
+  for (let i = 0; i < courses; i++) {
+    const ch = h / courses;
+    const w = 0.78 - (i / courses) * 0.18;
+    stoneBlock(stone, trs(px, py + ch * (i + 0.5), pz, r() * 0.4 - 0.2), w, ch * 0.98, w, seed + i, 0.12);
+  }
+  const dx = bx - px;
+  const dz = bz - pz;
+  const len = Math.hypot(dx, dz);
+  const yaw = Math.atan2(dx, dz);
+  stoneBlock(stone, trs((px + bx) / 2, top + 0.12, (pz + bz) / 2, yaw), 0.44, 0.34, len + 0.5, seed + 40, 0.1);
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * Math.PI * 2 + 0.05;
+    const a1 = ((i + 1) / n) * Math.PI * 2 - 0.05;
+    const P: THREE.Vector3[] = [];
+    for (let c = 0; c < 8; c++) {
+      const a = c & 1 ? a1 : a0;
+      const rr = c & 4 ? 0.88 : 0.58;
+      P.push(new THREE.Vector3(bx + Math.cos(a) * rr, by - 0.12 + (c & 2 ? 0.32 : 0), bz + Math.sin(a) * rr));
+    }
+    hexBlock(stone, P, bevels(r, 0.26, 0.06), stoneTint(r));
+  }
+  stoneBlock(stone, trs(bx, by - 0.2, bz), 1.2, 0.16, 1.2, seed + 50, 0.1);
+}
+
 /** Checkpoint lantern: stone post with a hooded lamp (lamp face in glow bucket). */
 export function lanternPost(stone: Bucket, glow: Bucket, x: number, y: number, z: number, seed: number): void {
   setSite(y, y + 2.6);
