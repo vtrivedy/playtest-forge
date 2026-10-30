@@ -327,6 +327,16 @@ try {
       await H('setKeys', []);
     }
   }
+  if (wants('turntable')) {
+    // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
+    await boot(quality, true); await H('forceRestore'); await advance(660, false);
+    await H('teleport', ...poses.meadow.fox, Math.PI); await advance(60, false);
+    const p = await H('getFoxPos'), n = 8 * fps;
+    await video('fox-turntable', n, async i => {
+      const a = i / n * Math.PI * 2;
+      await H('photo', [p.x + Math.sin(a) * 3.4, p.y + 0.75, p.z - Math.cos(a) * 3.4], [p.x, p.y + 0.5, p.z], 34);
+    });
+  }
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
 finally {
   report.errors = errors; report.qualityLog = log;

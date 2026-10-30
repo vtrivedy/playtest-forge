@@ -212,7 +212,7 @@ export async function createFox(): Promise<FoxActor> {
       update(dt, t, gliding) {
         foxLight.intensity += (0.35 - foxLight.intensity) * Math.min(1, 8 * dt);
         mixer.update(dt);
-        spiritFx.update(dt, t, gliding);
+        spiritFx.update(dt, t, gliding); // last: anchors read the final bone pose of this step
       },
       setAnim(name, fadeS = 0.18) {
         play(name, fadeS);

@@ -36,7 +36,7 @@ for v in bm.verts:
     if hw > 0.3 and n.z < -0.3 and co.y > head_c.y - 0.12:
         push += 0.045 * hw * -n.z  # full throat under the jaw (no shadow shelf between cheeks and bib)
     belly = wsum(w, "Torso", "Torso2")
-    if n.z < -0.5: push -= 0.012 * belly  # slight belly tuck (lean, but a solid body)
+    if n.z < -0.4: push += 0.06 * belly * -n.z  # deep chest / belly line (turnaround: chest depth ~0.28x height)
     v.co += n * push
 # longer, sharper snout: stretch everything in front of the eyes forward and taper it
 eye_ids = set(i for p in me.polygons if me.materials[p.material_index].name == "Eyes" for i in p.vertices)
@@ -55,7 +55,7 @@ for sgn in (1, -1):
     ev = [bm.verts[i] for i in eye_ids if bm.verts[i].co.x * sgn > 0]
     ec = sum((v.co for v in ev), Vector()) / len(ev)
     for v in ev: v.co = ec + (v.co - ec) * Vector((1.26, 1.14, 1.2))  # wider almond, lid height kept
-# rounder, bigger paws: spread + push the toes forward, flat sole
+# compact oval paws (turnaround: neat dark paws barely longer than the leg is wide), flat sole
 paw_groups = [g for g in gname.values() if "Paw" in g]
 for pg in paw_groups:
     vs = [v for v in bm.verts if sum(x for k, x in v[dl].items() if gname[k] == pg) > 0.35 and v.co.z < 0.24]
@@ -64,8 +64,8 @@ for pg in paw_groups:
     for v in vs:
         k = smooth(0.24, 0.02, v.co.z)
         d = v.co - c
-        v.co.x = c.x + d.x * (1 + 0.32 * k)
-        v.co.y = c.y + d.y * (1 + (0.55 if d.y < 0 else 0.15) * k) - 0.03 * k
+        v.co.x = c.x + d.x * (1 + 0.12 * k)
+        v.co.y = c.y + d.y * (1 - (0.22 if d.y < 0 else 0.1) * k)
         v.co.z = max(v.co.z, GROUND + 0.005)
 nose_ids = set(i for p in me.polygons if me.materials[p.material_index].name == "Black" for i in p.vertices)
 if nose_ids:
@@ -79,7 +79,7 @@ bm.to_mesh(me); bm.free(); me.update()
 # ---------------------------------------------------------------- 2. region colours (rest pose rules)
 # warm burnt orange (yellower than vermilion: ACES + warm fog push it red in engine); sock/paw authored a
 # notch light because the streak * AO bake darkens them (lands near the concept's (102, 62, 38) umber)
-PAL = dict(rust=(210, 116, 46), dorsal=(158, 74, 28), belly=(230, 156, 92), cream=(238, 222, 192),
+PAL = dict(rust=(206, 112, 44), dorsal=(132, 60, 24), belly=(230, 156, 92), cream=(238, 222, 192),
            umber=(124, 74, 42), sock=(92, 58, 37), paw=(68, 45, 31), earback=(70, 40, 26), nose=(22, 15, 13),
            amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(236, 214, 186))
 mat_names = [m.name for m in me.materials]
@@ -105,12 +105,14 @@ for v in me.vertices:
     leg = min(1, front_leg + back_leg)
     legmask.append(leg)
     c = PAL["rust"]
-    c = mix(c, PAL["dorsal"], smooth(0.2, 0.95, n.z) * 0.7)            # darker rust saddle along the spine / haunches
+    c = mix(c, PAL["dorsal"], smooth(0.05, 0.85, n.z) * 0.85)           # broad dark rust saddle over the back / haunches (painted mass)
     c = mix(c, PAL["belly"], smooth(-0.3, -0.85, n.z) * 0.55)           # warm pale underside (not pink)
     # cream: throat + bib tapering down the chest, muzzle, cheeks, inner ears (no belly/rump patches)
     if v.index in cream_vs and leg < 0.3:
-        if w.get("Head", 0) > 0.3 or wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"]) > 0.3:
+        if wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"]) > 0.3:
             k = 1.0
+        elif w.get("Head", 0) > 0.3:
+            k = 1.0 - smooth(0.05, 0.5, n.z)  # cream cheeks / lower muzzle only; the snout bridge stays rust
         elif co.y < CHEST_Y:
             half = 0.07 + 0.2 * smooth(1.25, 1.95, co.z)  # V-shaped bib: wide at the throat, narrow between the forelegs
             k = smooth(1.12, 1.4, co.z) * (1 - smooth(half - 0.03, half + 0.05, abs(co.x)))
@@ -125,7 +127,7 @@ for v in me.vertices:
     if v.index in grey_vs: c = PAL["sock"]
     # legs: burnt orange to the knee/elbow, then umber -> dark sock -> darkest paws
     if leg > 0.05:
-        top = 1.1 if front_leg >= back_leg else 1.04
+        top = 1.22 if front_leg >= back_leg else 1.12  # umber up to the elbow / hock
         lt = leg * (1 - smooth(top - 0.08, top + 0.1, co.z))
         c = mix(c, PAL["umber"], lt)
         c = mix(c, PAL["sock"], leg * (1 - smooth(top - 0.22, top - 0.02, co.z)))  # dark sock to the elbow / hock
@@ -163,7 +165,7 @@ for v in me.vertices:
 adj = [[] for _ in me.vertices]
 for e in me.edges:
     a, b = e.vertices; adj[a].append(b); adj[b].append(a)
-for it in range(3):
+for it in range(7):  # soft painted transitions (bib / saddle / socks blend, no cutout edges)
     new = []
     for i, c in enumerate(cols):
         if i in eye_vs or i in nose_vs or not adj[i]: new.append(c); continue
@@ -210,8 +212,8 @@ def streak(scale):
 body_s = streak((150, 10, 150)); leg_s = streak((150, 150, 12))
 sm = node("ShaderNodeMix", data_type="FLOAT"); L_.new(mask.outputs["Color"], sm.inputs["Factor"])
 L_.new(body_s.outputs["Fac"], sm.inputs[2]); L_.new(leg_s.outputs["Fac"], sm.inputs[3])
-cr = node("ShaderNodeValToRGB"); cr.color_ramp.elements[0].position = 0.34; cr.color_ramp.elements[0].color = (0.56, 0.5, 0.46, 1)
-cr.color_ramp.elements[1].position = 0.66; cr.color_ramp.elements[1].color = (1.16, 1.1, 1.02, 1)
+cr = node("ShaderNodeValToRGB"); cr.color_ramp.elements[0].position = 0.3; cr.color_ramp.elements[0].color = (0.8, 0.76, 0.72, 1)
+cr.color_ramp.elements[1].position = 0.7; cr.color_ramp.elements[1].color = (1.08, 1.05, 1.0, 1)
 L_.new(sm.outputs[0], cr.inputs["Fac"])
 big = node("ShaderNodeTexNoise"); big.inputs["Scale"].default_value = 2.5
 bigr = node("ShaderNodeMapRange"); bigr.inputs["To Min"].default_value = 0.9; bigr.inputs["To Max"].default_value = 1.08
@@ -228,7 +230,7 @@ m2 = node("ShaderNodeVectorMath", operation="SCALE"); L_.new(m1.outputs[2], m2.i
 m3 = node("ShaderNodeVectorMath", operation="SCALE"); L_.new(m2.outputs[0], m3.inputs[0]); L_.new(aom.outputs[0], m3.inputs["Scale"])
 emis = node("ShaderNodeEmission"); L_.new(m3.outputs[0], emis.inputs["Color"])
 bsdf = node("ShaderNodeBsdfPrincipled")
-bump = node("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.45; bump.inputs["Distance"].default_value = 0.02
+bump = node("ShaderNodeBump"); bump.inputs["Strength"].default_value = 0.2; bump.inputs["Distance"].default_value = 0.02
 L_.new(sm.outputs[0], bump.inputs["Height"]); L_.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
 L_.new(emis.outputs[0], out.inputs["Surface"])
 tex = node("ShaderNodeTexImage", image=img_c); N_.active = tex
@@ -248,11 +250,11 @@ img_s = bpy.data.images.new("fox_fur_strand", BAKE, BAKE); img_s.colorspace_sett
 for n_ in list(N_):
     if n_.type not in ("OUTPUT_MATERIAL", "TEX_IMAGE"): N_.remove(n_)
 tc2 = node("ShaderNodeTexCoord")
-mp2 = node("ShaderNodeMapping"); mp2.inputs["Scale"].default_value = (74, 16, 60)  # clumps stretched along the body
+mp2 = node("ShaderNodeMapping"); mp2.inputs["Scale"].default_value = (32, 7, 26)  # big soft clumps stretched along the body (painterly, not per-pixel hair)
 vor = node("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 1.0; vor.inputs["Randomness"].default_value = 1.0
 L_.new(tc2.outputs["Object"], mp2.inputs["Vector"]); L_.new(mp2.outputs["Vector"], vor.inputs["Vector"])
 fall = node("ShaderNodeMapRange", interpolation_type="SMOOTHSTEP"); fall.inputs["From Min"].default_value = 0.0
-fall.inputs["From Max"].default_value = 0.78; fall.inputs["To Min"].default_value = 1.0; fall.inputs["To Max"].default_value = 0.0
+fall.inputs["From Max"].default_value = 0.95; fall.inputs["To Min"].default_value = 1.0; fall.inputs["To Max"].default_value = 0.0
 L_.new(vor.outputs["Distance"], fall.inputs["Value"])
 sep = node("ShaderNodeSeparateColor"); L_.new(vor.outputs["Color"], sep.inputs["Color"])
 lenr = node("ShaderNodeMapRange"); lenr.inputs["To Min"].default_value = 0.55; lenr.inputs["To Max"].default_value = 1.0
@@ -511,12 +513,11 @@ def glow_shell(src, lengths, keep, frac, mat, name):
 glow_body = glow_shell(fox, furlen, glow, 0.3, M_GLOW, "SpiritFox_Glow")
 glow_tail = glow_shell(tail, tlen, [smooth(0.45, 0.6, s_) for s_ in vs_], 0.3, M_TGLOW, "SpiritFox_TailGlow")
 
-# ---------------------------------------------------------------- 7. cards: fur locks, cheek fluff, flame plume, ear curls, flakes
+# ---------------------------------------------------------------- 7. cards: fur locks, cheek fluff, flame plume, flakes
 UV = {  # atlas rects (u0, v0, u1, v1) in Blender UV (v up)
     "cream": (0.5, 0.5, 0.75, 1.0), "rusttuft": (0.75, 0.5, 1.0, 1.0),  # cards_col.png
     "plume0": (0.0, 0.5, 0.25, 1.0), "plume1": (0.25, 0.5, 0.5, 1.0), "plume2": (0.5, 0.5, 0.75, 1.0), "plume3": (0.75, 0.5, 1.0, 1.0),
-    "curl0": (0.0, 0.0, 0.25, 0.5), "curl1": (0.25, 0.0, 0.5, 0.5),
-    "flake0": (0.5, 0.25, 0.75, 0.5), "flake1": (0.75, 0.25, 1.0, 0.5), "flake2": (0.5, 0.0, 0.75, 0.25), "shimmer": (0.75, 0.0, 1.0, 0.25),
+    "flake0": (0.5, 0.25, 0.75, 0.5), "flake1": (0.75, 0.25, 1.0, 0.5), "flake2": (0.5, 0.0, 0.75, 0.25),
     "rustlickL": (0.0, 0.5, 0.25, 1.0), "rustlickR": (0.25, 0.5, 0.5, 1.0), "creamlickL": (0.0, 0.0, 0.25, 0.5), "creamlickR": (0.25, 0.0, 0.5, 0.5),  # cards_col.png
     "tf0": (0.0, 0.0, 0.25, 1.0), "tf1": (0.25, 0.0, 0.5, 1.0), "tf2": (0.5, 0.0, 0.75, 1.0), "tf3": (0.75, 0.0, 1.0, 1.0),  # tail_flame.png
 }
@@ -591,7 +592,7 @@ for j in range(56):
     th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
     off = side * math.cos(th) + up * math.sin(th)
     k = smooth(0.56, 1.0, s)
-    h = (0.85 + 0.65 * k) * rnd.uniform(0.85, 1.15)
+    h = (0.6 + 0.45 * k) * rnd.uniform(0.85, 1.15)  # low trailing tongues: no bonfire over the rump from the chase cam
     wd = h * rnd.uniform(0.65, 0.85)
     root = p + off * radius(min(s, S_FUR)) * (0.75 - 0.5 * k)
     lean = (tan * 1.0 + rise(off) * (0.2 + 0.12 * k) + up * (0.08 + 0.08 * k)).normalized()  # a trailing plume, not an upright fan
@@ -613,7 +614,7 @@ for j in range(22):
     fac = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.3, 0.3))).normalized()
     card("fx", pos, Vector((rnd.uniform(-1, 1), rnd.uniform(-0.3, 1), rnd.uniform(-1, 1))), fac, sz, sz * 1.3, FL[j % 3], {"FxPlumeC": 1.0})
 # silhouette flame-licks (concept's wispy fur edges): sparse fur locks whose tips curl like flame, on the
-# cheek ruff, chest bib and shoulders (no haunch licks: lying flat on the rump they read as paper patches in
+# cheek ruff and shoulders (none hanging off the bib: in engine they read as white fangs) (no haunch licks: lying flat on the rump they read as paper patches in
 # engine). Tips ride the ruff / neck FX bones so the edges lick in play.
 def licks(cond, n, rect_l, rect_r, size, dirf, fxw):
     for co, nrm, w in pick(cond, n):
@@ -622,25 +623,11 @@ def licks(cond, n, rect_l, rect_r, size, dirf, fxw):
         rect = rect_l if (co.x > 0) == (rnd.random() < 0.7) else rect_r
         wt = topw(w)
         card("tuft", co - nrm * 0.02, dirn, nrm, h * 0.42, h, rect, wt, wts_top=mixw(wt, fxw(co), 0.6))
-licks(lambda co, n, w: w.get("Head", 0) > 0.55 and abs(n.x) > 0.55 and co.z < head_c.z - 0.02 and co.y > head_c.y - 0.04, 10,
-      "creamlickL", "creamlickR", 0.24, lambda co, n: Vector((math.copysign(0.7, n.x), 0.75, -0.25)),
+licks(lambda co, n, w: w.get("Head", 0) > 0.55 and abs(n.x) > 0.55 and co.z < head_c.z - 0.02 and co.y > head_c.y - 0.04, 5,
+      "creamlickL", "creamlickR", 0.2, lambda co, n: Vector((math.copysign(0.7, n.x), 0.75, -0.25)),
       lambda co: {"FxCheek.L" if co.x > 0 else "FxCheek.R": 1.0})
-licks(lambda co, n, w: wsum(w, "Neck1", "Torso3") > 0.5 and n.y < -0.45 and n.z < 0.2 and abs(co.x) < 0.2 and co.z > 1.15, 14,
-      "creamlickL", "creamlickR", 0.3, lambda co, n: Vector((n.x * 0.5, -0.25, -1)), lambda co: {"FxBib": 1.0})
 licks(lambda co, n, w: wsum(w, "Torso3", "Neck1") > 0.5 and n.z > 0.55 and abs(n.x) > 0.25, 6,
       "rustlickL", "rustlickR", 0.24, lambda co, n: Vector((n.x * 0.6, 1, 0.45)), lambda co: {"FxNeck": 1.0})
-# ear embers: thin ribbons trailing back off the ear tips, curling over (not upright candles)
-for s in "LR":
-    e1, e4 = bh(f"Ear1.{s}"), bt(f"Ear4.{s}")
-    d = (e4 - e1).normalized()
-    out_ = Vector((1 if s == "L" else -1, 0, 0))
-    for k, (ln, wd, back, rect) in enumerate(((0.4, 0.3, 1.6, "curl0"), (0.32, 0.24, 2.2, "curl1"))):  # short licks, not antennae
-        upv = (d + Vector((0, back, 0)) + out_ * 0.1 * k).normalized()  # rise off the tip, sweep back
-        card("fx", e4 - d * (0.2 + 0.06 * k), upv, out_, wd, ln, rect, {f"Ear4.{s}": 1.0}, wts_top={f"FxEar.{s}": 1.0})
-# shoulders / nape: two faint heat-shimmer wisps lying back (no flame ridge)
-for j, (x_, t_) in enumerate(((0.07, 0.25), (-0.06, 0.55))):
-    base = bh("Neck1").lerp(bh("Neck2"), t_) + Vector((x_, 0.05, 0.2))
-    card("fx", base, Vector((x_ * 2, 1, 0.75)).normalized(), Vector((1, 0, 0)), 0.32, 0.42, "shimmer", {"Neck1": 0.5, "Neck2": 0.5}, wts_top={"FxNeck": 1.0})
 for k, o in cards.items():
     cbm[k].to_mesh(o.data); cbm[k].free()
     o.data.materials.append({"tuft": M_TUFT, "tflame": M_TFLAME}.get(k, M_FX))

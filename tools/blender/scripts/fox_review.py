@@ -40,6 +40,13 @@ if arm and arm.animation_data:
     else:
         for pb in arm.pose.bones: pb.matrix_basis.identity()
 bpy.context.view_layer.update()
+# spirit flame / glow cards are light in the game (emissive over additive-ish blend): drop their dark albedo
+for m in {s.material for o in fox for s in o.material_slots if s.material and "spiritwisp" in s.material.name.lower()}:
+    b = next((n for n in m.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if not b: continue
+    for l in list(b.inputs["Base Color"].links): m.node_tree.links.remove(l)
+    b.inputs["Base Color"].default_value = (0, 0, 0, 1)
+    b.inputs["Emission Strength"].default_value *= 2.0
 
 def world_pts(objs):
     dg = bpy.context.evaluated_depsgraph_get()
