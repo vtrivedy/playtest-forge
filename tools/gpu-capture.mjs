@@ -211,6 +211,28 @@ try {
     });
     await shot('orbit-end');
   }
+  if (wants('fox')) {
+    // Character review: staged stills around the fox (concept turnaround angles + face), then the real chase cam.
+    for (const state of ['sepia', 'restored']) {
+      await boot(quality, true);
+      if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
+      await H('teleport', ...poses.meadow.fox, Math.PI);
+      await advance(60, false);
+      const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
+      // fox faces -Z at yaw PI: "front" camera sits on -Z
+      const views = { front: [0, 0.55, -2.9, 30], three_q: [-1.9, 0.6, -2.2, 30], side: [-3.0, 0.5, 0, 30],
+        back_three_q: [-1.8, 0.75, 2.4, 30], back: [0, 0.8, 3.0, 30], face: [-0.45, 0.85, -1.15, 28] };
+      for (const [name, [dx, dy, dz, fov]] of Object.entries(views)) {
+        const look = name === 'face' ? [p.x, p.y + 0.82, p.z - 0.45] : at;
+        await H('photo', [p.x + dx, p.y + dy, p.z + dz], look, fov);
+        await advance(3); await shot(`fox-${state}-${name}`);
+      }
+      await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);
+      await H('setKeys', ['KeyW']); await advance(70); await shot(`fox-${state}-chase-run`);
+      await H('setKeys', ['KeyW', 'KeyA']); await advance(25); await shot(`fox-${state}-chase-turn`);
+      await H('setKeys', []);
+    }
+  }
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
 finally {
   report.errors = errors; report.qualityLog = log;

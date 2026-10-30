@@ -1,7 +1,7 @@
 """
 Hero v2 — Spirit Fox restyle of the CC0 Quaternius fox (assets/hero/source/fox_quaternius_raw.glb).
-Stages: re-proportion rest pose to the art lock -> smooth continuous mesh -> (later) fur bake,
-ember tail, tufts, eyes -> 9 game clips -> GLB.
+Stages: re-proportion rest pose to the art lock -> smooth continuous mesh -> look (fur bake,
+ember tail, tufts, eyes) -> 9 game clips -> game rig contract -> GLB.
 blender -b -P build_hero_v2.py -- out.glb [stage]
 """
 import sys, math
@@ -139,6 +139,8 @@ if STAGE != "proportion":
     exec(open(f"{ROOT}/tools/blender/scripts/build_hero_v2_look.py").read())
 if STAGE == "all":
     exec(open(f"{ROOT}/tools/blender/scripts/build_hero_v2_anims.py").read())
+if STAGE != "proportion":
+    exec(open(f"{ROOT}/tools/blender/scripts/build_hero_v2_rig.py").read())
 
 # ---------------------------------------------------------------- export
 if not arm.animation_data.action and "idle" in bpy.data.actions:
