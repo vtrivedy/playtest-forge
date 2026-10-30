@@ -160,3 +160,6 @@ At travel speed, hold the contact clip only for the first50ms, then resume autho
 
 ### Rendered pad contact calibration — 14:05
 Derive each pad from the actual core mesh vertices weighted at least65% to its paw bone. Average its lowest15mm band in bind pose, retain that point in paw-local space, and pin that point rather than the wrist/MTP landmark. Lower the visual rig by the mean pad offset so the forelegs remain reachable, then solve to pad-derived wrist targets while preserving paw rotation. Report the contact landmark explicitly. Keep independent capture joint telemetry and rendered-pad checks separate. No controller or fox-look changes.
+
+### Brake intent pose — 14:10
+Use input release/opposition and measured deceleration only to drive a restrained nose-up, rump-down brace. Do not graft the competing movement controller. A dedicated authored skid has forepaws ahead, hind feet beneath the rump, a quick load and a held recovery. Blend a small brake-load layer onto moving gaits so the animal braces before it has already stopped. Expose load amplitude and retain per-frame brake telemetry. Capture this as a separate pass after landing/pad contact.
