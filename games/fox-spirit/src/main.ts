@@ -991,7 +991,7 @@ async function boot() {
     // steer (in air: brake once over the target; wait at the bridge head until the roots finish growing)
     const prevLabel = route[auto.idx - 1]?.label;
     // wait at the bridge head for the roots, and at SW2/SW3 until the hearth has fed the seal (the marsh ink drains on latch)
-    const waitSeedwell = (prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit;
+    const waitSeedwell = ((prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit) || (prevLabel === 'SW1-feed' && !world.seedwells[0]!.lit);
     // Let the visible front cross the six-metre bed before stepping off the dry boardwalk.
     const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
     if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= wp.y + 0.5) auto.liftReady = true;

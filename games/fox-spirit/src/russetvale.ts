@@ -441,7 +441,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-112, 20, -24, { ground: false, label: 'SW1' });
   // dash H2 through the Kiln Shade's drain (the stroke punches through), then glide on east
   W(-111.4, 20, -23.0, { ground: false, act: 'dash', label: 'kiln-dash' });
-  W(-110.5, 20, -22.1, { ground: false });
+  W(-110.5, 20, -22.1, { ground: false, label: 'SW1-feed' });
   // glide off SW1 east, over the terraces' north shoulder, into Amberwood
   W(-108, 20, -25, { ground: false, act: 'glide' });
   W(-72, 0, -26, { ground: false });
