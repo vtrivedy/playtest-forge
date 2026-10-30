@@ -91,13 +91,13 @@ try {
     return window.__gameHooks[f](...a);
   }, [fn, args]);
   const advance = (n, render = true) => H('advance', n, 1 / 60, render);
-  async function boot(q = 'high', fixedClock = false) {
+  async function boot(q = 'high', fixedClock = false, query = '') {
     if (page) await page.close();
     page = await context.newPage();
     page.setDefaultTimeout(180000);
     page.on('pageerror', e => { errors.push(String(e)); console.error('PAGEERROR', String(e)); });
     page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error') errors.push(m.text()); if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
-    await page.goto(`http://127.0.0.1:5180/?q=${q}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://127.0.0.1:5180/?q=${q}${query}`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { polling: 100 });
     await H('setManual', true);
     if (fixedClock) await page.evaluate(() => {
@@ -154,7 +154,8 @@ try {
       }
     }
   }
-  async function video(name, frameCount, beforeFrame, stop) {
+  async function video(name, frameCount, beforeFrame, stop, options = {}) {
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const started = Date.now(), trace = [], frames = [], start = await H('state');
     const output = path.join(out, `${name}.mp4`);
     const encoder = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-vcodec', 'mjpeg', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output], { stdio: ['pipe', 'ignore', 'inherit'] });
@@ -165,7 +166,11 @@ try {
     try {
       for (let i = 0; i < frameCount; i++) {
         await beforeFrame(i);
-        state = await advance(60 / fps);
+        const dt = options.dt?.(i) ?? 1 / 60;
+        state = await H('advance', 60 / fps, dt, false);
+        if (options.afterStep) await options.afterStep(i, state);
+        await H('advance', 0, dt, true);
+        if (options.traceEveryFrame) trace.push({ frame: i, dt, state });
         if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
         const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
         if (encoderError) throw encoderError;
@@ -173,10 +178,10 @@ try {
         count++;
         if (i % fps === 0) {
           if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error(`Context lost at video frame ${i}`);
-          trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
+          if (!options.traceEveryFrame) trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
           console.log('FRAME', name, i, 'sim', state.t.toFixed(2), 'wp', state.auto.idx, 'restored', state.restored);
         }
-        if (i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
+        if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
         if (stop?.(state, i)) break;
       }
     } finally { encoder.stdin.end(); }
@@ -188,6 +193,62 @@ try {
     report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
     return state;
+  }
+  if (wants('gait')) {
+    await boot(quality, true, '&gym=gait');
+    const gym = await page.evaluate(() => window.__gameHooks.gym);
+    if (!gym) throw Error('Target ref has no gait gym; merge capture tooling first');
+    await H('teleport', ...gym.origin, Math.PI / 2);
+    await H('setStick', 0, 0);
+    // Times are output seconds; slow motion advances 1/240s per 60fps frame.
+    const segments = [
+      { name: 'idle', seconds: 1, stick: [0, 0] },
+      { name: 'walk', seconds: 2, stick: [.18, 0] },
+      { name: 'trot', seconds: 2, stick: [.45, 0] },
+      { name: 'gallop', seconds: 2, stick: [1, 0] },
+      { name: 'gallop-quarter-speed', seconds: 3, stick: [1, 0], slow: true },
+      { name: 'tight-left', seconds: 1, stick: [0, -1] },
+      { name: 'tight-right', seconds: 1, stick: [0, 1] },
+      { name: 'hard-stop', seconds: 1, stick: [0, 0] },
+      { name: 'jump-land', seconds: 2, stick: [.45, 0], jump: true },
+      { name: 'dash-stop', seconds: 1, stick: [1, 0], dash: true },
+      { name: 'slope-up', seconds: 3, stick: [.6, 0], reset: [653, 0, 0] },
+      { name: 'slope-down', seconds: 3, stick: [.6, 0], reset: [673, 12 * Math.tan(Math.PI / 12), 0] },
+    ];
+    let cursor = 0;
+    for (const segment of segments) { segment.start = cursor; cursor += segment.seconds * fps; segment.end = cursor; }
+    const segmentAt = i => segments.find(s => i < s.end);
+    const keyFrames = segments.flatMap(s => [s.start + Math.round(fps * .25), Math.min(s.end - 1, s.start + fps)]);
+    save('gait-script.json', { label: 'Live controller; staged course resets on slopes', segments, keyFrames, gym });
+    await video('gait', cursor, async i => {
+      const segment = segmentAt(i), local = i - segment.start;
+      if (local === 0) {
+        if (segment.reset) await H('teleport', ...segment.reset, Math.PI / 2);
+        await H('setStick', ...segment.stick);
+      }
+      await H('setKeys', segment.jump && local < .18 * fps ? ['Space'] : segment.dash && local === 0 ? ['ShiftLeft'] : []);
+    }, undefined, {
+      dt: i => segmentAt(i).slow ? 1 / 240 : 1 / 60,
+      keyFrames, traceEveryFrame: true,
+      afterStep: async (i, state) => {
+        const [x, y, z] = state.pos;
+        await H('photo', [x, y + 1.05, z + 4.4], [x, y + .45, z], 40);
+      },
+    });
+    await H('setKeys', []); await H('setStick', null);
+    await shot('gait-end');
+    report.videos.gait.game = await page.evaluate(() => window.__game);
+    save('gait.json', report.videos.gait);
+  }
+  if (wants('stills')) {
+    await boot(quality, true);
+    for (const [name, pose] of Object.entries(poses)) {
+      await H('teleport', ...pose.fox, Math.PI);
+      if (pose.photo) await H('photo', ...pose.photo);
+      await advance(30);
+      await shot(`still-${name}`);
+    }
+    await H('poseHero', { anim: 'idle', fx: true }); await advance(2); await shot('still-hero');
   }
   if (wants('route')) {
     await boot(quality, true);

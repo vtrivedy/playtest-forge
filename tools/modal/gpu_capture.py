@@ -89,8 +89,8 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit'}:
-        raise ValueError('shots: all, probe, perf, route, orbit or comma-separated')
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'gait', 'stills'}:
+        raise ValueError('shots: all, probe, perf, route, orbit, gait, stills or comma-separated')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:64]}-{time.strftime("%Y%m%d-%H%M%S")}'
     destination = Path(out) if out else ROOT.parent / 'playtest-forge-artifacts/gpu' / re.sub(r'[^a-zA-Z0-9_.-]', '_', ref)
     destination.mkdir(parents=True, exist_ok=True)

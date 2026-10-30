@@ -1,9 +1,15 @@
 import * as THREE from 'three';
+import { AuthoredLocomotion, type MotionInput } from './locomotion';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export type FoxAnimState =
   | 'idle'
   | 'run'
+  | 'walk'
+  | 'trot'
+  | 'turn_left'
+  | 'turn_right'
+  | 'skid'
   | 'jump_up'
   | 'jump_apex'
   | 'jump_fall'
@@ -14,6 +20,8 @@ export type FoxAnimState =
 
 export type FoxActor = {
   group: THREE.Group;
+  locomotion?: AuthoredLocomotion;
+  setMotion?: (input: MotionInput) => void;
   /** Approximate feet offset below group origin */
   feetOffset: number;
   /** World-space height of the scaled mesh (for camera / shadows) */
@@ -249,12 +257,13 @@ export async function createFox(): Promise<FoxActor> {
       const act = mixer.clipAction(clip);
       act.enabled = true;
       // Loop continuous states; one-shots clamp
-      const once = /jump_|land|burst|dash/.test(clip.name);
+      const once = /^(jump_up|land|burst|skid)$/.test(clip.name);
       act.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
       if (once) act.clampWhenFinished = true;
       actions.set(clip.name, act);
     }
 
+    const locomotion = new AuthoredLocomotion(root, group, actions);
     let current = '';
     const play = (name: string, fade = 0.18) => {
       if (!actions.has(name)) return;
@@ -274,6 +283,8 @@ export async function createFox(): Promise<FoxActor> {
     const height = targetHeight;
     return {
       group,
+      locomotion,
+      setMotion(input) { locomotion.input = input; },
       feetOffset: 0.02,
       height,
       hasClips: actions.size > 0,
@@ -285,14 +296,17 @@ export async function createFox(): Promise<FoxActor> {
       },
       update(dt, _t, _gliding) {
         foxLight.intensity += (0.35 - foxLight.intensity) * Math.min(1, 8 * dt);
+        locomotion.beforeMixer();
+        locomotion.blend(dt, current);
         mixer.update(dt);
+        locomotion.afterMixer(dt, current);
       },
       setAnim(name, fadeS = 0.18) {
         play(name, fadeS);
       },
       setTimeScale(k) {
         const act = actions.get(current);
-        if (act) act.setEffectiveTimeScale(Number.isFinite(k) ? Math.max(0, k) : 1);
+        if (act && current !== 'run') act.setEffectiveTimeScale(Number.isFinite(k) ? Math.max(0, k) : 1);
       },
       clipDuration(name) {
         return actions.get(name)?.getClip().duration ?? 0;

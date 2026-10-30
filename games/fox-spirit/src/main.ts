@@ -31,6 +31,7 @@ import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
 import { createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
+import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
 
 /**
@@ -142,6 +143,8 @@ async function boot() {
 
   const world = await createRussetvale(scene);
   const col = world.collision;
+  const gaitGym = new URLSearchParams(location.search).get('gym') === 'gait' ? createGaitGym(scene, col) : null;
+  let harnessStick: THREE.Vector3 | null = null;
   // Key light shadow frustum follows the fox across the 260 m realm
   const keyOffset = lights.key.position.clone().normalize().multiplyScalar(60);
   lights.key.shadow.camera.left = -34;
@@ -155,7 +158,7 @@ async function boot() {
   scene.add(lights.key.target);
   const foxActor = await createFox();
   scene.add(foxActor.group);
-  foxActor.group.position.copy(world.spawnPos);
+  foxActor.group.position.copy(gaitGym?.spawn ?? world.spawnPos);
   foxActor.group.position.y += foxActor.feetOffset;
   foxActor.group.rotation.y = Math.PI; // face north: Wellspring Hill on frame 1
 
@@ -297,6 +300,19 @@ async function boot() {
   fFeel.add(feel, 'glideForward', 4, 12, 0.1).listen();
   fFeel.add(feel, 'dashSpeed', 10, 30, 0.5).listen();
   fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
+  if (foxActor.locomotion) {
+    const params = foxActor.locomotion.params;
+    const folder = gui.addFolder('Authored locomotion');
+    folder.add(params, 'walkSpeed', .2, 3, .1);
+    folder.add(params, 'trotSpeed', 2, 6, .1);
+    folder.add(params, 'gallopSpeed', 4, 10, .1);
+    folder.add(params, 'strideScale', .5, 2, .01);
+    folder.add(params, 'plantStrength', 0, 1, .01);
+    folder.add(params, 'maxCorrection', 0, .3, .01);
+    folder.add(params, 'turnLean', 0, .1, .001);
+    folder.add(params, 'tailLag', 0, .3, .01);
+    folder.add(params, 'debug');
+  }
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
@@ -431,6 +447,13 @@ async function boot() {
   };
   win.__gameHooks = {
     hasClips: foxActor.hasClips,
+    gym: gaitGym ? { slopeDegrees: 15, origin: gaitGym.spawn.toArray() } : null,
+    setStick(x: number | null, z = 0) {
+      if (x === null) { harnessStick = null; return; }
+      harnessStick = new THREE.Vector3(x, 0, z);
+      if (harnessStick.length() > 1) harnessStick.normalize();
+    },
+    locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
     fx: { autumnFX, emberMotes },
@@ -858,6 +881,8 @@ async function boot() {
     wish.set(0, 0, 0);
     if (ix || iz) wish.addScaledVector(right, ix).addScaledVector(forward, -iz).normalize();
 
+    if (harnessStick) wish.copy(harnessStick);
+
     // ground probe (one-way surfaces; previous feet height catches fast falls)
     let feetY = fox.position.y - foxActor.feetOffset;
     const probe = col.groundAt(fox.position.x, fox.position.z, Math.max(feetY, prevFeet));
@@ -1042,12 +1067,14 @@ async function boot() {
         } else if (landT > 0 && (speed < 3.5 || landT > 0.16)) {
           anim = 'land';
           fade = 0.05;
-        } else if (speed > 1.2) {
+        } else if (speed > 0.08) {
           anim = 'run';
           // stride follows ground speed (clip authored near full run speed)
           rate = THREE.MathUtils.clamp(speed / 8.4, 0.55, 1.45);
         }
       }
+      foxActor.setMotion?.({ speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y,
+        groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
       foxActor.update(dt, elapsed, gliding || harnessAnimLock === 'glide');
@@ -1218,6 +1245,8 @@ async function boot() {
         extra: {
           preset: feelPreset,
           anim: foxActor.getAnim(),
+          gait: foxActor.locomotion?.metrics.gait ?? 'none',
+          plantError: foxActor.locomotion?.metrics.maxPlantError ?? 0,
           lastJumpDist: jumpStats.lastDist,
           lastLandImpact: jumpStats.lastImpact,
           lastDashDist: jumpStats.lastDashDist,
