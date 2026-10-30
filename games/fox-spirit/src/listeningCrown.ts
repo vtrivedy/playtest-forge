@@ -2,14 +2,15 @@ import * as THREE from 'three';
 import type GUI from 'lil-gui';
 import { createColorField } from '../../../src/render';
 import type { Realm } from './russetvale';
-import { boxCollider } from './collision';
+import { boxCollider, cylCollider } from './collision';
+import { loadNatureKit } from './russetNature';
 import { Bucket, PAL, rockSlab, stairFlight, ruinArch, hearthBrazier, kilnBowl, stoneBlock, trs, hangingRoot, rng } from './russetKit';
 import { createInlets, heatFeeds } from './chem/inlet';
 import type { createUpdrafts } from './chem/updraft';
 import type { WindSystem } from './chem/wind';
 
 /** A compact heat/wind round trip beyond the Wellspring. No changes to Russetvale's progression. */
-export function createListeningCrown(scene: THREE.Scene, world: Realm) {
+export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
   const group = new THREE.Group();
   group.name = 'listening-crown';
   scene.add(group);
@@ -79,6 +80,19 @@ export function createListeningCrown(scene: THREE.Scene, world: Realm) {
     const mesh = bucket.toMesh(material, { cast: true, receive: true, boxUV: name === 'rv-rock' ? 4 : 1.6 });
     if (mesh) group.add(mesh);
   }
+  // A lone bent maple gives the crown a recognizable silhouette from the summit.
+  const nature = await loadNatureKit();
+  nature.place('twisted_2', -53, 34, -121, { scale: 0.34, yaw: 1.9, gaps: 0.38, hue: PAL.russet, hue2: PAL.gold,
+    avoid: [{ x: -49, y: 36, z: -118, r: 2.6 }] });
+  col.add(cylCollider({ x: -53, z: -121, r: 0.45, top: 39, bottom: 33.5, tag: 'crown-maple' }));
+  for (const m of nature.build(group)) { field.patchMaterial(m); materials.push(m); }
+  // Quiet seat on the back shoulder: a place to find, with the return flight visible below.
+  const seat = new Bucket();
+  stoneBlock(seat, trs(-50, 34.5, -122.8, 0.15), 2.5, 0.25, 0.8, 870, 0.08);
+  stoneBlock(seat, trs(-50.8, 34.2, -122.8), 0.3, 0.5, 0.55, 871, 0.06);
+  stoneBlock(seat, trs(-49.2, 34.2, -122.8), 0.3, 0.5, 0.55, 872, 0.06);
+  const seatMesh = seat.toMesh(materials[1]!, { cast: true, receive: true, boxUV: 1.6 });
+  if (seatMesh) group.add(seatMesh);
   world.bounds.minZ = -135;
   let inlet: ReturnType<typeof createInlets> | null = null;
   let updrafts: ReturnType<typeof createUpdrafts>;

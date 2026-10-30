@@ -157,7 +157,7 @@ async function boot() {
   });
 
   const world = await createRussetvale(scene);
-  const crown = createListeningCrown(scene, world);
+  const crown = await createListeningCrown(scene, world);
   const col = world.collision;
   const gaitGym = new URLSearchParams(location.search).get('gym') === 'gait' ? createGaitGym(scene, col) : null;
   let harnessStick: THREE.Vector3 | null = null;
