@@ -238,12 +238,12 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Wind grass (golden) — sync uSat from ColorField in main
   const grass = createWindGrass(scene, {
-    count: 14000,
+    count: 16000,
     radius: 28,
-    bladeHeight: 0.2,
-    bladeBaseW: 0.026,
-    bladeTipW: 0.0035,
-    pathClearHalfW: 2.4,
+    bladeHeight: 0.14,
+    bladeBaseW: 0.018,
+    bladeTipW: 0.0025,
+    pathClearHalfW: 2.8,
     color: 0x8a4e1e,       // rust root (restored)
     tipColor: 0xc9963a,    // muted gold tip
     monoColor: 0x3a3228,   // dark sepia root (readable against parchment ground)
@@ -405,12 +405,14 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Dense fallen-leaf carpet along the critical path
   {
-    const carpetCount = 420;
-    const leafGeo = new THREE.PlaneGeometry(0.22, 0.28);
+    const carpetCount = 180;
+    const leafGeo = new THREE.PlaneGeometry(0.12, 0.15);
     const carpetDummy = new THREE.Object3D();
     for (let i = 0; i < carpetCount; i++) {
       const z = 14 - (i / carpetCount) * 26 + (Math.random() - 0.5) * 2.4;
-      const x = (Math.random() - 0.5) * 9.0;
+      // Bias to path edges — keep center walkway readable
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const x = side * (1.6 + Math.random() * 3.2);
       const y = yAt(x, z);
       if (y < 0.2) continue;
       const col = leafColors[i % leafColors.length]!;
@@ -427,7 +429,7 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
       const card = new THREE.Mesh(leafGeo, mat);
       card.position.set(x, y + 0.03 + Math.random() * 0.04, z);
       card.rotation.set(-Math.PI / 2 + (Math.random() - 0.5) * 0.35, Math.random() * Math.PI, (Math.random() - 0.5) * 0.4);
-      card.scale.setScalar(0.7 + Math.random() * 0.9);
+      card.scale.setScalar(0.45 + Math.random() * 0.4);
       card.castShadow = true;
       group.add(card);
     }
@@ -437,7 +439,7 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
   // Red autumn shrubs + extra maple litter tufts (restored-world density)
   {
     const shrubColors = [0x8a1e18, 0xa8281c, 0x6e1810, 0xb8321f, 0x7a2a14];
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 80; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = 3.5 + Math.random() * 20;
       const x = Math.cos(a) * r;
@@ -469,7 +471,7 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
       group.add(shrub);
     }
     // Scattered maple leaf cards beyond the path carpet
-    const litterGeo = new THREE.PlaneGeometry(0.2, 0.26);
+    const litterGeo = new THREE.PlaneGeometry(0.11, 0.14);
     for (let i = 0; i < 180; i++) {
       const a = Math.random() * Math.PI * 2;
       const r = Math.sqrt(Math.random()) * 24;

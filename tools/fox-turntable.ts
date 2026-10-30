@@ -105,9 +105,11 @@ async function main() {
     );
 
     await browser.close();
+    console.log('turntable done →', outDir);
   } finally {
-    vite.kill('SIGTERM');
+    try { vite.kill('SIGKILL'); } catch { /* */ }
   }
+  process.exit(0);
 }
 
 main().catch((e) => {

@@ -21,7 +21,7 @@ function buildBladeGeometry(height = 0.48, baseW = 0.042, tipW = 0.003, segs = 8
       const v = i / segs;
       const w = THREE.MathUtils.lerp(baseW, tipW, Math.pow(v, 1.35));
       // Nearly straight — slight tip sway only (was banana/claw curl)
-      const lean = Math.sin(v * Math.PI * 0.5) * 0.025 + v * v * 0.012;
+      const lean = Math.sin(v * Math.PI * 0.5) * 0.008 + v * v * 0.004;
       const y = v * height;
       const lx0 = -w * 0.5 + lean;
       const lx1 = w * 0.5 + lean;
@@ -111,10 +111,10 @@ export function createWindGrass(
         vec3 p = position;
         float h2 = vH * vH;
         float phase = instanceMatrix[3].x * 0.85 + instanceMatrix[3].z * 0.62;
-        float wind = sin(uTime * 1.65 + phase) * 0.14
-                   + sin(uTime * 2.7 + phase * 1.7) * 0.06;
+        float wind = sin(uTime * 1.4 + phase) * 0.045
+                   + sin(uTime * 2.2 + phase * 1.7) * 0.02;
         p.x += wind * h2;
-        p.z += cos(uTime * 1.25 + phase * 0.9) * 0.05 * h2;
+        p.z += cos(uTime * 1.1 + phase * 0.9) * 0.02 * h2;
 
         vec4 w = instanceMatrix * vec4(p, 1.0);
 
