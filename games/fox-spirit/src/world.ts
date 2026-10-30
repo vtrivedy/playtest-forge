@@ -4,11 +4,13 @@ import { createMapleTree, createWindGrass, createStylizedWater } from '../../../
 
 export type World = {
   group: THREE.Group;
+  /** Materials safe to ColorField-patch (excludes maple leaves — keep autumn chroma) */
   materials: THREE.MeshStandardMaterial[];
   yAt: (x: number, z: number) => number;
   shrinePos: THREE.Vector3;
   spawnPos: THREE.Vector3;
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
+  setGrassSat: (s: number) => void;
   update: (dt: number, t: number) => void;
 };
 
@@ -195,19 +197,19 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
   collectMats(terrain.mesh, materials);
 
   const yAt = terrain.yAt;
-  const spawnPos = new THREE.Vector3(0, yAt(0, 18) + 0.05, 18);
-  const shrineXZ = { x: 0.4, z: -13.5 };
+  const spawnPos = new THREE.Vector3(0, yAt(0, 12) + 0.05, 12);
+  const shrineXZ = { x: 0.4, z: -8.5 };
   const shrinePos = new THREE.Vector3(shrineXZ.x, yAt(shrineXZ.x, shrineXZ.z), shrineXZ.z);
 
   // Cloud sea / stylized water
   createStylizedWater(scene, { size: 160, y: -2.2 });
 
-  // Wind grass (golden)
-  createWindGrass(scene, {
-    count: 900,
-    radius: 26,
+  // Wind grass (golden) — sync uSat from ColorField in main
+  const grass = createWindGrass(scene, {
+    count: 650,
+    radius: 24,
     color: 0xc9a84a,
-    monoColor: 0x8a7358,
+    monoColor: 0x9a8060,
     ySampler: (x, z) => {
       const h = yAt(x, z);
       return h > 0.3 && h < 5 ? h : -10;
@@ -273,10 +275,21 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
         if ((c as THREE.Mesh).isMesh) {
           c.castShadow = true;
           c.receiveShadow = true;
-          const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
-          if (m?.isMeshStandardMaterial && /leaf/i.test(m.name || '')) {
-            m.emissive = new THREE.Color(leafColors[i % leafColors.length]!);
-            m.emissiveIntensity = 0.08;
+          const mats = (c as THREE.Mesh).material;
+          const list = Array.isArray(mats) ? mats : [mats];
+          for (const raw of list) {
+            const m = raw as THREE.MeshStandardMaterial;
+            if (!m?.isMeshStandardMaterial) continue;
+            // Vertex-colored leaf prims often lack a "Leaf" name — detect by vertexColors
+            if (/leaf/i.test(m.name || '') || m.vertexColors) {
+              if (!/bark|trunk|wood/i.test(m.name || '')) {
+                m.name = m.name || 'MapleLeaf';
+                if (!/bark/i.test(m.name)) {
+                  m.emissive = new THREE.Color(leafColors[i % leafColors.length]!);
+                  m.emissiveIntensity = 0.1;
+                }
+              }
+            }
           }
         }
       });
@@ -350,6 +363,37 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
     }
   }
 
+
+  // Dense fallen-leaf carpet along the critical path
+  {
+    const carpetCount = 110;
+    const leafGeo = new THREE.PlaneGeometry(0.28, 0.34);
+    const carpetDummy = new THREE.Object3D();
+    for (let i = 0; i < carpetCount; i++) {
+      const z = 12 - (i / carpetCount) * 22 + (Math.random() - 0.5) * 1.2;
+      const x = (Math.random() - 0.5) * 4.2;
+      const y = yAt(x, z);
+      if (y < 0.2) continue;
+      const col = leafColors[i % leafColors.length]!;
+      const mat = new THREE.MeshStandardMaterial({
+        color: col,
+        roughness: 0.92,
+        metalness: 0,
+        side: THREE.DoubleSide,
+        // Keep leaves slightly emissive so sepia wash still reads autumn
+        emissive: new THREE.Color(col),
+        emissiveIntensity: 0.12,
+      });
+      materials.push(mat);
+      const card = new THREE.Mesh(leafGeo, mat);
+      card.position.set(x, y + 0.03 + Math.random() * 0.04, z);
+      card.rotation.set(-Math.PI / 2 + (Math.random() - 0.5) * 0.35, Math.random() * Math.PI, (Math.random() - 0.5) * 0.4);
+      card.scale.setScalar(0.7 + Math.random() * 0.9);
+      card.castShadow = true;
+      group.add(card);
+    }
+  }
+
   // Rocks (Kenney optional)
   const rockUrls = [
     '/assets/env/kenney/rock_largeA.glb',
@@ -407,14 +451,22 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   const bounds = { minX: -40, maxX: 40, minZ: -40, maxZ: 40 };
 
+  // Maple leaves stay saturated (key art); ColorField only washes ground/stone/bark
+  const patchable = materials.filter((m) => !/leaf/i.test(m.name || ''));
+
   return {
     group,
-    materials,
+    materials: patchable,
     yAt,
     shrinePos,
     spawnPos,
     bounds,
+    setGrassSat(s) {
+      const u = (grass.mesh.material as THREE.ShaderMaterial).uniforms;
+      if (u?.uSat) u.uSat.value = s;
+    },
     update(_dt, t) {
+      grass.update(t);
       if (shrineOrb) {
         shrineOrb.rotation.y = t * 0.9;
         shrineOrb.position.y = (shrineOrb.userData.baseY as number | undefined) ?? shrineOrb.position.y;

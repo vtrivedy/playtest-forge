@@ -22,7 +22,7 @@ import { createFox } from './fox';
 import { createFollowCamera } from './camera';
 import { createGameAudio } from './audio';
 import { createHud } from './hud';
-import { createLeafKick } from './fx';
+import { createLeafKick, createEmberTrail } from './fx';
 import { createRestoreCinematic } from './restore';
 
 const feel: FeelParams = { ...PRESET_SPRING };
@@ -88,7 +88,8 @@ async function boot() {
     enableGTAO: false,
   });
 
-  const wisps = createFoxWisps(scene, 56);
+  const wisps = createFoxWisps(scene, 24); // sparse orbital
+  const emberTrail = createEmberTrail(scene, 52);
   const autumnFX = createAutumnParticles(scene, 180, 110);
   const leafKick = createLeafKick(scene);
 
@@ -128,7 +129,7 @@ async function boot() {
     roughness: 0.25,
   });
   for (let i = 0; i < 8; i++) {
-    const z = 16 - i * 3.6;
+    const z = 10 - i * 2.5;
     const x = Math.sin(i * 1.3) * 0.8;
     const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), emberMat);
     mesh.position.set(x, world.yAt(x, z) + 0.55, z);
@@ -310,8 +311,10 @@ async function boot() {
 
     // Wisps / autumn
     wisps.update(dt, fox.position, shrineOn ? 1 : 0.15);
+    emberTrail.update(dt, fox.position, gliding ? 1.2 : shrineOn ? 1 : 0.65);
     autumnFX.update(dt);
     sky.update(dt);
+    world.setGrassSat(shrineOn ? 1 : colorField.sample(fox.position));
 
     // Embers pickup
     for (const e of embers) {
