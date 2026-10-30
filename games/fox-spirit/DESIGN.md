@@ -369,3 +369,13 @@ Clear the full fox silhouette when a world face blocks the camera: remove the
 that touch the body. Keep a dithered outer edge. Remove the ineffective global
 near-face fade on stone/rock; ground and collision remain unchanged. Retest the
 normal-camera showcase, including stair approach frames239 and1079–1199.
+
+### Sprint final delivery — driver17:10
+At17:30 pin the settled main once. Record three20-second live-input chapters
+(Arrival Meadow, Windmill Rise, Reedmarsh shrine approach) at720p30 with normal
+camera, explicit staged chapter starts, no forced solves, retained state/deaths.
+Lanternhollow hub is not implemented; disclose Arrival Meadow substitution.
+Also capture a six-second close run and six concept-angle hero stills. Assemble
+a50-second trailer on Modal from that run, best20-second loco showcase,12seconds
+of summit-r4 restoration and12seconds of Reach. List every source commit and
+staging limitation; this is editorial footage, not a claimed continuous clear.

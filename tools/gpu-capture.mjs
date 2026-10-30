@@ -1,3 +1,4 @@
+import { captureFinale } from './finale-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
@@ -1075,6 +1076,7 @@ try {
     if(walkIdx!==walk.length-1 || walkEnd.deaths) report.failures.push('Crown permanent walking fallback incomplete');
 
   }
+  if (wants('finale')) await captureFinale({H,boot,video,shot,save,getPage:()=>page,fps,out,execFileSync,fs,path});
   if (wants('route')) {
     await boot(quality, true);
     const route = await H('route');
