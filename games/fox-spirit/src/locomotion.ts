@@ -24,8 +24,8 @@ class Spring {
 /** Authored pose is evaluated first; contact correction only moves a two-bone chain. */
 export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
-    plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
-  metrics = { gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
+    landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+  metrics = { landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
@@ -37,12 +37,16 @@ export class AuthoredLocomotion {
   reset() {
     this.beforeMixer();
     for (const foot of this.feet) foot.planted=false;
+    this.landSpring.value=0;this.landSpring.velocity=0;this.wasGrounded=true;this.previousVerticalSpeed=0;
     this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
     this.leanSpring.value=0;this.leanSpring.velocity=0;
     this.pitchSpring.value=0;this.pitchSpring.velocity=0;
     for(const spring of this.tailSprings){spring.value=0;spring.velocity=0;}
     this.previousSpeed=this.input.speed;this.terrainOffset=0;
   }
+  private landSpring=new Spring();
+  private wasGrounded=true;
+  private previousVerticalSpeed=0;
   private yaw = 0;
   private pitch = 0;
   private turn = 0;
@@ -124,6 +128,13 @@ export class AuthoredLocomotion {
   }
   afterMixer(dt: number, active: string) {
     const step=Math.max(dt,.00001);
+    if(this.input.grounded && !this.wasGrounded) {
+      const impact=THREE.MathUtils.clamp(-this.previousVerticalSpeed/14,.15,1);
+      this.landSpring.velocity-=this.params.landSquash*impact*16;
+    }
+    this.wasGrounded=this.input.grounded;this.previousVerticalSpeed=this.input.verticalSpeed;
+    const landOffset=this.landSpring.step(0,dt,this.params.landFrequency,.75);
+    this.metrics.landOffset=landOffset;
     let dy=Math.atan2(Math.sin(this.input.yaw-this.yaw),Math.cos(this.input.yaw-this.yaw));
     if(Math.abs(dy)>1)dy=0;
     this.yaw=this.input.yaw;
@@ -155,7 +166,7 @@ export class AuthoredLocomotion {
     const terrainTarget=this.input.grounded && Number.isFinite(rigGround) && Number.isFinite(actorGround)
       ? THREE.MathUtils.clamp(rigGround-actorGround,-.3,.3) : 0;
     this.terrainOffset=THREE.MathUtils.damp(this.terrainOffset,terrainTarget,25,dt);
-    this.root.position.y+=this.terrainOffset;
+    this.root.position.y+=this.terrainOffset+landOffset;
     let tailTarget=THREE.MathUtils.clamp(-this.turn*this.params.tailLag,-.25,.25);
     for(let i=0;i<this.tails.length;i++) {
       const bone=this.tails[i]; const spring=this.tailSprings[i];

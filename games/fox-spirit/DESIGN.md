@@ -154,3 +154,6 @@ latches/restoration or bypasses a failed move. Regional success means reaching M
 with no assists/deaths, not winning the realm. The default full route remains an
 unassisted restoration test. This lets level streams review later regions while
 earlier crossings are under repair, without hiding those failures.
+
+### Landing support transfer — 13:35
+At travel speed, hold the contact clip only for the first50ms, then resume authored strides. Carry the remaining absorption with a damped pelvis translation spring, driven by pre-contact vertical speed, so fixed feet do not trail behind a moving body for300ms. Stationary landings keep the full authored recovery. Expose squash and spring frequency; report spring displacement and planted residual separately. Graft only the landing impulse idea from b59448c; retain the selected movement controller.

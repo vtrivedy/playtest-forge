@@ -306,6 +306,8 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
+    folder.add(params,'landSquash',0,.2,.005);
+    folder.add(params,'landFrequency',2,6,.1);
     folder.add(params, 'trotSpeed', 2, 6, .1);
     folder.add(params, 'gallopSpeed', 4, 10, .1);
     folder.add(params, 'plantStrength', 0, 1, .01);
@@ -1085,7 +1087,7 @@ async function boot() {
         if (jumpedThisAir) jumpStats.lastDist = Number(Math.hypot(fox.position.x - takeoff.x, fox.position.z - takeoff.z).toFixed(2));
         if (airT > 0.12) {
           cam.land(impact);
-          landT = 0.24 + 0.16 * impact;
+          landT = Math.hypot(vel.x,vel.z)>1.5 ? .083 : .30;
           if (impact > 0.75) cam.shake(0.18 * impact);
           audio.play('land', { strength: impact, surface: surfaceOf(probe.collider?.tag) });
         }
@@ -1311,7 +1313,7 @@ async function boot() {
           else if (vel.y > 2.2) anim = 'jump_up';
           else if (vel.y > -1.6) anim = 'jump_apex';
           else anim = 'jump_fall';
-        } else if (landT > 0 && (speed < 3.5 || landT > 0.12)) {
+        } else if (landT > 0 && (speed < 1.5 || landT > .033)) {
           anim = 'land';
           fade = 0.05;
         } else if (skidT > 0 && wish.lengthSq() < .01) {
