@@ -170,3 +170,8 @@ Restored-edge Shades remain dormant until their Seedwell latch, activate once,
 and never respawn after release. Activation adds no new collection loop and does
 not undo permanently restored chemistry. The unavailable SW3 hollow-floor/K1
 geometry remains a level dependency; do not place a creature inside a solid trunk.
+
+Placement review correction: return loops need enough width for the frozen
+silhouette to drift through a turn. Increase the flume/stair return offset within
+the existing channel/flight width; skinny hairpins caused a near-instant reversal.
+Keep speed and encounter collision unchanged.

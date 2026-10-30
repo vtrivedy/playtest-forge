@@ -39,6 +39,9 @@ import type { InletSpot } from './chem/inlet';
 import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 import type { RootSpot } from './chem/growth';
+import { waterSpots } from './chem/water';
+import type { ShadeSpot } from './encounters/shades';
+export type { ShadeSpot } from './encounters/shades';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -49,7 +52,6 @@ import type { RootSpot } from './chem/growth';
 
 export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
 /** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
-export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 export type Waypoint = { x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string };
 
 export type SeedwellState = {
@@ -1783,12 +1785,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
   {
-    const channel = new THREE.CatmullRomCurve3([[100, 6, 18], [104, 5.2, 22.7627], [94, 4, 23.7627], [92, 3.2, 17], [95, 2.3, 10]].map(p => new THREE.Vector3(...p as [number, number, number])), false, 'centripetal');
+    const channel = new THREE.CatmullRomCurve3(waterSpots.find(s => s.id === 'reed-falls')!.path, false, 'centripetal');
     const patrol: ShadeSpot['patrol'] = [];
     for (const side of [1, -1]) for (let j = 0; j <= 8; j++) {
       const t = 0.25 + (side === 1 ? j : 8 - j) / 8 * 0.2;
       const p = channel.getPoint(t), tangent = channel.getTangent(t);
-      p.x += tangent.z * 0.12 * side; p.z -= tangent.x * 0.12 * side;
+      p.x += tangent.z * 0.52 * side; p.z -= tangent.x * 0.52 * side;
       patrol.push([p.x, p.y, p.z]);
     }
     shadeSpots.push({ id: 'shade-flume', patrol });
@@ -1801,15 +1803,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const patrol: ShadeSpot['patrol'] = [];
     for(const side of [1,-1]) for(let j=0;j<=8;j++) {
       const f=(side===1?j:8-j)/8;
-      patrol.push([x0+(x1-x0)*f,y0+(y1-y0)*f,z+side*.22]);
+      patrol.push([x0+(x1-x0)*f,y0+(y1-y0)*f,z+side*.52]);
     }
     shadeSpots.push({id,patrol});
   }
   // Restored-edge encounters awaken once; permanent elements remain immune.
   for(const [id,afterLatch,cx,cy,cz,rx,rz] of [
-    ['shade-edge-kiln','SW1',-112,20,-27,1.5,.3],
-    ['shade-edge-reeds','SW2',95,6,18,1.2,.5],
-    ['shade-edge-maple','SW3',-8,12,-60,1.5,.5],
+    ['shade-edge-kiln','SW1',-112,20,-27,1.5,.8],
+    ['shade-edge-reeds','SW2',95,6,18,1.2,.8],
+    ['shade-edge-maple','SW3',-8,12,-60,1.5,.8],
   ] as const) {
     const patrol: ShadeSpot['patrol']=[];
     for(let j=0;j<16;j++){const a=j/16*Math.PI*2;patrol.push([cx+Math.cos(a)*rx,cy,cz+Math.sin(a)*rz]);}
