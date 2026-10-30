@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
 import { Reactor, type ReactorTunables, type SupplyFn } from './reactor';
-import { boxCollider, type Collider, type CollisionWorld } from '../collision';
+import { boxCollider, cylCollider, type Collider, type CollisionWorld } from '../collision';
 import { barkTextures } from '../russetTextures';
 import { PAL, LEAF_COLORS, fbm3, vnoise3, leafShape } from '../russetKit';
 
@@ -25,6 +25,19 @@ export type RootSpot = {
   restoredBy?: string;
 };
 
+/** A lily pad: sunk and pressed under the ink until coloured; then its stalk lifts it to `top` and it unfurls */
+export type PadSpot = {
+  id: string;
+  x: number;
+  z: number;
+  /** Walk-surface height when risen */
+  top: number;
+  /** Surface it is pressed under while held (the ink) */
+  sunk: number;
+  r: number;
+  restoredBy?: string;
+};
+
 export type GrowthTunables = ReactorTunables & {
   /** Heat at or above which the root grows */
   growHeat: number;
@@ -34,6 +47,10 @@ export type GrowthTunables = ReactorTunables & {
   witherSegmentTime: number;
   /** Probe ring radius round the knot (m) */
   probeRing: number;
+  /** Lily pad: seconds to rise and unfurl (solid from heat ≥ growHeat, before the visual arrives) */
+  padRiseTime: number;
+  /** Lily pad: reactor ignite time (fast: the aura reaches a pad only just before a hop lands) */
+  padIgnite: number;
 };
 
 export const GROWTH_DEFAULTS: GrowthTunables = {
@@ -45,6 +62,8 @@ export const GROWTH_DEFAULTS: GrowthTunables = {
   segmentTime: 1.5,
   witherSegmentTime: 0.7,
   probeRing: 1.0,
+  padRiseTime: 0.55,
+  padIgnite: 0.12,
 };
 
 /** Walk surface sits this far above the braid's axis */
@@ -408,11 +427,144 @@ export class Root {
   }
 }
 
+
+export class LilyPad {
+  readonly reactor: Reactor;
+  readonly group = new THREE.Group();
+  readonly collider: Collider;
+  /** 0 pressed under the ink → 1 risen and open */
+  rise = 0;
+  retained = false;
+  flare = 0;
+  readonly mat: THREE.MeshStandardMaterial;
+  private readonly leaf: THREE.Mesh;
+  private readonly stalk: THREE.Mesh;
+  private readonly uni: Record<string, THREE.IUniform>;
+  readonly debug = new THREE.Group();
+  private readonly dbgMat: THREE.MeshBasicMaterial;
+
+  constructor(
+    readonly spot: PadSpot,
+    readonly tun: GrowthTunables,
+    shared: GrowthShared,
+    col: CollisionWorld,
+  ) {
+    const probes = [new THREE.Vector3(spot.x, spot.top + 0.3, spot.z)];
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      probes.push(new THREE.Vector3(spot.x + Math.cos(a) * spot.r, spot.top + 0.3, spot.z + Math.sin(a) * spot.r));
+    }
+    // a pad wakes fast and is solid from the instant it can carry the fox; its visual catches up
+    const padTun = new Proxy(tun, { get: (t, k) => (k === 'igniteTime' ? t.padIgnite : t[k as keyof GrowthTunables]) });
+    this.reactor = new Reactor(spot.id, 'root', probes, padTun);
+    this.group.name = `pad-${spot.id}`;
+    this.group.position.set(spot.x, 0, spot.z);
+    this.collider = col.add(cylCollider({ x: spot.x, z: spot.z, r: spot.r * 0.92, top: spot.top, bottom: spot.top - 0.8, tag: `pad:${spot.id}` }));
+    this.collider.enabled = false;
+    this.uni = { uOpen: { value: 0 }, uLife: { value: 0 }, uWarn: { value: 0 }, uTime: { value: 0 }, uGlow: { value: 0 } };
+    this.mat = shared.pad.clone();
+    patchPad(this.mat, this.uni);
+    this.leaf = new THREE.Mesh(shared.padGeo, this.mat);
+    this.leaf.scale.setScalar(spot.r);
+    this.leaf.rotation.y = hash(hashSeed(spot.id), 3) * Math.PI * 2;
+    this.leaf.castShadow = true;
+    this.leaf.receiveShadow = true;
+    this.group.add(this.leaf);
+    this.stalk = new THREE.Mesh(shared.stalkGeo, shared.stalk);
+    this.stalk.castShadow = true;
+    this.group.add(this.stalk);
+    this.dbgMat = new THREE.MeshBasicMaterial({ color: 0x555555, wireframe: true, depthTest: false });
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(this.collider.hx, this.collider.hx, 0.05, 20, 1, true), this.dbgMat);
+    ring.position.y = spot.top;
+    ring.renderOrder = 10;
+    this.debug.add(ring);
+    this.debug.visible = false;
+    this.group.add(this.debug);
+    this.layout();
+  }
+
+  private layout(): void {
+    const s = this.spot;
+    // pressed: lying just under the ink, cupped shut; risen: on its stalk at the walk height, flat open
+    const e = this.rise * this.rise * (3 - 2 * this.rise);
+    const y = THREE.MathUtils.lerp(s.sunk - 0.05, s.top - 0.06, e);
+    this.leaf.position.y = y;
+    const h = Math.max(0.01, y - (s.sunk - 0.6));
+    this.stalk.position.y = s.sunk - 0.6;
+    this.stalk.scale.set(1 + e * 0.4, h, 1 + e * 0.4);
+    this.stalk.visible = e > 0.02;
+  }
+
+  update(dt: number, t: number, supplyAt: SupplyFn, debugOn: boolean, foxOn: boolean, foxStable: boolean, hooks: { onPad?: (p: LilyPad, up: boolean) => void }, drainedAt?: (p: THREE.Vector3) => boolean): void {
+    this.reactor.update(dt, supplyAt, drainedAt);
+    this.retained = foxOn || (this.retained && !foxStable);
+    const heat = this.reactor.heat;
+    const up = heat >= this.tun.growHeat || this.retained;
+    const was = this.rise;
+    // an occupied pad never sinks (§1.5); colliders on before the visual, off only once sunk past the feet
+    this.rise = THREE.MathUtils.clamp(this.rise + (up ? 1 : -0.7) * (dt / this.tun.padRiseTime), 0, 1);
+    this.collider.enabled = up || this.rise > 0.85;
+    if (was === 0 && this.rise > 0) hooks.onPad?.(this, true);
+    if (was > 0.85 && this.rise <= 0.85) hooks.onPad?.(this, false);
+    this.layout();
+    this.flare = Math.max(0, this.flare - dt * 1.4);
+    const warn = this.reactor.state === 'guttering' && !this.retained ? 1 : 0;
+    const u = this.uni;
+    u.uOpen!.value = this.rise;
+    u.uLife!.value = THREE.MathUtils.damp(u.uLife!.value as number, this.reactor.restored ? 1 : Math.min(1, heat * 1.3 + this.rise * 0.4), 4, dt);
+    u.uWarn!.value = THREE.MathUtils.damp(u.uWarn!.value as number, warn, 10, dt);
+    u.uTime!.value = t;
+    u.uGlow!.value = this.flare + (heat > 0 ? 0.15 : 0);
+    // a gentle bob once risen; a trembling sag during the warning
+    this.leaf.position.y += Math.sin(t * 1.7 + this.spot.x) * 0.015 * this.rise - warn * 0.04;
+    this.dbgMat.color.setHex(this.collider.enabled ? 0x40ff70 : 0x555555);
+    this.debug.visible = debugOn;
+  }
+}
+
+/** Pad shading: notched disc, radial veins, curled rim; cupped shut (folded up) while pressed */
+function patchPad(m: THREE.MeshStandardMaterial, u: Record<string, THREE.IUniform>): void {
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        uniform float uOpen, uWarn, uTime;
+        varying vec2 vP;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vP = position.xz;
+        float rr = length(position.xz);
+        // pressed: rim folded up into a cup; open: flat with a slight upturned lip
+        float fold = (1.0 - uOpen) * 0.9;
+        transformed.y += rr * rr * fold + smoothstep(0.82, 1.0, rr) * 0.07 + sin(uTime * 30.0 + rr * 9.0) * 0.012 * uWarn * rr;
+        transformed.xz *= mix(0.55, 1.0, uOpen);`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform float uOpen, uLife, uWarn, uTime, uGlow;
+        varying vec2 vP;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float rr = length(vP);
+        float ang = atan(vP.y, vP.x);
+        float veins = smoothstep(0.86, 1.0, abs(cos(ang * 11.0))) * smoothstep(0.08, 0.3, rr) * 0.35;
+        vec3 leafCol = mix(vec3(0.42, 0.33, 0.12), vec3(0.62, 0.24, 0.08), smoothstep(0.35, 1.0, rr)); // olive heart → copper rim
+        leafCol = mix(leafCol, vec3(0.78, 0.5, 0.2), veins);
+        float lum = dot(leafCol, vec3(0.3, 0.55, 0.15));
+        vec3 sepia = vec3(lum) * vec3(0.9, 0.8, 0.66) * 0.55;
+        diffuseColor.rgb = mix(sepia, leafCol, clamp(uLife - uWarn * 0.5, 0.0, 1.0));`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance += vec3(1.0, 0.5, 0.17) * veins * uGlow * 1.2;`);
+  };
+  m.customProgramCacheKey = () => 'lily-pad';
+}
+
 type GrowthShared = {
   bark: THREE.MeshStandardMaterial;
   leaf: THREE.MeshStandardMaterial;
   leafGeo: THREE.BufferGeometry;
   probeGeo: THREE.BufferGeometry;
+  pad: THREE.MeshStandardMaterial;
+  padGeo: THREE.BufferGeometry;
+  stalk: THREE.MeshStandardMaterial;
+  stalkGeo: THREE.BufferGeometry;
 };
 
 function createShared(): GrowthShared {
@@ -440,7 +592,21 @@ function createShared(): GrowthShared {
   leafGeo.translate(0, 0.5, 0); // pivot at the stem
   leafGeo.computeVertexNormals();
   const leaf = new THREE.MeshStandardMaterial({ name: 'root-leaf', roughness: 0.75, side: THREE.DoubleSide, emissive: 0x7a2a08, emissiveIntensity: 0.05 });
-  return { bark, leaf, leafGeo, probeGeo: new THREE.SphereGeometry(0.08, 8, 6) };
+  // unit pad: a disc with a V notch, fine rings so the cup fold bends smoothly
+  const padGeo = new THREE.CircleGeometry(1, 48, 0.12, Math.PI * 2 - 0.24);
+  padGeo.rotateX(-Math.PI / 2);
+  {
+    const g2 = new THREE.RingGeometry(0.02, 1, 48, 6, 0.12, Math.PI * 2 - 0.24);
+    g2.rotateX(-Math.PI / 2);
+    padGeo.copy(g2);
+    g2.dispose();
+  }
+  padGeo.computeVertexNormals();
+  const pad = new THREE.MeshStandardMaterial({ name: 'lily-pad', roughness: 0.55, side: THREE.DoubleSide });
+  const stalkGeo = new THREE.CylinderGeometry(0.09, 0.14, 1, 8, 1, true);
+  stalkGeo.translate(0, 0.5, 0);
+  const stalk = new THREE.MeshStandardMaterial({ name: 'lily-stalk', color: 0x5a4422, roughness: 0.7 });
+  return { bark, leaf, leafGeo, probeGeo: new THREE.SphereGeometry(0.08, 8, 6), pad, padGeo, stalk, stalkGeo };
 }
 
 // ---------------------------------------------------------------- geometry
@@ -629,6 +795,7 @@ function buildKnot(k: THREE.Vector3, curve: THREE.CatmullRomCurve3, seed: number
 export type GrowthSystem = {
   readonly tun: GrowthTunables;
   readonly roots: Root[];
+  readonly pads: LilyPad[];
   /** `groundTag`: tag of the collider the fox stands on (null airborne, 'terrain' on the heightfield) */
   update: (dt: number, t: number, supplyAt: SupplyFn, debugOn: boolean, groundTag: string | null, drainedAt?: (p: THREE.Vector3) => boolean) => void;
   grown: (id: string) => number;
@@ -636,11 +803,12 @@ export type GrowthSystem = {
   restore: (seedwellId: string) => void;
   state: () => {
     roots: Array<{ id: string; heat: number; state: string; supply: number; holdLeft: number; restored: boolean; front: number; length: number; grown: number; wither: number; retained: boolean; segments: number; collidersOn: number; knot: number[] }>;
+    pads: Array<{ id: string; heat: number; state: string; rise: number; solid: boolean; retained: boolean; restored: boolean }>;
     tun: GrowthTunables;
   };
 };
 
-export function createGrowth(scene: THREE.Scene, spots: RootSpot[], col: CollisionWorld, opts: { gui?: GUI } & GrowthHooks = {}): GrowthSystem {
+export function createGrowth(scene: THREE.Scene, spots: RootSpot[], padSpots: PadSpot[], col: CollisionWorld, opts: { gui?: GUI; onPad?: (p: LilyPad, up: boolean) => void } & GrowthHooks = {}): GrowthSystem {
   const tun: GrowthTunables = { ...GROWTH_DEFAULTS };
   const shared = createShared();
   const roots = spots.map((s) => new Root(s, tun, shared, col));
@@ -651,16 +819,28 @@ export function createGrowth(scene: THREE.Scene, spots: RootSpot[], col: Collisi
       opts.onIgnite?.(r);
     };
   }
+  const pads = padSpots.map((s) => new LilyPad(s, tun, shared, col));
+  for (const p of pads) {
+    scene.add(p.group);
+    p.reactor.onIgnite = () => {
+      p.flare = 1;
+    };
+  }
   const sys: GrowthSystem = {
     tun,
     roots,
+    pads,
     update(dt, t, supplyAt, debugOn, groundTag, drainedAt) {
-      const stable = groundTag !== null && !groundTag.startsWith('root:');
+      // temporary supports form one chain: standing on any root or pad retains all of them (§1.5)
+      const temp = groundTag !== null && (groundTag.startsWith('root:') || groundTag.startsWith('pad:'));
+      const stable = groundTag !== null && !temp;
       for (const r of roots) r.update(dt, t, supplyAt, debugOn, groundTag === `root:${r.spot.id}`, stable, opts, drainedAt);
+      for (const p of pads) p.update(dt, t, supplyAt, debugOn, groundTag === `pad:${p.spot.id}`, stable, opts, drainedAt);
     },
     grown: (id) => roots.find((r) => r.spot.id === id)?.grown ?? 0,
     restore(seedwellId) {
       for (const r of roots) if (r.spot.restoredBy === seedwellId) r.reactor.restored = true;
+      for (const p of pads) if (p.spot.restoredBy === seedwellId) p.reactor.restored = true;
     },
     state: () => ({
       roots: roots.map((r) => ({
@@ -679,6 +859,7 @@ export function createGrowth(scene: THREE.Scene, spots: RootSpot[], col: Collisi
         collidersOn: r.pieces.filter((p) => p.c.enabled).length,
         knot: [r.spot.knot.x, r.spot.knot.y, r.spot.knot.z],
       })),
+      pads: pads.map((p) => ({ id: p.spot.id, heat: Number(p.reactor.heat.toFixed(3)), state: p.reactor.state, rise: Number(p.rise.toFixed(3)), solid: p.collider.enabled, retained: p.retained, restored: p.reactor.restored })),
       tun: { ...tun },
     }),
   };
@@ -691,6 +872,8 @@ export function createGrowth(scene: THREE.Scene, spots: RootSpot[], col: Collisi
     f.add(tun, 'growHeat', 0.1, 1, 0.01);
     f.add(tun, 'segmentTime', 0.3, 4, 0.05);
     f.add(tun, 'witherSegmentTime', 0.2, 3, 0.05);
+    f.add(tun, 'padRiseTime', 0.1, 2, 0.05);
+    f.add(tun, 'padIgnite', 0, 0.6, 0.01);
     f.close();
   }
   return sys;
