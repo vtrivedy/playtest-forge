@@ -9,8 +9,19 @@ export function createGameAudio() {
   let ctx: AudioContext | undefined, master: GainNode, compressor: DynamicsCompressorNode;
   let noise: AudioBuffer, pressed: ReturnType<typeof ambience>, warm: ReturnType<typeof ambience>, glide: GainNode;
   let enabled = false, restored = 0, stepClock = 0, natureClock = 4, leafClock = 1;
+  let fireClock = 0.5;
   let lastPickup = -10, streak = 0, shrineAt = -10, pendingShrine = false;
-  const rng = random(901), activeUntil: number[] = [];
+  const rng = random(901);
+  let activeVoices: { until: number; cost: number }[] = [];
+  const log: { cue: Cue; at: number; surface?: Surface }[] = [];
+  const surfaceCounts = { leaf: 0, stone: 0, wood: 0 };
+  const costs: Record<Cue, number> = { jump: 2, dash: 9, footstep: 2, land: 3, shrine: 25, ember: 3, bird: 2, cricket: 9, bridge: 3, checkpoint: 2, hazard: 1, respawn: 1, glide: 1, fire: 2 };
+  function reserve(cost: number, duration: number) {
+    if (!ctx) return false;
+    activeVoices = activeVoices.filter(v => v.until > ctx!.currentTime);
+    if (activeVoices.reduce((sum, v) => sum + v.cost, 0) + cost > 128) return false;
+    activeVoices.push({ until: ctx.currentTime + duration, cost }); return true;
+  }
   const counts: Partial<Record<Cue, number>> = {};
   let disposed = false, wasGliding = false;
   let queued: { name: Cue; opts: VoiceOptions } | undefined;
@@ -40,17 +51,19 @@ export function createGameAudio() {
     const t = ctx.currentTime;
     if (name === 'shrine') { pendingShrine = true; return; }
     if (name === 'footstep' && stepClock > 0) return;
-    while (activeUntil.length && activeUntil[0]! < t) activeUntil.shift();
-    if (activeUntil.length >= 24) return;
+    if (!reserve(costs[name], name === 'bridge' ? 3.5 : 1.6)) return;
     if (name === 'ember') { streak = t - lastPickup < 1.5 ? Math.min(7, streak + 1) : 0; lastPickup = t; opts = { ...opts, streak }; }
     cue(ctx, master, noise, name, t, opts); counts[name] = (counts[name] ?? 0) + 1;
-    activeUntil.push(t + 1.5); // conservative budget; synthesis cleans its nodes on end
+    log.push({ cue: name, at: t, surface: opts.surface }); if (log.length > 40) log.shift();
+    if (name === 'footstep') surfaceCounts[opts.surface ?? 'leaf']++;
     if (name === 'footstep' || name === 'land') stepClock = 0.22;
   }
   function swell(duration = 4.5) {
     pendingShrine = false;
     if (!ctx || ctx.state !== 'running' || ctx.currentTime - shrineAt < 0.5) return;
+    if (!reserve(costs.shrine, Math.max(1, Math.min(8, duration)) * 1.5 + 0.5)) return;
     shrineAt = ctx.currentTime;
+    log.push({ cue: 'shrine', at: shrineAt }); if (log.length > 40) log.shift();
     cue(ctx, master, noise, 'shrine', shrineAt, { duration }); counts.shrine = (counts.shrine ?? 0) + 1;
   }
   return {
@@ -97,15 +110,17 @@ export function createGameAudio() {
         play('footstep', { surface }); stepClock = Math.max(0.16, 1.9 / Math.max(2, speed)) * (0.92 + rng() * 0.16);
       }
       if (enabled) {
+        fireClock -= step;
+        if (fireClock <= 0) { play('fire', { strength: Math.min(1, 0.2 + speed / 14) }); fireClock = 0.3 + rng() * 1.1; }
         leafClock -= step; natureClock -= step;
         if (leafClock <= 0) {
-          if (restored > 0.02) breath(ctx, master, noise, t, 0.8 + rng(), 2100, 0.018 * restored, 700, 0.25);
+          if (restored > 0.02 && reserve(1, 2)) breath(ctx, master, noise, t, 0.8 + rng(), 2100, 0.018 * restored, 700, 0.25);
           leafClock = 2 + rng() * 4;
         }
         if (natureClock <= 0) { if (restored > 0.3) play(rng() > 0.5 ? 'bird' : 'cricket'); natureClock = 6 + rng() * 10; }
       }
     },
-    debug() { return { state: ctx?.state ?? 'locked', masterGain: ctx ? master.gain.value : 0, pressedGain: ctx ? pressed.gain.value : 0, warmGain: ctx ? warm.gain.value : 0, glideGain: ctx ? glide.gain.value : 0, restored, enabled, ...audioSettings, counts: { ...counts }, voices: activeUntil.length }; },
+    debug() { return { state: ctx?.state ?? 'locked', masterGain: ctx ? master.gain.value : 0, pressedGain: ctx ? pressed.gain.value : 0, warmGain: ctx ? warm.gain.value : 0, glideGain: ctx ? glide.gain.value : 0, restored, enabled, ...audioSettings, counts: { ...counts }, voices: activeVoices.filter(v => v.until > (ctx?.currentTime ?? 0)).reduce((sum, v) => sum + v.cost, 0), surfaceCounts: { ...surfaceCounts }, log: [...log] }; },
     dispose() {
       disposed = true; document.removeEventListener('visibilitychange', visible); window.removeEventListener('keydown', key);
       if (ctx) { pressed.stop(); warm.stop(); airSource?.stop(); void ctx.close(); }

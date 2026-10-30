@@ -1,6 +1,6 @@
 /** Shared by the live graph and OfflineAudioContext review renderer. */
 import type { Surface } from './surfaces';
-export type Cue = 'jump' | 'dash' | 'footstep' | 'land' | 'shrine' | 'ember' | 'bird' | 'cricket' | 'bridge' | 'checkpoint' | 'hazard' | 'respawn' | 'glide';
+export type Cue = 'jump' | 'dash' | 'footstep' | 'land' | 'shrine' | 'ember' | 'bird' | 'cricket' | 'bridge' | 'checkpoint' | 'hazard' | 'respawn' | 'glide' | 'fire';
 export type VoiceOptions = { stone?: boolean; surface?: Surface; strength?: number; streak?: number; duration?: number };
 export function random(seed = 173) {
   return () => { seed = (Math.imul(seed, 1664525) + 1013904223) | 0; return (seed >>> 0) / 4294967296; };
@@ -45,9 +45,13 @@ export function cue(ctx: BaseAudioContext, out: AudioNode, noise: AudioBuffer, n
       breath(ctx, out, noise, t, 0.25, 400, 0.28, 1900);
       tone(ctx, out, t, 180, 0.15, 0.075, 270); break;
     case 'glide': breath(ctx, out, noise, t, 0.6, 700, 0.13, 1800, 0.06); break;
+    case 'fire':
+      breath(ctx, out, noise, t, 0.045, 2400, 0.025 * strength);
+      breath(ctx, out, noise, t + 0.07, 0.025, 3400, 0.035 * strength); break;
     case 'dash':
       breath(ctx, out, noise, t, 0.35, 700, 0.22, 2400);
-      for (let i = 0; i < 7; i++) breath(ctx, out, noise, t + i * 0.035, 0.045, 1900 + i * 190, 0.11);
+      tone(ctx, out, t, 160, 0.28, 0.07, 80);
+      for (let i = 0; i < 7; i++) breath(ctx, out, noise, t + i * 0.029 + (i % 3) * 0.011, 0.025 + (i % 2) * 0.018, 1900 + i * 190, 0.11);
       break;
     case 'ember': {
       const hz = 261.63 * Math.pow(2, [0, 2, 4, 7, 9, 12, 14, 16][Math.min(7, opts.streak ?? 0)]! / 12);
