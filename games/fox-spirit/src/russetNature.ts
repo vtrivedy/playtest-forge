@@ -371,6 +371,7 @@ export async function loadNatureKit(): Promise<NatureKit> {
     },
     build(group) {
       for (const e of cells.values()) {
+        if (!e.geos.length) continue;
         const g = mergeGeometries(e.geos, false);
         for (const s of e.geos) s.dispose();
         if (!g) continue;

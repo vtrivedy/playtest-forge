@@ -203,3 +203,8 @@ Stag lookdev r4: retain the opaque ink core, add sparse soft sepia wash wisps
 rising from shoulders and flank. Deterministic shader billboards fade in/out and
 curl slowly; no glow, additive sparks, or glass torso. Expose wash size/opacity.
 They fade with the released silhouette; colored maple leaves remain the payoff.
+
+Integrated boot repair: standalone tree extraction can leave an existing cell
+with zero geometries. Skip empty cells in nature-kit build before calling Three's
+mergeGeometries; its empty input dereferences the nonexistent first geometry.
+This preserves all populated batches and is required for the integrated GPU run.
