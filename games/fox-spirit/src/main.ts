@@ -31,6 +31,7 @@ import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
 import { createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
+import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
 
 /**
@@ -142,6 +143,8 @@ async function boot() {
 
   const world = await createRussetvale(scene);
   const col = world.collision;
+  const gaitGym = new URLSearchParams(location.search).get('gym') === 'gait' ? createGaitGym(scene, col) : null;
+  let harnessStick: THREE.Vector3 | null = null;
   // Key light shadow frustum follows the fox across the 260 m realm
   const keyOffset = lights.key.position.clone().normalize().multiplyScalar(60);
   lights.key.shadow.camera.left = -34;
@@ -155,7 +158,7 @@ async function boot() {
   scene.add(lights.key.target);
   const foxActor = await createFox();
   scene.add(foxActor.group);
-  foxActor.group.position.copy(world.spawnPos);
+  foxActor.group.position.copy(gaitGym?.spawn ?? world.spawnPos);
   foxActor.group.position.y += foxActor.feetOffset;
   foxActor.group.rotation.y = Math.PI; // face north: Wellspring Hill on frame 1
 
@@ -431,6 +434,13 @@ async function boot() {
   };
   win.__gameHooks = {
     hasClips: foxActor.hasClips,
+    gym: gaitGym ? { slopeDegrees: 15, origin: gaitGym.spawn.toArray() } : null,
+    /** World-space analog input, same velocity/acceleration path as keyboard input. */
+    setStick(x: number | null, z = 0) {
+      if (x === null) { harnessStick = null; return; }
+      harnessStick = new THREE.Vector3(x, 0, z);
+      if (harnessStick.length() > 1) harnessStick.normalize();
+    },
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
     fx: { autumnFX, emberMotes },
@@ -857,6 +867,8 @@ async function boot() {
     right.crossVectors(forward, UP).normalize();
     wish.set(0, 0, 0);
     if (ix || iz) wish.addScaledVector(right, ix).addScaledVector(forward, -iz).normalize();
+
+    if (harnessStick) wish.copy(harnessStick);
 
     // ground probe (one-way surfaces; previous feet height catches fast falls)
     let feetY = fox.position.y - foxActor.feetOffset;
