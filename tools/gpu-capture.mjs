@@ -91,13 +91,13 @@ try {
     return window.__gameHooks[f](...a);
   }, [fn, args]);
   const advance = (n, render = true) => H('advance', n, 1 / 60, render);
-  async function boot(q = 'high', fixedClock = false) {
+  async function boot(q = 'high', fixedClock = false, query = '') {
     if (page) await page.close();
     page = await context.newPage();
     page.setDefaultTimeout(180000);
     page.on('pageerror', e => { errors.push(String(e)); console.error('PAGEERROR', String(e)); });
     page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error') errors.push(m.text()); if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
-    await page.goto(`http://127.0.0.1:5180/?q=${q}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://127.0.0.1:5180/?q=${q}${query}`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { polling: 100 });
     await H('setManual', true);
     if (fixedClock) await page.evaluate(() => {
@@ -128,9 +128,9 @@ try {
   await boot(quality);
   await shot('hardware-probe');
   const poses = {
-    establish: { fox: [0, 0, 80], photo: [[-60, 46, 120], [10, 14, -40], 52] },
+    establish: { fox: [0, 1, 90], photo: [[-60, 46, 120], [10, 14, -40], 52] },
     hill: { fox: [-2, 38, -84], photo: [[30, 44, -52], [-4, 36, -88], 50] },
-    marsh: { fox: [69, 0.4, 28.2] }, shrine: { fox: [0, 38, -79] }, meadow: { fox: [6, 0, 70] },
+    marsh: { fox: [69, 0.4, 28.2] }, shrine: { fox: [-5, 38, -83.5], photo: [[18, 47, -62], [0, 39, -88], 50] }, meadow: { fox: [6, 0, 70] },
   };
   if (wants('perf')) {
     for (const q of ['low', 'med', 'high']) for (const state of ['sepia', 'restored']) {
@@ -154,7 +154,8 @@ try {
       }
     }
   }
-  async function video(name, frameCount, beforeFrame, stop) {
+  async function video(name, frameCount, beforeFrame, stop, options = {}) {
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const started = Date.now(), trace = [], frames = [], start = await H('state');
     const output = path.join(out, `${name}.mp4`);
     const encoder = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-vcodec', 'mjpeg', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output], { stdio: ['pipe', 'ignore', 'inherit'] });
@@ -165,7 +166,12 @@ try {
     try {
       for (let i = 0; i < frameCount; i++) {
         await beforeFrame(i);
-        state = await advance(60 / fps);
+        const dt = options.dt?.(i) ?? 1 / 60;
+        state = await H('advance', 60 / fps, dt, false);
+        if (options.afterStep) await options.afterStep(i, state);
+        await H('advance', 0, dt, true);
+        state = await H('state');
+        if (options.traceEveryFrame) trace.push({ frame: i, dt, state, ...(i % fps === 0 ? { game: await page.evaluate(() => window.__game) } : {}) });
         if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
         const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
         if (encoderError) throw encoderError;
@@ -173,10 +179,10 @@ try {
         count++;
         if (i % fps === 0) {
           if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error(`Context lost at video frame ${i}`);
-          trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
+          if (!options.traceEveryFrame) trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
           console.log('FRAME', name, i, 'sim', state.t.toFixed(2), 'wp', state.auto.idx, 'restored', state.restored);
         }
-        if (i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
+        if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
         if (stop?.(state, i)) break;
       }
     } finally { encoder.stdin.end(); }
@@ -185,9 +191,94 @@ try {
     const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
     const stream = probe.streams[0];
     if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
-    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
+    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
+    if (options.keyFrames) {
+      const sheetPage = await context.newPage();
+      try {
+        await sheetPage.setViewportSize({ width: 1920, height: 1080 });
+        const cards = options.keyFrames.map(frame => {
+          const filename = `${name}-${String(frame).padStart(5, '0')}.png`;
+          const label = options.label?.(frame, trace.find(sample => sample.frame === frame)?.state) ?? `${name} frame ${frame}`;
+          return `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, filename)).toString('base64')}"></figure>`;
+        }).join('');
+        await sheetPage.setContent(`<style>*{box-sizing:border-box}body{margin:0;background:#211b16;color:#eadfc8;font:16px sans-serif;display:grid;grid-template-columns:repeat(4,1fr)}figure{margin:0}figcaption{height:30px;padding:6px}img{display:block;width:100%}</style>${cards}`);
+        await sheetPage.evaluate(() => Promise.all([...document.images].map(image => image.decode())));
+        await sheetPage.screenshot({ path: path.join(out, `${name}-contact-sheet.png`), fullPage: true });
+      } finally { await sheetPage.close(); }
+    }
     return state;
+  }
+  if (wants('gait')) {
+    if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
+    await boot(quality, true, '&gym=gait');
+    const gym = await page.evaluate(() => window.__gameHooks.gym);
+    if (!gym) throw Error('Target ref has no gait gym; merge capture tooling first');
+    await H('teleport', gym.origin[0] - 20, gym.origin[1], gym.origin[2], Math.PI / 2);
+    await H('setStick', 0, 0);
+    // Times are output seconds; slow motion advances 1/240s per 60fps frame.
+    const segments = [
+      { name: 'idle', seconds: 1, stick: [0, 0] },
+      { name: 'walk', seconds: 2, stick: [.18, 0] },
+      { name: 'trot', seconds: 2, stick: [.45, 0] },
+      { name: 'gallop', seconds: 2, stick: [1, 0] },
+      { name: 'gallop-quarter-speed', seconds: 3, stick: [1, 0], slow: true },
+      { name: 'tight-left', seconds: 1, stick: [0, -1] },
+      { name: 'tight-right', seconds: 1, stick: [0, 1] },
+      { name: 'hard-stop', seconds: 1, stick: [0, 0] },
+      { name: 'jump-land', seconds: 2, stick: [.45, 0], jump: true, reset: [610, 0, 0] },
+      { name: 'dash', seconds: 1, stick: [1, 0], dash: true, reset: [610, 0, 0] },
+      { name: 'slope-up', seconds: 3, stick: [.6, 0], reset: [653, 0, 0] },
+      { name: 'slope-down', seconds: 3, stick: [.6, 0], reset: [673, 12 * Math.tan(Math.PI / 12), 0] },
+    ];
+    let cursor = 0;
+    for (const segment of segments) { segment.start = cursor; cursor += segment.seconds * fps; segment.end = cursor; }
+    const segmentAt = i => segments.find(s => i < s.end);
+    const keyFrames = [...new Set(segments.flatMap(s => s.slow || s.jump ? Array.from({ length: 8 }, (_, i) => s.start + Math.round(i * (s.slow ? s.end - s.start - 1 : fps) / 7)) : [s.start + Math.round(fps * .25), Math.min(s.end - 1, s.start + fps)]))].sort((a, b) => a - b);
+    save('gait-script.json', { label: 'Live controller; staged resets for jump, dash and slopes; walk/trot/gallop are requested speed bands', segments, keyFrames, gym });
+    await video('gait', cursor, async i => {
+      const segment = segmentAt(i), local = i - segment.start;
+      if (local === 0) {
+        if (segment.reset) await H('teleport', ...segment.reset, Math.PI / 2);
+        await H('setStick', ...segment.stick);
+      }
+      await H('setKeys', segment.jump && local < .18 * fps ? ['Space'] : segment.dash && local === 0 ? ['ShiftLeft'] : []);
+    }, undefined, {
+      dt: i => segmentAt(i).slow ? 1 / 240 : 1 / 60,
+      keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.gait} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
+      afterStep: async (i, state) => {
+        const [x, , z] = state.pos;
+        if (state.deaths) throw Error(`Gait course death at frame ${i}`);
+        if (!segmentAt(i).name.startsWith('slope') && (x >= 650 || x <= 550 || Math.abs(z) >= 20)) throw Error(`Flat gait left the flat course at frame ${i}`);
+        await page.evaluate(([x, z, jumping]) => {
+          const ground = window.__gameHooks.debug.world.collision.highestAt(x, z);
+          window.__gameHooks.photo([x, ground + (jumping ? 1.7 : 1.35), z + (jumping ? 5.8 : 4.8)], [x, ground + (jumping ? 1.1 : .8), z], 42);
+        }, [x, z, !!segmentAt(i).jump]);
+      },
+    });
+    await H('setKeys', []); await H('setStick', null);
+    await shot('gait-end');
+    report.videos.gait.game = await page.evaluate(() => window.__game);
+    save('gait.json', report.videos.gait);
+  }
+  if (wants('stills')) {
+    await boot(quality, true);
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+    async function poseStill(name, pose) {
+      const [x, , z] = pose.fox;
+      const y = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [x, z]);
+      if (!Number.isFinite(y) || y < -24) throw Error(`Still ${name} has no safe surface`);
+      await H('teleport', x, y, z, Math.PI);
+      if (pose.photo) await H('photo', ...pose.photo);
+      await advance(30);
+      const state = await H('state');
+      if (state.deaths || state.pos[1] < y - .2) throw Error(`Still ${name} fell off its staged surface`);
+      await shot(`still-${name}`);
+    }
+    for (const [name, pose] of Object.entries(poses)) await poseStill(name, pose);
+    await H('poseHero', { anim: 'idle', fx: true }); await advance(2); await shot('still-hero');
+    await H('forceRestore'); await advance(660, false);
+    await poseStill('establish-restored', poses.establish);
   }
   if (wants('route')) {
     await boot(quality, true);

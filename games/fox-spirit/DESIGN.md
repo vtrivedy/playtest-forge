@@ -75,3 +75,14 @@ coalesce into one cue. Settings are available in the existing tuning panel.
 Verification: shared synthesis functions rendered through browser OfflineAudioContext
 into review WAVs, keyboard traversal, mute/unlock checks, staged restoration, screenshots,
 `window.__game` and audio diagnostics. Do not change movement, camera or visual tuning.
+
+## Sprint 2 gait review gym
+`?gym=gait` places the live fox/controller on an uncluttered measured course away
+from Russetvale: flat runway, 15-degree ascent, crest, descent. Same lighting,
+materials, animation and physics as gameplay. A harness-only world-space analog
+stick (magnitude 0..1) exercises walk/trot/gallop without changing feel parameters.
+The GPU harness records deterministic idle, speed bands, tight turns, hard stop,
+jump/landing and slopes; a quarter-speed segment uses smaller simulation steps,
+not duplicated frames. Side tracking keeps paws large enough to judge contact.
+1080p60 MP4, labelled pose contact sheet, per-frame state and __game snapshots
+are the evidence. Staged resets are explicitly recorded; route remains unassisted.
