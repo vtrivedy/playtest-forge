@@ -17,11 +17,8 @@ def assemble(spec:dict,run_id:str):
     for i,clip in enumerate(spec['clips']):
         source=f'/sources/{i}.mp4';target=out/f'part-{i}.mp4'
         base=['ffmpeg','-y','-v','error','-ss',str(clip['start']),'-i',source,'-t',str(clip['seconds']),'-an','-vf','scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,setsar=1','-pix_fmt','yuv420p']
-        proc=subprocess.run(base+['-c:v','h264_nvenc','-b:v','6M',str(target)],capture_output=True,text=True)
-        codec='h264_nvenc'
-        if proc.returncode:
-            subprocess.run(base+['-c:v','libx264','-preset','fast','-crf','18',str(target)],check=True)
-            codec='libx264 (NVENC unavailable; GPU container)'
+        subprocess.run(base+['-c:v','libx264','-preset','fast','-crf','18',str(target)],check=True)
+        codec='libx264 (uniform encoding in Modal GPU container)'
         encoders.append(codec)
     listing=out/'concat.txt';listing.write_text('\n'.join(f"file '{out/f'part-{i}.mp4'}'" for i in range(len(spec['clips']))))
     subprocess.run(['ffmpeg','-y','-v','error','-f','concat','-safe','0','-i',str(listing),'-c','copy','-movflags','+faststart',str(out/'trailer-50s.mp4')],check=True)

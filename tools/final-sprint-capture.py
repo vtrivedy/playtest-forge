@@ -2,13 +2,19 @@
 """Pin settled main once, render final gameplay/hero on Modal, then assemble trailer."""
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
-import json,subprocess,shutil,os
+import json,subprocess,shutil,os,uuid
 ROOT=Path(__file__).resolve().parents[1]
 ART=Path('/workspace/siyu/playtest-forge-artifacts/sprint2')
 OUT=ART/'final'
 def run(args,**kwargs):return subprocess.run(args,cwd=ROOT,check=True,**kwargs)
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
+    previous=OUT/f'previous-{uuid.uuid4().hex[:8]}'
+    owned=['COMMIT.txt','raw','hero-stills','gameplay-60s.mp4','final-gameplay.json','trailer-50s.mp4','trailer-sources.json','trailer-manifest.json','capture-exits.json','finale.log','fox.log','README.md']
+    for name in owned:
+        source=OUT/name
+        if source.exists():
+            previous.mkdir(exist_ok=True);source.rename(previous/name)
     sha=subprocess.check_output(['git','ls-remote','--heads','origin','main'],cwd=ROOT,text=True).split()[0]
     (OUT/'COMMIT.txt').write_text(sha+'\n')
     def capture(shot,size,fps):
@@ -18,14 +24,15 @@ def main():
         jobs=[pool.submit(capture,'finale','1280x720',30),pool.submit(capture,'fox','1920x1080',60)]
         codes=[job.result() for job in jobs]
     (OUT/'capture-exits.json').write_text(json.dumps(codes))
+    if any(codes):raise RuntimeError(f'Final GPU captures failed: {codes}; raw evidence retained, no publication')
     raw=OUT/'raw/finale/finale'
     for name in ['gameplay-60s.mp4','final-gameplay.json']:
-        if (raw/name).exists():shutil.copy2(raw/name,OUT/name)
+        shutil.copy2(raw/name,OUT/name)
     hero=OUT/'hero-stills';hero.mkdir(exist_ok=True)
     for grade in ['sepia','restored']:
         for angle in ['front','three_q','side']:
             source=OUT/f'raw/fox/fox/fox-{grade}-{angle}.png'
-            if source.exists():shutil.copy2(source,hero/source.name)
+            shutil.copy2(source,hero/source.name)
     sources=[
       (raw/'fox-closeup-run.mp4',sha,0,6,'Latest-main close run, staged start'),
       (ART/'loco-sol/showcase-clear/showcase.mp4',None,0,6,'Authored walk/trot/gallop; staged cuts; NEEDS REVISION critic'),
@@ -44,5 +51,5 @@ def main():
     spec={'latestMain':sha,'clips':clips,'editorial':True,'audio':'Silent fixed-clock captures; no recorded soundtrack'}
     manifest=OUT/'trailer-manifest.json';manifest.write_text(json.dumps(spec,indent=2))
     run(['modal','run','--detach','tools/modal/final_cut.py','--out',str(OUT)],env=dict(os.environ,FOX_FINAL_MANIFEST=str(manifest)))
-    (OUT/'README.md').write_text(f'''# Sprint2 final footage\n\nLatest main: `{sha}`. GPU capture exits: {codes}.\n\n`gameplay-60s.mp4`: three20-second chapters, Arrival Meadow → Windmill Rise → Reedmarsh shrine approach. Chapter starts after the opening are staged; movement afterward is real controller/autopilot input, with no forced solves. Lanternhollow hub is not implemented, so Arrival Meadow is the disclosed substitute. State/deaths are in `final-gameplay.json`; this is not a continuous completed route or feel approval.\n\n`trailer-50s.mp4`: editorial6+6+11+14+13s cut (occluded showcase turn span omitted). Every source commit, in/out time, and encoder is in `trailer-sources.json` and `trailer-manifest.json`. Earlier-build footage is intentionally identified; it is not represented as latest-main gameplay. The showcase source has a NEEDS REVISION critique. No soundtrack was recorded.\n\nSix1080p hero stills are in `hero-stills/`, three angles in each grade. Raw reports, traces, videos and contact sheets are in `raw/`. Visual review and remaining failures are recorded in `REVIEW.md` after inspection.\n''')
+    (OUT/'README.md').write_text(f'''# Sprint2 final footage\n\nLatest main: `{sha}`. GPU capture exits: {codes}.\n\n`gameplay-60s.mp4`: three20-second chapters, Arrival Meadow → Windmill Rise → Reedmarsh shrine approach. Chapter starts after the opening are staged; movement afterward uses scripted inputs through the actual movement controller, with no forced solves. Reedmarsh uses staged teleport plus scripted waypoint stick input. Lanternhollow hub is not implemented, so Arrival Meadow is the disclosed substitute. State/deaths are in `final-gameplay.json`; this is not a continuous completed route or feel approval.\n\n`trailer-50s.mp4`: editorial6+6+11+14+13s cut (occluded showcase turn span omitted). Every source commit, in/out time, and encoder is in `trailer-sources.json` and `trailer-manifest.json`. Earlier-build footage is intentionally identified; it is not represented as latest-main gameplay. The showcase source has a NEEDS REVISION critique. No soundtrack was recorded.\n\nSix1080p hero stills are in `hero-stills/`, three angles in each grade. Raw reports, traces, videos and contact sheets are in `raw/`. Visual review and remaining failures are recorded in `REVIEW.md` after inspection.\n''')
 if __name__=='__main__':main()

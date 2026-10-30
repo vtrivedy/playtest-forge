@@ -11,9 +11,13 @@ export async function captureFinale({H,boot,video,shot,save,getPage,fps,out,exec
       const idx=route.findIndex(w=>w.label==='cp-mills');if(idx<0)throw Error('No mill chapter start');
       const p=route[idx], y=await page.evaluate(p=>window.__gameHooks.debug.world.collision.groundAt(p.x,p.z,p.y+.5).y,p);
       if(!Number.isFinite(y)||y<p.y-1)throw Error('Unsafe mill chapter start');
-      await H('teleport',p.x,y,p.z,Math.PI);await H('autopilot',true,idx,{assist:false});
+      await H('teleport',p.x,y,p.z,Math.PI);await H('advance',3,1/60,false);await H('autopilot',true,idx,{assist:false});
     }
-    if(name==='reedmarsh')await H('teleport',90,1.2,15,Math.PI/2);
+    if(name==='reedmarsh') {
+      const y=await page.evaluate(()=>window.__gameHooks.debug.world.collision.groundAt(90,15,1.7).y);
+      if(!Number.isFinite(y)||y<.2)throw Error('Unsafe Reedmarsh start');
+      await H('teleport',90,y,15,Math.PI/2);await H('advance',3,1/60,false);
+    }
     let phase=0, lift=false;
     const approach=[[92.4,12.6],[95,10],[98.4,10.5],[96,16.1],[95,17]];
     await video(`final-${name}`,20*fps,async()=>{
