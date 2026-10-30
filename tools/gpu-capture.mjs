@@ -860,7 +860,7 @@ try {
   if (wants('reach')) {
     await boot(quality,true); await H('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
-    const points=[{x:40,y:38,z:-90},{x:76,y:38,z:-90},{x:112,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:173,y:30,z:-116,dash:true},{x:187,y:30,z:-118},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}];
+    const points=[{x:40,y:38,z:-90},{x:76,y:38,z:-90},{x:112,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:173,y:30,z:-116,dash:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}];
     let phase=0,age=0,reached=false,painted=false;
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await H('state'),p=points[phase];age+=1/fps;
