@@ -385,13 +385,14 @@ try {
     const board=[.868243,-.496139];
     const segments=[
       {name:'Reedmarsh boardwalk walk',seconds:2,stick:board.map(v=>v*.18),reset:[62.5,.3,32.5]},
-      {name:'Windmill terrace trot',seconds:2,stick:tn.map(v=>v*.45),reset:sp(5,-5,2)},
-      {name:'Windmill terrace gallop',seconds:2,stick:tn,reset:sp(5,-9,2)},
+      {name:'Windmill terrace trot',seconds:2,stick:tn.map(v=>v*.45),reset:sp(8,-5,2)},
+      {name:'Windmill terrace gallop',seconds:2,stick:tn,reset:sp(8,-8,2)},
       {name:'Windmill carved turns',seconds:3,turn:true,reset:sp(5,0,2)},
       {name:'Windmill jump and recovery',seconds:2,stick:tn.map(v=>v*.45),jump:true,reset:sp(5,0,2)},
       {name:'Windmill entrance ascent',seconds:3,stick:td.map(v=>v*.18),reset:sp(-6,0,.1+1.9*.5/6.9)},
       {name:'Windmill slope jump and land',seconds:3,stick:td.map(v=>v*.18),jump:true,reset:sp(-4,0,.1+1.9*2.5/6.9)},
-      {name:'Windmill brake and settle',seconds:3,stick:[0,0]},
+      {name:'Windmill dash',seconds:1,stick:tn,dash:true,reset:sp(8,-8,2)},
+      {name:'Windmill brake and settle',seconds:2,stick:[0,0]},
     ];
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
@@ -403,7 +404,7 @@ try {
       if(segment.turn){const angle=local/fps*2;stick=[(tn[0]*Math.cos(angle)+td[0]*Math.sin(angle))*.45,(tn[1]*Math.cos(angle)+td[1]*Math.sin(angle))*.45];}
       if(local===0 && segment.reset){const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...segment.reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
       await H('setStick',...stick);
-      await H('setKeys',segment.jump && local<Math.round(.25*fps)?['Space']:[]);
+      await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
     },undefined,{traceEveryFrame:true,keyFrames});
     await H('setKeys',[]);await H('setStick',null);
     const result=report.videos.showcase;
