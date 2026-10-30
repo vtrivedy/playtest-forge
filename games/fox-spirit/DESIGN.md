@@ -301,3 +301,13 @@ use the kit. Keep sacred glyphs and all gameplay collision unchanged.
 Hero still staging correction: use (0,70); the former (6,78) photo lens lay inside
 the H-a shelf and clipped its face into the foreground. Record the changed stage
 in capture provenance. This does not change the live third-person camera.
+
+### Small landmark material corrections
+Checkpoint lamps stay warm amber at a restrained emissive level rather than
+reading as white boxes. Windmill sailcloth sits behind its existing timber ribs
+and receives broad seam/lattice shading; no sail collision or rotation changes.
+Reduce foliage texture-value contrast so clump lighting carries the silhouette
+instead of fine photographic noise. Retain coherent crown gaps and branches.
+Retest adjustment: halve ink ripple amplitude, vary phase to break parallel bands,
+and compress only ink highlights more strongly. Broaden masonry texture scale to
+read as old stone courses at play distance instead of a tiny repeated brick grid.

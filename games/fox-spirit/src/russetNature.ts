@@ -170,7 +170,7 @@ function softenFoliage(geo: THREE.BufferGeometry, k: number): { clump: Uint16Arr
     nor.setXYZ(i, a.x, a.y, a.z);
     // interior + underside darker, outer sunlit shell lighter
     const h = THREE.MathUtils.clamp((p.y - box.min.y) / Math.max(0.01, size.y), 0, 1);
-    shade[i] = THREE.MathUtils.lerp(0.3, 0.92, THREE.MathUtils.smoothstep(local, 0.15, 0.95)) * THREE.MathUtils.lerp(0.72, 1.08, h);
+    shade[i] = THREE.MathUtils.lerp(0.42, 0.92, THREE.MathUtils.smoothstep(local, 0.15, 0.95)) * THREE.MathUtils.lerp(0.72, 1.08, h);
   }
   nor.needsUpdate = true;
   return { clump, shade };
@@ -188,7 +188,7 @@ export async function loadNatureKit(): Promise<NatureKit> {
       alphaTest: 0.42,
       side: THREE.DoubleSide,
     });
-    foliageShader(m, { translucency: src.name === 'Leaves' || src.name === 'Grass' ? 0.3 : 0.5, texMix: src.name === 'Leaves' ? 0.6 : src.name === 'Grass' ? 0 : 0.3 });
+    foliageShader(m, { translucency: src.name === 'Leaves' || src.name === 'Grass' ? 0.3 : 0.5, texMix: src.name === 'Leaves' ? 0.22 : src.name === 'Grass' ? 0 : 0.18 });
     m.userData.src = src;
     nearCameraFade(m);
     return m;

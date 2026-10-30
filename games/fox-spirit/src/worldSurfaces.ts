@@ -28,7 +28,7 @@ export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec3 wsWeights = pow(abs(normalize(vWSNormal)), vec3(4.0));
         wsWeights /= max(dot(wsWeights, vec3(1.0)), 0.001);
-        vec3 wsP = vWSPoint * ${timber ? 'vec3(0.72, 0.16, 0.72)' : 'vec3(0.48)'};
+        vec3 wsP = vWSPoint * ${timber ? 'vec3(0.72, 0.16, 0.72)' : 'vec3(0.25)'};
         vec3 wsScan = texture2D(uWSScan, wsP.zy).rgb * wsWeights.x
           + texture2D(uWSTop, wsP.xz).rgb * wsWeights.y
           + texture2D(uWSScan, wsP.xy).rgb * wsWeights.z;

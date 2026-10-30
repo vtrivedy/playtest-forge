@@ -282,6 +282,18 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   weatheredSurface(M.stone);
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
+  M.sail.onBeforeCompile = shader => {
+    shader.vertexShader = 'varying vec2 vSailLocal;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvSailLocal = position.xy;');
+    shader.fragmentShader = 'varying vec2 vSailLocal;\n' + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      float sailAlong = max(abs(vSailLocal.x), abs(vSailLocal.y));
+      float sailAcross = min(abs(vSailLocal.x), abs(vSailLocal.y));
+      float sailRib = 1.0 - smoothstep(0.025, 0.065, abs(fract(sailAlong) - 0.5));
+      float sailWarp = 1.0 - smoothstep(0.03, 0.075, abs(fract(sailAcross * 3.0) - 0.5));
+      diffuseColor.rgb *= 1.0 - max(sailRib, sailWarp) * 0.48;
+      diffuseColor.rgb *= 0.93 + 0.07 * sin(sailAlong * 44.0);`);
+  };
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
   const [nature, rubble, lanternColumn] = await Promise.all([loadNatureKit(), loadRubbleKit(), loadLanternColumn()]);
   // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
@@ -780,7 +792,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       // pressed-sepia sailcloth, a little torn on one blade
       const sail = new THREE.PlaneGeometry(1.4, k === 2 ? 4.2 : 5.8, 2, 4);
       const sp2 = sail.attributes.position as THREE.BufferAttribute;
-      for (let v = 0; v < sp2.count; v++) sp2.setZ(v, 0.08 + Math.sin(sp2.getY(v) * 0.9) * 0.08);
+      for (let v = 0; v < sp2.count; v++) sp2.setZ(v, -0.035 + Math.sin(sp2.getY(v) * 0.9) * 0.025);
       sail.translate(0.78, k === 2 ? 4.6 : 3.9, 0);
       sailB.add(sail, new THREE.Matrix4().makeRotationZ(a), PAL.sail.clone().offsetHSL(0, 0, (k % 2) * -0.05));
       sail.dispose();
@@ -866,7 +878,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // ==================================================================== REEDMARSH
   const inkGeo = new THREE.CircleGeometry(1, 64);
   inkGeo.rotateX(-Math.PI / 2);
-  const inkMat = new THREE.MeshStandardMaterial({ name: 'rv-ink', color: 0x1f1914, roughness: 0.38, metalness: 0.0 });
+  const inkMat = new THREE.MeshStandardMaterial({ name: 'rv-ink', color: 0x1f1914, roughness: 0.48, metalness: 0.0 });
   const inkTime = { value: 0 };
   inkMat.onBeforeCompile = shader => {
     shader.uniforms.uInkTime = inkTime;
@@ -874,13 +886,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvInkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = 'uniform float uInkTime; varying vec3 vInkWorld;\n' + shader.fragmentShader;
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
-      vec3 inkRipple = vec3(sin(vInkWorld.x * 1.7 + vInkWorld.z * 0.7 - uInkTime * 0.6), 0.0, cos(vInkWorld.z * 2.1 - uInkTime * 0.8)) * 0.07;
+      vec3 inkRipple = vec3(sin(vInkWorld.x * 1.7 + sin(vInkWorld.z * 0.7) - uInkTime * 0.6), 0.0, cos(vInkWorld.z * 2.1 + sin(vInkWorld.x * 0.8) - uInkTime * 0.8)) * 0.035;
       normal = normalize(normal + (viewMatrix * vec4(inkRipple, 0.0)).xyz);`);
     shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
       float inkFresnel = pow(1.0 - abs(dot(normal, geometryViewDir)), 4.0);
       outgoingLight += vec3(0.035, 0.025, 0.014) * inkFresnel;
       // Material-local shoulder keeps reflected lamps warm without white disks.
-      outgoingLight /= vec3(1.0) + outgoingLight * 0.8;
+      outgoingLight /= vec3(1.0) + outgoingLight * 2.5;
       #include <opaque_fragment>`);
   };
   const ink = new THREE.Mesh(inkGeo, inkMat);
@@ -1833,7 +1845,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 
   const lanternMat = glowMat('rv-glow-lanterns');
-  lanternMat.emissiveIntensity = 0.65;
+  lanternMat.color.set(0x8a6040);
+  lanternMat.emissive.set(0xffb46a);
+  lanternMat.emissiveIntensity = 0.28;
   patchable.push(lanternMat);
   const checkpoints: Realm['checkpoints'] = [];
   const lanternB = new Bucket();
@@ -2376,7 +2390,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         }
       }
       const litCount = checkpoints.filter((c) => c.lit).length;
-      lanternMat.emissiveIntensity = 0.65 + Math.min(1, litCount) * 0.9;
+      lanternMat.emissiveIntensity = 0.28 + Math.min(1, litCount) * 0.32;
 
       // seedwells
       for (let i = 0; i < seedwells.length; i++) {
