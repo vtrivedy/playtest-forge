@@ -354,3 +354,10 @@ Reduce its repeated shapes from22 to14, move its depth range to300–600m and
 reduce its scale range to10–30m. Lower it mostly into the cloud sea. This removes
 large crisp saucer shapes behind the hero while retaining the two dressed
 nearer island silhouettes. Scenery only; no playable world geometry changes.
+
+### Near-plane ruin-face fade
+The normal-camera showcase can brush the near face of a stair cheek even while
+the fox remains visible. Reuse the existing ordered near-camera dither on rock
+and stone faces over0.3–1.25m. Keep terrain/ground caps opaque, geometry/collision
+unchanged, and landing surfaces beyond that near plane fully visible. Recheck
+actual showcase cuts, especially the windmill stair approach.

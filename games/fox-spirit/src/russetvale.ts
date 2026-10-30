@@ -291,6 +291,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   M.rock.normalScale.set(1.1, 1.1);
   for (const m of [M.leaf, M.litter]) leafCutout(m, atlas);
   for (const m of [M.leaf, M.reed]) nearCameraFade(m);
+  for (const m of [M.rock, M.stone]) nearCameraFade(m, 0.3, 1.25);
   weatheredSurface(M.stone);
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
