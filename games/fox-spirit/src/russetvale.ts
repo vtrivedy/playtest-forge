@@ -1738,6 +1738,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       ],
     });
   }
+  // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
+  shadeSpots.push({ id: 'shade-flume', speed: 1.1, patrol: [[102, 4.7, 24], [98, 4.5, 26], [96, 0, 29], [104, 0, 30]] });
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
   inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
 

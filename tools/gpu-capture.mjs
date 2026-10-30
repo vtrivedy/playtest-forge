@@ -451,6 +451,17 @@ try {
       if ([fps, 5 * fps, 10 * fps, 13 * fps].includes(i)) await shot(`water-reed-${i}`);
     });
     save('water-reed-result.json', await H('state'));
+    await H('teleport', -30, 0, 65, Math.PI); await H('setStick', 0, 0);
+    await H('photo', [-23, 5, 70], [-30, 1, 61], 48); await advance(2); await shot('water-pond-frozen');
+    await video('water-pond-grotto', 8 * fps, async i => {
+      if (i === 15) { await H('setStick', 0, -1); await H('setKeys', ['ShiftLeft']); }
+      if (i === 40) await H('setKeys', []);
+      if (i === 95) await H('setStick', 0, 0);
+      if ([30, 60, 100, 300].includes(i)) await shot(`water-pond-${i}`);
+    });
+    await H('setStick', null); await H('setKeys', []);
+    save('water-pond-result.json', await H('state'));
+    await H('photo', [-7, 7, 79], [-23, 0, 66], 52); await advance(2); await shot('water-pond-vista');
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.

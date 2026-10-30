@@ -132,3 +132,5 @@ Marsh Mouth (57,36) teaches color → melt → moving front → washed crossing.
 Verification: GPU water shot retains frozen/melt/front/wash/refreeze stills and video, captures __game, and checks front/tail timing and SW2 inlet. Review visuals, apply critique, rerun.
 
 Water review corrections (12:15 ET): the crossing has a permanent shallow stone bed; flowing water removes the ink hazard, never the supporting ground. A local ink skin covers the dry channel. The final 0.8 s of hold warns that the wash is ending. Driver 12:05 changes the frozen look to pale translucent ice with warm inner light. Water already past a Shade drains away at 8 m/s; the Shade cannot erase it instantly. Flume beds and water are batched. No controller/animation edits.
+
+Water completion slice: S1 pond-grotto falls at (−30,62) uses the same reactor and opens its frozen sheet collider only while flowing. The grotto floor remains solid; the fox can relight from either side. Full flood restores all water. A slow authored flume Shade patrol uses the existing encounters public drain predicate; water already past it runs out normally. Original procedural assets only (CREDITS.md).

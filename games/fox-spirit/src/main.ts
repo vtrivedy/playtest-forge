@@ -1302,6 +1302,7 @@ async function boot() {
       }
     }
     colorField.update(dt);
+    if (colorField.globalColor >= 0.99) water.restoreAll();
     water.update(dt, simClock, supplyAt, drainedAt);
     updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
     wind.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
