@@ -334,6 +334,21 @@ try {
     await page.evaluate(() => {
       const fox = window.__gameHooks.debug.fox;
       window.__capturePaws = Object.fromEntries(Object.entries({ LF: 'front_paw_l', RF: 'front_paw_r', LH: 'hind_paw_l', RH: 'hind_paw_r' }).map(([id, name]) => [id, fox.getObjectByName(name)]));
+      window.__capturePadVertices={};
+      for(const [id,bone] of Object.entries(window.__capturePaws)) {
+        const samples=[];
+        fox.traverse(mesh=>{
+          if(!mesh.isSkinnedMesh || /fur|shell|glow|flame|spiritfx/i.test(mesh.name))return;
+          const boneIndex=mesh.skeleton.bones.indexOf(bone);if(boneIndex<0)return;
+          const indices=mesh.geometry.getAttribute('skinIndex'),weights=mesh.geometry.getAttribute('skinWeight');
+          for(let i=0;i<indices.count;i++) {
+            let weight=0;
+            for(let j=0;j<4;j++)if(indices.getComponent(i,j)===boneIndex)weight+=weights.getComponent(i,j);
+            if(weight>=.65)samples.push({mesh,index:i});
+          }
+        });
+        window.__capturePadVertices[id]=samples;
+      }
     });
     // Times are output seconds; slow motion advances 1/240s per 60fps frame.
     const segments = [
@@ -375,6 +390,18 @@ try {
           const ground = world.collision.groundAt(point.x, point.z, feetY + .6).y;
           feet[id] = { position: point.toArray(), ground: Number.isFinite(ground) ? ground : null, clearance: Number.isFinite(ground) ? point.y - ground : null };
         }
+        const pads={}, updatedMeshes=new Set();
+        for(const [id,samples] of Object.entries(window.__capturePadVertices)) {
+          let closest=null;
+          for(const {mesh,index} of samples) {
+            if(!updatedMeshes.has(mesh)){mesh.skeleton.update();updatedMeshes.add(mesh);}
+            const point=mesh.localToWorld(mesh.getVertexPosition(index,fox.position.clone()));
+            const ground=world.collision.groundAt(point.x,point.z,feetY+.6).y;
+            const clearance=point.y-ground;
+            if(Number.isFinite(clearance) && (!closest || clearance<closest.clearance))closest={clearance,position:point.toArray(),ground,index,mesh:mesh.name};
+          }
+          pads[id]={...closest,vertexCount:samples.length};
+        }
         const hip = fox.getObjectByName('pelvis'), chest = fox.getObjectByName('spine_04');
         let body = null;
         if (hip && chest) {
@@ -384,7 +411,7 @@ try {
           const behind = world.collision.groundAt(center.x - Math.sin(yaw) * .4, center.z - Math.cos(yaw) * .4, feetY + .6).y;
           body = { hip: a.toArray(), chest: b.toArray(), pitch: Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z)), floorPitch: Math.atan2(ahead - behind, .8) };
         }
-        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet, body };
+        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet, pads, padLandmark: 'lowest actual skinned core-mesh vertex with paw weight>=.65; fur/shader displacement excluded', body };
       }, state.pos[1]),
       keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.gait ?? st.locomotion?.gait ?? st.anim ?? 'unreported'} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
       afterStep: async (i, state) => {
