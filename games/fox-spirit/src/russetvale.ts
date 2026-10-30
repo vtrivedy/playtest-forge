@@ -57,7 +57,7 @@ export type RouteAct = 'jump' | 'jumpdash' | 'glide' | 'dash';
 /** Authored Shade patrol (world-1.md §3.8): a closed spline the encounters module walks */
 export type Waypoint = {
   x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string;
-  /** lift waypoints: metres to rise in the column before steering off (default 0.5) */
+  /** lift waypoints: metres to rise above the lift before steering off (default: 0.5 m above the next waypoint) */
   rise?: number;
 };
 
