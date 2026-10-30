@@ -2,7 +2,8 @@
  * Headless playtest harness — Chromium + SwiftShader WebGL.
  * Drives keyboard, screenshots, webm, reads window.__game.
  *
- *   npx tsx tools/playtest.ts --game creature-island --seconds 25
+ *   npx tsx tools/playtest.ts --game fox-spirit --seconds 30
+ *   npx tsx tools/playtest.ts --game fox-spirit --script shrine --port 5180
  */
 import { chromium } from 'playwright';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -24,7 +25,59 @@ const seconds = Number(arg('seconds', '25'));
 const outDir = path.resolve(arg('out', path.join(root, 'playtest-output', game))!);
 const port = Number(arg('port', '5173'));
 const urlOverride = arg('url');
+const scriptName = arg('script', game.includes('fox') ? 'shrine' : 'wander')!;
 fs.mkdirSync(outDir, { recursive: true });
+
+type Step = { down: string[]; ms: number; tap?: boolean };
+
+const SCRIPTS: Record<string, Step[]> = {
+  shrine: [
+    { down: ['KeyW'], ms: 500 },
+    { down: ['KeyW', 'Space'], ms: 90, tap: true }, // short hop (variable jump)
+    { down: ['KeyW'], ms: 400 },
+    { down: ['KeyW', 'Space'], ms: 140, tap: true },
+    { down: ['KeyW'], ms: 350 },
+    { down: ['KeyW', 'ShiftLeft'], ms: 70, tap: true },
+    { down: ['KeyW'], ms: 500 },
+    { down: ['KeyW', 'Space'], ms: 1000 }, // long hold → glide
+    { down: ['KeyW'], ms: 600 },
+    { down: ['KeyA', 'KeyW'], ms: 250 },
+    { down: ['KeyD', 'KeyW'], ms: 250 },
+    { down: ['KeyW', 'ShiftLeft'], ms: 70, tap: true },
+    { down: ['KeyW'], ms: 900 },
+    { down: ['KeyW', 'Space'], ms: 120, tap: true },
+    { down: ['KeyW'], ms: 800 },
+  ],
+  wander: [
+    { down: ['KeyW'], ms: 600 },
+    { down: ['Space'], ms: 80, tap: true },
+    { down: ['KeyW', 'Space'], ms: 700 },
+    { down: ['KeyD'], ms: 400 },
+    { down: ['ShiftLeft'], ms: 50, tap: true },
+    { down: ['KeyW', 'KeyA'], ms: 500 },
+    { down: ['Space'], ms: 80, tap: true },
+    { down: ['KeyW', 'Space'], ms: 800 },
+    { down: ['KeyA'], ms: 450 },
+    { down: ['KeyS', 'KeyD'], ms: 400 },
+    { down: ['Space'], ms: 80, tap: true },
+    { down: ['ShiftLeft'], ms: 50, tap: true },
+    { down: ['KeyW'], ms: 500 },
+  ],
+  'feel-probe': [
+    // Stand still, short tap jump
+    { down: ['Space'], ms: 70, tap: true },
+    { down: [], ms: 900 },
+    // Full hold jump then glide
+    { down: ['Space'], ms: 1200 },
+    { down: [], ms: 400 },
+    // Run + dash measure
+    { down: ['KeyW'], ms: 400 },
+    { down: ['KeyW', 'ShiftLeft'], ms: 60, tap: true },
+    { down: ['KeyW'], ms: 500 },
+    { down: ['KeyW', 'Space'], ms: 100, tap: true },
+    { down: ['KeyW'], ms: 600 },
+  ],
+};
 
 async function waitForServer(url: string, timeoutMs = 45_000): Promise<void> {
   const start = Date.now();
@@ -32,56 +85,33 @@ async function waitForServer(url: string, timeoutMs = 45_000): Promise<void> {
     try {
       const res = await fetch(url);
       if (res.ok || res.status === 404) return;
-    } catch { /* retry */ }
+    } catch {
+      /* retry */
+    }
     await new Promise((r) => setTimeout(r, 250));
   }
   throw new Error(`Server did not come up at ${url}`);
 }
 
 async function play(page: import('playwright').Page): Promise<void> {
-  // Creature platformer pattern: run, jump, glide, dash, gather
+  const sequence = SCRIPTS[scriptName] ?? SCRIPTS.wander!;
   const end = Date.now() + seconds * 1000;
-  // Fox-spirit shrine is at -Z from spawn; bias forward + occasional jump/dash/glide.
-  const sequence: Array<{ down: string[]; up?: string[]; ms: number }> = game.includes('fox')
-    ? [
-        { down: ['KeyW'], ms: 700 },
-        { down: ['KeyW', 'Space'], ms: 120 },
-        { down: ['KeyW'], ms: 500 },
-        { down: ['KeyW', 'ShiftLeft'], ms: 80 },
-        { down: ['KeyW'], ms: 600 },
-        { down: ['KeyW', 'Space'], ms: 900 }, // glide toward shrine
-        { down: ['KeyW'], ms: 700 },
-        { down: ['KeyA', 'KeyW'], ms: 300 },
-        { down: ['KeyD', 'KeyW'], ms: 300 },
-        { down: ['KeyW'], ms: 800 },
-        { down: ['KeyW', 'ShiftLeft'], ms: 80 },
-        { down: ['KeyW'], ms: 900 },
-      ]
-    : [
-        { down: ['KeyW'], ms: 600 },
-        { down: ['Space'], ms: 80 },
-        { down: ['KeyW', 'Space'], ms: 700 },
-        { down: ['KeyD'], ms: 400 },
-        { down: ['ShiftLeft'], ms: 50 },
-        { down: ['KeyW', 'KeyA'], ms: 500 },
-        { down: ['Space'], ms: 80 },
-        { down: ['KeyW', 'Space'], ms: 800 },
-        { down: ['KeyA'], ms: 450 },
-        { down: ['KeyS', 'KeyD'], ms: 400 },
-        { down: ['Space'], ms: 80 },
-        { down: ['ShiftLeft'], ms: 50 },
-        { down: ['KeyW'], ms: 500 },
-      ];
   let i = 0;
+  const samples: unknown[] = [];
   while (Date.now() < end) {
     const step = sequence[i % sequence.length]!;
     for (const k of step.down) await page.keyboard.down(k);
     await page.waitForTimeout(step.ms);
     for (const k of step.down) await page.keyboard.up(k);
+    if (step.tap) await page.waitForTimeout(40);
     i += 1;
-    const state = await page.evaluate(() => (window as unknown as { __game?: { status: string } }).__game);
+    const state = await page.evaluate(
+      () => (window as unknown as { __game?: { status: string; feel?: unknown } }).__game,
+    );
+    if (state?.feel) samples.push({ t: Date.now(), ...state.feel, status: state.status });
     if (state && (state.status === 'won' || state.status === 'lost')) break;
   }
+  fs.writeFileSync(path.join(outDir, 'feel-samples.json'), JSON.stringify(samples, null, 2));
 }
 
 let vite: ChildProcess | undefined;
@@ -123,7 +153,6 @@ try {
   await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 60_000 });
   await page.waitForTimeout(800);
 
-  // Do NOT call canvas.getContext — three.js already owns the WebGL2 context.
   const info = await page.evaluate(() => {
     const canvas = document.querySelector('canvas');
     const g = (window as unknown as { __game?: unknown }).__game;
@@ -140,7 +169,11 @@ try {
   const metrics = await page.evaluate(() => (window as unknown as { __game?: unknown }).__game ?? null);
   fs.writeFileSync(
     path.join(outDir, 'metrics.json'),
-    JSON.stringify({ game, seconds, metrics, finishedAt: new Date().toISOString() }, null, 2),
+    JSON.stringify(
+      { game, script: scriptName, seconds, metrics, finishedAt: new Date().toISOString() },
+      null,
+      2,
+    ),
   );
 
   await context.close();
@@ -153,9 +186,17 @@ try {
     .sort((a, b) => b.m - a.m);
   if (videos[0]) fs.renameSync(path.join(outDir, videos[0].f), path.join(outDir, 'playtest.webm'));
 
-  console.log(JSON.stringify({ ok: true, outDir, metrics }, null, 2));
+  console.log(JSON.stringify({ ok: true, outDir, script: scriptName, metrics }, null, 2));
 } finally {
   if (vite?.pid) {
-    try { process.kill(-vite.pid, 'SIGTERM'); } catch { try { vite.kill('SIGTERM'); } catch { /* */ } }
+    try {
+      process.kill(-vite.pid, 'SIGTERM');
+    } catch {
+      try {
+        vite.kill('SIGTERM');
+      } catch {
+        /* */
+      }
+    }
   }
 }

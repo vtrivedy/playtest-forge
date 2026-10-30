@@ -4,7 +4,13 @@ import { createForgeRenderer } from '../../shared/renderer';
 import { applyStylizedIslandLights } from '../../shared/environment';
 import { createPostStack } from '../../shared/postfx';
 import { Juice } from '../../shared/juice';
-import { DEFAULT_FEEL, createFeelPanel, type FeelParams } from '../../shared/character-feel';
+import {
+  PRESET_SPRING,
+  createFeelPanel,
+  JumpFeel,
+  emptyFeelMetrics,
+  type FeelParams,
+} from '../../shared/character-feel';
 import {
   createColorMaskState,
   updateColorTrail,
@@ -12,7 +18,9 @@ import {
   syncColorMaskUniforms,
 } from '../../shared/color-mask';
 
-const feel: FeelParams = { ...DEFAULT_FEEL, moveSpeed: 7.5, jumpVelocity: 9.2 };
+const feel: FeelParams = { ...PRESET_SPRING };
+const jumpFeel = new JumpFeel();
+const feelMetrics = emptyFeelMetrics();
 const mask = createColorMaskState();
 mask.auraRadius = 2.6;
 
@@ -207,8 +215,6 @@ addEventListener('keyup', (e) => keys.delete(e.code));
 
 const vel = new THREE.Vector3();
 let grounded = false;
-let coyote = 0;
-let jumpBuf = 0;
 let dashT = 0;
 let gliding = false;
 let shrineOn = false;
@@ -260,43 +266,66 @@ function tick() {
     wish.addScaledVector(right, ix).addScaledVector(forward, -iz).normalize();
   }
 
-  if (keys.has('Space')) jumpBuf = feel.jumpBuffer;
-  else jumpBuf = Math.max(0, jumpBuf - dt);
+  const spaceDown = keys.has('Space');
+  jumpFeel.sampleJumpEdge(spaceDown, dt, feel.jumpBuffer);
 
   const gy = groundY(fox.position.x, fox.position.z);
   const feetY = fox.position.y - 0.35;
+  const wasGrounded = grounded;
   grounded = gy !== null && feetY <= gy + 0.1 && vel.y <= 0.15;
   if (grounded) {
-    coyote = feel.coyoteTime;
+    jumpFeel.onGrounded(feel.coyoteTime);
+    if (jumpFeel.airTime > 0) {
+      feelMetrics.lastAirTime = jumpFeel.airTime;
+      feelMetrics.lastJumpApex = jumpFeel.apex;
+      feelMetrics.lastTimeToApex = jumpFeel.timeToApex;
+    }
     fox.position.y = gy! + 0.35;
     if (vel.y < 0) vel.y = 0;
     gliding = false;
-  } else coyote = Math.max(0, coyote - dt);
+    // Landing squash
+    if (!wasGrounded) {
+      fox.scale.set(1.15, 0.75, 1.15);
+      juice.bump(0.06);
+    }
+  } else {
+    jumpFeel.tickAir(dt, fox.position.y, vel.y);
+  }
 
-  if (jumpBuf > 0 && coyote > 0) {
-    vel.y = feel.jumpVelocity;
-    jumpBuf = 0;
-    coyote = 0;
+  const jv = jumpFeel.tryJump(feel.jumpVelocity, fox.position.y);
+  if (jv !== null) {
+    vel.y = jv;
     grounded = false;
+    feelMetrics.jumps += 1;
+    fox.scale.set(0.85, 1.2, 0.85); // stretch on takeoff
     juice.bump(0.1);
   }
+
+  // Variable jump height
+  vel.y = jumpFeel.applyCut(spaceDown, vel.y, feel.jumpCut);
 
   if ((keys.has('ShiftLeft') || keys.has('ShiftRight')) && dashT <= 0 && wish.lengthSq() > 0.01) {
     dashT = feel.dashDuration;
     vel.x = wish.x * feel.dashSpeed;
     vel.z = wish.z * feel.dashSpeed;
+    feelMetrics.dashesUsed += 1;
     juice.burst(fox.position.clone(), 0xff66aa);
     keys.delete('ShiftLeft');
     keys.delete('ShiftRight');
   }
   if (dashT > 0) dashT -= dt;
 
-  gliding = !grounded && vel.y < 0 && keys.has('Space');
+  gliding = !grounded && vel.y < 0 && spaceDown;
   vel.y -= feel.gravity * (gliding ? feel.glideGravityScale : 1) * dt;
   if (gliding) {
     vel.x *= Math.exp(-feel.glideDrag * dt);
     vel.z *= Math.exp(-feel.glideDrag * dt);
   }
+
+  // Ease squash/stretch back
+  fox.scale.x += (1 - fox.scale.x) * Math.min(1, 12 * dt);
+  fox.scale.y += (1 - fox.scale.y) * Math.min(1, 12 * dt);
+  fox.scale.z += (1 - fox.scale.z) * Math.min(1, 12 * dt);
 
   if (dashT <= 0) {
     const desired = wish.clone().multiplyScalar(feel.moveSpeed);
@@ -341,6 +370,7 @@ function tick() {
       g.taken = true;
       g.mesh.visible = false;
       gemsGot += 1;
+      feelMetrics.gemsCollected = gemsGot;
       juice.burst(g.mesh.position.clone(), 0xff66cc);
     }
   }
@@ -389,8 +419,21 @@ function tick() {
       `shrine=${shrineOn}`,
       `trail=${mask.trail.length}`,
       `gems=${gemsGot}`,
+      `apex=${feelMetrics.lastJumpApex.toFixed(3)}`,
+      `air=${feelMetrics.lastAirTime.toFixed(3)}`,
+      `jumps=${feelMetrics.jumps}`,
+      `dashes=${feelMetrics.dashesUsed}`,
       gliding ? 'glide' : grounded ? 'ground' : 'air',
     ],
+    feel: {
+      lastJumpApex: Number(feelMetrics.lastJumpApex.toFixed(3)),
+      lastTimeToApex: Number(feelMetrics.lastTimeToApex.toFixed(3)),
+      lastAirTime: Number(feelMetrics.lastAirTime.toFixed(3)),
+      dashesUsed: feelMetrics.dashesUsed,
+      jumps: feelMetrics.jumps,
+      grounded,
+      gliding,
+    },
   });
 
   post.render();

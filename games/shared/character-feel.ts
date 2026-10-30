@@ -5,6 +5,8 @@ export type FeelParams = {
   accel: number;
   turnRate: number;
   jumpVelocity: number;
+  /** Multiply upward velocity when jump is released early (variable height). */
+  jumpCut: number;
   gravity: number;
   airControl: number;
   glideGravityScale: number;
@@ -15,12 +17,14 @@ export type FeelParams = {
   jumpBuffer: number;
 };
 
-export const DEFAULT_FEEL: FeelParams = {
-  moveSpeed: 8,
-  accel: 28,
-  turnRate: 10,
-  jumpVelocity: 9.5,
-  gravity: 22,
+/** Sol REVIEW: spring (10/24-ish) beat brisk for readable hang time. */
+export const PRESET_SPRING: FeelParams = {
+  moveSpeed: 7.5,
+  accel: 30,
+  turnRate: 11,
+  jumpVelocity: 10,
+  jumpCut: 0.45,
+  gravity: 24,
   airControl: 0.55,
   glideGravityScale: 0.28,
   glideDrag: 1.8,
@@ -30,30 +34,127 @@ export const DEFAULT_FEEL: FeelParams = {
   jumpBuffer: 0.12,
 };
 
+export const PRESET_BRISK: FeelParams = {
+  moveSpeed: 8.5,
+  accel: 34,
+  turnRate: 12,
+  jumpVelocity: 9,
+  jumpCut: 0.4,
+  gravity: 26,
+  airControl: 0.5,
+  glideGravityScale: 0.32,
+  glideDrag: 2.0,
+  dashSpeed: 20,
+  dashDuration: 0.18,
+  coyoteTime: 0.08,
+  jumpBuffer: 0.1,
+};
+
+export const DEFAULT_FEEL: FeelParams = { ...PRESET_SPRING };
+
 export type FeelMetrics = {
   lastJumpApex: number;
   lastTimeToApex: number;
   lastAirTime: number;
   dashesUsed: number;
   gemsCollected: number;
+  jumps: number;
 };
 
-export function createFeelPanel(
-  params: FeelParams,
-  onChange?: () => void,
-): GUI {
+export function emptyFeelMetrics(): FeelMetrics {
+  return {
+    lastJumpApex: 0,
+    lastTimeToApex: 0,
+    lastAirTime: 0,
+    dashesUsed: 0,
+    gemsCollected: 0,
+    jumps: 0,
+  };
+}
+
+/** Edge-triggered jump buffer + coyote + variable cut + apex tracking. */
+export class JumpFeel {
+  buffer = 0;
+  coyote = 0;
+  private spaceWasDown = false;
+  private jumpStartY = 0;
+  private jumpClock = 0;
+  private rising = false;
+  private airClock = 0;
+  apex = 0;
+  timeToApex = 0;
+  airTime = 0;
+
+  /** Call once per frame with raw Space held state. */
+  sampleJumpEdge(spaceDown: boolean, dt: number, bufferWindow: number): void {
+    if (spaceDown && !this.spaceWasDown) this.buffer = bufferWindow;
+    else this.buffer = Math.max(0, this.buffer - dt);
+    this.spaceWasDown = spaceDown;
+  }
+
+  onGrounded(coyoteWindow: number): void {
+    this.coyote = coyoteWindow;
+    if (this.rising || this.airClock > 0) {
+      this.airTime = this.airClock;
+      this.rising = false;
+      this.airClock = 0;
+    }
+  }
+
+  tickAir(dt: number, y: number, velY: number): void {
+    this.coyote = Math.max(0, this.coyote - dt);
+    this.airClock += dt;
+    if (this.rising) {
+      this.jumpClock += dt;
+      const h = y - this.jumpStartY;
+      if (h > this.apex) {
+        this.apex = h;
+        this.timeToApex = this.jumpClock;
+      }
+      if (velY <= 0) this.rising = false;
+    }
+  }
+
+  tryJump(jumpVelocity: number, startY: number): number | null {
+    if (this.buffer <= 0 || this.coyote <= 0) return null;
+    this.buffer = 0;
+    this.coyote = 0;
+    this.jumpStartY = startY;
+    this.jumpClock = 0;
+    this.apex = 0;
+    this.timeToApex = 0;
+    this.rising = true;
+    this.airClock = 0;
+    return jumpVelocity;
+  }
+
+  /** Cut upward velocity when Space released mid-rise. */
+  applyCut(spaceDown: boolean, velY: number, cut: number): number {
+    if (this.rising && !spaceDown && velY > 0) return velY * cut;
+    return velY;
+  }
+}
+
+export function createFeelPanel(params: FeelParams, onChange?: () => void): GUI {
   const gui = new GUI({ title: 'Character Feel' });
-  gui.add(params, 'moveSpeed', 2, 20, 0.1).onChange(onChange);
-  gui.add(params, 'accel', 5, 60, 0.5).onChange(onChange);
-  gui.add(params, 'turnRate', 1, 20, 0.1).onChange(onChange);
-  gui.add(params, 'jumpVelocity', 4, 18, 0.1).onChange(onChange);
-  gui.add(params, 'gravity', 8, 40, 0.5).onChange(onChange);
-  gui.add(params, 'airControl', 0, 1, 0.01).onChange(onChange);
-  gui.add(params, 'glideGravityScale', 0.05, 1, 0.01).onChange(onChange);
-  gui.add(params, 'glideDrag', 0, 6, 0.05).onChange(onChange);
-  gui.add(params, 'dashSpeed', 8, 40, 0.5).onChange(onChange);
-  gui.add(params, 'dashDuration', 0.05, 0.6, 0.01).onChange(onChange);
-  gui.add(params, 'coyoteTime', 0, 0.25, 0.01).onChange(onChange);
-  gui.add(params, 'jumpBuffer', 0, 0.25, 0.01).onChange(onChange);
+  const apply = (p: FeelParams) => {
+    Object.assign(params, p);
+    onChange?.();
+  };
+  gui.add({ spring: () => apply(PRESET_SPRING) }, 'spring');
+  gui.add({ brisk: () => apply(PRESET_BRISK) }, 'brisk');
+  gui.add(params, 'moveSpeed', 2, 20, 0.1).onChange(onChange).listen();
+  gui.add(params, 'accel', 5, 60, 0.5).onChange(onChange).listen();
+  gui.add(params, 'turnRate', 1, 20, 0.1).onChange(onChange).listen();
+  gui.add(params, 'jumpVelocity', 4, 18, 0.1).onChange(onChange).listen();
+  gui.add(params, 'jumpCut', 0.1, 1, 0.01).onChange(onChange).listen();
+  gui.add(params, 'gravity', 8, 40, 0.5).onChange(onChange).listen();
+  gui.add(params, 'airControl', 0, 1, 0.01).onChange(onChange).listen();
+  gui.add(params, 'glideGravityScale', 0.05, 1, 0.01).onChange(onChange).listen();
+  gui.add(params, 'glideDrag', 0, 6, 0.05).onChange(onChange).listen();
+  gui.add(params, 'dashSpeed', 8, 40, 0.5).onChange(onChange).listen();
+  gui.add(params, 'dashDuration', 0.05, 0.6, 0.01).onChange(onChange).listen();
+  gui.add(params, 'coyoteTime', 0, 0.25, 0.01).onChange(onChange).listen();
+  gui.add(params, 'jumpBuffer', 0, 0.25, 0.01).onChange(onChange).listen();
   return gui;
 }

@@ -1,4 +1,14 @@
 /** Games must expose this on window so the playtest harness can read metrics. */
+export type FeelSnapshot = {
+  lastJumpApex: number;
+  lastTimeToApex: number;
+  lastAirTime: number;
+  dashesUsed: number;
+  jumps: number;
+  grounded: boolean;
+  gliding: boolean;
+};
+
 export type GameState = {
   title: string;
   status: 'playing' | 'won' | 'lost' | 'ready';
@@ -10,6 +20,7 @@ export type GameState = {
   winCondition?: string;
   loseCondition?: string;
   notes?: string[];
+  feel?: FeelSnapshot;
 };
 
 declare global {
@@ -19,5 +30,5 @@ declare global {
 }
 
 export function publishGame(state: GameState): void {
-  window.__game = { ...state };
+  window.__game = { ...state, feel: state.feel ? { ...state.feel } : undefined };
 }
