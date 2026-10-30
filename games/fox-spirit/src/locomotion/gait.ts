@@ -28,9 +28,9 @@ export type GaitTune = {
 };
 
 export const DEFAULT_GAITS: Record<GaitName, GaitTune> = {
-  walk: { speed: 1.1, freq: 1.6, duty: 0.66, stepHeight: 0.07, bob: 0.012 },
-  trot: { speed: 3.4, freq: 3.1, duty: 0.4, stepHeight: 0.12, bob: 0.024 },
-  gallop: { speed: 7.5, freq: 3.8, duty: 0.24, stepHeight: 0.15, bob: 0.045 },
+  walk: { speed: 1.1, freq: 1.6, duty: 0.66, stepHeight: 0.05, bob: 0.012 },
+  trot: { speed: 3.4, freq: 3.1, duty: 0.4, stepHeight: 0.075, bob: 0.024 },
+  gallop: { speed: 7.5, freq: 3.8, duty: 0.24, stepHeight: 0.11, bob: 0.035 },
 };
 
 /** Smooth band weights for a speed (sum to 1). */

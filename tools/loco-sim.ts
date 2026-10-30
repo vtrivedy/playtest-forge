@@ -47,6 +47,7 @@ let t = 0;
 let skateMax = 0;
 const skateLeg: Record<string, number> = {};
 let slips: number[] = [];
+let pitchMax = 0;
 const plantAge: Record<string, number> = {};
 const badAges: number[] = [];
 let skateSum = 0;
@@ -75,6 +76,7 @@ function stepSim(wish: THREE.Vector3, jump = false) {
   const gnd = y <= gy + 1e-4 && vy <= 0;
   loco.update(dt, { vel: new THREE.Vector3(vel.x, vy, vel.z), grounded: gnd, gliding: false, dashing: false, skidding: gnd && ms.skidding, windup: 0 });
   t += dt;
+  pitchMax = Math.max(pitchMax, Math.abs(loco.state.pitch));
   for (const id of LEG_IDS) {
     const L = loco.legs[id];
     const head = L.rig.foot.getWorldPosition(new THREE.Vector3());
@@ -94,6 +96,7 @@ function stepSim(wish: THREE.Vector3, jump = false) {
       plantAge[id] = (plantAge[id] ?? 0) + 1;
     } else { prevFoot[id] = null; plantAge[id] = 0; }
     if (!Number.isFinite(err)) throw new Error('NaN at t=' + t);
+    if (process.env.PEN && L.pen > 0.02) console.log('PEN', id, L.mode, (L.pen * 1000).toFixed(0), 't', t.toFixed(2), loco.state.gait, 'err', (L.err * 1000).toFixed(0));
   }
 }
 const W = (x: number, z: number) => new THREE.Vector3(x, 0, z);
@@ -115,13 +118,15 @@ for (const [name, dur, wish, jump] of segs) {
   skateMax = 0;
   for (const k of LEG_IDS) skateLeg[k] = 0;
   slips = [];
+  pitchMax = 0;
   for (let i = 0; i < n; i++) stepSim(wish, !!jump && i === 10);
   const st = loco.snapshot();
-  gaitLog.push(`${name.padEnd(8)} gait=${st.gait.padEnd(6)} speed=${st.speed.toFixed(2)} freq=${st.freq} duty=${st.duty} pitch=${st.pitch} roll=${st.roll} bend=${st.bend} skate=${LEG_IDS.map((k) => k + ':' + (skateLeg[k] * 1000).toFixed(0)).join(' ')}mm bad=${slips.filter((d) => d > 0.005).length}/${slips.length} yaw=${group.rotation.y.toFixed(2)} contacts=${Object.values(st.contacts).map((c) => (c ? 1 : 0)).join('')}`);
+  gaitLog.push(`${name.padEnd(8)} gait=${st.gait.padEnd(6)} speed=${st.speed.toFixed(2)} freq=${st.freq} duty=${st.duty} pitch=${st.pitch} roll=${st.roll} bend=${st.bend} skate=${LEG_IDS.map((k) => k + ':' + (skateLeg[k] * 1000).toFixed(0)).join(' ')}mm pitchMax=${pitchMax.toFixed(2)} bad=${slips.filter((d) => d > 0.005).length}/${slips.length} yaw=${group.rotation.y.toFixed(2)} contacts=${Object.values(st.contacts).map((c) => (c ? 1 : 0)).join('')}`);
   void ikBefore;
 }
 console.log(gaitLog.join('\n'));
 console.log('bad slip plant-ages', JSON.stringify(badAges.slice(0, 80)));
+console.log("solved metrics", JSON.stringify(loco.metrics()));
 console.log(`stance skate mean ${(skateSum / Math.max(1, skateN) * 1000).toFixed(3)} mm/frame; IK max err ${(ikMax * 1000).toFixed(1)} mm`);
 if (process.argv.includes('--trace')) {
   const leg = (process.argv[process.argv.indexOf('--trace') + 1] || 'LF') as (typeof LEG_IDS)[number];

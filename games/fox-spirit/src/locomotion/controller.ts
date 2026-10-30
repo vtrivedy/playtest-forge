@@ -27,11 +27,11 @@ export const DEFAULT_MOVE: MoveParams = {
   decel: 20,
   skidDecel: 34,
   lateralAccel: 40,
-  turnSlow: 0.75,
-  pivotRate: 9,
+  turnSlow: 0.6,
+  pivotRate: 7,
   skidAngle: 2.2,
   skidSpeed: 4.5,
-  jumpWindup: 0.06,
+  jumpWindup: 0.08,
 };
 
 export type MoveState = {

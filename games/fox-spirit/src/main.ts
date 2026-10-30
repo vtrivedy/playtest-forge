@@ -645,6 +645,7 @@ async function boot() {
         airT,
         gait: foxActor.loco.state.gait,
         loco: foxActor.loco.snapshot(),
+        locoMetrics: foxActor.loco.metrics(),
         grounded,
         gliding,
         preset: feelPreset,

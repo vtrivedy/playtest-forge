@@ -19,6 +19,10 @@ export type LocoParams = {
   maxScapula: number;
   /** Body lowers so planted paws stay within reach × this */
   reachMargin: number;
+  /** Planted paws farther than reach × this (horizontal) from their stride centre step immediately */
+  strideWindow: number;
+  /** Deepest the paw-reach cap may lower shoulders/hips (u) */
+  maxSink: number;
   /** Stance feet farther than reach × this from their hip are forced to step */
   overreach: number;
   /** Nose-down pitch (rad) per u/s² of forward acceleration (braking pitches nose-up) */
@@ -57,6 +61,10 @@ export type LocoParams = {
   tailDroop: number;
   /** Air pose follow rate (1/s) */
   airPoseRate: number;
+  /** Low-pass rate (1/s) of the ground height under shoulders / hips */
+  terrainRate: number;
+  /** Steepest body pitch the terrain may impose (rad) */
+  maxSlopePitch: number;
   /** Body follow rate for slope height/pitch (1/s) */
   bodyRate: number;
   debug: boolean;
@@ -72,20 +80,22 @@ export const DEFAULT_LOCO: LocoParams = {
   scapulaSwing: 0.6,
   maxScapula: 0.3,
   reachMargin: 0.96,
+  strideWindow: 0.62,
+  maxSink: 0.1,
   overreach: 1.04,
-  pitchAccel: 0.012,
+  pitchAccel: 0.008,
   maxPitch: 0.22,
-  lean: 0.55,
+  lean: 0.8,
   maxRoll: 0.28,
-  spineBend: 0.11,
-  maxBend: 0.32,
+  spineBend: 0.16,
+  maxBend: 0.45,
   gallopFlex: 0.2,
   headStabilize: 0.75,
   headLook: 0.12,
   crouchStiffness: 220,
   crouchDamping: 18,
   landCrouch: 0.16,
-  windupCrouch: 0.1,
+  windupCrouch: 0.15,
   takeoffStretch: 0.05,
   skidPitch: 0.16,
   skidSquat: 0.08,
@@ -98,6 +108,8 @@ export const DEFAULT_LOCO: LocoParams = {
   tailDroop: 0.12,
   airPoseRate: 14,
   bodyRate: 12,
+  terrainRate: 7,
+  maxSlopePitch: 0.3,
   debug: false,
 };
 
@@ -124,6 +136,11 @@ type LegState = {
   contact: boolean;
   /** Ground height of the current step's landing spot */
   ty: number;
+  /** Solved effector world position, its error to the target and its ground penetration (u) */
+  solved: THREE.Vector3;
+  err: number;
+  pen: number;
+  wasPlanted: boolean;
   joints: THREE.Vector3[];
 };
 
@@ -165,6 +182,10 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       prevPhase: 0,
       contact: true,
       ty: 0,
+      solved: new THREE.Vector3(),
+      err: 0,
+      pen: 0,
+      wasPlanted: false,
       joints: r.restJoints.map((p) => p.clone()),
     };
   }
@@ -195,12 +216,17 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     /** Treadmill speed for staged stills (group stays put, feet cycle) */
     treadmill: 0,
     clock: 0,
+    terrainF: 0,
+    terrainH: 0,
   };
   let prevYaw = model.rotation.y;
   let prevGrounded = true;
   let prevVel = new THREE.Vector3();
   let initialised = false;
   const footfalls: Footfall[] = [];
+  /** Planted-paw slip statistics from the SOLVED skeleton (reset with resetMetrics) */
+  const metrics = { n: 0, sum: 0, max: 0, bad: 0, errMax: 0, penMax: 0 };
+  let lastSkid = false;
 
   // tail spring chain (world space)
   const tailN = rig.tailRest.length;
@@ -367,19 +393,26 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     state.air = THREE.MathUtils.damp(state.air, grounded ? 0 : 1, grounded ? 18 : 8, dt);
     state.skid = THREE.MathUtils.damp(state.skid, input.skidding ? 1 : 0, 10, dt);
 
-    // --- body height + slope: fore/hind pairs follow their feet, capped so every planted paw stays in reach ---
+    // --- body height + slope: shoulders/hips follow the low-passed ground under them (not the paws, which lag a
+    // stride), then are capped so every planted paw stays in reach ---
     const yawQ = groupQ;
-    let foreUp = 0;
-    let hindUp = 0;
+    const base = groupPos.y - feetOffset;
+    const gS = _v.copy(rig.shoulder).applyQuaternion(yawQ).add(groupPos);
+    const groundS = ground(gS.x, gS.z, base + 0.6, base) - base;
+    const gH = _v.copy(rig.hip).applyQuaternion(yawQ).add(groupPos);
+    const groundH = ground(gH.x, gH.z, base + 0.6, base) - base;
+    // never steeper than the slope limit (ledges/steps read as a step, not a 40° pitch)
+    const maxRise = Math.tan(p.maxSlopePitch) * rig.shoulder.distanceTo(rig.hip);
+    const mid = (groundS + groundH) * 0.5;
+    const half = THREE.MathUtils.clamp((groundS - groundH) * 0.5, -maxRise * 0.5, maxRise * 0.5);
+    state.terrainF = THREE.MathUtils.damp(state.terrainF, grounded ? mid + half : 0, p.terrainRate, dt);
+    state.terrainH = THREE.MathUtils.damp(state.terrainH, grounded ? mid - half : 0, p.terrainRate, dt);
+    let foreUp = state.terrainF;
+    let hindUp = state.terrainH;
     let foreMax = Infinity;
     let hindMax = Infinity;
     for (const id of LEG_IDS) {
       const L = legs[id];
-      const fy = L.mode === 'step' ? THREE.MathUtils.lerp(L.from.y, L.ty, Math.min(1, L.t / L.dur)) : L.foot.y;
-      const restY = groupPos.y + L.rig.restFoot.y;
-      const up = L.mode === 'air' ? 0 : fy - restY;
-      if (L.rig.fore) foreUp += up * 0.5;
-      else hindUp += up * 0.5;
       // planted paws and the landing spot of late-swing paws must stay in reach (lower the body ahead of touchdown)
       const late = L.mode === 'step' && L.t > L.dur * 0.4;
       if ((L.mode === 'plant' || late) && grounded) {
@@ -395,6 +428,9 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       }
     }
     if (!grounded) foreUp = hindUp = 0;
+    // the reach cap may only sink the body so far; beyond that the paw has to step
+    foreMax = Math.max(foreMax, foreUp - p.maxSink);
+    hindMax = Math.max(hindMax, hindUp - p.maxSink);
     const fT = THREE.MathUtils.clamp(Math.min(foreUp, foreMax), -0.35, 0.3);
     const hT = THREE.MathUtils.clamp(Math.min(hindUp, hindMax), -0.35, 0.3);
     state.liftF = THREE.MathUtils.damp(state.liftF, fT, fT < state.liftF ? 30 : p.bodyRate, dt);
@@ -420,7 +456,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     const halfPitch = Math.sin(state.pitchDyn) * bodyLen * 0.5;
     const frontY = Math.min(state.liftF + common + halfPitch, foreMax);
     const hindY2 = Math.min(state.liftH + common - halfPitch, hindMax);
-    state.pitch = Math.atan2(frontY - hindY2, bodyLen);
+    state.pitch = THREE.MathUtils.clamp(Math.atan2(frontY - hindY2, bodyLen), -p.maxPitch - p.maxSlopePitch, p.maxPitch + p.maxSlopePitch);
     const dy = (frontY + hindY2) * 0.5;
     state.lift = dy;
     // root transform about the COM, in model space
@@ -484,6 +520,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     for (const ear of rig.ears) rotateBoneAxis(ear[0], rightW.set(-1, 0, 0).applyQuaternion(bodyQ), earBack, true);
 
     prevGrounded = grounded;
+    lastSkid = input.skidding;
 
     // --- debug ---
     debug.visible = p.debug;
@@ -505,7 +542,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     if (input.gliding) return -0.06;
     if (input.dashing) return -0.08;
     // nose up on the rise, nose down as it falls toward the landing
-    return THREE.MathUtils.clamp(input.vel.y * 0.035, -0.3, 0.25);
+    return THREE.MathUtils.clamp(input.vel.y * 0.04, -0.32, 0.32);
   }
 
   function airSpineFlex(input: LocoInput) {
@@ -569,6 +606,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
         if (L.mode === 'air') {
           airFoot(L, input, _v2);
           L.foot.lerp(_v2, 1 - Math.exp(-p.airPoseRate * dt));
+          L.foot.y = Math.max(L.foot.y, plantY(L, L.foot.x, L.foot.z));
         }
       }
       return;
@@ -613,7 +651,10 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
 
       if (L.mode === 'plant') {
         const hip = L.rig.chain[0].getWorldPosition(_v2);
-        const over = hip.distanceTo(L.foot) > L.rig.reach * p.overreach;
+        // a paw left behind its stride window steps now (rather than the reach cap dragging the body down to it)
+        neutralFoot(L.rig, groupPos, yaw, _v, L.rig.fore ? p.strideUnderHip : p.strideUnderHip * 0.25);
+        const lag = Math.hypot(_v.x - L.foot.x, _v.z - L.foot.z) > L.rig.reach * p.strideWindow;
+        const over = hip.distanceTo(L.foot) > L.rig.reach * p.overreach || (moving && lag);
         if (moving && ((wasStance && !isStance) || over)) {
           startStep(L, over && isStance ? Math.min(swingT, 0.16) : swingT * (1 - (legPhase - duty) / (1 - duty) * 0.5));
           stepping++;
@@ -675,12 +716,15 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       y = fore ? 0.28 : 0.24;
       z = fore ? 0.04 : 0.08;
     } else {
-      y = fore ? 0.1 : 0.2;
-      z = fore ? 0.16 : 0.1;
+      // falling: fores reach down and forward for the catch, hinds tuck
+      y = fore ? 0.02 : 0.2;
+      z = fore ? 0.24 : 0.1;
     }
     out.set(L.rig.restFoot.x * 0.9, L.rig.restFoot.y + y, L.rig.restFoot.z + z);
     // body frame (follows pitch) so the tuck reads relative to the spine
     out.applyQuaternion(bodyQ).add(groupPos);
+    // a pitched body must not swing a tucked paw through the ground
+    out.y = Math.max(out.y, plantY(L, out.x, out.z));
     return out;
   }
 
@@ -722,12 +766,29 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     const pawQ = _q2.copy(groupQ).multiply(footRestQ[L.rig.id]);
     if (L.mode === 'step') {
       const s = Math.min(1, L.t / L.dur);
-      const curl = Math.sin(Math.PI * s) * (L.rig.fore ? 1.1 : 0.7);
+      const curl = Math.sin(Math.PI * Math.min(1, s * 1.25)) * (L.rig.fore ? 0.75 : 0.45);
       pawQ.premultiply(_q.setFromAxisAngle(_side, curl));
     } else if (L.mode === 'air') {
       pawQ.premultiply(_q.setFromAxisAngle(_side, L.rig.fore ? 0.9 : 0.5));
     }
     setBoneWorldQuat(L.rig.foot, pawQ);
+    // measured (solved) effector: target error, ground penetration, world slip while planted
+    const solved = L.rig.foot.getWorldPosition(_v2);
+    L.err = solved.distanceTo(L.foot);
+    const gy = plantY(L, solved.x, solved.z);
+    L.pen = Math.max(0, gy - solved.y);
+    const planted = L.mode === 'plant' && L.contact && !lastSkid;
+    if (planted && L.wasPlanted) {
+      const slip = Math.hypot(solved.x - L.solved.x, solved.z - L.solved.z);
+      metrics.n++;
+      metrics.sum += slip;
+      metrics.max = Math.max(metrics.max, slip);
+      if (slip > 0.005) metrics.bad++;
+    }
+    metrics.errMax = Math.max(metrics.errMax, L.mode === 'air' ? 0 : L.err);
+    metrics.penMax = Math.max(metrics.penMax, L.pen);
+    L.solved.copy(solved);
+    L.wasPlanted = planted;
   }
 
   function updateTail(dt: number, speed: number, ph: number, moving: boolean) {
@@ -784,12 +845,28 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       model.updateMatrixWorld(true);
       snapAll(model.getWorldPosition(new THREE.Vector3()), model.rotation.y);
     },
+    /** Planted-paw world slip (mm) measured on the solved skeleton since the last reset; skids excluded. */
+    metrics() {
+      return {
+        plantedFrames: metrics.n,
+        slipMeanMm: Number(((metrics.sum / Math.max(1, metrics.n)) * 1000).toFixed(2)),
+        slipMaxMm: Number((metrics.max * 1000).toFixed(1)),
+        slipOver5mm: metrics.bad,
+        ikErrMaxMm: Number((metrics.errMax * 1000).toFixed(1)),
+        penetrationMaxMm: Number((metrics.penMax * 1000).toFixed(1)),
+      };
+    },
+    resetMetrics() {
+      Object.assign(metrics, { n: 0, sum: 0, max: 0, bad: 0, errMax: 0, penMax: 0 });
+    },
     snapshot() {
       const contacts: Record<string, boolean> = {};
       const feet: Record<string, number[]> = {};
+      const ik: Record<string, { errMm: number; penMm: number }> = {};
       for (const id of LEG_IDS) {
         contacts[id] = legs[id].contact;
-        feet[id] = legs[id].foot.toArray().map((v) => Number(v.toFixed(3)));
+        feet[id] = legs[id].solved.toArray().map((v) => Number(v.toFixed(3)));
+        ik[id] = { errMm: Number((legs[id].err * 1000).toFixed(1)), penMm: Number((legs[id].pen * 1000).toFixed(1)) };
       }
       return {
         gait: state.gait,
@@ -805,6 +882,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
         yawRate: Number(state.yawRate.toFixed(2)),
         contacts,
         feet,
+        ik,
       };
     },
   };
