@@ -1696,7 +1696,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x, z, w: 3.6, d: 3.2, top: 26, bottom: 24.9, rough: 0.45, seed: 349, topColor: PAL.stone.clone().lerp(PAL.rustMoss, 0.2), overhang: 0.15 });
     // Ruined spine carries the shelf, keeping its eastern face open to the river.
     col.add(boxCollider({ x: x - 0.8, z: z - 0.6, w: 1.4, d: 1.3, top: 25, bottom: 19.8, tag: 'kiln-spine' }));
-    for (let i = 0; i < 7; i++) stoneBlock(bk('stone', x, z), trs(x - 0.8, 20.35 + i * 0.72, z - 0.6, (i % 2) * 0.08), 1.4, 0.74, 1.3, 350 + i, 0.12);
+    // two broad carved drums (CC0 Quaternius column) carry the shelf instead of a stacked-block monolith
+    for (let i = 0; i < 2; i++) bk('stone', x, z).add(lanternColumn, trs(x - 0.8, 19.8 + i * 2.6, z - 0.6, i * 1.3, 2.25, 2.6 / 1.9, 2.25), PAL.stone);
   }
   // Kiln catch shelves (§3.4 recovery): y15 ledges on the spire's south and east faces, each with a hearth
   // whose column (to ≈ y25) overlaps the kiln ledge rim — a missed step is a ride back, not a long walk
@@ -1822,7 +1823,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     shadeSpots.push({id,afterLatch,patrol});
   }
   hearthSpots.forEach((h, i) => hearthBrazier(bk('stone', h.x, h.z), h.x, h.y, h.z, 300 + i));
-  inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i));
+  inletSpots.forEach((q, i) => kilnBowl(bk('stone', q.pillar.x, q.pillar.z), q.pillar.x, q.pillar.y, q.pillar.z, q.pos.x, q.pos.y, q.pos.z, 340 + i, lanternColumn));
 
   const lanternMat = glowMat('rv-glow-lanterns');
   lanternMat.emissiveIntensity = 0.65;
