@@ -1806,18 +1806,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     col.add(cylCollider({ x: p.x + 2.2, z: p.z + 1.7, r: 1.6, top: 34, bottom: 33.3, tag: 'mill-cap-perch' }));
     slab({ x: p.x + 2.2, z: p.z + 1.7, w: 3.2, d: 3.2, top: 34, bottom: 33.3, round: true, rough: 0.35, seed: 367, topColor: PAL.stone });
   }
-  // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
-  {
-    const channel = new THREE.CatmullRomCurve3(waterSpots.find(s => s.id === 'reed-falls')!.path, false, 'centripetal');
-    const patrol: ShadeSpot['patrol'] = [];
-    for (const side of [1, -1]) for (let j = 0; j <= 8; j++) {
-      const t = 0.25 + (side === 1 ? j : 8 - j) / 8 * 0.2;
-      const p = channel.getPoint(t), tangent = channel.getTangent(t);
-      p.x += tangent.z * 0.52 * side; p.z -= tangent.x * 0.52 * side;
-      patrol.push([p.x, p.y, p.z]);
-    }
-    shadeSpots.push({ id: 'shade-flume', patrol });
-  }
+  // The Shade visits the flume, then drifts around the recovery balconies.
+  // Its excursion leaves a real water-arrival window; a permanent on-flume
+  // drain made even sustained source colour unsolvable without freeing it.
+  shadeSpots.push({ id: 'shade-flume', speed: 1.1, patrol: [
+    [103, 5.1, 23], [108, 5, 26], [108, 5, 29],
+    [94, 5, 29], [92, 5, 27], [98, 4.7, 24],
+  ] });
   // Narrow loops on intact flights, never across either broken jump.
   for (const [id, x0, x1, z, y0, y1] of [
     ['shade-hill-low', 4.5, -4.5, -68.7, 12.83, 16.37],
