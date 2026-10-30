@@ -255,17 +255,15 @@ varying vec2 vUv; varying float vSeed; varying float vAlpha;
 ${NOISE_GLSL}
 void main() {
   float y = vUv.y;
-  float n = fxNoise(vec3(vUv.x * 3.0, y * 2.5 - uTime * 2.6, vSeed * 7.0));
-  float n2 = fxNoise(vec3(vUv.x * 7.0, y * 6.0 - uTime * 4.1, vSeed * 3.0 + 5.0));
-  float x = vUv.x - 0.5 + (n - 0.5) * 0.8 * y + (n2 - 0.5) * 0.15 * y + sin(y * 5.0 + uTime * 1.7 + vSeed) * 0.12 * y;
-  // teardrop: wide low, licking to a point; ragged top
-  float width = 0.34 * pow(1.0 - y, 1.1) * smoothstep(0.0, 0.22, y) + 0.015;
-  float body = 1.0 - smoothstep(width * 0.35, width, abs(x));
-  body *= 1.0 - smoothstep(0.55, 1.0, y + (n2 - 0.5) * 0.5);
-  float core = (1.0 - smoothstep(0.0, width * 0.55, abs(x))) * (1.0 - smoothstep(0.1, 0.6, y));
-  vec3 col = mix(vec3(0.8, 0.18, 0.03), vec3(1.0, 0.45, 0.08), smoothstep(0.0, 0.8, body));
-  col = mix(col, vec3(1.0, 0.6, 0.2), core * 0.25);
-  float a = body * vAlpha * uIntensity * 0.4;
+  float curl = sin(y * 6.0 - uTime * 1.2 + vSeed * 2.1) * 0.22 * y;
+  curl += sin(y * 11.0 - uTime * 0.8 + vSeed) * 0.065 * y;
+  float x = vUv.x - 0.5 + curl;
+  float width = mix(0.16, 0.055, y);
+  float body = exp(-2.0 * x * x / (width * width));
+  body *= smoothstep(0.0, 0.12, y) * (1.0 - smoothstep(0.6, 1.0, y));
+  float breathe = 0.2 + 0.8 * pow(0.5 + 0.5 * sin(uTime * 1.1 + vSeed * 3.0), 2.0);
+  vec3 col = mix(vec3(1.0, 0.25, 0.055), vec3(1.0, 0.65, 0.28), smoothstep(0.1, 0.85, y)) * 1.5;
+  float a = body * vAlpha * uIntensity * 0.65 * breathe;
   if (a < 0.003) discard;
   gl_FragColor = vec4(col * a, a);
 }`;
@@ -307,7 +305,9 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
     [body, [R.spine[3], R.neck[0]], 0.65, 2, 0.16, 0.06, 0.7],
     [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.18, 0.06, 0.8],
-    [tail, R.tail.slice(3), 0.0, 5, 0.26, 0.08, 0.9],
+    [tail, R.tail.slice(3), 0.0, 8, 0.34, 0.15, 0.9],
+    [body, R.ear("l").slice(2), -1.0, 1, 0.12, 0.06, 0.4],
+    [body, R.ear("r").slice(2), -1.0, 1, 0.12, 0.06, 0.4],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
@@ -397,7 +397,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       eVel[i * 3] = vel.x * 0.3 + (rnd() - 0.5) * 0.25;
       eVel[i * 3 + 1] = 0.25 + rnd() * 0.35;
       eVel[i * 3 + 2] = vel.z * 0.3 + (rnd() - 0.5) * 0.25;
-      eAge[i] = 0; eLife[i] = 0.7 + rnd() * 1.1;
+      eAge[i] = 0; eLife[i] = 2.2 + rnd();
       eSize[i] = L.emberSize * (0.5 + rnd());
     }
     (eg.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;

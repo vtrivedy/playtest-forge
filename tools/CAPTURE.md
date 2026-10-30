@@ -82,3 +82,9 @@ exit and transport warning. Gameplay failures stay nonzero.
 For a 720p milestone from an existing shot, use
 `python3 tools/review-capture.py <ref> --shots showcase --size 1280x720 --fps 30`.
 The same report verification and fetching apply. Gait requires60fps.
+
+Durable recovery verifies commit/shot, size/fps, route bounds, and matching
+run/report capture-tool hashes. Failed Modal retries preserve previous files in
+`attempt-NNN/` before writing fresh root artifacts. Route acceptance records an
+explicit reason in `route-acceptance.json`; sheets put the endpoint last and add
+waypoint/death labels from the captured state.
