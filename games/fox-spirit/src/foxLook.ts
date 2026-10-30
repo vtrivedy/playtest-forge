@@ -202,6 +202,8 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       } else if (n.includes('fur')) {
+        // The opaque coat supplies the soft shadow; shell shadow maps ignore our grazing-angle fade.
+        if (n.includes('shell')) mesh.castShadow = false;
         mat.color.setHex(0xffffff);
         mat.roughness = 0.85;
         mat.normalScale.setScalar(0.35);

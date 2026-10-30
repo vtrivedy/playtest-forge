@@ -90,7 +90,7 @@ bm.to_mesh(me); bm.free(); me.update()
 # notch light because the streak * AO bake darkens them (lands near the concept's (102, 62, 38) umber)
 PAL = dict(rust=(212, 124, 50), dorsal=(146, 70, 28), belly=(226, 168, 112), cream=(234, 218, 188),
            umber=(108, 62, 36), sock=(66, 42, 29), paw=(46, 31, 23), earback=(50, 29, 20), nose=(22, 15, 13),
-           amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(236, 214, 186))
+           amber=(236, 156, 40), pupil=(30, 14, 8), liner=(42, 22, 14), earin=(174, 145, 110))
 mat_names = [m.name for m in me.materials]
 MI = {n: i for i, n in enumerate(mat_names)}
 eye_vs, nose_vs, cream_vs, grey_vs = set(), set(), set(), set()
@@ -119,12 +119,13 @@ for v in me.vertices:
     # cream: throat + bib tapering down the chest, muzzle, cheeks, inner ears (no belly/rump patches)
     if leg < 0.3:
         if wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"]) > 0.3:
-            k = 1.0
+            k = 0.0  # ear interiors are painted below; never flood ear backs with the cheek blaze
         elif w.get("Head", 0) > 0.3:
             # Paint a soft oblique cheek boundary from anatomy, never the source polygon IDs.
             line = (eyeL.z + eyeR.z) * 0.5 - 0.12 + 0.07 * smooth(0.08, 0.38, abs(co.x))
             line += 0.025 * math.sin(co.y * 12.0)
             k = (1 - smooth(line - 0.12, line + 0.12, co.z)) * (1 - smooth(0.0, 0.6, n.z))
+            k *= 1 - smooth(head_c.y - 0.04, head_c.y + 0.22, co.y)
         elif co.y < CHEST_Y:
             half = 0.05 + 0.14 * smooth(1.35, 1.95, co.z)  # narrow V bib: wide at the throat, a thin blaze between the forelegs
             k = smooth(1.2, 1.5, co.z) * (1 - smooth(half - 0.05, half + 0.07, abs(co.x)))
@@ -148,7 +149,7 @@ for v in me.vertices:
     ear = wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"])
     if ear > 0.2:
         tipt = wsum(w, "Ear3.L", "Ear3.R", "Ear4.L", "Ear4.R")
-        if n.y > -0.1: c = mix(c, PAL["earback"], min(1, ear) * (0.15 + 0.85 * tipt))
+        if n.y > -0.1: c = mix(c, PAL["earback"], min(1, ear) * (0.7 + 0.3 * tipt))
         else: c = mix(c, PAL["earin"], min(1, ear) * 0.75 * (1 - tipt)); c = mix(c, PAL["earback"], tipt * 0.7)
     # eye liner ring + amber eyes with slit pupils
     d, _, _ = ekd.find(co)
