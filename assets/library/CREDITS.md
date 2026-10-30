@@ -89,3 +89,7 @@ Download: `https://poly.pizza/m/<id>` → `static.poly.pizza/<uuid>.glb`.
 
 ## Sprint 2 Water (2026-10-30)
 Water ice sheets, flume masonry, flow ribbons and ripples are original procedural geometry/shaders authored for this project; no external textures or assets were introduced by this stream.
+
+Sprint 2 world surface reuse: `Rock035` (ambientCG, CC0) supplies metre-scaled
+stone value/relief on aqueducts, ruins and carved housings. `bark_brown_02`
+(Poly Haven, CC0) supplies softened grain on existing timber. No new downloads.

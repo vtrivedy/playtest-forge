@@ -175,3 +175,10 @@ Restored-edge Shades remain dormant until their Seedwell latch, activate once,
 and never respawn after release. Activation adds no new collection loop and does
 not undo permanently restored chemistry. The unavailable SW3 hollow-floor/K1
 geometry remains a level dependency; do not place a creature inside a solid trunk.
+### World surface pass — 13:40
+Keep all landmark transforms and collision unchanged. Reuse the library's CC0
+ambientCG Rock035 and Poly Haven bark to give water masonry and timber readable,
+world-scaled surfaces. Stone combines softened scan values with damp seams and
+moss on upward faces; timber uses grain and dark joints. Preserve restoration
+color, atmospheric values and the full-route harness. Review matched remote GPU
+stills and water frames before landing; record concrete failures and retest.
