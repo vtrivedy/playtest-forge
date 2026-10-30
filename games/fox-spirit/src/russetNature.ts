@@ -317,7 +317,7 @@ export async function loadNatureKit(): Promise<NatureKit> {
       const geos: THREE.BufferGeometry[] = [];
       let src: THREE.MeshStandardMaterial | null = null;
       for (const [key, e] of cells) {
-        if (!e.mat.userData.foliage) continue;
+        if (!e.geos.length || !e.mat.userData.foliage) continue;
         const own = V.parts.some((p) => p.mat === e.mat);
         if (!own) continue;
         // Extract only geometry appended by this tree. Shared material cells
@@ -375,6 +375,7 @@ export async function loadNatureKit(): Promise<NatureKit> {
     },
     build(group) {
       for (const e of cells.values()) {
+        // Standalone foliage extraction can consume the last geometry in a cell.
         if (!e.geos.length) continue;
         const g = mergeGeometries(e.geos, false);
         for (const s of e.geos) s.dispose();
