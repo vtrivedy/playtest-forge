@@ -5,21 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fox Spirit — Autumn Awakening</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #1a1a1a; overflow: hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
-      #hud {
-        position: fixed; top: 14px; left: 14px; z-index: 2; color: #f5f5f5;
-        padding: 10px 14px; border-radius: 12px; background: rgba(0,0,0,0.5);
-        backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2);
-        font-size: 14px; line-height: 1.45; max-width: 360px;
-      }
-      #hint { opacity: 0.8; font-size: 12px; margin-top: 4px; }
+      html, body { margin: 0; height: 100%; background: #0c0a08; overflow: hidden; font-family: "Segoe UI", ui-sans-serif, system-ui, sans-serif; }
       canvas { display: block; }
+      #hud {
+        position: fixed; inset: 0; z-index: 2; pointer-events: none;
+        color: #f3e6d0;
+      }
+      #vignette {
+        position: absolute; inset: 0;
+        background: radial-gradient(ellipse at center, transparent 55%, rgba(20,12,6,0.45) 100%);
+        pointer-events: none;
+      }
+      #prompt {
+        position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%);
+        font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase;
+        opacity: 0.72; text-shadow: 0 2px 12px rgba(0,0,0,0.7);
+        transition: opacity 0.6s ease;
+      }
+      #ember-count {
+        position: absolute; top: 28px; right: 32px;
+        font-size: 18px; font-weight: 600; letter-spacing: 0.04em;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.65);
+      }
+      #ember-count span { color: #ff9a4a; }
+      #title-card {
+        position: absolute; top: 28px; left: 32px;
+        font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase;
+        opacity: 0.55; text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+      }
+      #restore-flash {
+        position: absolute; inset: 0; background: radial-gradient(circle at 50% 40%, rgba(255,180,80,0.35), transparent 60%);
+        opacity: 0; transition: opacity 1.2s ease; pointer-events: none;
+      }
+      #debug-panel {
+        display: none;
+        position: absolute; top: 14px; left: 14px; z-index: 3; pointer-events: auto;
+        color: #f5f5f5; padding: 10px 14px; border-radius: 12px;
+        background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.18); font-size: 12px; line-height: 1.45; max-width: 380px;
+      }
+      #debug-panel.visible { display: block; }
+      .lil-gui { display: none !important; }
+      body.debug-on .lil-gui { display: block !important; }
     </style>
   </head>
   <body>
     <div id="hud">
-      <div id="status">Loading fox spirit…</div>
-      <div id="hint">WASD move · Space jump (hold=glide) · Shift dash · Reach the shrine to restore color</div>
+      <div id="vignette"></div>
+      <div id="restore-flash"></div>
+      <div id="title-card">Russetvale · Ember Wellspring</div>
+      <div id="ember-count"><span id="ember-n">0</span> embers</div>
+      <div id="prompt">WASD · Space jump / hold glide · Shift dash · Reach the shrine</div>
+      <div id="debug-panel">
+        <div id="status">Loading…</div>
+        <div style="opacity:0.7;margin-top:4px">` or F1 toggles debug</div>
+      </div>
     </div>
     <script type="module" src="./src/main.ts"></script>
   </body>
