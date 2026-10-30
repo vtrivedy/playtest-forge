@@ -1,4 +1,3 @@
-import { DEFAULT_MOVE, createMoveState, groundMove } from './groundMove';
 import { createWind, type WindForce } from './chem/wind';
 import { createShades } from './encounters/shades';
 import { ShadeContact } from './encounters/contact';
@@ -322,10 +321,8 @@ async function boot() {
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
   fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
-  const move = { ...DEFAULT_MOVE, jumpWindup: .05 };
-  const moveState = createMoveState(Math.PI);
-  const moveGui = gui.addFolder('Ground momentum');
-  for (const key of ['accel','decel','skidDecel','lateralAccel','pivotRate'] as const) moveGui.add(move,key,.1,70,.1);
+  const actionFeel = { jumpWindup: .05 };
+  fFeel.add(actionFeel,'jumpWindup',0,.066,.001);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
@@ -1079,11 +1076,11 @@ async function boot() {
     let jv: number | null = null;
     if (windupT >= 0) {
       windupT += dt;
-      if (windupT >= move.jumpWindup || !grounded) {
+      if (windupT >= actionFeel.jumpWindup || !grounded) {
         windupT=-1;
         jv=jumpFeel.tryJump(feel.jumpVelocity * groundBounce,fox.position.y);
       }
-    } else if (grounded && jumpFeel.buffer>0 && move.jumpWindup>0) windupT=0;
+    } else if (grounded && jumpFeel.buffer>0 && actionFeel.jumpWindup>0) windupT=0;
     else jv=jumpFeel.tryJump(feel.jumpVelocity * groundBounce,fox.position.y);
     if (jv !== null) {
       vel.y = jv;
@@ -1178,9 +1175,7 @@ async function boot() {
     }
     wasGliding = gliding;
 
-    if (!grounded) moveState.skidding=false;
-    if (!dashing && grounded) groundMove(moveState,move,wish,feel.moveSpeed,fox.rotation.y,vel,dt);
-    else if (!dashing) {
+    if (!dashing) {
       const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward * (1 - updrafts.tun.columnSteer * lift.radialK * (lift.k > 0 ? 1 : 0)) : feel.moveSpeed);
       if (gliding && lift.k > 0) {
         // centre pull: the column holds a glider instead of letting it sail through
@@ -1221,9 +1216,7 @@ async function boot() {
     }
 
     const faceShrine = restore.inputLocked && wish.lengthSq() <= 0.01;
-    if (grounded && !dashing && !faceShrine && Math.hypot(vel.x,vel.z)>.05) {
-      fox.rotation.y=moveState.heading;
-    } else if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
+    if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
       const yaw = faceShrine ? restore.faceYaw : Math.hypot(vel.x, vel.z) > .6 ? Math.atan2(vel.x, vel.z) : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
@@ -1296,7 +1289,7 @@ async function boot() {
         } else if (landT > 0 && (speed < 3.5 || landT > 0.16)) {
           anim = 'land';
           fade = 0.05;
-        } else if (moveState.skidding || (skidT > 0 && wish.lengthSq() < .01)) {
+        } else if (skidT > 0 && wish.lengthSq() < .01) {
           anim = 'skid'; fade = .06;
         } else if (speed < .6 && Math.abs(foxActor.locomotion?.metrics.turnRate ?? 0) > .8) {
           anim = (foxActor.locomotion?.metrics.turnRate ?? 0) > 0 ? 'turn_left' : 'turn_right';
