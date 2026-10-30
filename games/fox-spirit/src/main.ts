@@ -1280,7 +1280,7 @@ async function boot() {
 
     const speedBeforeControl=Math.hypot(vel.x,vel.z);
     const opposition=speedBeforeControl>.01 && wish.lengthSq()>.001 ? (vel.x*wish.x+vel.z*wish.z)/(speedBeforeControl*wish.length()) : -1;
-    const brakeIntent=grounded && !dashing && speedBeforeControl>1 ? THREE.MathUtils.clamp((.35-opposition)/1.35,0,1) : 0;
+    const brakeIntent=grounded && !dashing && speedBeforeControl>1 && opposition<-.5 ? THREE.MathUtils.clamp((.35-opposition)/1.35,0,1) : 0;
     if (!dashing) {
       const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward * (1 - updrafts.tun.columnSteer * lift.radialK * (lift.k > 0 ? 1 : 0)) : feel.moveSpeed);
       if (gliding && lift.k > 0) {

@@ -66,6 +66,7 @@ export class AuthoredLocomotion {
   private armScale = 1;
   private rootPosition: THREE.Vector3;
   private terrainOffset=0;
+  private standingPelvisHeight=0;
   private spines:THREE.Object3D[]=[];
   private necks:THREE.Object3D[]=[];
   private head?:THREE.Object3D;
@@ -125,6 +126,7 @@ export class AuthoredLocomotion {
     root.position.y-=padHeights.reduce((a,b)=>a+b,0)/padHeights.length;
     this.rootPosition.copy(root.position);
     root.updateWorldMatrix(true,true);
+    this.standingPelvisHeight=this.spine!.getWorldPosition(v()).y-floor;
     this.debugGroup.name='LocomotionContactDebug';
     group.add(this.debugGroup);
   }
@@ -200,7 +202,7 @@ export class AuthoredLocomotion {
     const acceleration=(this.input.speed-this.previousSpeed)/step; this.previousSpeed=this.input.speed;
     this.pitch=this.pitchSpring.step(THREE.MathUtils.clamp(slope+acceleration*.002,-.4,.4),dt,this.params.springFrequency,this.params.springDamping);
     this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
-    this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(this.pitch,0,this.lean)));
+    this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(this.pitch,0,0)));
     this.root.updateWorldMatrix(true,true);
     // The actor pivot was centred on the whole silhouette (including the tail). Terrain height must
     // be sampled under the rendered rig origin, otherwise downhill leaves the forelegs beyond reach.
@@ -220,6 +222,7 @@ export class AuthoredLocomotion {
       const localAxis=worldAxis.applyQuaternion(bone.getWorldQuaternion(q()).invert());
       overlay(bone,localAxis,angle);
     };
+    for(const spine of this.spines)worldOverlay(spine,new THREE.Vector3(Math.sin(this.input.yaw),0,Math.cos(this.input.yaw)),this.lean/this.spines.length);
     const bend=THREE.MathUtils.clamp(this.turn*.035,-.14,.14);
     for(let i=0;i<this.spines.length;i++)worldOverlay(this.spines[i],new THREE.Vector3(0,1,0),bend/this.spines.length);
     for(const neck of this.necks)worldOverlay(neck,new THREE.Vector3(0,1,0),look*.22);
@@ -247,6 +250,12 @@ export class AuthoredLocomotion {
         if(Number.isFinite(ground))lift=Math.max(lift,Math.atan2(Math.max(0,ground+.24-p.y),Math.max(.2,p.distanceTo(base))));
       }
       if(lift>0) {overlay(this.tailBone,new THREE.Vector3(1,0,0),Math.min(.65,lift));this.root.updateWorldMatrix(true,true);}
+    }
+    if(this.input.grounded && Math.abs(slope)<.1 && Math.abs(this.turn)>.5 && this.spine) {
+      const pelvis=this.spine.getWorldPosition(v());
+      const floorY=this.input.groundAt(pelvis.x,pelvis.z,this.group.position.y+.8);
+      const deficit=this.standingPelvisHeight-.10-(pelvis.y-floorY);
+      if(Number.isFinite(deficit)&&deficit>0){this.root.position.y+=Math.min(.1,deficit);this.root.updateWorldMatrix(true,true);}
     }
     const gait=this.metrics.gait as Gait;
     const data=GAITS[gait];

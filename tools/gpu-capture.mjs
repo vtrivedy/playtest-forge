@@ -473,7 +473,7 @@ try {
       if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
       await H('setStick',...stick);
       await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
-    },undefined,{traceEveryFrame:true,keyFrames});
+    },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);}});
     await H('setKeys',[]);await H('setStick',null);
     const result=report.videos.showcase;
     const slope=segments.find(segment=>segment.name==='Windmill slope jump and land');

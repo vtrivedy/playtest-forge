@@ -344,3 +344,6 @@ aqueduct rather than a screen-space line. No new traversal or gate is added.
 
 ### Final camera/feel verification
 Track85% of jump rise with faster airborne focus so the fox stays in frame; pull the gameplay boom back up to15% at gallop speed. Retain a60-second scripted live-input loop in the authored meadow clearing, one initial placement and no resets, mixing jumps and dashes. It is controller verification, not a claim of observed human fun.
+
+### Final locomotion read correction — 16:50
+Author a longer rotary gallop with23% combined suspension (hind duty.32,fore.28), matched stance sweeps and a slower physical cadence. Keep the paw below the elbow and limit carpal fold. Carry tail segments in a shallow backward stream rather than the imported curl. Air pose reaches forelegs and gathers hind legs. Turn roll belongs in spine/shoulders; cap total flat-ground pelvis drop to10cm. Showcase now uses a disclosed side/three-quarter cinematic lens on the clear real-world lanes; remote-camera owns gameplay follow camera.
