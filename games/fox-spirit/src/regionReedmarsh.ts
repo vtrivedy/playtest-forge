@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { boxCollider, type CollisionWorld } from './collision';
 import { Bucket, PAL, rockSlab, ruinColumn, leafShape } from './russetKit';
 
+export const REED_SHADE_PATROL = { speed: 1.1, patrol: [
+  [103, 5.1, 23], [108, 5, 26], [108, 5, 29],
+  [94, 5, 29], [92, 5, 27], [98, 4.7, 24],
+] as Array<[number, number, number]> };
+
 /** The ruin is a real depression, not a room hidden below an uncut heightfield.
  * Apply this to groundRaw's final result so terrain visuals and physics agree. */
 export function reedRuinGround(x: number, z: number, ground: number): number {
@@ -43,7 +48,7 @@ export function createReedmarshRegion(
   // Its east/west wings extend beyond both piers; y5 landings finish the descent.
   // Keep the waterfall/flume and HP column open: these are balconies, not a
   // solid plate through the moving water.
-  slab(92.5, 20, 3, 10, 9, 8.25, 921);
+  slab(92, 20, 3, 10, 9, 8.25, 921);
   slab(107.5, 20, 3, 10, 9, 8.25, 926);
   slab(100, 24, 12, 2, 9, 8.25, 927);
   // Catch directly below the falls lip; leave HP and the stair approach open.

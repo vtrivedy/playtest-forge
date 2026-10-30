@@ -41,7 +41,7 @@ import type { InletSpot } from './chem/inlet';
 import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 import type { RootSpot, PadSpot } from './chem/growth';
-import { createReedmarshRegion, reedRuinGround, type ReedmarshRegion } from './regionReedmarsh';
+import { createReedmarshRegion, reedRuinGround, REED_SHADE_PATROL, type ReedmarshRegion } from './regionReedmarsh';
 import { waterSpots } from './chem/water';
 import type { ShadeSpot } from './encounters/shades';
 export type { ShadeSpot } from './encounters/shades';
@@ -1809,10 +1809,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // The Shade visits the flume, then drifts around the recovery balconies.
   // Its excursion leaves a real water-arrival window; a permanent on-flume
   // drain made even sustained source colour unsolvable without freeing it.
-  shadeSpots.push({ id: 'shade-flume', speed: 1.1, patrol: [
-    [103, 5.1, 23], [108, 5, 26], [108, 5, 29],
-    [94, 5, 29], [92, 5, 27], [98, 4.7, 24],
-  ] });
+  shadeSpots.push({ id: 'shade-flume', ...REED_SHADE_PATROL });
   // Narrow loops on intact flights, never across either broken jump.
   for (const [id, x0, x1, z, y0, y1] of [
     ['shade-hill-low', 4.5, -4.5, -68.7, 12.83, 16.37],
