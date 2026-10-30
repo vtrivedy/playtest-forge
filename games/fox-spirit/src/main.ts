@@ -590,6 +590,7 @@ async function boot() {
           landingNdc: cam.debug.landing,
           internals: cam.debug.internals(),
         },
+        look: { quality: quality.tier, gpu: quality.gpu, floodT, grade: post.params.restore, resScale: res.scale, pixelRatio: renderer.getPixelRatio() },
         fx: { enabled: fxEnabled, quality: quality.tier, bloom: post.bloom?.enabled ? post.bloom.strength : 0, bloomParam: post.params.bloomStrength, grain: post.params.grain },
       };
     },
@@ -1045,9 +1046,11 @@ async function boot() {
     res.t += ms / 1000;
     if (res.t < 2.5) return;
     let next = res.scale;
-    if (res.ema > 40) next = Math.max(quality.minScale, res.scale - 0.1);
+    // 30 fps policy: drop below ~28 fps, recover above ~45
+    if (res.ema > 36) next = Math.max(quality.minScale, res.scale - 0.1);
     else if (res.ema < 22) next = Math.min(1, res.scale + 0.1);
     if (Math.abs(next - res.scale) < 1e-3) return;
+    console.info(`[quality] resolution scale ${res.scale.toFixed(2)} → ${next.toFixed(2)} (frame ${res.ema.toFixed(1)} ms)`);
     res.scale = next;
     res.t = 0;
     const pr = Math.min(devicePixelRatio, quality.pixelRatio) * res.scale;

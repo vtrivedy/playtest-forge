@@ -197,12 +197,12 @@ export function createPostStack(
       highlightTint: new THREE.Color(1.03, 1.0, 0.93),
     },
     restored: {
-      saturation: 1.02,
+      saturation: 0.97,
       contrast: 1.12,
       lift: 0.003,
       // plum-umber fill under a gold key (key art: crimson shadows, golden light)
-      shadowTint: new THREE.Color(0.94, 0.86, 0.95),
-      highlightTint: new THREE.Color(1.06, 0.99, 0.86),
+      shadowTint: new THREE.Color(0.92, 0.86, 0.97),
+      highlightTint: new THREE.Color(1.03, 1.0, 0.93),
     },
   };
   const useBloom = opts.bloom ?? true;
@@ -216,8 +216,8 @@ export function createPostStack(
     gtao = new GTAOPass(scene, camera, innerWidth, innerHeight);
     gtao.output = GTAOPass.OUTPUT.Default;
     // soft, wide contact AO — grounds stones and roots without a dirty halo
-    gtao.blendIntensity = 0.75;
-    gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.2, scale: 1, samples: 12 });
+    gtao.blendIntensity = 0.45;
+    gtao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.5, thickness: 1.2, scale: 1, samples: 12 });
     gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
     composer.addPass(gtao);
   }
