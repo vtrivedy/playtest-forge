@@ -216,23 +216,56 @@ try {
     save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
     const camera = async () => {
       const [x,y,z] = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
-      await H('photo', [x + 6.5, y + 4.4, z + 7.5], [x, y + 1.4, z], 48);
+      await H('photo', [x + 4.5, y + 3.2, z + 6], [x, y + 1.4, z], 48);
     };
     const start = actors[0].pos;
-    await H('teleport', start[0] + 3.8, start[1], start[2] + 1, Math.PI);
-    await H('shadesProbe');
+    const safePosition = await page.evaluate(([x,y,z]) => {
+      const col = window.__gameHooks.debug.world.collision;
+      for (let k=0;k<64;k++) {
+        const a=k/64*Math.PI*2, px=x+Math.cos(a)*3.6, pz=z+Math.sin(a)*3.6;
+        if (!col.blocked(px,pz,y) && Math.abs(col.groundAt(px,pz,y+.1).y-y)<.2) return [px,y,pz];
+      }
+      throw Error('No safe patrol observer position');
+    }, start);
+    await H('teleport', ...safePosition, Math.PI);
+    const probe = await H('shadesProbe');
+    if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
+    save('shade-drain-probe.json', probe);
     await camera();
     await video('shade-patrol', 180, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 45, 90, 135, 179] });
     await H('setKeys', []);
     let p = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
-    await H('teleport', p[0] + 0.55, p[1], p[2], Math.PI);
+    const contactSetup = await page.evaluate(([x,y,z]) => {
+      const col = window.__gameHooks.debug.world.collision;
+      for (let k=0;k<128;k++) {
+        const a=k/128*Math.PI*2, dx=Math.cos(a), dz=Math.sin(a);
+        let safe=true;
+        for(let r=.55;r<3.9;r+=.1) {
+          const px=x+dx*r,pz=z+dz*r;
+          if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2) { safe=false; break; }
+        }
+        if(safe)return {pos:[x+dx*.65,y,z+dz*.65], direction:[dx,dz]};
+      }
+      throw Error('No 3m wall-free contact direction');
+    }, p);
+    save('shade-contact-setup.json', contactSetup);
+    await H('teleport', ...contactSetup.pos, Math.PI);
     await camera();
     await video('shade-contact', 90, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 89] });
     const contact = await page.evaluate(() => window.__gameHooks.shades.state());
     if (contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1) throw Error(`Shade contact failed: ${JSON.stringify(contact)}`);
     p = contact.actors[0].pos;
-    await H('teleport', p[0], p[1], p[2] + 2.7, Math.PI);
-    await H('setStick', 0, -1);
+    const dashSetup = await page.evaluate(([x,y,z]) => {
+      const col=window.__gameHooks.debug.world.collision;
+      for(let k=0;k<128;k++){
+        const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+        for(let r=.1;r<3.1;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+        if(safe)return {pos:[x+dx*2.7,y,z+dz*2.7], direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
+      }throw Error('No clear dash approach');
+    },p);
+    save('shade-dash-setup.json',dashSetup);
+    await H('teleport', ...dashSetup.pos, dashSetup.yaw);
+    await H('setStick', ...dashSetup.direction);
     await H('setKeys', ['ShiftLeft']);
     await camera();
     await video('shade-free', 210, async i => {

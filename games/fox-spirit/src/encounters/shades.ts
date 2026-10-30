@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
  * Shade (docs/design/world-1.md §3.8): an ink silhouette of an animal caught mid-stride when the Keeping
@@ -59,7 +59,7 @@ async function animalGeometry(): Promise<THREE.BufferGeometry> {
     if (source.index) g.setIndex(source.index.clone());
     parts.push(g.index ? g.toNonIndexed() : g);
   });
-  const g = mergeGeometries(parts)!;
+  const g = mergeVertices(mergeGeometries(parts)!, 0.0001);
   g.computeBoundingBox();
   const box = g.boundingBox!;
   const size = box.getSize(new THREE.Vector3());
@@ -116,11 +116,11 @@ function inkMaterial(): THREE.ShaderMaterial {
         float rim = pow(1.0 - abs(dot(vN, vV)), 2.2);
         // pressed ink: near-black umber core, a thin paper-pale rim like dried wash at the edge
         vec3 core = vec3(0.045, 0.035, 0.03);
-        vec3 edge = vec3(0.62, 0.55, 0.45);
-        vec3 col = mix(core, edge, rim * 0.55 + smoothstep(cut, cut + 0.06, n) * 0.0);
+        vec3 edge = vec3(0.13, 0.09, 0.055);
+        vec3 col = mix(core, edge, rim * 0.32 + smoothstep(cut, cut + 0.06, n) * 0.0);
         col = mix(col, edge * 0.8, 1.0 - smoothstep(cut, cut + 0.05, n));
         col = mix(col, vec3(0.16, 0.078, 0.033), n * 0.12);
-        gl_FragColor = vec4(col, 0.9);
+        gl_FragColor = vec4(col, 0.96);
         #include <colorspace_fragment>
         #include <fog_fragment>
       }`,
@@ -268,7 +268,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         const ring = s.debug.children[1]!;
         ring.position.copy(s.pos);
         ring.scale.setScalar(tun.drainRadius);
-        s.group.position.set(s.pos.x, s.pos.y + tun.bob + Math.sin(t * 1.3 + s.u * 20) * tun.bob, s.pos.z);
+        if (!s.freed) s.group.position.set(s.pos.x, s.pos.y + tun.bob + Math.sin(t * 1.3 + s.u * 20) * tun.bob, s.pos.z);
         s.group.rotation.y = s.heading;
         s.mat.uniforms.uTime!.value = t;
         s.mat.uniforms.uPresence!.value = s.presence;
