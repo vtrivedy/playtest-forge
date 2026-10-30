@@ -424,48 +424,46 @@ try {
 
   }
   if (wants('showcase')) {
-    await boot(quality,true,'&gym=gait');
+    await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
-    const gym=await page.evaluate(()=>window.__gameHooks.gym);
-    if(!gym)throw Error('Showcase requires gait gym');
-    const ramp=Math.tan(Math.PI/12);
+    await H('photoOff');
+    const n=Math.hypot(.684,.729),td=[-.684/n,-.729/n],tn=[.729/n,-.684/n];
+    const sp=(s,t,y)=>[-48+td[0]*s+tn[0]*t,y,52+td[1]*s+tn[1]*t];
+    const board=[.868243,-.496139];
     const segments=[
-      {name:'walk',seconds:2,stick:[.18,0],reset:[580,0,0]},
-      {name:'trot',seconds:2,stick:[.45,0]},
-      {name:'gallop',seconds:3,stick:[1,0]},
-      {name:'left turn',seconds:1,stick:[0,-1]},
-      {name:'right turn',seconds:1,stick:[1,0]},
-      {name:'jump and land',seconds:2,stick:[.45,0],jump:true,reset:[610,0,0]},
-      {name:'slope ascent',seconds:3,stick:[.6,0],reset:[653,0,0]},
-      {name:'slope jump and land',seconds:2,stick:[.45,0],jump:true,reset:[658,3*ramp,0]},
-      {name:'slope descent',seconds:3,stick:[.6,0],reset:[673,12*ramp,0]},
-      {name:'brake',seconds:1,stick:[0,0]},
+      {name:'Reedmarsh boardwalk walk',seconds:2,stick:board.map(v=>v*.18),reset:[62.5,.3,32.5]},
+      {name:'Windmill terrace trot',seconds:2,stick:tn.map(v=>v*.45),reset:sp(8,-5,2)},
+      {name:'Windmill terrace gallop',seconds:2,stick:tn,reset:sp(8,-8,2)},
+      {name:'Windmill carved turns',seconds:3,turn:true,reset:sp(5,0,2)},
+      {name:'Windmill jump and recovery',seconds:2,stick:tn.map(v=>v*.45),jump:true,reset:sp(5,0,2)},
+      {name:'Windmill entrance ascent',seconds:3,stick:td.map(v=>v*.18),reset:sp(-6,0,.1+1.9*.5/6.9)},
+      {name:'Windmill slope jump and land',seconds:3,stick:td.map(v=>v*.18),jump:true,reset:sp(-4,0,.1+1.9*2.5/6.9)},
+      {name:'Windmill dash',seconds:1,stick:tn,dash:true,reset:sp(8,-8,2)},
+      {name:'Windmill brake and settle',seconds:2,stick:[0,0]},
     ];
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
     const keyFrames=segments.flatMap(segment=>[segment.start+Math.round(fps*.25),segment.end-1]);
-    save('showcase-script.json',{label:'20 seconds, live controller input, staged segment resets, fixed side-follow lens, no forced poses',segments,gym});
+    save('showcase-script.json',{label:'20 seconds in real World1, live controller, staged segment cuts, standard gameplay camera, no forced poses or grade',segments});
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
-      if(local===0){if(segment.reset)await H('teleport',...segment.reset,Math.PI/2);await H('setStick',...segment.stick);}
-      await H('setKeys',segment.jump && local<Math.round(.25*fps)?['Space']:[]);
-    },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{
-      if(state.deaths)throw Error(`Showcase course death at ${i}`);
-      await page.evaluate(([x,y,z])=>{
-        const h=window.__gameHooks,ground=h.debug.world.collision.highestAt(x,z);
-        h.photo([x,ground+1.6,z+6],[x,ground+.85+Math.max(0,y-ground)*.25,z],42);
-      },state.pos);
-    }});
+      let stick=segment.stick;
+      if(segment.turn){const angle=local/fps*2;stick=[(tn[0]*Math.cos(angle)+td[0]*Math.sin(angle))*.45,(tn[1]*Math.cos(angle)+td[1]*Math.sin(angle))*.45];}
+      if(local===0 && segment.reset){const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...segment.reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
+      await H('setStick',...stick);
+      await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
+    },undefined,{traceEveryFrame:true,keyFrames});
     await H('setKeys',[]);await H('setStick',null);
     const result=report.videos.showcase;
-    const slope=segments.find(segment=>segment.name==='slope jump and land');
+    const slope=segments.find(segment=>segment.name==='Windmill slope jump and land');
     const rows=result.trace.filter(row=>row.frame>=slope.start && row.frame<slope.end);
     const air=rows.findIndex(row=>!row.state.grounded);
     const landed=air>=0?rows.slice(air+1).find(row=>row.state.grounded):null;
-    const p=landed?.state.pos;
-    const acceptance={seconds:cursor/fps,frames:cursor,slopeJumpAirborne:air>=0,slopeLanding:p??null,landedOnIncline:!!p && p[0]>655 && p[0]<667,deaths:(await H('state')).deaths};
+    const pos=landed?.state.pos;
+    const terraceS=pos ? (pos[0]+48)*td[0]+(pos[2]-52)*td[1] : null;
+    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Windmill Rise',camera:'standard gameplay',slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
-    if(!acceptance.landedOnIncline)throw Error('Showcase did not land on the actual incline');
+    if(!acceptance.landedOnIncline || acceptance.deaths)throw Error('World showcase did not complete safely with an incline landing');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');

@@ -274,6 +274,8 @@ Water critique correction: reduce the falls' local lamp from 2–5 to 0.8–2 li
 units and give the marsh ink subtle animated normals plus a soft highlight
 shoulder. It remains dark hazard ink; only surface response changes. Restored
 falls acquire a warmer ochre tint. Retest the water crossing and lifecycle.
+### World showcase + turn/head correction — 15:15
+Keep the selected controller and constrain its grounded travel to the same turning envelope as the visible fox. Opposed input brakes while the fox pivots, preventing a full-speed sideways stance. Feed the intended look direction into a spring-led head/neck turn; distribute a smaller body bend along the four spine bones and cancel part of terrain pitch at the head. Retain authored clips as the primary pose. Re-shoot20s on real Reedmarsh boardwalk and Windmill Rise approach terrain using the gameplay camera, warm grade, and per-frame state. Staged cuts remain disclosed.
 ### Opus capture audit follow-up — 15:36 ET
 Preserve failed retry files below attempt-N directories before writing a fresh
 attempt, preventing mixed sheets. Verify durable success against route interval,
@@ -323,3 +325,4 @@ lower-leg smoke fade and sparse antler-tip wisps. Strengthen the dark3m drain
 wash; enlarge a smaller set of mesh-sampled maple leaves so the memory release
 reads apart from ambient litter. Clear post-latch edge capture replaces the
 kiln-obscured release view. Preserve authored patrol and sad frozen-motion premise.
+World showcase review: settle the real gameplay camera for300ms while stationary at each disclosed cut; use slightly closer default chase framing (3.8m,1.5m height) so the creature stays readable through scenery. Add a small impact/brake head nod and pelvis-load tail lift, leaving FOX-owned tail appearance intact. Expose look and load spring tunables.

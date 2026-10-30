@@ -312,6 +312,11 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
+    folder.add(params,'headLead',0,.5,.01);
+    folder.add(params,'headFrequency',1,6,.1);
+    folder.add(params,'headDamping',.4,1.5,.05);
+    folder.add(params,'headStabilize',0,1,.05);
+    folder.add(params,'tailLoad',0,.4,.01);
     folder.add(params,'brakeSquat',0,.08,.002);
     folder.add(params,'brakePitch',0,.2,.005);
     folder.add(params,'landSquash',0,.2,.005);
@@ -1278,6 +1283,14 @@ async function boot() {
       }
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
+      if(grounded && wish.lengthSq()>.001) {
+        const targetYaw=Math.atan2(wish.x,wish.z);
+        const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
+        fox.rotation.y+=THREE.MathUtils.clamp(error,-4.5*dt,4.5*dt);
+        // Brake through a reversal; forward drive returns as the body points into the input.
+        const drive=Math.max(0,Math.cos(error));
+        desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
+      }
       cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
       vel.x = cur.x;
       vel.z = cur.z;
@@ -1301,7 +1314,7 @@ async function boot() {
     }
 
     const faceShrine = restore.inputLocked && wish.lengthSq() <= 0.01;
-    if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
+    if ((!grounded || faceShrine) && (wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
       const yaw = faceShrine ? restore.faceYaw : Math.hypot(vel.x, vel.z) > .6 ? Math.atan2(vel.x, vel.z) : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
@@ -1383,7 +1396,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
