@@ -364,7 +364,22 @@ try {
         timeline.push({ frame: i, state: (await H('state')).chem.water });
       }
     });
-    save('water-acceptance.json', timeline);
+    await H('teleport', 55.8, 0.3, 37.2, Math.PI); await H('photo', ...lens); await H('setStick', 0, 0);
+    await video('water-crossing', 4 * fps, async i => {
+      if (i === fps) await H('setStick', 0.839, -0.544);
+      if (i === Math.round(2.1 * fps)) await H('setStick', 0, 0);
+      if ([fps, Math.round(1.5 * fps), 3 * fps].includes(i)) await shot(`water-crossing-${i}`);
+    });
+    await H('setStick', null);
+    save('water-acceptance.json', { cycle: timeline, crossing: await H('state') });
+    await H('teleport', 95, 2, 10, Math.PI);
+    await H('photo', [113, 15, 37], [98, 8, 19], 52); await advance(2); await shot('water-reed-frozen');
+    await H('teleport', 100, 15, 20, Math.PI);
+    await H('photo', [113, 15, 37], [98, 8, 19], 52);
+    await video('water-reed-feed', 14 * fps, async i => {
+      if ([fps, 5 * fps, 10 * fps, 13 * fps].includes(i)) await shot(`water-reed-${i}`);
+    });
+    save('water-reed-result.json', await H('state'));
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
