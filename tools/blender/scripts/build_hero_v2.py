@@ -67,7 +67,7 @@ for s in ("L", "R"):
     sign = 1 if s == "L" else -1
     rot_world(f"Ear1.{s}", "Y", -14 * sign)
     rot_world(f"Ear1.{s}", "X", 6)
-    scl(f"Ear1.{s}", 1.25, 1.7, 1.25)  # big fox ears (turnaround: ears ~= head length), not toy-sized
+    scl(f"Ear1.{s}", 1.18, 1.35, 1.18)  # natural alert ears; pass-6 triangles overwhelmed the face
 # slender but solid legs (turnaround: umber-socked, defined joints)
 for s in ("L", "R"):
     scl(f"FrontUpperLeg.{s}", 1.12, 0.97, 1.12)

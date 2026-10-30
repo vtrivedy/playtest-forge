@@ -423,9 +423,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(29.5, -1, 10);
   WS(36.5, -1.2, 10);
   WS(36.5, -8.8, 14);
-  WS(39.8, -9.4, 14);
-  WS(45, -2, 14);
-  WS(51.2, 0, 14, { act: 'jumpdash', label: 'chasm' });
+  WS(35.7, -4, 14);
+  WS(38.8, 2.5, 14);
+  WS(39.7, 2.5, 14, { act: 'glide', label: 'wind-gap' });
   WS(62.3, 0.6, 14);
   WS(62.3, 1.2, 14);
   WS(62.3, 9.2, 18);
@@ -628,7 +628,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     { s0: 0, s1: T_END, top: 2, w: 30 },
     { s0: 12, s1: T_END, top: 6, w: 28 },
     { s0: 28, s1: T_END, top: 10, w: 26 },
-    { s0: 38, s1: 52, top: 14, w: 24 },
+    { s0: 36, s1: 40.5, top: 14, w: 24 },
     { s0: 60.5, s1: T_END, top: 14, w: 24 },
     { s0: 64, s1: T_END, top: 18, w: 22 },
     { s0: 68, s1: T_END, top: 22, w: 20 },
@@ -726,7 +726,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // R4 lateral flight on k3 (10 → 14)
   flightT(36.5, -0.6, 10, 36.5, -9.6, 14, 2.6, 5);
-  // chasm on k4 between s 52 and 60.5 (jump + air-dash, 8.5 m)
+  // Wind gap: twenty flat metres, with the y10 terrace four metres below for recovery.
   // R5 lateral flight on k4b (14 → 18)
   flightT(62.3, 0.4, 14, 62.3, 9.8, 18, 2.4, 6);
   // R6 lateral flight on k5 (18 → 22)
@@ -737,7 +737,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const mills: Mill[] = [];
   const millSites: Array<[number, number, number]> = [
     [23.8, -8.4, 6],
-    [48.6, -7.6, 14],
+    [39, -7.6, 14],
     [73.5, -4.6, 22],
   ];
   const millFacing = Math.atan2(-TD.x, -TD.y) + 0.5; // face back down the climb (toward meadow/camera)
@@ -1680,7 +1680,18 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     col.add(cylCollider({ x: px, z: pz, r: 0.45, top: hy + bowlUp + 0.6, bottom: hy - 1, tag: 'kiln-pillar' }));
     inletSpots.push({ seedwell: si, source: id, pos: new THREE.Vector3(hx + ux * 1.3, hy + bowlUp, hz + uz * 1.3), sealAt: new THREE.Vector3(sw.pos.x, sw.pos.y + 0.78, sw.pos.z), pillar: new THREE.Vector3(px, hy, pz), latchTime: 2 });
   };
-  kiln(0, 'H2', 2.2, 2.6, 5.5);
+  kiln(0, 'H2', 2.2, 2.6, 6);
+  // A real standing place beside the raised bowl: ride the column, steer onto the jut,
+  // then choose the wind-river line. The support stays outside the column's centre.
+  {
+    const bowl = inletSpots[0]!;
+    const x = bowl.pillar.x - 0.5, z = bowl.pillar.z - 0.6;
+    col.add(boxCollider({ x, z, w: 3.6, d: 3.2, top: 26, bottom: 24.9, tag: 'kiln-jut' }));
+    slab({ x, z, w: 3.6, d: 3.2, top: 26, bottom: 24.9, rough: 0.45, seed: 349, topColor: PAL.stone.clone().lerp(PAL.rustMoss, 0.2), overhang: 0.15 });
+    // Ruined spine carries the shelf, keeping its eastern face open to the river.
+    col.add(boxCollider({ x: x - 0.8, z: z - 0.6, w: 1.4, d: 1.3, top: 25, bottom: 19.8, tag: 'kiln-spine' }));
+    for (let i = 0; i < 7; i++) stoneBlock(bk('stone', x, z), trs(x - 0.8, 20.35 + i * 0.72, z - 0.6, (i % 2) * 0.08), 1.4, 0.74, 1.3, 350 + i, 0.12);
+  }
   // Kiln catch shelves (§3.4 recovery): y15 ledges on the spire's south and east faces, each with a hearth
   // whose column (to ≈ y25) overlaps the kiln ledge rim — a missed step is a ride back, not a long walk
   {
@@ -1723,9 +1734,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // (permanent route 1 up the hill: a plain glide from the column top covers ≈ 50 m of the ≈ 95 m).
   const windSpots: WindSpot[] = [];
   {
+    const a = sp(39, 2.5), b = sp(62, 2.5), source = sp(38.8, 2.5);
+    windSpots.push({ id: 'mill-gap', source: [source.x, 14.8, source.z],
+      path: [[a.x, 15.2, a.z], [b.x, 15.2, b.z]], radius: 2.8 });
+  }
+
+  {
     const sw = seedwells[0]!.pos;
     const h2 = hearthSpots.find((h) => h.id === 'H2')!;
-    windSpots.push({
+    windSpots.unshift({
       id: 'wind-river',
       source: [sw.x, sw.y + 1, sw.z],
       path: [
@@ -1737,6 +1754,32 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         [-18, 15.5, -65],
       ],
     });
+  }
+  // S2: a readable side branch in the restored river, ending at a quiet fox shrine.
+  // Its source shares SW1's restore radius; the fork obeys the same wind rules.
+  windSpots.push({ id: 'wind-islet-fork', source: [-112, 21, -24], radius: 1.5,
+    path: [[-60, 27.8, -45], [-66, 27, -57], [-72, 25.5, -75], [-70, 20, -95]] });
+  {
+    const x = -70, z = -98, y = 16;
+    col.add(cylCollider({ x, z, r: 7, top: y, bottom: -10, tag: 'old-fox-islet' }));
+    slab({ x, z, w: 14, d: 14, top: y, bottom: -4, round: true, rough: 0.65, seed: 360, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.5) });
+    const sb = bk('stone', x, z);
+    archAt(sb, x, y, z - 2, 0, { span: 3.2, pillarH: 4.4, broken: 0.25, seed: 361 });
+    seedwell(sb, new Bucket(), x, y, z - 2, 362);
+    hearthSpots.push({ id: 'islet-return', x: x + 3.5, y, z: z + 1.5, height: 12 });
+    litterPatch(bk('litter', x, z, false), rng(363), x, z, 5.5, 60, () => y);
+  }
+  // S4: three curls on one dash line invite a thermal-chain experiment. The
+  // last column reaches a stone perch beside mill 3's roof; there is no pickup trail.
+  {
+    const p = sp(73.5, -4.6);
+    for (let i = 0; i < 3; i++) {
+      const x = p.x + 4.2, z = p.z - 1.7 + i * 1.7;
+      hearthSpots.push({ id: `mill-cap-${i}`, x, y: 22, z, height: 6 + i * 3 });
+      col.add(cylCollider({ x, z, r: 0.82, top: 23, bottom: 21, tag: 'hearth' }));
+    }
+    col.add(cylCollider({ x: p.x + 2.2, z: p.z + 1.7, r: 1.6, top: 34, bottom: 33.3, tag: 'mill-cap-perch' }));
+    slab({ x: p.x + 2.2, z: p.z + 1.7, w: 3.2, d: 3.2, top: 34, bottom: 33.3, round: true, rough: 0.35, seed: 367, topColor: PAL.stone });
   }
   // Authored flume patrol; the encounter module supplies the public colour-drain predicate.
   shadeSpots.push({ id: 'shade-flume', speed: 1.1, patrol: [[102, 4.7, 24], [98, 4.5, 26], [96, 0, 29], [104, 0, 30]] });

@@ -20,10 +20,12 @@ image = (
 )
 if modal.is_local():
     image = image.add_local_file(ROOT / 'tools/gpu-capture.mjs', '/opt/browser/gpu-capture.mjs')
+    image = image.add_local_file(ROOT / 'tools/levels-capture.mjs', '/opt/browser/levels-capture.mjs')
+    image = image.add_local_file(ROOT / 'tools/windgap-capture.mjs', '/opt/browser/windgap-capture.mjs')
 
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)
-def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds: int, backend: str, size: str, quality: str, fps: int, cube_only: bool, verbose: bool) -> dict:
+def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds: int, backend: str, size: str, quality: str, fps: int, cube_only: bool, verbose: bool, route_from: int = 0, route_to: int = -1) -> dict:
     import os, subprocess, time, json, tarfile, tempfile, shutil
     started = time.monotonic()
     out = Path('/captures') / run_id
@@ -60,7 +62,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         command = ['node', '/opt/browser/gpu-capture.mjs', '--repo', str(repo), '--out', str(out),
              '--shots', shots, '--route-seconds', str(route_seconds), '--orbit-seconds', str(orbit_seconds),
              '--backend', backend, '--size', size, '--quality', quality, '--fps', str(fps),
-             '--cube-only', str(cube_only).lower(), '--verbose', str(verbose).lower()]
+             '--cube-only', str(cube_only).lower(), '--verbose', str(verbose).lower(), '--route-from', str(route_from), '--route-to', str(route_to)]
         browser_env = dict(os.environ)
         if verbose:
             browser_env['DEBUG'] = 'pw:browser'
@@ -94,14 +96,14 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
 def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
          orbit_seconds: int = 20, fetch_only: str = '', out: str = '',
          gpu: str = 'A10', backend: str = 'egl', size: str = '1920x1080',
-         quality: str = 'high', fps: int = 60, cube_only: bool = False, verbose: bool = False):
+         quality: str = 'high', fps: int = 60, cube_only: bool = False, verbose: bool = False, route_from: int = 0, route_to: int = -1):
     import subprocess, time, json, tarfile, re, uuid
     if backend not in {'vulkan', 'egl', 'gl', 'swiftshader'} or quality not in {'low', 'med', 'high'}:
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth'}:
-        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, water, shade, turntable, updraft, wind, growth or comma-separated')
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap'}:
+        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, water, shade, turntable, updraft, wind, growth, levels, windgap or comma-separated')
     if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
         raise ValueError('Gait requires --fps 60')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:40]}-{shots.replace(",", "_")}-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:10]}'
@@ -115,7 +117,7 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
             resolved_ref = subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', '--verify', f'{ref}^{{commit}}'], text=True).strip()
         token = subprocess.check_output(['gh', 'auth', 'token'], text=True).strip()
         try:
-            meta = capture.with_options(gpu=None if backend == 'swiftshader' else gpu, secrets=[modal.Secret.from_dict({'GH_TOKEN': token})]).remote(resolved_ref, shots, run_id, route_seconds, orbit_seconds, backend, size, quality, fps, cube_only, verbose)
+            meta = capture.with_options(gpu=None if backend == 'swiftshader' else gpu, secrets=[modal.Secret.from_dict({'GH_TOKEN': token})]).remote(resolved_ref, shots, run_id, route_seconds, orbit_seconds, backend, size, quality, fps, cube_only, verbose, route_from, route_to)
             print(json.dumps(meta, indent=2))
         except Exception as exc:
             error = exc

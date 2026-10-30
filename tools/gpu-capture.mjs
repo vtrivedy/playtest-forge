@@ -1,5 +1,7 @@
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
+import { captureLevels } from './levels-capture.mjs';
+import { captureWindGap } from './windgap-capture.mjs';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -428,26 +430,30 @@ try {
   }
   if (wants('water')) {
     await boot(quality, true);
-    await H('teleport', 51, 0, 43, Math.PI);
+    const stagingY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(51.4, 42.5));
+    await H('teleport', 51.4, stagingY, 42.5, Math.PI);
     const lens = [[64, 7, 44], [59, 0.5, 34], 48];
     await H('photo', ...lens); await advance(10); await shot('water-frozen');
     const timeline = [];
     await video('water-cycle', 12 * fps, async i => {
       if (i === 0) { await H('teleport', 56, 0.3, 37, Math.PI); await H('photo', ...lens); }
-      if (i === Math.round(1.4 * fps)) { await H('teleport', 51, 0, 43, Math.PI); await H('photo', ...lens); }
+      if (i === Math.round(1.4 * fps)) { await H('teleport', 51.4, stagingY, 42.5, Math.PI); await H('photo', ...lens); }
       if ([Math.round(0.3 * fps), Math.round(0.8 * fps), 2 * fps, 6 * fps, 8 * fps, 11 * fps].includes(i)) {
         await shot(`water-${i}`);
         timeline.push({ frame: i, state: (await H('state')).chem.water });
       }
     });
     await H('teleport', 55.8, 0.3, 37.2, Math.PI); await H('photo', ...lens); await H('setStick', 0, 0);
-    await video('water-crossing', 4 * fps, async i => {
+    const crossingStart = await H('state');
+    const crossingEnd = await video('water-crossing', 4 * fps, async i => {
       if (i === fps) await H('setStick', 0.839, -0.544);
       if (i === Math.round(2.1 * fps)) await H('setStick', 0, 0);
       if ([fps, Math.round(1.5 * fps), 3 * fps].includes(i)) await shot(`water-crossing-${i}`);
     });
     await H('setStick', null);
-    save('water-acceptance.json', { cycle: timeline, crossing: await H('state') });
+    const crossed = crossingEnd.deaths === crossingStart.deaths && crossingEnd.pos[0] > 62;
+    if (!crossed) report.failures.push('Water crossing failed: inspect crossing trace');
+    save('water-acceptance.json', { cycle: timeline, crossing: crossingEnd, crossingDeaths: crossingEnd.deaths - crossingStart.deaths, crossed });
     await H('teleport', 95, 2, 10, Math.PI);
     await H('photo', [113, 15, 37], [98, 8, 19], 52); await advance(2); await shot('water-reed-frozen');
     await H('teleport', 100, 15, 19.2, Math.PI);
@@ -587,6 +593,14 @@ try {
     save('updraft-acceptance.json', summary);
     console.log('UPDRAFT', JSON.stringify(summary));
   }
+  if (wants('windgap')) {
+    await boot(quality, true);
+    await captureWindGap({ H, advance, shot, video, save, page, fps, report });
+  }
+  if (wants('levels')) {
+    await boot(quality, true);
+    await captureLevels({ H, advance, shot, video, save, page, fps, quality, report });
+  }
   if (wants('wind')) {
     // Wind river acceptance (world-1.md §3.3 beat 6): SW1 latched → ride H2 up, glide into the river, land on the arena rim.
     await boot(quality, true);
@@ -705,15 +719,29 @@ try {
   }
   if (wants('route')) {
     await boot(quality, true);
-    save('route-waypoints.json', await H('route'));
-    await H('autopilot', true, 0, { assist: false });
+    const route = await H('route');
+    save('route-waypoints.json', route);
+    const from = Number(arg('route-from', '0')), requestedTo = Number(arg('route-to', '-1'));
+    const regional = from > 0 || requestedTo >= 0, to = requestedTo < 0 ? route.length : requestedTo;
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from >= to || to > route.length) throw Error('Invalid route waypoint interval');
+    if (regional) {
+      const wp = route[from];
+      const floor = await page.evaluate(p => window.__gameHooks.debug.world.collision.groundAt(p.x, p.z, p.y + .5).y, wp);
+      if (!Number.isFinite(floor) || Math.abs(floor - wp.y) > .65) throw Error('Regional route start must be a walkable waypoint');
+      await H('teleport', wp.x, floor, wp.z, Math.PI);
+      await advance(3, false);
+    }
+    save('route-plan.json', { from, to, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : 'Full unassisted restoration route' });
+    await H('autopilot', true, from, { assist: false });
     let restoredAt;
-    const state = await video('route-unassisted', Number(arg('route-seconds', '360')) * fps, async () => {}, (st, i) => {
+    const name = regional ? `route-segment-staged-${from}-${to}` : 'route-unassisted';
+    const state = await video(name, Number(arg('route-seconds', '360')) * fps, async () => {}, (st, i) => {
+      if (regional) return st.auto.idx >= to || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     });
-    await shot('route-end');
-    if (!state.restored || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}`);
+    await H('autopilot', false); await shot('route-end');
+    if ((regional ? state.auto.idx < to : !state.restored) || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
