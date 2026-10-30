@@ -1,3 +1,4 @@
+import { leafAtlas } from '../russetTextures';
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
 import { Reactor, type ReactorTunables, type SupplyFn } from './reactor';
@@ -96,6 +97,9 @@ export type WindSystem = {
 export function createWind(scene: THREE.Scene, spots: WindSpot[], opts: { gui?: GUI } = {}): WindSystem {
   const tun: WindTunables = { ...WIND_DEFAULTS };
   const N_LEAF = 90;
+  const windLeaf = leafAtlas(256);
+  windLeaf.repeat.set(0.5, 0.5);
+  windLeaf.offset.set(0, 0.5);
   const currents: Current[] = spots.map((spot) => {
     const curve = new THREE.CatmullRomCurve3(spot.path.map(([x, y, z]) => new THREE.Vector3(x, y, z)), false, 'centripetal');
     const length = curve.getLength();
@@ -129,7 +133,7 @@ export function createWind(scene: THREE.Scene, spots: WindSpot[], opts: { gui?: 
       leafOff[i * 3 + 1] = Math.sin(a) * r * 0.6;
       leafOff[i * 3 + 2] = rnd();
     }
-    const leafMat = new THREE.PointsMaterial({ color: 0xc8582a, size: 0.22, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false });
+    const leafMat = new THREE.PointsMaterial({ map: windLeaf, alphaTest: 0.03, color: 0xc8582a, size: 0.22, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false });
     const leaves = new THREE.Points(geo, leafMat);
     leaves.frustumCulled = false;
     scene.add(leaves);

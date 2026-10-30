@@ -77,7 +77,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     fallGeo.computeVertexNormals();
     const fall = new THREE.Mesh(fallGeo, glass);
     fall.position.copy(spot.lip).lerp(spot.foot, 0.5); fall.castShadow = true; scene.add(fall);
-    const light = new THREE.PointLight(0xffb55e, 3, 7, 2); light.position.copy(fall.position); scene.add(light);
+    const light = new THREE.PointLight(0xffb55e, 0.8, 7, 2); light.position.copy(fall.position); scene.add(light);
     const curve = new THREE.CatmullRomCurve3(spot.path, false, 'centripetal');
     const length = curve.getLength();
     const cells = Math.ceil(length / 0.25);
@@ -194,11 +194,11 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         if (w.surface.instanceColor) w.surface.instanceColor.needsUpdate = true;
         w.arriving = w.parcels.some(p => p.head >= w.length && p.tail < w.length);
         w.animation.uWaterTime.value = time; w.animation.uWaterFlow.value = flowing ? 1 : 0;
-        w.glass.color.set(0xc7c6af).lerp(foamColor.set(0x81988a), w.reactor.heat);
+        w.glass.color.set(0xc7c6af).lerp(foamColor.set(w.reactor.restored ? 0x9d8d66 : 0x81988a), w.reactor.heat);
         w.glass.roughness = flowing ? 0.18 : 0.25;
         w.glass.opacity = 0.88 - 0.36 * w.reactor.heat;
         w.glass.emissiveIntensity = 0.12 + w.reactor.heat * 0.18 + warning * (0.12 + Math.sin(time * 12) * 0.07);
-        w.light.intensity = 2 + w.reactor.heat * 3;
+        w.light.intensity = 0.8 + w.reactor.heat * 1.2;
         const fallBottom = flowing ? w.spot.path[0]!.y : w.spot.foot.y;
         w.fall.scale.y = (w.spot.lip.y - fallBottom) / (w.spot.lip.y - w.spot.foot.y);
         w.fall.position.y = (w.spot.lip.y + fallBottom) / 2;

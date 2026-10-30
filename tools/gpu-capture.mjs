@@ -540,13 +540,14 @@ try {
       await shot(`still-${name}`);
     }
     for (const [name, pose] of Object.entries(poses)) await poseStill(name, pose);
-    // Keep the staged hero clear of the arrival hearth added at (5.6,74.2).
-    const heroY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
+    // Stage in the clear meadow: the former (6,78) lens sat inside the H-a shelf at (13,75.5).
+    const heroY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
     if (!Number.isFinite(heroY) || heroY < -24) throw Error('Hero still has no safe surface');
-    await H('teleport', 6, heroY, 78, Math.PI); await advance(60, false);
+    await H('teleport', 0, heroY, 70, Math.PI); await advance(60, false);
     const hero = await H('getFoxPos');
     await H('photo', [hero.x + 3.5, hero.y + 0.7, hero.z - 4], [hero.x, hero.y + 0.5, hero.z], 30);
     await advance(3); await shot('still-hero');
+    save('hero-stage-provenance.json', { label: 'STAGED visual review; lens relocated to clear H-a shelf', fox: [0, heroY, 70], previousFox: [6, 78], previousLensXZ: [9.5, 74], obstruction: 'H-a shelf centred13,75.5 radius4.5' });
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }

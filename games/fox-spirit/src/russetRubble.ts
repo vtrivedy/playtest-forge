@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { Bucket, PAL, trs } from './russetKit';
+import { Bucket, PAL, trs, setRuinSupportGeometry } from './russetKit';
 
 /** Poly Haven rock_moss_set_01 (CC0): reuse scanned silhouettes, with the realm's quiet palette. */
 export async function loadRubbleKit() {
@@ -62,5 +62,6 @@ export async function loadLanternColumn(): Promise<THREE.BufferGeometry> {
   const height = box.max.y - box.min.y;
   g.translate(-centre.x, -box.min.y, -centre.z);
   g.scale(1.9 / height, 1.9 / height, 1.9 / height);
+  setRuinSupportGeometry(g);
   return g;
 }
