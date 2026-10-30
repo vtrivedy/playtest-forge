@@ -260,7 +260,16 @@ try {
           const ground = world.collision.groundAt(point.x, point.z, feetY + .6).y;
           feet[id] = { position: point.toArray(), ground: Number.isFinite(ground) ? ground : null, clearance: Number.isFinite(ground) ? point.y - ground : null };
         }
-        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet };
+        const hip = fox.getObjectByName('pelvis'), chest = fox.getObjectByName('spine_04');
+        let body = null;
+        if (hip && chest) {
+          const a = hip.getWorldPosition(fox.position.clone()), b = chest.getWorldPosition(fox.position.clone());
+          const yaw = fox.rotation.y, center = fox.position;
+          const ahead = world.collision.groundAt(center.x + Math.sin(yaw) * .4, center.z + Math.cos(yaw) * .4, feetY + .6).y;
+          const behind = world.collision.groundAt(center.x - Math.sin(yaw) * .4, center.z - Math.cos(yaw) * .4, feetY + .6).y;
+          body = { hip: a.toArray(), chest: b.toArray(), pitch: Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z)), floorPitch: Math.atan2(ahead - behind, .8) };
+        }
+        return { landmark: 'paw bone head after animation/IK; not a mesh toe measurement', feet, body };
       }, state.pos[1]),
       keyFrames, traceEveryFrame: true, label: (i, st) => `${segmentAt(i).name} | f${i} | ${st.gait ?? st.locomotion?.gait ?? st.anim ?? 'unreported'} ${Math.hypot(st.vel[0], st.vel[2]).toFixed(2)}m/s`,
       afterStep: async (i, state) => {
