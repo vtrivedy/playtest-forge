@@ -975,6 +975,19 @@ try {
         if (name === 'front' || name === 'face') {
           await page.evaluate(() => { const d = window.__gameHooks.debug; d.renderer.setRenderTarget(null); d.renderer.render(d.scene, d.camera); });
           await shot(`fox-${state}-${name}-raw`);
+          if (state === 'restored' && name === 'front') {
+            const passes = await page.evaluate(() => window.__gameHooks.debug.post.composer.passes.map(p => p.constructor.name));
+            save('fox-post-passes.json', passes);
+            for (let prefix = 0; prefix < passes.length - 1; prefix++) {
+              await page.evaluate(prefix => {
+                const d = window.__gameHooks.debug, ps = d.post.composer.passes;
+                ps.forEach((p,i) => { p.enabled = i <= prefix || i === ps.length - 1; });
+                d.post.composer.render();
+              }, prefix);
+              await shot(`fox-post-prefix-${prefix}`);
+            }
+            await page.evaluate(() => window.__gameHooks.debug.post.composer.passes.forEach(p => { p.enabled = true; }));
+          }
         }
       }
       await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);
