@@ -1,28 +1,25 @@
 import * as THREE from 'three';
+import { FOX_RIG, SIDES } from '../foxRig';
 
 /**
- * Rig contract: the locomotion system only talks to bones through these roles.
- * A new fox rig drops in by editing RIG_MAP (names) — nothing else assumes bone names or local axes.
- * Leg chains run hip → … → last bone; `foot` is the bone whose head is the ground-contact point.
+ * Rig contract (sprint2/fox/RIG-CONTRACT.md, names in foxRig.ts): locomotion only talks to bones through these
+ * roles. Leg chains run from the first IK bone to the last; `foot` is the effector bone (its head is the joint the
+ * IK places — wrist / toe joint); `scapula` swings for extra fore reach.
  */
 export const RIG_MAP = {
-  root: 'Body',
-  pelvis: 'Back',
-  spine: ['Torso', 'Torso2', 'Torso3'],
-  neck: ['Neck1', 'Neck2', 'Neck3'],
-  head: 'Head',
-  tail: ['Tail1', 'Tail2', 'Tail3', 'Tail4', 'Tail5', 'Tail6', 'Tail7', 'Tail8'],
-  ears: [
-    ['Ear1.L', 'Ear2.L'],
-    ['Ear1.R', 'Ear2.R'],
-  ],
+  pelvis: FOX_RIG.pelvis,
+  spine: FOX_RIG.spine,
+  neck: FOX_RIG.neck,
+  head: FOX_RIG.head,
+  tail: FOX_RIG.tail,
+  ears: SIDES.map((s) => FOX_RIG.ear(s).slice(0, 2)),
   legs: {
-    LF: { chain: ['FrontUpperLeg.L', 'FrontLowerLeg.L'], foot: 'FrontPaw.L' },
-    RF: { chain: ['FrontUpperLeg.R', 'FrontLowerLeg.R'], foot: 'FrontPaw.R' },
-    LH: { chain: ['BackLeg.L', 'BackUpperLeg.L', 'BackLowerLeg.L'], foot: 'BackPaw.L' },
-    RH: { chain: ['BackLeg.R', 'BackUpperLeg.R', 'BackLowerLeg.R'], foot: 'BackPaw.R' },
+    LF: { chain: [FOX_RIG.foreleg('l').upper, FOX_RIG.foreleg('l').lower], foot: FOX_RIG.foreleg('l').paw, scapula: FOX_RIG.foreleg('l').scapula },
+    RF: { chain: [FOX_RIG.foreleg('r').upper, FOX_RIG.foreleg('r').lower], foot: FOX_RIG.foreleg('r').paw, scapula: FOX_RIG.foreleg('r').scapula },
+    LH: { chain: [FOX_RIG.hindleg('l').thigh, FOX_RIG.hindleg('l').shin, FOX_RIG.hindleg('l').foot], foot: FOX_RIG.hindleg('l').paw, scapula: null },
+    RH: { chain: [FOX_RIG.hindleg('r').thigh, FOX_RIG.hindleg('r').shin, FOX_RIG.hindleg('r').foot], foot: FOX_RIG.hindleg('r').paw, scapula: null },
   },
-} as const;
+};
 
 export type LegId = keyof typeof RIG_MAP.legs;
 export const LEG_IDS: LegId[] = ['LH', 'LF', 'RH', 'RF'];
@@ -34,9 +31,12 @@ export type RigLeg = {
   side: 1 | -1;
   chain: THREE.Bone[];
   foot: THREE.Bone;
+  scapula: THREE.Bone | null;
   /** Segment lengths in world units (rest pose) */
   lengths: number[];
   reach: number;
+  /** Closest the chain can fold its effector to the base (with some margin) */
+  minReach: number;
   /** Rest joint positions (chain heads + foot head) in fox-model space (world units, group-local) */
   restJoints: THREE.Vector3[];
   /** Rest foot-head position in model space (on the ground plane, y≈0) */
@@ -44,7 +44,6 @@ export type RigLeg = {
 };
 
 export type Rig = {
-  root: THREE.Bone;
   pelvis: THREE.Bone;
   spine: THREE.Bone[];
   neck: THREE.Bone[];
@@ -91,8 +90,10 @@ export function buildRig(model: THREE.Object3D): Rig {
       side: id.startsWith('L') ? 1 : -1,
       chain,
       foot,
+      scapula: def.scapula ? get(def.scapula) : null,
       lengths,
       reach: lengths.reduce((a, b) => a + b, 0),
+      minReach: Math.max(0.05, (Math.max(...lengths) * 2 - lengths.reduce((a, b) => a + b, 0)) * 1.15, lengths.reduce((a, b) => a + b, 0) * 0.45),
       restJoints,
       restFoot: restJoints[restJoints.length - 1].clone(),
     };
@@ -105,7 +106,6 @@ export function buildRig(model: THREE.Object3D): Rig {
   tailRest.push(tailRest[n - 1].clone().add(tailRest[n - 1].clone().sub(tailRest[n - 2])));
 
   const rig: Rig = {
-    root: get(RIG_MAP.root),
     pelvis: get(RIG_MAP.pelvis),
     spine: RIG_MAP.spine.map(get),
     neck: RIG_MAP.neck.map(get),
@@ -120,11 +120,13 @@ export function buildRig(model: THREE.Object3D): Rig {
     com: new THREE.Vector3(),
     tailRest,
   };
-  rig.com.copy(rig.shoulder).lerp(rig.hip, 0.45);
-  const driven = new Set<THREE.Bone>([rig.root, rig.pelvis, ...rig.spine, ...rig.neck, rig.head, ...tail, ...rig.ears.flat()]);
+  // body pivot midway between shoulders and hips so fore/hind height changes map exactly to lift + pitch
+  rig.com.copy(rig.shoulder).lerp(rig.hip, 0.5);
+  const driven = new Set<THREE.Bone>([rig.pelvis, ...rig.spine, ...rig.neck, rig.head, ...tail, ...rig.ears.flat()]);
   for (const id of LEG_IDS) {
     for (const b of legs[id].chain) driven.add(b);
     driven.add(legs[id].foot);
+    if (legs[id].scapula) driven.add(legs[id].scapula!);
   }
   rig.driven = [...driven];
   for (const b of rig.driven) rig.rest.set(b, { p: b.position.clone(), q: b.quaternion.clone() });

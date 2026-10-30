@@ -183,6 +183,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     skid: 0,
     /** Treadmill speed for staged stills (group stays put, feet cycle) */
     treadmill: 0,
+    clock: 0,
   };
   let prevYaw = model.rotation.y;
   let prevGrounded = true;
@@ -388,8 +389,6 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     state.liftF = THREE.MathUtils.damp(state.liftF, fT, fT < state.liftF ? 30 : p.bodyRate, dt);
     state.liftH = THREE.MathUtils.damp(state.liftH, hT, hT < state.liftH ? 30 : p.bodyRate, dt);
     const bodyLen = rig.shoulder.distanceTo(rig.hip);
-    const slopePitch = Math.atan2(state.liftF - state.liftH, bodyLen);
-    state.lift = (state.liftF + state.liftH) * 0.5;
     const ph = state.phase * Math.PI * 2;
     // walk/trot: two dips per stride (one per diagonal/lateral support); gallop: one big rock per stride
     const bob = moving
@@ -399,14 +398,20 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     const accelPitch = THREE.MathUtils.clamp(-state.fwdAccel * p.pitchAccel, -p.maxPitch, p.maxPitch);
     const pitchTarget = (grounded ? accelPitch : 0) + gallopRock + state.skid * p.skidPitch + airPitch(input);
     state.pitchDyn = THREE.MathUtils.damp(state.pitchDyn, pitchTarget, p.bodyRate, dt);
-    state.pitch = state.pitchDyn + slopePitch;
     const leanPhys = Math.atan((speed * state.yawRate) / 9.8);
     const rollTarget = THREE.MathUtils.clamp(-leanPhys * p.lean, -p.maxRoll, p.maxRoll);
     state.roll = THREE.MathUtils.damp(state.roll, grounded ? rollTarget : rollTarget * 0.5, 8, dt);
     // idle breathing
-    const breathe = !moving && grounded ? Math.sin(performance.now() * 0.0021) * 0.004 : 0;
-
-    const dy = state.lift + bob + state.crouch + breathe;
+    state.clock += dt;
+    const breathe = !moving && grounded ? Math.sin(state.clock * 2.1) * 0.004 : 0;
+    // shoulder / hip heights: feet-follow lift + bob + crouch + dynamic pitch, hard-capped by paw reach
+    const common = bob + state.crouch + breathe;
+    const halfPitch = Math.sin(state.pitchDyn) * bodyLen * 0.5;
+    const frontY = Math.min(state.liftF + common + halfPitch, foreMax);
+    const hindY2 = Math.min(state.liftH + common - halfPitch, hindMax);
+    state.pitch = Math.atan2(frontY - hindY2, bodyLen);
+    const dy = (frontY + hindY2) * 0.5;
+    state.lift = dy;
     // root transform about the COM, in model space
     _e.set(-state.pitch, 0, state.roll, 'YXZ');
     _q.setFromEuler(_e);
@@ -416,13 +421,13 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       .multiply(new THREE.Matrix4().makeTranslation(-com.x, -com.y, -com.z));
     const bodyM = _m.clone();
     // world target for the root bone: G * M * G^-1 * rootWorld
-    const rootW = rig.root.matrixWorld.clone();
+    const rootW = rig.pelvis.matrixWorld.clone();
     const G = model.matrixWorld;
     const target = new THREE.Matrix4().copy(G).multiply(_m).multiply(_m2.copy(G).invert()).multiply(rootW);
-    const local = new THREE.Matrix4().copy(rig.root.parent!.matrixWorld).invert().multiply(target);
-    local.decompose(rig.root.position, rig.root.quaternion, _v.set(0, 0, 0));
-    rig.root.scale.copy(_v);
-    rig.root.updateMatrixWorld(true);
+    const local = new THREE.Matrix4().copy(rig.pelvis.parent!.matrixWorld).invert().multiply(target);
+    local.decompose(rig.pelvis.position, rig.pelvis.quaternion, _v.set(0, 0, 0));
+    rig.pelvis.scale.copy(_v);
+    rig.pelvis.updateMatrixWorld(true);
     bodyQ.copy(groupQ).multiply(_q);
 
     // --- spine: bend into turns, gallop flex/extend, skid hunch ---
@@ -438,7 +443,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     }
     // hips swing out opposite the chest
     rotateBoneAxis(rig.pelvis, upW, -state.bend * 0.25, false);
-    rig.root.updateMatrixWorld(true);
+    rig.pelvis.updateMatrixWorld(true);
 
     // --- feet ---
     updateFeet(dt, input, speed, vel, yaw, freq, duty, stepH, moving);
@@ -593,6 +598,9 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
       }
       if (L.mode === 'step') {
         L.t += dt;
+        // gait steps touch down exactly when the stride clock says this foot's stance begins
+        // (if the clock jumps into stance early, the step keeps its last planned end instead of snapping)
+        if (moving && !isStance) L.dur = L.t + (1 - legPhase) / Math.max(freq, 0.1);
         const remain = Math.max(0, L.dur - L.t);
         const tgt = stepTarget[id];
         if (moving) landingTarget(L, vel, yaw, remain, stanceT, tgt);
@@ -657,8 +665,10 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     const base = js[0];
     const target = _v.copy(L.foot);
     const maxR = L.rig.reach * 0.985;
+    const minR = L.rig.minReach;
     const d = target.distanceTo(base);
     if (d > maxR) target.sub(base).multiplyScalar(maxR / d).add(base);
+    else if (d < minR) target.sub(base).multiplyScalar(minR / Math.max(d, 1e-4)).add(base);
     // leg plane: contains base→target, normal ≈ body side axis
     _side.set(1, 0, 0).applyQuaternion(bodyQ);
     _v2.copy(target).sub(base).normalize();
