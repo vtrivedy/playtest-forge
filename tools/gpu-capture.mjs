@@ -170,6 +170,7 @@ try {
         state = await H('advance', 60 / fps, dt, false);
         if (options.afterStep) await options.afterStep(i, state);
         await H('advance', 0, dt, true);
+        state = await H('state');
         if (options.traceEveryFrame) trace.push({ frame: i, dt, state });
         if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
         const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
@@ -190,8 +191,22 @@ try {
     const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
     const stream = probe.streams[0];
     if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
-    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
+    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
+    if (options.keyFrames) {
+      const sheetPage = await context.newPage();
+      try {
+        await sheetPage.setViewportSize({ width: 1920, height: 1080 });
+        const cards = options.keyFrames.map(frame => {
+          const filename = `${name}-${String(frame).padStart(5, '0')}.png`;
+          const label = options.label?.(frame) ?? `${name} frame ${frame}`;
+          return `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, filename)).toString('base64')}"></figure>`;
+        }).join('');
+        await sheetPage.setContent(`<style>*{box-sizing:border-box}body{margin:0;background:#211b16;color:#eadfc8;font:16px sans-serif;display:grid;grid-template-columns:repeat(4,1fr)}figure{margin:0}figcaption{height:30px;padding:6px}img{display:block;width:100%}</style>${cards}`);
+        await sheetPage.evaluate(() => Promise.all([...document.images].map(image => image.decode())));
+        await sheetPage.screenshot({ path: path.join(out, `${name}-contact-sheet.png`), fullPage: true });
+      } finally { await sheetPage.close(); }
+    }
     return state;
   }
   if (wants('gait')) {
@@ -211,7 +226,7 @@ try {
       { name: 'tight-right', seconds: 1, stick: [0, 1] },
       { name: 'hard-stop', seconds: 1, stick: [0, 0] },
       { name: 'jump-land', seconds: 2, stick: [.45, 0], jump: true },
-      { name: 'dash-stop', seconds: 1, stick: [1, 0], dash: true },
+      { name: 'dash', seconds: 1, stick: [1, 0], dash: true },
       { name: 'slope-up', seconds: 3, stick: [.6, 0], reset: [653, 0, 0] },
       { name: 'slope-down', seconds: 3, stick: [.6, 0], reset: [673, 12 * Math.tan(Math.PI / 12), 0] },
     ];
@@ -229,7 +244,7 @@ try {
       await H('setKeys', segment.jump && local < .18 * fps ? ['Space'] : segment.dash && local === 0 ? ['ShiftLeft'] : []);
     }, undefined, {
       dt: i => segmentAt(i).slow ? 1 / 240 : 1 / 60,
-      keyFrames, traceEveryFrame: true,
+      keyFrames, traceEveryFrame: true, label: i => `${segmentAt(i).name} | frame ${i}`,
       afterStep: async (i, state) => {
         const [x, y, z] = state.pos;
         await H('photo', [x, y + 1.05, z + 4.4], [x, y + .45, z], 40);
