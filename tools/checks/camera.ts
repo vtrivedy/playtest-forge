@@ -60,6 +60,27 @@ for (let i = 0; i < 300; i++) {
 }
 assert(Math.abs(diagonal.getYaw() - initialYaw) < 0.01, 'Diagonal steering must stay stable');
 
+// Existing foliage fade owns leaf/reed cards: they must not pump the solid boom.
+const foliageWorld = new THREE.Group();
+const foliage = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 0.1), new THREE.MeshStandardMaterial({ name: 'rv-reed', side: THREE.DoubleSide }));
+foliage.position.set(0.4, 1, 2);
+foliageWorld.add(foliage);
+const leaves = createFollowCamera({ scenery: foliageWorld });
+tick(leaves, frame());
+assert(leaves.camera.position.length() > 3.8, 'Reeds should use existing fade instead of collision');
+
+// Hidden scene subtrees must not block the camera even when a child is visible.
+const hiddenWorld = new THREE.Group();
+const hidden = new THREE.Group();
+hidden.visible = false;
+const hiddenPost = post.clone();
+hiddenPost.visible = true;
+hidden.add(hiddenPost);
+hiddenWorld.add(hidden);
+const hiddenCam = createFollowCamera({ scenery: hiddenWorld });
+tick(hiddenCam, frame());
+assert(hiddenCam.camera.position.length() > 3.8, 'Hidden parent must suppress child collision');
+
 // Same stationary convergence at common frame rates.
 const poses = [30, 60, 120].map(hz => {
   const c = createFollowCamera();

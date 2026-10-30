@@ -284,9 +284,14 @@ export function createFollowCamera(opts: {
   opts.scenery?.updateWorldMatrix(true, true);
   opts.scenery?.traverse((o) => {
     const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
+    if (!mesh.isMesh || mesh.userData.isOccluder) return;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    if (materials.some((m) => (m as THREE.MeshStandardMaterial).isMeshStandardMaterial && m.depthWrite && (!m.transparent || m.opacity > 0.9))) {
+    // Foliage has its own near-lens fade. Treating those cards as walls would
+    // pump the boom in every patch of reeds; only opaque scenery should compress it.
+    if (materials.some((m) => (m as THREE.MeshStandardMaterial).isMeshStandardMaterial
+      && m.depthWrite && m.alphaTest === 0 && !m.userData.foliage
+      && !/canopy|leaf|leaves|reed|grass|litter|sail|glow/i.test(m.name)
+      && (!m.transparent || m.opacity > 0.9))) {
       mesh.geometry.computeBoundingBox();
       scenery.push(mesh);
     }
