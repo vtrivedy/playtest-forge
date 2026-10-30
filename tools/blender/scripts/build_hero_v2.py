@@ -81,7 +81,7 @@ for s in ("L", "R"):
     scl(f"FrontLowerLeg.{s}", 1.0, 1.08, 1.0)
     scl(f"BackLowerLeg.{s}", 1.0, 1.06, 1.0)
 # tail: droop from the rump, then sweep back/up (bushy plume rebuilt later)
-rot_world("Tail1", "X", -52)
+rot_world("Tail1", "X", -35)
 scl("Tail1", 1.32, 1.32, 1.32)  # brush hangs from the rump and reaches ~0.45x ear height behind it; outer ~45% dissolves into flame
 rot_world("Tail3", "X", 8)
 rot_world("Tail5", "X", 24)

@@ -29,7 +29,7 @@ for v in bm.verts:
     limb_coat = max(fore_coat, hind_coat * 0.75) * smooth(0.18, 0.5, co.z)
     v.co += Vector((n.x, n.y, 0)) * 0.055 * limb_coat
     neck = wsum(w, "Neck1", "Neck2") + 0.7 * w.get("Neck3", 0) + 0.55 * w.get("Torso3", 0)
-    push = 0.055 * neck
+    push = 0.09 * neck
     if n.y < 0 or n.z < 0:  # chest bib bulges forward / down: a deep keel of a chest, not a barrel
         push += 0.05 * neck * max(-n.y, -n.z, 0)
     chest = wsum(w, "Torso3", "Neck1") + 0.5 * w.get("Torso2", 0)
@@ -73,6 +73,22 @@ for pg in paw_groups:
         v.co.x = c.x + d.x * (1 + 0.32 * k)
         v.co.y = c.y + d.y * (1 + (0.12 if d.y < 0 else 0.0) * k)
         v.co.z = max(v.co.z, GROUND + 0.005)
+# Four compact, flattened toe volumes per paw, weighted to the existing paw bones.
+for pg in paw_groups:
+    root_vs = [v for v in bm.verts if sum(x for k,x in v[dl].items() if gname[k] == pg) > 0.35 and v.co.z < 0.24]
+    if not root_vs: continue
+    centre = sum((v.co for v in root_vs), Vector()) / len(root_vs)
+    front = min(v.co.y for v in root_vs) + 0.025
+    group_index = next(i for i,name in gname.items() if name == pg)
+    for toe in range(4):
+        made = bmesh.ops.create_uvsphere(bm, u_segments=8, v_segments=6, radius=1.0)["verts"]
+        origin = Vector((centre.x + (toe-1.5)*0.047, front, GROUND+0.063))
+        for v in made:
+            v.co = origin + Vector((v.co.x*0.039, v.co.y*0.085, v.co.z*0.053))
+            v[dl][group_index] = 1.0
+        for v in made:
+            for face in v.link_faces: face.smooth = True
+bm.verts.ensure_lookup_table()
 nose_ids = set(i for p in me.polygons if me.materials[p.material_index].name == "Black" for i in p.vertices)
 if nose_ids:
     nc = sum((bm.verts[i].co for i in nose_ids), Vector()) / len(nose_ids)
@@ -88,6 +104,31 @@ if cut_edges:
     caps = bmesh.ops.holes_fill(bm, edges=cut_edges, sides=0)["faces"]
     for face in caps: face.smooth = True
     bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+# Five broad throat/cheek tufts, rooted in the surface and tapered downward into a soft ruff.
+bm.normal_update()
+ruff_verts = []
+candidates = [v for v in bm.verts if sum(x for k,x in v[dl].items() if gname[k] in ("Neck1","Neck2","Neck3","Torso3")) > 0.35 and v.normal.y < -0.2]
+for x,z in [(-.22,2.12),(.22,2.12),(-.2,1.88),(.2,1.88),(0,1.8)]:
+    if not candidates: break
+    root = min(candidates, key=lambda v:(v.co-Vector((x,-1.04,z))).length_squared)
+    weights0 = dict(root[dl]); base = root.co-root.normal*.055
+    drift = Vector((.075 if x>0 else -.075 if x<0 else 0,-.04,-.27))
+    rings0=[]
+    for step in range(5):
+        t=step/4; radius0=[.075,.105,.085,.047,.006][step]
+        ring=[]
+        for k in range(8):
+            angle=k/8*2*math.pi
+            v=bm.verts.new(base+drift*t+Vector((math.cos(angle)*radius0,math.sin(angle)*radius0*.55,0)))
+            for group,weight in weights0.items():v[dl][group]=weight
+            ring.append(v);ruff_verts.append(v)
+        rings0.append(ring)
+    for step in range(4):
+        for k in range(8):
+            face=bm.faces.new((rings0[step][k],rings0[step][(k+1)%8],rings0[step+1][(k+1)%8],rings0[step+1][k]));face.smooth=True
+    for ring in [rings0[0][::-1],rings0[-1]]:bm.faces.new(ring)
+bm.verts.index_update(); RUFF_IDS={v.index for v in ruff_verts}
+bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
 bm.to_mesh(me); bm.free(); me.update()
 
 # ---------------------------------------------------------------- 2. region colours (rest pose rules)
@@ -165,6 +206,7 @@ for v in me.vertices:
         c = mix(PAL["amber"], PAL["pupil"], 1 - smooth(0.12, 0.35, dyx))
     elif d < 0.12: c = mix(c, PAL["liner"], 1 - smooth(0.03, 0.12, d))  # strong dark lid rim: watchful, not round
     if v.index in nose_vs: c = PAL["nose"]
+    if v.index in RUFF_IDS: c = mix(c, PAL["cream"], 0.88)
     cols.append(c)
     # shell-fur length (model units; fox ~3.3 tall): long ruff/cheeks, short face/lower legs, none on paws/eyes
     neck = wsum(w, "Neck1", "Neck2", "Neck3", "Torso3")

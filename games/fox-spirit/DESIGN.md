@@ -325,6 +325,22 @@ lower-leg smoke fade and sparse antler-tip wisps. Strengthen the dark3m drain
 wash; enlarge a smaller set of mesh-sampled maple leaves so the memory release
 reads apart from ambient litter. Clear post-latch edge capture replaces the
 kiln-obscured release view. Preserve authored patrol and sad frozen-motion premise.
+Opus clear-contact evidence moves to the high-hill patrol: open southern camera,
+terrain-checked approach/recoil/dash on the intact stair flight. This also avoids
+depending on whether the earlier staged SW1 dash happened to latch the Seedwell.
+No progression or freed state is forced; missing actor or missed contact fails.
 World showcase review: settle the real gameplay camera for300ms while stationary at each disclosed cut; use slightly closer default chase framing (3.8m,1.5m height) so the creature stays readable through scenery. Add a small impact/brake head nod and pelvis-load tail lift, leaving FOX-owned tail appearance intact. Expose look and load spring tunables.
 
 Final visibility correction: use the already-authored Arrival Meadow clearing for trot, gallop, turns, flat jump and dash. Its ground-cover exclusion keeps the fox and leaf-textured ground visible; no scenery is hidden or removed for capture. Retain Reedmarsh boardwalk walk and Windmill entrance ascent/jump/landing. Query the actual floor at staged meadow starts. Keep20seconds and the standard gameplay camera.
+### Driver 16:05 — ground cover and distant platform silhouettes
+The showcase red carpet is dense `bush_red` dressing under the fox, separate from
+the ColorField. Keep walkable ground cover at 0.18–0.23 m, open coherent gaps and
+mix most of its color back toward leaf brown. Sparse leaves and soil carry the
+wake; no opaque bush may hide the lower legs.
+Dress the already shipped Crown/Reach shelf undersides and bridge bays with the
+existing hanging-spire/ruin kit. Keep every platform top, collider and route fixed.
+Add arched structural silhouettes below the thin causeway so it reads as an old
+aqueduct rather than a screen-space line. No new traversal or gate is added.
+
+### Final camera/feel verification
+Track85% of jump rise with faster airborne focus so the fox stays in frame; pull the gameplay boom back up to15% at gallop speed. Retain a60-second scripted live-input loop in the authored meadow clearing, one initial placement and no resets, mixing jumps and dashes. It is controller verification, not a claim of observed human fun.

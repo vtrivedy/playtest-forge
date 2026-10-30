@@ -9,7 +9,7 @@ import type { Hearth } from './updraft';
 export type InletSpot = {
   /** Index into realm.seedwells */
   seedwell: number;
-  /** The named element that may feed it (a hearth id); no other source counts */
+  /** Designed source. 'reed-falls' = water arrival; otherwise heat: any hearth whose column holds the bowl feeds it (geometry decides, not the name) */
   source: string;
   /** Bowl centre the element must reach */
   pos: THREE.Vector3;

@@ -42,6 +42,7 @@ import { createRestoreCinematic } from './restore';
 import { createUpdrafts, type Hearth, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
 import { createGrowth, type Root } from './chem/growth';
+import { SUMMIT_REPAIR } from './regionSummit';
 import type { ColorStroke } from '../../../src/render/colorField';
 
 /**
@@ -371,6 +372,8 @@ async function boot() {
     },
   });
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
+  const summitHearth = updrafts.hearths.find((h) => h.spot.id === SUMMIT_REPAIR.hearthId);
+  let summitSeal = 0;
   const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
   // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
   let frontFxT = 0;
@@ -571,6 +574,8 @@ async function boot() {
     liftReady: false,
     pressT: 0,
     stuckT: 0,
+    /** seconds spent holding still for an element (lift, seal, root, wash); a hang is a stall, not a wait */
+    waitT: 0,
     bestD: Infinity,
     assists: 0,
     /** false = honest run: a stall stops the bot instead of teleporting it */
@@ -647,6 +652,7 @@ async function boot() {
     resetRestore() {
       restore.reset();
       world.resetWellspring();
+      summitSeal = 0;
       shrineOn = false;
       status = 'playing';
       hud.setStatus(`Sepia Russetvale · ${backend}`);
@@ -852,7 +858,7 @@ async function boot() {
     },
   };
 
-  /** Fox reached the Wellspring: the restore sequence takes the lens and ignites at IGNITE_S (restore.ts). */
+  /** The basin was fed (root-lifted lintel + summit hearth): the restore sequence takes the lens and ignites at IGNITE_S (restore.ts). */
   function triggerFlood() {
     restore.begin(foxActor.group.position.clone().setY(foxActor.group.position.y - foxActor.feetOffset));
   }
@@ -882,8 +888,6 @@ async function boot() {
       } else if (e.type === 'checkpoint') {
         shadeContact.wisps = 3;
         audio.play('checkpoint');
-      } else if (e.type === 'wellspring') {
-        if (!shrineOn && restore.phase === 'idle') triggerFlood();
       } else if (e.type === 'hazard') {
         audio.play('hazard');
         respawn();
@@ -1007,7 +1011,9 @@ async function boot() {
       if (onGround && auto.pressT > 0.1) auto.phase = 'run';
     }
     const reach = wp.label === 'channel' || wp.label?.startsWith('wash:') || wp.label?.startsWith('lift:') || wp.label?.startsWith('wind-ready:') ? 0.28 : 0.9;
-    if (d < reach && wp.y - (pos.y - foxActor.feetOffset) < 1.0 && (onGround || auto.phase === 'run')) {
+    // drop/lift waypoints are consumed only standing at their own height (never from above, mid-fall)
+    const level = wp.label?.startsWith('drop:') || wp.label?.startsWith('lift:') ? Math.abs(wp.y - (pos.y - foxActor.feetOffset)) < 1.0 && onGround : true;
+    if (d < reach && wp.y - (pos.y - foxActor.feetOffset) < 1.0 && level && (onGround || auto.phase === 'run')) {
       auto.idx += 1;
       auto.stuckT = 0;
       auto.bestD = Infinity;
@@ -1030,10 +1036,14 @@ async function boot() {
     const waitSeedwell = ((prevLabel === 'SW2' || prevLabel === 'SW3') && !world.seedwells.find((s) => s.id === prevLabel)!.lit) || (prevLabel === 'SW1-feed' && !world.seedwells[0]!.lit);
     // Let the visible front cross the six-metre bed before stepping off the dry boardwalk.
     const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
-    if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= wp.y + 0.5) auto.liftReady = true;
+    const liftWp = route[auto.idx - 1];
+    // ride until half a metre above the next stand (or an explicit rise above the lift itself)
+    const liftTop = liftWp?.rise !== undefined ? liftWp.y + liftWp.rise : wp.y + 0.5;
+    if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= liftTop) auto.liftReady = true;
     const waitLift = !!prevLabel?.startsWith('lift:') && !auto.liftReady;
+    const waitFinale = prevLabel === 'wellspring' && !shrineOn;
     const waitWind = !!prevLabel?.startsWith('wind-ready:') && (wind.state().find(w => w.id === prevLabel.slice(11))?.heat ?? 0) < 0.98;
-    const waitBridge = waitWind || waitLift || waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
+    const waitBridge = waitWind || waitLift || waitWash || waitFinale || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
@@ -1042,6 +1052,14 @@ async function boot() {
       auto.dashQueued = false;
     }
     // stuck → count an assist and hop to the waypoint (reported in state), or stop on honest runs
+    auto.waitT = waitBridge ? auto.waitT + dt : 0;
+    if (auto.waitT > 25 && !auto.allowAssist) {
+      auto.stalled = `${auto.idx}:wait-after-${prevLabel ?? ''}`;
+      auto.active = false;
+      auto.wish.set(0, 0, 0);
+      auto.space = false;
+      return;
+    }
     if (d < auto.bestD - 0.3 || waitBridge) {
       auto.bestD = d;
       auto.stuckT = 0;
@@ -1440,8 +1458,16 @@ async function boot() {
       // keep leaves riding a burning column, near the fox only (shared leaf pool)
       if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
     }
-    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); const h = updrafts.hearths.find((x) => x.spot.id === q.source); return !!h && heatFeeds(h, q.pos, updrafts.tun.radius); })) latchSeedwell(i);
+    for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); return updrafts.hearths.some((h) => heatFeeds(h, q.pos, updrafts.tun.radius)); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
+    // summit finale: the root holds the lintel up, the hearth's column (clipped by the stone) reaches the basin
+    world.summit.update(dt, growth.roots, shrineOn);
+    world.summit.fitColumn(summitHearth, updrafts.tun);
+    summitSeal = world.summit.feeds(summitHearth, updrafts.tun.radius) ? summitSeal + dt : Math.max(0, summitSeal - dt);
+    if (summitSeal >= SUMMIT_REPAIR.latchTime && !shrineOn && restore.phase === 'idle') {
+      world.lightWellspring();
+      triggerFlood();
+    }
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
     reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn, dashing, shades.drains(new THREE.Vector3(187,30,-118)));

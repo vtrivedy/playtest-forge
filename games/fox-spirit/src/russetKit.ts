@@ -1365,16 +1365,23 @@ export function hearthBrazier(stone: Bucket, x: number, y: number, z: number, se
 }
 
 /** Kiln inlet: a weathered pillar with a cantilevered arm carrying a shallow stone dish over a hearth. */
-export function kilnBowl(stone: Bucket, px: number, py: number, pz: number, bx: number, by: number, bz: number, seed: number): void {
+export function kilnBowl(stone: Bucket, px: number, py: number, pz: number, bx: number, by: number, bz: number, seed: number, column?: THREE.BufferGeometry): void {
   const r = rng(seed * 409 + 3);
   setSite(py, by + 0.6);
   const top = by + 0.55;
   const h = top - py;
-  const courses = Math.max(2, Math.round(h / 0.75));
-  for (let i = 0; i < courses; i++) {
-    const ch = h / courses;
-    const w = 0.78 - (i / courses) * 0.18;
-    stoneBlock(stone, trs(px, py + ch * (i + 0.5), pz, r() * 0.4 - 0.2), w, ch * 0.98, w, seed + i, 0.12);
+  if (column) {
+    // carved drums stacked into one tall pillar, each turned a little: an old kiln mast, not a monolith
+    const drums = Math.max(1, Math.round(h / 2.2));
+    const dh = h / drums;
+    for (let i = 0; i < drums; i++) stone.add(column, trs(px, py + dh * i, pz, r() * Math.PI, 1.35 - i * 0.08, dh / 1.9, 1.35 - i * 0.08), PAL.stone);
+  } else {
+    const courses = Math.max(2, Math.round(h / 0.75));
+    for (let i = 0; i < courses; i++) {
+      const ch = h / courses;
+      const w = 0.78 - (i / courses) * 0.18;
+      stoneBlock(stone, trs(px, py + ch * (i + 0.5), pz, r() * 0.4 - 0.2), w, ch * 0.98, w, seed + i, 0.12);
+    }
   }
   const dx = bx - px;
   const dz = bz - pz;

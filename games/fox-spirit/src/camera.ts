@@ -117,7 +117,7 @@ export function createFollowCamera(opts: {
     recenterRate: 1.25,
     recenterDelay: 1.2,
     sideBias: 0.55,
-    jumpTrack: 0.45,
+    jumpTrack: 0.85,
     landingBias: 0.42,
     clearance: 0.55,
     shake: 1,
@@ -396,7 +396,7 @@ export function createFollowCamera(opts: {
       if (f.grounded) groundLock = p.y;
       else if (f.gliding || p.y < groundLock - 1.2) groundLock = Math.min(groundLock, p.y + 0.6);
       const goalY = f.grounded ? p.y : groundLock + Math.max(0, p.y - groundLock) * params.jumpTrack + Math.min(0, p.y - groundLock);
-      focusY = THREE.MathUtils.damp(focusY, goalY, f.grounded ? 9 : 5, dt);
+      focusY = THREE.MathUtils.damp(focusY, goalY, f.grounded ? 9 : 12, dt);
 
       // ---- auto-recentre behind the run direction (never while backpedalling toward the lens)
       if (speed > 1 && manualT > params.recenterDelay && !f.dashing) {
@@ -423,6 +423,7 @@ export function createFollowCamera(opts: {
       let goalDist = f.gliding
         ? params.glideDistance
         : THREE.MathUtils.lerp(params.distance, params.airDistance, airW);
+      goalDist+=params.distance*.15*THREE.MathUtils.smoothstep(speed,4,9);
       let dropLift = 0;
       // ---- look target: fox + look-ahead; airborne, slide toward the predicted landing so it stays in frame
       const hasLanding = !!f.landing && !f.grounded;
