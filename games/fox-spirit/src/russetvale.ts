@@ -83,8 +83,10 @@ export type Realm = {
   wellspringLit: () => boolean;
   /** Per-frame: animation + triggers. `colorAt` = ColorField saturation probe. */
   update: (dt: number, t: number, fox: THREE.Vector3, feetY: number, colorAt: (p: THREE.Vector3) => number) => RealmEvent[];
-  /** Flood tween 0..1 (lone maple, wellspring glow) */
-  setFlood: (k: number) => void;
+  /** Flood tween 0..1 (lone maple, wellspring glow); `pulse` adds an ignition flare to the basin glow/light */
+  setFlood: (k: number, pulse?: number) => void;
+  /** Harness: un-light the Wellspring so the restore event can be replayed from sepia */
+  resetWellspring: () => void;
 };
 
 // ---------------------------------------------------------------- island shape
@@ -1735,13 +1737,17 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       const p = checkpoints[lastCheckpoint]?.pos ?? spawnPos;
       return p.clone();
     },
-    setFlood(k) {
+    resetWellspring() {
+      wellLit = false;
+      realm.setFlood(0);
+    },
+    setFlood(k, pulse = 0) {
       flood = k;
       const arr = loneCol.array as Float32Array;
       for (let i = 0; i < arr.length; i++) arr[i] = loneFaded[i]! + (loneFull[i]! - loneFaded[i]!) * k;
       loneCol.needsUpdate = true;
-      wsGlow.emissiveIntensity = 0.1 + k * 2.4;
-      wsLight.intensity = k * 60;
+      wsGlow.emissiveIntensity = 0.1 + k * 2.4 + pulse;
+      wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
       const ev: RealmEvent[] = [];

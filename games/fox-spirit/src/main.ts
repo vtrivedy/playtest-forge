@@ -219,6 +219,8 @@ async function boot() {
   const autumnFX = createAutumnParticles(scene, Math.round(180 * quality.particleScale), Math.round(60 * quality.particleScale), {
     colorField,
     groundAt: (x, z) => col.highestAt(x, z),
+    // restore vortex + front leaf release share this pool with running kicks
+    burstPool: 360,
   });
   const emberMotes = createEmberMotes(scene, { maxMotes: world.emberSpots.length });
   for (const e of world.emberSpots) emberMotes.add(e.p, e.value > 1 ? 1.6 : 1);
@@ -231,12 +233,18 @@ async function boot() {
     colorField,
     shrinePos: world.wellspringPos,
     radius: 235,
-    durationS: 6,
     autumnFX,
     motes: emberMotes,
     // ember basin on the wellspring's inner altar; open pavilion, so sparks clear the columns
     burstAt: world.wellspringPos.clone().add(new THREE.Vector3(0, 2.9, 0)),
     swirlAt: world.wellspringPos.clone().add(new THREE.Vector3(0, 1.6, 0)),
+    groundAt: (x, z) => col.highestAt(x, z),
+    setFlood: (k, pulse) => world.setFlood(k, pulse),
+    onIgnite: () => {
+      shrineOn = true;
+      status = 'won';
+      hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
+    },
     camera: cam,
     audio,
     hud,
@@ -345,7 +353,6 @@ async function boot() {
   let turntableAnim: FoxAnimState = 'idle';
   let embersGot = 0;
   let airDashUsed = false;
-  let floodT = -1;
   let prevFeet = world.spawnPos.y;
   let groundBounce = 1;
   let deaths = 0;
@@ -419,8 +426,18 @@ async function boot() {
       cam.snapBehind(Math.PI);
       foxActor.setAnim('idle');
     },
+    /** Staged: start the restore sequence from wherever the fox stands (real play uses the trigger). */
     forceRestore() {
       if (!shrineOn) triggerFlood();
+    },
+    /** Undo the Wellspring restore (clean sepia replay of the real event) */
+    resetRestore() {
+      restore.reset();
+      world.resetWellspring();
+      shrineOn = false;
+      status = 'playing';
+      hud.setStatus(`Sepia Russetvale · ${backend}`);
+      return { restored: shrineOn, phase: restore.phase };
     },
     getFoxPos() {
       const p = foxActor.group.position;
@@ -571,6 +588,7 @@ async function boot() {
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         audio: audio.debug(),
+        restore: { phase: restore.phase, age: restore.age, floodAge: restore.floodAge, frontRadius: restore.frontRadius, inputLocked: restore.inputLocked, path: cam.pathState() },
         auto: {
           active: auto.active,
           idx: auto.idx,
@@ -601,20 +619,15 @@ async function boot() {
           landingNdc: cam.debug.landing,
           internals: cam.debug.internals(),
         },
-        look: { quality: quality.tier, gpu: quality.gpu, floodT, grade: post.params.restore, resScale: res.scale, pixelRatio: renderer.getPixelRatio() },
+        look: { quality: quality.tier, gpu: quality.gpu, floodT: restore.floodAge, grade: post.params.restore, resScale: res.scale, pixelRatio: renderer.getPixelRatio() },
         fx: { enabled: fxEnabled, quality: quality.tier, bloom: post.bloom?.enabled ? post.bloom.strength : 0, bloomParam: post.params.bloomStrength, grain: post.params.grain },
       };
     },
   };
 
+  /** Fox reached the Wellspring: the restore sequence takes the lens and ignites at IGNITE_S (restore.ts). */
   function triggerFlood() {
-    shrineOn = true;
-    status = 'won';
-    floodT = 0;
-    restore.trigger();
-    cam.playShot({ subjects: [foxActor.group.position.clone(), world.wellspringPos.clone()], holdS: 3.2, blendS: 0.9, rise: 14 });
-    cam.shake(0.45);
-    hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
+    restore.begin(foxActor.group.position.clone().setY(foxActor.group.position.y - foxActor.feetOffset));
   }
 
   function handleEvents(events: ReturnType<typeof world.update>) {
@@ -648,7 +661,7 @@ async function boot() {
       } else if (e.type === 'checkpoint') {
         audio.play('checkpoint');
       } else if (e.type === 'wellspring') {
-        if (!shrineOn) triggerFlood();
+        if (!shrineOn && restore.phase === 'idle') triggerFlood();
       } else if (e.type === 'hazard') {
         audio.play('hazard');
         respawn();
@@ -840,6 +853,12 @@ async function boot() {
       spaceDown = auto.space;
       dashPressed = auto.dash;
     }
+    if (restore.inputLocked) {
+      // the restore sequence owns the fox: a slow step up to the basin, no jump/dash
+      restore.walkWish(fox.position, wish);
+      spaceDown = false;
+      dashPressed = false;
+    }
     if (dt > 0) jumpFeel.sampleJumpEdge(spaceDown, dt, feel.jumpBuffer);
 
     const wasGrounded = grounded;
@@ -1027,10 +1046,6 @@ async function boot() {
 
     // Realm: embers, checkpoints, seedwells, bridge, wellspring, hazards
     if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
-    if (floodT >= 0) {
-      floodT += dt;
-      world.setFlood(Math.min(1, floodT / 5));
-    }
     restore.update(dt);
     zone = world.zoneAt(fox.position.x, fox.position.z);
 
@@ -1133,7 +1148,8 @@ async function boot() {
       }
     }
     // grade follows the flood: faded sepia → rich autumn over the 6 s wave
-    post.params.restore = floodT >= 0 ? THREE.MathUtils.smootherstep(floodT, 0.4, 6) : 0;
+    // exposure stays put; the grade only follows once the front has left the summit
+    post.params.restore = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;
 
     // keep film grain off the hero
     heroNdc.set(fox.position.x, fox.position.y - foxActor.feetOffset + foxActor.height * 0.45, fox.position.z).project(cam.camera);

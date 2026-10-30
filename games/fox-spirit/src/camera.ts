@@ -25,6 +25,20 @@ export type CameraShot = {
   fov?: number;
 };
 
+/** One authored camera pose on a cinematic path (world space). */
+export type CameraPathKey = { t: number; pos: THREE.Vector3; look: THREE.Vector3; fov?: number };
+
+export type CameraPath = {
+  /** Poses in time order; interpolated as a C1 Hermite spline in time (zero velocity at the ends) */
+  keys: CameraPathKey[];
+  /** Blend from the traversal lens onto the path (s) */
+  blendInS?: number;
+  /** Blend from the last key back to traversal (s) */
+  blendOutS?: number;
+  /** Seconds before the player can take the camera back (move / jump / dash yields) */
+  lockS?: number;
+};
+
 export type CameraTunables = {
   distance: number;
   height: number;
@@ -58,6 +72,10 @@ export type FollowCamera = {
   setPullBack: (amount: number, durationS?: number) => void;
   /** Cinematic two-shot layered over traversal; traversal keeps updating underneath. */
   playShot: (shot: CameraShot) => void;
+  /** Authored camera move layered over traversal (restore money shot). Replaces any active shot. */
+  playPath: (path: CameraPath) => void;
+  /** Path playback state for the harness: time, weight (0..1), yielded to input */
+  pathState: () => { t: number; w: number; yielding: boolean } | null;
   /** Landing dip + FOV kick; impact 0..1 */
   land: (impact: number) => void;
   /** FOV punch (degrees) decaying over ~0.15 s */
@@ -140,6 +158,50 @@ export function createFollowCamera(opts: {
       `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)}`,
   };
   let shotW = 0;
+  /** Active authored path (restore cinematic) */
+  let path: (Required<CameraPath> & { t: number; end: number; yielding: boolean; outFrom: number; w: number }) | null = null;
+  const pathPos = new THREE.Vector3();
+  const pathLook = new THREE.Vector3();
+
+  /** C1 Hermite through keys in time; finite-difference tangents, zero velocity at both ends. */
+  function evalPath(keys: CameraPathKey[], t: number, field: 'pos' | 'look', out: THREE.Vector3) {
+    const n = keys.length;
+    if (t <= keys[0]!.t) return out.copy(keys[0]![field]);
+    if (t >= keys[n - 1]!.t) return out.copy(keys[n - 1]![field]);
+    let i = 0;
+    while (i < n - 2 && t > keys[i + 1]!.t) i++;
+    const a = keys[i]!;
+    const b = keys[i + 1]!;
+    const h = Math.max(1e-4, b.t - a.t);
+    const u = (t - a.t) / h;
+    const u2 = u * u;
+    const u3 = u2 * u;
+    const tan = (k: number, o: THREE.Vector3) => {
+      if (k <= 0 || k >= n - 1) return o.set(0, 0, 0);
+      const p = keys[k - 1]!;
+      const q = keys[k + 1]!;
+      return o.subVectors(q[field], p[field]).multiplyScalar(1 / Math.max(1e-4, q.t - p.t));
+    };
+    const ma = tan(i, _ta);
+    const mb = tan(i + 1, _tb);
+    return out
+      .copy(a[field])
+      .multiplyScalar(2 * u3 - 3 * u2 + 1)
+      .addScaledVector(ma, (u3 - 2 * u2 + u) * h)
+      .addScaledVector(b[field], -2 * u3 + 3 * u2)
+      .addScaledVector(mb, (u3 - u2) * h);
+  }
+  const _ta = new THREE.Vector3();
+  const _tb = new THREE.Vector3();
+  function pathFov(keys: CameraPathKey[], t: number, fallback: number) {
+    const n = keys.length;
+    let i = 0;
+    while (i < n - 2 && t > keys[i + 1]!.t) i++;
+    const a = keys[i]!;
+    const b = keys[Math.min(n - 1, i + 1)]!;
+    const u = THREE.MathUtils.smoothstep(t, a.t, b.t);
+    return THREE.MathUtils.lerp(a.fov ?? fallback, b.fov ?? fallback, u);
+  }
 
   /** Traversal rig position (spring state). The rendered camera adds dip/shake/shot on top. */
   const rig = new THREE.Vector3();
@@ -266,6 +328,23 @@ export function createFollowCamera(opts: {
       pullGoal = Number.isFinite(amount) ? Math.max(0, amount) : 0;
       pullHold = Number.isFinite(durationS) ? Math.max(0, durationS) : 1.8;
     },
+    playPath(p) {
+      if (p.keys.length < 2) return;
+      shot = null;
+      const blendOutS = p.blendOutS ?? 1.2;
+      path = {
+        keys: p.keys,
+        blendInS: p.blendInS ?? 0.8,
+        blendOutS,
+        lockS: p.lockS ?? 0,
+        t: 0,
+        end: p.keys[p.keys.length - 1]!.t + blendOutS,
+        yielding: false,
+        outFrom: 1,
+        w: 0,
+      };
+    },
+    pathState: () => (path ? { t: path.t, w: path.w, yielding: path.yielding } : null),
     playShot(s) {
       // a shot already on screen just extends; restarting would pop from its pose back to traversal
       if (shot) {
@@ -452,6 +531,35 @@ export function createFollowCamera(opts: {
         outLook.lerp(shotLook, shotW);
         outFov = THREE.MathUtils.lerp(outFov, shot.fov ?? params.fov, shotW);
       }
+
+      // ---- authored path (restore cinematic): ease on, play the keys, ease back to traversal.
+      // After lockS any move / jump / dash hands the lens back from wherever the blend is (no pop).
+      let pathW = 0;
+      if (path) {
+        path.t += dt;
+        const tEnd = path.keys[path.keys.length - 1]!.t;
+        if (!path.yielding && path.t > path.lockS && (speed > 1.5 || !f.grounded || f.dashing)) {
+          path.yielding = true;
+          path.outFrom = path.w;
+          path.end = path.t + path.blendOutS * 0.7 * path.w;
+        }
+        if (path.t >= path.end) path = null;
+        else {
+          let x: number;
+          if (path.yielding) x = path.outFrom * Math.max(0, (path.end - path.t) / (path.blendOutS * 0.7 * path.outFrom || 1));
+          else x = Math.min(1, path.t / path.blendInS, path.t > tEnd ? 1 - (path.t - tEnd) / path.blendOutS : 1);
+          x = THREE.MathUtils.clamp(x, 0, 1);
+          path.w = x;
+          pathW = x * x * (3 - 2 * x);
+          const pt = Math.min(path.t, tEnd);
+          evalPath(path.keys, pt, 'pos', pathPos);
+          evalPath(path.keys, pt, 'look', pathLook);
+          outPos.lerp(pathPos, pathW);
+          outLook.lerp(pathLook, pathW);
+          outFov = THREE.MathUtils.lerp(outFov, pathFov(path.keys, pt, params.fov), pathW);
+        }
+      }
+      shotW = Math.max(shotW, pathW);
       outPos.y += dip * (1 - shotW);
       // the rendered lens (shot blend + dip) gets the same floor guarantee as the rig
       if (opts.surfaceAt) {

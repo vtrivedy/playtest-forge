@@ -10,6 +10,19 @@ export type RestoreRegion = {
   age: number;
   /** 0..1 completion of the wavefront */
   t: number;
+  /** Radius fraction (0..1) at an age in seconds; default ease-out cubic over durationS */
+  profile?: (ageS: number) => number;
+  /** Max soft-edge half-width (m). Large restores keep a crisp, readable front instead of a 30 m smear. */
+  edgeMax: number;
+  /** Leading warm light band strength 0..1 (set from the expansion; 0 once settled) */
+  rim: number;
+};
+
+export type RestoreOptions = {
+  /** Radius fraction (0..1) at an age in seconds. Overrides the default ease-out over durationS. */
+  profile?: (ageS: number) => number;
+  /** Max soft-edge half-width in metres (default: proportional to radius). */
+  edgeMax?: number;
 };
 
 export type ColorFieldOptions = {
@@ -45,6 +58,8 @@ export class ColorField {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   /** Global fill 0..1 (debug / end state) */
   globalColor = 0;
+  /** Simulation clock (s) driving edge noise — advanced by update(), so captures are deterministic */
+  time = 0;
 
   /** Optional top-down mask RT (permanent + soft trail splat). Built lazily. */
   private maskRT: THREE.WebGLRenderTarget | null = null;
@@ -55,6 +70,7 @@ export class ColorField {
   private stampMesh: THREE.InstancedMesh | null = null;
   private stampStrength: THREE.InstancedBufferAttribute | null = null;
   private stampNoise: THREE.InstancedBufferAttribute | null = null;
+  private stampInner: THREE.InstancedBufferAttribute | null = null;
   private static readonly MAX_STAMPS = 96;
   private readonly _stampMatrix = new THREE.Matrix4();
   private maskSize: number;
@@ -80,7 +96,7 @@ export class ColorField {
   }
 
   /** Permanently restore a region with a painterly expanding wavefront. */
-  restore(center: THREE.Vector3, radius: number, durationS = 2.2): RestoreRegion {
+  restore(center: THREE.Vector3, radius: number, durationS = 2.2, opts: RestoreOptions = {}): RestoreRegion {
     const r: RestoreRegion = {
       center: center.clone(),
       targetRadius: radius,
@@ -88,12 +104,21 @@ export class ColorField {
       durationS: Math.max(0.2, durationS),
       age: 0,
       t: 0,
+      profile: opts.profile,
+      edgeMax: opts.edgeMax ?? Infinity,
+      rim: 0,
     };
     this.restores.push(r);
     return r;
   }
 
+  /** Soft-edge half-width of a restore front at its current radius (m). */
+  static edgeOf(r: RestoreRegion): number {
+    return Math.min(r.radius * 0.18, r.edgeMax);
+  }
+
   update(dt: number): void {
+    this.time += dt;
     this._accum += dt;
     for (const t of this.trail) t.life -= dt;
     this.trail = this.trail.filter((t) => t.life > 0);
@@ -105,9 +130,11 @@ export class ColorField {
     for (const r of this.restores) {
       r.age += dt;
       r.t = Math.min(1, r.age / r.durationS);
-      // ease-out cubic wavefront
-      const e = 1 - Math.pow(1 - r.t, 3);
+      // ease-out cubic wavefront unless the caller authored the timing
+      const e = r.profile ? THREE.MathUtils.clamp(r.profile(r.age), 0, 1) : 1 - Math.pow(1 - r.t, 3);
       r.radius = r.targetRadius * e;
+      // warm light band rides the front while it travels, then fades as it settles
+      r.rim = THREE.MathUtils.smoothstep(r.radius, 0.3, 2.5) * (1 - THREE.MathUtils.smoothstep(r.t, 0.82, 1));
     }
   }
 
@@ -115,9 +142,9 @@ export class ColorField {
   sample(p: THREE.Vector3): number {
     let s = this.globalColor;
     for (const r of this.restores) {
-      const d = p.distanceTo(r.center);
-      // soft noise-ish edge approx on CPU
-      const edge = r.radius * 0.12;
+      const d = Math.hypot(p.x - r.center.x, p.z - r.center.z);
+      // soft noise-ish edge approx on CPU (ground plane distance, like the shader)
+      const edge = ColorField.edgeOf(r) * 0.66;
       const local = 1 - THREE.MathUtils.smoothstep(r.radius - edge, r.radius + edge, d);
       s = Math.max(s, local);
     }
@@ -188,13 +215,16 @@ export class ColorField {
       vertexShader: /* glsl */ `
         attribute float aStrength;
         attribute float aNoise;
+        attribute float aInner;
         varying vec2 vUv;
         varying float vStrength;
         varying float vNoise;
+        varying float vInner;
         void main() {
           vUv = uv;
           vStrength = aStrength;
           vNoise = aNoise;
+          vInner = aInner;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */ `
@@ -202,6 +232,7 @@ export class ColorField {
         varying vec2 vUv;
         varying float vStrength;
         varying float vNoise;
+        varying float vInner;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
         float noise(vec2 p){
           vec2 i = floor(p); vec2 f = fract(p);
@@ -213,7 +244,7 @@ export class ColorField {
           vec2 p = vUv * 2.0 - 1.0;
           float n = noise(p * 4.0 + uTime) * vNoise;
           float d = length(p) + n;
-          float soft = 1.0 - smoothstep(0.55, 1.0, d);
+          float soft = 1.0 - smoothstep(vInner, 1.0, d);
           float ink = soft * soft * vStrength;
           gl_FragColor = vec4(ink, ink, ink, 1.0);
         }`,
@@ -223,10 +254,13 @@ export class ColorField {
     geo.rotateX(-Math.PI / 2);
     this.stampStrength = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
     this.stampNoise = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+    this.stampInner = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
     this.stampStrength.setUsage(THREE.DynamicDrawUsage);
     this.stampNoise.setUsage(THREE.DynamicDrawUsage);
+    this.stampInner.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aStrength', this.stampStrength);
     geo.setAttribute('aNoise', this.stampNoise);
+    geo.setAttribute('aInner', this.stampInner);
     this.stampMesh = new THREE.InstancedMesh(geo, this.stampMat, N);
     this.stampMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.stampMesh.frustumCulled = false;
@@ -266,16 +300,20 @@ export class ColorField {
     renderer.clear();
     renderer.autoClear = false;
 
-    const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number }> = [];
+    const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number; inner: number }> = [];
 
     for (const r of this.restores) {
       if (r.radius > 0.01) {
+        // full strength inside radius - edge, fading to 0 by radius + edge (matches the analytic front)
+        const edge = Math.max(0.3, ColorField.edgeOf(r));
+        const outer = r.radius + edge;
         stamps.push({
           x: r.center.x,
           z: r.center.z,
-          size: r.radius * 2.2,
+          size: outer * 2,
           strength: 1,
-          noise: 0.12,
+          noise: Math.min(0.12, (edge * 0.5) / outer),
+          inner: Math.max(0, (r.radius - edge) / outer),
         });
       }
     }
@@ -285,6 +323,7 @@ export class ColorField {
       size: this.auraRadius * 2.0,
       strength: 0.95,
       noise: 0.06,
+      inner: 0.55,
     });
     for (const t of this.trail) {
       const life = t.life / this.trailLife;
@@ -294,6 +333,7 @@ export class ColorField {
         size: this.trailRadius * 2.0,
         strength: 0.7 * life,
         noise: 0.1,
+        inner: 0.55,
       });
     }
 
@@ -306,12 +346,14 @@ export class ColorField {
       mesh.setMatrixAt(i, m);
       this.stampStrength!.setX(i, s.strength);
       this.stampNoise!.setX(i, s.noise);
+      this.stampInner!.setX(i, s.inner);
     }
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
     this.stampStrength!.needsUpdate = true;
     this.stampNoise!.needsUpdate = true;
-    this.stampMat.uniforms.uTime!.value = performance.now() * 0.001;
+    this.stampInner!.needsUpdate = true;
+    this.stampMat.uniforms.uTime!.value = this.time;
     renderer.render(this.maskScene, this.maskCam);
 
     renderer.setRenderTarget(prevTarget);
@@ -342,6 +384,8 @@ export class ColorField {
       // up to 4 restores
       shader.uniforms.uRestorePos = { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] };
       shader.uniforms.uRestoreRad = { value: new Float32Array(4) };
+      shader.uniforms.uRestoreEdge = { value: new Float32Array(4) };
+      shader.uniforms.uRestoreRim = { value: new Float32Array(4) };
       shader.uniforms.uRestoreCount = { value: 0 };
       shader.uniforms.uMaskMap = { value: field.getMaskTexture() };
       shader.uniforms.uUseMaskMap = { value: 0 };
@@ -381,7 +425,11 @@ export class ColorField {
           uniform int uTrailCount;
           uniform vec3 uRestorePos[4];
           uniform float uRestoreRad[4];
+          uniform float uRestoreEdge[4];
+          uniform float uRestoreRim[4];
           uniform int uRestoreCount;
+          // leading warm light band of a travelling restore front (written by colorMaskAt)
+          float cfRim;
           uniform sampler2D uMaskMap;
           uniform float uUseMaskMap;
           uniform vec4 uBounds;
@@ -400,6 +448,7 @@ export class ColorField {
 
           float colorMaskAt(vec3 p) {
             float s = uGlobalColor;
+            cfRim = 0.0;
             if (uUseMaskMap > 0.5) {
               vec2 uv = vec2(
                 (p.x - uBounds.x) / (uBounds.y - uBounds.x),
@@ -416,10 +465,14 @@ export class ColorField {
               if (rad < 0.001) continue;
               vec3 c = uRestorePos[i];
               float d = distance(p.xz, c.xz);
-              float n = (noise21(p.xz * 0.35 + uTime * 0.15) - 0.5) * rad * 0.14;
-              float edge = rad * 0.18;
+              float edge = min(rad * 0.18, uRestoreEdge[i]);
+              // painterly ragged front: two octaves so a crisp front still reads as brushwork
+              float n = ((noise21(p.xz * 0.35 + uTime * 0.15) - 0.5) * 0.8 + (noise21(p.xz * 1.7 - uTime * 0.1) - 0.5) * 0.35) * edge * 1.6;
               float local = 1.0 - smoothstep(rad - edge + n, rad + edge * 0.5 + n, d);
               s = max(s, local);
+              // the band just behind the front glows warm while it travels
+              float behind = rad + n - d;
+              cfRim = max(cfRim, uRestoreRim[i] * smoothstep(-edge * 0.4, edge * 0.3, behind) * (1.0 - smoothstep(edge * 0.4, edge * 2.6, behind)));
             }
             float ad = distance(p, uFox);
             s = max(s, pow(1.0 - clamp(ad / uAura, 0.0, 1.0), 1.15));
@@ -471,6 +524,10 @@ export class ColorField {
           vec3 chroma = outgoingLight * (1.0 + edgeBoost * 0.12);
           float bleed = smoothstep(0.0, 0.35, cm);
           outgoingLight = mix(washed, chroma, mix(cm, bleed, 0.35));
+          // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
+          // without repainting it — stone stays stone, just sunlit
+          float rimLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
+          outgoingLight += cfRim * (outgoingLight * vec3(0.55, 0.32, 0.08) + vec3(0.11, 0.06, 0.018) * (0.35 + rimLuma));
           #include <opaque_fragment>
           `,
         );
@@ -488,7 +545,7 @@ export class ColorField {
     u.uTrailRadius!.value = this.trailRadius;
     u.uTrailLife!.value = this.trailLife;
     u.uGlobalColor!.value = this.globalColor;
-    u.uTime!.value = performance.now() * 0.001;
+    u.uTime!.value = this.time;
     (u.uBounds!.value as THREE.Vector4).set(
       this.bounds.minX,
       this.bounds.maxX,
@@ -513,11 +570,16 @@ export class ColorField {
 
     const posArr = u.uRestorePos!.value as THREE.Vector3[];
     const radArr = u.uRestoreRad!.value as Float32Array;
+    const edgeArr = u.uRestoreEdge!.value as Float32Array;
+    const rimArr = u.uRestoreRim!.value as Float32Array;
     const rc = Math.min(4, this.restores.length);
     u.uRestoreCount!.value = rc;
     for (let i = 0; i < rc; i++) {
-      posArr[i]!.copy(this.restores[i]!.center);
-      radArr[i] = this.restores[i]!.radius;
+      const r = this.restores[i]!;
+      posArr[i]!.copy(r.center);
+      radArr[i] = r.radius;
+      edgeArr[i] = Number.isFinite(r.edgeMax) ? r.edgeMax : 1e6;
+      rimArr[i] = r.rim;
     }
   }
 

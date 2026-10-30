@@ -6,8 +6,8 @@ export type AutumnParticles = {
   embers: THREE.Points;
   /** Burst intensity at restore wavefront (0..1+) */
   setWavefront: (center: THREE.Vector3, radius: number, strength: number) => void;
-  /** Kick a few leaves up off the ground (fox running through litter). */
-  kick: (origin: THREE.Vector3, strength?: number) => void;
+  /** Kick a few leaves up off the ground (fox running through litter). `size` scales the leaves (restore front release). */
+  kick: (origin: THREE.Vector3, strength?: number, size?: number) => void;
   /** Rising leaf vortex around a point (shrine restore money shot). */
   swirl: (center: THREE.Vector3, count?: number, radius?: number) => void;
   /** focus = point ambient leaves drift around (fox / camera target). */
@@ -374,7 +374,7 @@ export function createAutumnParticles(
     setWavefront(center, radius, strength) {
       wave = { x: center.x, y: center.y, z: center.z, r: radius, s: strength };
     },
-    kick(origin, strength = 1) {
+    kick(origin, strength = 1, size = 1) {
       const n = Math.round(3 + strength * 3);
       for (let k = 0; k < n; k++) {
         const s = takePooled();
@@ -390,7 +390,7 @@ export function createAutumnParticles(
         s.vx = Math.cos(a) * sp;
         s.vz = Math.sin(a) * sp;
         s.vy = rand(1.2, 2.4) * strength;
-        s.scale = rand(0.65, 1.3);
+        s.scale = rand(0.65, 1.3) * size;
         s.pitchRate = rand(5, 10) * (Math.random() < 0.5 ? -1 : 1);
         s.maxLife = s.life = rand(2.5, 4);
       }
