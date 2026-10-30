@@ -8,3 +8,4 @@ agent-runs
 .env.*
 *.log
 .vite
+*.blend1
