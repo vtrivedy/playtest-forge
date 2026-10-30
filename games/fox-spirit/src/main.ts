@@ -225,7 +225,7 @@ async function boot() {
   reach.init(renderer);
   colorField.groundAt = (x, z) => col.highestAt(x, z);
   // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
-  const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75 };
+  const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75, 'rv-terrain': 0.62, 'rv-ground': 0.62 };
   for (const m of world.materials) {
     m.userData.cfRestoredChroma = RESTORED_CHROMA[m.name] ?? 1;
     colorField.patchMaterial(m);

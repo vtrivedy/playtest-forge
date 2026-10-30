@@ -2147,13 +2147,30 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     ];
     const sr = rng(1111);
     for (let i = 0; i < sats.length; i++) {
-      const [x, y, z, rad, ruins] = sats[i]!;
+      const [baseX, baseY, baseZ, baseRad, ruins] = sats[i]!;
+      const hero = i === 0 || i === 2;
+      const depth = hero ? 1 : 1.32 + (i % 3) * 0.16;
+      const x = baseX * depth, z = baseZ * depth;
+      const y = hero ? baseY + (i === 0 ? 9 : -6) : baseY - 12 + Math.sin(i * 2.4) * 19;
+      const rad = baseRad * (hero ? 1.35 : 0.62 + (i % 3) * 0.1);
+      const slopeX = Math.sin(i * 2.1) * 0.12, slopeZ = Math.cos(i * 1.7) * 0.09;
+      const topAt = (px: number, pz: number) => {
+        const dx = px - x, dz = pz - z;
+        const d = Math.hypot(dx, dz) / rad;
+        return y + (1 - d * d) * rad * 0.12 + dx * slopeX + dz * slopeZ
+          + Math.sin(dx * 0.23 + i) * Math.cos(dz * 0.17) * rad * 0.035;
+      };
       const ob = new Bucket();
       const sb = new Bucket();
       const lb = new Bucket();
       const bkb = new Bucket();
-      const outl = (th: number) => rad * (1 + 0.12 * Math.sin(th * 3 + i) + 0.06 * Math.sin(th * 7 + i * 2));
-      islandUnderside(ob, x, z, y, outl, rad * 2.6, 50 + i, 48);
+      const outl = (th: number) => rad * (1 + 0.24 * Math.sin(th * 3 + i) + 0.12 * Math.sin(th * 7 + i * 2));
+      islandUnderside(ob, x, z, y, outl, rad * (2.6 + (i % 3) * 0.55), 50 + i, 48);
+      for (let k = 0; k < (hero ? 4 : 2); k++) {
+        const a = k * 2.39996 + i;
+        hangingSpire(ob, x + Math.cos(a) * rad * 0.4, y - rad * 0.8, z + Math.sin(a) * rad * 0.4,
+          rad * (0.2 + k * 0.045), rad * (2.8 + k * 0.55), 5100 + i * 10 + k);
+      }
       // top cap
       const cap = new THREE.CircleGeometry(1, 32);
       cap.rotateX(-Math.PI / 2);
@@ -2164,7 +2181,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const th = Math.atan2(pz, px);
         const d = Math.hypot(px, pz);
         const R = outl(th) * d;
-        cp.setXYZ(v, x + Math.cos(th) * R, y + (1 - d * d) * rad * 0.12 + 0.1, z + Math.sin(th) * R);
+        cp.setXYZ(v, x + Math.cos(th) * R, topAt(x + Math.cos(th) * R, z + Math.sin(th) * R) + 0.1, z + Math.sin(th) * R);
       }
       cap.computeVertexNormals();
       ob.add(cap, undefined, PAL.grassDry.clone().lerp(PAL.moss, 0.4));
@@ -2174,17 +2191,17 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         hangingRoot(bkb, sr, x + Math.cos(th) * outl(th) * 0.9, y - 1, z + Math.sin(th) * outl(th) * 0.9, 6 + sr() * 12, new THREE.Vector2(-Math.cos(th), -Math.sin(th)), 0.3);
       }
       if (ruins) {
-        ruinArch(sb, x - rad * 0.2, y + rad * 0.1, z, sr() * 3, { span: 3.6, pillarH: 5 + sr() * 3, seed: 900 + i, broken: sr() * 0.6, pointed: sr() < 0.5 });
-        ruinColumn(sb, x + rad * 0.35, y + rad * 0.08, z + rad * 0.2, 4 + sr() * 4, 950 + i, 0.6);
-        ruinColumn(sb, x + rad * 0.1, y + rad * 0.1, z - rad * 0.35, 2 + sr() * 5, 970 + i, 0.55);
+        ruinArch(sb, x - rad * 0.2, topAt(x - rad * 0.2, z), z, sr() * 3, { span: 3.6, pillarH: 5 + sr() * 3, seed: 900 + i, broken: sr() * 0.6, pointed: sr() < 0.5 });
+        ruinColumn(sb, x + rad * 0.35, topAt(x + rad * 0.35, z + rad * 0.2), z + rad * 0.2, 4 + sr() * 4, 950 + i, 0.6);
+        ruinColumn(sb, x + rad * 0.1, topAt(x + rad * 0.1, z - rad * 0.35), z - rad * 0.35, 2 + sr() * 5, 970 + i, 0.55);
       }
-      kitTree(x + rad * 0.3, y + rad * 0.08, z - rad * 0.3, 7 + sr() * 5, i, 1200 + i, { cast: false, collide: false });
+      kitTree(x + rad * 0.3, topAt(x + rad * 0.3, z - rad * 0.3), z - rad * 0.3, 7 + sr() * 5, i, 1200 + i, { cast: false, collide: false });
       // overgrown cap: red leaf-carpet, bracken and tussocks spilling toward the rim
       for (let k = 0; k < 10 + Math.floor(rad); k++) {
         const th = sr() * Math.PI * 2;
         const d = 0.25 + sr() * 0.65;
         const R = outl(th) * d;
-        const py = y + (1 - d * d) * rad * 0.12 + 0.1;
+        const py = topAt(x + Math.cos(th) * R, z + Math.sin(th) * R) + 0.1;
         const kind = sr();
         const v = kind < 0.55 ? 'bush_red' : kind < 0.8 ? 'fern' : 'grass_wispy';
         nature.place(v, x + Math.cos(th) * R, py - 0.1, z + Math.sin(th) * R, {

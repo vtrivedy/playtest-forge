@@ -280,3 +280,14 @@ attempt, preventing mixed sheets. Verify durable success against route interval,
 size/fps, and matching report/tool hashes. Order route evidence chronologically
 with endpoint last and state labels. Save structured route acceptance with an
 explicit stall/budget/death/assist reason. Existing play failures remain failures.
+
+### Opus world critique — 15:36 follow-up
+Backdrop satellite islets remain floating, as in the canonical keyart. Make two
+near silhouettes larger and irregular; push minor scenery farther into lower
+mist, with varied altitude, sloping caps and long uneven hanging spires. These
+scenery-only islands have no gameplay colliders; realm landmarks and traversal
+geography stay locked. Do not enlarge the playable summit.
+The temporary ColorField render grade should blend through the full mask range
+with world-space edge variation; keep gameplay supply sampling unchanged. Lower
+ground chroma toward muted brown, leaving bright autumn accents to leaves and
+fox. This addresses the orange-disc appearance without extending the source.
