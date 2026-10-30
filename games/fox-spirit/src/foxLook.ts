@@ -16,7 +16,7 @@ export const FOX_LOOK = {
   rimStrength: 0.3,
   rimPower: 2.5,
   rimColor: [1.0, 0.72, 0.42] as [number, number, number], // pale gold: separates the fox from orange ground
-  eyeGlow: 0.18,
+  eyeGlow: 0.025,
   /** spirit wisps (thin curling flame off the back and tail): height multiplier, brightness, stream-back with speed */
   lickScale: 1.0,
   lickIntensity: 1.0,
@@ -24,7 +24,7 @@ export const FOX_LOOK = {
   /** embers per second at rest / extra per m/s of speed; size in metres */
   emberRate: 3,
   emberRateSpeed: 2,
-  emberSize: 0.022,
+  emberSize: 0.035,
 };
 
 type FurUniforms = {
@@ -137,7 +137,7 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
   }
   mat.map = null;
   mat.color.setHex(0xffffff);
-  mat.roughness = 0.2;
+  mat.roughness = 0.4;
   mat.emissive = new THREE.Color(0xffffff);
   const uni = { uEyeL: { value: cen[0] }, uEyeR: { value: cen[1] }, uEyeR0: { value: r } };
   mat.onBeforeCompile = (shader) => {
@@ -154,7 +154,7 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
   vec2 q = (vRest.zy - c.zy) / uEyeR0;          // forward, up in units of the eye radius
   float d = length(q);
   float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.2, 0.78)));
-  vec3 iris = mix(vec3(0.95, 0.55, 0.12), vec3(0.55, 0.22, 0.05), smoothstep(0.15, 0.85, d));
+  vec3 iris = mix(vec3(0.48, 0.23, 0.055), vec3(0.22, 0.075, 0.018), smoothstep(0.15, 0.85, d));
   iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.7, 0.95, d));   // limbal ring + lid shadow
   iris = mix(iris, vec3(0.02, 0.01, 0.008), pupil);
   float glint = 1.0 - smoothstep(0.08, 0.14, length(q - vec2(0.3, 0.32)));
@@ -273,7 +273,7 @@ void main() {
   if (a < 0.004) discard;
   vec3 col = mix(vec3(0.75, 0.12, 0.02), vec3(1.0, 0.55, 0.15), smoothstep(0.1, 0.6, vHeat));
   col = mix(col, vec3(1.0, 0.85, 0.55), smoothstep(0.75, 1.0, vHeat) * (1.0 - d));
-  gl_FragColor = vec4(col * a, a);
+  gl_FragColor = vec4(col * a * 2.5, a);
 }`;
 
 export type SpiritFx = {
@@ -309,7 +309,10 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       const index = pts[Math.floor(rnd() * pts.length)]!;
       licks.push({ a: { mesh, index }, h: h * (0.7 + 0.6 * rnd()), w: w * (0.8 + 0.4 * rnd()), seed: rnd() * 10, lean, tailFlow: mesh === tail });
     }
-    for (let i = 0; i < Math.min(40, pts.length); i++) emberPool.push({ mesh, index: pts[Math.floor(rnd() * pts.length)]! });
+    const sparkPts = mesh === tail ? surfacePoints(mesh, R.tail.slice(6), -1) : pts;
+    const sourcePts = sparkPts.length ? sparkPts : pts;
+    const count = mesh === tail ? 160 : 20;
+    for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(rnd() * sourcePts.length)]! });
   }
 
   // flame licks: one instanced billboard per lick
