@@ -4,18 +4,14 @@ export type MotionInput = {
   speed: number; grounded: boolean; yaw: number; verticalSpeed: number;
   groundAt: (x: number, z: number, ceiling: number) => number;
 };
-const GAITS = {
-  walk: { sweep: 1.1, duty: .65, phases: [ .25, .75, 0, .5 ] },
-  trot: { sweep: 1.5, duty: .48, phases: [ .5, 0, 0, .5 ] },
-  run: { sweep: 1.615, duty: .34, phases: [ .55, .46, 0, .08 ] },
-};
+import GAITS from '../../../assets/hero/spirit_fox.loco.json';
 type Gait = keyof typeof GAITS;
 const v = () => new THREE.Vector3();
 const q = () => new THREE.Quaternion();
 
 /** Authored pose is evaluated first; contact correction only moves a two-bone chain. */
 export class AuthoredLocomotion {
-  params = { walkSpeed: 1.4, trotSpeed: 3.5, gallopSpeed: 6.5, strideScale: 1,
+  params = { trotSpeed: 2.6, gallopSpeed: 5.5,
     plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, debug: false };
   metrics = { gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
@@ -24,6 +20,13 @@ export class AuthoredLocomotion {
     planted: boolean; anchor: THREE.Vector3; clearance: number; dot: THREE.Mesh }[] = [];
   private debugGroup = new THREE.Group();
   private phase = 0;
+  private lastActive = '';
+  private lastGait = '';
+  reset() {
+    this.beforeMixer();
+    for (const foot of this.feet) foot.planted=false;
+    this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
+  }
   private yaw = 0;
   private pitch = 0;
   private turn = 0;
@@ -38,6 +41,7 @@ export class AuthoredLocomotion {
     root.updateWorldMatrix(true, true);
     const arm = root.getObjectByName('SpiritFox_Armature');
     this.armScale = arm ? arm.getWorldScale(v()).x : root.getWorldScale(v()).x;
+    this.yaw=group.rotation.y;
     this.spine = root.getObjectByName('Body');
     this.tailBone = root.getObjectByName('Tail1');
     const floor = new THREE.Box3().setFromObject(root).min.y;
@@ -62,39 +66,43 @@ export class AuthoredLocomotion {
     for (const o of this.overlays) o.bone.quaternion.copy(o.rotation);
     this.overlays.length=0;
   }
+  fadeSeconds = .16;
+  private weights = new Map<string,number>([['idle',1]]);
   blend(dt: number, active: string) {
-    if (active !== 'run' && active !== 'walk' && active !== 'trot') {
-      for (const name of Object.keys(GAITS)) {
-        if (name !== active) this.actions.get(name)?.setEffectiveWeight(0);
-      }
-      return;
-    }
+    if (active!==this.lastActive) { for (const foot of this.feet) foot.planted=false; this.lastActive=active; }
+    const locomoting=['run','walk','trot'].includes(active);
     const speed=this.input.speed;
-    const w = THREE.MathUtils.smoothstep(speed,this.params.walkSpeed,this.params.trotSpeed);
-    const r = THREE.MathUtils.smoothstep(speed,this.params.trotSpeed,this.params.gallopSpeed);
-    const weights = {walk:1-w,trot:w*(1-r),run:r};
+    const walkToTrot=THREE.MathUtils.smoothstep(speed,this.params.trotSpeed-.3,this.params.trotSpeed+.3);
+    const trotToGallop=THREE.MathUtils.smoothstep(speed,this.params.gallopSpeed-.5,this.params.gallopSpeed+.5);
+    const weights = {walk:1-walkToTrot,trot:walkToTrot*(1-trotToGallop),run:trotToGallop};
     let dominant: Gait='walk';
     for (const name of Object.keys(GAITS) as Gait[]) if (weights[name]>weights[dominant]) dominant=name;
     const stride = (Object.keys(GAITS) as Gait[]).reduce((sum,name) =>
-      sum + weights[name]*GAITS[name].sweep*this.armScale/GAITS[name].duty, 0)*this.params.strideScale;
-    this.phase=(this.phase+dt*speed/Math.max(.01,stride))%1;
-    for (const name of Object.keys(GAITS) as Gait[]) {
-      const action=this.actions.get(name); if (!action) continue;
-      if (!action.isRunning()) action.reset().play();
-      action.enabled=true; action.paused=false;
-      action.stopFading();
-      action.setEffectiveWeight(weights[name]);
-      // One normalized phase for every clip. The mixer interpolates compatible poses, not unrelated cycles.
-      action.time=this.phase*action.getClip().duration;
-      action.setEffectiveTimeScale(0);
-      if (name===dominant) this.metrics.playback=speed*action.getClip().duration/Math.max(.01,stride);
+      sum + weights[name]*GAITS[name].stride*this.armScale, 0);
+    if(locomoting) this.phase=(this.phase+dt*speed/Math.max(.01,stride))%1;
+    const alpha=this.fadeSeconds<=0 ? 1 : 1-Math.exp(-4*dt/this.fadeSeconds);
+    for(const [name,action] of this.actions) {
+      const target=locomoting ? (weights[name as Gait] ?? 0) : name===active ? 1 : 0;
+      const weight=THREE.MathUtils.lerp(this.weights.get(name) ?? 0,target,alpha);
+      this.weights.set(name,weight);
+      if(weight>1e-5 && !action.isScheduled()) action.play();
+      action.enabled=true;
+      action.setEffectiveWeight(weight);
+      if(name in GAITS) {
+        action.paused=false;
+        action.time=this.phase*action.getClip().duration;
+        action.setEffectiveTimeScale(0);
+        if(name===dominant)this.metrics.playback=speed*action.getClip().duration/Math.max(.01,stride);
+      }
     }
-    this.metrics.gait=dominant;
-    this.metrics.clipWeights=weights;
+    if (this.lastGait!==dominant) { for(const foot of this.feet)foot.planted=false; this.lastGait=dominant; }
+    this.metrics.gait=locomoting ? dominant : active;
+    this.metrics.clipWeights=Object.fromEntries(this.weights);
   }
   afterMixer(dt: number, active: string) {
     const step=Math.max(dt,.00001);
-    const dy=Math.atan2(Math.sin(this.input.yaw-this.yaw),Math.cos(this.input.yaw-this.yaw));
+    let dy=Math.atan2(Math.sin(this.input.yaw-this.yaw),Math.cos(this.input.yaw-this.yaw));
+    if(Math.abs(dy)>1)dy=0;
     this.yaw=this.input.yaw;
     this.turn=THREE.MathUtils.damp(this.turn,dy/step,12,dt);
     this.metrics.turnRate=this.turn;
@@ -126,9 +134,9 @@ export class AuthoredLocomotion {
     this.debugGroup.visible=this.params.debug;
     this.feet.forEach((foot,i)=>{
       const paw=foot.paw.getWorldPosition(v());
-      const ph=data ? (phase-data.phases[i]+1)%1 : 0;
+      
       const support=(Object.keys(GAITS) as Gait[]).reduce((sum,name)=> {
-        const d=GAITS[name]; const p=(phase-d.phases[i]+1)%1;
+        const d=GAITS[name].contacts[i]; const p=(phase-d.phase+1)%1;
         return sum+(p<d.duty ? (this.metrics.clipWeights[name] ?? 0) : 0);
       },0);
       const stance=this.input.grounded && (locomoting ? support>.55 : active==='idle');
@@ -136,14 +144,19 @@ export class AuthoredLocomotion {
         const ground=this.input.groundAt(paw.x,paw.z,this.group.position.y+.6);
         if (!Number.isFinite(ground)) {foot.planted=false;return;}
         if (!foot.planted) foot.anchor.copy(paw);
+        if(active==='idle')foot.anchor.lerp(paw,1-Math.exp(-5*dt));
         foot.anchor.y=ground+foot.clearance;
         const delta=foot.anchor.clone().sub(paw);
         this.metrics.maxPlantError=Math.max(this.metrics.maxPlantError,Math.hypot(delta.x,delta.z));
         delta.clampLength(0,this.params.maxCorrection).multiplyScalar(this.params.plantStrength);
         this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,delta.length());
         // Save both joints so correction cannot accumulate when a clip doesn't key that bone.
-        for (const bone of [foot.upper,foot.lower]) this.overlays.push({bone,rotation:bone.quaternion.clone()});
+        for (const bone of [foot.upper,foot.lower,foot.paw]) this.overlays.push({bone,rotation:bone.quaternion.clone()});
+        const padRotation=foot.paw.getWorldQuaternion(q());
         this.solve(foot.upper,foot.lower,foot.paw,paw.add(delta));
+        const padParent=foot.paw.parent!.getWorldQuaternion(q());
+        foot.paw.quaternion.copy(padParent.invert().multiply(padRotation));
+        foot.paw.updateWorldMatrix(false,true);
         const corrected=foot.paw.getWorldPosition(v());
         this.metrics.maxResidual=Math.max(this.metrics.maxResidual,corrected.distanceTo(foot.anchor));
         this.metrics.stanceFeet++;
@@ -159,8 +172,9 @@ export class AuthoredLocomotion {
     const l1=a.distanceTo(b),l2=b.distanceTo(c); if(l1<.001||l2<.001)return;
     const direction=target.clone().sub(a).normalize();
     const distance=THREE.MathUtils.clamp(a.distanceTo(target),Math.abs(l1-l2)+.0001,l1+l2-.0001);
-    const bend=b.clone().sub(a).addScaledVector(direction,-b.clone().sub(a).dot(direction)).normalize();
-    if(bend.lengthSq()<.1)return;
+    const bend=b.clone().sub(a).addScaledVector(direction,-b.clone().sub(a).dot(direction));
+    if(bend.lengthSq()<1e-8) bend.crossVectors(new THREE.Vector3(1,0,0).applyQuaternion(this.group.quaternion),direction);
+    bend.normalize();
     const along=(l1*l1+distance*distance-l2*l2)/(2*distance);
     const joint=a.clone().addScaledVector(direction,along).addScaledVector(bend,Math.sqrt(Math.max(0,l1*l1-along*along)));
     const aim=(bone:THREE.Object3D,from:THREE.Vector3,to:THREE.Vector3)=>{

@@ -1,0 +1,77 @@
+{
+  "walk": {
+    "stride": 1.5384615384615383,
+    "contacts": [
+      {
+        "phase": 0.25,
+        "duty": 0.65,
+        "sweep": 1.0
+      },
+      {
+        "phase": 0.75,
+        "duty": 0.65,
+        "sweep": 1.0
+      },
+      {
+        "phase": 0,
+        "duty": 0.65,
+        "sweep": 1.0
+      },
+      {
+        "phase": 0.5,
+        "duty": 0.65,
+        "sweep": 1.0
+      }
+    ]
+  },
+  "trot": {
+    "stride": 2.7083333333333335,
+    "contacts": [
+      {
+        "phase": 0.5,
+        "duty": 0.48,
+        "sweep": 1.3
+      },
+      {
+        "phase": 0,
+        "duty": 0.48,
+        "sweep": 1.3
+      },
+      {
+        "phase": 0,
+        "duty": 0.48,
+        "sweep": 1.3
+      },
+      {
+        "phase": 0.5,
+        "duty": 0.48,
+        "sweep": 1.3
+      }
+    ]
+  },
+  "run": {
+    "stride": 4.7399305555555555,
+    "contacts": [
+      {
+        "phase": 0.55,
+        "duty": 0.32,
+        "sweep": 1.462
+      },
+      {
+        "phase": 0.46,
+        "duty": 0.32,
+        "sweep": 1.462
+      },
+      {
+        "phase": 0.0,
+        "duty": 0.36,
+        "sweep": 1.768
+      },
+      {
+        "phase": 0.08,
+        "duty": 0.36,
+        "sweep": 1.768
+      }
+    ]
+  }
+}

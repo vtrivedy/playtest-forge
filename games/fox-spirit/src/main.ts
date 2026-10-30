@@ -303,10 +303,8 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
-    folder.add(params, 'walkSpeed', .2, 3, .1);
     folder.add(params, 'trotSpeed', 2, 6, .1);
     folder.add(params, 'gallopSpeed', 4, 10, .1);
-    folder.add(params, 'strideScale', .5, 2, .01);
     folder.add(params, 'plantStrength', 0, 1, .01);
     folder.add(params, 'maxCorrection', 0, .3, .01);
     folder.add(params, 'turnLean', 0, .1, .001);
@@ -533,6 +531,7 @@ async function boot() {
     teleport(x: number, y: number, z: number, yaw = Math.PI) {
       foxActor.group.position.set(x, y + foxActor.feetOffset + 0.05, z);
       foxActor.group.rotation.y = yaw;
+      foxActor.locomotion?.reset();
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
       photo = null;
@@ -1039,7 +1038,7 @@ async function boot() {
 
     const faceShrine = restore.inputLocked && wish.lengthSq() <= 0.01;
     if ((wish.lengthSq() > 0.01 || faceShrine) && dt > 0) {
-      const yaw = faceShrine ? restore.faceYaw : Math.atan2(wish.x, wish.z);
+      const yaw = faceShrine ? restore.faceYaw : Math.hypot(vel.x, vel.z) > .6 ? Math.atan2(vel.x, vel.z) : Math.atan2(wish.x, wish.z);
       // shortest-arc turn (damping raw angles spins the long way round across ±π)
       const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
       fox.rotation.y += d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
