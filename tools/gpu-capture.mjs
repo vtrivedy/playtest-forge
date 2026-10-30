@@ -132,7 +132,7 @@ try {
   const poses = {
     establish: { fox: [0, 0, 80], photo: [[-60, 46, 120], [10, 14, -40], 52] },
     hill: { fox: [-2, 38, -84], photo: [[30, 44, -52], [-4, 36, -88], 50] },
-    marsh: { fox: [69, 0.4, 28.2] }, shrine: { fox: [0, 38, -79] }, meadow: { fox: [6, 0, 70] },
+    marsh: { fox: [69, 0.4, 28.2] }, shrine: { fox: [-5, 38, -83.5], photo: [[18, 47, -62], [0, 39, -88], 50] }, meadow: { fox: [6, 0, 70] },
   };
   if (wants('perf')) {
     for (const q of ['low', 'med', 'high']) for (const state of ['sepia', 'restored']) {
@@ -163,35 +163,32 @@ try {
     // cinematic export; preserve the authored vignette and all in-world restoration FX.
     await cleanUI();
     const started = Date.now(), trace = [], frames = [], start = await H('state');
-    const output = path.join(out, `${name}.mp4`);
-    const encoder = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-vcodec', 'mjpeg', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output], { stdio: ['pipe', 'ignore', 'inherit'] });
-    let encoderError;
-    encoder.stdin.on('error', e => { encoderError = e; });
-    const completed = once(encoder, 'close');
+    const output = path.join(out, `${name}.mp4`), pending = path.join(out, `${name}.pending.mp4`);
+    const frameDir = path.join(out, `${name}-frames`);
+    fs.mkdirSync(frameDir, { recursive: true });
     let state, count = 0;
-    try {
       for (let i = 0; i < frameCount; i++) {
         await beforeFrame(i);
         state = await advance(60 / fps);
         if (state.look.quality !== quality || state.look.pixelRatio !== (quality === 'low' ? 0.5 : 1)) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
-        const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
-        if (encoderError) throw encoderError;
-        if (!encoder.stdin.write(jpeg)) await once(encoder.stdin, 'drain');
+        await page.screenshot({ path: path.join(frameDir, `${String(i).padStart(6, '0')}.jpg`), type: 'jpeg', quality: 96, animations: 'disabled' });
         count++;
         if (i % fps === 0) {
           if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error(`Context lost at video frame ${i}`);
           trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
+          save(`${name}-progress.json`, { frames: count, trace });
           console.log('FRAME', name, i, 'sim', state.t.toFixed(2), 'wp', state.auto.idx, 'restored', state.restored);
         }
         if (i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
         if (stop?.(state, i)) break;
       }
-    } finally { encoder.stdin.end(); }
-    const [code] = await completed;
-    if (code !== 0) throw Error(`ffmpeg ${name} exited ${code}`);
-    const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
+    console.log('ENCODE', name, count, 'frames');
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(fps), '-i', path.join(frameDir, '%06d.jpg'), '-frames:v', String(count), '-an', '-c:v', 'libx264', '-threads', '4', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', pending], { stdio: 'inherit' });
+    const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', pending], { encoding: 'utf8' }));
     const stream = probe.streams[0];
     if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
+    fs.renameSync(pending, output);
+    fs.rmSync(frameDir, { recursive: true });
     report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: 60, stepsPerVideoFrame: 60 / fps, seed: 42, ui: 'Cinematic: HUD hidden, vignette and in-world effects preserved', trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
     return state;
@@ -199,14 +196,32 @@ try {
   if (wants('route')) {
     await boot(quality, true);
     save('route-waypoints.json', await H('route'));
-    await H('autopilot', true, 0, { assist: false });
-    let restoredAt;
-    const state = await video('route-unassisted', Number(arg('route-seconds', '360')) * fps, async () => {}, (st, i) => {
-      if (st.restored && restoredAt === undefined) restoredAt = i;
-      return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
+    const seconds = Number(arg('route-seconds', '60'));
+    if (seconds < 45 || seconds > 90) throw Error('Trailer route must be 45–90 seconds');
+    const stagedAt = (seconds - 20) * fps;
+    const assists = [];
+    await H('photo', ...poses.establish.photo);
+    const state = await video('route-assisted', seconds * fps, async i => {
+      if (i === 5 * fps) { await H('photoOff'); await H('autopilot', true, 0, { assist: true }); }
+      if (i === stagedAt) {
+        assists.push({ frame: i, type: 'editorial cut to shrine approach' });
+        await H('autopilot', false);
+        await H('resetRestore');
+        await H('teleport', -5, 38, -83.5, Math.atan2(5, -5.5));
+        await H('setKeys', ['KeyW']);
+      }
+      if (i >= stagedAt && i <= stagedAt + 4 * fps && i % fps === 0) {
+        const st = await H('state');
+        if (st.restore.phase !== 'idle') await H('setKeys', []);
+        else if (i === stagedAt + 4 * fps) {
+          await H('setKeys', []); await H('forceRestore');
+          assists.push({ frame: i, type: 'forceRestore fallback' });
+        }
+      }
     });
     await shot('route-end');
-    if (!state.restored || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}`);
+    save('route-staging.json', { label: 'Assisted editorial trailer route; not an unassisted win', assists, auto: state.auto, deaths: state.deaths });
+    if (!state.restored) throw Error('Trailer route did not restore shrine');
   }
   if (wants('orbit')) {
     await boot(quality, true); await H('forceRestore'); await advance(660, false);

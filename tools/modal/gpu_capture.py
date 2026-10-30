@@ -4,6 +4,9 @@
 
 Default: A10, 1920x1080, q=high, 60 fps silent H.264. The simulation advances
 at 60 Hz and screenshots are encoded in order, independently of wall time.
+Numbered JPEGs are persisted first; only validated, finalized MP4s are published.
+The 45–90 second route is explicitly assisted and cuts to a staged shrine walk-in.
+route-staging.json records every editorial assist; this is not an unassisted win.
 Perf covers low/med/high, five look poses, sepia/restored; GPU-synchronized
 render-only batches exclude simulation, browser presentation and encoding.
 Video hides wall-timed HUD overlays, preserving the vignette and world effects.
@@ -91,7 +94,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         results.commit()
 
 @app.local_entrypoint()
-def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
+def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 60,
          orbit_seconds: int = 20, fetch_only: str = '', out: str = '',
          gpu: str = 'A10', backend: str = 'egl', size: str = '1920x1080',
          quality: str = 'high', fps: int = 60, cube_only: bool = False, verbose: bool = False):
