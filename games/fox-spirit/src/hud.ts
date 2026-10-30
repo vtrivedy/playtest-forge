@@ -23,7 +23,7 @@ export function createHud(): Hud {
   const toggleDebug = () => setDebugVisible(!document.body.classList.contains('debug-on'));
   addEventListener('keydown', (event: KeyboardEvent) => {
     if (event.code !== 'Backquote' && event.key !== 'F1') return;
-    const element = event.target as HTMLElement | null;
+    const element = event.target instanceof HTMLElement ? event.target : null;
     if (element?.isContentEditable || element?.closest('input, textarea, select')) return;
     event.preventDefault();
     if (!event.repeat) toggleDebug();

@@ -14,7 +14,7 @@ export function createFollowCamera(opts: {
   lookAtHeight?: number;
   yAt?: (x: number, z: number) => number;
 } = {}): FollowCamera {
-  const camera = new THREE.PerspectiveCamera(opts.fov ?? 55, 1, 0.1, 300);
+  const camera = new THREE.PerspectiveCamera(opts.fov ?? 55, 1, 0.1, 900);
   const distance = opts.distance ?? 7.5;
   const height = opts.height ?? 4.2;
   const lookHeight = opts.lookAtHeight ?? 0.6;
@@ -61,7 +61,7 @@ export function createFollowCamera(opts: {
       pull = THREE.MathUtils.lerp(pullStart, pullGoal, t * t * (3 - 2 * t));
       const extra = Math.max(0, frame.pullBack ?? pull);
       // Keep a stable world-relative orbit so camera-relative steering never chases itself.
-      desired.copy(target).add(new THREE.Vector3(0, height + extra * 0.35, distance + extra));
+      desired.set(target.x, target.y + height + extra * 0.35, target.z + distance + extra);
       const ahead = frame.lookAhead ?? 1.1;
       aim.set(target.x + Math.sin(facingY) * ahead, target.y + lookHeight, target.z + Math.cos(facingY) * ahead);
       if (!initialized) {

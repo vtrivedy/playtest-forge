@@ -151,7 +151,7 @@ try {
     if (msg.type() === 'error') console.error('[console.error]', msg.text());
   });
 
-  await page.goto(baseUrl, { waitUntil: 'networkidle', timeout: 60_000 });
+  await page.goto(baseUrl, { waitUntil: 'load', timeout: 60_000 });
   await page.waitForTimeout(800);
 
   const info = await page.evaluate(() => {
