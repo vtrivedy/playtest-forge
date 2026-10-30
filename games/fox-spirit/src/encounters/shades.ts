@@ -28,6 +28,7 @@ type ShadeActor = {
   mat: THREE.ShaderMaterial;
   fringe: THREE.ShaderMaterial;
   smoke: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
+  eyes: THREE.Group;
   pool: THREE.Mesh;
   /** 1 = present, falls to 0 while freed */
   presence: number;
@@ -38,6 +39,8 @@ type ShadeActor = {
   debug: THREE.Group;
   poolSampleAt: THREE.Vector3;
   poolRadius: number;
+  notice: number;
+  noticeYaw: number;
 };
 
 /** Bake the licensed library animal in one authored gallop pose. No live skeleton or hero code. */
@@ -80,10 +83,13 @@ async function animalGeometry(): Promise<THREE.BufferGeometry> {
   const box = g.boundingBox!;
   const size = box.getSize(new THREE.Vector3());
   const centre = box.getCenter(new THREE.Vector3());
+  const headPoint=gltf.scene.getObjectByName('Head')!.getWorldPosition(new THREE.Vector3());
   g.translate(-centre.x, -box.min.y, -centre.z);
   // An elongated ink memory: a tall narrow animal, still recognisably mid-stride.
   const scale = 3.1 / size.y;
   g.scale(scale * 0.82, scale, scale * 0.82);
+  headPoint.sub(new THREE.Vector3(centre.x,box.min.y,centre.z)).multiply(new THREE.Vector3(scale*.82,scale,scale*.82));
+  g.userData.headPoint=headPoint;
   g.computeVertexNormals();
   g.computeBoundingBox();
   mixer.stopAllAction();
@@ -101,13 +107,19 @@ const NOISE = /* glsl */ `
 
 function inkMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uFringe: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uFringe: { value: 0 }, uNoticeYaw: { value: 0 } },
     vertexShader: /* glsl */ `
-      uniform float uTime, uPresence, uSeed, uFringe;
+      uniform float uTime, uPresence, uSeed, uFringe, uNoticeYaw;
       varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
       ${NOISE}
       void main() {
         vec3 p = position;
+        float head = smoothstep(1.45, 2.05, p.y) * smoothstep(0.15, 0.55, p.z);
+        float angle = uNoticeYaw * head;
+        vec3 pivot = vec3(0.0, 1.45, 0.48);
+        vec3 q = p - pivot;
+        q.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * q.xz;
+        p = pivot + q;
         // wavering: the ink never quite holds still; it boils more toward the feet
         float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.015 + 0.025;
         p += normal * (n3(p * 3.0 + vec3(0.0, uTime * 1.3, uSeed)) - 0.5) * w * 2.0;
@@ -121,7 +133,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      uniform float uTime, uPresence, uSeed, uFringe;
+      uniform float uTime, uPresence, uSeed, uFringe, uNoticeYaw;
       varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
       ${NOISE}
       void main() {
@@ -133,18 +145,19 @@ function inkMaterial(): THREE.ShaderMaterial {
         if (n < cut) discard;
         if (uPresence < 0.999 && vY + (n - 0.5) * 0.5 < (1.0 - uPresence) * 3.9) discard;
         // pressed ink: near-black umber core, a thin paper-pale rim like dried wash at the edge
-        vec3 core = vec3(0.0015, 0.0009, 0.0005);
-        vec3 edge = vec3(0.045, 0.022, 0.009);
+        vec3 core = vec3(0.0423, 0.0252, 0.016);
+        vec3 edge = vec3(0.065, 0.038, 0.020);
         vec3 col = mix(core, edge, rim * 0.32 + smoothstep(cut, cut + 0.06, n) * 0.0);
         col = mix(col, edge * 0.8, 1.0 - smoothstep(cut, cut + 0.05, n));
         col = mix(col, vec3(0.055, 0.018, 0.006), rim * n * 0.18);
-        float alpha = uFringe > 0.5 ? smoothstep(0.15, 0.85, rim) * 0.22 * uPresence : 1.0;
+        float legFade = smoothstep(0.12, 0.9, vY);
+        float alpha = uFringe > 0.5 ? smoothstep(0.15, 0.85, rim) * 0.22 * uPresence : 0.85 * (1.0 - smoothstep(0.72, 1.0, rim)) * legFade;
         gl_FragColor = vec4(col, alpha);
         #include <colorspace_fragment>
         #include <fog_fragment>
       }`,
     fog: false,
-    transparent: false,
+    transparent: true,
     depthWrite: true,
   });
 }
@@ -155,8 +168,8 @@ function inkWisps(seed: number) {
   const points = new Float32Array(24 * 3);
   for(let k=0;k<24;k++) {
     points[k*3]=Math.sin(k*2.399)*.42;
-    points[k*3+1]=.65+(k%5)*.2;
-    points[k*3+2]=Math.cos(k*1.73)*.85;
+    points[k*3+1]=k<3 ? 2.8+(k%3)*.1 : .65+(k%5)*.2;
+    points[k*3+2]=k<3 ? .75 : Math.cos(k*1.73)*.85;
   }
   g.setAttribute('position',new THREE.BufferAttribute(points,3));
   g.setAttribute('aPhase',new THREE.BufferAttribute(Float32Array.from({length:24},(_,k)=>(k*.618+seed*.13)%1),1));
@@ -203,10 +216,10 @@ function poolMaterial(): THREE.ShaderMaterial {
         vec2 q = vUv - 0.5;
         float r = length(q) * 2.0;
         float n = n3(vec3(q * 6.0, uTime * 0.25));
-        float a = (1.0 - smoothstep(0.55 + n * 0.25, 1.0, r)) * 0.55 * uPresence;
+        float a = (1.0 - smoothstep(0.55 + n * 0.25, 1.0, r)) * 0.74 * uPresence;
         // faint ring at the drain edge so the reach reads in play
         a += smoothstep(0.86, 0.93, r) * (1.0 - smoothstep(0.93, 1.0, r)) * 0.25 * uPresence;
-        gl_FragColor = vec4(vec3(0.05, 0.04, 0.035), a * smoothstep(0.2, 0.8, vValid));
+        gl_FragColor = vec4(vec3(0.008, 0.005, 0.003), a * smoothstep(0.2, 0.8, vValid));
       }`,
     transparent: true,
     depthWrite: false,
@@ -254,21 +267,29 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     group.add(wash);
     const smoke=inkWisps(i);
     group.add(smoke);
+    const eyes=new THREE.Group();eyes.position.set(0,1.45,.48);
+    const eyeMat=new THREE.SpriteMaterial({color:0xb87935,opacity:.3,transparent:true,depthWrite:false});
+    for(const side of [-1,1]){
+      const eye=new THREE.Sprite(eyeMat);
+      eye.position.copy(geo.userData.headPoint as THREE.Vector3).sub(eyes.position).add(new THREE.Vector3(side*.075,.055,.13));
+      eye.scale.set(.035,.035,1);eyes.add(eye);
+    }
+    group.add(eyes);
     scene.add(group);
     const poolGeometry = poolGeo.clone();
     poolGeometry.setAttribute('aValid', new THREE.BufferAttribute(new Float32Array(poolGeometry.attributes.position!.count).fill(1), 1));
     const pool = new THREE.Mesh(poolGeometry, poolMaterial());
     pool.renderOrder = 1;
     scene.add(pool);
-    const leaves = new THREE.InstancedMesh(leafGeo, leafMat.clone(), 72);
+    const leaves = new THREE.InstancedMesh(leafGeo, leafMat.clone(), 48);
     leaves.visible = false;
     leaves.frustumCulled = false;
     leaves.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(leaves);
-    const leafSeeds = Array.from({ length: 72 }, (_, k) => {
+    const leafSeeds = Array.from({ length: 48 }, (_, k) => {
       const source = geo.attributes.position!;
       const p = new THREE.Vector3().fromBufferAttribute(source, (k * 167 + i * 31) % source.count);
-      return { p, velocity: new THREE.Vector3(Math.sin(k * 2.4) * 0.75, 0.4 + (k % 7) * 0.11, Math.cos(k * 1.7) * 0.75), phase: k * 2.399, landed: null };
+      return { p, velocity: new THREE.Vector3(Math.sin(k * 2.4) * 0.75, 1.0 + (k % 7) * 0.14, Math.cos(k * 1.7) * 0.75), phase: k * 2.399, landed: null };
     });
     const debug = new THREE.Group();
     const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(curve.getPoints(96)), new THREE.LineBasicMaterial({ color: 0xc9a04a }));
@@ -277,7 +298,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, fringe, smoke, pool, presence: 1, freed: false };
+    return { notice: 0, noticeYaw: 0, active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, fringe, smoke, eyes, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
@@ -296,7 +317,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         s.group.visible = s.presence > 0; s.pool.visible = s.presence > 0;
         s.smoke.material.uniforms.uTime!.value=t;
         s.smoke.material.uniforms.uPresence!.value=s.presence;
-        s.smoke.material.uniforms.uOpacity!.value=tun.inkOpacity;
+        s.smoke.material.uniforms.uOpacity!.value=tun.inkOpacity*(1+s.notice*.4);
         s.smoke.material.uniforms.uSize!.value=tun.inkSize;
         if (s.freed) {
           s.releaseAge += dt;
@@ -318,7 +339,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
             const fade = Math.min(1, age * 9) * (1 - THREE.MathUtils.smoothstep(age, 8, 10));
             const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(age * 1.8 + seed.phase, seed.phase + age, Math.sin(age + seed.phase)));
             if (seed.landed) q.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, seed.phase));
-            const size = 0.063 * fade * (0.88 + (k % 5) * 0.06);
+            const size = 0.14 * fade * (0.88 + (k % 5) * 0.06);
             matrix.compose(p, q, new THREE.Vector3(size, size, size));
             s.leaves.setMatrixAt(k, matrix);
             leafColor.copy(inkColor).lerp(autumnColors[k % 4]!, THREE.MathUtils.smoothstep(age, 0.08 + (k % 4) * 0.04, 0.8));
@@ -334,6 +355,11 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           s.curve.getPointAt(s.u, s.pos);
           s.curve.getTangentAt(s.u, tmp);
           s.heading = Math.atan2(tmp.x, tmp.z);
+          const near = Math.hypot(fox.x-s.pos.x,fox.z-s.pos.z)<6 && Math.abs(fox.y-s.pos.y)<3;
+          s.notice=THREE.MathUtils.damp(s.notice,near?1:0,10,dt);
+          const facing=Math.atan2(fox.x-s.pos.x,fox.z-s.pos.z)-s.heading;
+          const yaw=Math.atan2(Math.sin(facing),Math.cos(facing));
+          s.noticeYaw=THREE.MathUtils.damp(s.noticeYaw,near?THREE.MathUtils.clamp(yaw,-.45,.45):0,10,dt);
           // drift: a slow bob, as if the ink were suspended in water
           const gy = groundAt(s.pos.x, s.pos.z, s.pos.y + 2);
           if (Number.isFinite(gy) && Math.abs(gy - s.pos.y) < 1) s.pos.y = gy;
@@ -358,8 +384,12 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         const ring = s.debug.children[1]!;
         ring.position.copy(s.pos);
         ring.scale.setScalar(tun.drainRadius);
-        if (!s.freed) s.group.position.set(s.pos.x, s.pos.y + tun.bob + Math.sin(t * 1.3 + s.u * 20) * tun.bob, s.pos.z);
+        if (!s.freed) s.group.position.set(s.pos.x, s.pos.y + tun.bob + Math.sin(t * 1.3 + s.u * 20) * tun.bob - Math.sin(s.notice*Math.PI)*.07, s.pos.z);
         s.group.rotation.y = s.heading;
+        s.eyes.rotation.y=s.noticeYaw;
+        s.eyes.visible=!s.freed;
+        s.mat.uniforms.uNoticeYaw!.value = s.noticeYaw;
+        s.fringe.uniforms.uNoticeYaw!.value = s.noticeYaw;
         s.mat.uniforms.uTime!.value = t;
         s.mat.uniforms.uPresence!.value = s.presence;
         s.fringe.uniforms.uTime!.value = t;
@@ -390,7 +420,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       return ev;
     },
     state() {
-      return shades.filter(s => s.active).map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 10 ? 72 : 0 }));
+      return shades.filter(s => s.active).map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, heading: Number(s.heading.toFixed(4)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.freed && s.releaseAge < 10 ? 48 : 0 }));
     },
   };
   if (gui) {
