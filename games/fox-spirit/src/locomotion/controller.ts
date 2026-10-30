@@ -10,6 +10,8 @@ export type MoveParams = {
   skidDecel: number;
   /** Max lateral (centripetal) accel u/s² — sets the turn radius r = v² / a */
   lateralAccel: number;
+  /** Fraction of speed shed when the input points ≥ ~90° off the heading */
+  turnSlow: number;
   /** Turn rate cap (rad/s) at standstill / very low speed */
   pivotRate: number;
   /** Reversal angle (rad) that triggers a skid instead of a carve */
@@ -24,7 +26,8 @@ export const DEFAULT_MOVE: MoveParams = {
   accel: 16,
   decel: 20,
   skidDecel: 34,
-  lateralAccel: 34,
+  lateralAccel: 40,
+  turnSlow: 0.75,
   pivotRate: 9,
   skidAngle: 2.2,
   skidSpeed: 4.5,
@@ -64,8 +67,10 @@ export function groundMove(s: MoveState, p: MoveParams, wish: THREE.Vector3, max
     } else {
       const rate = Math.min(p.pivotRate, p.lateralAccel / Math.max(s.speed, 0.1));
       s.heading = wrap(s.heading + THREE.MathUtils.clamp(diff, -rate * dt, rate * dt));
-      // slow down while carving hard (you can't hold top speed through a hairpin)
-      const target = maxSpeed * mag * (1 - 0.35 * Math.min(1, Math.abs(diff) / 1.6));
+      // slow down for tight turns (you can't hold top speed through a hairpin) — the radius collapses so the fox
+      // never orbits a target
+      const t = THREE.MathUtils.clamp((Math.abs(diff) - 0.35) / 1.25, 0, 1);
+      const target = maxSpeed * mag * (1 - p.turnSlow * t * t * (3 - 2 * t));
       if (s.speed < target) s.speed = Math.min(target, s.speed + p.accel * dt);
       else s.speed = Math.max(target, s.speed - p.decel * dt);
     }

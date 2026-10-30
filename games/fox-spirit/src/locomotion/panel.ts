@@ -13,6 +13,7 @@ export function createLocoPanel(gui: GUI, loco: Locomotion, move: MoveParams) {
   fm.add(move, 'decel', 4, 60, 0.5);
   fm.add(move, 'skidDecel', 8, 80, 0.5);
   fm.add(move, 'lateralAccel', 8, 120, 1).name('lateralAccel (turn radius)');
+  fm.add(move, 'turnSlow', 0, 1, 0.01);
   fm.add(move, 'pivotRate', 2, 20, 0.1);
   fm.add(move, 'skidAngle', 1.2, 3.1, 0.01);
   fm.add(move, 'skidSpeed', 1, 10, 0.1);
@@ -63,6 +64,8 @@ export function createLocoPanel(gui: GUI, loco: Locomotion, move: MoveParams) {
   ft.add(p, 'tailDrag', 0, 20, 0.1);
   ft.add(p, 'tailGravity', 0, 20, 0.1);
   ft.add(p, 'tailSway', 0, 0.3, 0.005);
+  ft.add(p, 'tailStream', 0, 1, 0.01);
+  ft.add(p, 'tailDroop', -0.5, 0.8, 0.01);
   f.close();
   return f;
 }

@@ -51,6 +51,10 @@ export type LocoParams = {
   tailDrag: number;
   tailGravity: number;
   tailSway: number;
+  /** 0..1 how far the tail swings from its rest curl to trailing straight back when moving */
+  tailStream: number;
+  /** Trailing tail slope (down per unit back) */
+  tailDroop: number;
   /** Air pose follow rate (1/s) */
   airPoseRate: number;
   /** Body follow rate for slope height/pitch (1/s) */
@@ -75,7 +79,7 @@ export const DEFAULT_LOCO: LocoParams = {
   maxRoll: 0.28,
   spineBend: 0.11,
   maxBend: 0.32,
-  gallopFlex: 0.1,
+  gallopFlex: 0.2,
   headStabilize: 0.75,
   headLook: 0.12,
   crouchStiffness: 220,
@@ -85,11 +89,13 @@ export const DEFAULT_LOCO: LocoParams = {
   takeoffStretch: 0.05,
   skidPitch: 0.16,
   skidSquat: 0.08,
-  tailStiffness: 26,
-  tailStiffnessTip: 6,
+  tailStiffness: 34,
+  tailStiffnessTip: 10,
   tailDrag: 5,
   tailGravity: 1.5,
   tailSway: 0.05,
+  tailStream: 0.7,
+  tailDroop: 0.12,
   airPoseRate: 14,
   bodyRate: 12,
   debug: false,
@@ -514,7 +520,7 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     const travel = state.treadmill > 0 ? 0 : remain;
     const pos = _v.copy(groupPos).addScaledVector(vel, travel);
     const yawAt = yaw + state.yawRate * travel;
-    neutralFoot(L.rig, pos, yawAt, out, params.strideUnderHip);
+    neutralFoot(L.rig, pos, yawAt, out, L.rig.fore ? params.strideUnderHip : params.strideUnderHip * 0.25);
     out.addScaledVector(vel, stanceT * params.strideLead);
     out.y = plantY(L, out.x, out.z);
     // never aim a paw where the leg can't reach at touchdown (it would pop forward on contact)
@@ -731,12 +737,19 @@ export function createLocomotion(model: THREE.Group, groundAt: (x: number, z: nu
     tailTipObj.getWorldPosition(tailTarget[tailN - 1]);
     const sideW = _side.set(1, 0, 0).applyQuaternion(bodyQ);
     const sway = moving ? p.tailSway * Math.sin(ph * (weights.gallop > 0.5 ? 1 : 2)) : 0;
-    // tail lifts on the run, streams in the air
-    const liftUp = Math.min(1, speed / 8) * 0.15;
+    // on the move the brush trails out behind like a real fox (rest shape swung toward −forward, a touch below level)
+    const stream = Math.min(1, speed / 3 + state.air * 0.6) * p.tailStream;
+    if (stream > 0) {
+      const root = tailTarget[0];
+      const restDir = _v.copy(tailTarget[tailN - 1]).sub(root).normalize();
+      const wantDir = _v2.set(0, -p.tailDroop, -1).normalize().applyQuaternion(bodyQ);
+      _q.setFromUnitVectors(restDir, wantDir);
+      _q2.identity().slerp(_q, stream);
+      for (let i = 1; i < tailN; i++) tailTarget[i].sub(root).applyQuaternion(_q2).add(root);
+    }
     for (let i = 1; i < tailN; i++) {
       const k = i / (tailN - 1);
       tailTarget[i].addScaledVector(sideW, sway * k * 2.5);
-      tailTarget[i].y += liftUp * k * k;
     }
     tailP[0].copy(tailTarget[0]);
     const drag = Math.exp(-p.tailDrag * dt);

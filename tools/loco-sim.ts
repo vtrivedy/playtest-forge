@@ -133,3 +133,16 @@ if (process.argv.includes('--trace')) {
     if (i > 50) console.log(i, L.mode, 'foot', L.foot.toArray().map((v) => v.toFixed(3)).join(','), 'head', head.toArray().map((v) => v.toFixed(3)).join(','), 'hipD', hip.distanceTo(L.foot).toFixed(3), '/', L.rig.reach.toFixed(3), 'liftF', loco.state.liftF.toFixed(3), 'pos', group.position.z.toFixed(3));
   }
 }
+if (process.argv.includes('--switchback')) {
+  // autopilot-style steering through 3 m switchbacks (route waypoints 70–79 shape); must hit each within 0.9 u
+  group.position.set(0, 0, 0); y = 0; vel.set(0, 0, 0);
+  const pts = [[6.6, 0], [-6.4, 0], [-6.4, -2.8], [6.4, -2.8], [6.4, -5.8], [1.8, -5.8], [-2.1, -5.8], [-6.4, -5.8], [-6.4, -8.8]];
+  let idx = 0; let frames = 0;
+  while (idx < pts.length && frames < 60 * 40) {
+    const [tx, tz] = pts[idx];
+    const dx = tx - group.position.x, dz = tz - group.position.z, d = Math.hypot(dx, dz);
+    if (d < 0.9) { idx++; continue; }
+    stepSim(W(dx / d, dz / d)); frames++;
+  }
+  console.log(`switchback: reached ${idx}/${pts.length} in ${(frames / 60).toFixed(1)} s`);
+}
