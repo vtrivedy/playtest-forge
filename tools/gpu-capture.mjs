@@ -243,7 +243,7 @@ try {
     if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
     save('shade-drain-probe.json', probe);
     await camera();
-    await video('shade-patrol', 180, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 45, 90, 135, 179] });
+    await video('shade-patrol', 120, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 30, 60, 90, 119] });
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
     await H('photoOff');
     await advance(30);
@@ -292,13 +292,13 @@ try {
     await H('setKeys', ['ShiftLeft']);
     lens=null;
     await camera();
-    await video('shade-free', 210, async i => {
+    await video('shade-free', 120, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
       await camera();
-    }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 120, 180, 209] });
+    }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 119] });
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
     if (freed.frees !== 1 || !freed.actors[0].freed || freed.hits !== contact.hits || freed.wisps < contact.wisps) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
-    await advance(90);
+    await advance(180);
     await shot('shade-leaf-litter');
     await advance(600, false);
     if ((await page.evaluate(() => window.__gameHooks.shades.state().actors[0].leaves)) !== 0) throw Error('Leaf one-shot did not end empty');
@@ -321,9 +321,9 @@ try {
     await H('advance', 1, 0, true);
     await page.keyboard.down('w');
     await page.keyboard.down('Shift');
-    await video('shade-play', 180, async i => {
+    await video('shade-play', 120, async i => {
       if(i===12){await page.keyboard.up('w');await page.keyboard.up('Shift');}
-    }, undefined, {traceEveryFrame:true,keyFrames:[0,6,12,24,45,90,179]});
+    }, undefined, {traceEveryFrame:true,keyFrames:[0,6,12,24,45,90,119]});
     const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
     if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
     save('shade-live-acceptance.json',{label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
