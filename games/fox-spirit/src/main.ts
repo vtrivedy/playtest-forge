@@ -3,6 +3,7 @@ import GUI from 'lil-gui';
 import { publishGame } from '../../shared/game-state';
 import {
   PRESET_SPRING,
+  PRESET_BRISK,
   JumpFeel,
   emptyFeelMetrics,
   type FeelParams,
@@ -22,17 +23,58 @@ import {
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
+import type { FoxAnimState } from './fox';
 import { createGameAudio } from './audio';
 import { createHud } from './hud';
 import { createLeafKick, createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
 import { createRestoreCinematic } from './restore';
 
-const feel: FeelParams = { ...PRESET_SPRING, moveSpeed: PRESET_SPRING.moveSpeed * 1.12 };
-/** game-design §3.2: glide 3:1 — capped sink while gliding */
-const glide = { sink: 2.5, forward: 7.5 };
+/**
+ * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
+ * `fallGravity` gives weight on the way down; `apexHang` floats the top of a held jump.
+ */
+type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number };
+const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
+  spring: {
+    ...PRESET_SPRING,
+    moveSpeed: 8.4,
+    jumpVelocity: 9.6,
+    gravity: 21,
+    fallGravity: 1.35,
+    apexHang: 0.62,
+    jumpCut: 0.45,
+    airControl: 0.6,
+    coyoteTime: 0.11,
+    jumpBuffer: 0.13,
+    glideSink: 2.5,
+    glideForward: 7.5,
+    glideDelay: 0.1,
+  },
+  brisk: {
+    ...PRESET_BRISK,
+    moveSpeed: 9,
+    jumpVelocity: 10.2,
+    gravity: 27,
+    fallGravity: 1.5,
+    apexHang: 0.75,
+    jumpCut: 0.4,
+    airControl: 0.7,
+    coyoteTime: 0.1,
+    jumpBuffer: 0.12,
+    glideSink: 2.7,
+    glideForward: 8,
+    glideDelay: 0.08,
+  },
+};
+const presetParam = new URLSearchParams(location.search).get('feel');
+let feelPreset: keyof typeof FEEL_PRESETS = presetParam === 'brisk' ? 'brisk' : 'spring';
+const feel: FoxFeel = { ...FEEL_PRESETS[feelPreset] };
 const jumpFeel = new JumpFeel();
 const feelMetrics = emptyFeelMetrics();
+const BLOOM = 0.1;
+/** Ember pickup freeze — just enough to register the hit */
+const HITSTOP_S = 0.045;
 
 async function boot() {
   const hud = createHud();
@@ -129,14 +171,10 @@ async function boot() {
     return mesh;
   })();
 
-  const camFloorRef = { y: world.spawnPos.y + 3 };
   const cam = createFollowCamera({
-    fov: 48,
-    distance: 2.7,
-    height: 1.2,
-    lookAtHeight: 0.5,
-    yAt: (x, z) => col.groundAt(x, z, camFloorRef.y).y,
+    surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
   });
+  cam.snapBehind(Math.PI);
   cam.resize(innerWidth, innerHeight);
 
   const colorField = createColorField({
@@ -151,10 +189,10 @@ async function boot() {
   for (const m of world.materials) colorField.patchMaterial(m);
 
   const post = createPostStack(renderer, scene, cam.camera, {
-    bloomStrength: 0.1,
+    bloomStrength: BLOOM,
     bloomThreshold: 0.96,
     vignette: 0.34,
-    grain: 0.06,
+    grain: 0.015,
     enableGTAO: false,
   });
 
@@ -162,7 +200,10 @@ async function boot() {
   const emberTrail = createEmberTrail(scene, 36);
   const autumnFX = createAutumnParticles(scene, 180, 110);
   const leafKick = createLeafKick(scene);
-  const occlusion = createOcclusionFader(scene);
+  const occlusion = createOcclusionFader(scene, {
+    solidAt: (x, z) => col.highestAt(x, z),
+    exclude: foxActor.group,
+  });
 
   // Autumn particle field rides with the fox (the kit spawns in a 28 m box)
   const fxOffset = new THREE.Vector3();
@@ -190,10 +231,40 @@ async function boot() {
   addEventListener('keydown', (e) => {
     if (e.code === 'Backquote' || e.key === 'F1') setTimeout(syncGuiVis, 0);
   });
-  gui.add(feel, 'moveSpeed', 4, 14, 0.1);
-  gui.add(feel, 'jumpVelocity', 6, 16, 0.1);
-  gui.add(feel, 'gravity', 10, 40, 0.5);
-  gui.add(feel, 'dashSpeed', 10, 30, 0.5);
+  const usePreset = (name: keyof typeof FEEL_PRESETS) => {
+    feelPreset = name;
+    Object.assign(feel, FEEL_PRESETS[name]);
+  };
+  gui.add({ spring: () => usePreset('spring') }, 'spring');
+  gui.add({ brisk: () => usePreset('brisk') }, 'brisk');
+  const fFeel = gui.addFolder('Fox');
+  fFeel.add(feel, 'moveSpeed', 4, 14, 0.1).listen();
+  fFeel.add(feel, 'jumpVelocity', 6, 16, 0.1).listen();
+  fFeel.add(feel, 'gravity', 10, 40, 0.5).listen();
+  fFeel.add(feel, 'fallGravity', 1, 2.2, 0.05).listen();
+  fFeel.add(feel, 'apexHang', 0.3, 1, 0.01).listen();
+  fFeel.add(feel, 'jumpCut', 0.1, 1, 0.01).listen();
+  fFeel.add(feel, 'airControl', 0, 1, 0.01).listen();
+  fFeel.add(feel, 'coyoteTime', 0, 0.25, 0.01).listen();
+  fFeel.add(feel, 'jumpBuffer', 0, 0.25, 0.01).listen();
+  fFeel.add(feel, 'glideSink', 1, 5, 0.1).listen();
+  fFeel.add(feel, 'glideForward', 4, 12, 0.1).listen();
+  fFeel.add(feel, 'dashSpeed', 10, 30, 0.5).listen();
+  fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
+  const fCam = gui.addFolder('Camera');
+  fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
+  fCam.add(cam.params, 'height', 0.5, 4, 0.05);
+  fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
+  fCam.add(cam.params, 'glideDistance', 3, 12, 0.1);
+  fCam.add(cam.params, 'fov', 35, 80, 0.5);
+  fCam.add(cam.params, 'lag', 0.04, 0.5, 0.01);
+  fCam.add(cam.params, 'lookAhead', 0, 4, 0.05);
+  fCam.add(cam.params, 'recenterRate', 0, 4, 0.05);
+  fCam.add(cam.params, 'sideBias', -0.6, 0.6, 0.01);
+  fCam.add(cam.params, 'jumpTrack', 0, 1, 0.01);
+  fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
+  fCam.add(cam.params, 'shake', 0, 2, 0.05);
+  fCam.close();
 
   const keys = new Set<string>();
   addEventListener('keydown', (e) => {
@@ -207,16 +278,26 @@ async function boot() {
     void audio.resume();
     audio.setAmbient(true);
   });
+  // drag to orbit (auto-recentre resumes after cam.params.recenterDelay)
+  addEventListener('pointermove', (e) => {
+    if (!(e.buttons & 1) || (e.target as HTMLElement)?.closest?.('.lil-gui')) return;
+    cam.orbit(-e.movementX * 0.006, e.movementY * 0.003);
+  });
 
   const vel = new THREE.Vector3();
   let grounded = false;
   let dashT = 0;
   let gliding = false;
+  let glideHoldT = 0;
+  let airT = 0;
+  let jumpedThisAir = false;
+  let landT = 0;
+  let hitstop = 0;
   let shrineOn = false;
   let fxEnabled = true;
   let turntableMode = false;
   let turntableYaw = 0;
-  let turntableAnim: import('./fox').FoxAnimState = 'idle';
+  let turntableAnim: FoxAnimState = 'idle';
   let embersGot = 0;
   let airDashUsed = false;
   let floodT = -1;
@@ -224,6 +305,13 @@ async function boot() {
   let groundBounce = 1;
   let deaths = 0;
   let zone = world.zoneAt(world.spawnPos.x, world.spawnPos.z);
+  const takeoff = new THREE.Vector3();
+  const landing = new THREE.Vector3();
+  let landingValid = false;
+  const jumpStats = { lastDist: 0, lastImpact: 0, lastDashDist: 0, glideDist: 0, glideDrop: 0, glideRatio: 0 };
+  const dashFrom = new THREE.Vector3();
+  const glideFrom = new THREE.Vector3();
+  let wasGliding = false;
   // autopilot (verification bot): follows world.route through real input + physics
   const auto = {
     active: false,
@@ -236,6 +324,9 @@ async function boot() {
     stuckT: 0,
     bestD: Infinity,
     assists: 0,
+    /** false = honest run: a stall stops the bot instead of teleporting it */
+    allowAssist: true,
+    stalled: '' as string,
     log: [] as string[],
     act: undefined as Waypoint['act'],
   };
@@ -244,14 +335,23 @@ async function boot() {
   let elapsed = 0;
   let status: 'playing' | 'won' = 'playing';
   let kickCooldown = 0;
-  const spawn = foxActor.group.position.clone();
+  /** Manual clock: the harness advances sim time explicitly (deterministic captures on slow GPUs) */
+  let manual = false;
+  let visualDt = 0;
+
+  const setFx = (on: boolean) => {
+    fxEnabled = !!on;
+    // the post stack re-applies params every frame, so write params (not the pass)
+    post.params.bloomStrength = on ? BLOOM : 0;
+    wisps.points.visible = fxEnabled;
+    emberTrail.points.visible = fxEnabled;
+  };
 
   addEventListener('resize', () => {
     cam.resize(innerWidth, innerHeight);
     forge.setSize(innerWidth, innerHeight);
     post.setSize(innerWidth, innerHeight);
   });
-
 
   const win = window as unknown as {
     __gameHooks?: Record<string, unknown>;
@@ -264,6 +364,8 @@ async function boot() {
       foxActor.group.rotation.y = Math.PI; // face north toward shrine
       prevFeet = p.y + 0.2;
       vel.set(0, 0, 0);
+      photo = null;
+      cam.snapBehind(Math.PI);
       foxActor.setAnim('idle');
     },
     forceRestore() {
@@ -274,24 +376,20 @@ async function boot() {
       return { x: p.x, y: p.y, z: p.z };
     },
     setFxEnabled(on: boolean) {
-      fxEnabled = !!on;
-      post.bloom.strength = on ? 0.1 : 0;
-      wisps.points.visible = on;
-      emberTrail.points.visible = on;
+      setFx(on);
     },
     getAnim() {
       return foxActor.getAnim();
     },
+    setFeelPreset(name: 'spring' | 'brisk') {
+      usePreset(name === 'brisk' ? 'brisk' : 'spring');
+      return feelPreset;
+    },
     runTurntable(opts?: { anim?: string; fx?: boolean }) {
       turntableMode = true;
       turntableYaw = 0;
-      turntableAnim = (opts?.anim as import('./fox').FoxAnimState) || 'idle';
-      if (opts?.fx === false) {
-        fxEnabled = false;
-        post.bloom.strength = 0;
-        wisps.points.visible = false;
-        emberTrail.points.visible = false;
-      }
+      turntableAnim = (opts?.anim as FoxAnimState) || 'idle';
+      if (opts?.fx === false) setFx(false);
       foxActor.setAnim(turntableAnim);
     },
     stopTurntable() {
@@ -305,28 +403,26 @@ async function boot() {
       foxActor.group.position.set(x, gy + foxActor.feetOffset, z);
       foxActor.group.rotation.y = Math.PI * 0.72; // 3/4 toward south-east cam
       vel.set(0, 0, 0);
-      const anim = (opts?.anim as import('./fox').FoxAnimState) || 'run';
+      const anim = (opts?.anim as FoxAnimState) || 'run';
       foxActor.setAnim(anim);
       // Advance a few mixer frames so run pose isn't T-pose
       for (let i = 0; i < 8; i++) foxActor.update(1 / 30, i / 30, false);
-      if (opts?.fx === false) {
-        fxEnabled = false;
-        post.bloom.strength = 0;
-        wisps.points.visible = false;
-        emberTrail.points.visible = false;
-      }
-      // Hard-snap cam to readable 3/4 (bypass spring)
+      if (opts?.fx === false) setFx(false);
+      // Staged still: photo framing, not the traversal camera
       const fx = foxActor.group.position;
-      cam.camera.position.set(fx.x + 1.6, fx.y + 1.15, fx.z + 2.6);
-      cam.camera.lookAt(fx.x, fx.y + 0.45, fx.z);
-      contactShadow.position.set(fx.x, gy + 0.03, fx.z);
-      (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.78;
+      photo = {
+        pos: new THREE.Vector3(fx.x + 1.6, fx.y + 1.15, fx.z + 2.6),
+        look: new THREE.Vector3(fx.x, fx.y + 0.45, fx.z),
+        fov: 50,
+      };
     },
     teleport(x: number, y: number, z: number, yaw = Math.PI) {
       foxActor.group.position.set(x, y + foxActor.feetOffset + 0.05, z);
       foxActor.group.rotation.y = yaw;
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
+      photo = null;
+      cam.snapBehind(yaw);
     },
     lightSeedwells() {
       for (const s of world.seedwells) {
@@ -336,22 +432,39 @@ async function boot() {
         handleEvents(world.update(0.016, elapsed, foxActor.group.position, p.y, (q) => colorField.sample(q)));
       }
     },
-    autopilot(on = true, fromIdx = 0) {
+    autopilot(on = true, fromIdx = 0, opts?: { assist?: boolean }) {
       auto.active = on;
       auto.idx = fromIdx;
       auto.phase = 'run';
       auto.stuckT = 0;
       auto.bestD = Infinity;
+      auto.allowAssist = opts?.assist ?? true;
+      auto.stalled = '';
+    },
+    /** Manual clock: pause the rAF sim; the harness calls advance() */
+    setManual(on: boolean) {
+      manual = !!on;
+      clock.getDelta();
+    },
+    /** Step the sim `frames` × dt (fixed), then render once. Returns state. */
+    advance(frames = 1, dt = 1 / 60, render = true) {
+      for (let i = 0; i < frames; i++) step(dt);
+      if (render) draw();
+      return win.__gameHooks!.state && (win.__gameHooks!.state as () => unknown)();
+    },
+    /** Press keys for the next advance() calls (harness input in manual mode) */
+    setKeys(codes: string[]) {
+      keys.clear();
+      for (const c of codes) keys.add(c);
     },
     photo(pos: [number, number, number], look: [number, number, number], fov = 50) {
       photo = { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look), fov };
     },
     photoOff() {
       photo = null;
-      cam.camera.fov = 50;
-      cam.camera.updateProjectionMatrix();
     },
     state() {
+      const p = foxActor.group.position;
       return {
         zone,
         embers: embersGot,
@@ -359,9 +472,31 @@ async function boot() {
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         bridge: world.bridgeGrown(),
         restored: shrineOn,
-        auto: { active: auto.active, idx: auto.idx, of: world.route.length, assists: auto.assists, log: auto.log.slice(-12) },
+        auto: {
+          active: auto.active,
+          idx: auto.idx,
+          of: world.route.length,
+          assists: auto.assists,
+          allowAssist: auto.allowAssist,
+          stalled: auto.stalled,
+          log: auto.log.slice(-12),
+        },
         deaths,
         t: simClock,
+        pos: [p.x, p.y - foxActor.feetOffset, p.z],
+        anim: foxActor.getAnim(),
+        grounded,
+        gliding,
+        preset: feelPreset,
+        feel: { ...jumpStats, apex: feelMetrics.lastJumpApex, air: feelMetrics.lastAirTime },
+        camera: {
+          pos: cam.camera.position.toArray(),
+          fov: cam.camera.fov,
+          yaw: cam.getYaw(),
+          occlusion: occlusion.strength,
+          photo: !!photo,
+        },
+        fx: { enabled: fxEnabled, bloom: post.bloom.strength, bloomParam: post.params.bloomStrength, grain: post.params.grain },
       };
     },
   };
@@ -371,6 +506,8 @@ async function boot() {
     status = 'won';
     floodT = 0;
     restore.trigger();
+    cam.playShot({ subjects: [foxActor.group.position.clone(), world.wellspringPos.clone()], holdS: 3.2, blendS: 0.9, rise: 14 });
+    cam.shake(0.45);
     hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
   }
 
@@ -381,6 +518,8 @@ async function boot() {
         feelMetrics.gemsCollected = embersGot;
         hud.setEmbers(embersGot);
         audio.play('ember');
+        hitstop = HITSTOP_S;
+        foxActor.pulse(2.2);
       } else if (e.type === 'seedwell') {
         const s = world.seedwells[e.index]!;
         colorField.restore(s.pos, s.radius, 3.2);
@@ -390,7 +529,8 @@ async function boot() {
         const lit = world.seedwells.filter((q) => q.lit).length;
         hud.setPrompt(`${s.name} lit · ${lit}/3${lit === 3 ? ' · the root bridge grows' : ''}`);
         hud.hidePromptSoon(5);
-        cam.setPullBack(3, 1.6);
+        cam.playShot({ subjects: [foxActor.group.position.clone(), s.pos.clone()], holdS: 1.7, blendS: 0.6 });
+        cam.shake(0.3);
       } else if (e.type === 'bridge') {
         audio.swell(3);
       } else if (e.type === 'checkpoint') {
@@ -407,7 +547,7 @@ async function boot() {
   }
 
   hud.setStatus(`Sepia Russetvale · ${backend}`);
-  hud.setPrompt('WASD · Space jump / hold glide · Shift dash · Reach the shrine');
+  hud.setPrompt('WASD · Space jump / hold glide · Shift dash · drag to look · Reach the shrine');
   hud.hidePromptSoon(8);
   hud.setEmbers(0);
 
@@ -428,7 +568,33 @@ async function boot() {
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
     prevFeet = p.y + 0.1;
     vel.set(0, 0, 0);
-    void spawn;
+  }
+
+  /** Ballistic landing preview for the camera (same gravity/glide model as the sim). */
+  function predictLanding(pos: THREE.Vector3, v: THREE.Vector3, glidingNow: boolean): boolean {
+    let x = pos.x;
+    let y = pos.y - foxActor.feetOffset;
+    let z = pos.z;
+    let vy = v.y;
+    const h = 0.05;
+    for (let i = 0; i < 70; i++) {
+      const g = feel.gravity * (glidingNow ? feel.glideGravityScale : vy < 0 ? feel.fallGravity : 1);
+      vy -= g * h;
+      if (glidingNow) vy = Math.max(vy, -feel.glideSink);
+      const py = y;
+      x += v.x * h;
+      z += v.z * h;
+      y += vy * h;
+      if (vy < 0) {
+        const gy = col.groundAt(x, z, py).y;
+        if (Number.isFinite(gy) && y <= gy) {
+          landing.set(x, gy, z);
+          return true;
+        }
+      }
+      if (y < pos.y - 40) return false;
+    }
+    return false;
   }
 
   /** Bot: steer along world.route; jumps/dashes/glides are real key presses through JumpFeel. */
@@ -469,14 +635,22 @@ async function boot() {
     if (auto.phase === 'air' && d < 0.6) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
-    // stuck → count an assist and hop to the waypoint (reported in state)
+    // stuck → count an assist and hop to the waypoint (reported in state), or stop on honest runs
     if (d < auto.bestD - 0.3) {
       auto.bestD = d;
       auto.stuckT = 0;
     } else auto.stuckT += dt;
     if (auto.stuckT > 7) {
+      const tag = `${auto.idx}:${wp.label ?? ''}(${wp.x.toFixed(1)},${wp.y.toFixed(1)},${wp.z.toFixed(1)})`;
+      if (!auto.allowAssist) {
+        auto.stalled = tag;
+        auto.active = false;
+        auto.wish.set(0, 0, 0);
+        auto.space = false;
+        return;
+      }
       auto.assists += 1;
-      auto.log.push(`assist@${auto.idx}:${wp.label ?? ''}(${wp.x.toFixed(1)},${wp.y.toFixed(1)},${wp.z.toFixed(1)})`);
+      auto.log.push(`assist@${tag}`);
       foxActor.group.position.set(wp.x, wp.y + foxActor.feetOffset + 0.3, wp.z);
       prevFeet = wp.y + 0.3;
       vel.set(0, 0, 0);
@@ -485,10 +659,22 @@ async function boot() {
     }
   }
 
-  function tick() {
-    const dt = Math.min(clock.getDelta(), 0.05);
+  const forward = new THREE.Vector3();
+  const right = new THREE.Vector3();
+  const wish = new THREE.Vector3();
+  const UP = new THREE.Vector3(0, 1, 0);
+
+  /** Fixed-input simulation step: input → physics → animation state → realm events → camera. */
+  function step(rawDt: number) {
+    // hit-stop freezes the fox and the world, never the camera shake / FOV
+    let dt = rawDt;
+    if (hitstop > 0) {
+      hitstop -= rawDt;
+      dt = 0;
+    }
     if (status === 'playing') elapsed += dt;
-    simClock += dt;
+    simClock += rawDt;
+    visualDt += dt;
     const fox = foxActor.group;
 
     let ix = 0;
@@ -498,37 +684,12 @@ async function boot() {
     if (keys.has('KeyW') || keys.has('ArrowUp')) iz -= 1;
     if (keys.has('KeyS') || keys.has('ArrowDown')) iz += 1;
 
-    const forward = new THREE.Vector3();
-    cam.camera.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    const wish = new THREE.Vector3();
-    if (ix || iz) {
-      wish.addScaledVector(right, ix).addScaledVector(forward, -iz).normalize();
-    }
-
-    if (turntableMode) {
-      turntableYaw += dt * 0.7;
-      // Open meadow north of the portal — clear ground for silhouette judgment
-      const tx = 6;
-      const tz = 76;
-      const ty = world.terrainY(tx, tz);
-      fox.position.set(tx, ty + foxActor.feetOffset, tz);
-      fox.rotation.y = turntableYaw; // model spins; camera fixed (classic turntable)
-      vel.set(0, 0, 0);
-      foxActor.setAnim(turntableAnim);
-      foxActor.update(dt, elapsed, turntableAnim === 'glide');
-      cam.camera.position.set(tx, fox.position.y + 1.25, tz + 3.6);
-      cam.camera.lookAt(tx, fox.position.y + 0.4, tz);
-      contactShadow.position.set(tx, ty + 0.03, tz);
-      contactShadow.scale.set(1, 1, 1);
-      (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
-      sky.update(dt);
-      post.render();
-      requestAnimationFrame(tick);
-      return;
-    }
+    // camera-relative input from the traversal yaw (not the rendered pose — shots/shake don't steer)
+    const cy = cam.getYaw();
+    forward.set(-Math.sin(cy), 0, -Math.cos(cy));
+    right.crossVectors(forward, UP).normalize();
+    wish.set(0, 0, 0);
+    if (ix || iz) wish.addScaledVector(right, ix).addScaledVector(forward, -iz).normalize();
 
     // ground probe (one-way surfaces; previous feet height catches fast falls)
     let feetY = fox.position.y - foxActor.feetOffset;
@@ -543,10 +704,13 @@ async function boot() {
       spaceDown = auto.space;
       dashPressed = auto.dash;
     }
-    jumpFeel.sampleJumpEdge(spaceDown, dt, feel.jumpBuffer);
+    if (dt > 0) jumpFeel.sampleJumpEdge(spaceDown, dt, feel.jumpBuffer);
 
     const wasGrounded = grounded;
-    grounded = Number.isFinite(gy) && feetY <= gy + 0.1 && vel.y <= 0.15;
+    const impactVy = vel.y;
+    // stick to gentle downslopes/steps while running instead of popping airborne
+    const snap = wasGrounded && !jumpedThisAir && vel.y <= 0 && feetY - gy < 0.35;
+    grounded = Number.isFinite(gy) && (feetY <= gy + 0.1 || snap) && vel.y <= 0.15;
     if (grounded) {
       jumpFeel.onGrounded(feel.coyoteTime);
       if (jumpFeel.airTime > 0) {
@@ -561,19 +725,32 @@ async function boot() {
       airDashUsed = false;
       groundBounce = probe.collider?.bounce ?? 1;
       if (!wasGrounded) {
-        foxActor.squash(1.18, 0.72, 1.18);
-        audio.play('footstep');
+        // landing: weight goes into the camera (dip + FOV kick) and a short land clip
+        const impact = THREE.MathUtils.clamp((-impactVy - 3) / 11, 0, 1);
+        jumpStats.lastImpact = Number(impact.toFixed(2));
+        if (jumpedThisAir) jumpStats.lastDist = Number(Math.hypot(fox.position.x - takeoff.x, fox.position.z - takeoff.z).toFixed(2));
+        if (airT > 0.12) {
+          cam.land(impact);
+          landT = 0.1 + 0.28 * impact;
+          if (impact > 0.75) cam.shake(0.18 * impact);
+          audio.play('footstep');
+        }
+        jumpedThisAir = false;
       }
+      airT = 0;
     } else {
-      jumpFeel.tickAir(dt, fox.position.y, vel.y);
+      if (dt > 0) jumpFeel.tickAir(dt, fox.position.y, vel.y);
+      airT += dt;
     }
 
     const jv = jumpFeel.tryJump(feel.jumpVelocity * groundBounce, fox.position.y);
     if (jv !== null) {
       vel.y = jv;
       grounded = false;
+      jumpedThisAir = true;
+      takeoff.copy(fox.position);
       feelMetrics.jumps += 1;
-      foxActor.squash(0.82, 1.22, 0.82);
+      foxActor.pulse(1.6);
       audio.play('jump');
     }
 
@@ -593,27 +770,48 @@ async function boot() {
         airDashUsed = true;
         vel.y = Math.max(vel.y, 0);
       }
+      dashFrom.copy(fox.position);
       feelMetrics.dashesUsed += 1;
+      cam.punch(5);
+      cam.shake(0.22);
+      foxActor.pulse(1.8);
       audio.play('dash');
       keys.delete('ShiftLeft');
       keys.delete('ShiftRight');
     }
+    const wasDashing = dashT > 0;
     dashT -= dt;
     const dashing = dashT > 0;
+    if (wasDashing && !dashing) jumpStats.lastDashDist = Number(Math.hypot(fox.position.x - dashFrom.x, fox.position.z - dashFrom.z).toFixed(2));
 
-    gliding = !grounded && vel.y < 0 && spaceDown && !dashing;
-    if (!dashing || grounded) vel.y -= feel.gravity * (gliding ? feel.glideGravityScale : 1) * dt;
-    else if (!grounded) vel.y = Math.max(vel.y, 0) * 0.9;
-    if (gliding) {
-      vel.y = Math.max(vel.y, -glide.sink);
+    // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it
+    glideHoldT = !grounded && spaceDown && vel.y < 0 && !dashing ? glideHoldT + dt : 0;
+    gliding = glideHoldT > feel.glideDelay;
+    if (dashing && !grounded) vel.y = Math.max(vel.y, 0) * 0.9;
+    else if (gliding) {
+      vel.y -= feel.gravity * feel.glideGravityScale * dt;
+      // ease into the glide sink instead of clamping (no jolt when caught mid-fall)
+      if (vel.y < -feel.glideSink) vel.y = THREE.MathUtils.damp(vel.y, -feel.glideSink, 7, dt);
       vel.x *= Math.exp(-feel.glideDrag * dt);
       vel.z *= Math.exp(-feel.glideDrag * dt);
+    } else if (!grounded) {
+      // heavier fall, floaty apex while jump is held
+      const hang = spaceDown && Math.abs(vel.y) < 1.4 ? feel.apexHang : 1;
+      const fall = vel.y < 0 ? feel.fallGravity : 1;
+      vel.y -= feel.gravity * fall * hang * dt;
     }
-
-    foxActor.relaxScale(dt);
+    if (gliding && !wasGliding) glideFrom.copy(fox.position);
+    if (!gliding && wasGliding) {
+      const gd = Math.hypot(fox.position.x - glideFrom.x, fox.position.z - glideFrom.z);
+      const drop = glideFrom.y - fox.position.y;
+      jumpStats.glideDist = Number(gd.toFixed(2));
+      jumpStats.glideDrop = Number(drop.toFixed(2));
+      jumpStats.glideRatio = drop > 0.2 ? Number((gd / drop).toFixed(2)) : 0;
+    }
+    wasGliding = gliding;
 
     if (!dashing) {
-      const desired = wish.clone().multiplyScalar(gliding ? Math.max(feel.moveSpeed, glide.forward) : feel.moveSpeed);
+      const desired = wish.clone().multiplyScalar(gliding ? Math.max(feel.moveSpeed, feel.glideForward) : feel.moveSpeed);
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
       cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
@@ -638,45 +836,83 @@ async function boot() {
       }
     }
 
-    if (wish.lengthSq() > 0.01) {
+    if (wish.lengthSq() > 0.01 && dt > 0) {
       const yaw = Math.atan2(wish.x, wish.z);
-      fox.rotation.y = THREE.MathUtils.damp(fox.rotation.y, yaw, feel.turnRate, dt);
+      // shortest-arc turn (damping raw angles spins the long way round across ±π)
+      const d = Math.atan2(Math.sin(yaw - fox.rotation.y), Math.cos(yaw - fox.rotation.y));
+      fox.rotation.y += d * (1 - Math.exp(-feel.turnRate * (grounded ? 1 : 0.6) * dt));
     }
 
-    // Animation state from locomotion
+    // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
+    const speed = Math.hypot(vel.x, vel.z);
+    landT -= dt;
     {
-      const speed = Math.hypot(vel.x, vel.z);
-      let anim: import('./fox').FoxAnimState = 'idle';
-      if (!grounded) {
-        if (gliding) anim = 'glide';
-        else if (vel.y > 0.6) anim = 'jump_up';
-        else if (vel.y > -0.4) anim = 'jump_apex';
-        else anim = 'jump_fall';
-      } else if (dashT > 0) {
+      let anim: FoxAnimState = 'idle';
+      let fade = 0.16;
+      let rate = 1;
+      const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
+      if (dashing) {
         anim = 'dash';
+        fade = 0.05;
+      } else if (!grounded && !offLedge) {
+        fade = 0.1;
+        if (gliding) anim = 'glide';
+        else if (vel.y > 2.2) anim = 'jump_up';
+        else if (vel.y > -1.6) anim = 'jump_apex';
+        else anim = 'jump_fall';
+      } else if (landT > 0 && (speed < 3.5 || landT > 0.16)) {
+        anim = 'land';
+        fade = 0.05;
       } else if (speed > 1.2) {
         anim = 'run';
-      } else {
-        anim = 'idle';
+        // stride follows ground speed (clip authored near full run speed)
+        rate = THREE.MathUtils.clamp(speed / 8.4, 0.55, 1.45);
       }
-      foxActor.setAnim(anim);
+      foxActor.setAnim(anim, fade);
+      foxActor.setTimeScale(rate);
       foxActor.update(dt, elapsed, gliding);
     }
 
-
-    // Color field
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
     colorField.update(dt);
-    colorField.renderMask(dt);
-    for (const m of world.materials) colorField.syncMaterial(m);
 
     // Leaf kick while running
     kickCooldown -= dt;
-    const speed = Math.hypot(vel.x, vel.z);
     if (grounded && speed > 3.5 && kickCooldown <= 0) {
       leafKick.burst(fox.position.clone().setY(fox.position.y - foxActor.feetOffset + 0.1), 0.85);
       kickCooldown = 0.18;
     }
+
+    // Realm: embers, checkpoints, seedwells, bridge, wellspring, hazards
+    if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
+    if (floodT >= 0) {
+      floodT += dt;
+      world.setFlood(Math.min(1, floodT / 5));
+    }
+    restore.update(dt);
+    zone = world.zoneAt(fox.position.x, fox.position.z);
+
+    landingValid = !grounded && predictLanding(fox.position, vel, gliding);
+    cam.update(rawDt, {
+      target: feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
+      vel,
+      grounded,
+      gliding,
+      dashing,
+      landing: landingValid ? landing : null,
+    });
+    audio.update(dt, speed > 1.2, grounded, gliding);
+  }
+  const feetPos = new THREE.Vector3();
+  const heroNdc = new THREE.Vector3();
+
+  /** Visual-only work: particles, colour mask, shadows, photo override, post. */
+  function draw() {
+    const dt = Math.min(visualDt, 0.1);
+    visualDt = 0;
+    const fox = foxActor.group;
+    colorField.renderMask(dt);
+    for (const m of world.materials) colorField.syncMaterial(m);
     leafKick.update(dt);
 
     // Wisps / autumn (particle field follows the fox)
@@ -695,15 +931,6 @@ async function boot() {
     sky.update(dt);
     distant.update(dt);
 
-    // Realm: embers, checkpoints, seedwells, bridge, wellspring, hazards
-    handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
-    if (floodT >= 0) {
-      floodT += dt;
-      world.setFlood(Math.min(1, floodT / 5));
-    }
-    restore.update(dt);
-    zone = world.zoneAt(fox.position.x, fox.position.z);
-
     // shadows follow the fox
     lights.key.target.position.copy(fox.position);
     lights.key.position.copy(fox.position).add(keyOffset);
@@ -717,9 +944,9 @@ async function boot() {
       contactShadow.scale.set(k, k, 1);
       (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.85 * k;
     }
-    camFloorRef.y = fox.position.y + 2.5;
-    cam.update(dt, fox.position, fox.rotation.y, { lookAhead: grounded ? 1.4 : 0.6 });
+
     if (photo) {
+      // staged framing (establishing shots / hero stills) — never used by traversal
       cam.camera.position.copy(photo.pos);
       cam.camera.lookAt(photo.look);
       if (cam.camera.fov !== photo.fov) {
@@ -727,8 +954,11 @@ async function boot() {
         cam.camera.updateProjectionMatrix();
       }
     }
-    occlusion.update(dt, cam.camera, fox.position);
-    audio.update(dt, speed > 1.2, grounded, gliding);
+    occlusion.update(dt, cam.camera, renderer, feetPos, foxActor.height);
+    // keep film grain off the hero
+    heroNdc.set(fox.position.x, fox.position.y - foxActor.feetOffset + foxActor.height * 0.45, fox.position.z).project(cam.camera);
+    const heroR = THREE.MathUtils.clamp(0.9 / Math.max(0.5, cam.camera.position.distanceTo(fox.position)), 0.05, 0.4);
+    post.setHeroScreen(heroNdc.x * 0.5 + 0.5, heroNdc.y * 0.5 + 0.5, heroNdc.z < 1 ? heroR : 0);
 
     const lit = world.seedwells.filter((q) => q.lit).length;
     hud.setStatus(
@@ -757,6 +987,7 @@ async function boot() {
         `air=${feelMetrics.lastAirTime.toFixed(3)}`,
         `jumps=${feelMetrics.jumps}`,
         `dashes=${feelMetrics.dashesUsed}`,
+        `preset=${feelPreset}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',
       ],
@@ -768,10 +999,50 @@ async function boot() {
         jumps: feelMetrics.jumps,
         grounded,
         gliding,
+        extra: {
+          preset: feelPreset,
+          anim: foxActor.getAnim(),
+          lastJumpDist: jumpStats.lastDist,
+          lastLandImpact: jumpStats.lastImpact,
+          lastDashDist: jumpStats.lastDashDist,
+          glideRatio: jumpStats.glideRatio,
+        },
       },
     });
 
     post.render();
+  }
+
+  function tick() {
+    const rawDt = Math.min(clock.getDelta(), 0.05);
+    if (manual) {
+      requestAnimationFrame(tick);
+      return;
+    }
+    const fox = foxActor.group;
+    if (turntableMode) {
+      turntableYaw += rawDt * 0.7;
+      // Open meadow north of the portal — clear ground for silhouette judgment
+      const tx = 6;
+      const tz = 76;
+      const ty = world.terrainY(tx, tz);
+      fox.position.set(tx, ty + foxActor.feetOffset, tz);
+      fox.rotation.y = turntableYaw; // model spins; camera fixed (classic turntable)
+      vel.set(0, 0, 0);
+      foxActor.setAnim(turntableAnim);
+      foxActor.update(rawDt, elapsed, turntableAnim === 'glide');
+      cam.camera.position.set(tx, fox.position.y + 1.25, tz + 3.6);
+      cam.camera.lookAt(tx, fox.position.y + 0.4, tz);
+      contactShadow.position.set(tx, ty + 0.03, tz);
+      contactShadow.scale.set(1, 1, 1);
+      (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
+      sky.update(rawDt);
+      post.render();
+      requestAnimationFrame(tick);
+      return;
+    }
+    step(rawDt);
+    draw();
     requestAnimationFrame(tick);
   }
 

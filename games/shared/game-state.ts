@@ -7,6 +7,8 @@ export type FeelSnapshot = {
   jumps: number;
   grounded: boolean;
   gliding: boolean;
+  /** Game-specific feel readouts (jump distance, landing impact, anim, preset …) */
+  extra?: Record<string, number | string | boolean>;
 };
 
 export type GameState = {

@@ -19,12 +19,16 @@ export type FoxActor = {
   /** World-space height of the scaled mesh (for camera / shadows) */
   height: number;
   setFacing: (yaw: number) => void;
-  squash: (x: number, y: number, z: number) => void;
-  relaxScale: (dt: number) => void;
+  /** Ember-light pulse (1 = rest). Squash/stretch lives in the camera, never on the mesh. */
+  pulse: (k: number) => void;
   /** Advance mixer + secondary motion. Call every frame. */
   update: (dt: number, t: number, gliding: boolean) => void;
-  /** Crossfade to a named clip (must exist on the GLB). */
+  /** Crossfade to a named clip (must exist on the GLB). Same clip = no restart. */
   setAnim: (name: FoxAnimState, fadeS?: number) => void;
+  /** Playback rate of the current clip (run cadence follows ground speed). */
+  setTimeScale: (s: number) => void;
+  /** Clip length in seconds (0 when missing). */
+  clipDuration: (name: FoxAnimState) => number;
   /** Currently playing clip name (best-effort). */
   getAnim: () => string;
   /** True when GLB clips are driving the skeleton. */
@@ -135,6 +139,8 @@ function proceduralFox(): FoxActor {
   group.add(body, belly, head, snout, earL, earR, legFL, legFR, legBL, legBR, tail, tip);
 
   let anim = 'idle';
+  let gaitT = 0;
+  let rate = 10;
   const feetOffset = 0.38;
   return {
     group,
@@ -144,17 +150,11 @@ function proceduralFox(): FoxActor {
     setFacing(yaw) {
       group.rotation.y = yaw;
     },
-    squash(x, y, z) {
-      group.scale.set(x, y, z);
-    },
-    relaxScale(dt) {
-      group.scale.x += (1 - group.scale.x) * Math.min(1, 12 * dt);
-      group.scale.y += (1 - group.scale.y) * Math.min(1, 12 * dt);
-      group.scale.z += (1 - group.scale.z) * Math.min(1, 12 * dt);
-    },
-    update(_dt, t, gliding) {
-      tail.rotation.z = 0.7 + Math.sin(t * 3.2) * 0.12 + (gliding ? 0.2 : 0);
-      const gait = Math.sin(t * 10);
+    pulse() {},
+    update(dt, _t, gliding) {
+      gaitT += dt * rate;
+      tail.rotation.z = 0.7 + Math.sin(gaitT * 0.32) * 0.12 + (gliding ? 0.2 : 0);
+      const gait = anim === 'run' ? Math.sin(gaitT) : 0;
       legFL.rotation.x = gait * 0.55;
       legBR.rotation.x = gait * 0.55;
       legFR.rotation.x = -gait * 0.55;
@@ -163,6 +163,10 @@ function proceduralFox(): FoxActor {
     setAnim(name) {
       anim = name;
     },
+    setTimeScale(k) {
+      rate = 10 * k;
+    },
+    clipDuration: () => 0,
     getAnim() {
       return anim;
     },
@@ -242,8 +246,9 @@ export async function createFox(): Promise<FoxActor> {
       if (current === name) return;
       const next = actions.get(name)!;
       const prev = current ? actions.get(current) : undefined;
-      next.reset().fadeIn(fade).play();
-      prev?.fadeOut(fade);
+      next.reset().setEffectiveTimeScale(1).play();
+      if (prev) prev.crossFadeTo(next, fade, false);
+      else next.fadeIn(fade);
       current = name;
     };
 
@@ -260,20 +265,22 @@ export async function createFox(): Promise<FoxActor> {
       setFacing(yaw) {
         group.rotation.y = yaw;
       },
-      squash(x, y, z) {
-        // Don't squash the skinned mesh (destroys silhouette) — pulse light instead
-        foxLight.intensity = 0.35 * y;
-        void x;
-        void z;
-      },
-      relaxScale(dt) {
-        foxLight.intensity += (0.35 - foxLight.intensity) * Math.min(1, 8 * dt);
+      pulse(k) {
+        foxLight.intensity = 0.35 * k;
       },
       update(dt, _t, _gliding) {
+        foxLight.intensity += (0.35 - foxLight.intensity) * Math.min(1, 8 * dt);
         mixer.update(dt);
       },
       setAnim(name, fadeS = 0.18) {
         play(name, fadeS);
+      },
+      setTimeScale(k) {
+        const act = actions.get(current);
+        if (act) act.setEffectiveTimeScale(Number.isFinite(k) ? Math.max(0, k) : 1);
+      },
+      clipDuration(name) {
+        return actions.get(name)?.getClip().duration ?? 0;
       },
       getAnim() {
         return current || 'none';
