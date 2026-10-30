@@ -998,8 +998,18 @@ try {
       await boot(quality, true);
       if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
       // Central arrival lane: keep the front camera and running fox clear of H-a and its rock wall.
-      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
-      await H('teleport', 0, reviewY, 70, Math.PI);
+      const stages = await page.evaluate(() => {
+        const h = window.__gameHooks, col = h.debug.world.collision;
+        return [[0,70],[-8,78],[-18,76],[20,62],[-20,52],[12,52],[28,54]].map(([x,z]) => {
+          const y = col.highestAt(x,z), look = [x,y+0.5,z];
+          const views = [[0,.6,-5.2],[3.5,.7,-4],[-5.6,.55,0],[-3.3,.9,4.4],[0,.9,5.4],[-.8,.95,-2.2]];
+          const blockers = views.map(([dx,dy,dz]) => h.photoBlocker([x+dx,Math.max(y+dy,col.highestAt(x+dx,z+dz)+.3),z+dz],look));
+          return {x,y,z,blockers,score:blockers.filter(Boolean).length};
+        }).sort((a,b)=>a.score-b.score);
+      });
+      save(`fox-${state}-stages.json`, stages);
+      const stage = stages[0];
+      await H('teleport', stage.x, stage.y, stage.z, Math.PI);
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
       await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
@@ -1011,6 +1021,23 @@ try {
         const cameraFloor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [p.x + dx, p.z + dz]);
         await H('photo', [p.x + dx, Math.max(p.y + dy, cameraFloor + 0.3), p.z + dz], look, fov);
         await advance(3); await shot(`fox-${state}-${name}`);
+        if (name === 'front' || name === 'face') {
+          await page.evaluate(() => { const d = window.__gameHooks.debug; d.renderer.setRenderTarget(null); d.renderer.render(d.scene, d.camera); });
+          await shot(`fox-${state}-${name}-raw`);
+          if (state === 'restored' && name === 'front') {
+            const passes = await page.evaluate(() => window.__gameHooks.debug.post.composer.passes.map(p => p.constructor.name));
+            save('fox-post-passes.json', passes);
+            for (let prefix = 0; prefix < passes.length - 1; prefix++) {
+              await page.evaluate(prefix => {
+                const d = window.__gameHooks.debug, ps = d.post.composer.passes;
+                ps.forEach((p,i) => { p.enabled = i <= prefix || i === ps.length - 1; });
+                d.post.composer.render();
+              }, prefix);
+              await shot(`fox-post-prefix-${prefix}`);
+            }
+            await page.evaluate(() => window.__gameHooks.debug.post.composer.passes.forEach(p => { p.enabled = true; }));
+          }
+        }
       }
       await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);
       await H('setKeys', ['KeyW']); await advance(70); await shot(`fox-${state}-chase-run`);

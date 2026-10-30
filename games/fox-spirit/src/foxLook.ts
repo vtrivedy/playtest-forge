@@ -307,7 +307,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
     [body, [R.spine[3], R.neck[0]], 0.65, 2, 0.16, 0.06, 0.7],
     [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.18, 0.06, 0.8],
-    [tail, R.tail.slice(3), 0.0, 5, 0.26, 0.08, 0.9],
+    [tail, R.tail.slice(3), 0.0, 8, 0.34, 0.11, 0.9],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];

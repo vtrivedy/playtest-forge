@@ -746,6 +746,18 @@ async function boot() {
     photo(pos: [number, number, number], look: [number, number, number], fov = 50) {
       photo = { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look), fov };
     },
+    /** Read-only review-camera clearance, including scenery without gameplay colliders. */
+    photoBlocker(pos: [number, number, number], look: [number, number, number]) {
+      const origin = new THREE.Vector3(...look), delta = new THREE.Vector3(...pos).sub(origin);
+      const ray = new THREE.Raycaster(origin, delta.clone().normalize(), 0.15, delta.length() + 0.25);
+      world.group.updateWorldMatrix(true, true);
+      let hit = ray.intersectObject(world.group, true).find((h) => h.object.visible);
+      if (!hit) {
+        ray.set(new THREE.Vector3(...pos), delta.clone().normalize().negate());
+        hit = ray.intersectObject(world.group, true).find((h) => h.object.visible);
+      }
+      return hit ? { distance: hit.distance, name: hit.object.name, point: hit.point.toArray() } : null;
+    },
     photoOff() {
       photo = null;
     },
