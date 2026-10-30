@@ -895,9 +895,9 @@ try {
     for (const state of ['sepia', 'restored']) {
       await boot(quality, true);
       if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
-      // Open meadow between the portal (z85) and broken arch (z64).
-      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
-      await H('teleport', 6, reviewY, 78, Math.PI);
+      // Central arrival lane: keep the front camera and running fox clear of H-a and its rock wall.
+      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-2, 82));
+      await H('teleport', -2, reviewY, 82, Math.PI);
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
       await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
