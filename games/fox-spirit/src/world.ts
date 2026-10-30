@@ -208,8 +208,8 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
   const grass = createWindGrass(scene, {
     count: 11000,
     radius: 28,
-    bladeHeight: 0.68,
-    bladeBaseW: 0.1,
+    bladeHeight: 0.52,
+    bladeBaseW: 0.095,
     bladeTipW: 0.012,
     color: 0x8a4e1e,       // rust root (restored)
     tipColor: 0xc9963a,    // muted gold tip

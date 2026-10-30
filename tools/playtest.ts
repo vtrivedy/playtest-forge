@@ -185,24 +185,25 @@ try {
         __gameHooks?: { teleportToShrine: () => void; forceRestore: () => void };
       }).__gameHooks;
       h?.teleportToShrine();
-      h?.forceRestore();
     });
-    await page.waitForTimeout(2200); // let wavefront + camera pull-back play
+    await page.waitForTimeout(600); // settle cam on fox at shrine
+    // Hero silhouette — FX off, before restore pull-back
+    await page.evaluate(() => {
+      // @ts-expect-error playtest hook
+      window.__gameHooks?.setFxEnabled?.(false);
+    });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(outDir, 'shot-silhouette.png') });
+    await page.evaluate(() => {
+      // @ts-expect-error playtest hook
+      window.__gameHooks?.setFxEnabled?.(true);
+      // @ts-expect-error playtest hook
+      window.__gameHooks?.forceRestore?.();
+    });
+    await page.waitForTimeout(1800); // wavefront + mild pull-back
   } else {
     await page.waitForTimeout(400);
   }
-  // Hero silhouette at shrine — FX/bloom off
-  await page.evaluate(() => {
-    // @ts-expect-error playtest hook
-    window.__gameHooks?.setFxEnabled?.(false);
-  });
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(outDir, 'shot-silhouette.png') });
-  await page.evaluate(() => {
-    // @ts-expect-error playtest hook
-    window.__gameHooks?.setFxEnabled?.(true);
-  });
-  await page.waitForTimeout(150);
   await page.screenshot({ path: path.join(outDir, 'shot-end.png') });
 
   const metrics = await page.evaluate(() => (window as unknown as { __game?: unknown }).__game ?? null);

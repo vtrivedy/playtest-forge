@@ -86,10 +86,10 @@ async function boot() {
   foxActor.group.position.y += foxActor.feetOffset;
 
   const cam = createFollowCamera({
-    fov: 48,
-    distance: 3.15,
-    height: 1.25,
-    lookAtHeight: 0.55,
+    fov: 50,
+    distance: 3.7,
+    height: 1.65,
+    lookAtHeight: 0.7,
     yAt: world.yAt,
   });
   cam.resize(innerWidth, innerHeight);

@@ -44,7 +44,7 @@ export function createRestoreCinematic(opts: {
       active = true;
       age = 0;
       region = opts.colorField.restore(opts.shrinePos, radius, durationS);
-      opts.camera.setPullBack(6.5, 2.8);
+      opts.camera.setPullBack(2.2, 2.2);
       opts.audio.play('shrine');
       opts.audio.swell(4.5);
       opts.hud.flashRestore();
