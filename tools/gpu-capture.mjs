@@ -951,7 +951,10 @@ try {
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     });
     await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
-    if ((regional ? state.auto.idx < to : !state.restored) || state.auto.assists || state.deaths) report.failures.push(`Route incomplete or assisted: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
+    const passed = !(regional ? state.auto.idx < to : !state.restored) && !state.auto.assists && !state.deaths;
+    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : state.auto.stalled ? 'stalled' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
+    save('route-acceptance.json', { passed, reason, from, to, staged: regional, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
