@@ -86,16 +86,32 @@ async function main() {
       console.log('wrote', file);
     }
 
-    // Also force run pose strip
+    // Fixed-camera run strip (side view) — prove gait, not rubbery scissor
     await page.evaluate(() => {
-      const h = (window as unknown as { __gameHooks?: { runTurntable?: (o: { anim: string; fx: boolean }) => void } })
-        .__gameHooks;
+      const h = (window as unknown as {
+        __gameHooks?: {
+          runTurntable?: (o: { anim: string; fx: boolean }) => void;
+          poseHero?: (o: { anim: string; fx: boolean }) => void;
+        };
+      }).__gameHooks;
+      // poseHero snaps a readable 3/4; then force run via turntable anim
+      h?.poseHero?.({ anim: 'run', fx: false });
       h?.runTurntable?.({ anim: 'run', fx: false });
     });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(350);
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(90);
+      await page.screenshot({
+        path: path.join(outDir, `run-strip-${String(i).padStart(2, '0')}.png`),
+        timeout: 60_000,
+        animations: 'disabled',
+      });
+    }
+    // Legacy run-frame aliases (first 4)
     for (let i = 0; i < 4; i++) {
-      await page.waitForTimeout(200);
-      await page.screenshot({ path: path.join(outDir, `run-frame-${i}.png`), timeout: 60_000, animations: 'disabled' });
+      const src = path.join(outDir, `run-strip-${String(i).padStart(2, '0')}.png`);
+      const dst = path.join(outDir, `run-frame-${i}.png`);
+      if (fs.existsSync(src)) fs.copyFileSync(src, dst);
     }
 
     // Side-by-side note file

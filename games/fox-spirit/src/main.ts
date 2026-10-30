@@ -25,6 +25,7 @@ import { createFollowCamera } from './camera';
 import { createGameAudio } from './audio';
 import { createHud } from './hud';
 import { createLeafKick, createEmberTrail } from './fx';
+import { createOcclusionFader } from './occlusion';
 import { createRestoreCinematic } from './restore';
 
 const feel: FeelParams = { ...PRESET_SPRING, moveSpeed: PRESET_SPRING.moveSpeed * 1.12 };
@@ -161,6 +162,7 @@ async function boot() {
   const emberTrail = createEmberTrail(scene, 36);
   const autumnFX = createAutumnParticles(scene, 180, 110);
   const leafKick = createLeafKick(scene);
+  const occlusion = createOcclusionFader(scene);
 
   // Autumn particle field rides with the fox (the kit spawns in a 28 m box)
   const fxOffset = new THREE.Vector3();
@@ -725,6 +727,7 @@ async function boot() {
         cam.camera.updateProjectionMatrix();
       }
     }
+    occlusion.update(dt, cam.camera, fox.position);
     audio.update(dt, speed > 1.2, grounded, gliding);
 
     const lit = world.seedwells.filter((q) => q.lit).length;

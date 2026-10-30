@@ -1045,6 +1045,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   maple(loneBark, loneLeaves, 8.5, 38, -92.5, { height: 15, trunkR: 0.9, lean: 0.28, leaf: PAL.maple, seed: 999, crownR: 3.6, density: 1.3 });
   col.add(cylCollider({ x: 8.5, z: -92.5, r: 1.1, top: 46, bottom: 37, tag: 'lone-trunk' }));
   const loneMesh = loneLeaves.toMesh(loneMat)!;
+  loneMesh.userData.isOccluder = true;
   group.add(loneMesh);
   const loneCol = loneMesh.geometry.attributes.color as THREE.BufferAttribute;
   const loneFull = Float32Array.from(loneCol.array as Float32Array);
@@ -1398,7 +1399,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     verts += b.vertexCount;
     perMat[mat.name] = (perMat[mat.name] ?? 0) + b.vertexCount;
     const m = b.toMesh(mat, { cast, receive: true });
-    if (m) group.add(m);
+    if (m) {
+      // Canopy / leaf buckets sit between follow-cam and the fox — fade them.
+      if (mat.name === 'rv-canopy' || mat.name.includes('leaf') || mat.name.includes('canopy')) {
+        m.userData.isOccluder = true;
+      }
+      group.add(m);
+    }
   }
   console.info(`[russetvale] merged ${buckets.size} buckets, ${verts} verts, ${col.colliders.length} colliders, ${emberSpots.length} embers`, JSON.stringify(perMat));
 
