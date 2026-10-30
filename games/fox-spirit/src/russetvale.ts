@@ -1,5 +1,6 @@
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { createSummitRepair, type SummitRepair } from './regionSummit';
+import { routeRemnant } from './routeRemnants';
 import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
@@ -744,15 +745,14 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // R2 lateral flight on k1 (2 → 6)
   flightT(10.5, 11.2, 2, 10.5, 2.0, 6, 2.6, 2);
   // R3 jump chain on k2: broken pillar stumps (6 → 7.5 → 9 → 10)
-  for (const [s, top, seed] of [[23, 7.5, 3], [25.5, 9.0, 4]] as const) {
+  for (const [s, top, variant] of [[23, 7.5, 0], [25.5, 9.0, 1]] as const) {
     const p = sp(s, -1);
-    col.add(boxCollider({ x: p.x, z: p.z, w: 1.9, d: 1.9, yaw: T_YAW, top, bottom: 5, tag: 'stump' }));
-    const sb = bk('stone', p.x, p.z);
+    const width = 1.9;
+    col.add(boxCollider({ x: p.x, z: p.z, w: width, d: width, yaw: T_YAW, top, bottom: 5, tag: 'stump' }));
+    routeRemnant(bk('stone', p.x, p.z), lanternColumn, p.x, p.z, T_YAW, 6, top, width, variant);
+    // Keep the shared scenery RNG sequence unchanged after removing the block courses.
     const n = Math.round((top - 6) / 0.62);
-    for (let i = 0; i < n; i++) {
-      const hh = (top - 6) / n;
-      stoneBlock(sb, trs(p.x, 6 + hh * (i + 0.5), p.z, T_YAW + (r() - 0.5) * 0.1), 1.9, hh * 0.98, 1.9, seed * 10 + i, 0.12);
-    }
+    for (let i = 0; i < n; i++) r();
   }
   // R4 lateral flight on k2 (10 → 14), set wholly in front of terrace 3 (s36) and climbing toward
   // the wind gap: the closed cheek is terrace 3's face, the top lands on an apron facing the gap,
