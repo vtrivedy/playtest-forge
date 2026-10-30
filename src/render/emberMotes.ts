@@ -12,6 +12,8 @@ export type EmberBurstOptions = {
   drag?: number;
   /** Flash glow radius at the origin (0 = none) */
   flash?: number;
+  /** Spark head size range m */
+  size?: [number, number];
 };
 
 export type EmberMotes = {
@@ -30,11 +32,11 @@ export type EmberMotes = {
 };
 
 // HDR linear colors: core > 1 so it blooms through the post stack threshold
-const CORE = new THREE.Color(3.4, 2.1, 0.95);
-const FLAME_HOT = new THREE.Color(2.4, 1.3, 0.42);
+const CORE = new THREE.Color(2.6, 1.15, 0.32);
+const FLAME_HOT = new THREE.Color(1.5, 0.62, 0.15);
 const FLAME_COOL = new THREE.Color(1.1, 0.28, 0.06);
-const HALO = new THREE.Color(0.9, 0.36, 0.1);
-const SPARK = new THREE.Color(3.0, 1.55, 0.55);
+const HALO = new THREE.Color(1.0, 0.34, 0.07);
+const SPARK = new THREE.Color(2.5, 1.05, 0.28);
 
 const SHAPE_GLOW = 0;
 const SHAPE_FLAME = 1;
@@ -127,13 +129,14 @@ export function createEmberMotes(scene: THREE.Scene, opts: { maxMotes?: number; 
         }
         a *= vAlpha;
         if (a < 0.004) discard;
-        gl_FragColor = vec4(vColor * a, a);
+        // premultiplied; partial alpha dims what's behind so embers stay orange over pale sepia instead of clipping white
+        gl_FragColor = vec4(vColor * a, a * 0.45);
       }`,
   });
-  // premultiplied additive: src*1 + dst*1
+  // premultiplied add-over: src + dst·(1 − αocc)
   mat.blending = THREE.CustomBlending;
   mat.blendSrc = THREE.OneFactor;
-  mat.blendDst = THREE.OneFactor;
+  mat.blendDst = THREE.OneMinusSrcAlphaFactor;
 
   const points = new THREE.Points(geo, mat);
   points.frustumCulled = false;
@@ -241,15 +244,15 @@ export function createEmberMotes(scene: THREE.Scene, opts: { maxMotes?: number; 
       const count = o.count ?? 60;
       const [s0, s1] = o.speed ?? [1.5, 4];
       const [l0, l1] = o.life ?? [1.6, 3.2];
-      if (o.flash) flash(origin, o.flash, 0.6);
+      if (o.flash) flash(origin, o.flash, 0.9);
       for (let k = 0; k < count; k++) {
         const a = Math.random() * Math.PI * 2;
-        const el = rand(-0.15, 0.9);
+        const el = rand(-0.25, 0.75);
         tmpV.set(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)).multiplyScalar(rand(s0, s1));
         tmpV.y += o.lift ?? 1;
         spawnSpark(origin, tmpV, {
           maxLife: rand(l0, l1),
-          size: rand(0.03, 0.065),
+          size: rand(...(o.size ?? [0.03, 0.065])),
           drag: o.drag ?? 1.4,
           buoyancy: o.buoyancy ?? 0.8,
         });
@@ -268,7 +271,7 @@ export function createEmberMotes(scene: THREE.Scene, opts: { maxMotes?: number; 
         const { x, y, z } = m.pos;
         // two-frequency flicker so neighbouring motes never pulse in sync
         const flick = 0.82 + 0.12 * Math.sin(t * 13 + ph * 3) + 0.08 * Math.sin(t * 29 + ph);
-        emit(x, y + 0.02, z, HALO, 1, 0.62, 0.28 * flick, SHAPE_GLOW);
+        emit(x, y + 0.03, z, HALO, 1, 0.95, 0.4 * flick, SHAPE_GLOW);
         for (let i = 0; i < FLAMES; i++) {
           const p = (t * (1.3 + (i % 2) * 0.35) + i / FLAMES + ph) % 1;
           const sway = Math.sin(t * 6 + i * 1.7 + ph) * 0.025 * p;
@@ -276,16 +279,16 @@ export function createEmberMotes(scene: THREE.Scene, opts: { maxMotes?: number; 
           tmpCol.copy(FLAME_HOT).lerp(FLAME_COOL, p);
           emit(
             x + Math.cos(ang) * 0.025 * (1 - p) + sway,
-            y - 0.04 + p * 0.3,
+            y - 0.04 + p * 0.22,
             z + Math.sin(ang) * 0.025 * (1 - p),
             tmpCol,
             1,
-            0.17 * Math.pow(1 - p, 0.6) + 0.03,
-            (1 - p) * THREE.MathUtils.smoothstep(p, 0, 0.12) * 0.85,
+            0.2 * Math.pow(1 - p, 0.6) + 0.04,
+            (1 - p) * THREE.MathUtils.smoothstep(p, 0, 0.12) * 0.6,
             SHAPE_FLAME,
           );
         }
-        emit(x, y, z, CORE, flick, 0.13 * (0.92 + 0.08 * flick), 1, SHAPE_GLOW);
+        emit(x, y, z, CORE, flick, 0.11 * (0.92 + 0.08 * flick), 1, SHAPE_GLOW);
         for (let i = 0; i < ORBITERS; i++) {
           const a = t * (2.1 + i * 0.55) + i * 2.1 + ph;
           const r = 0.17 + 0.04 * Math.sin(t * 1.7 + i);
@@ -344,7 +347,7 @@ export function createEmberMotes(scene: THREE.Scene, opts: { maxMotes?: number; 
         }
         if (f.follow) f.pos.copy(target);
         const k = f.life / f.maxLife;
-        emit(f.pos.x, f.pos.y, f.pos.z, SPARK, 0.8, f.size * (1.25 - 0.25 * k), k * k, SHAPE_GLOW);
+        emit(f.pos.x, f.pos.y, f.pos.z, SPARK, 0.9, f.size * (1.25 - 0.25 * k), Math.pow(k, 1.5), SHAPE_GLOW);
       }
 
       geo.setDrawRange(0, n);

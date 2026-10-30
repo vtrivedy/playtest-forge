@@ -33,7 +33,8 @@ export function createRestoreCinematic(opts: {
   let age = 0;
   let region: { radius: number; targetRadius: number } | null = null;
   let sparkTrickle = 0;
-  const burstAt = opts.shrinePos.clone().setY(opts.shrinePos.y + 1.1);
+  // ember bowl in the shrine niche (3.2 m shrine, niche faces +Z) — just in front of the stone so sparks aren't buried
+  const burstAt = opts.shrinePos.clone().add(new THREE.Vector3(0, 1.2, 1.35));
 
   return {
     get active() {
@@ -54,7 +55,7 @@ export function createRestoreCinematic(opts: {
       opts.hud.setPrompt('Autumn restored');
       opts.autumnFX.setWavefront(opts.shrinePos, 2, 1.4);
       opts.autumnFX.swirl(opts.shrinePos, 110);
-      opts.motes?.burst(burstAt, { count: 70, speed: [1.2, 3.6], lift: 1.2, flash: 2.2 });
+      opts.motes?.burst(burstAt, { count: 80, speed: [2, 4.5], lift: 0.4, buoyancy: 0.5, drag: 1.6, flash: 1.8, size: [0.05, 0.1] });
       sparkTrickle = 1.8;
     },
     update(dt) {
@@ -63,7 +64,7 @@ export function createRestoreCinematic(opts: {
       // after the first pop, a thinning plume of embers keeps rising off the shrine
       if (sparkTrickle > 0) {
         sparkTrickle -= dt;
-        opts.motes?.burst(burstAt, { count: Math.random() < sparkTrickle * 0.6 ? 2 : 1, speed: [0.3, 1.2], lift: 0.8, life: [1.4, 2.6], buoyancy: 1 });
+        opts.motes?.burst(burstAt, { count: Math.random() < sparkTrickle * 0.6 ? 2 : 1, speed: [0.3, 1.2], lift: 0.8, life: [1.4, 2.6], buoyancy: 1, size: [0.04, 0.08] });
       }
       const r = region?.radius ?? Math.min(radius, (age / durationS) * radius);
       const strength = 1.1 + Math.sin(age * 3) * 0.15;

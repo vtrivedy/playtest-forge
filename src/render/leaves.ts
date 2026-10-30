@@ -383,6 +383,7 @@ export function createAutumnParticles(
         s.vx = Math.cos(a) * sp;
         s.vz = Math.sin(a) * sp;
         s.vy = rand(1.2, 2.4) * strength;
+        s.scale = rand(0.65, 1.3);
         s.pitchRate = rand(5, 10) * (Math.random() < 0.5 ? -1 : 1);
         s.maxLife = s.life = rand(2.5, 4);
       }
@@ -391,7 +392,7 @@ export function createAutumnParticles(
       for (let k = 0; k < count; k++) {
         const s = takePooled();
         const a = Math.random() * Math.PI * 2;
-        const r = rand(0.6, 2.2);
+        const r = rand(1.5, 3);
         s.alive = true;
         s.mode = 2;
         s.rest = 0;
@@ -400,7 +401,9 @@ export function createAutumnParticles(
         s.cz = center.z;
         s.x = center.x + Math.cos(a) * r;
         s.z = center.z + Math.sin(a) * r;
-        s.y = center.y + rand(0, 0.6);
+        s.y = center.y + rand(0.2, 0.9);
+        // hero moment: a little larger than the ambient drift so the vortex reads at shrine distance
+        s.scale = rand(1.1, 1.8);
         s.vx = s.vy = s.vz = 0;
         s.pitchRate = rand(2, 6) * (Math.random() < 0.5 ? -1 : 1);
         s.maxLife = s.life = rand(5, 8);
@@ -449,10 +452,11 @@ export function createAutumnParticles(
           const dx = s.x - s.cx;
           const dz = s.z - s.cz;
           const d = Math.hypot(dx, dz) + 0.001;
-          const tan = (2.6 + 1.5 / d) * k;
-          const tx = (-dz / d) * tan + (dx / d) * 0.9;
-          const tz = (dx / d) * tan + (dz / d) * 0.9;
-          const ty = 2.4 * k * k - 0.2;
+          const tan = (2.2 + 1.5 / d) * k;
+          const tx = (-dz / d) * tan + (dx / d) * 1.1;
+          const tz = (dx / d) * tan + (dz / d) * 1.1;
+          // stay around shrine-body height so the vortex sweeps through a follow-cam frame
+          const ty = 1.1 * k * k - 0.15;
           const blend = 1 - Math.exp(-3 * dt);
           s.vx += (tx - s.vx) * blend;
           s.vy += (ty - s.vy) * blend;

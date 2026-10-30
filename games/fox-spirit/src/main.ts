@@ -223,6 +223,7 @@ async function boot() {
       hasClips: boolean;
       runTurntable: (opts?: { anim?: string; fx?: boolean }) => void;
       stopTurntable: () => void;
+      fx: { autumnFX: typeof autumnFX; emberMotes: typeof emberMotes };
     };
   };
   win.__gameHooks = {
@@ -267,6 +268,7 @@ async function boot() {
     stopTurntable() {
       turntableMode = false;
     },
+    fx: { autumnFX, emberMotes },
   };
 
   hud.setStatus(`Sepia Russetvale · ${backend}`);

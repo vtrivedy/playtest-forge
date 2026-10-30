@@ -45,7 +45,7 @@ try {
   await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
   await page.waitForFunction(() => Boolean((window as unknown as { __gameHooks?: unknown }).__gameHooks), null, { timeout: 60_000 });
   await page.waitForTimeout(1500);
-  const shot = (name: string) => page.screenshot({ path: path.join(outDir, `${name}.png`) });
+  const shot = (name: string) => page.screenshot({ path: path.join(outDir, `${name}.png`), timeout: 120_000 });
 
   await shot('01-start-pickups');
   await page.keyboard.down('KeyW');
@@ -61,11 +61,22 @@ try {
   await page.waitForTimeout(900);
   await shot('05-shrine-before');
   await page.evaluate(() => (window as unknown as { __gameHooks: { forceRestore: () => void } }).__gameHooks.forceRestore());
-  for (const [i, ms] of [400, 700, 1000, 1500].entries()) {
-    await page.waitForTimeout(ms);
+  // SwiftShader runs ~0.25× game speed: these span ~0.3–4 s of game time
+  // game clock stops at 'won' — mirror the game's dt clamp with our own rAF counter
+  // string form: tsx keepNames would inject __name() into a function body
+  await page.evaluate(`(() => {
+    window.__fxT = 0;
+    let last = performance.now();
+    const loop = (now) => { window.__fxT += Math.min((now - last) / 1000, 0.05); last = now; requestAnimationFrame(loop); };
+    requestAnimationFrame(loop);
+  })()`);
+  const gameT = () => page.evaluate(() => (window as unknown as { __fxT: number }).__fxT);
+  const t0 = await gameT();
+  for (const [i, gs] of [0.08, 0.35, 0.9, 2.2].entries()) {
+    while ((await gameT()) - t0 < gs) await page.waitForTimeout(100);
     await shot(`06-restore-${i}`);
   }
-  await page.waitForTimeout(2500);
+  while ((await gameT()) - t0 < 6) await page.waitForTimeout(200);
   await shot('07-restored-leaves');
   const game = await page.evaluate(() => (window as unknown as { __game?: unknown }).__game);
   fs.writeFileSync(path.join(outDir, 'game.json'), JSON.stringify(game, null, 2));
