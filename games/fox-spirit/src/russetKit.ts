@@ -1392,11 +1392,9 @@ export function kilnBowl(stone: Bucket, px: number, py: number, pz: number, bx: 
 }
 
 /** Checkpoint lantern: stone post with a hooded lamp (lamp face in glow bucket). */
-export function lanternPost(stone: Bucket, glow: Bucket, x: number, y: number, z: number, seed: number): void {
+export function lanternPost(stone: Bucket, glow: Bucket, column: THREE.BufferGeometry, x: number, y: number, z: number, seed: number): void {
   setSite(y, y + 2.6);
-  stoneBlock(stone, trs(x, y + 0.15, z), 0.8, 0.3, 0.8, seed, 0.12);
-  stoneBlock(stone, trs(x, y + 0.95, z), 0.32, 1.3, 0.32, seed + 1, 0.06);
-  stoneBlock(stone, trs(x, y + 1.75, z), 0.62, 0.3, 0.62, seed + 2, 0.08);
+  stone.add(column, trs(x, y, z, seed * 0.13), PAL.stone);
   const lamp = new THREE.BoxGeometry(0.4, 0.38, 0.4);
   glow.add(lamp, trs(x, y + 2.08, z), PAL.amber);
   lamp.dispose();

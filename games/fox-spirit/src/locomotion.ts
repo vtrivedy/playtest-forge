@@ -79,6 +79,9 @@ export class AuthoredLocomotion {
     const floor = new THREE.Box3().setFromObject(root).min.y;
     const chains = [FOX_RIG.foreleg('l'),FOX_RIG.foreleg('r')].map(l=>[l.upper,l.lower,l.paw]);
     chains.push(...[FOX_RIG.hindleg('l'),FOX_RIG.hindleg('r')].map(l=>[l.thigh,l.shin,l.paw]));
+    // SkinnedMesh.updateMatrixWorld refreshes bindMatrixInverse after hero normalization.
+    // Object3D.updateWorldMatrix alone does not run that override.
+    root.updateMatrixWorld(true);
     const padHeights:number[]=[];
     for (const [upper, lower, paw] of chains) {
       const a=root.getObjectByName(upper), b=root.getObjectByName(lower), c=root.getObjectByName(paw);
