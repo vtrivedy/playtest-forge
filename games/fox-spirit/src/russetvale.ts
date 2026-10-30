@@ -1680,7 +1680,18 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     col.add(cylCollider({ x: px, z: pz, r: 0.45, top: hy + bowlUp + 0.6, bottom: hy - 1, tag: 'kiln-pillar' }));
     inletSpots.push({ seedwell: si, source: id, pos: new THREE.Vector3(hx + ux * 1.3, hy + bowlUp, hz + uz * 1.3), sealAt: new THREE.Vector3(sw.pos.x, sw.pos.y + 0.78, sw.pos.z), pillar: new THREE.Vector3(px, hy, pz), latchTime: 2 });
   };
-  kiln(0, 'H2', 2.2, 2.6, 5.5);
+  kiln(0, 'H2', 2.2, 2.6, 6);
+  // A real standing place beside the raised bowl: ride the column, steer onto the jut,
+  // then choose the wind-river line. The support stays outside the column's centre.
+  {
+    const bowl = inletSpots[0]!;
+    const x = bowl.pillar.x - 0.5, z = bowl.pillar.z - 0.6;
+    col.add(boxCollider({ x, z, w: 3.6, d: 3.2, top: 26, bottom: 24.9, tag: 'kiln-jut' }));
+    slab({ x, z, w: 3.6, d: 3.2, top: 26, bottom: 24.9, rough: 0.45, seed: 349, topColor: PAL.stone.clone().lerp(PAL.rustMoss, 0.2), overhang: 0.15 });
+    // Ruined spine carries the shelf, keeping its eastern face open to the river.
+    col.add(boxCollider({ x: x - 0.8, z: z - 0.6, w: 1.4, d: 1.3, top: 25, bottom: 19.8, tag: 'kiln-spine' }));
+    for (let i = 0; i < 7; i++) stoneBlock(bk('stone', x, z), trs(x - 0.8, 20.35 + i * 0.72, z - 0.6, (i % 2) * 0.08), 1.4, 0.74, 1.3, 350 + i, 0.12);
+  }
   // Kiln catch shelves (§3.4 recovery): y15 ledges on the spire's south and east faces, each with a hearth
   // whose column (to ≈ y25) overlaps the kiln ledge rim — a missed step is a ride back, not a long walk
   {
