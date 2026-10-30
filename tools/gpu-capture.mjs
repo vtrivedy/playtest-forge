@@ -896,8 +896,8 @@ try {
       await boot(quality, true);
       if (state === 'restored') { await H('forceRestore'); await advance(660, false); }
       // Central arrival lane: keep the front camera and running fox clear of H-a and its rock wall.
-      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-2, 82));
-      await H('teleport', -2, reviewY, 82, Math.PI);
+      const reviewY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
+      await H('teleport', 0, reviewY, 70, Math.PI);
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
       await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
@@ -906,7 +906,8 @@ try {
         back_three_q: [-3.3, 0.9, 4.4, 30], back: [0, 0.9, 5.4, 30], face: [-0.8, 0.95, -2.2, 26] };
       for (const [name, [dx, dy, dz, fov]] of Object.entries(views)) {
         const look = name === 'face' ? [p.x, p.y + 0.82, p.z - 0.45] : at;
-        await H('photo', [p.x + dx, p.y + dy, p.z + dz], look, fov);
+        const cameraFloor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [p.x + dx, p.z + dz]);
+        await H('photo', [p.x + dx, Math.max(p.y + dy, cameraFloor + 0.3), p.z + dz], look, fov);
         await advance(3); await shot(`fox-${state}-${name}`);
       }
       await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);
@@ -918,12 +919,14 @@ try {
   if (wants('turntable')) {
     // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
-    const turntableY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(6, 78));
-    await H('teleport', 6, turntableY, 78, Math.PI); await advance(60, false);
+    const turntableY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
+    await H('teleport', 0, turntableY, 70, Math.PI); await advance(60, false);
     const p = await H('getFoxPos'), n = 8 * fps;
     await video('fox-turntable', n, async i => {
       const a = i / n * Math.PI * 2;
-      await H('photo', [p.x + Math.sin(a) * 3.4, p.y + 0.75, p.z - Math.cos(a) * 3.4], [p.x, p.y + 0.5, p.z], 34);
+      const cx = p.x + Math.sin(a) * 3.4, cz = p.z - Math.cos(a) * 3.4;
+      const floor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [cx, cz]);
+      await H('photo', [cx, Math.max(p.y + 0.75, floor + 0.3), cz], [p.x, p.y + 0.5, p.z], 34);
     });
   }
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
