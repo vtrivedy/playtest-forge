@@ -42,6 +42,7 @@ import { createRestoreCinematic } from './restore';
 import { createUpdrafts, type Hearth, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
 import { createGrowth, type Root } from './chem/growth';
+import { SUMMIT_REPAIR } from './regionSummit';
 import type { ColorStroke } from '../../../src/render/colorField';
 
 /**
@@ -368,6 +369,8 @@ async function boot() {
     },
   });
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
+  const summitHearth = updrafts.hearths.find((h) => h.spot.id === SUMMIT_REPAIR.hearthId);
+  let summitSeal = 0;
   const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
   // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
   let frontFxT = 0;
@@ -646,6 +649,7 @@ async function boot() {
     resetRestore() {
       restore.reset();
       world.resetWellspring();
+      summitSeal = 0;
       shrineOn = false;
       status = 'playing';
       hud.setStatus(`Sepia Russetvale · ${backend}`);
@@ -838,7 +842,7 @@ async function boot() {
     },
   };
 
-  /** Fox reached the Wellspring: the restore sequence takes the lens and ignites at IGNITE_S (restore.ts). */
+  /** The basin was fed (root-lifted lintel + summit hearth): the restore sequence takes the lens and ignites at IGNITE_S (restore.ts). */
   function triggerFlood() {
     restore.begin(foxActor.group.position.clone().setY(foxActor.group.position.y - foxActor.feetOffset));
   }
@@ -864,8 +868,6 @@ async function boot() {
       } else if (e.type === 'checkpoint') {
         shadeContact.wisps = 3;
         audio.play('checkpoint');
-      } else if (e.type === 'wellspring') {
-        if (!shrineOn && restore.phase === 'idle') triggerFlood();
       } else if (e.type === 'hazard') {
         audio.play('hazard');
         respawn();
@@ -1426,6 +1428,14 @@ async function boot() {
     }
     for (const i of inlets.update(dt, (q) => { if (q.source === 'reed-falls') return water.arriving(q.source); return updrafts.hearths.some((h) => heatFeeds(h, q.pos, updrafts.tun.radius)); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
+    // summit finale: the root holds the lintel up, the hearth's column (clipped by the stone) reaches the basin
+    world.summit.update(dt, growth.roots, shrineOn);
+    world.summit.fitColumn(summitHearth, updrafts.tun);
+    summitSeal = world.summit.feeds(summitHearth, updrafts.tun.radius) ? summitSeal + dt : Math.max(0, summitSeal - dt);
+    if (summitSeal >= SUMMIT_REPAIR.latchTime && !shrineOn && restore.phase === 'idle') {
+      world.lightWellspring();
+      triggerFlood();
+    }
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
     reach.update(dt, fox.position, fox.position.y - foxActor.feetOffset, grounded, shrineOn);

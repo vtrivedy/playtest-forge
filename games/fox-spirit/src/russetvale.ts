@@ -1,4 +1,5 @@
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
+import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
@@ -76,7 +77,6 @@ export type RealmEvent =
   | { type: 'seedwell'; index: number }
   | { type: 'bridge' }
   | { type: 'checkpoint'; index: number }
-  | { type: 'wellspring' }
   | { type: 'hazard'; kind: 'ink' | 'fall' };
 
 export type Realm = {
@@ -108,6 +108,10 @@ export type Realm = {
   zoneAt: (x: number, z: number) => string;
   bridgeGrown: () => number;
   wellspringLit: () => boolean;
+  /** Summit finale: a grown root lifts the fallen lintel so the summit hearth's column reaches the basin */
+  summit: SummitRepair;
+  /** The basin was fed for its latch time: the Wellspring wakes (main runs the restore) */
+  lightWellspring: () => void;
   /** Per-frame: animation + triggers. `colorAt` = ColorField saturation probe. */
   update: (dt: number, t: number, fox: THREE.Vector3, feetY: number, colorAt: (p: THREE.Vector3) => number) => RealmEvent[];
   /** Flood tween 0..1 (lone maple, wellspring glow); `pulse` adds an ignition flare to the basin glow/light */
@@ -475,7 +479,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(6.4, 32.8, -80.5, { ground: false });
   W(-6.4, 38, -80.5, { ground: false });
   W(-5, 38, -83.5, { ground: false });
-  W(0, 38, -86, { ground: false, label: 'wellspring' });
+  // finale: wake the root knot at the west foot (it lifts the fallen lintel), then light the summit hearth
+  W(-3.5, 38, -84.4, { ground: false, label: 'grow:summit-KS' });
+  W(-1.2, 39.04, -86.6, { ground: false, label: 'wellspring' });
 
   // ==================================================================== TERRAIN
   {
@@ -1574,6 +1580,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const wsGlowB = new Bucket();
   domedShrine(bk('stone', 0, -89), wsGlowB, WSP.x, WSP.y, WSP.z, 1.3, 170);
   col.add(boxCollider({ x: WSP.x, z: WSP.z, w: 6.0, d: 6.0, top: WSP.y + 0.5, bottom: WSP.y - 1, tag: 'shrine-plinth' }));
+  // finale (world-1.md §3.7): reaching the shrine wins nothing. A fallen lintel caps the summit hearth's
+  // column below the basin; wake the root knot at the west foot and it lifts the stone, then heat reaches it
+  const summit = createSummitRepair(group, col, M.stone);
+  rootSpots.push(summit.rootSpot);
+  hearthSpots.push(summit.hearthSpot);
+  col.add(cylCollider({ x: summit.hearthSpot.x, z: summit.hearthSpot.z, r: 0.82, top: summit.hearthSpot.y + 1, bottom: summit.hearthSpot.y - 1.5, tag: 'hearth' }));
   archAt(bk('stone', -8, -88), -8.5, 38, -86.5, 0.25, { span: 3.4, pillarH: 4.4, seed: 171, pointed: true });
   archAt(bk('stone', -7, -94), -6.5, 38, -94, -0.3, { span: 3, pillarH: 3.6, seed: 172, broken: 0.5 });
   ruinColumn(bk('stone', 9, -85), 9, 38, -84.5, 2.2, 173);
@@ -2351,6 +2363,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     zoneAt,
     bridgeGrown: () => bridgeT,
     wellspringLit: () => wellLit,
+    summit,
+    lightWellspring() {
+      wellLit = true;
+    },
     respawnPos() {
       const p = checkpoints[lastCheckpoint]?.pos ?? spawnPos;
       return p.clone();
@@ -2434,11 +2450,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         (m.material as THREE.MeshBasicMaterial).opacity = inkActive ? 0.55 : 0.3;
       }
 
-      // wellspring
-      if (!wellLit && Math.hypot(fox.x - WSP.x, fox.z - WSP.z) < 5.2 && feetY > WSP.y - 1.5) {
-        wellLit = true;
-        ev.push({ type: 'wellspring' });
-      }
       if (!wellLit) wsGlow.emissiveIntensity = 0.06 + flood;
 
       // hazards
