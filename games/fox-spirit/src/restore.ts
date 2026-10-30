@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { ColorField } from '../../../src/render';
-import type { AutumnParticles } from '../../../src/render';
+import type { AutumnParticles, EmberMotes } from '../../../src/render';
 import type { FollowCamera } from './camera';
 import type { GameAudio } from './audio';
 import type { Hud } from './hud';
@@ -22,6 +22,11 @@ export function createRestoreCinematic(opts: {
   radius?: number;
   durationS?: number;
   autumnFX: AutumnParticles;
+  motes?: EmberMotes;
+  /** Spark burst origin (ember basin); defaults to just above shrinePos. */
+  burstAt?: THREE.Vector3;
+  /** Leaf vortex centre; defaults to shrinePos. */
+  swirlAt?: THREE.Vector3;
   camera: FollowCamera;
   audio: GameAudio;
   hud: Hud;
@@ -31,6 +36,8 @@ export function createRestoreCinematic(opts: {
   let active = false;
   let age = 0;
   let region: { radius: number; targetRadius: number } | null = null;
+  let sparkTrickle = 0;
+  const burstAt = opts.burstAt ?? opts.shrinePos.clone().setY(opts.shrinePos.y + 1.2);
 
   return {
     get active() {
@@ -50,10 +57,18 @@ export function createRestoreCinematic(opts: {
       opts.hud.flashRestore();
       opts.hud.setPrompt('Autumn restored');
       opts.autumnFX.setWavefront(opts.shrinePos, 2, 1.4);
+      opts.autumnFX.swirl(opts.swirlAt ?? opts.shrinePos, 170, 3.2);
+      opts.motes?.burst(burstAt, { count: 130, speed: [2, 5.5], lift: 0.6, buoyancy: 0.6, drag: 1.4, life: [2, 3.6], flash: 2.6, size: [0.1, 0.2], heat: 0.75 });
+      sparkTrickle = 1.8;
     },
     update(dt) {
       if (!active) return;
       age += dt;
+      // after the first pop, a thinning plume of embers keeps rising off the shrine
+      if (sparkTrickle > 0) {
+        sparkTrickle -= dt;
+        opts.motes?.burst(burstAt, { count: Math.random() < sparkTrickle * 0.6 ? 2 : 1, speed: [0.3, 1.2], lift: 0.8, life: [1.6, 3], buoyancy: 1, size: [0.08, 0.16], heat: 0.75 });
+      }
       const r = region?.radius ?? Math.min(radius, (age / durationS) * radius);
       const strength = 1.1 + Math.sin(age * 3) * 0.15;
       opts.autumnFX.setWavefront(opts.shrinePos, r, strength);

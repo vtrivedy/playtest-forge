@@ -54,7 +54,7 @@ export type RealmEvent =
   | { type: 'seedwell'; index: number }
   | { type: 'bridge' }
   | { type: 'checkpoint'; index: number }
-  | { type: 'ember'; value: number }
+  | { type: 'ember'; value: number; index: number }
   | { type: 'wellspring' }
   | { type: 'hazard'; kind: 'ink' | 'fall' };
 
@@ -71,6 +71,8 @@ export type Realm = {
   respawnPos: () => THREE.Vector3;
   route: Waypoint[];
   emberTotal: number;
+  /** Pickup spots (visuals live in the game's EmberMotes kit). */
+  emberSpots: ReadonlyArray<{ p: THREE.Vector3; value: number }>;
   zoneAt: (x: number, z: number) => string;
   bridgeGrown: () => number;
   wellspringLit: () => boolean;
@@ -1361,14 +1363,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       acc = (acc + len) % spacing;
     }
   }
-  const emberGeo = new THREE.OctahedronGeometry(0.17, 0);
-  const emberMat = new THREE.MeshStandardMaterial({ color: 0xffb060, emissive: 0xff6a10, emissiveIntensity: 1.6, roughness: 0.3 });
-  const embers = new THREE.InstancedMesh(emberGeo, emberMat, emberSpots.length);
-  embers.name = 'rv-embers';
   const emberTaken = new Array<boolean>(emberSpots.length).fill(false);
-  const tmpM = new THREE.Matrix4();
-  embers.frustumCulled = false;
-  group.add(embers);
   const emberTotal = emberSpots.reduce((s, e) => s + e.value, 0);
 
   // ==================================================================== ATMOSPHERE: cloud sea sheets under the realm
@@ -1449,6 +1444,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     checkpoints,
     route,
     emberTotal,
+    emberSpots,
     zoneAt,
     bridgeGrown: () => bridgeT,
     wellspringLit: () => wellLit,
@@ -1469,20 +1465,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       // embers
       for (let i = 0; i < emberSpots.length; i++) {
         const e = emberSpots[i]!;
-        if (emberTaken[i]) {
-          tmpM.makeScale(0, 0, 0);
-        } else {
-          const bob = Math.sin(t * 2.6 + i * 0.7) * 0.09;
-          const s = e.value > 1 ? 1.8 : 1;
-          tmpM.compose(new THREE.Vector3(e.p.x, e.p.y + bob, e.p.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, t * 2 + i, 0)), new THREE.Vector3(s, s, s));
-          if (Math.abs(fox.x - e.p.x) < 1.2 && Math.abs(fox.z - e.p.z) < 1.2 && Math.abs(fox.y + 0.5 - e.p.y) < 1.4) {
-            emberTaken[i] = true;
-            ev.push({ type: 'ember', value: e.value });
-          }
+        if (emberTaken[i]) continue;
+        if (Math.abs(fox.x - e.p.x) < 1.2 && Math.abs(fox.z - e.p.z) < 1.2 && Math.abs(fox.y + 0.5 - e.p.y) < 1.4) {
+          emberTaken[i] = true;
+          ev.push({ type: 'ember', value: e.value, index: i });
         }
-        embers.setMatrixAt(i, tmpM);
       }
-      embers.instanceMatrix.needsUpdate = true;
 
       // checkpoints
       for (let i = 0; i < checkpoints.length; i++) {

@@ -21,6 +21,7 @@ import {
   createFoxWisps,
   createAutumnParticles,
   detectQuality,
+  createEmberMotes,
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createFox } from './fox';
@@ -28,7 +29,7 @@ import { createFollowCamera } from './camera';
 import type { FoxAnimState } from './fox';
 import { createGameAudio } from './audio';
 import { createHud } from './hud';
-import { createLeafKick, createEmberTrail } from './fx';
+import { createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
 import { createRestoreCinematic } from './restore';
 
@@ -215,25 +216,27 @@ async function boot() {
 
   const wisps = createFoxWisps(scene, 28); // spirit-fire aura
   const emberTrail = createEmberTrail(scene, 36);
-  const autumnFX = createAutumnParticles(scene, Math.round(180 * quality.particleScale), Math.round(110 * quality.particleScale));
-  const leafKick = createLeafKick(scene);
+  const autumnFX = createAutumnParticles(scene, Math.round(180 * quality.particleScale), Math.round(60 * quality.particleScale), {
+    colorField,
+    groundAt: (x, z) => col.highestAt(x, z),
+  });
+  const emberMotes = createEmberMotes(scene, { maxMotes: world.emberSpots.length });
+  for (const e of world.emberSpots) emberMotes.add(e.p, e.value > 1 ? 1.6 : 1);
   const occlusion = createOcclusionFader(scene, {
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
 
-  // Autumn particle field rides with the fox (the kit spawns in a 28 m box)
-  const fxOffset = new THREE.Vector3();
-  const autumnFollow = {
-    ...autumnFX,
-    setWavefront: (c: THREE.Vector3, r: number, s: number) => autumnFX.setWavefront(c.clone().sub(fxOffset), r, s),
-  };
   const restore = createRestoreCinematic({
     colorField,
     shrinePos: world.wellspringPos,
     radius: 235,
     durationS: 6,
-    autumnFX: autumnFollow,
+    autumnFX,
+    motes: emberMotes,
+    // ember basin on the wellspring's inner altar; open pavilion, so sparks clear the columns
+    burstAt: world.wellspringPos.clone().add(new THREE.Vector3(0, 2.9, 0)),
+    swirlAt: world.wellspringPos.clone().add(new THREE.Vector3(0, 1.6, 0)),
     camera: cam,
     audio,
     hud,
@@ -398,6 +401,7 @@ async function boot() {
     hasClips: foxActor.hasClips,
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField },
+    fx: { autumnFX, emberMotes },
     teleportToShrine() {
       const p = world.wellspringPos;
       foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.2, p.z + 4.5);
@@ -608,6 +612,7 @@ async function boot() {
         feelMetrics.gemsCollected = embersGot;
         hud.setEmbers(embersGot);
         audio.play('ember');
+        emberMotes.collect(e.index);
         if (simClock - lastHitstop > HITSTOP_COOLDOWN_S) {
           hitstop = HITSTOP_S;
           lastHitstop = simClock;
@@ -616,6 +621,8 @@ async function boot() {
       } else if (e.type === 'seedwell') {
         const s = world.seedwells[e.index]!;
         colorField.restore(s.pos, s.radius, 3.2);
+        autumnFX.swirl(s.pos, 40, 1.6);
+        emberMotes.burst(s.pos.clone().setY(s.pos.y + 1), { count: 36, speed: [1.2, 3], lift: 0.5, flash: 1.2, size: [0.04, 0.08] });
         audio.play('shrine');
         audio.swell(2.5);
         hud.flashRestore();
@@ -994,7 +1001,7 @@ async function boot() {
     // Leaf kick while running
     kickCooldown -= dt;
     if (grounded && speed > 3.5 && kickCooldown <= 0) {
-      leafKick.burst(fox.position.clone().setY(fox.position.y - foxActor.feetOffset + 0.1), 0.85);
+      autumnFX.kick(fox.position.clone().setY(fox.position.y - foxActor.feetOffset), 0.85);
       kickCooldown = 0.18;
     }
 
@@ -1032,12 +1039,8 @@ async function boot() {
     const fox = foxActor.group;
     colorField.renderMask(dt);
     for (const m of world.materials) colorField.syncMaterial(m);
-    leafKick.update(dt);
 
-    // Wisps / autumn (particle field follows the fox)
-    fxOffset.set(fox.position.x, fox.position.y - 3, fox.position.z);
-    autumnFX.leaves.position.copy(fxOffset);
-    autumnFX.embers.position.copy(fxOffset);
+    // Wisps / autumn
     if (fxEnabled) {
       wisps.update(dt, fox.position, shrineOn ? 0.85 : 0.45);
       emberTrail.update(dt, fox.position, gliding ? 0.9 : shrineOn ? 0.7 : 0.5);
@@ -1046,7 +1049,8 @@ async function boot() {
       wisps.update(dt, new THREE.Vector3(0, -50, 0), 0);
       emberTrail.update(dt, new THREE.Vector3(0, -50, 0), 0);
     }
-    autumnFX.update(dt);
+    autumnFX.update(dt, fox.position);
+    emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
     sky.update(dt);
     distant.update(dt);
 

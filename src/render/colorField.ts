@@ -184,6 +184,7 @@ export class ColorField {
       blending: THREE.AdditiveBlending,
       depthTest: false,
       depthWrite: false,
+      side: THREE.DoubleSide, // mask camera views stamps from below
       vertexShader: /* glsl */ `
         attribute float aStrength;
         attribute float aNoise;
@@ -239,8 +240,10 @@ export class ColorField {
     this.maskCam.right = maxX;
     this.maskCam.top = maxZ;
     this.maskCam.bottom = minZ;
-    this.maskCam.position.set(0, 50, 0);
-    this.maskCam.up.set(0, 0, -1);
+    // Look *up* from below with up=+Z so mask u→+X and v→+Z, matching every
+    // sampler's uv = ((x - minX)/w, (z - minZ)/d). (Looking down with up=-Z mirrored Z.)
+    this.maskCam.position.set(0, -50, 0);
+    this.maskCam.up.set(0, 0, 1);
     this.maskCam.lookAt(0, 0, 0);
     this.maskCam.updateProjectionMatrix();
   }
