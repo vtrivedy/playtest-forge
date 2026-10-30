@@ -58,7 +58,13 @@ async function main() {
     });
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
-    await page.waitForTimeout(1200);
+    // Russetvale mesh merge is heavy — wait for hooks, not a fixed 1.2s
+    await page.waitForFunction(
+      () => Boolean((window as unknown as { __gameHooks?: { runTurntable?: unknown } }).__gameHooks?.runTurntable),
+      undefined,
+      { timeout: 180_000 },
+    );
+    await page.waitForTimeout(800);
 
     const info = await page.evaluate(
       ({ anim, fxOn }) => {
@@ -90,17 +96,31 @@ async function main() {
     await page.evaluate(() => {
       const h = (window as unknown as {
         __gameHooks?: {
-          runTurntable?: (o: { anim: string; fx: boolean }) => void;
+          stopTurntable?: () => void;
           poseHero?: (o: { anim: string; fx: boolean }) => void;
+          advance?: (frames?: number, dt?: number) => unknown;
+          setManual?: (on: boolean) => void;
+          getFoxPos?: () => { x: number; y: number; z: number };
+          photo?: (pos: [number, number, number], look: [number, number, number], fov?: number) => void;
         };
       }).__gameHooks;
-      // poseHero snaps a readable 3/4; then force run via turntable anim
+      h?.stopTurntable?.();
       h?.poseHero?.({ anim: 'run', fx: false });
-      h?.runTurntable?.({ anim: 'run', fx: false });
+      // Side profile for gait (poseHero left a 3/4 photo)
+      const pos = h?.getFoxPos?.() as { x: number; y: number; z: number } | undefined;
+      if (pos && h?.photo) {
+        h.photo([pos.x + 3.4, pos.y + 0.85, pos.z], [pos.x, pos.y + 0.4, pos.z], 48);
+      }
+      h?.setManual?.(true);
     });
-    await page.waitForTimeout(350);
+    await page.waitForTimeout(200);
     for (let i = 0; i < 8; i++) {
-      await page.waitForTimeout(90);
+      await page.evaluate(() => {
+        const h = (window as unknown as { __gameHooks?: { advance?: (f?: number, d?: number) => unknown } }).__gameHooks;
+        // ~2 frames of run at 24fps ≈ one strip step across the 14-frame cycle
+        h?.advance?.(3, 1 / 24);
+      });
+      await page.waitForTimeout(40);
       await page.screenshot({
         path: path.join(outDir, `run-strip-${String(i).padStart(2, '0')}.png`),
         timeout: 60_000,
