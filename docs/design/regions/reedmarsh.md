@@ -89,3 +89,6 @@ The near aqueduct stair from(91,10) to(94.5,16.1) crosses the earlier island-ent
 
 ## Opus critique correction
 The new catches overlapped the moved stair. Split the y5 south catch into side wings, remove the y9 slab over the stair, and catch directly beneath the falls lip at(100,18),y9 instead. Keep HP column at(95,18) open. Source probes now sample the upper frozen sheet at13.8/15m, so neither standing nor a normal jump from the y9 recovery balcony can supply it (ColorField threshold0.3 has smaller effective range than its3.4m outer radius). This resolves the safety/access conflict: a six-metre catch no longer becomes a low source-sustain solve. Capture still must prove the source and catch arrangement in play.
+
+## Live source test repair
+GPU reed-r2 proves incoming stair→east stair→HP rise→aqueduct landing→lip sustain, zero deaths. Source stays fully burning, but seal max0.002 because the previous Shade loop remained on the flume permanently. Revise only its authored placement: it visits the flume then makes a long excursion around the south recovery balcony at1.1m/s, leaving enough time for downstream travel plus7s seal. Freeing it remains another solution; no artificial drain exemption or forced latch is added.
