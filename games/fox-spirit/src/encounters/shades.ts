@@ -161,8 +161,8 @@ function inkWisps(seed: number) {
   g.setAttribute('position',new THREE.BufferAttribute(points,3));
   g.setAttribute('aPhase',new THREE.BufferAttribute(Float32Array.from({length:24},(_,k)=>(k*.618+seed*.13)%1),1));
   const mat=new THREE.ShaderMaterial({
-    uniforms:{uTime:{value:0},uPresence:{value:1},uOpacity:{value:.16},uSize:{value:.65}},
-    vertexShader:`attribute float aPhase; uniform float uTime,uPresence,uSize; varying float vAge; varying float vPhase;
+    uniforms:{uTime:{value:0},uPresence:{value:1},uOpacity:{value:.16},uSize:{value:.65},uPixelScale:{value:540}},
+    vertexShader:`attribute float aPhase; uniform float uTime,uPresence,uSize,uPixelScale; varying float vAge; varying float vPhase;
       void main(){
         float age=fract(aPhase+uTime*.22);vAge=age;vPhase=aPhase;
         vec3 p=position; p.y+=age*1.3;
@@ -170,7 +170,7 @@ function inkWisps(seed: number) {
         p.z-=age*.5;
         vec4 mv=modelViewMatrix*vec4(p,1.);
         gl_Position=projectionMatrix*mv;
-        gl_PointSize=clamp(uSize*(.55+age)*projectionMatrix[1][1]*540./max(.1,-mv.z),1.,180.);
+        gl_PointSize=clamp(uSize*(.55+age)*projectionMatrix[1][1]*uPixelScale/max(.1,-mv.z),1.,180.);
       }`,
     fragmentShader:`uniform float uTime,uPresence,uOpacity; varying float vAge; varying float vPhase;
       ${NOISE}
@@ -186,6 +186,8 @@ function inkWisps(seed: number) {
     transparent:true,depthWrite:false,depthTest:true,
   });
   const smoke=new THREE.Points(g,mat);smoke.frustumCulled=false;
+  const size=new THREE.Vector2();
+  smoke.onBeforeRender=renderer=>{mat.uniforms.uPixelScale!.value=renderer.getDrawingBufferSize(size).y*.5;};
   return smoke;
 }
 

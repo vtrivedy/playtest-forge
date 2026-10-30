@@ -234,3 +234,7 @@ After validating clear review cameras, broaden the forearm and upper rear-leg co
 Expose the landed flow, Crown, and showcase shots through the one-command
 review helper. These use the same GPU harness and report verification already
 used by direct Modal invocation; do not maintain a helper-only capture path.
+Integrated boot repair: standalone tree extraction can leave an existing cell
+with zero geometries. Skip empty cells in nature-kit build before calling Three's
+mergeGeometries; its empty input dereferences the nonexistent first geometry.
+This preserves all populated batches and is required for the integrated GPU run.
