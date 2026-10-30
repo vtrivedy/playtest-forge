@@ -1,3 +1,4 @@
+import { loadRubbleKit } from './russetRubble';
 import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
@@ -280,7 +281,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
-  const nature = await loadNatureKit();
+  const [nature, rubble] = await Promise.all([loadNatureKit(), loadRubbleKit()]);
   // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
   // yaw picked to keep foliage out of the route's jump arcs
   const TREE_HUES: Array<[THREE.Color, THREE.Color]> = [
@@ -2194,6 +2195,18 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       group.add(m);
     }
   }
+
+  // CC0 scanned fragments sit inside existing masonry footprints; route landings stay clear.
+  for (let i = 0; i < 9; i++) {
+    const a = i * 2.39996;
+    const x = -30 + Math.cos(a) * (1.05 + (i % 2) * 0.4);
+    const z = 60.4 + Math.sin(a) * 1.55;
+    rubble.place(bk('rock', x, z), x, 3.18, z, 0.7 + (i % 3) * 0.18, 420 + i, 0.48);
+  }
+  for (const [x, y, z, seed] of [[55.6, -0.1, 35.3, 440], [95, -1.9, 20, 441], [105, -1.9, 20, 442]] as const) {
+    rubble.place(bk('rock', x, z), x, y, z, 1.05, seed, 1.4);
+  }
+  rubble.dispose();
 
   // ==================================================================== merge buckets
   let verts = 0;
