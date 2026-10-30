@@ -225,9 +225,11 @@ export class AuthoredLocomotion {
     for(const neck of this.necks)worldOverlay(neck,new THREE.Vector3(0,1,0),look*.22);
     worldOverlay(this.head,new THREE.Vector3(0,1,0),look*.34);
     const right=new THREE.Vector3(Math.cos(this.input.yaw),0,-Math.sin(this.input.yaw));
-    const nod=this.nodSpring.step(-landOffset*2-this.brake*.10+(this.input.grounded ? Math.sin(this.phase*Math.PI*2)*.025 : THREE.MathUtils.clamp(-this.input.verticalSpeed*.012,-.1,.1)),dt,4,.8);
+    for(const neck of this.necks)worldOverlay(neck,right.clone(),.10);
+    worldOverlay(this.head,right.clone(),-.10*this.necks.length);
+    const nod=this.nodSpring.step(-landOffset*2-this.brake*.10+(this.input.grounded ? Math.sin(this.phase*Math.PI*(this.metrics.gait==='run' ? 2 : 4))*(this.metrics.gait==='run' ? .22 : .06) : THREE.MathUtils.clamp(-this.input.verticalSpeed*.012,-.1,.1)),dt,6,.7);
     worldOverlay(this.head,right,-this.pitch*this.params.headStabilize+nod);
-    const tailLoad=this.tailLoadSpring.step(this.params.tailLoad+this.input.speed*.005-landOffset*3+this.brake*.10,dt,2.8,.8);
+    const tailLoad=this.tailLoadSpring.step(this.params.tailLoad+this.input.speed*.005-landOffset*3+this.brake*.10+(this.input.grounded ? 0 : THREE.MathUtils.clamp(this.input.verticalSpeed*.015,-.1,.15)),dt,2.8,.8);
     overlay(this.tailBone,new THREE.Vector3(1,0,0),tailLoad);
     let tailTarget=THREE.MathUtils.clamp(-this.turn*this.params.tailLag,-.25,.25);
     for(let i=0;i<this.tails.length;i++) {
