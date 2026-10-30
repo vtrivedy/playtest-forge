@@ -21,7 +21,7 @@ const mode = arg('mode', 'shots');
 const port = Number(arg('port', '5193'));
 const out = path.resolve(arg('out', 'playtest-output/fox-spirit/feel'));
 const [vw, vh] = arg('size', '800x450').split('x').map(Number);
-const preset = arg('feel', 'spring');
+const preset = arg('feel', 'brisk');
 fs.mkdirSync(out, { recursive: true });
 
 let server = null;
@@ -100,10 +100,9 @@ async function probes() {
   await at();
   await run(['KeyW'], 40); await run(['KeyW', 'ShiftLeft'], 2); st = await run(['KeyW'], 30);
   res.groundDash = { dist: st.feel.lastDashDist };
-  // glide off the hill path: a long held jump that becomes a glide over falling ground
-  await H('teleport', -79.5, 14, 13.6, Math.PI);
-  await run([], 20);
-  await run(['KeyW'], 30); st = await run(['KeyW', 'Space'], 160); st = await run(['KeyW'], 60);
+  // glide: drop in 14 m above the flat meadow, hold jump + forward until touchdown
+  await H('teleport', 6, 14, 60, Math.PI);
+  st = await run(['KeyW', 'Space'], 420); st = await run(['KeyW'], 30);
   res.glide = { dist: st.feel.glideDist, drop: st.feel.glideDrop, ratio: st.feel.glideRatio };
   await H('setKeys', []);
   return { label: 'STAGED probe — teleported to flat ground, scripted keys, fixed 60 Hz', ...res };

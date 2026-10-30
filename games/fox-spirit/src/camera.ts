@@ -65,7 +65,11 @@ export type FollowCamera = {
   /** Manual orbit (radians); suspends auto-recentre for `recenterDelay` */
   orbit: (dYaw: number, dPitch?: number) => void;
   snapBehind: (yaw: number) => void;
-  /** Camera yaw (camera sits at target + (sin yaw, cos yaw) * distance) */
+  /**
+   * Steering yaw: the "behind" direction input is read against. The 3/4 framing bias is
+   * applied on top when placing the lens, never here — otherwise holding forward while the
+   * camera recentres feeds back into a spiral.
+   */
   getYaw: () => number;
   resize: (w: number, h: number) => void;
 };
@@ -187,7 +191,7 @@ export function createFollowCamera(opts: {
     const fov = s.fov ?? params.fov;
     const need = (size * 0.62 + 2.2) / Math.tan(THREE.MathUtils.degToRad(fov * 0.5));
     // Look from the traversal side, swung 25° and raised so both subjects separate on screen
-    const a = yaw + 0.45;
+    const a = yaw + params.sideBias + 0.45;
     const elev = THREE.MathUtils.degToRad(18 + (s.rise ?? 10));
     shotPos.set(
       shotLook.x + Math.sin(a) * Math.cos(elev) * need,
@@ -252,7 +256,7 @@ export function createFollowCamera(opts: {
       // ---- auto-recentre behind the run direction (never while backpedalling toward the lens)
       if (speed > 1 && manualT > params.recenterDelay && !f.dashing) {
         const heading = Math.atan2(f.vel.x, f.vel.z);
-        const behind = wrap(heading + Math.PI + params.sideBias);
+        const behind = wrap(heading + Math.PI);
         const toward = -Math.cos(heading - yaw); // 1 = running away from camera
         const weight = toward > -0.2 ? Math.max(0.15, toward) : 0;
         const rate = params.recenterRate * Math.min(1, speed / 7.5) * weight * (f.gliding ? 1.4 : 1);
@@ -285,7 +289,8 @@ export function createFollowCamera(opts: {
       dist = THREE.MathUtils.damp(dist, goalDist, goalDist > dist ? 2.2 : 1.4, dt);
 
       const pitchLift = params.height * (dist / params.distance) + pitchBias * dist + pullAmt * 0.3;
-      desired.set(p.x + Math.sin(yaw) * dist + lead.x * 0.3, focusY + pitchLift, p.z + Math.cos(yaw) * dist + lead.z * 0.3);
+      const lensYaw = yaw + params.sideBias;
+      desired.set(p.x + Math.sin(lensYaw) * dist + lead.x * 0.3, focusY + pitchLift, p.z + Math.cos(lensYaw) * dist + lead.z * 0.3);
       sweepBoom(boomFocus.set(p.x, focusY + params.lookHeight, p.z), desired);
 
       if (!initialized) {

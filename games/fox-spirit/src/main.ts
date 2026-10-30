@@ -48,7 +48,7 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     coyoteTime: 0.11,
     jumpBuffer: 0.13,
     glideSink: 2.5,
-    glideForward: 7.5,
+    glideForward: 7.9,
     glideDelay: 0.1,
   },
   brisk: {
@@ -62,13 +62,16 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     airControl: 0.7,
     coyoteTime: 0.1,
     jumpBuffer: 0.12,
+    dashSpeed: 20,
+    dashDuration: 0.2,
     glideSink: 2.7,
-    glideForward: 8,
+    glideForward: 8.4,
     glideDelay: 0.08,
   },
 };
 const presetParam = new URLSearchParams(location.search).get('feel');
-let feelPreset: keyof typeof FEEL_PRESETS = presetParam === 'brisk' ? 'brisk' : 'spring';
+// brisk won the Russetvale comparison (apex 1.85 m / 0.80 s air vs spring's floaty 1.05 s; route 100 s vs 110 s)
+let feelPreset: keyof typeof FEEL_PRESETS = presetParam === 'spring' ? 'spring' : 'brisk';
 const feel: FoxFeel = { ...FEEL_PRESETS[feelPreset] };
 const jumpFeel = new JumpFeel();
 const feelMetrics = emptyFeelMetrics();
@@ -790,9 +793,9 @@ async function boot() {
     gliding = glideHoldT > feel.glideDelay;
     if (dashing && !grounded) vel.y = Math.max(vel.y, 0) * 0.9;
     else if (gliding) {
-      vel.y -= feel.gravity * feel.glideGravityScale * dt;
-      // ease into the glide sink instead of clamping (no jolt when caught mid-fall)
-      if (vel.y < -feel.glideSink) vel.y = THREE.MathUtils.damp(vel.y, -feel.glideSink, 7, dt);
+      // ease into the glide sink from a fast fall (no jolt), then hold it exactly
+      if (vel.y > -feel.glideSink) vel.y = Math.max(vel.y - feel.gravity * feel.glideGravityScale * dt, -feel.glideSink);
+      else vel.y = THREE.MathUtils.damp(vel.y, -feel.glideSink, 7, dt);
       vel.x *= Math.exp(-feel.glideDrag * dt);
       vel.z *= Math.exp(-feel.glideDrag * dt);
     } else if (!grounded) {
@@ -812,7 +815,7 @@ async function boot() {
     wasGliding = gliding;
 
     if (!dashing) {
-      const desired = wish.clone().multiplyScalar(gliding ? Math.max(feel.moveSpeed, feel.glideForward) : feel.moveSpeed);
+      const desired = wish.clone().multiplyScalar(gliding ? feel.glideForward : feel.moveSpeed);
       const control = grounded ? 1 : gliding ? 0.9 : feel.airControl;
       const cur = new THREE.Vector3(vel.x, 0, vel.z);
       cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
