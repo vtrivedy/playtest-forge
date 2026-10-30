@@ -397,7 +397,7 @@ function createShared(): HearthShared {
           // soft heat body: big dim warm puffs that give the column volume at distance
           float d = length(q);
           float g = exp(-d * d * 9.0);
-          gl_FragColor = vec4(vec3(1.0, 0.42, 0.1) * g * vA * 0.58 * vHot, g * vA * 0.55);
+          gl_FragColor = vec4(vec3(1.0, 0.45, 0.14) * g * vA * 0.42 * vHot, g * vA * 0.4);
         } else if (vLeaf > 0.5) {
           // turning maple-ish leaf: rotated lens with a notch, warm rust lit from below
           float c = cos(vSpin), s = sin(vSpin);
@@ -411,9 +411,9 @@ function createShared(): HearthShared {
           float d = length(q);
           float core = exp(-d * d * 38.0);
           if (core < 0.02) discard;
-          vec3 hot = vec3(1.0, 0.86, 0.5);
-          vec3 cool = vec3(1.0, 0.32, 0.06);
-          gl_FragColor = vec4(mix(cool, hot, vHot * vHot) * 3.2, core * vA);
+          vec3 hot = vec3(1.0, 0.62, 0.26);
+          vec3 cool = vec3(0.9, 0.26, 0.05);
+          gl_FragColor = vec4(mix(cool, hot, vHot * vHot) * 1.7, core * vA);
         }
         #include <colorspace_fragment>
       }`,
@@ -422,7 +422,8 @@ function createShared(): HearthShared {
     blending: THREE.AdditiveBlending,
   });
 
-  // warm haze: an open cylinder, brightest low and at grazing angles, breathing with noise
+  // warm haze: an open cylinder that is densest through its middle and vanishes at the silhouette
+  // (no rim, no stripes: a lit glass tube is exactly the look this must never have), wavering like heat
   const glowGeo = new THREE.CylinderGeometry(1, 1, 1, 28, 1, true);
   glowGeo.translate(0, 0.5, 0);
   const glow = new THREE.ShaderMaterial({
@@ -449,10 +450,11 @@ function createShared(): HearthShared {
       varying vec3 vV;
       varying float vAng;
       void main() {
-        float rim = 1.0 - abs(dot(vN, vV));
-        float band = 0.6 + 0.4 * sin(vAng * 3.0 + vY * 9.0 - uTime * 4.0);
-        float a = uHeat * pow(1.0 - vY, 1.15) * (0.35 + rim * 0.85) * band * 0.82;
-        gl_FragColor = vec4(vec3(1.0, 0.48, 0.14) * a * 1.35, a);
+        float facing = pow(abs(dot(vN, vV)), 2.2);
+        float shimmer = 0.75 + 0.25 * sin(vY * 13.0 - uTime * 3.1 + sin(vAng * 2.0 + uTime * 0.7) * 2.0);
+        float ends = smoothstep(0.0, 0.14, vY) * pow(1.0 - vY, 1.6);
+        float a = uHeat * facing * ends * shimmer * 0.16;
+        gl_FragColor = vec4(vec3(1.0, 0.5, 0.18) * a, a);
         #include <colorspace_fragment>
       }`,
     transparent: true,
@@ -589,7 +591,7 @@ function createShared(): HearthShared {
         float w2 = sin(u * 7.0 - uTime * 2.1 + seed * 2.3) * 0.5 + 0.5;
         float dash = smoothstep(0.35, 0.95, w1 * w2 * 1.6);
         float ends = smoothstep(0.0, 0.1, u) * (1.0 - smoothstep(0.55, 1.0, u));
-        float a = uHeat * edge * dash * ends * 0.3;
+        float a = uHeat * edge * dash * ends * 0.16;
         gl_FragColor = vec4(vec3(1.0, 0.42, 0.12) * a * 0.9, a);
         #include <colorspace_fragment>
       }`,
