@@ -407,9 +407,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(24.2, 9.7, 6, { act: 'dash', label: 'hearth-brush' });
   WS(27.2, 9.7, 6, { act: 'glide', label: 'lift:H0' });
   WS(29.5, 8.5, 10);
-  WS(36.5, -1.2, 10);
-  WS(36.5, -8.8, 14);
-  WS(36.4, -4, 14);
+  WS(31.8, -6, 10);
+  WS(34.7, -11, 10);
+  WS(34.7, -0.2, 14);
+  WS(37.6, 0.8, 14);
   WS(38.8, 2.5, 14);
   WS(39.7, 2.5, 14, { act: 'glide', label: 'wind-gap' });
   WS(62.3, 0.6, 14);
@@ -710,8 +711,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       stoneBlock(sb, trs(p.x, 6 + hh * (i + 0.5), p.z, T_YAW + (r() - 0.5) * 0.1), 1.9, hh * 0.98, 1.9, seed * 10 + i, 0.12);
     }
   }
-  // R4 lateral flight on k3 (10 → 14)
-  flightT(36.5, -0.6, 10, 36.5, -9.6, 14, 2.6, 5);
+  // R4 lateral flight on k2 (10 → 14), set wholly in front of terrace 3 (s36) and climbing toward
+  // the wind gap: the closed cheek is terrace 3's face, the top lands on an apron facing the gap,
+  // and the mill (s39, t-7.6) stays behind the fox instead of across the walk to the launch.
+  flightT(34.7, -9.8, 10, 34.7, -0.8, 14, 2.6, 5);
+  {
+    const p = sp(34.85, 0.3);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 2.6, d: 2.9, yaw: T_YAW, top: 14, bottom: 9.5, tag: 'r4-landing' }));
+    slab({ x: p.x, z: p.z, w: 2.6, d: 2.9, yaw: T_YAW, top: 14, bottom: 9.5, rough: 0.3, seed: 75, topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
+  }
   // Wind gap: twenty flat metres, with the y10 terrace four metres below for recovery.
   // R5 lateral flight on k4b (14 → 18)
   flightT(62.3, 0.4, 14, 62.3, 9.8, 18, 2.4, 6);
