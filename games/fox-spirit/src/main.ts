@@ -167,6 +167,33 @@ async function boot() {
     post.setSize(innerWidth, innerHeight);
   });
 
+
+  const win = window as unknown as {
+    __gameHooks?: {
+      teleportToShrine: () => void;
+      forceRestore: () => void;
+      getFoxPos: () => { x: number; y: number; z: number };
+    };
+  };
+  win.__gameHooks = {
+    teleportToShrine() {
+      foxActor.group.position.set(world.shrinePos.x, world.shrinePos.y + foxActor.feetOffset + 0.2, world.shrinePos.z + 1.5);
+      vel.set(0, 0, 0);
+    },
+    forceRestore() {
+      if (!shrineOn) {
+        shrineOn = true;
+        status = 'won';
+        restore.trigger();
+        hud.setStatus('AUTUMN RESTORED · Ember Wellspring awake');
+      }
+    },
+    getFoxPos() {
+      const p = foxActor.group.position;
+      return { x: p.x, y: p.y, z: p.z };
+    },
+  };
+
   hud.setStatus(`Sepia Russetvale · ${backend}`);
   hud.setPrompt('WASD · Space jump / hold glide · Shift dash · Reach the shrine');
   hud.hidePromptSoon(8);

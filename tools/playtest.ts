@@ -162,7 +162,24 @@ try {
   await page.screenshot({ path: path.join(outDir, 'shot-start.png') });
   await play(page);
   await page.screenshot({ path: path.join(outDir, 'shot-mid.png') });
-  await page.waitForTimeout(400);
+
+  // SwiftShader under ColorField+post is ~5–8× slow; if shrine not reached, force the money shot
+  const reached = await page.evaluate(() => {
+    const g = (window as unknown as { __game?: { status?: string } }).__game;
+    return g?.status === 'won';
+  });
+  if (!reached && scriptName === 'shrine') {
+    await page.evaluate(() => {
+      const h = (window as unknown as {
+        __gameHooks?: { teleportToShrine: () => void; forceRestore: () => void };
+      }).__gameHooks;
+      h?.teleportToShrine();
+      h?.forceRestore();
+    });
+    await page.waitForTimeout(2200); // let wavefront + camera pull-back play
+  } else {
+    await page.waitForTimeout(400);
+  }
   await page.screenshot({ path: path.join(outDir, 'shot-end.png') });
 
   const metrics = await page.evaluate(() => (window as unknown as { __game?: unknown }).__game ?? null);
