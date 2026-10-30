@@ -908,6 +908,15 @@ try {
       await shot(`flow-${seg.name}-end`);
     }
   }
+  if (wants('reachview')) {
+    await boot(quality,true);await H('forceRestore');await advance(660,false);
+    // Staged source hold uses real colour supply; no basin, seal or float state is assigned.
+    await H('teleport',173,30,-116,Math.PI/2);await advance(900,false);
+    await H('teleport',150,38,-96,Math.PI/2);await H('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
+    await H('teleport',201,36,-121,-Math.PI/2);await H('setStick',-1,0);await H('setKeys',['ShiftLeft']);await advance(1);await H('setKeys',[]);await H('setStick',null);await advance(260,false);
+    await H('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
+    save('reachview-state.json',await H('state'));
+  }
   if (wants('reach')) {
     await boot(quality,true); await H('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');

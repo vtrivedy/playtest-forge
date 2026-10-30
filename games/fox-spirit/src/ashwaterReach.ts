@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { createColorField } from '../../../src/render';
 import { boxCollider } from './collision';
 import type { Realm } from './russetvale';
@@ -65,8 +66,10 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   const ferry = wood.toMesh(timber,{cast:true,receive:true,boxUV:1.4}); if(ferry) raft.add(ferry);
   raft.position.set(187,30,-118);
   const raftCol=col.add(boxCollider({x:187,z:-118,w:6.2,d:7,top:30,bottom:29.5,tag:'reach-ferry'}));
-  const waterMat=new THREE.MeshPhysicalMaterial({color:0x34433c,roughness:.22,metalness:.2,transparent:true,opacity:.6});
+  const waterMat=new THREE.MeshPhysicalMaterial({color:0x34433c,roughness:.22,metalness:.2,transparent:true,opacity:.24});
   const pool=new THREE.Mesh(new THREE.PlaneGeometry(22,24),waterMat); pool.rotation.x=-Math.PI/2; pool.position.set(187,29.8,-118); group.add(pool);
+  const mirror=new Reflector(new THREE.PlaneGeometry(22,24),{color:0x53685e,textureWidth:512,textureHeight:512,clipBias:.03,multisample:0});
+  mirror.rotation.x=-Math.PI/2;mirror.position.set(187,29.79,-118);group.add(mirror);
   // Portal leaf-seal opens after W1's flood; the bridge itself never vanishes.
   const gate=col.add(boxCollider({x:28,z:-90,w:1,d:4.5,top:42,bottom:37,tag:'reach-flood-gate'}));
   const gateMat=new THREE.MeshStandardMaterial({color:0x55412c,transparent:true,opacity:.8,roughness:1});
@@ -104,7 +107,9 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   const handles=[[173,30,-124],[201,36,-121]];
   const handleMeshes:THREE.Mesh[]=[];
   for(const [x,y,z] of handles){const m=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,2.2,8),timber);m.position.set(x,y+1,z);m.rotation.z=.5;group.add(m);handleMeshes.push(m);}
-  const mistMat=new THREE.MeshBasicMaterial({color:0xb2b4a4,transparent:true,opacity:.1,depthWrite:false,side:THREE.DoubleSide});
+  const mistCanvas=document.createElement('canvas');mistCanvas.width=mistCanvas.height=64;
+  const mistCtx=mistCanvas.getContext('2d')!;const mistGradient=mistCtx.createRadialGradient(32,32,5,32,32,32);mistGradient.addColorStop(0,'rgba(255,255,255,.55)');mistGradient.addColorStop(.6,'rgba(255,255,255,.3)');mistGradient.addColorStop(1,'rgba(255,255,255,0)');mistCtx.fillStyle=mistGradient;mistCtx.fillRect(0,0,64,64);
+  const mistMat=new THREE.MeshBasicMaterial({color:0xb2b4a4,map:new THREE.CanvasTexture(mistCanvas),transparent:true,opacity:.25,depthWrite:false,side:THREE.DoubleSide});
   const mist=new THREE.Mesh(new THREE.PlaneGeometry(25,27),mistMat);mist.rotation.x=-Math.PI/2;mist.position.set(187,30.1,-118);group.add(mist);
   let inlet: ReturnType<typeof createInlets>;
   let water: ReturnType<typeof createWater>;
@@ -135,7 +140,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       const latched=inlet.update(dt,()=>level==='high'&&arrived&&fill>=.98&&!retained);seal=inlet.inlets[0]!.seal;if(!restored&&latched.length){restored=true;restoreSource();try{localStorage.setItem(saveKey,'1');}catch{}}
       bellMat.emissiveIntensity=.02+seal*.7;bell.rotation.z=restored?Math.sin(field.time*1.7)*.07:0;
       for(const f of floats){f.mesh.position.y=f.base+tun.rise*fill;f.c.top0=f.c.top1=f.mesh.position.y;f.c.bottom=f.mesh.position.y-.5;}
-      pool.position.y=29.8+tun.rise*fill;
+      pool.position.y=29.8+tun.rise*fill;mirror.position.y=pool.position.y-.015;
       mist.position.y=pool.position.y+.2;waterMat.color.setHex(retained?0x4b4940:0x34433c);
     },
     submergedAt(p:THREE.Vector3,feet:number){return fill>.2&&p.x>176&&p.x<198&&p.z>-130&&p.z<-106&&feet<pool.position.y-.8;},
