@@ -413,8 +413,9 @@ try {
       await H('teleport', ...poses.meadow.fox, Math.PI);
       await advance(60, false);
       const p = await H('getFoxPos'), at = [p.x, p.y + 0.5, p.z];
+      await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
       // fox faces -Z at yaw PI: "front" camera sits on -Z
-      const views = { front: [0, 0.6, -5.2, 30], three_q: [-3.5, 0.7, -4.0, 30], side: [-5.6, 0.55, 0, 30],
+      const views = { front: [0, 0.6, -5.2, 30], three_q: [3.5, 0.7, -4.0, 30], side: [-5.6, 0.55, 0, 30],
         back_three_q: [-3.3, 0.9, 4.4, 30], back: [0, 0.9, 5.4, 30], face: [-0.8, 0.95, -2.2, 26] };
       for (const [name, [dx, dy, dz, fov]] of Object.entries(views)) {
         const look = name === 'face' ? [p.x, p.y + 0.82, p.z - 0.45] : at;
