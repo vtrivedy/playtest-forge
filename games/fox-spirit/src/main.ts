@@ -33,7 +33,7 @@ import { createEmberTrail } from './fx';
 import { createOcclusionFader } from './occlusion';
 import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
-import { createUpdrafts, type Lift } from './chem/updraft';
+import { createUpdrafts, type Hearth, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
 import type { ColorStroke } from '../../../src/render/colorField';
 
@@ -316,7 +316,8 @@ async function boot() {
     gui,
     onIgnite: (h) => {
       // struck by a dash: a harder flare than a hearth caught by the passing wake
-      const byDash = colorField.strokeAt(h.reactor.probes[0]!) > 0.9 || h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
+      const byDash = h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
+      if (byDash) dashStruck.add(h);
       h.flare = byDash ? 1.6 : 1;
       emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: byDash ? 60 : 26, speed: byDash ? [2, 5] : [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: byDash ? 1.4 : 0.8, size: [0.04, 0.1], heat: 0.7 });
       audio.play('checkpoint');
@@ -351,8 +352,18 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
   let inColumn = false;
+  const baseJumpTrack = cam.params.jumpTrack;
   let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
+  const dashStruck = new Set<Hearth>();
+  /** Dash through an already-lit hearth: the strong flare without touching its heat (the stroke supplies it) */
+  function hearthStruck(h: Hearth) {
+    h.flare = 1.6;
+    emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: 50, speed: [2, 5], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: 1.3, size: [0.04, 0.1], heat: 0.7 });
+    autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 24, 1.7);
+    audio.play('checkpoint');
+    cam.shake(0.12);
+  }
   const fLook = gui.addFolder('Look');
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
@@ -1004,6 +1015,8 @@ async function boot() {
     const enteredColumn = lift.k > 0.02 && !inColumn && !grounded;
     inColumn = lift.k > 0.02 && !grounded;
     if (enteredColumn) cam.punch(3);
+    // ride framing: the lens follows the full rise in a column (normal jumps keep the partial track)
+    cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, inColumn || (gliding && lift.k > 0) ? 1 : baseJumpTrack, 3, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
     glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
@@ -1117,7 +1130,16 @@ async function boot() {
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
     if (dashStroke) {
       dashStroke.b.copy(colorField.fox);
-      if (!dashing) dashStroke = null;
+      // a dash through a hearth always flares it, whether cold, holding or guttering (once per stroke)
+      for (const h of updrafts.hearths) {
+        if (dashStruck.has(h) || !h.reactor.probes.some((q) => colorField.strokeAt(q) > 1)) continue;
+        dashStruck.add(h);
+        if (h.reactor.state !== 'cold') hearthStruck(h);
+      }
+      if (!dashing) {
+        dashStroke = null;
+        dashStruck.clear();
+      }
     }
     colorField.update(dt);
     updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), drainedAt);
@@ -1131,7 +1153,7 @@ async function boot() {
       // keep leaves riding a burning column, near the fox only (shared leaf pool)
       if (leafPulse && h.reactor.heat > 0.6 && h.base.distanceTo(fox.position) < 30) autumnFX.swirl(h.base.clone().setY(h.base.y + 0.2), 8, 1.5);
     }
-    for (const i of inlets.update(dt, (q) => updrafts.hearths.some((h) => heatFeeds(h, q, updrafts.tun.radius)))) latchSeedwell(i);
+    for (const i of inlets.update(dt, (q) => { const h = updrafts.hearths.find((x) => x.spot.id === q.source); return !!h && heatFeeds(h, q.pos, updrafts.tun.radius); })) latchSeedwell(i);
     for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 

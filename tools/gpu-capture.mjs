@@ -350,6 +350,22 @@ try {
         suppliedS: Number((tl.filter(r => r.supply >= 0.3).length / 60).toFixed(2)) };
       await H('setKeys', []);
     }
+    { // D: falling entry from the opposite (shelf) side — light it, step off the shelf lip, glide into the column
+      await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(20);
+      await H('teleport', hx + 6.5, hy + 5.3, hz, -Math.PI / 2); await advance(10);
+      let left = -1;
+      const tl = [];
+      await video('updraft-fall-entry', 9 * fps, async i => {
+        const st = await H('state');
+        tl.push({ i, pos: st.pos, vy: st.vel[1], grounded: st.grounded, gliding: st.gliding, heat: hearth(st).heat });
+        if (left < 0 && !st.grounded) left = i;
+        const over = Math.abs(st.pos[0] - hx) < 1.0;
+        await H('setKeys', left < 0 ? ['KeyW'] : over || st.vel[1] > 0 ? ['Space'] : ['KeyW', 'Space']);
+      }, (st, i) => left > 0 && st.grounded && i - left > 30, { keyFrames: [10, 40, 70, 100, 140, 200] });
+      const ride = (await H('state')).chem.lastRide;
+      summary.D = { ride, minVyBeforeLift: Math.min(...tl.map(r => r.vy)), peak: Math.max(...tl.map(r => r.pos[1])) };
+      await H('setKeys', []); await advance(300, false);
+    }
     // debug view of the column volume + lit still (staged, lit by standing at the bowl)
     await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(20);
     await page.evaluate(() => document.body.classList.add('debug-on'));
