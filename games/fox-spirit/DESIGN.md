@@ -76,6 +76,9 @@ Verification: shared synthesis functions rendered through browser OfflineAudioCo
 into review WAVs, keyboard traversal, mute/unlock checks, staged restoration, screenshots,
 `window.__game` and audio diagnostics. Do not change movement, camera or visual tuning.
 
+## Sprint 2 authored locomotion (LOCO-SOL)
+Existing hero geometry/materials remain the baseline. Blender-baked walk/trot/rotary gallop clips provide the primary pose; AnimationMixer blends by speed with stride-matched playback. Grounded contact correction and damped tail/torso overlays provide terrain and momentum response. Turn, skid, jump/air/land remain authored states. Expose blend speeds, stride scale, plant correction, turn lean and spring damping in the existing debug GUI and publish contact/state metrics through the game hooks. Verify on the remote GPU gait gym before comparison; this branch stays isolated pending driver selection.
+
 ## Sprint 2 gait review gym
 `?gym=gait` places the live fox/controller on an uncluttered measured course away
 from Russetvale: flat runway, 15-degree ascent, crest, descent. Same lighting,
@@ -133,6 +136,8 @@ Verification: GPU water shot retains frozen/melt/front/wash/refreeze stills and 
 
 Water review corrections (12:15 ET): the crossing has a permanent shallow stone bed; flowing water removes the ink hazard, never the supporting ground. A local ink skin covers the dry channel. The final 0.8 s of hold warns that the wash is ending. Driver 12:05 changes the frozen look to pale translucent ice with warm inner light. Water already past a Shade drains away at 8 m/s; the Shade cannot erase it instantly. Flume beds and water are batched. No controller/animation edits.
 
+### Authored fox action refinement — 13:15
+Jump poses must show an anatomical hind push, all-four gathered paws at apex, then forepaw reach before landing. Author each action on the current hero armature with sagittal IK, preserving bone scale; show loading immediately and launch after50ms for grounded jumps; coyote jumps launch immediately. Dash receives a distinct low extended pose, and the tail plume keeps a visible air gap above the floor. Verify every frame and compare independent bone measurements against planted-only metrics; low planted residual alone does not prove natural swing.
 Stag lookdev r2: a solid sepia-ink core with a thin translucent, wavering back-face
 wash. Only the fringe is translucent; masonry must not show through the torso.
 Capture uses one fixed exterior lens per moment and renders the late lifecycle
@@ -141,3 +146,21 @@ after advancing the simulation so empty-state stills match their diagnostics.
 Water completion slice: S1 pond-grotto falls at (−30,62) uses the same reactor and opens its frozen sheet collider only while flowing. The grotto floor remains solid; the fox can relight from either side. Full flood restores all water. A slow authored flume Shade patrol uses the existing encounters public drain predicate; water already past it runs out normally. Original procedural assets only (CREDITS.md).
 ### Fox pass 7 — 2026-10-30 13:20 ET
 Preserve the published quadruped rig and locomotion ownership. Refine the existing CC0 scaffold toward the concept: reduce ear height, retain a continuous soft brush through the tail tip, reduce detached flame cards, and strengthen coherent saddle/chest values. Keep the reference scene cameras and lights fixed. Verify with Modal concept comparisons, in-game close/chase frames and state logs; request cross-model critique before claiming the milestone. Use quick headless Blender exports because Blender MCP has no live connection; all renders remain remote.
+
+Stag lookdev r3: the drain wash clips to nearby walkable ground instead of
+floating beyond a cliff. Release consumes the silhouette from feet to antlers
+with a broken watercolor edge, avoiding round holes across the torso. Contact
+review starts outside the hit radius and walks into the real encounter.
+### Regional route review
+`--route-from N --route-to M` captures real traversal of a waypoint interval after
+an explicit staged start on a validated walkable surface. It never forces element
+latches/restoration or bypasses a failed move. Regional success means reaching M
+with no assists/deaths, not winning the realm. The default full route remains an
+unassisted restoration test. This lets level streams review later regions while
+earlier crossings are under repair, without hiding those failures.
+
+### Capture hero staging — 14:15 ET
+The relocated arrival hearth occludes the old poseHero location in review stills.
+Use the same collision-checked open meadow (6,78) and three-quarter lens as the
+fox review shot, with the actual idle actor. Keep gameplay routes unchanged;
+this is an explicitly staged character review, not traversal evidence.

@@ -1,0 +1,143 @@
+{
+  "walk": {
+    "stride": 1.5384615384615383,
+    "contacts": [
+      {
+        "phase": 0.25,
+        "duty": 0.65,
+        "sweep": 1.0
+      },
+      {
+        "phase": 0.75,
+        "duty": 0.65,
+        "sweep": 1.0
+      },
+      {
+        "phase": 0,
+        "duty": 0.65,
+        "sweep": 1.0
+      },
+      {
+        "phase": 0.5,
+        "duty": 0.65,
+        "sweep": 1.0
+      }
+    ],
+    "measured": [
+      {
+        "meanStanceSpeed": 2.1466546919610767,
+        "stanceSpeedCV": 0.0001676201713559809,
+        "stanceHeightRange": 0.0003254711627960205
+      },
+      {
+        "meanStanceSpeed": 2.146645122104221,
+        "stanceSpeedCV": 0.00016996544164055844,
+        "stanceHeightRange": 0.00032819807529449463
+      },
+      {
+        "meanStanceSpeed": 2.146031459172567,
+        "stanceSpeedCV": 0.0006384164815935118,
+        "stanceHeightRange": 0.0004562288522720337
+      },
+      {
+        "meanStanceSpeed": 2.1459877490997314,
+        "stanceSpeedCV": 0.0006196775618494446,
+        "stanceHeightRange": 0.0004567056894302368
+      }
+    ]
+  },
+  "trot": {
+    "stride": 2.7083333333333335,
+    "contacts": [
+      {
+        "phase": 0.5,
+        "duty": 0.48,
+        "sweep": 1.3
+      },
+      {
+        "phase": 0,
+        "duty": 0.48,
+        "sweep": 1.3
+      },
+      {
+        "phase": 0,
+        "duty": 0.48,
+        "sweep": 1.3
+      },
+      {
+        "phase": 0.5,
+        "duty": 0.48,
+        "sweep": 1.3
+      }
+    ],
+    "measured": [
+      {
+        "meanStanceSpeed": 6.018540225923061,
+        "stanceSpeedCV": 0.00027790189966632017,
+        "stanceHeightRange": 0.0006962120532989502
+      },
+      {
+        "meanStanceSpeed": 6.018598452210426,
+        "stanceSpeedCV": 0.0002742228020455494,
+        "stanceHeightRange": 0.0007135868072509766
+      },
+      {
+        "meanStanceSpeed": 6.01790115237236,
+        "stanceSpeedCV": 0.0006511659978243787,
+        "stanceHeightRange": 0.0007338523864746094
+      },
+      {
+        "meanStanceSpeed": 6.01749449968338,
+        "stanceSpeedCV": 0.0006498540861167824,
+        "stanceHeightRange": 0.0007573515176773071
+      }
+    ]
+  },
+  "run": {
+    "stride": 4.569930555555556,
+    "contacts": [
+      {
+        "phase": 0.55,
+        "duty": 0.32,
+        "sweep": 1.462
+      },
+      {
+        "phase": 0.46,
+        "duty": 0.32,
+        "sweep": 1.462
+      },
+      {
+        "phase": 0.0,
+        "duty": 0.36,
+        "sweep": 1.6456
+      },
+      {
+        "phase": 0.08,
+        "duty": 0.36,
+        "sweep": 1.6456
+      }
+    ],
+    "measured": [
+      {
+        "meanStanceSpeed": 13.053565546870232,
+        "stanceSpeedCV": 1.4854605365227904e-06,
+        "stanceHeightRange": 9.685754776000977e-07
+      },
+      {
+        "meanStanceSpeed": 13.053559698164463,
+        "stanceSpeedCV": 2.286511060957792e-06,
+        "stanceHeightRange": 7.599592208862305e-07
+      },
+      {
+        "meanStanceSpeed": 13.052246740886144,
+        "stanceSpeedCV": 0.0010035093052775464,
+        "stanceHeightRange": 0.004304870963096619
+      },
+      {
+        "meanStanceSpeed": 13.057530948093959,
+        "stanceSpeedCV": 7.00562845790687e-05,
+        "stanceHeightRange": 0.00010776519775390625
+      }
+    ]
+  }
+}

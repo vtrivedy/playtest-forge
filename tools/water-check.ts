@@ -54,3 +54,20 @@ assert.equal(field.sample(new THREE.Vector3(95, 2, 10)), 1);
 assert.equal(field.sample(new THREE.Vector3(-112, 20, -24)), 0);
 assert.equal(field.sample(new THREE.Vector3(-10, 17.5, -36)), 0);
 console.log('Restored-region locality: PASS');
+
+const { createInlets } = await import('../games/fox-spirit/src/chem/inlet');
+function reedTrial(supplySeconds: number) {
+  const scene = new THREE.Scene(), w = createWater(scene, new CollisionWorld(() => -2));
+  const inlet = createInlets(scene, [{ seedwell: 1, source: 'reed-falls', pos: new THREE.Vector3(95, 2.3, 10), sealAt: new THREE.Vector3(), pillar: new THREE.Vector3(), latchTime: 7 }], new THREE.MeshStandardMaterial());
+  let latchAt: number | null = null;
+  for (let i = 0; i < 16 * 120; i++) {
+    const time = i / 120;
+    w.update(1 / 120, time, () => time < supplySeconds ? 1 : 0);
+    if (inlet.update(1 / 120, () => w.arriving('reed-falls')).length && latchAt === null) latchAt = time;
+  }
+  return latchAt;
+}
+assert.equal(reedTrial(2.5), null, 'Brief pass through falls is a near miss, never a latch');
+const dashLatch = reedTrial(6);
+assert(dashLatch !== null && dashLatch > 11.4 && dashLatch < 11.8, 'Six-second stroke feeds a seven-second seal after 4s travel');
+console.log('Reed near-miss and dash-duration latch: PASS', dashLatch);
