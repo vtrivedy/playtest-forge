@@ -103,8 +103,8 @@ for v in me.vertices:
     leg = min(1, front_leg + back_leg)
     legmask.append(leg)
     c = PAL["rust"]
-    c = mix(c, PAL["dorsal"], smooth(0.05, 0.85, n.z) * 0.85)           # broad dark rust saddle over the back / haunches (painted mass)
-    c = mix(c, PAL["belly"], smooth(-0.3, -0.85, n.z) * 0.55)           # warm pale underside (not pink)
+    c = mix(c, PAL["dorsal"], smooth(-0.12, 0.7, n.z) * 0.88)           # broad dark rust saddle over the back / haunches (painted mass)
+    c = mix(c, PAL["belly"], smooth(-0.15, -0.8, n.z) * 0.75)           # warm pale underside (not pink)
     # cream: throat + bib tapering down the chest, muzzle, cheeks, inner ears (no belly/rump patches)
     if v.index in cream_vs and leg < 0.3:
         if wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"]) > 0.3:
@@ -147,10 +147,10 @@ for v in me.vertices:
     cols.append(c)
     # shell-fur length (model units; fox ~3.3 tall): long ruff/cheeks, short face/lower legs, none on paws/eyes
     neck = wsum(w, "Neck1", "Neck2", "Neck3", "Torso3")
-    L = 0.045 + 0.045 * min(1, neck) + 0.02 * wsum(w, "Back", "BackLeg.L", "BackLeg.R")  # short: long shells read as raised chips
-    if w.get("Head", 0) > 0.4: L = 0.016 + 0.05 * smooth(0.2, 0.6, abs(n.x)) * (1 - smooth(-0.3, -0.7, n.y))
-    L = max(L, 0.07 * jaw)  # throat fur hangs over the jaw / bib crease
-    if ear > 0.3: L = 0.012
+    L = 0.018 + 0.022 * min(1, neck) + 0.012 * wsum(w, "Back", "BackLeg.L", "BackLeg.R")  # short: long shells read as raised chips
+    if w.get("Head", 0) > 0.4: L = 0.008 + 0.02 * smooth(0.2, 0.6, abs(n.x)) * (1 - smooth(-0.3, -0.7, n.y))
+    L = max(L, 0.028 * jaw)  # throat fur hangs over the jaw / bib crease
+    if ear > 0.3: L = 0.005
     L *= 1 - 0.75 * leg * (1 - smooth(0.7, 1.2, co.z))
     if v.index in eye_vs or v.index in nose_vs or (d < 0.075): L = 0.0  # keep shells off the (enlarged) eyes and lids
     if co.z < 0.2: L = 0.0
@@ -188,7 +188,7 @@ for o in sc.objects: o.select_set(o is fox)
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
 bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.006)
 bpy.ops.object.mode_set(mode="OBJECT")
-BAKE = 1024
+BAKE = 2048
 img_c = bpy.data.images.new("fox_fur_col", BAKE, BAKE); img_n = bpy.data.images.new("fox_fur_nrm", BAKE, BAKE)
 img_n.colorspace_settings.name = "Non-Color"
 bake = bpy.data.materials.new("BakeFur"); bake.use_nodes = True
@@ -207,7 +207,7 @@ def streak(scale):
     nz.inputs["Detail"].default_value = 8; nz.inputs["Roughness"].default_value = 0.62
     L_.new(tc.outputs["Object"], mp.inputs["Vector"]); L_.new(mp.outputs["Vector"], nz.inputs["Vector"])
     return nz
-body_s = streak((150, 10, 150)); leg_s = streak((150, 150, 12))
+body_s = streak((65, 7, 65)); leg_s = streak((65, 65, 8))
 sm = node("ShaderNodeMix", data_type="FLOAT"); L_.new(mask.outputs["Color"], sm.inputs["Factor"])
 L_.new(body_s.outputs["Fac"], sm.inputs[2]); L_.new(leg_s.outputs["Fac"], sm.inputs[3])
 cr = node("ShaderNodeValToRGB"); cr.color_ramp.elements[0].position = 0.3; cr.color_ramp.elements[0].color = (0.8, 0.76, 0.72, 1)
