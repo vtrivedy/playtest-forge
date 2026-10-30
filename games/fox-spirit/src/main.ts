@@ -981,7 +981,7 @@ async function boot() {
       if (auto.act === 'glide') auto.space = auto.pressT < 0.12 || vel.y > 0 || d > 0.9;
       if (onGround && auto.pressT > 0.1) auto.phase = 'run';
     }
-    const reach = wp.label === 'channel' || wp.label?.startsWith('wash:') || wp.label?.startsWith('lift:') ? 0.28 : 0.9;
+    const reach = wp.label === 'channel' || wp.label?.startsWith('wash:') || wp.label?.startsWith('lift:') || wp.label?.startsWith('wind-ready:') ? 0.28 : 0.9;
     if (d < reach && wp.y - (pos.y - foxActor.feetOffset) < 1.0 && (onGround || auto.phase === 'run')) {
       auto.idx += 1;
       auto.stuckT = 0;
@@ -1007,7 +1007,8 @@ async function boot() {
     const waitWash = !!prevLabel?.startsWith('wash:') && !water.arriving(prevLabel.slice(5));
     if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= wp.y + 0.5) auto.liftReady = true;
     const waitLift = !!prevLabel?.startsWith('lift:') && !auto.liftReady;
-    const waitBridge = waitLift || waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
+    const waitWind = !!prevLabel?.startsWith('wind-ready:') && (wind.state().find(w => w.id === prevLabel.slice(11))?.heat ?? 0) < 0.98;
+    const waitBridge = waitWind || waitLift || waitWash || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;

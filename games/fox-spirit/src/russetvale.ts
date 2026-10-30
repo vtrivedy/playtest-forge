@@ -407,9 +407,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(29.5, 8.5, 10);
   WS(36.5, -1.2, 10);
   WS(36.5, -8.8, 14);
-  WS(35.7, -4, 14);
-  WS(38.8, 2.5, 14);
-  WS(39.7, 2.5, 14, { act: 'glide', label: 'wind-gap' });
+  WS(39.8, -9.4, 14);
+  WS(38.8, 2.5, 14, { label: 'wind-ready:mill-gap' });
+  WS(40.0, 2.5, 14, { act: 'glide', label: 'wind-gap' });
   WS(62.3, 0.6, 14);
   WS(62.3, 1.2, 14);
   WS(62.3, 9.2, 18);
@@ -612,7 +612,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     { s0: 0, s1: T_END, top: 2, w: 30 },
     { s0: 12, s1: T_END, top: 6, w: 28 },
     { s0: 28, s1: T_END, top: 10, w: 26 },
-    { s0: 36, s1: 40.5, top: 14, w: 24 },
+    { s0: 38, s1: 40.5, top: 14, w: 24 },
     { s0: 60.5, s1: T_END, top: 14, w: 24 },
     { s0: 64, s1: T_END, top: 18, w: 22 },
     { s0: 68, s1: T_END, top: 22, w: 20 },
@@ -730,7 +730,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const mills: Mill[] = [];
   const millSites: Array<[number, number, number]> = [
     [23.8, -8.4, 6],
-    [39, -7.6, 14],
+    [35, -7.6, 10],
     [73.5, -4.6, 22],
   ];
   const millFacing = Math.atan2(-TD.x, -TD.y) + 0.5; // face back down the climb (toward meadow/camera)

@@ -85,3 +85,6 @@ R6 reaches y22 at constant s66, while the y22 terrace begins s68. A fox running 
 
 ## Critical-path order repair (driver14:10)
 The realm route must follow its authored recommendation: opening H-a → Windmill Rise → SW1 → Creek Root / heartwood → summit. Reedmarsh is an optional branch tested independently, not a prerequisite detour that blocks the first minute. H0 becomes the direct heat transfer on the way up: dash beside the brazier at t9.7, then hold-jump in its column and exit to y10. Old stump geometry remains an optional route. The seven-second H0 duration pocket remains unimplemented. Rendered route paving follows this new order.
+
+## R4 regression correction
+The first gap edit moved the y14 slab start from s38 to s36, accidentally burying R4 inside a four-metre wall. Regional GPU capture windmill-route-r1 stalls there with no deaths. Restore s0=38 and the original diagonal top exit; move the middle mill to the existing y10 shoulder at s35,t−7.6 so the short y14 shelf stays traversable. Keep20m gap end40.5→60.5. Wait for actual mill-gap heat≥.98 at the near source before jumping; no movement tuning.
