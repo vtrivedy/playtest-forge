@@ -2258,7 +2258,11 @@ function stoneWeathering(mat: THREE.MeshStandardMaterial, detail: THREE.Texture)
         {
           vec3 swN = normalize(vSWN);
           float swL = dot(texture2D(uStoneDetail, vMapUv * 0.37).rgb, vec3(0.3, 0.59, 0.11));
-          diffuseColor.rgb *= mix(1.0, clamp(swL * 2.1, 0.5, 1.35), 0.5);
+          diffuseColor.rgb *= mix(1.0, clamp(swL * 2.2, 0.4, 1.5), 0.8);
+          // rust/ochre lichen blooms on the faces, darker damp seams between them
+          float swLi = swNoise(vSWPos.xz * 1.3 + vSWPos.y * 0.9) * 0.6 + swNoise(vec2(vSWPos.x - vSWPos.z, vSWPos.y) * 4.0) * 0.4;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.58, 0.4, 0.2) * (0.8 + 0.4 * swL), smoothstep(0.58, 0.75, swLi) * 0.55);
+          diffuseColor.rgb *= 1.0 - smoothstep(0.32, 0.18, swLi) * 0.25;
           float swUp = smoothstep(0.4, 0.85, swN.y);
           float swM = smoothstep(0.4, 0.68, swNoise(vSWPos.xz * 0.8 + vSWPos.y * 0.37) * 0.7 + swNoise(vSWPos.xz * 3.1) * 0.3);
           diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.34, 0.31, 0.15) * (0.75 + 0.5 * swL), swUp * swM * 0.8);
