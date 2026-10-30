@@ -972,6 +972,10 @@ try {
         const cameraFloor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [p.x + dx, p.z + dz]);
         await H('photo', [p.x + dx, Math.max(p.y + dy, cameraFloor + 0.3), p.z + dz], look, fov);
         await advance(3); await shot(`fox-${state}-${name}`);
+        if (name === 'front' || name === 'face') {
+          await page.evaluate(() => { const d = window.__gameHooks.debug; d.renderer.setRenderTarget(null); d.renderer.render(d.scene, d.camera); });
+          await shot(`fox-${state}-${name}-raw`);
+        }
       }
       await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);
       await H('setKeys', ['KeyW']); await advance(70); await shot(`fox-${state}-chase-run`);
