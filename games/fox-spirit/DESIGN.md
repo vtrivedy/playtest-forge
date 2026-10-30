@@ -347,3 +347,10 @@ source rule. Additive blending saturated dozens of overlapping trail stamps
 while idle, turning a feathered aura into a hard disc. Keep sources, radius,
 lifetime and CPU supply evaluation unchanged. Let permanently restored ground
 recover full authored chroma and a mild warm lift; temporary ground stays muted.
+
+### Far scenery composition
+The generic distant-land layer is distinct from the dressed satellite islets.
+Reduce its repeated shapes from22 to14, move its depth range to300–600m and
+reduce its scale range to10–30m. Lower it mostly into the cloud sea. This removes
+large crisp saucer shapes behind the hero while retaining the two dressed
+nearer island silhouettes. Scenery only; no playable world geometry changes.
