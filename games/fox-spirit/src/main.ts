@@ -382,7 +382,7 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
   let inColumn = false;
-  const baseJumpTrack = cam.params.jumpTrack;
+  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
   let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
   const dashStruck = new Set<Hearth>();
@@ -1082,7 +1082,11 @@ async function boot() {
     inColumn = lift.k > 0.02 && !grounded;
     if (enteredColumn) cam.punch(3);
     // ride framing: the lens follows the full rise in a column (normal jumps keep the partial track)
-    cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, inColumn || (gliding && lift.k > 0) ? 1 : baseJumpTrack, 3, dt);
+    const riding = inColumn || (gliding && lift.k > 0);
+    cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, riding ? 1 : baseCam.jumpTrack, 3, dt);
+    // and rides above the fox, pulled in, looking down the column (the source stays in frame, the sun leaves it)
+    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 2.4 : baseCam.height, 2.2, dt);
+    cam.params.glideDistance = THREE.MathUtils.damp(cam.params.glideDistance, riding ? baseCam.glideDistance - 0.9 : baseCam.glideDistance, 2.2, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
     glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
