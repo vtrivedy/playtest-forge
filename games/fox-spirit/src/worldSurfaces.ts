@@ -33,6 +33,9 @@ export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false
         // Broad grain stays legible through the painterly post; no noisy photo hue.
         float wsGrain = sin((vWSPoint.x + vWSPoint.z) * 22.0 + sin(vWSPoint.y * 0.7) * 1.8);
         diffuseColor.rgb *= 0.91 + 0.09 * wsGrain;
+        float wsBoard = floor((vWSPoint.x + vWSPoint.z) / 0.28);
+        float wsJoint = smoothstep(0.014, 0.042, abs(fract((vWSPoint.x + vWSPoint.z) / 0.28) - 0.5));
+        diffuseColor.rgb *= mix(0.58, 1.0, wsJoint) * (0.91 + sin(wsBoard * 7.13) * 0.09);
         ` : `
         float wsPatch = sin(vWSPoint.x * 1.3 + sin(vWSPoint.z * 1.8)) * sin(vWSPoint.z * 0.8 + vWSPoint.y * 0.7);
         float wsMoss = smoothstep(0.0, 0.6, wsPatch) * (0.2 + 0.8 * smoothstep(0.3, 0.85, vWSNormal.y));

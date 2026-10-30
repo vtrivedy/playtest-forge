@@ -203,3 +203,17 @@ Stag lookdev r4: retain the opaque ink core, add sparse soft sepia wash wisps
 rising from shoulders and flank. Deterministic shader billboards fade in/out and
 curl slowly; no glow, additive sparks, or glass torso. Expose wash size/opacity.
 They fade with the released silhouette; colored maple leaves remain the payoff.
+
+### Water appearance follow-up
+Animate the existing pond/creek water shaders from the realm tick (their time
+uniform currently stays at zero). Add soft warm-sky Fresnel reflection to live
+flume/fall surfaces, retaining wet/dry masks, front/tail timing, gates and colliders.
+The marsh hazard stays dark ink, with restrained moving sky reflection. Verify
+frozen/flowing/warning states and retain water acceptance telemetry on GPU.
+
+### CC0 masonry dressing
+Reuse Poly Haven's six-piece moss-rock scan as shallow, half-buried rubble at
+existing masonry bases and along the grotto roof. Normalize the imported forms,
+restyle through the shared stone palette, and batch into the existing world
+buckets. Keep traversable edges and collider footprints unchanged; no random
+scatter in route corridors. Review the grotto and meadow at gameplay distance.

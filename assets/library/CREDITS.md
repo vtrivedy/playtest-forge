@@ -93,3 +93,6 @@ Water ice sheets, flume masonry, flow ribbons and ripples are original procedura
 Sprint 2 world surface reuse: `Rock035` (ambientCG, CC0) supplies metre-scaled
 stone value/relief on aqueducts, ruins and carved housings. `bark_brown_02`
 (Poly Haven, CC0) supplies softened grain on existing timber. No new downloads.
+`models/nature/rock_moss_set_01.glb` (Poly Haven, CC0, source above) is also
+reused as normalized scanned rubble at existing water masonry footprints and
+the grotto roof. Colors are restyled to the realm's warm stone/lichen palette.
