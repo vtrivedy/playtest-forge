@@ -10,3 +10,7 @@ lower-leg smoke fade and sparse antler-tip wisps. Strengthen the dark3m drain
 wash; enlarge a smaller set of mesh-sampled maple leaves so the memory release
 reads apart from ambient litter. Clear post-latch edge capture replaces the
 kiln-obscured release view. Preserve authored patrol and sad frozen-motion premise.
+Opus clear-contact evidence moves to the high-hill patrol: open southern camera,
+terrain-checked approach/recoil/dash on the intact stair flight. This also avoids
+depending on whether the earlier staged SW1 dash happened to latch the Seedwell.
+No progression or freed state is forced; missing actor or missed contact fails.
