@@ -3,7 +3,8 @@ python3 hero_v2_sheet.py out.png prefix [suffix] [label]
 Columns: front | side | three_q | back (concept crops from fox-turnaround.jpg)."""
 import sys
 from PIL import Image, ImageDraw
-CONCEPT = "/workspace/siyu/playtest-forge/assets/concept/fox-turnaround.jpg"
+import os
+CONCEPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../assets/concept/fox-turnaround.jpg")
 CROPS = {"front": (40, 20, 260, 400), "side": (260, 20, 700, 400),
          "three_q": (680, 20, 1010, 400), "back": (1000, 20, 1270, 400),
          "run": (30, 430, 400, 660), "dash": (420, 420, 900, 660), "trot": (930, 430, 1260, 660)}

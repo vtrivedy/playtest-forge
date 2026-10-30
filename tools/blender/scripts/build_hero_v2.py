@@ -8,7 +8,8 @@ import sys, math
 import bpy, bmesh
 from mathutils import Vector, Matrix
 
-ROOT = "/workspace/siyu/playtest-forge"
+import os
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))  # repo root of this checkout
 SRC = f"{ROOT}/assets/hero/source/fox_quaternius_raw.glb"
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 OUT = argv[0] if argv else f"{ROOT}/assets/hero/spirit_fox.glb"

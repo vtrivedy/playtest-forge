@@ -7,7 +7,8 @@ cards atlas 1024: [0..512 x 0..1024] 4 flame wisps (128x1024 each... laid as 2x2
 (pixel coords, y down)."""
 import math, random
 from PIL import Image, ImageDraw, ImageFilter, ImageChops
-OUT = "/workspace/siyu/playtest-forge/assets/hero/source/v2"
+import os
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../assets/hero/source/v2")
 random.seed(7)
 S = 1024
 col = Image.new("RGBA", (S, S), (0, 0, 0, 0))

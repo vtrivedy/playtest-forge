@@ -12,7 +12,8 @@ Palette: burnt orange edges -> amber -> pale gold core. Never white (bloom would
 import math, random
 import numpy as np
 from PIL import Image, ImageFilter
-OUT = "/workspace/siyu/playtest-forge/assets/hero/source/v2"
+import os
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../../assets/hero/source/v2")
 rnd = random.Random(23)
 S = 1024
 atlas = np.zeros((S, S, 4), np.float32)
