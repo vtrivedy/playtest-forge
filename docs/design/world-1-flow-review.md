@@ -64,3 +64,7 @@ Concrete tasks were appended to `/workspace/siyu/playtest-forge-artifacts/sprint
 ## Scope / feel gate
 
 No controller values, animation clips or renderer settings were changed for this review. The retained failure is actionable, but it is not a feel approval. **Game feel: NOT ASSESSED as a complete milestone; first traversal: FAIL.** The fox is moving in the route video; pose/foot planting still needs the dedicated gait critic's comparison. World expansion should not hide these blockers under more scenery.
+
+## Segmented follow-up, captured from later main
+
+The first segmented run was interrupted by Modal after completing the mill segment. Its checkout was `d836741` (the retry moved again; do not call this the original baseline). Retained mill video/state: `levels-sol/flow/flow-mills-staged-start.*`. Starting at `cp-mills`, real movement advances to waypoint 44 `(-95,22,0.4)` with **zero deaths and zero assists**, then stalls with feet at y18. The inspected frame shows the fox below a stair/rock overhang, visible only through the occlusion cutout. This is a second concrete blocker: the terrace transition's collision/route does not match the intended stair ascent. It is not evidence that the eventual wind-gap challenge was attempted. The Kiln segment is incomplete and is not counted as a verified traversal.

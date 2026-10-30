@@ -817,7 +817,7 @@ try {
       {x:-19,z:-88,y:38}, {x:-32,z:-94,y:24}, {x:-37,z:-101,y:24},
       {x:-37,z:-101,y:30,jump:true}, {x:-43,z:-108,y:29},
       {x:-45,z:-112,y:29}, {x:-45,z:-112,y:41,jump:true},
-      {x:-19,z:-88,y:38,jump:true,land:true}, {x:-11,z:-88,y:38,land:true},
+      {x:-19,z:-88,y:38,jump:true,land:true}, {x:-12,z:-91,y:38,land:true},
     ];
     let phase=0, age=0, reached=false;
     await video('crown-roundtrip-staged-start', 48 * fps, async () => {
