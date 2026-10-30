@@ -727,7 +727,7 @@ try {
     if (regional) {
       const wp = route[from];
       const floor = await page.evaluate(p => window.__gameHooks.debug.world.collision.groundAt(p.x, p.z, p.y + .5).y, wp);
-      if (!Number.isFinite(floor) || Math.abs(floor - wp.y) > .65) throw Error('Regional route start must be a walkable waypoint');
+      if (!Number.isFinite(floor) || wp.ground === false || floor < wp.y - 1) throw Error('Regional route start must be a walkable waypoint');
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
