@@ -11,8 +11,8 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
  */
 export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 
-export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean };
-export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 0.8, invulnerability: 1, debug: false };
+export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number };
+export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 0.8, invulnerability: 1, debug: false, inkOpacity: 0.16, inkSize: 0.65 };
 
 type ShadeActor = {
   active: boolean;
@@ -27,6 +27,7 @@ type ShadeActor = {
   group: THREE.Group;
   mat: THREE.ShaderMaterial;
   fringe: THREE.ShaderMaterial;
+  smoke: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
   pool: THREE.Mesh;
   /** 1 = present, falls to 0 while freed */
   presence: number;
@@ -108,7 +109,7 @@ function inkMaterial(): THREE.ShaderMaterial {
       void main() {
         vec3 p = position;
         // wavering: the ink never quite holds still; it boils more toward the feet
-        float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.15 + 0.1;
+        float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.015 + 0.025;
         p += normal * (n3(p * 3.0 + vec3(0.0, uTime * 1.3, uSeed)) - 0.5) * w * 2.0;
         p.x += sin(uTime * 1.7 + p.y * 2.0 + uSeed) * 0.075;
         // freeing: the body lifts and spreads as it comes apart
@@ -146,6 +147,48 @@ function inkMaterial(): THREE.ShaderMaterial {
     transparent: false,
     depthWrite: true,
   });
+}
+
+/** Sparse paper-wash wisps: original analytic sprites, no texture or external asset. */
+function inkWisps(seed: number) {
+  const g = new THREE.BufferGeometry();
+  const points = new Float32Array(24 * 3);
+  for(let k=0;k<24;k++) {
+    points[k*3]=Math.sin(k*2.399)*.42;
+    points[k*3+1]=.65+(k%5)*.2;
+    points[k*3+2]=Math.cos(k*1.73)*.85;
+  }
+  g.setAttribute('position',new THREE.BufferAttribute(points,3));
+  g.setAttribute('aPhase',new THREE.BufferAttribute(Float32Array.from({length:24},(_,k)=>(k*.618+seed*.13)%1),1));
+  const mat=new THREE.ShaderMaterial({
+    uniforms:{uTime:{value:0},uPresence:{value:1},uOpacity:{value:.16},uSize:{value:.65},uPixelScale:{value:540}},
+    vertexShader:`attribute float aPhase; uniform float uTime,uPresence,uSize,uPixelScale; varying float vAge; varying float vPhase;
+      void main(){
+        float age=fract(aPhase+uTime*.22);vAge=age;vPhase=aPhase;
+        vec3 p=position; p.y+=age*1.3;
+        p.x+=sin(age*4.+aPhase*19.)*.22*age;
+        p.z-=age*.5;
+        vec4 mv=modelViewMatrix*vec4(p,1.);
+        gl_Position=projectionMatrix*mv;
+        gl_PointSize=clamp(uSize*(.55+age)*projectionMatrix[1][1]*uPixelScale/max(.1,-mv.z),1.,180.);
+      }`,
+    fragmentShader:`uniform float uTime,uPresence,uOpacity; varying float vAge; varying float vPhase;
+      ${NOISE}
+      void main(){
+        vec2 q=(gl_PointCoord-.5)*2.;q.x+=sin(q.y*3.+vPhase*23.+uTime*.6)*.15;
+        float edge=1.-smoothstep(.2,1.,length(q*vec2(1.1,.85)));
+        float grain=n3(vec3(q*3.,vPhase*13.+uTime*.2));
+        float life=sin(vAge*3.14159265);
+        float a=edge*edge*(.35+grain*.65)*life*uOpacity*uPresence;
+        gl_FragColor=vec4(vec3(.026,.016,.008),a);
+        #include <colorspace_fragment>
+      }`,
+    transparent:true,depthWrite:false,depthTest:true,
+  });
+  const smoke=new THREE.Points(g,mat);smoke.frustumCulled=false;
+  const size=new THREE.Vector2();
+  smoke.onBeforeRender=renderer=>{mat.uniforms.uPixelScale!.value=renderer.getDrawingBufferSize(size).y*.5;};
+  return smoke;
 }
 
 function poolMaterial(): THREE.ShaderMaterial {
@@ -209,6 +252,8 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     const wash = new THREE.Mesh(geo, fringe);
     wash.renderOrder = 2;
     group.add(wash);
+    const smoke=inkWisps(i);
+    group.add(smoke);
     scene.add(group);
     const poolGeometry = poolGeo.clone();
     poolGeometry.setAttribute('aValid', new THREE.BufferAttribute(new Float32Array(poolGeometry.attributes.position!.count).fill(1), 1));
@@ -232,7 +277,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, fringe, pool, presence: 1, freed: false };
+    return { active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, fringe, smoke, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
@@ -249,6 +294,10 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       for (const s of shades) {
         if (!s.active) { s.group.visible = false; s.pool.visible = false; s.debug.visible = false; continue; }
         s.group.visible = s.presence > 0; s.pool.visible = s.presence > 0;
+        s.smoke.material.uniforms.uTime!.value=t;
+        s.smoke.material.uniforms.uPresence!.value=s.presence;
+        s.smoke.material.uniforms.uOpacity!.value=tun.inkOpacity;
+        s.smoke.material.uniforms.uSize!.value=tun.inkSize;
         if (s.freed) {
           s.releaseAge += dt;
           const age = s.releaseAge;
@@ -353,6 +402,8 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     f.add(tun, 'bob', 0, 0.6, 0.01);
     f.add(tun, 'releaseTime', 0.4, 2, 0.05);
     f.add(tun, 'invulnerability', 0.3, 2, 0.05);
+    f.add(tun, 'inkOpacity',0,.4,.01);
+    f.add(tun, 'inkSize',.2,1.5,.05);
     f.add(tun, 'debug');
     f.close();
   }

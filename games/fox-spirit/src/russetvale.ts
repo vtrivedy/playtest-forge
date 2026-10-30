@@ -1,3 +1,4 @@
+import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
@@ -242,6 +243,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   group.name = 'russetvale';
   scene.add(group);
   const r = rng(20261030);
+  const waterVisuals: ReturnType<typeof createStylizedWater>[] = [];
 
   const terrainY = (x: number, z: number) => (insideIsland(x, z) ? groundRaw(x, z) : -1000);
   const col = new CollisionWorld(terrainY);
@@ -281,7 +283,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
-  const nature = await loadNatureKit();
+  const [nature, rubble, lanternColumn] = await Promise.all([loadNatureKit(), loadRubbleKit(), loadLanternColumn()]);
   // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
   // yaw picked to keep foliage out of the route's jump arcs
   const TREE_HUES: Array<[THREE.Color, THREE.Color]> = [
@@ -407,9 +409,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(29.5, 8.5, 10);
   WS(36.5, -1.2, 10);
   WS(36.5, -8.8, 14);
-  WS(39.8, -9.4, 14);
-  WS(38.8, 2.5, 14, { label: 'wind-ready:mill-gap' });
-  WS(40.0, 2.5, 14, { act: 'glide', label: 'wind-gap' });
+  WS(36.4, -4, 14);
+  WS(38.8, 2.5, 14);
+  WS(39.7, 2.5, 14, { act: 'glide', label: 'wind-gap' });
   WS(62.3, 0.6, 14);
   WS(62.3, 1.2, 14);
   WS(62.3, 9.2, 18);
@@ -612,7 +614,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     { s0: 0, s1: T_END, top: 2, w: 30 },
     { s0: 12, s1: T_END, top: 6, w: 28 },
     { s0: 28, s1: T_END, top: 10, w: 26 },
-    { s0: 38, s1: 40.5, top: 14, w: 24 },
+    { s0: 36, s1: 40.5, top: 14, w: 24 },
     { s0: 60.5, s1: T_END, top: 14, w: 24 },
     { s0: 64, s1: T_END, top: 18, w: 22 },
     { s0: 68, s1: T_END, top: 22, w: 20 },
@@ -730,7 +732,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const mills: Mill[] = [];
   const millSites: Array<[number, number, number]> = [
     [23.8, -8.4, 6],
-    [35, -7.6, 10],
+    [39, -7.6, 14],
     [73.5, -4.6, 22],
   ];
   const millFacing = Math.atan2(-TD.x, -TD.y) + 0.5; // face back down the climb (toward meadow/camera)
@@ -1148,6 +1150,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   {
     const len = CREEK.x1 - CREEK.x0 + CREEK.taper;
     const w = createStylizedWater(scene, { size: 6, y: CREEK.bed + 0.18, colorDeep: 0x2e2a22, colorShallow: 0x6a5c46 });
+    waterVisuals.push(w);
     w.mesh.scale.set(len / 6, 1, 0.62);
     w.mesh.position.set((CREEK.x0 + CREEK.x1) / 2, CREEK.bed + 0.18, (CREEK.zS + CREEK.zN) / 2);
     (w.material.uniforms.uSky!.value as THREE.Color).set(0x5a4e40);
@@ -1828,12 +1831,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   for (let i = 0; i < cpSites.length; i++) {
     const [x, y0, z] = cpSites[i]!;
     const y = y0 === 0 ? groundRaw(x, z) : y0;
-    lanternPost(bk('stone', x, z), lanternB, x, y, z, 220 + i);
+    lanternPost(bk('stone', x, z), lanternB, lanternColumn, x, y, z, 220 + i);
     col.add(cylCollider({ x, z, r: 0.45, top: y + 2.6, bottom: y - 1, tag: 'lantern' }));
     const lampLight = new THREE.PointLight(0xffbf72, 3.5, 7, 2);
     lampLight.position.set(x, y + 2.1, z); group.add(lampLight);
     checkpoints.push({ pos: new THREE.Vector3(x - 1.6, y, z), lit: false });
   }
+  lanternColumn.dispose();
   const lanternMesh = lanternB.toMesh(lanternMat, { cast: false });
   if (lanternMesh) group.add(lanternMesh);
 
@@ -1857,6 +1861,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // Wen's pond
   const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x393c30, colorShallow: 0x827657 });
+  waterVisuals.push(pond);
   pond.mesh.position.set(POND.x, POND.water, POND.z);
   pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
   (pond.material.uniforms.uSky!.value as THREE.Color).set(0xb5a17a);
@@ -2218,6 +2223,18 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   }
 
+  // CC0 scanned fragments sit inside existing masonry footprints; route landings stay clear.
+  for (let i = 0; i < 9; i++) {
+    const a = i * 2.39996;
+    const x = -30 + Math.cos(a) * (1.05 + (i % 2) * 0.4);
+    const z = 60.4 + Math.sin(a) * 1.55;
+    rubble.place(bk('rock', x, z), x, 3.18, z, 0.7 + (i % 3) * 0.18, 420 + i, 0.48);
+  }
+  for (const [x, y, z, seed] of [[55.6, -0.1, 35.3, 440], [95, -1.9, 20, 441], [105, -1.9, 20, 442]] as const) {
+    rubble.place(bk('rock', x, z), x, y, z, 1.05, seed, 1.4);
+  }
+  rubble.dispose();
+
   // ==================================================================== merge buckets
   let verts = 0;
   const perMat: Record<string, number> = {};
@@ -2302,6 +2319,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
+      for (const water of waterVisuals) water.update(t);
       const ev: RealmEvent[] = [];
       // checkpoints
       for (let i = 0; i < checkpoints.length; i++) {

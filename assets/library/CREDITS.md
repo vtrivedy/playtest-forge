@@ -93,3 +93,16 @@ Water ice sheets, flume masonry, flow ribbons and ripples are original procedura
 Sprint 2 world surface reuse: `Rock035` (ambientCG, CC0) supplies metre-scaled
 stone value/relief on aqueducts, ruins and carved housings. `bark_brown_02`
 (Poly Haven, CC0) supplies softened grain on existing timber. No new downloads.
+`models/nature/rock_moss_set_01.glb` (Poly Haven, CC0, source above) is also
+reused as normalized scanned rubble at existing water masonry footprints and
+the grotto roof. Colors are restyled to the realm's warm stone/lichen palette.
+
+## Quaternius Column — CC0
+`models/ruins/quaternius_column.glb` — Column by Quaternius, public domain CC0.
+Source: https://poly.pizza/m/wLubNpOTX4 (license checked 2026-10-30).
+Binary: https://static.poly.pizza/5239f88f-e30b-452b-a19e-89745d580b1e.glb
+Used as checkpoint lantern supports, with the realm's weathered stone material.
+`models/ruins/moss_rubble.glb` is a texture-free clustered derivative of the same
+CC0 `rock_moss_set_01` source. Rebuild with `python3 tools/prepare-world-rubble.py`.
+Six scanned silhouettes retain 15,309 triangles total (from 63,127); source scans
+remain in the reusable library. Runtime placements batch into existing buckets.
