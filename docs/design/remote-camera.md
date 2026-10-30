@@ -18,10 +18,25 @@ Run repository `tsc --noEmit` and fox Vite build. Request immutable pushed befor
 The named briefs `_style-update-1105.md` and `_studio-roles-note.md` were not available in this checkout at design time; follow the supplied autumn realism direction and stream brief.
 
 ## Query cost refinement
-CPU-only stress test: a97,792-triangle merged mesh costs ~14ms/update with three direct raycasts on the stream worker. To avoid spending the frame budget on scenery queries, partition large single-material static meshes into8m local-space chunks for ray queries only. Reuse the source position attribute and build index lists; bound each chunk by its actual triangles (including triangles crossing cell edges). These proxies never enter the scene or upload GPU buffers. Source visibility still controls collision. Keep small or multi-material meshes on the direct query path; both use identical triangle hit semantics.
+CPU-only stress test: a 97,792-triangle merged mesh costs ~14 ms/update with three direct raycasts on the stream worker. To avoid spending the frame budget on scenery queries, partition large single-material static meshes into 8 m local-space chunks for ray queries only. Reuse the source position attribute and build index lists; bound each chunk by its actual triangles (including triangles crossing cell edges). These proxies never enter the scene or upload GPU buffers. Source visibility still controls collision. Keep small or multi-material meshes on the direct query path; both use identical triangle hit semantics.
 
 ## Column framing refinement
-A CPU reproduction using a2.6m lantern-column collider found the existing3m terrain lift still creates a~44° downward view even after geometry compression. Cap terrain boom lift at0.9m: gentle grades retain clearance, while tall obstructions shorten the boom instead of climbing above the fox. Validate the near-column elevation and review on GPU before accepting the framing.
+A CPU reproduction using a 2.6 m lantern-column collider found the existing 3 m terrain lift still creates a ~44° downward view even after geometry compression. Cap terrain boom lift at 0.9 m: gentle grades retain clearance, while tall obstructions shorten the boom instead of climbing above the fox. Validate the near-column elevation and review on GPU before accepting the framing.
 
 ## Moving-column pop refinement
-A sideways traversal past a column reproduced a1.33m one-frame vertical pop: floor correction was applied to the uncompressed spring before geometry collision, so a post could kick the spring above itself. Remove that premature floor impulse; retain the final rendered-lens floor guarantee after compression and the final feet/ears guard. Test the moving-column case for vertical continuity.
+A sideways traversal past a column reproduced a 1.33 m one-frame vertical pop: floor correction was applied to the uncompressed spring before geometry collision, so a post could kick the spring above itself. Remove that premature floor impulse; retain the final rendered-lens floor guarantee after compression and the final feet/ears guard. Test the moving-column case for vertical continuity.
+
+
+## Current defaults and checks
+
+| Parameter | Value | Purpose |
+| --- | --- | --- |
+| Ground distance / height | 3.8 m / 1.25 m | Read the legs with a low, comfortable horizon |
+| Shoulder angle | 0.34 rad (19.5°) | Separate legs and body in three-quarter view |
+| Jump height share | 0.8 | Track ascent while retaining vertical lag |
+| Landing attraction | 0.24, descending only | Preserve the fox on ascent; reveal the landing on descent |
+| Position lag / lookahead | 0.14 s / 1.6 m | Retain the existing soft follow and forward space |
+| Scenery compression / release | Damping 24 / 2.2 s⁻¹ | Pull in promptly and return gently |
+| Terrain boom lift cap | 0.9 m | Avoid climbing above narrow columns |
+
+Typecheck, fox Vite build and `npx tsx tools/checks/camera.ts` pass. Camera checks are CPU math only: they cover decorative posts, visibility, foliage exclusion, query chunk equivalence, jump/raised-floor framing, stable diagonals, frame-rate convergence and moving-column continuity. Captured gameplay, PNG inspection, window.__game review and the Opus critique remain required before visual acceptance. No GPU evidence had arrived when these notes were written.
