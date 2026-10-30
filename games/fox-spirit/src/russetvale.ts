@@ -38,7 +38,7 @@ import {
 import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } from './russetTextures';
 import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
-import type { ShadeSpot } from './chem/shade';
+import type { ShadeSpot } from './encounters/shades';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).

@@ -35,7 +35,8 @@ import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
 import { createUpdrafts, type Lift } from './chem/updraft';
 import { createInlets, heatFeeds } from './chem/inlet';
-import { createShades } from './chem/shade';
+import { ShadeContact } from './encounters/contact';
+import { createShades } from './encounters/shades';
 import type { ColorStroke } from '../../../src/render/colorField';
 
 /**
@@ -324,14 +325,14 @@ async function boot() {
     },
   });
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
-  const shades = createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
+  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
   /** Temporary colour as reactors read it: a Shade's drain zeroes aura/trail and spent strokes (≤ 1) */
   const supplyAt = (q: THREE.Vector3) => {
     if (!shades.drains(q)) return colorField.sample(q);
     const s = colorField.strokeAt(q);
     return s > 1 ? 1 : 0;
   };
-  let shadeInvuln = 0;
+  const shadeContact = new ShadeContact();
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number) {
@@ -464,7 +465,14 @@ async function boot() {
     __gameHooks?: Record<string, unknown>;
   };
   win.__gameHooks = {
+    shadesProbe() {
+      const p = new THREE.Vector3(...shades.state()[0]!.pos as [number, number, number]);
+      const weak = supplyAt(p);
+      const draining = shades.drains(p);
+      return { p: p.toArray(), draining, weak };
+    },
     hasClips: foxActor.hasClips,
+    shades: { state: () => ({ ...shadeContact.state(), actors: shades.state() }), tun: shades.tun, drains: (x: number, y: number, z: number) => shades.drains(new THREE.Vector3(x, y, z)) },
     gym: gaitGym ? { slopeDegrees: 15, origin: gaitGym.spawn.toArray() } : null,
     /** World-space analog input, same velocity/acceleration path as keyboard input. */
     setStick(x: number | null, z = 0) {
@@ -640,6 +648,7 @@ async function boot() {
         chem: { ...updrafts.state(), shades: shades.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
+        shades: { ...shadeContact.state(), actors: shades.state() },
         audio: audio.debug(),
         restore: { phase: restore.phase, age: restore.age, floodAge: restore.floodAge, frontRadius: restore.frontRadius, inputLocked: restore.inputLocked, path: cam.pathState() },
         auto: {
@@ -732,6 +741,7 @@ async function boot() {
   const clock = new THREE.Clock();
 
   function respawn() {
+    shadeContact.respawn();
     const p = world.respawnPos();
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
     prevFeet = p.y + 0.1;
@@ -1117,28 +1127,28 @@ async function boot() {
     // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
     colorField.glows.length = 0;
     for (const h of updrafts.hearths) if (h.reactor.heat > 0) colorField.glows.push({ x: h.base.x, z: h.base.z, radius: 4.2, strength: h.reactor.heat * 0.8 });
-    shadeInvuln = Math.max(0, shadeInvuln - dt);
+    shadeContact.update(dt, (dx, dz) => {
+      const beforeX = fox.position.x, beforeZ = fox.position.z;
+      const fy = fox.position.y - foxActor.feetOffset;
+      if (!col.blocked(fox.position.x + dx, fox.position.z, fy)) fox.position.x += dx;
+      if (!col.blocked(fox.position.x, fox.position.z + dz, fy)) fox.position.z += dz;
+      return Math.hypot(fox.position.x - beforeX, fox.position.z - beforeZ);
+    });
     for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
       if (e.type === 'freed') {
-        // freed: the ink comes apart into leaves that warm as they fall
-        autumnFX.swirl(e.pos, 46, 1.4);
-        emberMotes.burst(e.pos, { count: 40, speed: [1.5, 4], lift: 0.6, life: [0.8, 1.8], flash: 1.2, size: [0.04, 0.09], heat: 0.6 });
+        shadeContact.frees++;
         hitstop = 0.08;
-        cam.shake(0.3);
+        cam.shake(0.12);
         audio.play('bridge');
-      } else if (shadeInvuln <= 0) {
-        // contact: knocked back out of the ink, brief grace
-        const dx = fox.position.x - e.pos.x;
-        const dz = fox.position.z - e.pos.z;
-        const d = Math.hypot(dx, dz) || 1;
-        vel.x = (dx / d) * shades.tun.knockback;
-        vel.z = (dz / d) * shades.tun.knockback;
-        vel.y = Math.max(vel.y, 3.5);
-        grounded = false;
-        shadeInvuln = 1.0;
-        cam.shake(0.25);
+        hud.setPrompt('The Keeping loosens. A memory returns.');
+        hud.hidePromptSoon(3);
+      } else if (shadeContact.hit(fox.position, e.pos, shades.tun.knockback, shades.tun.invulnerability)) {
+        cam.shake(0.2);
         foxActor.pulse(0.4);
         audio.play('hazard');
+        hud.setPrompt(`${shadeContact.wisps} ember wisps · Dash through the ink to free it`);
+        hud.hidePromptSoon(3);
+        if (shadeContact.wisps === 0) { respawn(); deaths++; }
       }
     }
     for (const i of inlets.update(dt, (q) => updrafts.hearths.some((h) => heatFeeds(h, q, updrafts.tun.radius)))) latchSeedwell(i);
@@ -1275,7 +1285,8 @@ async function boot() {
       title: 'Fox Spirit — Russetvale',
       status,
       score: lit * 250 + (shrineOn ? 1000 : 0),
-      lives: 1,
+      lives: shadeContact.wisps,
+      shades: { ...shadeContact.state(), actors: shades.state() },
       elapsedSec: Number(elapsed.toFixed(2)),
       deaths,
       backend,

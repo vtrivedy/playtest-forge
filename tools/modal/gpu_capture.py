@@ -89,7 +89,7 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'updraft'}:
+    if shots != 'all' and not set(shots.split(',')) <= {'shade', 'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'updraft'}:
         raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, updraft or comma-separated')
     if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
         raise ValueError('Gait requires --fps 60')

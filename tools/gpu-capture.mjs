@@ -209,6 +209,43 @@ try {
     }
     return state;
   }
+  if (wants('shade')) {
+    await boot(quality, true);
+    const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
+    if (!actors.length) throw Error('No Shade encounter authored');
+    save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
+    const camera = async () => {
+      const [x,y,z] = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
+      await H('photo', [x + 6.5, y + 4.4, z + 7.5], [x, y + 1.4, z], 48);
+    };
+    const start = actors[0].pos;
+    await H('teleport', start[0] + 3.8, start[1], start[2] + 1, Math.PI);
+    await H('shadesProbe');
+    await camera();
+    await video('shade-patrol', 180, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 45, 90, 135, 179] });
+    await H('setKeys', []);
+    let p = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
+    await H('teleport', p[0] + 0.55, p[1], p[2], Math.PI);
+    await camera();
+    await video('shade-contact', 90, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 9, 18, 45, 89] });
+    const contact = await page.evaluate(() => window.__gameHooks.shades.state());
+    if (contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1) throw Error(`Shade contact failed: ${JSON.stringify(contact)}`);
+    p = contact.actors[0].pos;
+    await H('teleport', p[0], p[1], p[2] + 2.7, Math.PI);
+    await H('setStick', 0, -1);
+    await H('setKeys', ['ShiftLeft']);
+    await camera();
+    await video('shade-free', 210, async i => {
+      if (i === 12) { await H('setKeys', []); await H('setStick', null); }
+      await camera();
+    }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 120, 180, 209] });
+    const freed = await page.evaluate(() => window.__gameHooks.shades.state());
+    if (freed.frees !== 1 || !freed.actors[0].freed || freed.wisps !== 2) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
+    await advance(360, false);
+    if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
+    await shot('shade-after-free');
+    save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+  }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
     await boot(quality, true, '&gym=gait');

@@ -86,3 +86,19 @@ jump/landing and slopes; a quarter-speed segment uses smaller simulation steps,
 not duplicated frames. Side tracking keeps paws large enough to judge contact.
 1080p60 MP4, labelled pose contact sheet, per-frame state and __game snapshots
 are the evidence. Staged resets are explicitly recorded; route remains unassisted.
+
+## Sprint 2 Shade encounter
+The Keeping caught a woodland animal mid-stride. Its enlarged, vertically drawn
+Quaternius CC0 fox silhouette floats in a warm ink wash, wavering without a walk
+cycle. SW1's authored loop is the first playable encounter. A 3 m drain suppresses
+weak temporary supply; fresh dash strokes and permanent restoration still win.
+Contact costs one of three wisps, grants one second of grace and pushes the fox
+3 m over a short eased impulse, through the existing wall checks. Dash through
+the silhouette to free it permanently: ink breaks into falling leaves whose
+sepia warms to copper and russet. No explosion, score pickup or respawn.
+
+Expose patrol speed (2.2 m/s), bob (0.3 m), hit/drain radii, release timing,
+knockback distance and invulnerability in lil-gui. Debug spline and drain off by
+default. Publish actors, wisps, hits, frees and impulse travel on __game.shades.
+GPU review must retain patrol, contact/grace, and a real dash-through release,
+including drain/strong-stroke assertions, then receive an Opus critique and retest.
