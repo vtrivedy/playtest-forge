@@ -24,6 +24,9 @@ async function shot(name, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForFunction(() => !!(window.__game && window.__lookdev), null, { timeout: 45000 });
   await page.waitForTimeout(800);
+  await page.evaluate(() => {
+    document.querySelectorAll('.dg, .lil-gui').forEach((el) => { el.style.display = 'none'; });
+  });
   // pause flythrough so frame is stable
   await page.evaluate(() => {
     const g = document.querySelector('.dg') || null;

@@ -158,10 +158,33 @@ export function scatterProps(
     if (hy > 0.25) {
       const hero = createStylizedTree(0xb8321f, 0x3a2418);
       hero.position.set(hx, hy, hz);
-      hero.scale.setScalar(1.45);
+      hero.scale.setScalar(2.1);
       scene.add(hero);
       objs.push(hero);
       hero.traverse((c) => {
+        if ((c as THREE.Mesh).isMesh) {
+          const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
+          if (!leafMats.includes(m)) {
+            leafMats.push(m);
+            mats.push(m);
+          }
+        }
+      });
+    }
+  }
+
+
+  // accent maple west (keyart massing)
+  {
+    const hx = -5.5, hz = -2.8;
+    const hy = yAt(hx, hz);
+    if (hy > 0.25) {
+      const accent = createStylizedTree(0xa83228, 0x3a2418);
+      accent.position.set(hx, hy, hz);
+      accent.scale.setScalar(1.7);
+      scene.add(accent);
+      objs.push(accent);
+      accent.traverse((c) => {
         if ((c as THREE.Mesh).isMesh) {
           const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial;
           if (!leafMats.includes(m)) {

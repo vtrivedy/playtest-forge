@@ -79,7 +79,7 @@ async function main() {
     bloomStrength: 0.48,
     bloomThreshold: 0.78,
     vignette: 0.3,
-    enableGTAO: false, // toggle via GUI — costly on SwiftShader
+    grain: 0.09,
   });
 
   // --- Scripted flythrough path ---
