@@ -1560,6 +1560,22 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     inletSpots.push({ seedwell: si, source: id, pos: new THREE.Vector3(hx + ux * 1.3, hy + bowlUp, hz + uz * 1.3), sealAt: new THREE.Vector3(sw.pos.x, sw.pos.y + 0.78, sw.pos.z), pillar: new THREE.Vector3(px, hy, pz), latchTime: 2 });
   };
   kiln(0, 'H2', 2.2, 2.6, 5.5);
+  // Kiln catch shelves (§3.4 recovery): y15 ledges on the spire's south and east faces, each with a hearth
+  // whose column (to ≈ y25) overlaps the kiln ledge rim — a missed step is a ride back, not a long walk
+  {
+    const sw = seedwells[0]!.pos;
+    for (const [id, ang] of [['HS', Math.PI / 2], ['HE', 0]] as const) {
+      const cx = sw.x + Math.cos(ang) * 7.4;
+      const cz = sw.z + Math.sin(ang) * 7.4;
+      const yaw = -ang;
+      col.add(boxCollider({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 11, tag: 'kiln-shelf' }));
+      slab({ x: cx, z: cz, w: 4.2, d: 5.4, yaw, top: 15, bottom: 9.5, rough: 0.8, seed: 90 + id.length, topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45), overhang: 0.6 });
+      const hx = sw.x + Math.cos(ang) * 6.95;
+      const hz = sw.z + Math.sin(ang) * 6.95;
+      col.add(cylCollider({ x: hx, z: hz, r: 0.82, top: 16, bottom: 14, tag: 'hearth' }));
+      hearthSpots.push({ id, x: hx, y: 15, z: hz, height: 9.5 });
+    }
+  }
   // HP sits on the island's approach so arriving across the stones brushes it
   kiln(1, 'HP', 0.8, 2.6, 4.5, -1);
   kiln(2, 'HK', 1.68, -1.56, 4.5);
