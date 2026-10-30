@@ -280,6 +280,59 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
+  if (wants('updraft')) {
+    // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
+    // A: run past the cold H-a hearth, jump into its column, ride it onto the 5 m shelf, watch hold → gutter.
+    // B: light it again, hover in the column (jump held, no steering) until it gutters under the glider.
+    await boot(quality, true);
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+    const hearth = st => st.chem.hearths.find(h => h.id === 'H-a');
+    const h0 = hearth(await H('state'));
+    const [hx, hy, hz] = h0.pos;
+    const summary = { hearth: h0, A: {}, B: {} };
+    // matched cold / lit stills from the same staged lens (fox out of colour range for the cold one)
+    const lens = [[hx - 10, hy + 2.4, hz + 13], [hx + 3, hy + 3, hz - 2], 50];
+    await H('teleport', hx - 9, hy, hz + 14, Math.PI); await H('photo', ...lens); await advance(30); await shot('updraft-still-cold');
+    const runFrom = [hx - 1.4, hy, hz + 9];
+    for (const variant of ['A', 'B']) {
+      await H('photoOff');
+      await H('teleport', ...runFrom, Math.PI); await advance(40);
+      let phase = 'run', i0 = -1, landed = -1, minVyGutter = Infinity;
+      const keyFrames = [], timeline = [];
+      const name = variant === 'A' ? 'updraft-ride' : 'updraft-hover';
+      await video(name, (variant === 'A' ? 13 : 12) * fps, async i => {
+        const st = await H('state'), hs = hearth(st), y = st.pos[1];
+        timeline.push({ i, t: st.t, pos: st.pos, vy: st.vel[1], grounded: st.grounded, gliding: st.gliding, heat: hs.heat, state: hs.state, supply: hs.supply });
+        if (hs.state === 'guttering' && !st.grounded) minVyGutter = Math.min(minVyGutter, st.vel[1]);
+        if (phase === 'run' && st.pos[2] < hz + 0.2) { phase = 'ride'; i0 = i; keyFrames.push(i); }
+        if (phase === 'ride' && st.grounded && i - i0 > 20) { phase = 'stand'; landed = i; keyFrames.push(i); }
+        if (i === 0 || phase === 'ride' && (i - i0) % 15 === 0 || phase === 'stand' && (i - landed) % 45 === 0) if (!keyFrames.includes(i)) keyFrames.push(i);
+        if (variant === 'A' && phase === 'stand' && i - landed === 50) await H('photo', [hx + 14, hy + 9, hz + 9], [hx + 1, hy + 2, hz - 1], 50);
+        const keys = phase === 'run' ? ['KeyW'] : phase === 'ride' ? (variant === 'A' ? ['KeyD', 'Space'] : ['Space']) : variant === 'A' && i - landed < 20 ? ['KeyD'] : [];
+        await H('setKeys', keys);
+      }, (st, i) => phase === 'stand' && i - landed > 5.5 * fps, { keyFrames, label: (f, st) => st ? `${name} f${f} y=${st.pos[1].toFixed(2)} vy=${st.vel[1].toFixed(2)} heat=${hearth(st).heat.toFixed(2)} ${hearth(st).state}` : `${name} f${f}` });
+      const after = await H('state');
+      const firstLit = timeline.find(r => r.heat > 0);
+      const lastSupplied = [...timeline].reverse().find(r => r.supply >= after.chem.tun.threshold);
+      const holdEnd = timeline.find(r => lastSupplied && r.t > lastSupplied.t && r.state === 'guttering');
+      const cold = timeline.find(r => holdEnd && r.t > holdEnd.t && r.state === 'cold');
+      summary[variant] = {
+        ignitedAtS: firstLit ? Number((firstLit.t - timeline[0].t).toFixed(3)) : null,
+        holdS: lastSupplied && holdEnd ? Number((holdEnd.t - lastSupplied.t).toFixed(3)) : null,
+        gutterS: holdEnd && cold ? Number((cold.t - holdEnd.t).toFixed(3)) : null,
+        minVyWhileGutteringAirborne: Number.isFinite(minVyGutter) ? Number(minVyGutter.toFixed(3)) : null,
+        ride: after.chem.lastRide, end: { pos: after.pos, grounded: after.grounded, deaths: after.deaths },
+      };
+      save(`${name}-timeline.json`, timeline);
+      await H('setKeys', []); await H('photoOff');
+    }
+    // debug view of the column volume (staged, lit by standing at the bowl)
+    await H('teleport', hx - 1.2, hy, hz + 0.6, Math.PI); await page.evaluate(() => document.body.classList.add('debug-on'));
+    await H('photo', ...lens); await advance(30); await shot('updraft-still-debug');
+    await page.evaluate(() => document.body.classList.remove('debug-on')); await advance(2); await shot('updraft-still-lit');
+    save('updraft-acceptance.json', summary);
+    console.log('UPDRAFT', JSON.stringify(summary));
+  }
   if (wants('route')) {
     await boot(quality, true);
     save('route-waypoints.json', await H('route'));

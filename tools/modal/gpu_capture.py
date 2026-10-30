@@ -1,7 +1,7 @@
 """Real-GPU Russetvale capture. No local browser or permanent deployment.
 
 modal run tools/modal/gpu_capture.py --ref main --shots all
---shots probe | perf | route | orbit | fox | gait | stills | all (or comma-separated); --fetch-only RUN_ID
+--shots probe | perf | route | orbit | fox | gait | stills | updraft | all (or comma-separated); --fetch-only RUN_ID
 Gait requires 60 fps. Usage and review workflow: tools/CAPTURE.md.
 """
 from pathlib import Path
@@ -89,8 +89,8 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills'}:
-        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills or comma-separated')
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'updraft'}:
+        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, updraft or comma-separated')
     if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
         raise ValueError('Gait requires --fps 60')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:40]}-{shots.replace(",", "_")}-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:10]}'
