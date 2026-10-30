@@ -10,6 +10,7 @@ from pathlib import Path
 import modal
 
 app = modal.App('fox-blender-render')
+results = modal.Volume.from_name('fox-blender-reviews', create_if_missing=True)
 BLENDER = 'blender-4.2.5-linux-x64'
 image = (
     modal.Image.debian_slim(python_version='3.11')
@@ -20,9 +21,10 @@ image = (
 )
 
 
-@app.function(image=image, gpu=['L4', 'A10', 'L40S', 'T4'], cpu=8, memory=16384, timeout=1800, scaledown_window=2)
-def render(script: bytes, inputs: dict, args: list) -> dict:
-    import os, subprocess
+@app.function(image=image, gpu=['L4', 'A10', 'L40S', 'T4'], cpu=8, memory=16384, timeout=1800, scaledown_window=2,
+              volumes={'/reviews': results})
+def render(script: bytes, inputs: dict, args: list, run_id: str) -> dict:
+    import os, subprocess, tarfile
     work = Path('/work'); (work / 'in').mkdir(parents=True); (work / 'out').mkdir()
     for name, data in inputs.items():
         (work / 'in' / name).write_bytes(data)
@@ -31,20 +33,36 @@ def render(script: bytes, inputs: dict, args: list) -> dict:
     proc = subprocess.run([f'/opt/{BLENDER}/blender', '-b', '--python', str(work / 'script.py'), '--', *args],
                           env=env, capture_output=True, text=True)
     log = proc.stdout[-20000:] + '\n--- stderr ---\n' + proc.stderr[-8000:]
-    files = {p.name: p.read_bytes() for p in (work / 'out').iterdir() if p.is_file()}
-    files['blender.log'] = log.encode()
-    if proc.returncode:
-        print(log)
-    return files
+    (work / 'out' / 'blender.log').write_text(log)
+    archive = Path('/reviews') / f'{run_id}.tar'
+    with tarfile.open(archive, 'w') as tar:
+        tar.add(work / 'out', arcname='.')
+    results.commit()
+    return {'archive': archive.name, 'exitCode': proc.returncode,
+            'files': sorted(p.name for p in (work / 'out').iterdir() if p.is_file())}
 
 
 @app.local_entrypoint()
-def main(script: str, inputs: str = '', out: str = '', args: str = ''):
+def main(script: str, inputs: str = '', out: str = '', args: str = '', fetch_only: str = ''):
+    import tarfile, uuid, time
     root = Path(__file__).resolve().parents[2]
     ins = {Path(p).name: (root / p if not Path(p).is_absolute() else Path(p)).read_bytes()
            for p in inputs.split(',') if p}
-    files = render.remote((root / script).read_bytes(), ins, args.split())
     dest = Path(out or '/tmp/blender-render'); dest.mkdir(parents=True, exist_ok=True)
-    for name, data in files.items():
-        (dest / name).write_bytes(data)
-    print(f'{len(files)} files -> {dest}:', ', '.join(sorted(files)))
+    run_id = fetch_only or f'fox-review-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:8]}'
+    print(f'Run ID: {run_id}', flush=True)
+    meta = None if fetch_only else render.remote((root / script).read_bytes(), ins, args.split(), run_id)
+    target = dest / f'{run_id}.tar'
+    for attempt in range(3):
+        try:
+            with target.open('wb') as f:
+                for chunk in results.read_file(f'{run_id}.tar'): f.write(chunk)
+            with tarfile.open(target) as tar: tar.extractall(dest, filter='data')
+            target.unlink()
+            break
+        except Exception:
+            if attempt == 2:
+                print(f'Recover with --fetch-only {run_id}', flush=True)
+                raise
+    print(f'Review files -> {dest}', meta or run_id)
+    if meta and meta['exitCode']: raise RuntimeError(f'Blender failed; inspect {dest / "blender.log"}')
