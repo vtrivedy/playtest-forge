@@ -348,7 +348,7 @@ try {
     if(flume){
       await H('teleport',95,6,18,0);
       await H('photo',[103,10,31],[99,5,23],48);
-      await video('shade-flume',120,undefined,undefined,{traceEveryFrame:true,keyFrames:[0,30,60,90,119]});
+      await video('shade-flume',120,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,90,119]});
       const result=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
       if(result.pos[1]<3.5||result.pos[1]>7)throw Error('Flume Shade left elevated channel');
       save('shade-flume-acceptance.json',{actor:result,game:await page.evaluate(()=>window.__game)});
@@ -357,7 +357,7 @@ try {
         ['shade-hill-high',[8,32.8,-79.5],[12,41,-73],[0,35,-80.5]],
       ]){
         await H('teleport',...observer,0);await H('photo',lens,target,48);
-        await video(id,90,undefined,undefined,{traceEveryFrame:true,keyFrames:[0,30,60,89]});
+        await video(id,90,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,89]});
         const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
         if(!actor)throw Error(`Missing ${id}`);
         save(`${id}-acceptance.json`,actor);
