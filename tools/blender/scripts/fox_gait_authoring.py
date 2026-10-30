@@ -114,11 +114,15 @@ def ik2(root, target, a_, b_, pole=-1):
     knee = root + Vector((math.cos(a1), math.sin(a1))) * a_
     tgt = root + d.normalized() * L
     return a1, ang(tgt - knee)
-def paw_path(stance, u, foot, fwd, back, lift, early=1.0):
+def paw_path(stance, u, foot, fwd, back, lift, early=1.0, duty=0.5):
     """fetlock target (y, z): stance slides back on the ground, swing arcs up and forward."""
     if stance: return Vector((foot.x - fwd + (fwd + back) * u, foot.y))
     k = ease_io2(u)
-    y = foot.x + back - (fwd + back) * k
+    sweep=fwd+back
+    # Hermite endpoint tangents continue stance velocity through lift-off/touchdown.
+    # The paw first lifts vertically in world space, instead of snapping to root speed near the floor.
+    tangent=sweep*(1-duty)/duty
+    y = foot.x + back - sweep*k + tangent*(2*u**3-3*u*u+u)
     z = foot.y + lift * math.sin(math.pi * min(1.0, u ** early)) ** 1.4
     return Vector((y, z))
 def apply_dict(pose):
@@ -161,7 +165,7 @@ def gallop_pose(t, st=1.0):
         s_ = key[0]; stance, u = leg_phase(t, td, duty)
         if "hind" in key:
             L_ = HIND[s_]
-            P = paw_path(stance, u, L_["foot"], 0.391 * st, 0.577 * st, 0.34, early=0.75)
+            P = paw_path(stance, u, L_["foot"], 0.391 * st, 0.577 * st, 0.34, early=0.75, duty=duty)
             mt = rest_ang(L_["mt"]) + math.radians((-6 + 40 * u ** 2) if stance else (34 + 16 * math.sin(math.pi * u) - 40 * ease_io2(u)))
             J = P - Vector((math.cos(mt), math.sin(mt))) * L_["c"]
             hip = posed_yz(L_["th"])[0]
@@ -171,7 +175,7 @@ def gallop_pose(t, st=1.0):
         else:
             L_ = FORE[s_]
             center=L_["foot"].copy(); center.x=REST_YZ[L_["up"]][0].x+.05
-            P = paw_path(stance, u, center, 0.43 * st, 0.43 * st, 0.5, early=1.25)
+            P = paw_path(stance, u, center, 0.43 * st, 0.43 * st, 0.5, early=1.25, duty=duty)
             sh = posed_yz(L_["up"])[0]
             # The authored paw arc is the constraint through stance AND swing. FK angle interpolation
             # can cross the +/-pi branch and flip the forepaw above the shoulder on a normalized rig.

@@ -8,7 +8,7 @@ from pathlib import Path
 import modal
 
 ROOT = Path(__file__).resolve().parents[2] if modal.is_local() else Path('/tmp/game')
-app = modal.App('russetvale-gpu-capture')
+app = modal.App('russetvale-loco-sol-gpu-capture')
 results = modal.Volume.from_name('russetvale-gpu-captures', create_if_missing=True)
 image = (
     modal.Image.from_registry('node:22-bookworm-slim', add_python='3.12')
@@ -24,13 +24,21 @@ if modal.is_local():
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)
 def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds: int, backend: str, size: str, quality: str, fps: int, cube_only: bool, verbose: bool) -> dict:
-    import os, subprocess, time, json, tarfile
+    import os, subprocess, time, json, tarfile, tempfile, shutil
     started = time.monotonic()
     out = Path('/captures') / run_id
-    out.mkdir(parents=True)
+    out.mkdir(parents=True, exist_ok=True)
     def run(args, **kw):
         return subprocess.run(args, check=True, text=True, **kw)
+    repo = None
     try:
+        # Modal can redeliver an input after an interrupted result acknowledgement.
+        completed = out / 'run.json'
+        if completed.exists():
+            metadata = json.loads(completed.read_text())
+            if metadata['ref'] == ref and metadata['shots'] == shots:
+                return metadata
+            raise ValueError('Run ID belongs to another capture')
         gpu = run(['nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'], capture_output=True).stdout.strip() if backend != 'swiftshader' else 'CPU / SwiftShader (explicit fallback)'
         (out / 'nvidia-smi.txt').write_text(gpu + '\n')
         print('GPU:', gpu, flush=True)
@@ -40,7 +48,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         ask.write_text('#!/bin/sh\ncase "$1" in *Username*) echo x-access-token;; *) printf "%s\\n" "$GH_TOKEN";; esac\n')
         ask.chmod(0o700)
         env = dict(os.environ, GIT_ASKPASS=str(ask), GIT_TERMINAL_PROMPT='0')
-        repo = Path('/tmp/game')
+        repo = Path(tempfile.mkdtemp(prefix='fox-capture-'))
         run(['git', 'init', str(repo)])
         run(['git', '-C', str(repo), 'remote', 'add', 'origin', 'https://github.com/vtrivedy/playtest-forge.git'])
         run(['git', '-C', str(repo), 'fetch', '--depth=1', 'origin', ref], env=env)
@@ -67,6 +75,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         metadata = {'ref': ref, 'commit': sha, 'gpu': gpu, 'shots': shots, 'runId': run_id,
                     'buildSeconds': round(built-started, 2), 'captureSeconds': round(time.monotonic()-built, 2),
                     'backend': backend, 'size': size, 'quality': quality, 'fps': fps,
+                    'captureToolSha': json.loads((out / 'report.json').read_text())['captureToolSha'],
                     'totalSeconds': round(time.monotonic()-started, 2)}
         (out / 'run.json').write_text(json.dumps(metadata, indent=2))
         return metadata
@@ -74,6 +83,8 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
         (out / 'failure.json').write_text(json.dumps({'error': str(exc), 'ref': ref, 'elapsedSeconds': round(time.monotonic() - started, 2)}, indent=2))
         raise
     finally:
+        if repo is not None:
+            shutil.rmtree(repo, ignore_errors=True)
         archive = Path('/captures') / f'{run_id}.tar'
         with tarfile.open(archive, 'w') as tar:
             tar.add(out, arcname='.')
@@ -89,8 +100,8 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'turntable', 'updraft'}:
-        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, turntable, updraft or comma-separated')
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'shade', 'turntable', 'updraft'}:
+        raise ValueError('shots: all, probe, perf, route, orbit, fox, gait, stills, shade, turntable, updraft or comma-separated')
     if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
         raise ValueError('Gait requires --fps 60')
     run_id = fetch_only or f'{re.sub(r"[^a-zA-Z0-9_.-]", "_", ref)[:40]}-{shots.replace(",", "_")}-{time.strftime("%Y%m%d-%H%M%S")}-{uuid.uuid4().hex[:10]}'

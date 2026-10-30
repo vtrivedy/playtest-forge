@@ -53,13 +53,13 @@ def gait_pose(t, phases, duty, sweep, lift, kind):
         if 'fore' in key:
             l = FORE[side]
             center=l['foot'].copy(); center.x=REST_YZ[l['up']][0].x+.05
-            target = paw_path(stance, u, center, sweep/2, sweep/2, lift)
+            target = paw_path(stance, u, center, sweep/2, sweep/2, lift, duty=duty)
             a,b = ik2(posed_yz(l['up'])[0], target, l['a'], l['b'], pole=1)
             paw = rest_ang(l['paw']) + math.radians(30 * math.sin(math.pi*u) if not stance else 0)
             set_chain(p, [l['up'],l['lo'],l['paw']], [a,b,paw])
         else:
             l = HIND[side]
-            target = paw_path(stance, u, l['foot'], sweep/2, sweep/2, lift*.8)
+            target = paw_path(stance, u, l['foot'], sweep/2, sweep/2, lift*.8, duty=duty)
             mt = rest_ang(l['mt']) + math.radians(18*math.sin(math.pi*u) if not stance else -3+6*u)
             joint = target - Vector((math.cos(mt),math.sin(mt)))*l['c']
             a,b = ik2(posed_yz(l['th'])[0],joint,l['a'],l['b'])
