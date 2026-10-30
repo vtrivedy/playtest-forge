@@ -39,7 +39,8 @@ export class Reactor {
     readonly tun: ReactorTunables,
   ) {}
 
-  update(dt: number, supplyAt: SupplyFn): void {
+  /** `drainedAt`: probe sits in a Shade's drain — an unsupplied reactor there skips its hold (§1.2 step 3) */
+  update(dt: number, supplyAt: SupplyFn, drainedAt?: (p: THREE.Vector3) => boolean): void {
     if (this.restored) {
       this.heat = 1;
       this.state = 'restored';
@@ -58,6 +59,7 @@ export class Reactor {
       return;
     }
     if (this.state === 'cold') return;
+    if (this.holdLeft > 0 && drainedAt && this.probes.some(drainedAt)) this.holdLeft = 0;
     this.sinceSupply = this.sinceSupply < 0 ? dt : this.sinceSupply + dt;
     if (this.holdLeft > 0) {
       this.holdLeft -= dt;

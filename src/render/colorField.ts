@@ -2,6 +2,9 @@ import * as THREE from 'three';
 
 export type TrailSample = { x: number; y: number; z: number; life: number };
 
+/** A deliberate colour stroke (the fox's dash): a capsule a→b that outlives the trail and can exceed 1. */
+export type ColorStroke = { a: THREE.Vector3; b: THREE.Vector3; life: number; strength: number; radius: number };
+
 export type RestoreRegion = {
   center: THREE.Vector3;
   targetRadius: number;
@@ -55,6 +58,11 @@ export class ColorField {
   trailRadius: number;
   private _accum = 0;
   restores: RestoreRegion[] = [];
+  strokes: ColorStroke[] = [];
+  /** Visual-only warmth (e.g. a lit hearth tinting its surroundings): stamped into the mask, never read by sample() */
+  glows: Array<{ x: number; z: number; radius: number; strength: number }> = [];
+  /** Strokes fade linearly to 0 over their last `strokeFade` seconds */
+  strokeFade = 1.5;
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   /** Global fill 0..1 (debug / end state) */
   globalColor = 0;
@@ -71,7 +79,7 @@ export class ColorField {
   private stampStrength: THREE.InstancedBufferAttribute | null = null;
   private stampNoise: THREE.InstancedBufferAttribute | null = null;
   private stampInner: THREE.InstancedBufferAttribute | null = null;
-  private static readonly MAX_STAMPS = 96;
+  private static readonly MAX_STAMPS = 128;
   private readonly _stampMatrix = new THREE.Matrix4();
   private maskSize: number;
   private _renderer: THREE.WebGLRenderer | null = null;
@@ -112,6 +120,30 @@ export class ColorField {
     return r;
   }
 
+  /** Lay a stroke (e.g. along a dash). Extend it by moving `b` while the dash runs. */
+  stroke(a: THREE.Vector3, b: THREE.Vector3, opts: { life?: number; strength?: number; radius?: number } = {}): ColorStroke {
+    const s: ColorStroke = { a: a.clone(), b: b.clone(), life: opts.life ?? 6, strength: opts.strength ?? 1.5, radius: opts.radius ?? 1.6 };
+    this.strokes.push(s);
+    return s;
+  }
+
+  /** Current strength of a stroke (strength, fading to 0 over its last strokeFade seconds). */
+  strokeStrength(s: ColorStroke): number {
+    return s.strength * Math.min(1, s.life / this.strokeFade);
+  }
+
+  /** Max stroke contribution at p (may exceed 1: fresh strokes punch through drains). */
+  strokeAt(p: THREE.Vector3): number {
+    let best = 0;
+    for (const s of this.strokes) {
+      const d = distToSegment(p, s.a, s.b);
+      if (d >= s.radius) continue;
+      const k = 1 - THREE.MathUtils.smoothstep(d, s.radius * 0.6, s.radius);
+      best = Math.max(best, this.strokeStrength(s) * k);
+    }
+    return best;
+  }
+
   /** Soft-edge half-width of a restore front at its current radius (m). */
   static edgeOf(r: RestoreRegion): number {
     return Math.min(r.radius * 0.18, r.edgeMax);
@@ -122,6 +154,8 @@ export class ColorField {
     this._accum += dt;
     for (const t of this.trail) t.life -= dt;
     this.trail = this.trail.filter((t) => t.life > 0);
+    for (const s of this.strokes) s.life -= dt;
+    if (this.strokes.length) this.strokes = this.strokes.filter((s) => s.life > 0);
     if (this._accum >= this.trailDepositInterval) {
       this._accum = 0;
       this.trail.push({ x: this.fox.x, y: this.fox.y, z: this.fox.z, life: this.trailLife });
@@ -155,6 +189,7 @@ export class ColorField {
       const fall = 1 - Math.min(1, d / this.trailRadius);
       s = Math.max(s, fall * (t.life / this.trailLife));
     }
+    if (this.strokes.length) s = Math.max(s, this.strokeAt(p));
     return THREE.MathUtils.clamp(s, 0, 1);
   }
 
@@ -335,6 +370,20 @@ export class ColorField {
         noise: 0.1,
         inner: 0.55,
       });
+    }
+
+    for (const g of this.glows) {
+      if (g.strength > 0.01) stamps.push({ x: g.x, z: g.z, size: g.radius * 2, strength: g.strength, noise: 0.12, inner: 0.35 });
+    }
+    // strokes: a bead of stamps along each capsule, brighter and longer-lived than the trail
+    for (const st of this.strokes) {
+      const len = Math.hypot(st.b.x - st.a.x, st.b.z - st.a.z);
+      const n = Math.max(1, Math.ceil(len / 0.9));
+      const k = Math.min(1, this.strokeStrength(st));
+      for (let i = 0; i <= n; i++) {
+        const u = i / n;
+        stamps.push({ x: st.a.x + (st.b.x - st.a.x) * u, z: st.a.z + (st.b.z - st.a.z) * u, size: st.radius * 2.2, strength: 0.95 * k, noise: 0.08, inner: 0.5 });
+      }
     }
 
     const mesh = this.stampMesh;
@@ -598,4 +647,14 @@ export class ColorField {
 /** Convenience factory */
 export function createColorField(opts?: ColorFieldOptions): ColorField {
   return new ColorField(opts);
+}
+
+const _ab = new THREE.Vector3();
+const _ap = new THREE.Vector3();
+function distToSegment(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): number {
+  _ab.subVectors(b, a);
+  _ap.subVectors(p, a);
+  const l2 = _ab.lengthSq();
+  const t = l2 > 1e-8 ? THREE.MathUtils.clamp(_ap.dot(_ab) / l2, 0, 1) : 0;
+  return _ap.addScaledVector(_ab, -t).length();
 }

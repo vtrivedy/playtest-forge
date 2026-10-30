@@ -104,15 +104,7 @@ export class Hearth {
     this.group.position.set(spot.x, spot.y, spot.z);
     this.group.name = `hearth-${spot.id}`;
 
-    // stone pedestal + bowl (colour-field patched: sepia until coloured / restored)
-    const stone = new THREE.Mesh(shared.bowlGeo, shared.stone);
-    stone.castShadow = true;
-    stone.receiveShadow = true;
-    this.group.add(stone);
-    const feet = new THREE.Mesh(shared.footGeo, shared.stone);
-    feet.receiveShadow = true;
-    this.group.add(feet);
-
+    // (masonry is realm art: russetKit.hearthBrazier, merged with the world's stone)
     // ash bed: grey, with ember cracks that wake with heat
     this.ash = shared.ash.clone();
     const bed = new THREE.Mesh(shared.bedGeo, this.ash);
@@ -180,8 +172,8 @@ export class Hearth {
     this.glow.uniforms.uRadius!.value = tun.radius * 0.85;
   }
 
-  update(dt: number, t: number, supplyAt: SupplyFn, debugOn: boolean): void {
-    this.reactor.update(dt, supplyAt);
+  update(dt: number, t: number, supplyAt: SupplyFn, debugOn: boolean, drainedAt?: (p: THREE.Vector3) => boolean): void {
+    this.reactor.update(dt, supplyAt, drainedAt);
     const h = this.reactor.heat;
     this.flare = Math.max(0, this.flare - dt * 1.6);
     // guttering flicker: embers/light stutter so the warning reads before lift dies
@@ -231,14 +223,11 @@ export class Hearth {
 }
 
 type HearthShared = {
-  stone: THREE.MeshStandardMaterial;
   ash: THREE.MeshStandardMaterial;
   smoke: THREE.MeshBasicMaterial;
   embers: THREE.ShaderMaterial;
   glow: THREE.ShaderMaterial;
   flame: THREE.ShaderMaterial;
-  bowlGeo: THREE.BufferGeometry;
-  footGeo: THREE.BufferGeometry;
   bedGeo: THREE.BufferGeometry;
   smokeGeo: THREE.BufferGeometry;
   flameGeo: THREE.BufferGeometry;
@@ -292,52 +281,6 @@ function crackTexture(): THREE.CanvasTexture {
 }
 
 function createShared(): HearthShared {
-  // pedestal + bowl as one lathe: foot flare, waist, wide shallow bowl with a thick rolled lip
-  const prof: Array<[number, number]> = [
-    [0.0, 0.0], [0.62, 0.0], [0.66, 0.06], [0.5, 0.16], [0.4, 0.36], [0.42, 0.5], [0.62, 0.62],
-    [0.8, 0.78], [0.86, 0.9], [0.84, 0.98], [0.76, 1.0], [0.7, 0.94], [0.62, 0.9], [0.0, 0.88],
-  ];
-  const bowlGeo = new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 18);
-  bowlGeo.computeVertexNormals();
-  // chunky jitter so it reads as cut stone, not a turned vase
-  {
-    const p = bowlGeo.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < p.count; i++) {
-      const x = p.getX(i);
-      const y = p.getY(i);
-      const z = p.getZ(i);
-      const a = Math.atan2(z, x);
-      const n = 1 + 0.035 * Math.sin(a * 5 + y * 7) + 0.02 * Math.sin(a * 11 - y * 13);
-      p.setXYZ(i, x * n, y, z * n);
-    }
-    bowlGeo.computeVertexNormals();
-  }
-  // three flat footing stones the hearth sits on
-  const footGeo = (() => {
-    const parts: THREE.BufferGeometry[] = [];
-    for (let i = 0; i < 3; i++) {
-      const a = (i / 3) * Math.PI * 2 + 0.3;
-      const g = new THREE.BoxGeometry(0.75, 0.16, 0.5, 1, 1, 1).toNonIndexed();
-      g.rotateY(-a + 0.4);
-      g.translate(Math.cos(a) * 0.72, 0.04, Math.sin(a) * 0.72);
-      parts.push(g);
-    }
-    const out = new THREE.BufferGeometry();
-    let n = 0;
-    for (const g of parts) n += g.attributes.position!.count;
-    const pos = new Float32Array(n * 3);
-    const nor = new Float32Array(n * 3);
-    let o = 0;
-    for (const g of parts) {
-      pos.set(g.attributes.position!.array as Float32Array, o * 3);
-      nor.set(g.attributes.normal!.array as Float32Array, o * 3);
-      o += g.attributes.position!.count;
-    }
-    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
-    return out;
-  })();
-  const stone = new THREE.MeshStandardMaterial({ name: 'chem-hearth-stone', color: 0x8a7a6a, roughness: 0.92, metalness: 0 });
   const crack = crackTexture();
   const ash = new THREE.MeshStandardMaterial({
     name: 'chem-hearth-ash',
@@ -380,19 +323,21 @@ function createShared(): HearthShared {
   const smoke = new THREE.MeshBasicMaterial({ color: 0xb9ad9c, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, fog: true });
 
   // rising embers + a few lifted leaves, animated entirely in the vertex shader
-  const N_EMBER = 170;
-  const N_LEAF = 22;
+  const N_EMBER = 300;
+  const N_LEAF = 26;
+  const N_HAZE = 34;
   const emberGeo = new THREE.BufferGeometry();
-  const seeds = new Float32Array((N_EMBER + N_LEAF) * 4);
+  const N_ALL = N_EMBER + N_LEAF + N_HAZE;
+  const seeds = new Float32Array(N_ALL * 4);
   let s = 11;
   const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < N_EMBER + N_LEAF; i++) {
+  for (let i = 0; i < N_ALL; i++) {
     seeds[i * 4] = rnd();
     seeds[i * 4 + 1] = rnd();
     seeds[i * 4 + 2] = rnd();
-    seeds[i * 4 + 3] = i < N_EMBER ? 0 : 1;
+    seeds[i * 4 + 3] = i < N_EMBER ? 0 : i < N_EMBER + N_LEAF ? 1 : 2;
   }
-  emberGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((N_EMBER + N_LEAF) * 3), 3));
+  emberGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N_ALL * 3), 3));
   emberGeo.setAttribute('seed', new THREE.BufferAttribute(seeds, 4));
   emberGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 5, 0), 12);
   const embers = new THREE.ShaderMaterial({
@@ -405,13 +350,14 @@ function createShared(): HearthShared {
       varying float vHot;
       varying float vSpin;
       void main() {
-        float leaf = seed.w;
-        float speed = leaf > 0.5 ? mix(2.2, 3.4, seed.y) : mix(3.6, 6.8, seed.y);
+        float leaf = seed.w > 0.5 && seed.w < 1.5 ? 1.0 : 0.0;
+        float haze = seed.w > 1.5 ? 1.0 : 0.0;
+        float speed = haze > 0.5 ? mix(1.4, 2.2, seed.y) : leaf > 0.5 ? mix(2.2, 3.4, seed.y) : mix(3.6, 6.8, seed.y);
         float ph = fract(seed.x + uTime * speed / uHeight);
-        float y = ph * uHeight * (leaf > 0.5 ? 0.85 : 1.0);
+        float y = ph * uHeight * (leaf > 0.5 ? 0.85 : haze > 0.5 ? 0.7 : 1.0);
         float turn = uTime * (leaf > 0.5 ? 1.1 : 1.6 + seed.y) + ph * 5.0;
         float a = seed.z * 6.2832 + turn;
-        float r = uRadius * (leaf > 0.5 ? 0.35 + 0.45 * seed.y : 0.08 + 0.7 * sqrt(seed.y)) * (0.55 + 0.45 * ph);
+        float r = uRadius * (leaf > 0.5 ? 0.35 + 0.45 * seed.y : haze > 0.5 ? 0.15 + 0.35 * seed.y : 0.08 + 0.7 * sqrt(seed.y)) * (0.55 + 0.45 * ph);
         vec3 p = vec3(cos(a) * r, y, sin(a) * r);
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_Position = projectionMatrix * mv;
@@ -419,10 +365,10 @@ function createShared(): HearthShared {
         // a cold column shows nothing; heat thins the stream rather than dimming it all evenly
         float alive = step(seed.y * 0.85, uHeat);
         vA = fade * alive * min(1.0, uHeat * 1.4);
-        vLeaf = leaf;
+        vLeaf = leaf + haze * 2.0;
         vHot = 1.0 - ph;
         vSpin = seed.z * 6.2832 + uTime * (1.5 + seed.y * 2.0);
-        float size = leaf > 0.5 ? mix(0.16, 0.26, seed.x) : mix(0.035, 0.085, seed.x) * (1.2 - ph * 0.6);
+        float size = haze > 0.5 ? mix(0.9, 1.6, seed.x) * (0.6 + ph) : leaf > 0.5 ? mix(0.18, 0.3, seed.x) : mix(0.06, 0.13, seed.x) * (1.25 - ph * 0.6);
         gl_PointSize = size * uScale / max(0.5, -mv.z);
       }`,
     fragmentShader: /* glsl */ `
@@ -432,7 +378,12 @@ function createShared(): HearthShared {
       varying float vSpin;
       void main() {
         vec2 q = gl_PointCoord - 0.5;
-        if (vLeaf > 0.5) {
+        if (vLeaf > 1.5) {
+          // soft heat body: big dim warm puffs that give the column volume at distance
+          float d = length(q);
+          float g = exp(-d * d * 9.0);
+          gl_FragColor = vec4(vec3(1.0, 0.45, 0.12) * g * vA * 0.32 * vHot, g * vA * 0.32);
+        } else if (vLeaf > 0.5) {
           // turning maple-ish leaf: rotated lens with a notch, warm rust lit from below
           float c = cos(vSpin), s = sin(vSpin);
           vec2 r = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
@@ -447,7 +398,7 @@ function createShared(): HearthShared {
           if (core < 0.02) discard;
           vec3 hot = vec3(1.0, 0.86, 0.5);
           vec3 cool = vec3(1.0, 0.32, 0.06);
-          gl_FragColor = vec4(mix(cool, hot, vHot * vHot) * 2.2, core * vA);
+          gl_FragColor = vec4(mix(cool, hot, vHot * vHot) * 3.2, core * vA);
         }
         #include <colorspace_fragment>
       }`,
@@ -485,7 +436,7 @@ function createShared(): HearthShared {
       void main() {
         float rim = 1.0 - abs(dot(vN, vV));
         float band = 0.6 + 0.4 * sin(vAng * 3.0 + vY * 9.0 - uTime * 4.0);
-        float a = uHeat * pow(1.0 - vY, 1.6) * (0.25 + rim * 0.75) * band * 0.16;
+        float a = uHeat * pow(1.0 - vY, 1.3) * (0.3 + rim * 0.7) * band * 0.34;
         gl_FragColor = vec4(vec3(1.0, 0.55, 0.2) * a, a);
         #include <colorspace_fragment>
       }`,
@@ -497,32 +448,48 @@ function createShared(): HearthShared {
 
   // flame tongues: crossed quads with an animated teardrop
   const flameGeo = (() => {
-    const g1 = new THREE.PlaneGeometry(1.1, 1.3).translate(0, 0.65, 0);
-    const g2 = g1.clone().rotateY(Math.PI / 3);
-    const g3 = g1.clone().rotateY((2 * Math.PI) / 3);
-    const out = new THREE.BufferGeometry();
-    const parts = [g1, g2, g3].map((g) => g.toNonIndexed());
-    const pos = new Float32Array(parts.reduce((n, g) => n + g.attributes.position!.count * 3, 0));
-    const uv = new Float32Array(parts.reduce((n, g) => n + g.attributes.uv!.count * 2, 0));
-    let o = 0;
-    let u = 0;
-    for (const g of parts) {
-      pos.set(g.attributes.position!.array as Float32Array, o);
-      uv.set(g.attributes.uv!.array as Float32Array, u);
-      o += g.attributes.position!.count * 3;
-      u += g.attributes.uv!.count * 2;
-    }
-    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    return out;
+    const pos: number[] = [];
+    const uv: number[] = [];
+    const ph: number[] = [];
+    const tongues: Array<[number, number, number, number]> = [
+      // x, z, height, width
+      [0, 0, 0.95, 0.7],
+      [0.26, 0.1, 0.62, 0.5],
+      [-0.2, 0.22, 0.7, 0.5],
+      [-0.12, -0.26, 0.55, 0.45],
+      [0.18, -0.2, 0.5, 0.42],
+    ];
+    tongues.forEach(([x, z, h, w], k) => {
+      for (const rot of [0.3 + k, 0.3 + k + Math.PI / 2]) {
+        const c = Math.cos(rot) * w * 0.5;
+        const sn = Math.sin(rot) * w * 0.5;
+        const quad = [
+          [x - c, 0, z - sn, 0, 0], [x + c, 0, z + sn, 1, 0], [x + c, h, z + sn, 1, 1],
+          [x - c, 0, z - sn, 0, 0], [x + c, h, z + sn, 1, 1], [x - c, h, z - sn, 0, 1],
+        ];
+        for (const [px, py, pz, u, v] of quad) {
+          pos.push(px!, py!, pz!);
+          uv.push(u!, v!);
+          ph.push(k * 1.7);
+        }
+      }
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setAttribute('phase', new THREE.Float32BufferAttribute(ph, 1));
+    return g;
   })();
   const flame = new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uHeat: { value: 0 } },
     vertexShader: /* glsl */ `
       uniform float uHeat;
+      attribute float phase;
       varying vec2 vUv;
+      varying float vPh;
       void main() {
         vUv = uv;
+        vPh = phase;
         vec3 p = position;
         p.y *= max(0.001, uHeat);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
@@ -530,16 +497,18 @@ function createShared(): HearthShared {
     fragmentShader: /* glsl */ `
       uniform float uTime, uHeat;
       varying vec2 vUv;
+      varying float vPh;
       void main() {
         float y = vUv.y;
+        float t = uTime + vPh;
         float x = (vUv.x - 0.5) * 2.0;
-        float sway = 0.12 * sin(uTime * 9.0 + y * 6.0) * y;
-        float w = (1.0 - y) * (0.55 + 0.25 * sin(uTime * 13.0 + y * 11.0));
+        float sway = 0.16 * sin(t * 9.0 + y * 6.0) * y;
+        float w = (1.0 - y) * (0.55 + 0.25 * sin(t * 13.0 + y * 11.0));
         float d = abs(x + sway) / max(0.02, w);
         float a = (1.0 - smoothstep(0.4, 1.0, d)) * smoothstep(0.0, 0.08, y) * (1.0 - smoothstep(0.55, 1.0, y));
-        vec3 col = mix(vec3(1.0, 0.95, 0.7), vec3(1.0, 0.35, 0.05), smoothstep(0.0, 0.7, y + d * 0.3));
-        float k = a * min(1.0, uHeat);
-        gl_FragColor = vec4(col * 2.4 * k, k);
+        vec3 col = mix(vec3(1.0, 0.72, 0.32), vec3(0.95, 0.24, 0.04), smoothstep(0.0, 0.55, y + d * 0.35));
+        float k = a * min(1.0, uHeat) * 0.85;
+        gl_FragColor = vec4(col * 1.7 * k, k);
         #include <colorspace_fragment>
       }`,
     transparent: true,
@@ -549,14 +518,11 @@ function createShared(): HearthShared {
   });
 
   return {
-    stone,
     ash,
     smoke,
     embers,
     glow,
     flame,
-    bowlGeo,
-    footGeo,
     bedGeo,
     smokeGeo,
     flameGeo,
@@ -569,10 +535,8 @@ function createShared(): HearthShared {
 export type UpdraftSystem = {
   readonly tun: UpdraftTunables;
   readonly hearths: Hearth[];
-  /** Colour-field patched materials (sync each frame with the realm's) */
-  readonly materials: THREE.MeshStandardMaterial[];
   lastRide: RideLog | null;
-  update: (dt: number, t: number, supplyAt: SupplyFn, debugOn: boolean) => void;
+  update: (dt: number, t: number, supplyAt: SupplyFn, debugOn: boolean, drainedAt?: (p: THREE.Vector3) => boolean) => void;
   liftAt: (x: number, feetY: number, z: number, out?: Lift) => Lift;
   /** Per-step ride bookkeeping (ride log for acceptance) */
   trackRide: (dt: number, feetY: number, vy: number, grounded: boolean, lift: Lift, groundTag: string | null) => void;
@@ -604,10 +568,9 @@ export function createUpdrafts(
   const sys: UpdraftSystem = {
     tun,
     hearths,
-    materials: [shared.stone],
     lastRide: null,
-    update(dt, t, supplyAt, debugOn) {
-      for (const h of hearths) h.update(dt, t, supplyAt, debugOn);
+    update(dt, t, supplyAt, debugOn, drainedAt) {
+      for (const h of hearths) h.update(dt, t, supplyAt, debugOn, drainedAt);
     },
     liftAt(x, feetY, z, out = tmp) {
       out.k = 0;

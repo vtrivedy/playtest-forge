@@ -34,6 +34,9 @@ import { createOcclusionFader } from './occlusion';
 import { createGaitGym } from './gaitGym';
 import { createRestoreCinematic } from './restore';
 import { createUpdrafts, type Lift } from './chem/updraft';
+import { createInlets, heatFeeds } from './chem/inlet';
+import { createShades } from './chem/shade';
+import type { ColorStroke } from '../../../src/render/colorField';
 
 /**
  * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
@@ -82,6 +85,8 @@ const jumpFeel = new JumpFeel();
 const feelMetrics = emptyFeelMetrics();
 const BLOOM = 0.16;
 /** Ember pickup freeze — just enough to register the hit; cooldown so ember lines don't stutter */
+/** Dash stroke (world-1.md §1.1): life s, strength (>1 punches through Shade drain), capsule radius m */
+const DASH_STROKE = { life: 6, strength: 1.5, radius: 1.6 };
 const HITSTOP_S = 0.03;
 const HITSTOP_COOLDOWN_S = 0.35;
 
@@ -310,16 +315,39 @@ async function boot() {
   const updrafts = createUpdrafts(scene, world.hearthSpots, {
     gui,
     onIgnite: (h) => {
-      emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: 26, speed: [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.6], flash: 0.8, size: [0.04, 0.09], heat: 0.7 });
+      // struck by a dash: a harder flare than a hearth caught by the passing wake
+      const byDash = colorField.strokeAt(h.reactor.probes[0]!) > 0.9 || h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
+      h.flare = byDash ? 1.6 : 1;
+      emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: byDash ? 60 : 26, speed: byDash ? [2, 5] : [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: byDash ? 1.4 : 0.8, size: [0.04, 0.1], heat: 0.7 });
       audio.play('checkpoint');
+      if (byDash) cam.shake(0.15);
     },
   });
-  for (const m of updrafts.materials) {
-    m.userData.cfRestoredChroma = 0.5;
-    colorField.patchMaterial(m);
-  }
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
+  const shades = createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
+  /** Temporary colour as reactors read it: a Shade's drain zeroes aura/trail and spent strokes (≤ 1) */
+  const supplyAt = (q: THREE.Vector3) => {
+    if (!shades.drains(q)) return colorField.sample(q);
+    const s = colorField.strokeAt(q);
+    return s > 1 ? 1 : 0;
+  };
+  let shadeInvuln = 0;
+  const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
+  /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
+  function latchSeedwell(i: number) {
+    const sw = world.seedwells[i]!;
+    for (const h of updrafts.hearths) if (Math.hypot(h.base.x - sw.pos.x, h.base.z - sw.pos.z) <= sw.radius) h.reactor.restored = true;
+    const inlet = inlets.inlets.find((q) => q.seedwell === i);
+    if (inlet) inlet.latched = true;
+    handleEvents(world.latchSeedwell(i));
+  }
+  const fStroke = gui.addFolder('Chem › Dash stroke');
+  fStroke.add(DASH_STROKE, 'life', 2, 10, 0.1);
+  fStroke.add(DASH_STROKE, 'strength', 1, 2, 0.05);
+  fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
+  fStroke.close();
   let inColumn = false;
+  let dashStroke: ColorStroke | null = null;
   const fLook = gui.addFolder('Look');
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
@@ -393,6 +421,8 @@ async function boot() {
     wish: new THREE.Vector3(),
     space: false,
     dash: false,
+    /** route act 'dash': press dash toward the next waypoint on the next step */
+    dashQueued: false,
     phase: 'run' as 'run' | 'air',
     pressT: 0,
     stuckT: 0,
@@ -528,12 +558,7 @@ async function boot() {
       return world.route;
     },
     lightSeedwells() {
-      for (const s of world.seedwells) {
-        const p = s.pos;
-        foxActor.group.position.set(p.x, p.y + foxActor.feetOffset, p.z);
-        prevFeet = p.y;
-        handleEvents(world.update(0.016, elapsed, foxActor.group.position, p.y, (q) => colorField.sample(q)));
-      }
+      for (let i = 0; i < world.seedwells.length; i++) latchSeedwell(i);
     },
     autopilot(on = true, fromIdx = 0, opts?: { assist?: boolean }) {
       auto.active = on;
@@ -612,7 +637,7 @@ async function boot() {
       return {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
-        chem: updrafts.state(),
+        chem: { ...updrafts.state(), shades: shades.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         bridge: world.bridgeGrown(),
         restored: shrineOn,
         audio: audio.debug(),
@@ -787,6 +812,10 @@ async function boot() {
       auto.idx += 1;
       auto.stuckT = 0;
       auto.bestD = Infinity;
+      if (wp.act === 'dash' && onGround) {
+        auto.dashQueued = true;
+        return;
+      }
       if (wp.act && onGround) {
         auto.act = wp.act;
         auto.phase = 'air';
@@ -800,6 +829,10 @@ async function boot() {
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else auto.wish.set(dx / d, 0, dz / d);
     if (auto.phase === 'run') auto.space = false;
+    if (auto.dashQueued) {
+      auto.dash = true;
+      auto.dashQueued = false;
+    }
     // stuck → count an assist and hop to the waypoint (reported in state), or stop on honest runs
     if (d < auto.bestD - 0.3 || waitBridge) {
       auto.bestD = d;
@@ -944,6 +977,8 @@ async function boot() {
         vel.y = Math.max(vel.y, 0);
       }
       dashFrom.copy(fox.position);
+      // the dash is the brush: a 6 s strong colour stroke along its path (world-1.md §1.1)
+      dashStroke = colorField.stroke(fox.position.clone().setY(fox.position.y + 0.25), fox.position.clone().setY(fox.position.y + 0.25), { life: DASH_STROKE.life, strength: DASH_STROKE.strength, radius: DASH_STROKE.radius });
       feelMetrics.dashesUsed += 1;
       cam.punch(5);
       cam.shake(0.22);
@@ -1073,8 +1108,41 @@ async function boot() {
     }
 
     colorField.setFox(fox.position.clone().setY(fox.position.y + 0.25));
+    if (dashStroke) {
+      dashStroke.b.copy(colorField.fox);
+      if (!dashing) dashStroke = null;
+    }
     colorField.update(dt);
-    updrafts.update(dt, simClock, (q) => colorField.sample(q), document.body.classList.contains('debug-on'));
+    updrafts.update(dt, simClock, supplyAt, document.body.classList.contains('debug-on'), shades.drains);
+    // a burning hearth warms the ground round it (visual only: reactors never read glows, so no feedback)
+    colorField.glows.length = 0;
+    for (const h of updrafts.hearths) if (h.reactor.heat > 0) colorField.glows.push({ x: h.base.x, z: h.base.z, radius: 4.2, strength: h.reactor.heat * 0.8 });
+    shadeInvuln = Math.max(0, shadeInvuln - dt);
+    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
+      if (e.type === 'freed') {
+        // freed: the ink comes apart into leaves that warm as they fall
+        autumnFX.swirl(e.pos, 46, 1.4);
+        emberMotes.burst(e.pos, { count: 40, speed: [1.5, 4], lift: 0.6, life: [0.8, 1.8], flash: 1.2, size: [0.04, 0.09], heat: 0.6 });
+        hitstop = 0.08;
+        cam.shake(0.3);
+        audio.play('bridge');
+      } else if (shadeInvuln <= 0) {
+        // contact: knocked back out of the ink, brief grace
+        const dx = fox.position.x - e.pos.x;
+        const dz = fox.position.z - e.pos.z;
+        const d = Math.hypot(dx, dz) || 1;
+        vel.x = (dx / d) * shades.tun.knockback;
+        vel.z = (dz / d) * shades.tun.knockback;
+        vel.y = Math.max(vel.y, 3.5);
+        grounded = false;
+        shadeInvuln = 1.0;
+        cam.shake(0.25);
+        foxActor.pulse(0.4);
+        audio.play('hazard');
+      }
+    }
+    for (const i of inlets.update(dt, (q) => updrafts.hearths.some((h) => heatFeeds(h, q, updrafts.tun.radius)))) latchSeedwell(i);
+    for (const q of inlets.inlets) world.seedwells[q.seedwell]!.seal = q.seal;
     updrafts.trackRide(dt, fox.position.y - foxActor.feetOffset, vel.y, grounded, lift, grounded ? (probe.collider?.tag ?? 'terrain') : null);
 
     // Leaf kick while running
@@ -1149,7 +1217,6 @@ async function boot() {
     drawFrame++;
     colorField.renderMask(dt);
     for (const m of world.materials) colorField.syncMaterial(m);
-    for (const m of updrafts.materials) colorField.syncMaterial(m);
 
     // Wisps / autumn
     if (fxEnabled) {
@@ -1213,7 +1280,7 @@ async function boot() {
       deaths,
       backend,
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
-      chem: { updraft: updrafts.state() },
+      chem: { updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [
         `zone=${zone}`,
         `seedwells=${world.seedwells.map((q) => `${q.id}:${q.lit ? 1 : 0}`).join(',')}`,
