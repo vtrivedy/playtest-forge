@@ -917,7 +917,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   };
   // Marsh Mouth water washes the missing six metres of boardwalk into a shallow stone crossing.
-  plankWalk({ x: 55.2, z: 37.5 }, { x: 57, z: 36 }, 0.3, 2.0);
+  // A stable apron beside the frozen spill gives a running fox room to stop
+  // while the front washes the channel. The remaining five metres still need water.
+  plankWalk({ x: 54.6, z: 38.0 }, { x: 57.7, z: 35.546 }, 0.3, 2.8);
   plankWalk({ x: 62.034, z: 32.736 }, { x: 66, z: 30.5 }, 0.3, 2.0);
 
   /** Marsh tussock: a low peat mound with a flat walkable crown that slumps into the ink. */
