@@ -198,3 +198,8 @@ Use input release/opposition and measured deceleration only to drive a restraine
 
 ## Listening Crown extension
 Design: `docs/design/wellspring-summit.md`. From the Wellspring west arch, a permanent stair reaches a compact cliff ruin. Two existing hearth columns reach a heat-fed crown bowl. A two-second element inlet latches permanent heat and an inward wind route to the summit; dash-through Shade or strong stroke are both valid. No new inputs, ability, collectible, or World 1 gate. Safe stairs remain available. Tunable seal time, saved latch, and `__game.crown` state support GPU verification.
+
+Stag lookdev r4: retain the opaque ink core, add sparse soft sepia wash wisps
+rising from shoulders and flank. Deterministic shader billboards fade in/out and
+curl slowly; no glow, additive sparks, or glass torso. Expose wash size/opacity.
+They fade with the released silhouette; colored maple leaves remain the payoff.
