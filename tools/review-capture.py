@@ -19,15 +19,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def contact_sheet(folder: Path):
     from PIL import Image, ImageDraw, ImageOps
-    script_file = folder / 'gait-script.json'
-    if script_file.exists():
-        script = json.loads(script_file.read_text())
-        entries = []
-        for frame in script['keyFrames']:
-            segment = next(s for s in script['segments'] if s['start'] <= frame < s['end'])
-            entries.append((folder / f'gait-{frame:05d}.png', f"{segment['name']} | frame {frame}"))
-    else:
-        entries = [(p, p.stem) for p in sorted(folder.glob('*.png')) if 'contact' not in p.stem and p.stem not in {'cube', 'hardware-probe'}]
+    gait_sheet = folder / 'gait-contact-sheet.png'
+    if gait_sheet.exists():
+        return gait_sheet
+    entries = [(p, p.stem) for p in sorted(folder.glob('*.png')) if 'contact' not in p.stem and p.stem not in {'cube', 'hardware-probe'}]
     entries = [(p, label) for p, label in entries if p.exists()]
     if not entries:
         return None
@@ -67,14 +62,24 @@ def main():
     matches = [line.split()[0] for line in remote if line.split()[1] == f'refs/heads/{args.ref}']
     if len(matches) == 1:
         ref = matches[0]
+        source = 'remote-head'
+        local = subprocess.run(['git', 'rev-parse', '--verify', '--quiet', f'{args.ref}^{{commit}}'], cwd=ROOT, text=True, capture_output=True)
+        if local.returncode == 0 and local.stdout.strip() != ref:
+            print(f'Warning: local {args.ref} differs from remote; reviewing pushed commit {ref}', flush=True)
     elif re.fullmatch(r'[0-9a-fA-F]{40}', args.ref):
         ref = args.ref
+        source = 'github-commit'
     else:
         ref = subprocess.check_output(['git', 'rev-parse', '--verify', f'{args.ref}^{{commit}}'], cwd=ROOT, text=True).strip()
-    print(f'Reviewing remote ref {args.ref} at immutable commit {ref}', flush=True)
+        source = 'github-commit'
+    if source == 'github-commit':
+        published = subprocess.check_output(['gh', 'api', f'repos/vtrivedy/playtest-forge/commits/{ref}', '--jq', '.sha'], text=True).strip()
+        if published != ref:
+            raise ValueError('Commit is not available on GitHub; push it before GPU review')
+    print(f'Reviewing {source} {args.ref} at immutable commit {ref}', flush=True)
     destination = args.out.resolve() if args.out else Path('/workspace/siyu/playtest-forge-artifacts/sprint2/capture') / f"{re.sub(r'[^a-zA-Z0-9_.-]', '_', args.ref)}-{datetime.now():%Y%m%d-%H%M%S}-{uuid4().hex[:6]}"
     destination.mkdir(parents=True, exist_ok=True)
-    (destination / 'review.json').write_text(json.dumps({'ref': args.ref, 'commit': ref, 'shots': args.shots}, indent=2))
+    (destination / 'review.json').write_text(json.dumps({'ref': args.ref, 'commit': ref, 'source': source, 'shots': args.shots}, indent=2))
 
     def capture(shot):
         folder = destination / shot

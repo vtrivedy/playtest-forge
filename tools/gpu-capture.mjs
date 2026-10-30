@@ -250,10 +250,10 @@ try {
         const [x, , z] = state.pos;
         if (state.deaths) throw Error(`Gait course death at frame ${i}`);
         if (!segmentAt(i).name.startsWith('slope') && (x >= 650 || x <= 550 || Math.abs(z) >= 20)) throw Error(`Flat gait left the flat course at frame ${i}`);
-        await page.evaluate(([x, z]) => {
+        await page.evaluate(([x, z, jumping]) => {
           const ground = window.__gameHooks.debug.world.collision.highestAt(x, z);
-          window.__gameHooks.photo([x, ground + 1.35, z + 4.8], [x, ground + .8, z], 42);
-        }, [x, z]);
+          window.__gameHooks.photo([x, ground + (jumping ? 1.7 : 1.35), z + (jumping ? 5.8 : 4.8)], [x, ground + (jumping ? 1.1 : .8), z], 42);
+        }, [x, z, !!segmentAt(i).jump]);
       },
     });
     await H('setKeys', []); await H('setStick', null);
