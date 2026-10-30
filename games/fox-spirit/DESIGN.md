@@ -214,3 +214,9 @@ Use input release/opposition and measured deceleration only to drive a restraine
 Design: `docs/design/wellspring-summit.md`. From the Wellspring west arch, a permanent stair reaches a compact cliff ruin. Two existing hearth columns reach a heat-fed crown bowl. A two-second element inlet latches permanent heat and an inward wind route to the summit; dash-through Shade or strong stroke are both valid. No new inputs, ability, collectible, or World 1 gate. Safe stairs remain available. Tunable seal time, saved latch, and `__game.crown` state support GPU verification.
 
 Foliage extraction: standalone trees remove only geometry appended by their own placement. Empty material cells never reach mergeGeometries.
+
+### Arrival lantern support
+Replace the lantern's plain stacked rectangular support with the CC0 Quaternius
+Column asset, scaled to the same 1.9 m support height and collision footprint.
+Keep the lamp, light, checkpoint and all site positions. Batch its fluted shaft,
+base and capital into the existing weathered stone bucket; no parallel old stem.
