@@ -389,30 +389,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(4.5, groundRaw(4.5, 74.2), 74.2, { label: 'lift:H-a', act: 'glide' });
   W(13, groundRaw(13, 75.5) + 5, 75.5, { ground: false, act: 'glide', label: 'meadow-vista' });
   W(21, 0, 64);
-  W(22, 0, 58);
-  W(42, 0, 46);
-  W(54, 0, 40, { label: 'cp-marsh' });
-  // C · Reedmarsh — boardwalk, hummock, ghost-ink stones, SW2 island
-  W(56.65, 0.3, 36.3, { ground: false, label: 'wash:marsh-mouth' });
-  W(58, -0.05, 35.3516, { ground: false, label: 'channel' });
-  W(60.0, -0.05, 34.0548, { ground: false, label: 'channel' });
-  W(62.034, -0.05, 32.736, { ground: false, label: 'channel' });
-  W(64.5, 0.3, 31.4, { ground: false });
-  W(68.5, 0.4, 28.2, { ground: false, act: 'jump' });
-  W(73.5, 0.25, 25, { ground: false, act: 'jump' });
-  W(77.5, 0.25, 22.5, { ground: false, act: 'jump' });
-  W(81.5, 0.25, 20, { ground: false, act: 'jump' });
-  W(85.5, 0.25, 17.5, { ground: false, act: 'jump' });
-  W(89.4, 1.2, 15.6, { ground: false });
-  W(92.4, 2.0, 12.6, { ground: false });
-  W(95, 2, 10, { ground: false, label: 'SW2' });
-  // after SW2 the ink dries — walk out west across the basin floor
-  W(90, 2, 9, { ground: false });
-  W(86.6, -1.9, 12.2, { ground: false });
-  W(62, -1.9, 22, { ground: false });
-  W(44, 0, 26);
-  W(20, 0, 40);
-  W(-10, 0, 52);
+  W(-10, 0, 64);
   W(-34, 0, 56);
   // B · Windmill Rise
   WS(-7, 0, 0, { ground: true });
@@ -422,10 +399,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(10.5, 2.6, 6);
   WS(14.5, 2.4, 6);
   WS(17.2, 6.5, 6, { label: 'cp-mills' });
-  WS(20.4, -1, 6, { act: 'jump' });
-  WS(23, -1, 7.5, { act: 'jump' });
-  WS(25.5, -1, 9.0, { act: 'jump' });
-  WS(29.5, -1, 10);
+  WS(24.2, 9.7, 6, { act: 'dash', label: 'hearth-brush' });
+  WS(27.2, 9.7, 6, { act: 'glide', label: 'lift:H0' });
+  WS(29.5, 8.5, 10);
   WS(36.5, -1.2, 10);
   WS(36.5, -8.8, 14);
   WS(35.7, -4, 14);
