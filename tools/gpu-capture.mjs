@@ -313,20 +313,36 @@ try {
     const actor = () => page.evaluate(() => window.__gameHooks.shades?.state().actors[0]);
     const first = await actor();
     if (!first) throw Error('Target ref has no Shade review hook');
-    await H('teleport', first.pos[0] + 3, first.pos[1], first.pos[2], -Math.PI / 2);
+    async function approach(current, distance) {
+      return page.evaluate(([pos, distance]) => {
+        const col = window.__gameHooks.debug.world.collision, [x, y, z] = pos;
+        for (const radius of [3.5, 3, 2.5]) for (let i = 0; i < 16; i++) {
+          const a = i / 16 * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a);
+          const safe = (px, pz) => Math.abs(col.groundAt(px, pz, y + .2).y - y) < .25 && !col.blocked(px, pz, y);
+          const px = x + dx * radius, pz = z + dz * radius;
+          if (!safe(px, pz) || !safe(x - dx * 1.5, z - dz * 1.5)) continue;
+          if (![[.4,0],[-.4,0],[0,.4],[0,-.4]].every(([sx,sz]) => safe(px + sx, pz + sz))) continue;
+          return { pos: [x + dx * Math.min(distance,radius), y, z + dz * Math.min(distance,radius)], stick: [-dx, -dz], yaw: Math.atan2(-dx, -dz) };
+        }
+        throw Error('No safe Shade approach/knockback lane found');
+      }, [current.pos, distance]);
+    }
+    let lane = await approach(first, 3);
+    await H('teleport', ...lane.pos, lane.yaw);
     await H('setStick', 0, 0);
     const keyFrames = Array.from({ length: 24 }, (_, i) => i * fps / 2);
     save('shade-script.json', { label: 'Staged patrol/contact/dash-free; real encounter state, no forced damage/free', contactAt: 4, dashAt: 7 });
     await video('shade-staged', 12 * fps, async i => {
       if (i === 4 * fps || i === 7 * fps) {
         const current = await actor();
-        const offset = i === 4 * fps ? .4 : 3;
-        await H('teleport', current.pos[0] + offset, current.pos[1], current.pos[2], -Math.PI / 2);
+        lane = await approach(current, i === 4 * fps ? .4 : 3);
+        await H('teleport', ...lane.pos, lane.yaw);
       }
-      await H('setStick', i >= 7 * fps && i < 7.3 * fps ? -1 : 0, 0);
+      await H('setStick', ...(i >= 7 * fps && i < 7.3 * fps ? lane.stick : [0, 0]));
       await H('setKeys', i === 7 * fps ? ['ShiftLeft'] : []);
     }, undefined, { keyFrames, label: i => `Shade ${i / fps}s | staged review`,
-      afterStep: async () => {
+      afterStep: async (i, state) => {
+        if (state.deaths) throw Error(`Staged Shade approach caused death at frame ${i}`);
         const current = await actor(), [x, y, z] = current.pos;
         await H('photo', [x + 7, y + 3.2, z + 8], [x, y + 1.1, z], 46);
       },

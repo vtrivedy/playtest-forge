@@ -27,8 +27,8 @@ modal run tools/modal/gpu_capture.py --ref s2-loco --shots gait --out /absolute/
 modal run tools/modal/gpu_capture.py --fetch-only RUN_ID --out /absolute/path
 ```
 
-Gait is 22 output seconds, 1080p60, deterministic random seed 42. The live controller
-receives analog world-space inputs at walk/trot/gallop speed bands, tight turns, stop,
+Gait is 23 output seconds, 1080p60, deterministic random seed 42. The live controller
+receives analog world-space inputs at walk/trot/gallop speed bands, tight left/right turns, reversal, stop,
 short jump, dash and 15-degree slopes. Names describe requested tests; they do not
 assert that the target implements those gaits. Staged teleports reset jump/dash/slope
 segments; the JSON script labels them. Quarter-speed uses 1/240 s simulation steps.
@@ -60,3 +60,8 @@ npx tsx tools/fx-capture.ts --effect hearth-updraft --out playtest-forge-artifac
 
 Needs chem/updraft on the branch. Fixed-step `setManual` + `advance`. SwiftShader is
 smoke-only; judge column glow on Modal GPU (`updraft` shot in `gpu-capture.mjs`).
+`--shots shade` is an explicit encounter probe for refs with the Shade hooks. It
+records patrol, contact/knockback and dash-free on safe collision-checked lanes.
+`python3 tools/compare-gait.py LEFT/gait RIGHT/gait --out REVIEW` builds the matched
+side-by-side MP4 and joint-landmark tables. Both captures must use the same tool hash,
+quality, timing and gym metadata. Read the stated proxy limitations before scoring.
