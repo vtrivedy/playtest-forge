@@ -99,3 +99,9 @@ The review must disclose that limitation and exclude staged teleport transitions
 The explicit `shade` GPU shot stages the fox near the first live Shade, then records
 patrol, real contact/knockback and a real dash through it. Resets are labelled staged;
 no health or freed flags are forced. Preserve per-second __game/state and key frames.
+
+### Real-fox comparison edit
+A separate three-panel review edit pairs the two game candidates with documented
+walk/trot/run/pounce excerpts. Crop only for readability and label all playback
+changes. Wildlife source playback is uncalibrated and not phase-aligned; use it for
+anatomy, support, gathering and head/tail behavior, never numeric biological timing.
