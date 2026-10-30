@@ -423,9 +423,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(29.5, -1, 10);
   WS(36.5, -1.2, 10);
   WS(36.5, -8.8, 14);
-  WS(39.8, -9.4, 14);
-  WS(45, -2, 14);
-  WS(51.2, 0, 14, { act: 'jumpdash', label: 'chasm' });
+  WS(35.7, -4, 14);
+  WS(38.8, 2.5, 14);
+  WS(39.7, 2.5, 14, { act: 'glide', label: 'wind-gap' });
   WS(62.3, 0.6, 14);
   WS(62.3, 1.2, 14);
   WS(62.3, 9.2, 18);
@@ -628,7 +628,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     { s0: 0, s1: T_END, top: 2, w: 30 },
     { s0: 12, s1: T_END, top: 6, w: 28 },
     { s0: 28, s1: T_END, top: 10, w: 26 },
-    { s0: 38, s1: 52, top: 14, w: 24 },
+    { s0: 36, s1: 40.5, top: 14, w: 24 },
     { s0: 60.5, s1: T_END, top: 14, w: 24 },
     { s0: 64, s1: T_END, top: 18, w: 22 },
     { s0: 68, s1: T_END, top: 22, w: 20 },
@@ -726,7 +726,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // R4 lateral flight on k3 (10 → 14)
   flightT(36.5, -0.6, 10, 36.5, -9.6, 14, 2.6, 5);
-  // chasm on k4 between s 52 and 60.5 (jump + air-dash, 8.5 m)
+  // Wind gap: twenty flat metres, with the y10 terrace four metres below for recovery.
   // R5 lateral flight on k4b (14 → 18)
   flightT(62.3, 0.4, 14, 62.3, 9.8, 18, 2.4, 6);
   // R6 lateral flight on k5 (18 → 22)
@@ -737,7 +737,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const mills: Mill[] = [];
   const millSites: Array<[number, number, number]> = [
     [23.8, -8.4, 6],
-    [48.6, -7.6, 14],
+    [39, -7.6, 14],
     [73.5, -4.6, 22],
   ];
   const millFacing = Math.atan2(-TD.x, -TD.y) + 0.5; // face back down the climb (toward meadow/camera)
@@ -1734,9 +1734,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // (permanent route 1 up the hill: a plain glide from the column top covers ≈ 50 m of the ≈ 95 m).
   const windSpots: WindSpot[] = [];
   {
+    const a = sp(39, 2.5), b = sp(62, 2.5), source = sp(38.8, 2.5);
+    windSpots.push({ id: 'mill-gap', source: [source.x, 14.8, source.z],
+      path: [[a.x, 15.2, a.z], [b.x, 15.2, b.z]], radius: 2.8 });
+  }
+
+  {
     const sw = seedwells[0]!.pos;
     const h2 = hearthSpots.find((h) => h.id === 'H2')!;
-    windSpots.push({
+    windSpots.unshift({
       id: 'wind-river',
       source: [sw.x, sw.y + 1, sw.z],
       path: [
