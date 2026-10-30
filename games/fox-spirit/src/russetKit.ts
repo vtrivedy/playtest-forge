@@ -147,6 +147,14 @@ export class Bucket {
     if (this.aux) this.aux.push(this.auxDefault, this.auxDefault, this.auxDefault);
   }
 
+  /** Raw triangle with per-vertex normals (world space). */
+  triN(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, na: THREE.Vector3, nb: THREE.Vector3, nc: THREE.Vector3, ca: THREE.Color, cb: THREE.Color, cc: THREE.Color): void {
+    this.pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    this.nor.push(na.x, na.y, na.z, nb.x, nb.y, nb.z, nc.x, nc.y, nc.z);
+    this.col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b, cc.r, cc.g, cc.b);
+    if (this.aux) this.aux.push(this.auxDefault, this.auxDefault, this.auxDefault);
+  }
+
   /**
    * `boxUV` (m per tile): per-triangle box projection on the dominant face axis, so
    * merged stone/rock gets a world-scaled surface texture without authored UVs.
@@ -289,7 +297,7 @@ const _rc = new THREE.Color();
 export function rockColor(q: THREE.Vector3, n: THREE.Vector3, top: number, seed: number, topC: THREE.Color | null, out: THREE.Color): THREE.Color {
   const bed = Math.floor((q.y + seed * 0.37 + vnoise3(q.x * 0.05, 0, q.z * 0.05) * 2) / 2.3);
   const k = hash3(bed, seed, 3);
-  out.copy(k < 0.4 ? PAL.rockGrey : k < 0.75 ? PAL.rockA : PAL.rockB);
+  out.copy(PAL.rockGrey).lerp(k < 0.5 ? PAL.rockA : PAL.rockB, 0.35 + k * 0.2);
   const mott = fbm3(q.x * 0.35, q.y * 0.35, q.z * 0.35, 2);
   out.multiplyScalar(0.78 + mott * 0.42);
   // darker and damper toward the foot of each face, black under overhangs
@@ -302,12 +310,12 @@ export function rockColor(q: THREE.Vector3, n: THREE.Vector3, top: number, seed:
   // dusty ledges + rust moss on near-flat steps
   if (n.y > 0.3 && n.y <= 0.7) {
     out.lerp(PAL.rockDust, 0.35);
-    if (fbm3(q.x * 0.6 + 3, q.y, q.z * 0.6, 2) > 0.5) out.lerp(PAL.rustMoss, 0.45);
+    if (fbm3(q.x * 0.6 + 3, q.y, q.z * 0.6, 2) > 0.6) out.lerp(PAL.rustMoss, 0.28);
   }
   if (n.y > 0.7) {
     const t = THREE.MathUtils.smoothstep(n.y, 0.7, 0.9);
     if (topC) out.lerp(_rc.copy(topC).offsetHSL(0, 0, (vnoise3(q.x * 0.5, 0, q.z * 0.5) - 0.5) * 0.08), t);
-    else out.lerp(PAL.rustMoss, t * 0.5 * vnoise3(q.x * 0.4, 1, q.z * 0.4));
+    else out.lerp(PAL.rustMoss, t * 0.3 * vnoise3(q.x * 0.4, 1, q.z * 0.4));
   }
   return out;
 }
@@ -348,7 +356,8 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
       const len = Math.hypot(x1 - x0, z1 - z0);
       const m = Math.max(2, Math.round(len / 0.85));
       for (let k = 0; k < m; k++) {
-        const t = k / m;
+        // irregular spacing along the edge (corners stay put) so no regular panel grid shows
+        const t = (k + (k > 0 ? (hash3(k, e, 77) - 0.5) * 0.6 : 0)) / m;
         ring.push({ x: x0 + (x1 - x0) * t, z: z0 + (z1 - z0) * t, nx, nz, u: u + len * t });
       }
       u += len;
@@ -361,7 +370,7 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
     const q = ring[i]!;
     const col: THREE.Vector3[] = [];
     for (let j = 0; j <= ny; j++) {
-      const yWorld = s.bottom + (h * j) / ny;
+      const yWorld = s.bottom + (h * (j + (j > 0 && j < ny ? (hash3(j, Math.floor(q.u / 4), 91) - 0.5) * 0.5 : 0))) / ny;
       const below = s.top - yWorld;
       const v = new THREE.Vector3(q.x, yWorld, q.z);
       if (s.round) {
@@ -371,14 +380,14 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
       }
       // jointed facets: irregular-width vertical columns, each its own depth, lean and one fracture
       const u = q.u;
-      const ci = Math.floor(u / 1.8 + vnoise3(u * 0.11, seed, 1.7) * 1.3);
-      const d0 = (hash3(ci, seed, 1) - 0.42) * rough * 1.25;
+      const ci = Math.floor(u / 3.1 + vnoise3(u * 0.07, seed, 1.7) * 1.4);
+      const d0 = (hash3(ci, seed, 1) - 0.42) * rough * 1.3;
       const lean = (hash3(ci, seed, 2) - 0.5) * rough * 0.16 * below;
       const fy = hash3(ci, seed, 4) * h;
       const frac = below > fy ? (hash3(ci, seed, 5) - 0.5) * rough * 0.9 : 0;
       // weak, irregular bedding (not a layer cake)
       const bed = Math.floor((yWorld + seed * 0.7 + vnoise3(u * 0.07, 0, seed) * 3) / 2.6);
-      const bedOff = (hash3(bed, ci >> 2, seed) - 0.5) * rough * 0.35;
+      const bedOff = (hash3(bed, ci >> 2, seed) - 0.5) * rough * 0.18;
       // cap rock at the lip, undercut beneath it where the noise says so
       const ovN = THREE.MathUtils.smoothstep(vnoise3(u * 0.09, seed * 0.3, 4.4), 0.35, 0.75);
       const cap = below < 0.6 ? 0 : -over * ovN * THREE.MathUtils.smoothstep(below, 0.6, 1.4) * (1 - THREE.MathUtils.smoothstep(below, 2.6, 4.5));
@@ -429,15 +438,70 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
     }
     b.tri(A, B, C, n, rockColor(A, n, s.top, seed, topC, ca), rockColor(B, n, s.top, seed, topC, cb), rockColor(C, n, s.top, seed, topC, cc));
   };
+  // sides: world-space grid, one normal per quad, then creased vertex normals — smooth across
+  // gentle facets (an intact fracture plane), hard where the plane breaks (> ~38°)
+  const WP = P.map((col) => col.map(W));
+  const qn: THREE.Vector3[][] = [];
   const out = new THREE.Vector3();
   for (let i = 0; i < N; i++) {
     const i2 = (i + 1) % N;
     const q = ring[i]!;
     const q2 = ring[i2]!;
     out.set(q.nx + q2.nx, 0, q.nz + q2.nz).normalize().applyMatrix3(nm);
+    const colN: THREE.Vector3[] = [];
     for (let j = 0; j < ny; j++) {
-      emit(P[i]![j]!, P[i2]![j]!, P[i2]![j + 1]!, out);
-      emit(P[i]![j]!, P[i2]![j + 1]!, P[i]![j + 1]!, out);
+      const a = WP[i]![j]!;
+      const d = WP[i2]![j + 1]!;
+      e1.subVectors(d, a);
+      e2.subVectors(WP[i]![j + 1]!, WP[i2]![j]!);
+      const fn = new THREE.Vector3().crossVectors(e1, e2);
+      if (fn.lengthSq() < 1e-12) fn.copy(out);
+      fn.normalize();
+      if (fn.dot(out) < 0) fn.negate();
+      colN.push(fn);
+    }
+    qn.push(colN);
+  }
+  const CREASE = Math.cos((38 * Math.PI) / 180);
+  const vn = (i: number, j: number, own: THREE.Vector3) => {
+    const acc = new THREE.Vector3();
+    for (const di of [-1, 0]) {
+      for (const dj of [-1, 0]) {
+        const qi = (i + di + N) % N;
+        const qj = j + dj;
+        if (qj < 0 || qj >= ny) continue;
+        const f = qn[qi]![qj]!;
+        if (f.dot(own) >= CREASE) acc.add(f);
+      }
+    }
+    return acc.lengthSq() > 0 ? acc.normalize() : own.clone();
+  };
+  for (let i = 0; i < N; i++) {
+    const i2 = (i + 1) % N;
+    for (let j = 0; j < ny; j++) {
+      const own = qn[i]![j]!;
+      const A = WP[i]![j]!;
+      const B = WP[i2]![j]!;
+      const C = WP[i2]![j + 1]!;
+      const D = WP[i]![j + 1]!;
+      const nA = vn(i, j, own);
+      const nB = vn(i2, j, own);
+      const nC = vn(i2, j + 1, own);
+      const nD = vn(i, j + 1, own);
+      const cA = rockColor(A, nA, s.top, seed, topC, new THREE.Color());
+      const cB = rockColor(B, nB, s.top, seed, topC, new THREE.Color());
+      const cC = rockColor(C, nC, s.top, seed, topC, new THREE.Color());
+      const cD = rockColor(D, nD, s.top, seed, topC, new THREE.Color());
+      // winding: outward-facing
+      e1.subVectors(B, A);
+      e2.subVectors(C, A);
+      if (n.crossVectors(e1, e2).dot(own) >= 0) {
+        b.triN(A, B, C, nA, nB, nC, cA, cB, cC);
+        b.triN(A, C, D, nA, nC, nD, cA, cC, cD);
+      } else {
+        b.triN(A, C, B, nA, nC, nB, cA, cC, cB);
+        b.triN(A, D, C, nA, nD, nC, cA, cD, cC);
+      }
     }
   }
   // top: chipped rim band → inset rings (relief for crags) → flat cap triangulated in-plane
@@ -555,7 +619,13 @@ export function setSite(base: number, top: number, moss = 1, soot = 1): void {
   SITE = { base, top, moss, soot };
 }
 
-const STONE_TINTS = [0xa89c88, 0xaea089, 0xa19686, 0xa4927a, 0xaca08e].map((c) => new THREE.Color(c));
+/** Authored weathering: dark run-off streaks falling from a damaged point (x,z) below yTop. */
+const STAINS: Array<{ x: number; z: number; r: number; yTop: number }> = [];
+export function addStain(x: number, z: number, r: number, yTop: number): void {
+  STAINS.push({ x, z, r, yTop });
+}
+
+const STONE_TINTS = [0xa29d94, 0xa8a195, 0x9b978f, 0xa09887, 0xa6a196].map((c) => new THREE.Color(c));
 
 /** Per-vertex masonry colour: block tint, worn arrises, rising damp, soot streaks, rust moss. */
 function stoneShade(p: THREE.Vector3, n: THREE.Vector3, kind: number, base: THREE.Color, out: THREE.Color): THREE.Color {
@@ -569,10 +639,17 @@ function stoneShade(p: THREE.Vector3, n: THREE.Vector3, kind: number, base: THRE
   // run-off streaks down vertical faces
   const st = vnoise3(p.x * 2.4 + p.z * 1.9, p.y * 0.22, 3.1);
   if (Math.abs(n.y) < 0.5 && st > 0.6) out.lerp(PAL.stoneSoot, (st - 0.6) * 1.4 * SITE.soot);
+  for (const st2 of STAINS) {
+    const d = Math.hypot(p.x - st2.x, p.z - st2.z);
+    if (d < st2.r && p.y < st2.yTop) {
+      const streak = vnoise3(p.x * 3.3 + p.z * 2.9, p.y * 0.15, 7);
+      out.lerp(PAL.stoneSoot, (1 - d / st2.r) * (0.35 + streak * 0.45) * THREE.MathUtils.smoothstep(st2.yTop - p.y, 0, 0.6));
+    }
+  }
   // rust moss / lichen: tops and the damp lower courses, in patches
   const m = fbm3(p.x * 1.2 + 7, p.y * 1.2, p.z * 1.2, 2);
   const want = THREE.MathUtils.smoothstep(n.y, 0.45, 0.9) * 0.32 + (1 - h) * 0.22;
-  const k = m + want - 0.72;
+  const k = m + want - 0.8;
   if (k > 0) out.lerp(k > 0.12 ? PAL.rustMoss : PAL.lichen, Math.min(0.8, k * 3.2) * SITE.moss);
   return out;
 }
@@ -655,7 +732,7 @@ function stoneTint(r: () => number): THREE.Color {
 
 function bevels(r: () => number, size: number, chip: number): number[] {
   const base = Math.min(0.028, size * 0.08);
-  return Array.from({ length: 8 }, () => (r() < chip * 0.7 ? Math.min(size * 0.4, base + 0.05 + r() * 0.12) : base * (0.7 + r() * 0.6)));
+  return Array.from({ length: 8 }, () => (r() < chip * 0.4 ? Math.min(size * 0.4, base + 0.05 + r() * 0.12) : base * (0.7 + r() * 0.6)));
 }
 
 /** One dressed, fitted ashlar block (local centre at origin, transform `m`). */
@@ -889,7 +966,7 @@ export function stairFlight(
   c: { x: number; z: number; y: number },
   width: number,
   seed: number,
-  o: { open?: [boolean, boolean]; foot?: number; crumbleStart?: boolean; crumbleEnd?: boolean } = {},
+  o: { open?: [boolean, boolean]; foot?: number; crumbleStart?: boolean; crumbleEnd?: boolean; rock?: Bucket } = {},
 ): void {
   const dx = c.x - a.x;
   const dz = c.z - a.z;
@@ -925,7 +1002,7 @@ export function stairFlight(
       }
       const mid = pieces === 3 ? k === 1 : false;
       const sag = mid ? 0.025 : 0.008 * r();
-      const tz = z0 + run * 0.5 - 0.04; // nosing overhangs the riser a little
+      const tz = z0 + run * 0.5 - 0.02; // nosing overhangs the riser a little
       const P: THREE.Vector3[] = [];
       for (let q = 0; q < 8; q++) {
         const lx = q & 1 ? x + pw : x;
@@ -960,37 +1037,68 @@ export function stairFlight(
     b.add(g, m0, PAL.stoneSoot);
     g.dispose();
   }
-  // cheek walls on the open side(s): courses stepping up under the treads
+  // open side(s): a band of coursed cheek masonry just under the treads; below it the flight
+  // is buried in a rough rock buttress, so the stair reads before its support
+  const lineAt = (z: number) => a.y + (rise * z) / len;
   for (const side of [0, 1] as const) {
     if (!open[side]) continue;
-    const sx = side === 0 ? -hw - cheek / 2 + 0.06 : hw + cheek / 2 - 0.06;
-    const ch = 0.46;
-    const lo = foot;
-    const hiMax = Math.max(a.y, c.y);
+    const sgn = side === 0 ? -1 : 1;
+    const sx = sgn * (hw + cheek / 2 - 0.06);
+    const ch = 0.42;
+    const band = 1.0;
     for (let k = 0; ; k++) {
-      const y0 = lo + k * ch;
-      if (y0 > hiMax - 0.05) break;
+      const y0 = foot + k * ch;
       const y1 = y0 + ch;
-      // run where the stair line is above this course's top
-      const f = (y: number) => THREE.MathUtils.clamp((y - a.y) / (rise || 1), 0, 1) * len;
-      let zs = 0;
-      let ze = len;
-      if (rise > 0) zs = Math.min(len, Math.max(0, f(y1 + tread)));
-      else ze = Math.max(0, Math.min(len, f(y1 + tread)));
-      if (ze - zs < 0.3) {
-        if (rise > 0) zs = Math.max(0, ze - 0.3);
-        else ze = Math.min(len, zs + 0.3);
-        if (y0 > hiMax - tread - 0.2) break;
-      }
-      const crumbleCut = (o.crumbleEnd && rise > 0 ? 1.2 : 0) * (k > 1 ? 1 : 0);
-      // course helper runs along local x: yaw π/2 maps it onto the flight's −z
-      course(b, m0.clone().multiply(trs(sx, 0, 0, Math.PI / 2)), -(ze - crumbleCut), -zs, y0, Math.min(y1, hiMax - tread), cheek, seed * 13 + k * 7 + side, 1.15, 0.1);
+      if (y0 > Math.max(a.y, c.y) - tread - 0.15) break;
+      // this course shows only where the tread line is between its top and `band` above it
+      const zLo = THREE.MathUtils.clamp(((y1 + tread - a.y) / (rise || 1)) * len, 0, len);
+      const zHi = THREE.MathUtils.clamp(((y1 + band - a.y) / (rise || 1)) * len, 0, len);
+      const zs = Math.min(zLo, zHi);
+      const ze = Math.max(zLo, zHi);
+      const cut = o.crumbleEnd ? 1.1 : 0;
+      const s0 = (o.crumbleStart ? 1.1 : 0) + zs;
+      if (ze - cut - s0 < 0.35) continue;
+      course(b, m0.clone().multiply(trs(sx, 0, 0, Math.PI / 2)), -(ze - cut), -s0, y0, Math.min(y1, Math.max(a.y, c.y) - tread), cheek, seed * 13 + k * 7 + side, 1.15, 0.1);
     }
-    // coping: slab stones along the top, one per two steps
-    for (let i = 0; i < steps; i += 2) {
-      if ((o.crumbleEnd && i >= steps - 3) || (o.crumbleStart && i < 2)) continue;
-      const top = a.y + rise * ((i + 1) / steps);
-      stoneBlock(b, m0.clone().multiply(trs(sx, top + 0.06, run * (i + 1))), cheek + 0.08, 0.2, run * 2 * 0.98, seed + i * 3 + side, 0.12);
+    if (o.rock) {
+      // buttress: a rough sloping rock face from the foot up to just under the masonry band
+      const nz = Math.max(3, Math.ceil(len / 0.7));
+      const ny = 5;
+      const pts: THREE.Vector3[][] = [];
+      for (let zi = 0; zi <= nz; zi++) {
+        const z = (len * zi) / nz;
+        const topY = Math.max(foot, lineAt(z) - tread - band + 0.15);
+        const row: THREE.Vector3[] = [];
+        for (let yi = 0; yi <= ny; yi++) {
+          const t = yi / ny;
+          const y = foot - 0.3 + (topY - foot + 0.3) * t;
+          const out = hw + cheek * 0.6 + (1 - t) * 0.9 + (vnoise3(z * 0.9 + seed, y * 0.8, side) - 0.5) * 0.5;
+          row.push(new THREE.Vector3(sgn * out, y, z).applyMatrix4(m0));
+        }
+        pts.push(row);
+      }
+      const nn = new THREE.Vector3();
+      const ca = new THREE.Color();
+      const cb2 = new THREE.Color();
+      const cc2 = new THREE.Color();
+      const outW = new THREE.Vector3(sgn, 0, 0).transformDirection(m0);
+      const tri = (p: THREE.Vector3, q: THREE.Vector3, r2: THREE.Vector3) => {
+        nn.crossVectors(new THREE.Vector3().subVectors(q, p), new THREE.Vector3().subVectors(r2, p));
+        if (nn.lengthSq() < 1e-10) return;
+        nn.normalize();
+        if (nn.dot(outW) < 0) {
+          nn.negate();
+          [q, r2] = [r2, q];
+        }
+        const yt = Math.max(a.y, c.y);
+        o.rock!.tri(p, q, r2, nn, rockColor(p, nn, yt, seed, PAL.soilUmber, ca), rockColor(q, nn, yt, seed, PAL.soilUmber, cb2), rockColor(r2, nn, yt, seed, PAL.soilUmber, cc2));
+      };
+      for (let zi = 0; zi < nz; zi++) {
+        for (let yi = 0; yi < ny; yi++) {
+          tri(pts[zi]![yi]!, pts[zi + 1]![yi]!, pts[zi + 1]![yi + 1]!);
+          tri(pts[zi]![yi]!, pts[zi + 1]![yi + 1]!, pts[zi]![yi + 1]!);
+        }
+      }
     }
   }
   // crumbled end: rubble below the break
@@ -1021,7 +1129,7 @@ export function paving(b: Bucket, m: THREE.Matrix4, w: number, d: number, y: num
       if (r() >= skip && (!inside || inside(cx, cz))) {
         const th = 0.12;
         const tilt = (r() - 0.5) * 0.03;
-        stoneBlock(b, m.clone().multiply(trs(cx, y + th / 2 - 0.05 + (r() - 0.5) * 0.02, cz, (r() - 0.5) * 0.04, 1, 1, 1, tilt, tilt)), pw - 0.04, th, rowD - 0.04, seed * 17 + Math.round(cx * 13 + cz * 71), 0.12, 0.74 + r() * 0.12);
+        stoneBlock(b, m.clone().multiply(trs(cx, y + th / 2 - 0.085 + (r() - 0.5) * 0.02, cz, (r() - 0.5) * 0.04, 1, 1, 1, tilt, tilt)), pw - 0.04, th, rowD - 0.04, seed * 17 + Math.round(cx * 13 + cz * 71), 0.12, 0.74 + r() * 0.12);
       }
       x += pw;
     }
@@ -1126,6 +1234,8 @@ export function domedShrine(stone: Bucket, glow: Bucket, x: number, y: number, z
       leaf.dispose();
     }
   }
+  // rain has run off the broken corner for a long time: a dark streak down the NE pier
+  addStain(x + 1.45 * S, z - 1.45 * S, 1.1 * S, y + (entY + 0.86) * S);
   // the fallen cornice stones lie below the broken corner
   for (const [fx, fz, k] of [[2.9, -2.4, 0], [3.5, -1.6, 1], [2.4, -3.2, 2]] as const) fallen(stone, M, fx, fz, 1.0, 0.2 + k * 0.03, 0.62, seed + 600 + k);
   // --- dome: fitted wedge courses (corbelled), staggered joints, over a dark shell

@@ -165,8 +165,8 @@ export function stoneTextures(N = 512): SurfaceSet {
   for (let k = 0; k < N * N; k++) {
     const a = Math.max(0.3, Math.min(1, A[k]! - D[k]! * 0.22));
     rgba[k * 4] = Math.round(a * 255);
-    rgba[k * 4 + 1] = Math.round(a * 0.975 * 255);
-    rgba[k * 4 + 2] = Math.round(a * 0.93 * 255);
+    rgba[k * 4 + 1] = Math.round(a * 0.985 * 255);
+    rgba[k * 4 + 2] = Math.round(a * 0.96 * 255);
     rgba[k * 4 + 3] = 255;
     const g = Math.min(1, 0.86 + D[k]! * 0.14 - (H[k]! - 0.5) * 0.1);
     rough[k * 4] = rough[k * 4 + 1] = rough[k * 4 + 2] = Math.round(g * 255);
@@ -206,8 +206,8 @@ export function rockTextures(N = 512): SurfaceSet {
   for (let k = 0; k < N * N; k++) {
     const a = Math.max(0.25, Math.min(1, A[k]! - Math.min(1, D[k]!) * 0.3));
     rgba[k * 4] = Math.round(a * 255);
-    rgba[k * 4 + 1] = Math.round(a * 0.97 * 255);
-    rgba[k * 4 + 2] = Math.round(a * 0.92 * 255);
+    rgba[k * 4 + 1] = Math.round(a * 0.985 * 255);
+    rgba[k * 4 + 2] = Math.round(a * 0.96 * 255);
     rgba[k * 4 + 3] = 255;
     const g = Math.min(1, 0.88 + Math.min(1, D[k]!) * 0.12);
     rough[k * 4] = rough[k * 4 + 1] = rough[k * 4 + 2] = Math.round(g * 255);
@@ -225,20 +225,22 @@ export function barkTextures(N = 512): SurfaceSet {
     for (let x = 0; x < N; x++) {
       const u = x / N;
       const v = y / N;
-      // plates between wandering vertical furrows, each plate broken by cross-cracks
+      // long flat plates between narrow wandering furrows, with fine vertical fibres
       const warp = (pfbm(u, v, 3, 3, 21) - 0.5) * 0.9 + (pfbm(u, v, 7, 2, 22) - 0.5) * 0.25;
-      const f = u * 5 + warp * 1.8;
+      const f = u * 6 + warp * 1.6;
       const col = Math.floor(f);
       const fr = f - col;
-      const cy = v * 2 + ihash(((col % 5) + 5) % 5, 1, 31) * 3 + (pfbm(u, v, 5, 2, 24) - 0.5) * 0.3;
+      const cy = v * 2 + ihash(((col % 6) + 6) % 6, 1, 31) * 3 + (pfbm(u, v, 5, 2, 24) - 0.5) * 0.3;
       const cell = Math.floor(cy);
       const cf = cy - cell;
-      const plate = Math.pow(Math.sin(fr * Math.PI), 0.35) * Math.min(1, 0.55 + Math.min(cf, 1 - cf) * 12);
-      const shade = ihash(((col % 5) + 5) % 5, ((cell % 2) + 2) % 2, 33);
-      const cross = pfbm(u, v, 12, 3, 23);
+      const edge = Math.min(fr, 1 - fr);
+      const plate = THREE.MathUtils.smoothstep(edge, 0.02, 0.14) * (0.75 + 0.25 * THREE.MathUtils.smoothstep(Math.min(cf, 1 - cf), 0, 0.04));
+      const shade = ihash(((col % 6) + 6) % 6, ((cell % 2) + 2) % 2, 33);
+      const fibre = pnoise(u * 64, v * 4, 64, 25);
+      const cross = fibre;
       const k = y * N + x;
-      H[k] = plate * (0.7 + shade * 0.3) + cross * 0.2 + ihash(x, y, 4) * 0.05;
-      A[k] = 0.42 + plate * (0.36 + shade * 0.2) + (cross - 0.5) * 0.2;
+      H[k] = plate * 0.6 + cross * 0.12 + ihash(x, y, 4) * 0.03;
+      A[k] = 0.36 + plate * (0.42 + shade * 0.14) + (cross - 0.5) * 0.14;
     }
   }
   const rgba = new Uint8Array(N * N * 4);
@@ -252,7 +254,7 @@ export function barkTextures(N = 512): SurfaceSet {
     rough[k * 4] = rough[k * 4 + 1] = rough[k * 4 + 2] = 235;
     rough[k * 4 + 3] = 255;
   }
-  return { map: toTexture(N, rgba, true), normalMap: normalFromHeight(N, H, 3.0), roughnessMap: toTexture(N, rough, false) };
+  return { map: toTexture(N, rgba, true), normalMap: normalFromHeight(N, H, 1.6), roughnessMap: toTexture(N, rough, false) };
 }
 
 // ---------------------------------------------------------------- ground: soil + leaf carpet (blended per fragment)
@@ -504,8 +506,8 @@ export function leafAtlas(N = 1024): THREE.CanvasTexture {
     g.fillStyle = grd;
     maplePath(g, s, 0.22, r);
     g.fill();
-    g.strokeStyle = `rgba(60,36,20,0.42)`;
-    g.lineWidth = Math.max(1, s * 0.045);
+    g.strokeStyle = `rgba(80,52,32,0.2)`;
+    g.lineWidth = Math.max(1, s * 0.03);
     g.beginPath();
     for (const ang of [0, 1.25, -1.25, 2.3, -2.3]) {
       g.moveTo(0, s * 0.12);
@@ -532,12 +534,12 @@ export function leafAtlas(N = 1024): THREE.CanvasTexture {
     for (let i = 0; i < n; i++) {
       const t = n === 1 ? 0.5 : i / (n - 1);
       const a = -Math.PI / 2 + (t - 0.5) * 2.2 + (r() - 0.5) * 0.25;
-      const len = C * (0.42 + r() * 0.16) * (1 - Math.abs(t - 0.5) * 0.35);
+      const len = C * (0.3 + r() * 0.16) * (1 - Math.abs(t - 0.5) * 0.35);
       tips.push([bx + Math.cos(a) * len, by + Math.sin(a) * len, a]);
     }
-    g.strokeStyle = 'rgb(150,118,92)';
+    g.strokeStyle = 'rgba(150,118,92,0.6)';
     for (const [tx, ty] of tips) {
-      g.lineWidth = C * 0.007;
+      g.lineWidth = C * 0.005;
       g.beginPath();
       g.moveTo(bx, by);
       g.quadraticCurveTo((bx + tx) / 2 + (r() - 0.5) * C * 0.08, (by + ty) / 2, tx, ty);
@@ -546,12 +548,16 @@ export function leafAtlas(N = 1024): THREE.CanvasTexture {
     // back leaves darker, front lighter
     const order = tips.map((p, i) => ({ p, i, k: r() })).sort((a, b) => a.k - b.k);
     for (const { p, k } of order) {
-      const s = C * (0.17 + r() * 0.07);
+      const s = C * (0.11 + r() * 0.05);
       leafAt(p[0], p[1] - s * 0.35, s, p[2] + Math.PI / 2 + (r() - 0.5) * 0.5, 0.78 + k * 0.22, 0.75 + r() * 0.25);
+      // a second, smaller leaf partway along the twig fills the spray without big shapes
+      const mx = (p[0] + bx) / 2 + (r() - 0.5) * C * 0.06;
+      const my = (p[1] + by) / 2;
+      leafAt(mx, my, s * 0.75, p[2] + Math.PI / 2 + (r() - 0.5) * 0.9, 0.7 + r() * 0.25, 0.7 + r() * 0.3);
     }
   };
-  spray(0, C, 7);
-  spray(C, C, 4);
+  spray(0, C, 9);
+  spray(C, C, 5);
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;

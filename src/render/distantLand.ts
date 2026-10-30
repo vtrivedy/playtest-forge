@@ -61,7 +61,8 @@ function rimNoise(a: number, seed: number): number {
  * spires, small tree silhouettes, and — on ruin islands — a broken colonnade and an arch whose
  * proportions match the near ruins, so the far tier reads as the same shrine culture.
  */
-function islandVariant(rand: () => number, ruins: boolean): THREE.BufferGeometry {
+function islandVariant(rand: () => number, kind: 'arch' | 'colonnade' | 'tower' | 'bare'): THREE.BufferGeometry {
+  const ruins = kind !== 'bare';
   const parts: THREE.BufferGeometry[] = [];
   const seed = rand() * 10;
 
@@ -175,50 +176,57 @@ function islandVariant(rand: () => number, ruins: boolean): THREE.BufferGeometry
   }
 
   if (ruins) {
-    // broken colonnade: drums of varied height, one fallen lintel still bridging a pair
-    const n = 3 + Math.floor(rand() * 3);
-    const baseA = rand() * Math.PI * 2;
-    const hs: number[] = [];
-    const ps: Array<[number, number]> = [];
-    for (let i = 0; i < n; i++) {
-      const a = baseA + i * 0.32;
-      const px = Math.cos(a) * 0.5;
-      const pz = Math.sin(a) * 0.5;
-      const ph = i === 1 || i === 2 ? 0.42 + rand() * 0.12 : 0.12 + rand() * 0.3;
-      const col = new THREE.CylinderGeometry(0.03, 0.034, ph, 7);
+    const pillar = (px: number, pz: number, ph: number, r0: number, snapped: boolean) => {
+      const col = new THREE.CylinderGeometry(r0 * 0.9, r0, ph, 7);
       const cp = col.attributes.position as THREE.BufferAttribute;
-      for (let k = 0; k < cp.count; k++) if (cp.getY(k) > 0 && i !== 1 && i !== 2) cp.setY(k, cp.getY(k) - (cp.getX(k) + 0.03) * 0.8);
+      if (snapped) for (let k = 0; k < cp.count; k++) if (cp.getY(k) > 0) cp.setY(k, cp.getY(k) - (cp.getX(k) + r0) * 1.2);
       col.translate(px, 0.1 + ph / 2, pz);
       parts.push(col.toNonIndexed());
-      const plinth = new THREE.BoxGeometry(0.085, 0.03, 0.085);
-      plinth.translate(px, 0.115, pz);
-      parts.push(plinth.toNonIndexed());
-      hs.push(ph);
-      ps.push([px, pz]);
-    }
-    if (n >= 3) {
-      const [x1, z1] = ps[1]!;
-      const [x2, z2] = ps[2]!;
-      const lin = new THREE.BoxGeometry(Math.hypot(x2 - x1, z2 - z1) + 0.09, 0.045, 0.06);
-      lin.rotateY(-Math.atan2(z2 - z1, x2 - x1));
-      lin.translate((x1 + x2) / 2, 0.1 + Math.min(hs[1]!, hs[2]!) + 0.02, (z1 + z2) / 2);
-      parts.push(lin.toNonIndexed());
-    }
-    if (rand() > 0.3) {
-      // arch: two piers + a thick ring, sometimes snapped on one side
-      const span = 0.17;
-      const legH = 0.32 + rand() * 0.12;
-      const broken = rand() < 0.45;
-      const ring = new THREE.TorusGeometry(span + 0.03, 0.035, 5, 12, broken ? Math.PI * 0.62 : Math.PI);
-      ring.scale(1, 1, 1.6);
+      parts.push(new THREE.BoxGeometry(r0 * 2.8, 0.035, r0 * 2.8).translate(px, 0.115, pz).toNonIndexed());
+    };
+    const archAt = (ax: number, az: number, span: number, legH: number, broken: boolean, yaw: number) => {
+      const ring = new THREE.TorusGeometry(span + 0.045, 0.05, 5, 14, broken ? Math.PI * 0.6 : Math.PI);
+      ring.scale(1, 1, 1.5);
       ring.translate(0, 0.1 + legH, 0);
-      const l1 = new THREE.BoxGeometry(0.07, legH, 0.08).translate(-span - 0.03, 0.1 + legH / 2, 0);
-      const l2h = broken ? legH * 0.55 : legH;
-      const l2 = new THREE.BoxGeometry(0.07, l2h, 0.08).translate(span + 0.03, 0.1 + l2h / 2, 0);
+      const l1 = new THREE.BoxGeometry(0.1, legH, 0.11).translate(-span - 0.045, 0.1 + legH / 2, 0);
+      const l2h = broken ? legH * 0.5 : legH;
+      const l2 = new THREE.BoxGeometry(0.1, l2h, 0.11).translate(span + 0.045, 0.1 + l2h / 2, 0);
       const g = mergeGeometries([ring.toNonIndexed(), l1.toNonIndexed(), l2.toNonIndexed()])!;
-      g.rotateY(rand() * Math.PI);
-      g.translate((rand() - 0.5) * 0.4, 0, (rand() - 0.5) * 0.4);
+      g.rotateY(yaw);
+      g.translate(ax, 0, az);
       parts.push(g);
+    };
+    const baseA = rand() * Math.PI * 2;
+    if (kind === 'arch') {
+      // one tall broken arch — a secondary vertical landmark that survives the haze
+      archAt((rand() - 0.5) * 0.3, (rand() - 0.5) * 0.3, 0.2 + rand() * 0.06, 0.75 + rand() * 0.3, rand() < 0.6, rand() * Math.PI);
+      pillar(Math.cos(baseA) * 0.55, Math.sin(baseA) * 0.55, 0.3 + rand() * 0.2, 0.035, true);
+    } else if (kind === 'colonnade') {
+      // clustered colonnade: tall survivors still carrying a lintel, stumps around them
+      const n = 4 + Math.floor(rand() * 3);
+      const ps: Array<[number, number, number]> = [];
+      for (let i = 0; i < n; i++) {
+        const a = baseA + i * 0.36;
+        const tall = i === 1 || i === 2;
+        const ph = tall ? 0.7 + rand() * 0.25 : 0.15 + rand() * 0.35;
+        ps.push([Math.cos(a) * 0.48, Math.sin(a) * 0.48, ph]);
+        pillar(ps[i]![0], ps[i]![1], ph, 0.04, !tall);
+      }
+      const [x1, z1, h1] = ps[1]!;
+      const [x2, z2, h2] = ps[2]!;
+      const lin = new THREE.BoxGeometry(Math.hypot(x2 - x1, z2 - z1) + 0.12, 0.06, 0.08);
+      lin.rotateY(-Math.atan2(z2 - z1, x2 - x1));
+      lin.translate((x1 + x2) / 2, 0.1 + Math.min(h1, h2) + 0.03, (z1 + z2) / 2);
+      parts.push(lin.toNonIndexed());
+    } else {
+      // tower stub: a squat broken drum-tower with a small arch beside it
+      const th = 0.6 + rand() * 0.35;
+      const tower = new THREE.CylinderGeometry(0.13, 0.16, th, 9);
+      const tp2 = tower.attributes.position as THREE.BufferAttribute;
+      for (let k = 0; k < tp2.count; k++) if (tp2.getY(k) > 0) tp2.setY(k, tp2.getY(k) - Math.max(0, tp2.getX(k) + 0.05) * 1.4);
+      tower.translate(Math.cos(baseA) * 0.35, 0.1 + th / 2, Math.sin(baseA) * 0.35);
+      parts.push(tower.toNonIndexed());
+      archAt(-Math.cos(baseA) * 0.3, -Math.sin(baseA) * 0.3, 0.15, 0.4, true, baseA);
     }
   }
 
@@ -319,7 +327,8 @@ export function createDistantLand(scene: THREE.Scene, opts: Partial<DistantLandO
   // variants: half with ruins
   const VARIANTS = 6;
   const geos: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < VARIANTS; i++) geos.push(islandVariant(rand, i % 3 !== 2));
+  const kinds = ['arch', 'colonnade', 'bare', 'tower', 'colonnade', 'arch'] as const;
+  for (let i = 0; i < VARIANTS; i++) geos.push(islandVariant(rand, kinds[i]!));
 
   const perVariant: THREE.Matrix4[][] = geos.map(() => []);
   const dummy = new THREE.Object3D();

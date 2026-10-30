@@ -226,12 +226,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const groundTex = groundTextures();
   const atlas = leafAtlas();
   Object.assign(M.stone, stoneTex);
-  M.stone.color.setScalar(1.2);
+  M.stone.color.setScalar(1.15);
   M.stone.normalScale.set(0.9, 0.9);
   Object.assign(M.bark, barkTextures());
   M.bark.color.setScalar(1.25);
   Object.assign(M.rock, rockTex);
-  M.rock.color.setScalar(1.3);
+  M.rock.color.setScalar(1.25);
   M.rock.normalScale.set(1.1, 1.1);
   for (const m of [M.leaf, M.litter]) leafCutout(m, atlas);
   groundBlend(M.terrain, groundTex);
@@ -605,7 +605,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
     foot = Math.max(Math.min(a.y, b.y) - 8, Math.min(foot, Math.min(a.y, b.y)) - 0.3);
     col.add(boxCollider({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, w: width, d: len, yaw, top: a.y, top1: b.y, bottom: Math.min(a.y, b.y) - 1, tag: 'stair' }));
-    stairFlight(bk('stone', a.x, a.z), a, b, width, seed, { open, foot, ...o });
+    stairFlight(bk('stone', a.x, a.z), a, b, width, seed, { open, foot, rock: bk('rock', a.x, a.z), ...o });
     // leaves bank up at the foot of the flight and along the foot of open cheek walls
     drifts.push({ x: a.x - Math.sin(yaw) * 0.9, y: a.y, z: a.z - Math.cos(yaw) * 0.9, r: width * 0.6, n: 34 });
     for (const side of [0, 1] as const) {
@@ -807,8 +807,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       for (let i = 0; i < seg; i++) {
         const a = (i / seg) * Math.PI * 2;
         const wob = 1 + (vnoise3(Math.cos(a) * 1.5 + seed, Math.sin(a) * 1.5, 0) - 0.5) * 0.3;
-        const d = t * rr * 1.45 * wob;
-        const k = THREE.MathUtils.smoothstep(d, rr * 0.82, rr * 1.4);
+        const d = t * rr * 1.55 * (t < 0.66 ? 1 : wob);
+        const k = THREE.MathUtils.smoothstep(d, rr * 1.02, rr * 1.5); // flat through the collider radius
         const y = top + (vnoise3(x + Math.cos(a) * d, seed, z + Math.sin(a) * d) - 0.5) * 0.08 * (1 - k) - k * (top - MARSH.ink + 0.5) - k * k * 0.3;
         row.push(new THREE.Vector3(x + Math.cos(a) * d, y, z + Math.sin(a) * d));
       }
@@ -816,14 +816,17 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
     const push = (p: THREE.Vector3, t: number) => {
       pos.push(p.x, p.y, p.z);
-      lf.push(THREE.MathUtils.clamp(0.22 - t * 0.3 + (vnoise3(p.x * 0.7, 3, p.z * 0.7) - 0.5) * 0.3, 0, 1));
-      c.copy(PAL.bankDamp).lerp(PAL.soilUmber, (1 - t) * 0.55).lerp(PAL.grassDry, (1 - t) * 0.25 * vnoise3(p.x * 0.5, 1, p.z * 0.5));
+      const crown = 1 - THREE.MathUtils.smoothstep(t, 0.6, 0.85);
+      lf.push(THREE.MathUtils.clamp(0.1 + crown * 0.3 + (vnoise3(p.x * 0.7, 3, p.z * 0.7) - 0.5) * 0.3, 0, 1));
+      // muted peat crown with dry sedge, darkening down the wet slump
+      c.copy(PAL.bankDamp).lerp(PAL.soilUmber.clone().lerp(PAL.grassDry, 0.5 + 0.3 * vnoise3(p.x * 0.5, 1, p.z * 0.5)), crown);
       cc.push(c.r, c.g, c.b);
     };
     for (let j = 0; j < rings; j++) {
       for (let i = 0; i < seg; i++) {
         const i2 = (i + 1) % seg;
-        for (const [jj, ii] of [[j, i], [j + 1, i], [j + 1, i2], [j, i], [j + 1, i2], [j, i2]] as const) push(pts[jj]![ii]!, jj / rings);
+        // counter-clockwise seen from above (upward normals)
+        for (const [jj, ii] of [[j, i], [j + 1, i2], [j + 1, i], [j, i], [j, i2], [j + 1, i2]] as const) push(pts[jj]![ii]!, jj / rings);
       }
     }
     const g = new THREE.BufferGeometry();
@@ -887,15 +890,11 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       if (routeNear(route, x, z, 2.4)) continue;
       if (Math.hypot(x - SW2P.x, z - SW2P.z) < 6.5) continue;
       placed++;
-      const base = e < 0.85 ? MARSH.ink - 0.05 : groundRaw(x, z) - 0.05;
+      const base = e < 0.85 ? MARSH.ink - 0.25 : groundRaw(x, z) - 0.12; // roots below the waterline
       const b = bk('reed', x, z, false);
       const n = 10 + Math.floor(rr() * 14);
       const spread = 0.25 + rr() * 0.6;
       const tone = reedTones[Math.floor(rr() * reedTones.length)]!;
-      // dark rooted clump at the waterline
-      const clump = new THREE.ConeGeometry(spread + 0.25, 0.22, 7, 1, true);
-      b.add(clump, trs(x, base + 0.08, z, rr() * 3), PAL.bankDamp.clone().multiplyScalar(0.7));
-      clump.dispose();
       for (let k = 0; k < n; k++) {
         const a = rr() * Math.PI * 2;
         const d = Math.sqrt(rr()) * spread;
@@ -1081,8 +1080,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     // (reads as a landing from below and above), drooping sprays hide the rim
     const lb = bk('leaf', x, z);
     const tw = bk('bark', x, z);
-    const mat = new THREE.CylinderGeometry(rad * 0.82, rad * 0.55, 0.28, 14);
-    tw.add(mat, trs(x, top - 0.2, z), PAL.leafBrown.clone().multiplyScalar(0.55));
+    const mat = new THREE.CylinderGeometry(rad * 0.72, rad * 0.5, 0.28, 14);
+    tw.add(mat, trs(x, top - 0.24, z), PAL.leafBrown.clone().multiplyScalar(0.32));
     mat.dispose();
     for (let k = 0; k < 5; k++) {
       const a = (k / 5) * Math.PI * 2 + r();
@@ -1104,14 +1103,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const c = new THREE.Color();
     const hueSet = [PAL.maple, PAL.russet, PAL.amber, PAL.gold];
     const padHue = hueSet[i % 4]!;
-    for (let k = 0; k < rad * rad * 26; k++) {
+    for (let k = 0; k < rad * rad * 30; k++) {
       const a = r() * Math.PI * 2;
       const d = Math.sqrt(r()) * rad * 0.95;
+      // a few openings in the mat so it reads as massed foliage, not a carpet (never at the centre)
+      if (d > rad * 0.78 && vnoise3(x + Math.cos(a) * d * 0.9, 5, z + Math.sin(a) * d * 0.9) > 0.62) continue;
       nn.set(Math.cos(a) * d * 0.08, 1, Math.sin(a) * d * 0.08).normalize();
       c.copy(r() < 0.75 ? padHue : LEAF_COLORS[Math.floor(r() * 4)]!).offsetHSL(0, 0, 0.04 + (r() - 0.5) * 0.1);
-      pushLeaf(lb, x + Math.cos(a) * d, top + 0.03 + r() * 0.08, z + Math.sin(a) * d, 0.6 + r() * 0.45, r() * 6.28, -Math.PI / 2 + (r() - 0.5) * 0.35, (r() - 0.5) * 0.35, c, nn, r() < 0.5 ? LEAF_CELL.single : LEAF_CELL.spray, r() < 0.5);
+      pushLeaf(lb, x + Math.cos(a) * d, top + 0.03 + r() * 0.08, z + Math.sin(a) * d, 0.6 + r() * 0.35, r() * 6.28, -Math.PI / 2 + (r() - 0.5) * 0.35, (r() - 0.5) * 0.35, c, nn, r() < 0.8 ? LEAF_CELL.spray : LEAF_CELL.sparse, r() < 0.5);
     }
-    const rim = Math.round(Math.PI * 2 * rad * 3.2);
+    const rim = Math.round(Math.PI * 2 * rad * 2.2);
     for (let k = 0; k < rim; k++) {
       const a = (k / rim) * Math.PI * 2 + (r() - 0.5) * 0.3;
       const d = rad * (0.82 + r() * 0.2);
