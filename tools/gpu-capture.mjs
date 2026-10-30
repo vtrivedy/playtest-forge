@@ -202,7 +202,7 @@ try {
       const sheetPage = await context.newPage();
       try {
         await sheetPage.setViewportSize({ width: 1920, height: 1080 });
-        const cards = options.keyFrames.map(frame => {
+        const cards = options.keyFrames.filter(frame => frame < count).map(frame => {
           const filename = `${name}-${String(frame).padStart(5, '0')}.png`;
           const label = options.label?.(frame, trace.find(sample => sample.frame === frame)?.state) ?? `${name} frame ${frame}`;
           return `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, filename)).toString('base64')}"></figure>`;
@@ -912,7 +912,7 @@ try {
     save('crown-acceptance.json',{reached,phase,restored:st.crown.restored,deaths:st.deaths,end:st});
     if (!reached || !st.crown.restored || st.deaths || !st.grounded) report.failures.push('Crown round trip did not finish restored, grounded, and without deaths');
     // Prove the permanent walking fallback in both directions, with no jumping or staged movement.
-    const walkOut = [[-19,38,-88],[-22,38,-88],[-39,24,-96],[-41,24,-99],[-49,29,-101.5],[-49,29,-109],[-57,34,-113],[-53,34,-116]];
+    const walkOut = [[-12,38,-88],[-19,38,-88],[-22,38,-88],[-39,24,-96],[-41,24,-99],[-49,29,-101.5],[-49,29,-109],[-57,34,-113],[-53,34,-116]];
     const walk = [...walkOut, ...walkOut.slice(0,-1).reverse(),[-12,38,-88],[-12,38,-93]];
     let walkIdx=0, walkAge=0;
     await video('crown-walking-fallback', 50*fps, async () => {
