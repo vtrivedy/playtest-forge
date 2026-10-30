@@ -14,6 +14,7 @@ import {
   createAutumnParticles,
 } from '../../../src/render';
 import { createIslandMesh, scatterProps, createShrine, createFoxStandIn } from './island';
+import { tryLoadGlb, collectStandardMats, placeGlb } from './assets';
 
 async function main() {
   const forge = await createForgeRenderer({ container: document.body, exposure: 1.05 });
@@ -42,6 +43,79 @@ async function main() {
   scene.add(shrine.group);
   patched.push(...shrine.materials);
 
+  // Prefer authored autumn GLBs when available (assets stream)
+  const [mapleGlb, shrineGlb, archGlb, foxGlb, leafPileGlb] = await Promise.all([
+    tryLoadGlb('/assets/env/procedural/maple_tree.glb'),
+    tryLoadGlb('/assets/env/procedural/shrine.glb'),
+    tryLoadGlb('/assets/env/procedural/ruin_arch.glb'),
+    tryLoadGlb('/assets/hero/spirit_fox.glb'),
+    tryLoadGlb('/assets/env/procedural/leaf_pile.glb'),
+  ]);
+
+  if (shrineGlb) {
+    scene.remove(shrine.group);
+    const placed = placeGlb(shrineGlb, shrine.position.x, shrine.position.z, island.yAt, 3.4, 0.2);
+    scene.add(placed);
+    shrine.group = placed;
+    collectStandardMats(placed, patched);
+    // keep a named orb for pulse if present
+    placed.traverse((c) => {
+      if ((c as THREE.Mesh).isMesh && /orb|crystal|glow|ember/i.test(c.name)) c.name = 'shrineOrb';
+    });
+    shrine.materials = [];
+    collectStandardMats(placed, shrine.materials);
+  }
+
+  if (mapleGlb) {
+    const sites: Array<[number, number, number, number]> = [
+      [3.6, -1.2, 7.2, 0.35], // hero maple (keyart right mass)
+      [-5.5, -2.8, 4.8, 1.1],
+      [5.8, 3.0, 4.2, 2.2],
+      [-3.8, 5.0, 3.8, 0.8],
+      [1.2, -6.5, 4.4, 1.6],
+      [-1.5, -4.8, 3.6, -0.5],
+    ];
+    for (const [x, z, h, yaw] of sites) {
+      if (island.yAt(x, z) < 0.25) continue;
+      const tree = placeGlb(mapleGlb, x, z, island.yAt, h, yaw);
+      scene.add(tree);
+      collectStandardMats(tree, patched);
+    }
+  }
+
+  if (archGlb) {
+    const arches: Array<[number, number, number, number]> = [
+      [-4.5, 2.5, 2.6, 0.6],
+      [6.8, -4.2, 2.2, -0.9],
+      [-7.2, -5.5, 2.0, 1.4],
+    ];
+    for (const [ax, az, h, yaw] of arches) {
+      if (island.yAt(ax, az) < 0.15) continue;
+      const arch = placeGlb(archGlb, ax, az, island.yAt, h, yaw);
+      scene.add(arch);
+      collectStandardMats(arch, patched);
+    }
+  }
+
+  if (leafPileGlb) {
+    const piles: Array<[number, number, number, number]> = [
+      [1.6, -0.8, 0.55, 0.3],
+      [-1.2, 1.4, 0.48, 1.1],
+      [3.8, 1.2, 0.52, -0.4],
+      [-2.8, -2.2, 0.42, 2.0],
+      [0.4, 3.2, 0.5, 0.7],
+      [4.6, -3.0, 0.4, -1.2],
+      [-5.0, 0.6, 0.45, 0.2],
+      [2.2, 4.5, 0.38, 1.6],
+    ];
+    for (const [x, z, h, yaw] of piles) {
+      if (island.yAt(x, z) < 0.2) continue;
+      const pile = placeGlb(leafPileGlb, x, z, island.yAt, h, yaw);
+      scene.add(pile);
+      collectStandardMats(pile, patched);
+    }
+  }
+
   // underside material
   island.mesh.traverse((c) => {
     if ((c as THREE.Mesh).isMesh && c !== island.mesh) {
@@ -59,7 +133,47 @@ async function main() {
     ySampler: (x, z) => island.yAt(x, z),
   });
 
-  const fox = createFoxStandIn();
+  let fox = createFoxStandIn();
+  if (foxGlb) {
+    const box = new THREE.Box3().setFromObject(foxGlb);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    // scale by height so the hero reads at keyart scale (~1.35 m)
+    const s = 1.35 / Math.max(size.y, 0.001);
+    foxGlb.scale.setScalar(s);
+    box.setFromObject(foxGlb);
+    foxGlb.position.x -= (box.min.x + box.max.x) * 0.5;
+    foxGlb.position.z -= (box.min.z + box.max.z) * 0.5;
+    foxGlb.position.y -= box.min.y;
+    // warm spirit emissive — stay saturated, never ColorField-patched
+    foxGlb.traverse((c) => {
+      if (!(c as THREE.Mesh).isMesh) return;
+      const mats = Array.isArray((c as THREE.Mesh).material)
+        ? ((c as THREE.Mesh).material as THREE.Material[])
+        : [(c as THREE.Mesh).material as THREE.Material];
+      for (const mat of mats) {
+        const sm = mat as THREE.MeshStandardMaterial;
+        if (!sm?.isMeshStandardMaterial) continue;
+        const hsl = { h: 0, s: 0, l: 0 };
+        sm.color.getHSL(hsl);
+        // cream / light → soft gold; saturated warm → ember glow
+        if (hsl.l > 0.75 && hsl.s < 0.35) {
+          sm.emissive = new THREE.Color(0xffc878);
+          sm.emissiveIntensity = Math.max(sm.emissiveIntensity, 0.12);
+        } else if (hsl.s > 0.25 && (hsl.h < 0.12 || hsl.h > 0.9)) {
+          sm.emissive = new THREE.Color(0xff6a22);
+          sm.emissiveIntensity = Math.max(sm.emissiveIntensity, 0.55);
+        }
+        sm.needsUpdate = true;
+      }
+    });
+    const group = new THREE.Group();
+    group.add(foxGlb);
+    const foxLight = new THREE.PointLight(0xff6622, 1.8, 9);
+    foxLight.position.set(0, 0.55, -0.15);
+    group.add(foxLight);
+    fox = { group, materials: [], tail: null as unknown as THREE.Mesh };
+  }
   scene.add(fox.group);
   // fox stays saturated — do NOT patch fox materials
   const wisps = createFoxWisps(scene, 56);
@@ -79,7 +193,7 @@ async function main() {
     bloomStrength: 0.48,
     bloomThreshold: 0.78,
     vignette: 0.3,
-    grain: 0.09,
+    grain: 0.12,
   });
 
   // --- Scripted flythrough path ---
@@ -185,6 +299,22 @@ async function main() {
   const foxPos = new THREE.Vector3();
   const lookAt = new THREE.Vector3();
 
+
+  function setShrineGlow(intensity: number) {
+    const orb = shrine.group.getObjectByName('shrineOrb') as THREE.Mesh | undefined;
+    const mats = orb
+      ? (Array.isArray(orb.material) ? (orb.material as THREE.MeshStandardMaterial[]) : [orb.material as THREE.MeshStandardMaterial])
+      : shrine.materials;
+    for (const m of mats) {
+      if (m && (m as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+        const sm = m as THREE.MeshStandardMaterial;
+        if (!sm.emissive) sm.emissive = new THREE.Color(0xff6622);
+        else if (sm.emissive.getHex() === 0) sm.emissive.setHex(0xff6622);
+        sm.emissiveIntensity = intensity;
+      }
+    }
+  }
+
   function restart() {
     t = 0;
     elapsed = 0;
@@ -193,7 +323,7 @@ async function main() {
     colorField.restores.length = 0;
     colorField.trail = [];
     colorField.globalColor = 0;
-    shrine.materials[1]!.emissiveIntensity = 0.15;
+    setShrineGlow(0.15);
   }
 
   /** Jump flythrough clock; O(1) — safe under SwiftShader. */
@@ -247,7 +377,7 @@ async function main() {
     restoreTriggered = true;
     const c = shrine.position.clone().setY(island.yAt(shrine.position.x, shrine.position.z));
     colorField.restore(c, 14, 2.6);
-    shrine.materials[1]!.emissiveIntensity = 2.8;
+    setShrineGlow(2.8);
     shrineT = 0;
     autumnFX.setWavefront(c, 1.5, 2.5);
   }
