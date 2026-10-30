@@ -807,6 +807,10 @@ try {
   }
   if (wants('crown')) {
     await boot(quality, true);
+    await H('forceRestore'); await advance(660, false);
+    const afterFlood = await H('state');
+    save('crown-after-valley-flood.json', afterFlood);
+    if (afterFlood.crown.restored) throw Error('Valley flood solved the Crown remotely');
     await H('teleport', -10, 38, -87, -Math.PI / 2);
     await advance(2); await shot('crown-entry');
     const points = [
@@ -832,6 +836,7 @@ try {
     await H('setKeys',[]); await H('setStick',null); await shot('crown-end');
     const st=await H('state');
     save('crown-acceptance.json',{reached,phase,restored:st.crown.restored,deaths:st.deaths,end:st});
+    if (!reached || !st.crown.restored || st.deaths || !st.grounded) report.failures.push('Crown round trip did not finish restored, grounded, and without deaths');
   }
   if (wants('route')) {
     await boot(quality, true);
