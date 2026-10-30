@@ -181,7 +181,7 @@ export class ColorField {
       const d = Math.hypot(p.x - r.center.x, p.z - r.center.z);
       // soft noise-ish edge approx on CPU (ground plane distance, like the shader)
       const edge = ColorField.edgeOf(r) * 0.66;
-      const local = 1 - THREE.MathUtils.smoothstep(r.radius - edge, r.radius + edge, d);
+      const local = 1 - THREE.MathUtils.smoothstep(d, r.radius - edge, r.radius + edge);
       s = Math.max(s, local);
     }
     const aura = 1 - Math.min(1, p.distanceTo(this.fox) / this.auraRadius);

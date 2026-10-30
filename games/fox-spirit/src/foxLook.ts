@@ -250,8 +250,8 @@ void main() {
   body *= 1.0 - smoothstep(0.55, 1.0, y + (n2 - 0.5) * 0.5);
   float core = (1.0 - smoothstep(0.0, width * 0.55, abs(x))) * (1.0 - smoothstep(0.1, 0.6, y));
   vec3 col = mix(vec3(0.8, 0.18, 0.03), vec3(1.0, 0.45, 0.08), smoothstep(0.0, 0.8, body));
-  col = mix(col, vec3(1.0, 0.62, 0.22), core * 0.45);
-  float a = body * vAlpha * uIntensity * 0.55;
+  col = mix(col, vec3(1.0, 0.6, 0.2), core * 0.25);
+  float a = body * vAlpha * uIntensity * 0.4;
   if (a < 0.003) discard;
   gl_FragColor = vec4(col * a, a);
 }`;
@@ -291,9 +291,9 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const R = FOX_RIG;
   // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — calm at idle: nothing on the ears / head
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
-    [body, [R.spine[3], R.neck[0]], 0.65, 2, 0.16, 0.035, 0.7],
-    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.18, 0.035, 0.8],
-    [tail, R.tail.slice(3), 0.0, 5, 0.26, 0.05, 0.9],
+    [body, [R.spine[3], R.neck[0]], 0.65, 2, 0.16, 0.06, 0.7],
+    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.18, 0.06, 0.8],
+    [tail, R.tail.slice(3), 0.0, 5, 0.26, 0.08, 0.9],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
