@@ -66,6 +66,7 @@ float fxNoise(vec3 x) {
 
 function patchFur(mat: THREE.MeshStandardMaterial) {
   const shell = mat.name.toLowerCase().includes("shell");
+  const tail = mat.name.toLowerCase().startsWith('foxtailfur');
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, furUniforms);
     shader.vertexShader = shader.vertexShader
@@ -99,15 +100,22 @@ ${NOISE_GLSL}`,
         '#include <opaque_fragment>',
         `{
   float facing = saturate(dot(normal, normalize(vViewPosition)));
-  ${shell ? "if (facing > 0.48) discard;" : ""}
+  ${shell ? "float coverage = 1.0 - smoothstep(0.25, 0.65, facing); if (fxNoise(vRest * vec3(73.0, 41.0, 61.0)) > coverage) discard;" : ""}
   float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.35, 0.8, fxNoise(vRest * vec3(40.0, 22.0, 9.0)));
   outgoingLight += uRimColor * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
+  ${tail ? `
+  #ifdef USE_MAP
+    float tipHeat = smoothstep(0.72, 1.0, vMapUv.y);
+    outgoingLight += uRimColor * 0.12 * tipHeat;
+    float tipCoverage = 1.0 - smoothstep(0.92, 1.0, vMapUv.y);
+    if (fxNoise(vRest * vec3(93.0, 71.0, 87.0)) > tipCoverage) discard;
+  #endif` : ''}
 }
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => shell ? 'fox-fur-edge-shell' : 'fox-fur';
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}`;
   mat.needsUpdate = true;
 }
 
@@ -184,7 +192,7 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.depthWrite = false;
         mesh.castShadow = false;
         // translucent: the brush dissolves into soft flame instead of an opaque fan over the rump
-        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.5 : 0.68);
+        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.12 : n.includes('tailflame') ? 0.24 : 0.32);
         if (isGlow) mat.side = THREE.FrontSide;
       } else if (n.includes('eye')) {
         patchEye(mat, mesh.geometry);
