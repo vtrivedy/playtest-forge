@@ -674,7 +674,7 @@ try {
       await lifeShot(`lit-${target}f`, target);
     }
     await H('teleport', hx - 14, hy, hz + 18, Math.PI); await H('photo', ...lens);
-    for (const target of [60, 120, 180, 210, 240, 300]) {
+    for (const target of [60, 120, 180, 210, 240, 300, 360, 420]) {
       await advance(target + 180 - lifeFrame); lifeFrame = target + 180;
       await lifeShot(`decay-${target}f`, lifeFrame);
     }
@@ -695,7 +695,7 @@ try {
     await H('teleport', hx - 1.4, hy, hz + 0.4, Math.PI); await advance(30);
     await H('photo', [hx - 12, hy + 6, hz + 16], [hx, hy + 3, hz], 50);
     await advance(1); await shot('updraft-fx-distance-20m');
-    await H('teleport', hx - 14, hy, hz + 18, Math.PI); await advance(300, false);
+    await H('teleport', hx - 14, hy, hz + 18, Math.PI); await advance(480, false);
     const runFrom = [hx - 1.4, hy, hz + 9];
     for (const variant of ['A', 'B']) {
       await H('photoOff');

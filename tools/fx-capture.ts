@@ -108,7 +108,7 @@ try {
       // walk away, wait hold → gutter → cold (hold ~3 s + gutter ~0.8 s)
       await H('teleport', hx - 14, hy, hz + 18, Math.PI);
       await H('photo', ...lens);
-      for (const [i, n] of [60, 120, 180, 240].entries()) {
+      for (const [i, n] of [60, 120, 180, 240, 300, 360, 420].entries()) {
         await advance(60);
         await capture(`${String(i + 6).padStart(2, '0')}-decay-${n}f`);
       }
