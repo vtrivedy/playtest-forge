@@ -421,6 +421,22 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
+  if (wants('water')) {
+    await boot(quality, true);
+    await H('teleport', 51, 0, 43, Math.PI);
+    const lens = [[64, 7, 44], [59, 0.5, 34], 48];
+    await H('photo', ...lens); await advance(10); await shot('water-frozen');
+    const timeline = [];
+    await video('water-cycle', 12 * fps, async i => {
+      if (i === 0) await H('teleport', 56, 0.3, 37, Math.PI);
+      if (i === Math.round(1.4 * fps)) await H('teleport', 49, 0, 44, Math.PI);
+      if ([Math.round(0.3 * fps), Math.round(0.8 * fps), 2 * fps, 6 * fps, 8 * fps, 11 * fps].includes(i)) {
+        await shot(`water-${i}`);
+        timeline.push({ frame: i, state: (await H('state')).chem.water });
+      }
+    });
+    save('water-acceptance.json', timeline);
+  }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
     // A: run past the cold H-a hearth, jump into its column, ride it onto the 5 m shelf, watch hold → gutter.
@@ -539,6 +555,36 @@ try {
     }
     save('updraft-acceptance.json', summary);
     console.log('UPDRAFT', JSON.stringify(summary));
+  }
+  if (wants('wind')) {
+    // Wind river acceptance (world-1.md §3.3 beat 6): SW1 latched → ride H2 up, glide into the river, land on the arena rim.
+    await boot(quality, true);
+    await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
+    await H('lightSeedwells'); await advance(240, false);
+    const st0 = await H('state');
+    const h2 = st0.chem.hearths.find(h => h.id === 'H2');
+    const [hx, hy, hz] = h2.pos;
+    // stand 1.6 m west of H2 facing east (along the river's first leg)
+    const yawE = Math.atan2(1, 0.45);
+    await H('teleport', hx - 1.6, 20, hz - 0.7, yawE); await advance(30);
+    let phase = 'jump', t0 = 0;
+    const tl = [];
+    await video('wind-river', 26 * fps, async i => {
+      const st = await H('state');
+      tl.push({ i, pos: st.pos, vel: st.vel, gliding: st.gliding, grounded: st.grounded, wind: st.chem.wind[0] });
+      let keys = [];
+      if (phase === 'jump') { keys = ['KeyD', 'Space']; if (i > 4) phase = 'rise'; }
+      else if (phase === 'rise') { keys = ['Space']; if (st.pos[1] > 27 || (st.vel[1] < 0.5 && i > 60)) { phase = 'ride'; t0 = i; } }
+      else if (phase === 'ride') { keys = ['KeyW', 'Space']; if (st.grounded) phase = 'landed'; }
+      await H('setKeys', keys);
+    }, (st, i) => phase === 'landed' && i > 30, { keyFrames: [0, 60, 150, 300, 450, 600, 750, 900] });
+    const end = await H('state');
+    const peak = Math.max(...tl.map(r => r.pos[1]));
+    const landedArena = end.grounded && Math.hypot(end.pos[0], end.pos[2] + 60) < 20 && end.pos[1] > 10;
+    const summary = { end: end.pos, grounded: end.grounded, landedArena, peak, wind: end.chem.wind, rideFrames: tl.length - t0 };
+    save('wind-acceptance.json', summary); save('wind-timeline.json', tl.filter((_, k) => k % 10 === 0));
+    console.log('WIND', JSON.stringify(summary));
+    await H('setKeys', []);
   }
   if (wants('route')) {
     await boot(quality, true);

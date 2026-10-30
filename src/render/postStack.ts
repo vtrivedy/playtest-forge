@@ -18,6 +18,8 @@ export type PostStackOptions = {
   /** Quality switches (see quality.ts). Off passes are never added to the composer. */
   bloom?: boolean;
   smaa?: boolean;
+  /** Painterly (Kuwahara) brush mix 0..1; 0 = pass not added */
+  painterly?: number;
   /** Composer pixel ratio; defaults to the renderer's */
   pixelRatio?: number;
 };
@@ -51,6 +53,8 @@ export type PostStack = {
     highlightCap: number;
     /** 0 = sepia grade, 1 = restored grade */
     restore: number;
+    /** Kuwahara brush mix (only live when the pass was created with painterly > 0) */
+    painterly: number;
   };
   grade: { sepia: GradeParams; restored: GradeParams };
   setSize: (w: number, h: number) => void;
@@ -170,7 +174,52 @@ const GradeShader = {
     }`,
 };
 
-/** Highlight compression → bloom → grade/vignette/grain → SMAA → output (ACES on renderer). */
+/**
+ * Painterly brush pass: 4-quadrant Kuwahara (radius 3 px). Each pixel takes the mean of its
+ * flattest neighbouring quadrant, so texture noise and leaf-card speckle fold into soft brush
+ * dabs while silhouettes stay crisp. `uPaint` mixes it over the source.
+ */
+const PainterlyShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uTexel: { value: new THREE.Vector2(1 / 1920, 1 / 1080) },
+    uPaint: { value: 0.6 },
+  },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform vec2 uTexel;
+    uniform float uPaint;
+    varying vec2 vUv;
+    void main() {
+      vec4 src = texture2D(tDiffuse, vUv);
+      vec3 m[4]; vec3 v[4];
+      for (int k = 0; k < 4; k++) { m[k] = vec3(0.0); v[k] = vec3(0.0); }
+      for (int j = 0; j <= 3; j++) {
+        for (int i = 0; i <= 3; i++) {
+          vec3 a = texture2D(tDiffuse, vUv + vec2(-i, -j) * uTexel).rgb;
+          vec3 b = texture2D(tDiffuse, vUv + vec2( i, -j) * uTexel).rgb;
+          vec3 c = texture2D(tDiffuse, vUv + vec2(-i,  j) * uTexel).rgb;
+          vec3 d = texture2D(tDiffuse, vUv + vec2( i,  j) * uTexel).rgb;
+          m[0] += a; v[0] += a * a;
+          m[1] += b; v[1] += b * b;
+          m[2] += c; v[2] += c * c;
+          m[3] += d; v[3] += d * d;
+        }
+      }
+      vec3 best = src.rgb;
+      float bestS = 1e9;
+      for (int k = 0; k < 4; k++) {
+        vec3 mu = m[k] / 16.0;
+        vec3 var = abs(v[k] / 16.0 - mu * mu);
+        float sg = var.r + var.g + var.b;
+        if (sg < bestS) { bestS = sg; best = mu; }
+      }
+      gl_FragColor = vec4(mix(src.rgb, best, uPaint), src.a);
+    }`,
+};
+
+/** Highlight compression → bloom → grade/vignette/grain → painterly → SMAA → output (ACES on renderer). */
 export function createPostStack(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,
@@ -187,6 +236,7 @@ export function createPostStack(
     highlightKnee: 1.4,
     highlightCap: 2.4,
     restore: 0,
+    painterly: opts.painterly ?? 0,
   };
   const grade = {
     sepia: {
@@ -241,6 +291,14 @@ export function createPostStack(
   gradePass.uniforms.uAspect!.value = innerWidth / Math.max(1, innerHeight);
   composer.addPass(gradePass);
 
+  let paintPass: ShaderPass | null = null;
+  if (params.painterly > 0) {
+    paintPass = new ShaderPass(PainterlyShader);
+    const pr0 = opts.pixelRatio ?? renderer.getPixelRatio();
+    (paintPass.uniforms.uTexel!.value as THREE.Vector2).set(1 / (innerWidth * pr0), 1 / (innerHeight * pr0));
+    composer.addPass(paintPass);
+  }
+
   if (opts.smaa ?? true) composer.addPass(new SMAAPass());
   composer.addPass(new OutputPass());
 
@@ -260,6 +318,8 @@ export function createPostStack(
       composer.setSize(w, h);
       gtao?.setSize(w, h);
       if (w > 0 && h > 0) U.uAspect!.value = w / h;
+      const pr = opts.pixelRatio ?? renderer.getPixelRatio();
+      if (paintPass && w > 0 && h > 0) (paintPass.uniforms.uTexel!.value as THREE.Vector2).set(1 / (w * pr), 1 / (h * pr));
     },
     setHeroScreen(u, v, r) {
       (U.uHero!.value as THREE.Vector3).set(u, v, r);
@@ -287,6 +347,7 @@ export function createPostStack(
       U.uVignette!.value = params.vignette;
       U.uGrain!.value = params.grain;
       U.uTime!.value = performance.now() * 0.001;
+      if (paintPass) paintPass.uniforms.uPaint!.value = params.painterly;
       composer.render();
     },
     dispose() {

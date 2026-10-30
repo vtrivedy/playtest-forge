@@ -125,3 +125,8 @@ A separate three-panel review edit pairs the two game candidates with documented
 walk/trot/run/pounce excerpts. Crop only for readability and label all playback
 changes. Wildlife source playback is uncalibrated and not phase-aligned; use it for
 anatomy, support, gathering and head/tail behavior, never numeric biological timing.
+
+## Sprint 2 Water — implementation contract
+Marsh Mouth (57,36) teaches color → melt → moving front → washed crossing. The amber spill melts in 0.6 s, holds 3 s after supply, then refreezes for 2 s with no new output. Water travels at 8 m/s; both its leading front and trailing end move along the channel. Only wet sections suppress ink and reveal the stone bed. The waterfall at (100,18) has probes at y10–15 and feeds a 32 m flume; only arriving water feeds SW2 for 7 s. Shade drains sever downstream flow, and restored sources stay on. All timings and speed live in the Water GUI and telemetry. No movement changes.
+
+Verification: GPU water shot retains frozen/melt/front/wash/refreeze stills and video, captures __game, and checks front/tail timing and SW2 inlet. Review visuals, apply critique, rerun.
