@@ -339,12 +339,36 @@ async function boot() {
   };
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
-  function latchSeedwell(i: number) {
+  function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
     for (const h of updrafts.hearths) if (Math.hypot(h.base.x - sw.pos.x, h.base.z - sw.pos.z) <= sw.radius) h.reactor.restored = true;
     const inlet = inlets.inlets.find((q) => q.seedwell === i);
     if (inlet) inlet.latched = true;
-    handleEvents(world.latchSeedwell(i));
+    const ev = world.latchSeedwell(i);
+    if (quiet) colorField.restore(sw.pos, sw.radius, 0.05);
+    else handleEvents(ev);
+    saveLatches();
+  }
+  /** Latches are saved (world-1.md §1.4): restored on load without the ceremony. `?fresh` starts sepia. */
+  const SAVE_KEY = 'fox-spirit:russetvale:latched';
+  function saveLatches() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(world.seedwells.filter((s) => s.lit).map((s) => s.id)));
+    } catch {
+      /* storage unavailable: play on unsaved */
+    }
+  }
+  {
+    let saved: string[] = [];
+    try {
+      if (new URLSearchParams(location.search).has('fresh')) localStorage.removeItem(SAVE_KEY);
+      saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? '[]') as string[];
+    } catch {
+      saved = [];
+    }
+    world.seedwells.forEach((s, i) => {
+      if (saved.includes(s.id)) latchSeedwell(i, true);
+    });
   }
   const fStroke = gui.addFolder('Chem › Dash stroke');
   fStroke.add(DASH_STROKE, 'life', 2, 10, 0.1);

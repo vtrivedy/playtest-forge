@@ -521,9 +521,9 @@ function createShared(): HearthShared {
         float w = (1.0 - y) * (0.55 + 0.25 * sin(t * 13.0 + y * 11.0));
         float d = abs(x + sway) / max(0.02, w);
         float a = (1.0 - smoothstep(0.4, 1.0, d)) * smoothstep(0.0, 0.08, y) * (1.0 - smoothstep(0.55, 1.0, y));
-        vec3 col = mix(vec3(1.0, 0.72, 0.32), vec3(0.95, 0.24, 0.04), smoothstep(0.0, 0.55, y + d * 0.35));
-        float k = a * min(1.0, uHeat) * 0.85;
-        gl_FragColor = vec4(col * 1.7 * k, k);
+        vec3 col = mix(vec3(1.0, 0.6, 0.24), vec3(0.9, 0.2, 0.03), smoothstep(0.0, 0.5, y + d * 0.35));
+        float k = a * min(1.0, uHeat) * 0.8;
+        gl_FragColor = vec4(col * 1.15 * k, k);
         #include <colorspace_fragment>
       }`,
     transparent: true,
@@ -546,7 +546,7 @@ function createShared(): HearthShared {
         const a = ph + u * Math.PI * 2 * 1.6;
         const r = 0.45 + 0.3 * u;
         for (const e of [-1, 1]) {
-          pos.push(Math.cos(a) * r, u + e * 0.035, Math.sin(a) * r);
+          pos.push(Math.cos(a) * r, u + e * 0.05, Math.sin(a) * r);
           uv.push(u, e * 0.5 + 0.5 + b * 7.31);
         }
         if (i < N) {
@@ -582,12 +582,15 @@ function createShared(): HearthShared {
       void main() {
         float u = vUv.x;
         float band = fract(vUv.y);
-        float edge = 1.0 - abs(band - 0.5) * 2.0;
+        // soft feathered band, broken into drifting wisps (never a solid ribbon)
+        float edge = pow(1.0 - abs(band - 0.5) * 2.0, 1.8);
         float seed = floor(vUv.y);
-        float dash = smoothstep(0.15, 0.6, sin(u * 22.0 - uTime * 5.5 + seed) * 0.5 + 0.5);
-        float ends = smoothstep(0.0, 0.08, u) * (1.0 - smoothstep(0.7, 1.0, u));
-        float a = uHeat * edge * dash * ends * 0.55;
-        gl_FragColor = vec4(vec3(1.0, 0.58, 0.22) * a * 1.4, a);
+        float w1 = sin(u * 17.0 - uTime * 4.6 + seed) * 0.5 + 0.5;
+        float w2 = sin(u * 7.0 - uTime * 2.1 + seed * 2.3) * 0.5 + 0.5;
+        float dash = smoothstep(0.35, 0.95, w1 * w2 * 1.6);
+        float ends = smoothstep(0.0, 0.1, u) * (1.0 - smoothstep(0.55, 1.0, u));
+        float a = uHeat * edge * dash * ends * 0.3;
+        gl_FragColor = vec4(vec3(1.0, 0.42, 0.12) * a * 0.9, a);
         #include <colorspace_fragment>
       }`,
     transparent: true,
