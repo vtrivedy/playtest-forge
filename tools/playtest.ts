@@ -191,6 +191,18 @@ try {
   } else {
     await page.waitForTimeout(400);
   }
+  // Hero silhouette at shrine — FX/bloom off
+  await page.evaluate(() => {
+    // @ts-expect-error playtest hook
+    window.__gameHooks?.setFxEnabled?.(false);
+  });
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(outDir, 'shot-silhouette.png') });
+  await page.evaluate(() => {
+    // @ts-expect-error playtest hook
+    window.__gameHooks?.setFxEnabled?.(true);
+  });
+  await page.waitForTimeout(150);
   await page.screenshot({ path: path.join(outDir, 'shot-end.png') });
 
   const metrics = await page.evaluate(() => (window as unknown as { __game?: unknown }).__game ?? null);

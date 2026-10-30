@@ -57,6 +57,9 @@ export function createWindGrass(
     monoColor?: number;
     tipColor?: number;
     tipMono?: number;
+    bladeHeight?: number;
+    bladeBaseW?: number;
+    bladeTipW?: number;
     ySampler?: (x: number, z: number) => number;
   } = {},
 ): WindFoliage {
@@ -65,7 +68,13 @@ export function createWindGrass(
   const center = opts.center ?? new THREE.Vector3();
   const ySampler = opts.ySampler ?? (() => 0);
 
-  const geo = buildBladeGeometry(0.55, 0.045, 0.003, 8);
+  // Wider blades so density reads as a carpet, not pin stakes
+  const geo = buildBladeGeometry(
+    opts.bladeHeight ?? 0.62,
+    opts.bladeBaseW ?? 0.09,
+    opts.bladeTipW ?? 0.01,
+    8,
+  );
 
   const mat2 = new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
@@ -159,8 +168,8 @@ export function createWindGrass(
     // slight lean variety
     dummy.rotation.x = (Math.random() - 0.5) * 0.15;
     dummy.rotation.z = (Math.random() - 0.5) * 0.12;
-    const sx = 0.65 + Math.random() * 0.7;
-    const sy = 0.75 + Math.random() * 0.85;
+    const sx = 0.95 + Math.random() * 0.85;
+    const sy = 0.9 + Math.random() * 0.95;
     dummy.scale.set(sx, sy, sx);
     dummy.updateMatrix();
     mesh.setMatrixAt(placed++, dummy.matrix);

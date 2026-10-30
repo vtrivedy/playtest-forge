@@ -86,10 +86,10 @@ async function boot() {
   foxActor.group.position.y += foxActor.feetOffset;
 
   const cam = createFollowCamera({
-    fov: 50,
-    distance: 4.1,
-    height: 1.85,
-    lookAtHeight: 0.72,
+    fov: 48,
+    distance: 3.15,
+    height: 1.25,
+    lookAtHeight: 0.55,
     yAt: world.yAt,
   });
   cam.resize(innerWidth, innerHeight);
@@ -209,6 +209,9 @@ async function boot() {
     },
     setFxEnabled(on: boolean) {
       fxEnabled = !!on;
+      post.bloom.strength = on ? 0.1 : 0;
+      wisps.points.visible = on;
+      emberTrail.points.visible = on;
     },
     forceRestore() {
       if (!shrineOn) {

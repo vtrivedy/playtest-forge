@@ -206,8 +206,11 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Wind grass (golden) — sync uSat from ColorField in main
   const grass = createWindGrass(scene, {
-    count: 7200,
+    count: 11000,
     radius: 28,
+    bladeHeight: 0.68,
+    bladeBaseW: 0.1,
+    bladeTipW: 0.012,
     color: 0x8a4e1e,       // rust root (restored)
     tipColor: 0xc9963a,    // muted gold tip
     monoColor: 0x3a3228,   // dark sepia root (readable against parchment ground)
@@ -369,7 +372,7 @@ export async function createWorld(scene: THREE.Scene): Promise<World> {
 
   // Dense fallen-leaf carpet along the critical path
   {
-    const carpetCount = 260;
+    const carpetCount = 420;
     const leafGeo = new THREE.PlaneGeometry(0.22, 0.28);
     const carpetDummy = new THREE.Object3D();
     for (let i = 0; i < carpetCount; i++) {

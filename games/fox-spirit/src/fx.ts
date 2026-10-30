@@ -86,6 +86,7 @@ export function createLeafKick(scene: THREE.Scene, max = 48): LeafKick {
 
 /** Soft circular ember trail — replaces square PointsMaterial sprites. */
 export type EmberTrail = {
+  points: THREE.Points;
   update: (dt: number, fox: THREE.Vector3, intensity?: number) => void;
 };
 
@@ -136,6 +137,7 @@ export function createEmberTrail(scene: THREE.Scene, count = 48): EmberTrail {
   const phases = Float32Array.from({ length: count }, () => Math.random() * Math.PI * 2);
 
   return {
+    points,
     update(dt, fox, intensity = 0.7) {
       t += dt;
       trail.push(fox.clone());

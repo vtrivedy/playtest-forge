@@ -139,7 +139,7 @@ export async function createFox(): Promise<FoxActor> {
     const box = new THREE.Box3().setFromObject(root);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const targetLen = 2.4; // ~1.3× prior — readable at gameplay cam
+    const targetLen = 3.05; // ~1.6× original — hero fills mid-frame
     const s = targetLen / Math.max(size.x, size.y, size.z, 0.001);
     root.scale.setScalar(s);
     box.setFromObject(root);
