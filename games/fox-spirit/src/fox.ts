@@ -59,6 +59,9 @@ function tuneMaterials(root: THREE.Object3D) {
         mat.transparent = true;
         mat.depthWrite = false;
         mat.toneMapped = true;
+        // Flame / glow cards are light, not matter: the shadow pass ignores blend alpha, so they would
+        // stamp full dark quads over the tail and body
+        mesh.castShadow = false;
         if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
         if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
         if (isGlow) {

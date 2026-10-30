@@ -560,13 +560,13 @@ for co, n, w in pick(lambda co, n, w: w.get("Head", 0) > 0.6 and abs(n.x) > 0.6 
     card("tuft", co - n * 0.02, dirn, n, 0.12, 0.2, "cream", topw(w))
 # tail fur locks over the fur half: laid flat along the brush (low splay -> no hedgehog spikes end-on), body
 # burnt orange; they hand over to the fur-to-flame locks below
-for j in range(110):
-    s = 0.05 + 0.55 * (j / 109)
+for j in range(150):
+    s = 0.05 + 0.55 * (j / 149)
     p, tan, w, side, up = frame(s); th = j * 2.39996 + rnd.uniform(-0.3, 0.3)  # golden-angle spiral -> even layering
     off = side * math.cos(th) + up * math.sin(th)
     _, _, w2 = at(min(1.0, s + 0.1))
-    h = (0.4 + 0.26 * smooth(0.05, 0.4, s)) * rnd.uniform(0.85, 1.15)
-    card("tuft", p + off * radius(s) * 0.82, (tan + off * 0.18).normalized(), off, h * 0.58, h, "rusttuft", w, wts_top=w2)
+    h = (0.3 + 0.2 * smooth(0.05, 0.4, s)) * rnd.uniform(0.85, 1.15)  # small, narrow locks: big ones read as flat leaves
+    card("tuft", p + off * radius(s) * 0.86, (tan + off * 0.14).normalized(), off, h * 0.4, h, "rusttuft", w, wts_top=w2)
 def fxb(s): return "FxPlumeA" if s < 0.55 else "FxPlumeB" if s < 0.78 else "FxPlumeC"
 # fur -> flame: translucent locks rooted on the brush over its outer half. Each is dense fur at the root and
 # breaks up into amber flame toward its tip, so the tail dissolves gradually (concept) instead of ending
@@ -613,14 +613,15 @@ for j in range(22):
     fac = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.3, 0.3))).normalized()
     card("fx", pos, Vector((rnd.uniform(-1, 1), rnd.uniform(-0.3, 1), rnd.uniform(-1, 1))), fac, sz, sz * 1.3, FL[j % 3], {"FxPlumeC": 1.0})
 # silhouette flame-licks (concept's wispy fur edges): sparse fur locks whose tips curl like flame, on the
-# cheek ruff, chest bib, shoulders and haunches. Tips ride the ruff / neck FX bones so the edges lick in play.
+# cheek ruff, chest bib and shoulders (no haunch licks: lying flat on the rump they read as paper patches in
+# engine). Tips ride the ruff / neck FX bones so the edges lick in play.
 def licks(cond, n, rect_l, rect_r, size, dirf, fxw):
     for co, nrm, w in pick(cond, n):
         dirn = dirf(co, nrm).normalized()
         h = size * rnd.uniform(0.8, 1.2)
         rect = rect_l if (co.x > 0) == (rnd.random() < 0.7) else rect_r
         wt = topw(w)
-        card("tuft", co - nrm * 0.02, dirn, nrm, h * 0.42, h, rect, wt, wts_top=mixw(wt, fxw(co), 0.6) if fxw(co) else None)
+        card("tuft", co - nrm * 0.02, dirn, nrm, h * 0.42, h, rect, wt, wts_top=mixw(wt, fxw(co), 0.6))
 licks(lambda co, n, w: w.get("Head", 0) > 0.55 and abs(n.x) > 0.55 and co.z < head_c.z - 0.02 and co.y > head_c.y - 0.04, 10,
       "creamlickL", "creamlickR", 0.24, lambda co, n: Vector((math.copysign(0.7, n.x), 0.75, -0.25)),
       lambda co: {"FxCheek.L" if co.x > 0 else "FxCheek.R": 1.0})
@@ -628,8 +629,6 @@ licks(lambda co, n, w: wsum(w, "Neck1", "Torso3") > 0.5 and n.y < -0.45 and n.z 
       "creamlickL", "creamlickR", 0.3, lambda co, n: Vector((n.x * 0.5, -0.25, -1)), lambda co: {"FxBib": 1.0})
 licks(lambda co, n, w: wsum(w, "Torso3", "Neck1") > 0.5 and n.z > 0.55 and abs(n.x) > 0.25, 6,
       "rustlickL", "rustlickR", 0.24, lambda co, n: Vector((n.x * 0.6, 1, 0.45)), lambda co: {"FxNeck": 1.0})
-licks(lambda co, n, w: wsum(w, "BackUpperLeg.L", "BackUpperLeg.R", "BackLeg.L", "BackLeg.R") > 0.4 and n.z > 0.3 and abs(n.x) > 0.45, 8,
-      "rustlickL", "rustlickR", 0.22, lambda co, n: Vector((n.x * 0.5, 1, 0.3)), lambda co: None)
 # ear embers: thin ribbons trailing back off the ear tips, curling over (not upright candles)
 for s in "LR":
     e1, e4 = bh(f"Ear1.{s}"), bt(f"Ear4.{s}")

@@ -129,10 +129,10 @@ tg = np.concatenate([ramp(0.25 + 0.55 * v * aa), np.clip(aa * 0.7, 0, 0.6)[..., 
 Image.fromarray((tg * 255).astype(np.uint8), "RGBA").filter(ImageFilter.GaussianBlur(1.2)).save(f"{OUT}/tail_glow.png", optimize=True)
 
 # --- tail_flame 1024x512 RGBA (+ tail_flame_emit RGB): 4 fur-to-flame locks, 256x512, base = bottom edge.
-# The plume's outer ~45%: dense burnt-orange strands at the root (unlit, matches the tail fur) that thin out,
-# warm to amber and break up into soft flame tongues toward the tip. Emission only where it has become flame.
+# The plume's outer ~45%: dense burnt-orange strands at the root (matches the tail fur) that thin out, warm to
+# amber and break up into soft flame tongues toward the tip. Faint emission in the fur, full where it is flame.
 from PIL import ImageDraw
-FUR = np.array([196, 104, 42], np.float32) / 255
+FUR = np.array([182, 92, 34], np.float32) / 255
 def furflame(w, h, seed, f0, curl):
     rg = random.Random(seed)
     yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
@@ -155,7 +155,7 @@ def furflame(w, h, seed, f0, curl):
     n = vnoise(w, h, 6, 12, seed + 7)[..., None]
     furc = FUR[None, None, :] * (0.82 + 0.3 * n) * (0.9 + 0.2 * fur[..., None])
     col = furc * (1 - k[..., None]) + trgb * k[..., None]
-    emit = col * np.clip(k * 1.15 - 0.1, 0, 1)[..., None]
+    emit = col * np.clip(0.22 + k * 0.95, 0, 1)[..., None]  # faint inner glow in the fur too: the plume core never goes dead brown
     return col, a, emit
 TF = np.zeros((512, 1024, 4), np.float32); TE = np.zeros((512, 1024, 3), np.float32)
 for i in range(4):

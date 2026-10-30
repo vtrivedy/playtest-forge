@@ -60,6 +60,9 @@ export function createEmberTrail(scene: THREE.Scene, count = 48): EmberTrail {
   const anchor = new THREE.Vector3();
   const phases = Float32Array.from({ length: count }, () => Math.random() * Math.PI * 2);
   const rates = Float32Array.from({ length: count }, () => 0.55 + Math.random() * 0.5);
+  // per-ember scatter around the plume tip so a standing fox never stacks them into one additive blob
+  const jx = Float32Array.from({ length: count }, () => (Math.random() - 0.5) * 0.5);
+  const jy = Float32Array.from({ length: count }, () => (Math.random() - 0.5) * 0.3);
   const base = Float32Array.from(colors);
 
   return {
@@ -85,7 +88,7 @@ export function createEmberTrail(scene: THREE.Scene, count = 48): EmberTrail {
       trail.push(anchor.clone());
       if (trail.length > 28) trail.shift();
       mat.opacity = 0.3 + intensity * 0.3;
-      mat.size = 0.1 + intensity * 0.1;
+      mat.size = 0.05 + intensity * 0.05;
       const pos = geo.getAttribute('position') as THREE.BufferAttribute;
       const colAttr = geo.getAttribute('color') as THREE.BufferAttribute;
       for (let i = 0; i < count; i++) {
@@ -95,9 +98,10 @@ export function createEmberTrail(scene: THREE.Scene, count = 48): EmberTrail {
         const back = Math.min(trail.length - 1, Math.floor(life * trail.length));
         const slot = trail[trail.length - 1 - back] ?? anchor;
         const sway = Math.sin(t * 2.2 + ph * 3) * (0.05 + life * 0.12);
-        const wx = slot.x - heading.x * life * 0.35 + heading.z * sway;
-        const wz = slot.z - heading.z * life * 0.35 - heading.x * sway;
-        const wy = slot.y + life * (0.35 + (i % 4) * 0.06) + Math.sin(t * 3.1 + ph) * 0.03;
+        const side = sway + jx[i]! * (0.4 + life);
+        const wx = slot.x - heading.x * life * 0.35 + heading.z * side;
+        const wz = slot.z - heading.z * life * 0.35 - heading.x * side;
+        const wy = slot.y + jy[i]! + life * (0.35 + (i % 4) * 0.06) + Math.sin(t * 3.1 + ph) * 0.03;
         pos.setXYZ(i, wx, wy, wz);
         const fade = (1 - life) * Math.min(1, life * 6) * intensity;
         colAttr.setXYZ(i, base[i * 3]! * fade, base[i * 3 + 1]! * fade, base[i * 3 + 2]! * fade);

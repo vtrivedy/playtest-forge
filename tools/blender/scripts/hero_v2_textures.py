@@ -77,7 +77,7 @@ def tuft(x0, y0, w, h, base, tip, seed, strands=110):
     col.alpha_composite(rgb.filter(ImageFilter.GaussianBlur(0.8)), (x0, y0))
 
 tuft(512, 0, 256, 512, (232, 204, 160), (252, 240, 214), 3)        # warm cream lock (clean, no pink)
-tuft(768, 0, 256, 512, (212, 112, 44), (246, 166, 80), 4)          # burnt-orange lock (body orange) -> warm gold tips
+tuft(768, 0, 256, 512, (188, 94, 36), (210, 118, 48), 4)          # burnt-orange lock: body orange, barely warmer tips (no beige)
 
 def maple(x0, y0, w, seed):
     rnd = random.Random(seed)
@@ -115,8 +115,8 @@ out.save(f"{OUT}/cards_col.png", optimize=True); emi.save(f"{OUT}/cards_emit.png
 # ---------------- tail strip: u around, v along (row 0 = image top = tip in Blender v=1)
 TW, TH = 256, 1024
 tc = Image.new("RGB", (TW, TH)); te = Image.new("RGB", (TW, TH))
-# same burnt orange as the body, brightening toward the flame (no khaki / brown plume)
-TAIL = [(0, (214, 116, 48)), (0.4, (220, 122, 50)), (0.6, (224, 132, 54)), (0.78, (232, 148, 66)), (1, (238, 172, 96))]
+# the body's *rendered* burnt orange (its bake is darkened by streaks + AO; an unbaked match reads pale beige)
+TAIL = [(0, (178, 88, 34)), (0.4, (184, 92, 36)), (0.6, (192, 100, 40)), (0.78, (206, 116, 50)), (1, (216, 134, 66))]
 pc, pe = tc.load(), te.load()
 for y in range(TH):
     v = 1 - y / (TH - 1)
