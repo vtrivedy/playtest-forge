@@ -1,7 +1,7 @@
 """Procedural textures for hero v2 (system python + PIL, deterministic).
 Writes assets/hero/source/v2/{cards_col.png, cards_emit.png, tail_col.png, tail_emit.png, tail_core.png}
-tail v = arc fraction along the tail (0 root .. 1 old tip); fur only exists to ~0.68, then the plume is flame cards.
-cards atlas 1024: [0..512 x 0..1024] 4 flame wisps (128x1024 each... laid as 2x2 of 256x512)
+tail v = arc fraction along the tail (0 root .. 1 old tip); fur core is eroded into flame tongues over ~0.5..0.75, then the plume is fur-to-flame + flame cards.
+cards atlas 1024: [0..512 x 0..1024] 4 silhouette flame-lick locks (rust L/R, cream L/R; 2x2 of 256x512)
                   [512..1024 x 0..512]  2 fur tufts (cream | rust), 256x512 each
                   [512..1024 x 512..1024] 4 maple leaves 256x256
 (pixel coords, y down)."""
@@ -21,46 +21,33 @@ def ramp(stops, t):
         if t <= t1: return lerp(c0, c1, (t - t0) / max(1e-6, t1 - t0))
     return stops[-1][1]
 
-FLAME = [(0, (140, 34, 6)), (0.4, (225, 82, 16)), (0.75, (250, 150, 40)), (1, (255, 205, 110))]
-
-def flame(x0, y0, w, h, seed):
-    """Wispy ember tendrils (smoke-fire ribbons): base at bottom, curling and thinning upward,
-    soft alpha falloff (rendered with alpha BLEND + emissive + bloom)."""
+def lick(x0, y0, w, h, base, tip, seed, curl, strands=90):
+    """Silhouette flame-lick lock: fur strands gathering into one tapered tongue that curls over at the tip
+    (the concept's wispy ruff / ear / shoulder edges). Alpha-clipped fur, warmer tip, no glow."""
     rnd = random.Random(seed)
-    acc = Image.new("L", (w, h), 0); hot = Image.new("L", (w, h), 0)
-    da, dh = ImageDraw.Draw(acc), ImageDraw.Draw(hot)
-    for k in range(rnd.randint(5, 7)):
-        ph = rnd.uniform(0, 6.3); amp = rnd.uniform(0.08, 0.22); fr = rnd.uniform(0.8, 1.8)
-        x = w * (0.5 + rnd.uniform(-0.12, 0.12)); L = rnd.uniform(0.55, 0.98); r0 = w * rnd.uniform(0.05, 0.11)
-        N = 90
-        for i in range(N):
-            t = i / N
-            if t > L: break
-            cx = x + w * amp * math.sin(ph + t * fr * 6.28) * (0.3 + t) + w * 0.12 * math.sin(ph * 2 + t * 2) * t
-            cy = h * (0.98 - t * 0.96)
-            r = r0 * (1 - t / L) ** 0.7 + 1
-            val = int(255 * (1 - (t / L)) ** 0.6)
-            da.ellipse([cx - r, cy - r, cx + r, cy + r], fill=max(val, 0) if val > 0 else 0)
-            if t < L * 0.45:
-                rr = r * 0.45
-                dh.ellipse([cx - rr, cy - rr, cx + rr, cy + rr], fill=int(255 * (1 - t / (L * 0.45))))
-    for k in range(10):  # ember flecks
-        fx, fy, fr_ = rnd.uniform(0.1, 0.9) * w, rnd.uniform(0.05, 0.6) * h, rnd.uniform(2, 5)
-        da.ellipse([fx - fr_, fy - fr_, fx + fr_, fy + fr_], fill=230); dh.ellipse([fx - fr_, fy - fr_, fx + fr_, fy + fr_], fill=200)
-    acc = acc.filter(ImageFilter.GaussianBlur(3)); hot = hot.filter(ImageFilter.GaussianBlur(5))
-    A, Hh = acc.load(), hot.load()
-    layer = Image.new("RGBA", (w, h)); el = Image.new("RGB", (w, h))
-    L_, E_ = layer.load(), el.load()
-    for yy in range(h):
-        for xx in range(w):
-            a_, h_ = A[xx, yy] / 255, Hh[xx, yy] / 255
-            c = ramp(FLAME, 0.15 + 0.6 * a_ + 0.35 * h_)
-            L_[xx, yy] = c + (int(255 * min(1, a_ * 1.4)),)
-            E_[xx, yy] = lerp((0, 0, 0), c, min(1, 0.35 + 0.65 * a_))
-    col.alpha_composite(layer, (x0, y0)); emi.paste(el, (x0, y0), layer.split()[3])
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
+    for s_ in range(strands):
+        u = rnd.uniform(-1, 1)
+        L = h * (0.96 - 0.5 * abs(u) ** 1.1) * rnd.uniform(0.55, 1.0)
+        bw = w * rnd.uniform(0.01, 0.022)
+        pts_l, pts_r = [], []
+        for i in range(30):
+            t = i / 29
+            spread = (1 - t) ** 1.3 * 0.34                       # gathers into a single licking point
+            cx = w / 2 - curl * w * 0.1 + u * w * spread + curl * w * 0.26 * t ** 2.2 + w * 0.04 * math.sin(t * 5 + seed)
+            cy = h - L * t
+            ww = bw * (1 - t) ** 0.7 + 0.6
+            pts_l.append((cx - ww, cy)); pts_r.append((cx + ww, cy))
+        c = lerp(base, tip, min(1, max(0, L / h - 0.35) * 1.4) * rnd.uniform(0.6, 1.0))
+        k_ = rnd.uniform(0.82, 1.08); c = tuple(min(255, int(v * k_)) for v in c)
+        d.polygon(pts_l + pts_r[::-1], fill=c + (255,))
+    col.alpha_composite(layer.filter(ImageFilter.GaussianBlur(0.7)), (x0, y0))
 
-for i in range(4):
-    flame((i % 2) * 256, (i // 2) * 512, 256, 512, 11 + i)
+# [0..512 x 0..1024]: rust lick curling left / right, cream lick left / right (2x2 of 256x512)
+lick(0, 0, 256, 512, (200, 104, 40), (236, 150, 70), 11, -1)
+lick(256, 0, 256, 512, (200, 104, 40), (236, 150, 70), 12, 1)
+lick(0, 512, 256, 512, (232, 206, 164), (248, 228, 190), 13, -1)
+lick(256, 512, 256, 512, (232, 206, 164), (248, 228, 190), 14, 1)
 
 def tuft(x0, y0, w, h, base, tip, seed, strands=110):
     """Soft fur lock: teardrop envelope filled with fine tapered strands that break up at the edge."""
@@ -129,7 +116,7 @@ out.save(f"{OUT}/cards_col.png", optimize=True); emi.save(f"{OUT}/cards_emit.png
 TW, TH = 256, 1024
 tc = Image.new("RGB", (TW, TH)); te = Image.new("RGB", (TW, TH))
 # same burnt orange as the body, brightening toward the flame (no khaki / brown plume)
-TAIL = [(0, (214, 116, 48)), (0.3, (222, 124, 50)), (0.5, (226, 136, 54)), (0.66, (242, 170, 84)), (1, (250, 214, 150))]
+TAIL = [(0, (214, 116, 48)), (0.4, (220, 122, 50)), (0.6, (224, 132, 54)), (0.78, (232, 148, 66)), (1, (238, 172, 96))]
 pc, pe = tc.load(), te.load()
 for y in range(TH):
     v = 1 - y / (TH - 1)
@@ -161,10 +148,10 @@ env = Image.new("L", (TW, TH)); ep = env.load()
 ph = [rnd.uniform(0, 6.3) for _ in range(3)]
 for x in range(TW):
     th = x / TW * 2 * math.pi
-    edge = 0.5 + 0.06 * math.sin(3 * th + ph[0]) + 0.05 * math.sin(7 * th + ph[1]) + 0.03 * math.sin(13 * th + ph[2])
+    edge = 0.62 + 0.06 * math.sin(3 * th + ph[0]) + 0.05 * math.sin(7 * th + ph[1]) + 0.03 * math.sin(13 * th + ph[2])
     for y in range(TH):
         v = 1 - y / (TH - 1)
-        ep[x, y] = int(255 * max(0.0, min(1.0, (edge + 0.12 - v) / 0.24)))
+        ep[x, y] = int(255 * max(0.0, min(1.0, (edge + 0.13 - v) / 0.26)))
 env = env.filter(ImageFilter.GaussianBlur(2))
 core = tc.copy(); core.putalpha(env); core.save(f"{OUT}/tail_core.png", optimize=True)
 tc.putalpha(ImageChops.multiply(am, env))

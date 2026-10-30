@@ -25,15 +25,18 @@ for v in bm.verts:
     n = v.normal; co = v.co
     neck = wsum(w, "Neck1", "Neck2") + 0.7 * w.get("Neck3", 0) + 0.55 * w.get("Torso3", 0)
     push = 0.055 * neck
-    if n.y < 0 or n.z < 0:  # chest bib bulges forward / down (slender, not barrel)
-        push += 0.035 * neck * max(-n.y, -n.z, 0)
+    if n.y < 0 or n.z < 0:  # chest bib bulges forward / down: a deep keel of a chest, not a barrel
+        push += 0.05 * neck * max(-n.y, -n.z, 0)
+    chest = wsum(w, "Torso3", "Neck1") + 0.5 * w.get("Torso2", 0)
+    if n.z < -0.3 and co.y < bh("FrontUpperLeg.L").y + 0.25:
+        push += 0.1 * min(1, chest) * -n.z  # deeper brisket between / ahead of the forelegs
     hw = w.get("Head", 0)
     if hw > 0.3 and abs(n.x) > 0.45 and co.y > head_c.y - 0.05 and co.z < head_c.z + 0.05:
         push += 0.05 * hw * abs(n.x)  # cheek fluff
     if hw > 0.3 and n.z < -0.3 and co.y > head_c.y - 0.12:
         push += 0.045 * hw * -n.z  # full throat under the jaw (no shadow shelf between cheeks and bib)
     belly = wsum(w, "Torso", "Torso2")
-    if n.z < -0.5: push -= 0.035 * belly  # tuck the belly (lean)
+    if n.z < -0.5: push -= 0.012 * belly  # slight belly tuck (lean, but a solid body)
     v.co += n * push
 # longer, sharper snout: stretch everything in front of the eyes forward and taper it
 eye_ids = set(i for p in me.polygons if me.materials[p.material_index].name == "Eyes" for i in p.vertices)
@@ -47,6 +50,11 @@ for v in snout:
     v.co.y = ey - 0.03 - f * 1.42
     v.co.x *= 1 - 0.30 * t
     v.co.z = zc + (v.co.z - zc) * (1 - 0.16 * t)
+# eyes a touch larger (grounded amber, not cute): grow each eye about its centroid
+for sgn in (1, -1):
+    ev = [bm.verts[i] for i in eye_ids if bm.verts[i].co.x * sgn > 0]
+    ec = sum((v.co for v in ev), Vector()) / len(ev)
+    for v in ev: v.co = ec + (v.co - ec) * Vector((1.2, 1.12, 1.22))
 # rounder, bigger paws: spread + push the toes forward, flat sole
 paw_groups = [g for g in gname.values() if "Paw" in g]
 for pg in paw_groups:
@@ -72,7 +80,7 @@ bm.to_mesh(me); bm.free(); me.update()
 # warm burnt orange (yellower than vermilion: ACES + warm fog push it red in engine); sock/paw authored a
 # notch light because the streak * AO bake darkens them (lands near the concept's (102, 62, 38) umber)
 PAL = dict(rust=(210, 116, 46), dorsal=(180, 90, 34), belly=(230, 156, 92), cream=(238, 222, 192),
-           umber=(138, 82, 46), sock=(118, 74, 44), paw=(84, 55, 37), earback=(70, 40, 26), nose=(22, 15, 13),
+           umber=(124, 74, 42), sock=(92, 58, 37), paw=(68, 45, 31), earback=(70, 40, 26), nose=(22, 15, 13),
            amber=(236, 156, 40), pupil=(30, 14, 8), liner=(70, 36, 20), earin=(236, 214, 186))
 mat_names = [m.name for m in me.materials]
 MI = {n: i for i, n in enumerate(mat_names)}
@@ -117,10 +125,10 @@ for v in me.vertices:
     if v.index in grey_vs: c = PAL["sock"]
     # legs: burnt orange to the knee/elbow, then umber -> dark sock -> darkest paws
     if leg > 0.05:
-        top = 1.06 if front_leg >= back_leg else 0.98
-        lt = leg * (1 - smooth(top - 0.18, top + 0.04, co.z))
+        top = 1.1 if front_leg >= back_leg else 1.04
+        lt = leg * (1 - smooth(top - 0.08, top + 0.1, co.z))
         c = mix(c, PAL["umber"], lt)
-        c = mix(c, PAL["sock"], leg * (1 - smooth(top - 0.42, top - 0.14, co.z)))
+        c = mix(c, PAL["sock"], leg * (1 - smooth(top - 0.22, top - 0.02, co.z)))  # dark sock to the elbow / hock
         c = mix(c, PAL["paw"], leg * (1 - smooth(0.06, 0.26, co.z)))
     # ears: dark backs + tips, pale inner
     ear = wsum(w, *[f"Ear{i}.{s}" for i in (1, 2, 3, 4) for s in "LR"])
@@ -333,6 +341,11 @@ tail_c, tcore_c = load("tail_col.png"), load("tail_core.png")
 # tail core: alpha-clipped so the fur ends in flame-tongue shapes (the flame cards take over from there)
 M_TAIL = pbr("FoxTailFur", tcore_c, None, rough=0.85, spec=0.2, alpha_mode="MASK", clip=0.5)
 cards_c = load("cards_col.png")
+tf_c, tf_e = load("tail_flame.png"), load("tail_flame_emit.png")
+# fur-to-flame locks over the plume's outer half: unlit burnt-orange strands at the root, glowing only where
+# they have turned to flame (separate emission map); "wisp" name -> game keeps them soft-emissive
+M_TFLAME = pbr("SpiritWispTailFlame", tf_c, None, emit_img=tf_e, emit_str=1.0, rough=0.85, alpha_mode="BLEND", spec=0.1)
+M_TFLAME.use_backface_culling = False
 M_TUFT = pbr("FoxFurCards", cards_c, None, rough=0.9, alpha_mode="MASK", spec=0.15)
 # spirit FX: names contain "wisp" so the game's tuneMaterials keeps them soft-emissive (not the fur branch)
 fx_c, glow_c, tglow_c = load("spirit_fx.png"), load("fox_glow.png"), load("tail_glow.png")
@@ -404,8 +417,8 @@ def at(s):
             if i + 1 < len(chain) and t > 0.5: w[chain[i + 1]] = 0.5 * (t - 0.5) * 2 * 0.5
             tot = sum(w.values()); return p, tan, {k: x / tot for k, x in w.items()}
         d -= L
-S_FUR = 0.68  # fur tube ends here (alpha-eroded from ~0.36 in flame-tongue shapes, see tail_core.png)
-RPROF = [(0, 0.14), (0.1, 0.25), (0.3, 0.35), (0.46, 0.36), (0.58, 0.29), (0.68, 0.12)]
+S_FUR = 0.8  # fur tube ends here (alpha-eroded over ~0.5..0.75 in flame-tongue shapes, see tail_core.png)
+RPROF = [(0, 0.16), (0.1, 0.3), (0.3, 0.44), (0.5, 0.47), (0.66, 0.4), (0.8, 0.2)]
 def radius(s):
     for (a, ra), (b, rb) in zip(RPROF, RPROF[1:]):
         if s <= b:
@@ -422,7 +435,12 @@ def gidx(o, n):
 # FX flicker bones (keyed per clip in the anim stage: scale/rotation flicker so flames lick in play)
 FX_BONES = {  # name: (parent, head, direction)
     "FxPlumeA": ("Tail4", at(0.4)), "FxPlumeB": ("Tail6", at(0.62)), "FxPlumeC": ("Tail8", at(0.86)),
-    "FxEar.L": ("Ear4.L", None), "FxEar.R": ("Ear4.R", None), "FxNeck": ("Neck2", None)}
+    "FxEar.L": ("Ear4.L", None), "FxEar.R": ("Ear4.R", None), "FxNeck": ("Neck2", None),
+    "FxBib": ("Neck1", None), "FxCheek.L": ("Head", None), "FxCheek.R": ("Head", None)}
+# ruff flicker pivots sit at the ruff itself (chest keel / each cheek), not at the parent bone's tail
+FX_AT = {"FxBib": lambda: (bh("Neck1") + Vector((0, -0.28, -0.32)), Vector((0, -0.3, -1))),
+         "FxCheek.L": lambda: (head_c + Vector((0.2, 0.06, -0.1)), Vector((0.6, 0.7, -0.35))),
+         "FxCheek.R": lambda: (head_c + Vector((-0.2, 0.06, -0.1)), Vector((-0.6, 0.7, -0.35)))}
 bpy.context.view_layer.objects.active = arm
 for o in sc.objects: o.select_set(o is arm)
 bpy.ops.object.mode_set(mode="EDIT")
@@ -431,6 +449,8 @@ for name, (par, sample_) in FX_BONES.items():
     b = EB.new(name)
     if sample_:
         p, tan, _ = sample_; b.head = p; b.tail = p + tan * 0.3
+    elif name in FX_AT:
+        p, d_ = FX_AT[name](); b.head = p; b.tail = p + d_.normalized() * 0.2
     else:
         pb = EB[par]; b.head = pb.tail.copy(); b.tail = pb.tail + (pb.tail - pb.head).normalized() * 0.2
     b.parent = EB[par]; b.use_connect = False; b.use_deform = True; b.roll = 0
@@ -471,7 +491,7 @@ vs_ = [ring_s[min(i // SEG, RINGS)] for i in range(len(tme.vertices))]  # arc fr
 tlen, tflow = [], []
 for v, s_ in zip(tme.vertices, vs_):
     _, tan, _ = at(min(1.0, s_ + 0.03))
-    L = (0.06 + 0.14 * smooth(0.0, 0.4, s_)) * (1 - smooth(0.5, 0.62, s_))  # no shells past the flame line
+    L = (0.06 + 0.15 * smooth(0.0, 0.4, s_)) * (1 - smooth(0.6, 0.74, s_))  # no shells past the flame line
     tlen.append(L)
     t = tan - v.normal * tan.dot(v.normal); tflow.append(t.normalized() if t.length > 1e-4 else Vector())
 tail_shell = shells(tail, tlen, tflow, M_TSHELL, "SpiritFox_TailShell")
@@ -489,7 +509,7 @@ def glow_shell(src, lengths, keep, frac, mat, name):
     for p in o.data.polygons: p.material_index = 0
     return o
 glow_body = glow_shell(fox, furlen, glow, 0.3, M_GLOW, "SpiritFox_Glow")
-glow_tail = glow_shell(tail, tlen, [smooth(0.3, 0.45, s_) for s_ in vs_], 0.3, M_TGLOW, "SpiritFox_TailGlow")
+glow_tail = glow_shell(tail, tlen, [smooth(0.45, 0.6, s_) for s_ in vs_], 0.3, M_TGLOW, "SpiritFox_TailGlow")
 
 # ---------------------------------------------------------------- 7. cards: fur locks, cheek fluff, flame plume, ear curls, flakes
 UV = {  # atlas rects (u0, v0, u1, v1) in Blender UV (v up)
@@ -497,8 +517,10 @@ UV = {  # atlas rects (u0, v0, u1, v1) in Blender UV (v up)
     "plume0": (0.0, 0.5, 0.25, 1.0), "plume1": (0.25, 0.5, 0.5, 1.0), "plume2": (0.5, 0.5, 0.75, 1.0), "plume3": (0.75, 0.5, 1.0, 1.0),
     "curl0": (0.0, 0.0, 0.25, 0.5), "curl1": (0.25, 0.0, 0.5, 0.5),
     "flake0": (0.5, 0.25, 0.75, 0.5), "flake1": (0.75, 0.25, 1.0, 0.5), "flake2": (0.5, 0.0, 0.75, 0.25), "shimmer": (0.75, 0.0, 1.0, 0.25),
+    "rustlickL": (0.0, 0.5, 0.25, 1.0), "rustlickR": (0.25, 0.5, 0.5, 1.0), "creamlickL": (0.0, 0.0, 0.25, 0.5), "creamlickR": (0.25, 0.0, 0.5, 0.5),  # cards_col.png
+    "tf0": (0.0, 0.0, 0.25, 1.0), "tf1": (0.25, 0.0, 0.5, 1.0), "tf2": (0.5, 0.0, 0.75, 1.0), "tf3": (0.75, 0.0, 1.0, 1.0),  # tail_flame.png
 }
-cards = {"tuft": new_obj("SpiritFox_Fur"), "fx": new_obj("SpiritFox_SpiritFX")}
+cards = {"tuft": new_obj("SpiritFox_Fur"), "tflame": new_obj("SpiritFox_TailFlame"), "fx": new_obj("SpiritFox_SpiritFX")}
 cbm = {k: bmesh.new() for k in cards}
 for k, b_ in cbm.items(): b_.loops.layers.uv.new("UVMap"); b_.verts.layers.deform.new()
 def card(kind, base, up, facing, w, h, rect, wts, cross=False, wts_top=None):
@@ -533,54 +555,84 @@ def topw(w):
 for co, n, w in pick(lambda co, n, w: w.get("Head", 0) > 0.6 and abs(n.x) > 0.6 and co.z < head_c.z and co.y > head_c.y - 0.08, 12):
     dirn = (Vector((math.copysign(0.6, n.x), 0.7, -0.35))).normalized()
     card("tuft", co - n * 0.02, dirn, n, 0.12, 0.2, "cream", topw(w))
-# tail fur locks, root third only: laid flat along the plume (low splay -> no hedgehog spikes end-on),
-# all burnt orange (no cream/ash locks; the plume brightens through the flame instead)
-for j in range(90):
-    s = 0.05 + 0.47 * (j / 89)
+# tail fur locks over the fur half: laid flat along the brush (low splay -> no hedgehog spikes end-on), body
+# burnt orange; they hand over to the fur-to-flame locks below
+for j in range(110):
+    s = 0.05 + 0.55 * (j / 109)
     p, tan, w, side, up = frame(s); th = j * 2.39996 + rnd.uniform(-0.3, 0.3)  # golden-angle spiral -> even layering
     off = side * math.cos(th) + up * math.sin(th)
     _, _, w2 = at(min(1.0, s + 0.1))
-    h = (0.36 + 0.22 * smooth(0.05, 0.4, s)) * rnd.uniform(0.85, 1.15)
-    card("tuft", p + off * radius(s) * 0.82, (tan + off * 0.16).normalized(), off, h * 0.55, h, "rusttuft", w, wts_top=w2)
-# flame plume: translucent tongues rooted inside the fur from mid-plume out, streaming along the tail and
-# curling back/up. Layered around the whole circumference (underside too) so the plume volume is kept; tips
-# are skinned to the FX flicker bones. A few broad tongues lean off-axis so the plume still reads as fire
-# from the chase cam (looking down the tail).
-PL = ["plume0", "plume1", "plume2", "plume3"]
+    h = (0.4 + 0.26 * smooth(0.05, 0.4, s)) * rnd.uniform(0.85, 1.15)
+    card("tuft", p + off * radius(s) * 0.82, (tan + off * 0.18).normalized(), off, h * 0.58, h, "rusttuft", w, wts_top=w2)
 def fxb(s): return "FxPlumeA" if s < 0.55 else "FxPlumeB" if s < 0.78 else "FxPlumeC"
-for j in range(54):
-    s = 0.26 + 0.68 * (j / 53) ** 0.9
+# fur -> flame: translucent locks rooted on the brush over its outer half. Each is dense fur at the root and
+# breaks up into amber flame toward its tip, so the tail dissolves gradually (concept) instead of ending
+# in a separate fire jet. Tips flicker on the FX bones.
+TF = ["tf0", "tf1", "tf2", "tf3"]
+for j in range(64):
+    s = 0.4 + 0.42 * (j / 63)
     p, tan, w, side, up = frame(s)
     th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
     off = side * math.cos(th) + up * math.sin(th)
-    k = smooth(0.26, 0.95, s)
-    h = (0.6 + 0.9 * k) * rnd.uniform(0.85, 1.15)
-    wd = h * rnd.uniform(0.5, 0.7)
-    root = p + off * radius(min(s, S_FUR)) * (0.85 - 0.6 * k)  # early tongues sit on the fur, later ones inside
-    lean = (tan * 1.0 + off * (0.14 + 0.1 * k) + up * 0.06).normalized()  # stream back, not a bouquet
-    card("fx", root, lean, off, wd, h, PL[j % 4], w, cross=(j % 3 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.8))
-for j in range(7):  # tip: broader tongues licking up and back, a pale-gold heart (concept: bright, not ash)
-    s = 0.84 + 0.03 * j
-    p, tan, w, side, up = frame(s)
-    lean = (tan * 1.0 + up * (0.12 + 0.03 * j) + side * rnd.uniform(-0.3, 0.3)).normalized()
-    card("fx", p - tan * 0.1, lean, side, 0.75, 1.25 + 0.08 * j, PL[(j + 1) % 4], w, cross=True, wts_top={"FxPlumeC": 1.0})
-# flake embers trailing behind the plume along the motion path (sparse, shrinking with distance)
-FL = ["flake0", "flake1", "flake2"]
-for j in range(18):
-    d = (j + rnd.uniform(0, 1)) / 18
-    s = 0.72 + 0.75 * d
+    k = smooth(0.4, 0.82, s)
+    h = (0.75 + 0.55 * k) * rnd.uniform(0.85, 1.15)
+    root = p + off * radius(min(s, S_FUR)) * (0.8 - 0.35 * k)
+    lean = (tan * 1.0 + off * (0.22 + 0.12 * k) + up * 0.05).normalized()
+    card("tflame", root, lean, off, h * rnd.uniform(0.5, 0.62), h, TF[j % 4], w, cross=(j % 4 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.7))
+# soft flame tongues from the dissolve line out past the old tip: the brush's outer silhouette, amber-rust
+PL = ["plume0", "plume1", "plume2", "plume3"]
+for j in range(56):
+    s = 0.56 + 0.46 * (j / 55) ** 0.9
     p, tan, w, side, up = frame(min(s, 1.0))
     if s > 1: p = p + tan * (s - 1) * total
-    pos = p + up * rnd.uniform(0.15, 0.55 + 0.9 * d) + side * rnd.uniform(-0.35, 0.35) * (0.6 + d) + Vector((0, 0.15 * d, 0.25 * d))
-    sz = rnd.uniform(0.11, 0.17) * (1 - 0.4 * d)
+    th = j * 2.39996 + rnd.uniform(-0.25, 0.25)
+    off = side * math.cos(th) + up * math.sin(th)
+    k = smooth(0.56, 1.0, s)
+    h = (0.85 + 0.65 * k) * rnd.uniform(0.85, 1.15)
+    wd = h * rnd.uniform(0.65, 0.85)
+    root = p + off * radius(min(s, S_FUR)) * (0.75 - 0.5 * k)
+    lean = (tan * 1.0 + off * (0.2 + 0.12 * k) + up * 0.08).normalized()  # stream back and fan, not a bouquet
+    card("fx", root, lean, off, wd, h, PL[j % 4], w, cross=(j % 3 == 0), wts_top=mixw(w, {fxb(s): 1.0}, 0.8))
+for j in range(4):  # tip: a few broad, soft tongues licking up and back (small pale-gold heart in the texture)
+    s = 0.9 + 0.035 * j
+    p, tan, w, side, up = frame(s)
+    lean = (tan * 1.0 + up * (0.16 + 0.04 * j) + side * rnd.uniform(-0.35, 0.35)).normalized()
+    card("fx", p - tan * 0.12, lean, side, 0.7, 1.05 + 0.08 * j, PL[(j + 1) % 4], w, cross=True, wts_top={"FxPlumeC": 1.0})
+# leaf-ember flakes drifting off the plume (sparse, shrinking with distance, scattered up and back)
+FL = ["flake0", "flake1", "flake2"]
+for j in range(22):
+    d = (j + rnd.uniform(0, 1)) / 22
+    s = 0.62 + 0.8 * d
+    p, tan, w, side, up = frame(min(s, 1.0))
+    if s > 1: p = p + tan * (s - 1) * total
+    pos = p + up * rnd.uniform(0.25, 0.6 + 0.9 * d) + side * rnd.uniform(-0.5, 0.5) * (0.7 + d) + Vector((0, 0.15 * d, 0.2 * d))
+    sz = rnd.uniform(0.08, 0.14) * (1 - 0.4 * d)
     fac = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.3, 0.3))).normalized()
     card("fx", pos, Vector((rnd.uniform(-1, 1), rnd.uniform(-0.3, 1), rnd.uniform(-1, 1))), fac, sz, sz * 1.3, FL[j % 3], {"FxPlumeC": 1.0})
+# silhouette flame-licks (concept's wispy fur edges): sparse fur locks whose tips curl like flame, on the
+# cheek ruff, chest bib, shoulders and haunches. Tips ride the ruff / neck FX bones so the edges lick in play.
+def licks(cond, n, rect_l, rect_r, size, dirf, fxw):
+    for co, nrm, w in pick(cond, n):
+        dirn = dirf(co, nrm).normalized()
+        h = size * rnd.uniform(0.8, 1.2)
+        rect = rect_l if (co.x > 0) == (rnd.random() < 0.7) else rect_r
+        wt = topw(w)
+        card("tuft", co - nrm * 0.02, dirn, nrm, h * 0.42, h, rect, wt, wts_top=mixw(wt, fxw(co), 0.6) if fxw(co) else None)
+licks(lambda co, n, w: w.get("Head", 0) > 0.55 and abs(n.x) > 0.55 and co.z < head_c.z - 0.02 and co.y > head_c.y - 0.04, 10,
+      "creamlickL", "creamlickR", 0.24, lambda co, n: Vector((math.copysign(0.7, n.x), 0.75, -0.25)),
+      lambda co: {"FxCheek.L" if co.x > 0 else "FxCheek.R": 1.0})
+licks(lambda co, n, w: wsum(w, "Neck1", "Torso3") > 0.5 and n.y < -0.45 and n.z < 0.2 and abs(co.x) < 0.2 and co.z > 1.15, 14,
+      "creamlickL", "creamlickR", 0.3, lambda co, n: Vector((n.x * 0.5, -0.25, -1)), lambda co: {"FxBib": 1.0})
+licks(lambda co, n, w: wsum(w, "Torso3", "Neck1") > 0.5 and n.z > 0.55 and abs(n.x) > 0.25, 6,
+      "rustlickL", "rustlickR", 0.24, lambda co, n: Vector((n.x * 0.6, 1, 0.45)), lambda co: {"FxNeck": 1.0})
+licks(lambda co, n, w: wsum(w, "BackUpperLeg.L", "BackUpperLeg.R", "BackLeg.L", "BackLeg.R") > 0.4 and n.z > 0.3 and abs(n.x) > 0.45, 8,
+      "rustlickL", "rustlickR", 0.22, lambda co, n: Vector((n.x * 0.5, 1, 0.3)), lambda co: None)
 # ear embers: thin ribbons trailing back off the ear tips, curling over (not upright candles)
 for s in "LR":
     e1, e4 = bh(f"Ear1.{s}"), bt(f"Ear4.{s}")
     d = (e4 - e1).normalized()
     out_ = Vector((1 if s == "L" else -1, 0, 0))
-    for k, (ln, wd, back, rect) in enumerate(((0.46, 0.2, 0.55, "curl0"), (0.34, 0.15, 0.9, "curl1"))):
+    for k, (ln, wd, back, rect) in enumerate(((0.56, 0.28, 1.4, "curl0"), (0.42, 0.2, 2.0, "curl1"))):
         upv = (d + Vector((0, back, 0)) + out_ * 0.1 * k).normalized()  # rise off the tip, sweep back
         card("fx", e4 - d * (0.24 + 0.06 * k), upv, out_, wd, ln, rect, {f"Ear4.{s}": 1.0}, cross=(k == 0), wts_top={f"FxEar.{s}": 1.0})
 # shoulders / nape: two faint heat-shimmer wisps lying back (no flame ridge)
@@ -589,7 +641,7 @@ for j, (x_, t_) in enumerate(((0.07, 0.25), (-0.06, 0.55))):
     card("fx", base, Vector((x_ * 2, 1, 0.75)).normalized(), Vector((1, 0, 0)), 0.32, 0.42, "shimmer", {"Neck1": 0.5, "Neck2": 0.5}, wts_top={"FxNeck": 1.0})
 for k, o in cards.items():
     cbm[k].to_mesh(o.data); cbm[k].free()
-    o.data.materials.append(M_TUFT if k == "tuft" else M_FX)
+    o.data.materials.append({"tuft": M_TUFT, "tflame": M_TFLAME}.get(k, M_FX))
     for p in o.data.polygons: p.use_smooth = False
 for o in (fur_shell, tail_shell, glow_body, glow_tail):
     o.parent = arm
