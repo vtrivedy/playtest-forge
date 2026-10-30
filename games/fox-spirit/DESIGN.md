@@ -61,3 +61,17 @@ Activate the shrine. Gems optional path juice.
 - `node tools/feel-capture.mjs --mode framing|presets|honest|moments|shots|video` → playtest-output/fox-spirit/feel/
   (manual 60 Hz clock; every output labelled UNASSISTED or STAGED)
 - `npm run playtest:fox` → playtest-output/fox-spirit/ (`metrics.json` splits unassisted vs staged)
+
+## Audio — procedural autumn pass
+One WebAudio graph in `src/audio/`: lazy user-gesture unlock, smoothed master volume,
+M mute, visibility suspension, bounded transient voices and seeded noise. No asset requests.
+Pressed ambience is thin wind and hollow low fifths. Permanent ColorField wavefronts
+near the fox crossfade over seconds into warmer wind, leaf rustles, sparse bird/cricket
+calls and a quiet suspended autumn pad. Ignore the fox's own aura (otherwise it would
+always sound restored). Glide air follows movement state; leaf/stone steps follow
+collider surface and speed. Landing uses impact, pickups rise gently within a streak.
+Restoration has one rumble/crackle/chord envelope; existing `play('shrine')` + `swell()`
+coalesce into one cue. Settings are available in the existing tuning panel.
+Verification: shared synthesis functions rendered through browser OfflineAudioContext
+into review WAVs, keyboard traversal, mute/unlock checks, staged restoration, screenshots,
+`window.__game` and audio diagnostics. Do not change movement, camera or visual tuning.

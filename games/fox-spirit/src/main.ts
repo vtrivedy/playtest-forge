@@ -271,6 +271,10 @@ async function boot() {
   fFeel.add(feel, 'glideForward', 4, 12, 0.1).listen();
   fFeel.add(feel, 'dashSpeed', 10, 30, 0.5).listen();
   fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
+  const fAudio = gui.addFolder('Audio');
+  fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume');
+  fAudio.add(audio.settings, 'muted').name('Mute (M)').listen();
+  fAudio.close();
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
   fCam.add(cam.params, 'height', 0.5, 4, 0.05);
@@ -566,6 +570,7 @@ async function boot() {
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         bridge: world.bridgeGrown(),
         restored: shrineOn,
+        audio: audio.debug(),
         auto: {
           active: auto.active,
           idx: auto.idx,
@@ -862,7 +867,7 @@ async function boot() {
           cam.land(impact);
           landT = 0.1 + 0.28 * impact;
           if (impact > 0.75) cam.shake(0.18 * impact);
-          audio.play('footstep');
+          audio.play('land', { strength: impact });
         }
         jumpedThisAir = false;
       }
@@ -1040,7 +1045,13 @@ async function boot() {
       landing: landingValid ? landing : null,
     });
     occlusion.update(rawDt, cam.camera, renderer, feetPos, foxActor.height, fox.rotation.y);
-    audio.update(dt, speed > 1.2, grounded, gliding);
+    // Permanent wavefronts only: the fox's own saturated aura must not keep ambience warm.
+    let audioRestore = colorField.globalColor;
+    for (const region of colorField.restores) {
+      const distance = Math.hypot(fox.position.x - region.center.x, fox.position.z - region.center.z);
+      audioRestore = Math.max(audioRestore, THREE.MathUtils.smoothstep(region.radius - distance, -3, 3));
+    }
+    audio.update(dt, speed > 1.2, grounded, gliding, audioRestore, probe.collider != null && groundBounce <= 1, speed);
   }
   const feetPos = new THREE.Vector3();
   const heroNdc = new THREE.Vector3();
