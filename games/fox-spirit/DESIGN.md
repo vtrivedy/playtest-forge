@@ -257,3 +257,6 @@ Replace the lantern's plain stacked rectangular support with the CC0 Quaternius
 Column asset, scaled to the same 1.9 m support height and collision footprint.
 Keep the lamp, light, checkpoint and all site positions. Batch its fluted shaft,
 base and capital into the existing weathered stone bucket; no parallel old stem.
+
+### World showcase + turn/head correction — 15:15
+Keep the selected controller and constrain its grounded travel to the same turning envelope as the visible fox. Opposed input brakes while the fox pivots, preventing a full-speed sideways stance. Feed the intended look direction into a spring-led head/neck turn; distribute a smaller body bend along the four spine bones and cancel part of terrain pitch at the head. Retain authored clips as the primary pose. Re-shoot20s on real Reedmarsh boardwalk and Windmill Rise approach terrain using the gameplay camera, warm grade, and per-frame state. Staged cuts remain disclosed.
