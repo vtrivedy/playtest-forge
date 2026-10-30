@@ -16,7 +16,7 @@ export const FOX_LOOK = {
   rimStrength: 0.35,
   rimPower: 3.0,
   rimColor: [1.0, 0.45, 0.12] as [number, number, number],
-  eyeGlow: 0.65,
+  eyeGlow: 0.18,
   /** spirit wisps (thin curling flame off the back and tail): height multiplier, brightness, stream-back with speed */
   lickScale: 1.0,
   lickIntensity: 1.0,
@@ -127,16 +127,16 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.color.setHex(0xffffff);
         mat.emissive = new THREE.Color(0xffffff);
         const isGlow = n.includes('glow');
-        mat.emissiveIntensity = isGlow ? 0.35 : Math.min(mat.emissiveIntensity || 0.7, 0.7);
+        mat.emissiveIntensity = isGlow ? 0.3 : Math.min(mat.emissiveIntensity || 0.5, 0.5);
         mat.transparent = true;
         mat.depthWrite = false;
         mesh.castShadow = false;
         // translucent: the brush dissolves into soft flame instead of an opaque fan over the rump
-        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.55 : 0.78);
+        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.5 : 0.68);
         if (isGlow) mat.side = THREE.FrontSide;
       } else if (n.includes('eye')) {
         mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffc060);
+        mat.emissive = new THREE.Color(0xffa040); // faint amber: a watchful glint, not a lamp
         eyeMats.push(mat);
       } else if (n.includes('nose')) {
         mat.color.setHex(0xffffff);
