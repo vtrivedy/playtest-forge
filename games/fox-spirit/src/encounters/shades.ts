@@ -12,7 +12,7 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 
 export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number; noticeDistance: number; noticeTime: number; leafSize: number };
-export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 0.8, invulnerability: 1, debug: false, inkOpacity: 0.16, inkSize: 0.65, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14 };
+export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 2.2, hitRadius: 1.1, knockback: 3, bob: 0.3, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.16, inkSize: 0.65, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14 };
 
 type ShadeActor = {
   active: boolean;
@@ -143,11 +143,11 @@ function inkMaterial(): THREE.ShaderMaterial {
         float cut = mix(0.0, 0.62, 1.0 - smoothstep(0.05, 0.7, vY));
         cut += smoothstep(0.45, 0.95, rim) * 0.24;
         if (n < cut) discard;
-        if (uPresence < 0.999 && vY + (n - 0.5) * 0.5 < (1.0 - uPresence) * 3.9) discard;
+        if (uPresence < 0.999 && vY - (n - 0.5) * 0.3 > uPresence * 3.25) discard;
         // pressed ink: near-black umber core, a thin paper-pale rim like dried wash at the edge
-        vec3 core = vec3(0.0423, 0.0252, 0.016);
-        vec3 edge = vec3(0.065, 0.038, 0.020);
-        vec3 col = mix(core, edge, rim * 0.32 + smoothstep(cut, cut + 0.06, n) * 0.0);
+        vec3 core = vec3(0.018, 0.013, 0.008);
+        vec3 edge = vec3(0.11, 0.095, 0.073);
+        vec3 col = mix(core, edge, smoothstep(0.25, 0.9, rim));
         col = mix(col, edge * 0.8, 1.0 - smoothstep(cut, cut + 0.05, n));
         col = mix(col, vec3(0.055, 0.018, 0.006), rim * n * 0.18);
         float legFade = smoothstep(0.12, 0.9, vY);
@@ -193,7 +193,7 @@ function inkWisps(seed: number) {
         float grain=n3(vec3(q*3.,vPhase*13.+uTime*.2));
         float life=sin(vAge*3.14159265);
         float a=edge*edge*(.35+grain*.65)*life*uOpacity*uPresence;
-        gl_FragColor=vec4(vec3(.026,.016,.008),a);
+        gl_FragColor=vec4(vec3(.08,.065,.045),a);
         #include <colorspace_fragment>
       }`,
     transparent:true,depthWrite:false,depthTest:true,
@@ -207,10 +207,10 @@ function inkWisps(seed: number) {
 function poolMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uRadius: { value: 3 }, uReleased: {value:0}, uReleaseAge: {value:0} },
-    vertexShader: /* glsl */ `attribute float aValid; varying float vValid; varying vec2 vUv; void main() { vValid = aValid; vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    vertexShader: /* glsl */ `attribute float aValid; varying float vValid; varying float vUp; varying vec2 vUv; void main() { vValid = aValid; vUp = abs(normal.y); vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: /* glsl */ `
       uniform float uTime, uPresence, uReleased, uReleaseAge;
-      varying vec2 vUv; varying float vValid;
+      varying vec2 vUv; varying float vValid; varying float vUp;
       ${NOISE}
       void main() {
         vec2 q = vUv - 0.5;
@@ -222,10 +222,10 @@ function poolMaterial(): THREE.ShaderMaterial {
         vec3 color = vec3(0.008, 0.005, 0.003);
         if(uReleased > 0.5){
           float wave = clamp(uReleaseAge/1.4,0.0,1.0);
-          a=(1.0-smoothstep(0.025,0.16,abs(r-wave)))*(1.0-smoothstep(0.7,1.5,uReleaseAge))*.3;
-          color=vec3(.16,.055,.012);
+          a=(1.0-smoothstep(0.025,0.16,abs(r-wave)))*(1.0-smoothstep(0.7,1.5,uReleaseAge))*.5;
+          color=vec3(.3,.12,.025);
         }
-        gl_FragColor = vec4(color, a * smoothstep(0.2, 0.8, vValid));
+        gl_FragColor = vec4(color, a * smoothstep(0.2, 0.8, vValid) * smoothstep(0.55,0.85,vUp));
         #include <colorspace_fragment>
       }`,
     transparent: true,
@@ -296,7 +296,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     const leafSeeds = Array.from({ length: 48 }, (_, k) => {
       const source = geo.attributes.position!;
       const p = new THREE.Vector3().fromBufferAttribute(source, (k * 167 + i * 31) % source.count);
-      return { p, velocity: new THREE.Vector3(Math.sin(k * 2.4) * 0.75, 1.0 + (k % 7) * 0.14, Math.cos(k * 1.7) * 0.75), phase: k * 2.399, landed: null };
+      return { p, velocity: new THREE.Vector3(Math.sin(k * 2.4) * 0.12, 0.8 + (k % 7) * 0.1, Math.cos(k * 1.7) * 0.4), phase: k * 2.399, landed: null };
     });
     const debug = new THREE.Group();
     const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(curve.getPoints(96)), new THREE.LineBasicMaterial({ color: 0xc9a04a }));
@@ -334,9 +334,8 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           for (let k = 0; k < s.leafSeeds.length; k++) {
             const seed = s.leafSeeds[k]!;
             const p = seed.p.clone().applyAxisAngle(THREE.Object3D.DEFAULT_UP, s.heading);
-            p.add(base).addScaledVector(seed.velocity, age);
-            p.x += Math.sin(age * 2 + seed.phase) * age * 0.13;
-            p.z += Math.cos(age * 1.6 + seed.phase) * age * 0.13;
+            p.add(base).addScaledVector(seed.velocity.clone().applyAxisAngle(THREE.Object3D.DEFAULT_UP,s.heading), age);
+            p.add(new THREE.Vector3(Math.sin(age*2+seed.phase)*.14,0,Math.cos(age*1.6+seed.phase)*.22).applyAxisAngle(THREE.Object3D.DEFAULT_UP,s.heading));
             p.y -= age * age * 0.75;
             if (!seed.landed) {
               const floor = groundAt(p.x, p.z, Math.max(base.y + seed.p.y, p.y) + 0.2);
@@ -349,7 +348,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
             const size = tun.leafSize * fade * (0.88 + (k % 5) * 0.06);
             matrix.compose(p, q, new THREE.Vector3(size, size, size));
             s.leaves.setMatrixAt(k, matrix);
-            leafColor.copy(inkColor).lerp(autumnColors[k % 4]!, THREE.MathUtils.smoothstep(age, 0.08 + (k % 4) * 0.04, 0.8));
+            leafColor.copy(inkColor).lerp(autumnColors[k % 4]!, 0.3 + 0.7 * THREE.MathUtils.smoothstep(age, 0.05 + (k % 4) * 0.025, 0.5));
             s.leaves.setColorAt(k, leafColor);
           }
           s.leaves.instanceMatrix.needsUpdate = true;
@@ -407,11 +406,12 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           for (let k=0;k<positions.count;k++) {
             const x=s.pos.x+positions.getX(k)*tun.drainRadius;
             const z=s.pos.z+positions.getZ(k)*tun.drainRadius;
-            const floor=groundAt(x,z,s.pos.y+0.1);
-            const onGround=Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<0.6;
+            const floor=groundAt(x,z,s.pos.y+2);
+            const onGround=Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<2;
             valid.setX(k,onGround?1:0);
             positions.setY(k,onGround?(floor-s.pos.y+0.04)/tun.drainRadius:0);
           }
+          s.pool.geometry.computeVertexNormals();
           positions.needsUpdate=true;
           valid.needsUpdate=true;
           s.poolSampleAt.copy(s.pos);

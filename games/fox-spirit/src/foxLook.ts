@@ -10,10 +10,10 @@ export const FOX_LOOK = {
   furSaturation: 0.85,
   furValue: 0.95,
   /** painterly value strokes (object-space clumps laid along the body) */
-  strokeStrength: 0.18,
+  strokeStrength: 0.25,
   strokeScale: 1.0,
   /** broken amber rim at grazing angles = the spirit glow at the silhouette */
-  rimStrength: 0.6,
+  rimStrength: 0.3,
   rimPower: 2.5,
   rimColor: [1.0, 0.72, 0.42] as [number, number, number], // pale gold: separates the fox from orange ground
   eyeGlow: 0.18,
@@ -182,19 +182,7 @@ export function applyFoxLook(root: THREE.Object3D) {
       const n = (mat.name || mesh.name || '').toLowerCase();
       if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
       if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-      if (n.includes('spiritwisp')) {
-        // authored flame / glow cards: light, not matter (no shadows; the shadow pass ignores blend alpha)
-        mat.color.setHex(0xffffff);
-        mat.emissive = new THREE.Color(0xffffff);
-        const isGlow = n.includes('glow');
-        mat.emissiveIntensity = isGlow ? 0.3 : Math.min(mat.emissiveIntensity || 0.5, 0.5);
-        mat.transparent = true;
-        mat.depthWrite = false;
-        mesh.castShadow = false;
-        // translucent: the brush dissolves into soft flame instead of an opaque fan over the rump
-        mat.opacity = Math.min(mat.opacity ?? 1, isGlow ? 0.12 : n.includes('tailflame') ? 0.24 : 0.32);
-        if (isGlow) mat.side = THREE.FrontSide;
-      } else if (n.includes('eye')) {
+      if (n.includes('eye')) {
         patchEye(mat, mesh.geometry);
         eyeMats.push(mat);
       } else if (n.includes('nose')) {
@@ -219,7 +207,7 @@ export function applyFoxLook(root: THREE.Object3D) {
 // ------------------------------------------------------------------------------------------- spirit fire
 
 type Anchor = { mesh: THREE.SkinnedMesh; index: number };
-type Lick = { a: Anchor; h: number; w: number; seed: number; lean: number };
+type Lick = { a: Anchor; h: number; w: number; seed: number; lean: number; tailFlow: boolean };
 
 /** Surface points whose dominant bone is in `bones` and whose rest normal points up enough. */
 function surfacePoints(mesh: THREE.SkinnedMesh, bones: readonly string[], minUp: number): number[] {
@@ -258,12 +246,12 @@ void main() {
   float curl = sin(y * 6.0 - uTime * 1.2 + vSeed * 2.1) * 0.22 * y;
   curl += sin(y * 11.0 - uTime * 0.8 + vSeed) * 0.065 * y;
   float x = vUv.x - 0.5 + curl;
-  float width = mix(0.16, 0.055, y);
+  float width = mix(0.22, 0.055, y);
   float body = exp(-2.0 * x * x / (width * width));
   body *= smoothstep(0.0, 0.12, y) * (1.0 - smoothstep(0.6, 1.0, y));
   float breathe = 0.2 + 0.8 * pow(0.5 + 0.5 * sin(uTime * 1.1 + vSeed * 3.0), 2.0);
   vec3 col = mix(vec3(1.0, 0.25, 0.055), vec3(1.0, 0.65, 0.28), smoothstep(0.1, 0.85, y)) * 1.5;
-  float a = body * vAlpha * uIntensity * 0.65 * breathe;
+  float a = body * vAlpha * uIntensity * 0.45 * breathe;
   if (a < 0.003) discard;
   gl_FragColor = vec4(col * a, a);
 }`;
@@ -303,11 +291,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const R = FOX_RIG;
   // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — calm at idle: nothing on the ears / head
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
-    [body, [R.spine[3], R.neck[0]], 0.65, 2, 0.16, 0.06, 0.7],
-    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 3, 0.18, 0.06, 0.8],
+    [body, [R.spine[3], R.neck[0]], 0.65, 0, 0.16, 0.06, 0.7],
+    [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 0, 0.18, 0.06, 0.8],
     [tail, R.tail.slice(3), 0.0, 8, 0.34, 0.15, 0.9],
-    [body, R.ear("l").slice(2), -1.0, 1, 0.12, 0.06, 0.4],
-    [body, R.ear("r").slice(2), -1.0, 1, 0.12, 0.06, 0.4],
+    [body, R.ear("l").slice(2), -1.0, 0, 0.12, 0.06, 0.4],
+    [body, R.ear("r").slice(2), -1.0, 0, 0.12, 0.06, 0.4],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
@@ -319,7 +307,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     if (!pts.length) continue;
     for (let i = 0; i < n; i++) {
       const index = pts[Math.floor(rnd() * pts.length)]!;
-      licks.push({ a: { mesh, index }, h: h * (0.7 + 0.6 * rnd()), w: w * (0.8 + 0.4 * rnd()), seed: rnd() * 10, lean });
+      licks.push({ a: { mesh, index }, h: h * (0.7 + 0.6 * rnd()), w: w * (0.8 + 0.4 * rnd()), seed: rnd() * 10, lean, tailFlow: mesh === tail });
     }
     for (let i = 0; i < Math.min(40, pts.length); i++) emberPool.push({ mesh, index: pts[Math.floor(rnd() * pts.length)]! });
   }
@@ -382,7 +370,9 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     licks.forEach((lk, i) => {
       anchorPos(lk.a, tmp);
       aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
-      dir.copy(up).addScaledVector(vel, -L.lickStream * lk.lean * 0.25).normalize();
+      dir.copy(up);
+      if (lk.tailFlow) dir.multiplyScalar(0.7).add(new THREE.Vector3(0, 0, -1).transformDirection(group.matrixWorld).multiplyScalar(0.8));
+      dir.addScaledVector(vel, -L.lickStream * lk.lean * 0.25).normalize();
       aDir.setXYZ(i, dir.x, dir.y, dir.z);
       const flick = 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
       const stretch = 1 + Math.min(1, speed * 0.12) * lk.lean;

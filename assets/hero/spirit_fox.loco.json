@@ -25,24 +25,24 @@
     ],
     "measured": [
       {
-        "meanStanceSpeed": 2.1466552548938327,
-        "stanceSpeedCV": 0.00016750569312354755,
-        "stanceHeightRange": 0.00032539665699005127
+        "meanStanceSpeed": 2.146655387348599,
+        "stanceSpeedCV": 0.00016656929428169343,
+        "stanceHeightRange": 0.0003254711627960205
       },
       {
-        "meanStanceSpeed": 2.1466460161738925,
-        "stanceSpeedCV": 0.00016989406413300278,
-        "stanceHeightRange": 0.00032836198806762695
+        "meanStanceSpeed": 2.14664445983039,
+        "stanceSpeedCV": 0.0001701039052845066,
+        "stanceHeightRange": 0.00032819807529449463
       },
       {
-        "meanStanceSpeed": 2.1460313267178006,
-        "stanceSpeedCV": 0.0006384283415938849,
-        "stanceHeightRange": 0.00045621395111083984
+        "meanStanceSpeed": 2.146030002170139,
+        "stanceSpeedCV": 0.0006375408471935847,
+        "stanceHeightRange": 0.00045599043369293213
       },
       {
-        "meanStanceSpeed": 2.1459860271877713,
-        "stanceSpeedCV": 0.0006185868894252264,
-        "stanceHeightRange": 0.00045700371265411377
+        "meanStanceSpeed": 2.145987616644965,
+        "stanceSpeedCV": 0.0006194857119525899,
+        "stanceHeightRange": 0.0004565715789794922
       }
     ]
   },
@@ -72,24 +72,24 @@
     ],
     "measured": [
       {
-        "meanStanceSpeed": 6.018539406359196,
-        "stanceSpeedCV": 0.0002779796359323567,
-        "stanceHeightRange": 0.0006959438323974609
+        "meanStanceSpeed": 6.018538549542427,
+        "stanceSpeedCV": 0.00027785584889313735,
+        "stanceHeightRange": 0.0006962567567825317
       },
       {
-        "meanStanceSpeed": 6.018598526716232,
-        "stanceSpeedCV": 0.00027413491539673876,
-        "stanceHeightRange": 0.000713646411895752
+        "meanStanceSpeed": 6.018598675727844,
+        "stanceSpeedCV": 0.00027405212244186464,
+        "stanceHeightRange": 0.0007134228944778442
       },
       {
-        "meanStanceSpeed": 6.017900854349136,
-        "stanceSpeedCV": 0.0006511256951897113,
-        "stanceHeightRange": 0.0007338374853134155
+        "meanStanceSpeed": 6.01790115237236,
+        "stanceSpeedCV": 0.0006509662010144005,
+        "stanceHeightRange": 0.0007340162992477417
       },
       {
-        "meanStanceSpeed": 6.017496436834335,
-        "stanceSpeedCV": 0.0006500685614702815,
-        "stanceHeightRange": 0.0007574707269668579
+        "meanStanceSpeed": 6.01749375462532,
+        "stanceSpeedCV": 0.0006503188190235484,
+        "stanceHeightRange": 0.0007575750350952148
       }
     ]
   },
@@ -119,24 +119,24 @@
     ],
     "measured": [
       {
-        "meanStanceSpeed": 13.053560368716717,
-        "stanceSpeedCV": 1.4948426961965414e-06,
-        "stanceHeightRange": 1.043081283569336e-06
+        "meanStanceSpeed": 13.053561057895422,
+        "stanceSpeedCV": 1.8882724425747688e-06,
+        "stanceHeightRange": 7.897615432739258e-07
       },
       {
-        "meanStanceSpeed": 13.053556010127068,
-        "stanceSpeedCV": 1.157932211898686e-06,
-        "stanceHeightRange": 1.087784767150879e-06
+        "meanStanceSpeed": 13.053557276725769,
+        "stanceSpeedCV": 1.1748440443920906e-06,
+        "stanceHeightRange": 1.341104507446289e-06
       },
       {
-        "meanStanceSpeed": 13.05224597454071,
-        "stanceSpeedCV": 0.0010035415599051137,
-        "stanceHeightRange": 0.004304870963096619
+        "meanStanceSpeed": 13.052246740886144,
+        "stanceSpeedCV": 0.0010015840656003726,
+        "stanceHeightRange": 0.004304878413677216
       },
       {
-        "meanStanceSpeed": 13.057528138160706,
-        "stanceSpeedCV": 7.037390786457533e-05,
-        "stanceHeightRange": 0.00010789930820465088
+        "meanStanceSpeed": 13.057533247130257,
+        "stanceSpeedCV": 7.015225285426194e-05,
+        "stanceHeightRange": 0.00010798871517181396
       }
     ]
   }

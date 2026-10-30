@@ -1,6 +1,6 @@
 # World 2 — Ashwater Reach
 
-Status: design → first playable graybox. Owner: levels-sol, sprint 2.
+Status: playable graybox / reversible-water revision, visual review in progress. Owner: levels-sol, sprint 2.
 
 ## Quick reference
 
@@ -8,7 +8,7 @@ Status: design → first playable graybox. Owner: levels-sol, sprint 2.
 - Type: exploration / environmental puzzle / waterborne traversal.
 - Play time: first slice 3–4 min; full realm target 12–15 min. Difficulty 4/10.
 - Prerequisite: World 1 Wellspring flood; existing move, jump/hold glide, dash. No extra input.
-- Art: sepia, copper water, umber timber, burnt rust reeds, soft late light. This continues the locked autumn palette; the earlier Frost realm proposal remains deferred.
+- Art: still dark teal-umber mirror water, low mist, half-submerged rust maples, cool shadow and warm copper rim light. This continues the locked autumn palette; the earlier Frost realm proposal remains deferred.
 
 ## Questions answered and choice
 
@@ -40,9 +40,9 @@ W1 summit [S] == east causeway == [G] flood-open arch
 
 1. After the valley flood, an east-facing arch opens onto a broad causeway. The bell tower and its suspended ferry are visible through it. Continuous permanent collision connects back to W1; no scene reload or teleport.
 2. Arrival shelf previews a raft resting on its dry cradle 6 m below the shrine ledge. Descend a permanent stair to the spout. A visible stone flume joins source to basin.
-3. Color the frozen source by running beside it or dashing through it. A front travels along the flume; only arriving water fills the basin. Water raises the ferry gradually, up to 6 m. Standing still beside the source is valid; a dash gives time to board.
+3. Color the frozen source by running beside it or dashing through it. A front travels along the flume; only arriving water fills the basin. Water raises three timber bodies together by6m in2.5s after arrival. Dash supplies the source long enough to board; running the bank and timing the returning front remain valid.
 4. Board the ferry from its cradle. Ride the height, then step/jump to the shrine ledge. Misses land on basin stone, not an invisible hazard.
-5. The basin's water level feeds the bell shrine for 2 s at the upper notch. It latches: source flows forever, ferry stays raised, and an onward orchard path becomes a permanent route. The shrine is fed by water, never by fox proximity.
+5. The basin's water level feeds the bell shrine for2s at the upper notch. It latches: the source flows forever. Dash a linked sluice handle on either bank or bell ledge to switch LOW/HIGH at any time; restoration preserves this choice. HIGH connects floating timbers; LOW reveals the sunken lane and steam shortcut. The shrine is fed by water, never by fox proximity.
 
 ### Optional paths / reasons to explore
 
@@ -57,13 +57,13 @@ W1 summit [S] == east causeway == [G] flood-open arch
 
 | ID | Location | Pre-restore | Permanent verb | Traversal | Teach ≤30 s? |
 |---|---|---|---|---|---|
-| Reach bell | Basin upper notch | Frozen source, grounded ferry | Water fills basin forever; raised ferry becomes bridge | Moving water adds elevation, then a permanent route | Target: source/front/raft visible in one frame |
+| Reach bell | Basin upper notch | Frozen source, grounded ferry | Source remains supplied; sluice controls whether basin fills or drains | Choosing LOW/HIGH alternates a sunken route and a floating route | Target: source/front/raft visible in one frame |
 
 **Twist: buoyancy.** Fill is stored output, not a new color source. The basin receives the water front and its tail using existing water timing. If supply ends, warn for ≥0.8 s before draining. If occupied, retain the ferry at its current height until the fox lands on stable ground; retained height never fills the shrine seal. Do not add elemental conduction or let a retained platform simulate active water.
 
 ## Encounter
 
-One Shade patrols the spout's upstream bank. Its drain can stop fresh input, but water already in transit continues to arrive. Dash through the source leaves a strong stroke; dash through the Shade removes the interruption. First slice may ship without the Shade until the moving-platform contract is verified; the core solve must not require a kill.
+One Shade drinks from the basin on an authored patrol. While present it opposes filling; dash through it frees the animal. A boarding dash can both reach the timber and free it. No kill or extra attack input is required; timing supply around its pass is valid. Water already in transit continues arriving.
 
 ## Pacing
 
@@ -80,7 +80,7 @@ The bell tower is a single tall silhouette in a horizontal wetland. Lighter flum
 
 ## Scope and acceptance
 
-First slice only: causeway + flood gate, source/front, one rising ferry, one water-fed shrine, safe return and one niche. Full two-basin routing and orchard expansion are later work, not claimed as shipped.
+First slice only: causeway + flood gate, source/front, one rising ferry, one water-fed shrine, safe return and one niche. Reversible LOW/HIGH, three timber bodies, the basin Shade, and the low-water steam shortcut are part of this slice. Full two-basin routing and larger orchard expansion remain later work.
 
 - [ ] DESIGN.md updated before game code.
 - [ ] Real input from W1 summit reaches first slice with no teleport.
@@ -105,3 +105,5 @@ This supersedes the one-way ferry ending above. The shrine makes the source perm
 - **Reveal:** the bell ledge looks across a second aqueduct to a lower orchard islet; the first slice ends in a reachable place with another view, not a door to future content.
 
 Acceptance now includes one arrival frame showing source, bell and a low-only destination; three visible buoyant bodies rising; `__game.reach.level`; HIGH→LOW→HIGH real dash input, a low-lane traversal / shortcut, and a recovery checkpoint within10s of a boarding miss. Retaining an occupied float never counts as water at the shrine inlet.
+
+Closing the sluice for HIGH sends water down the short flume again: a1.8s transit delay before the2.5s rise gives the fox time to board after restoration. LOW drains in1.67s after its1s warning. This keeps the ferry re-boardable after a fall; the source-bank checkpoint avoids replaying the long causeway.
