@@ -36,7 +36,7 @@ import {
 import { stoneTextures, rockTextures, barkTextures, groundTextures, leafAtlas } from './russetTextures';
 import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
-import { loadNatureKit, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
+import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 
 /**
  * Russetvale — World 1 realm (docs/design/world-1.md §2).
@@ -243,6 +243,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   M.rock.color.setScalar(1.25);
   M.rock.normalScale.set(1.1, 1.1);
   for (const m of [M.leaf, M.litter]) leafCutout(m, atlas);
+  for (const m of [M.leaf, M.reed]) nearCameraFade(m);
+  stoneWeathering(M.stone, new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg'));
   groundBlend(M.terrain, groundTex);
   groundBlend(M.ground, groundTex);
   const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
@@ -273,7 +275,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       }
     }
     const [hue, hue2] = TREE_HUES[ci % TREE_HUES.length]!;
-    nature.place(v, x, y - 0.15, z, { yaw, scale, hue, hue2, bark: new THREE.Color(0.95, 0.85, 0.78), avoid: o.avoid, cast: o.cast });
+    nature.place(v, x, y - 0.15, z, { yaw, scale, hue, hue2, bark: new THREE.Color(0.95, 0.85, 0.78), avoid: o.avoid, cast: o.cast, gaps: 0.3 });
     if (o.collide !== false) col.add(cylCollider({ x, z, r: nature.trunkR(v) * scale + 0.15, top: y + h * 0.5, bottom: y - 1, tag: 'trunk' }));
   };
 
@@ -1503,7 +1505,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
   // stairs down the summit's front (key art: stair flight to the shrine)
   // lone maple (the key-art tree over the shrine stair) — keeps a faint russet before the flood, flares after
-  const loneMesh = nature.standalone('twisted_4', 8.5, 37.8, -92.5, { name: 'rv-lone-maple', yaw: 2.3, scale: 0.9, hue: PAL.maple, hue2: PAL.amber, bark: new THREE.Color(0.9, 0.8, 0.72) });
+  const loneMesh = nature.standalone('twisted_4', 8.5, 37.8, -92.5, { name: 'rv-lone-maple', yaw: 2.3, scale: 0.9, gaps: 0.36, hue: PAL.maple, hue2: PAL.amber, bark: new THREE.Color(0.9, 0.8, 0.72) });
   col.add(cylCollider({ x: 8.5, z: -92.5, r: nature.trunkR('twisted_4') * 0.9 + 0.2, top: 46, bottom: 37, tag: 'lone-trunk' }));
   group.add(loneMesh);
   const loneCol = loneMesh.geometry.getAttribute('color') as THREE.BufferAttribute;
@@ -1817,6 +1819,22 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         });
       }
     }
+    // open ground between the clumps: dry tussock drifts and loose stones break up the plane
+    for (let i = 0; i < 1400; i++) {
+      const x = (lr() * 2 - 1) * 128;
+      const z = (lr() * 2 - 1) * 100;
+      if (!insideIsland(x, z, 4) || routeNear(route, x, z, 1.6) || marshE(x, z) < 1.05) continue;
+      if (Math.hypot(x - POND.x, (z - POND.z) * 1.6) < 16 || Math.hypot(x, z + 58) < 17 || (z < -66 && Math.abs(x) < 24)) continue;
+      const g = groundAtCover(x, z);
+      if (!Number.isFinite(g) || Math.abs(g - groundRaw(x, z)) > 0.3) continue;
+      const tuft = fbm3(x * 0.07 + 3.1, 2.2, z * 0.07, 2);
+      if (tuft > 0.52 && lr() < 0.8) {
+        plant(x, g, z, 0.2 + lr() * 0.4, shrubHues[0]!, 0.86 + lr() * 0.14);
+      } else if (lr() < 0.25) {
+        const rr = 0.08 + lr() * lr() * 0.35;
+        boulder(bk('rock', x, z, false), x, g - rr * 0.35, z, rr, 4000 + i, 0.55);
+      }
+    }
     // red thickets: dense bush masses banked against tree roots and the meadow's edges
     // (the key art's flaming foreground; the 10 % accent once restored)
     {
@@ -1935,6 +1953,23 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         ruinColumn(sb, x + rad * 0.1, y + rad * 0.1, z - rad * 0.35, 2 + sr() * 5, 970 + i, 0.55);
       }
       kitTree(x + rad * 0.3, y + rad * 0.08, z - rad * 0.3, 7 + sr() * 5, i, 1200 + i, { cast: false, collide: false });
+      // overgrown cap: red leaf-carpet, bracken and tussocks spilling toward the rim
+      for (let k = 0; k < 10 + Math.floor(rad); k++) {
+        const th = sr() * Math.PI * 2;
+        const d = 0.25 + sr() * 0.65;
+        const R = outl(th) * d;
+        const py = y + (1 - d * d) * rad * 0.12 + 0.1;
+        const kind = sr();
+        const v = kind < 0.55 ? 'bush_red' : kind < 0.8 ? 'fern' : 'grass_wispy';
+        nature.place(v, x + Math.cos(th) * R, py - 0.1, z + Math.sin(th) * R, {
+          yaw: sr() * 6.28,
+          scale: v === 'bush_red' ? 1 + sr() * 1.2 : v === 'fern' ? 0.12 + sr() * 0.1 : 1 + sr(),
+          squash: v === 'bush_red' ? 0.5 : 1,
+          hue: [PAL.maple, PAL.russet, PAL.amber, PAL.crimson][k % 4]!,
+          hue2: PAL.copper,
+          cast: false,
+        });
+      }
       for (const [bb, mat] of [[ob, M.rock], [sb, M.stone], [lb, M.leaf], [bkb, M.bark]] as const) {
         const m = bb.toMesh(mat, { cast: false, receive: false, boxUV: mat === M.rock ? 4 : mat === M.stone ? 1.6 : mat === M.bark ? 2 : undefined });
         if (m) group.add(m);
@@ -2191,6 +2226,55 @@ function leafCutout(mat: THREE.MeshStandardMaterial, atlas: THREE.Texture): void
 }
 
 /**
+ * Masonry weathering: a CC0 rock scan (ambientCG Rock035) as a value-only detail layer, lichen and
+ * moss pooled on up-facing ledges and block tops, and soot/rain streaks down vertical faces, so
+ * ruins read as old stone rather than clean stacked boxes. Hue still comes from the vertex palette.
+ */
+function stoneWeathering(mat: THREE.MeshStandardMaterial, detail: THREE.Texture): void {
+  detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
+  detail.colorSpace = THREE.SRGBColorSpace;
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = (shader, renderer) => {
+    prev.call(mat, shader, renderer);
+    shader.uniforms.uStoneDetail = { value: detail };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vSWPos;
+        varying vec3 vSWN;`)
+      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
+        vSWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vSWN = normalize(mat3(modelMatrix) * objectNormal);`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+        uniform sampler2D uStoneDetail;
+        varying vec3 vSWPos;
+        varying vec3 vSWN;
+        float swHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
+        float swNoise(vec2 p) {
+          vec2 i = floor(p); vec2 f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+          return mix(mix(swHash(i), swHash(i + vec2(1, 0)), u.x), mix(swHash(i + vec2(0, 1)), swHash(i + vec2(1, 1)), u.x), u.y);
+        }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          vec3 swN = normalize(vSWN);
+          float swL = dot(texture2D(uStoneDetail, vMapUv * 0.37).rgb, vec3(0.3, 0.59, 0.11));
+          diffuseColor.rgb *= mix(1.0, clamp(swL * 2.2, 0.4, 1.5), 0.8);
+          // rust/ochre lichen blooms on the faces, darker damp seams between them
+          float swLi = swNoise(vSWPos.xz * 1.3 + vSWPos.y * 0.9) * 0.6 + swNoise(vec2(vSWPos.x - vSWPos.z, vSWPos.y) * 4.0) * 0.4;
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.58, 0.4, 0.2) * (0.8 + 0.4 * swL), smoothstep(0.58, 0.75, swLi) * 0.55);
+          diffuseColor.rgb *= 1.0 - smoothstep(0.32, 0.18, swLi) * 0.25;
+          float swUp = smoothstep(0.4, 0.85, swN.y);
+          float swM = smoothstep(0.4, 0.68, swNoise(vSWPos.xz * 0.8 + vSWPos.y * 0.37) * 0.7 + swNoise(vSWPos.xz * 3.1) * 0.3);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.34, 0.31, 0.15) * (0.75 + 0.5 * swL), swUp * swM * 0.8);
+          float swV = 1.0 - abs(swN.y);
+          float swS = swNoise(vec2((vSWPos.x + vSWPos.z) * 1.9, vSWPos.y * 0.16));
+          diffuseColor.rgb *= 1.0 - swV * smoothstep(0.45, 0.85, swS) * 0.38;
+        }`);
+  };
+  mat.needsUpdate = true;
+}
+
+/**
  * Ground = packed soil (tinted by vertex colour) with a litter layer on top. The leaf
  * texture's alpha is a per-leaf rank: a leaf shows only where rank > 1 − leafiness, so
  * worn paths thin out leaf by leaf into drifts. Leaves take their own autumn hue from
@@ -2243,7 +2327,13 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
         gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.70, 0.20, 0.12) : vec3(0.66, 0.27, 0.12), smoothstep(0.58, 0.74, gReg) * gTake);
         gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.76, 0.60, 0.29) : vec3(0.82, 0.50, 0.17), smoothstep(0.42, 0.28, gReg) * gTake);
         vec3 gLeafCol = gLeaf.rgb * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
-        diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);`);
+        diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);
+        // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of
+        // dry olive-gold grass where the litter thins, so open ground never reads as one plane
+        float gMac = gNoise(vGPos.xz * 0.045 + 21.0) * 0.65 + gNoise(vGPos.xz * 0.13 + 5.0) * 0.35;
+        diffuseColor.rgb *= mix(vec3(0.6, 0.56, 0.52), vec3(1.18, 1.08, 0.86), smoothstep(0.2, 0.8, gMac));
+        float gGrass = smoothstep(0.52, 0.72, gNoise(vGPos.xz * 0.06 + 40.0)) * (1.0 - gVis);
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.2, 1.12, 0.62) + vec3(0.05, 0.045, 0.0), gGrass * 0.7);`);
   };
   mat.needsUpdate = true;
 }

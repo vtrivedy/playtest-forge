@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { rng } from './russetKit';
+import { rng, vnoise3 } from './russetKit';
 
 /**
  * CC0 Quaternius Stylized Nature MegaKit pieces (assets/env/quaternius/nature.glb), restyled
@@ -32,6 +32,8 @@ type Variant = { parts: Part[]; height: number; trunkR: number };
 export type PlaceOpts = {
   yaw?: number;
   scale?: number;
+  /** fraction of the crown opened into coherent gaps (0 = as authored) */
+  gaps?: number;
   /** vertical squash (ground-hugging masses) */
   squash?: number;
   /** foliage base hue; per-clump jitter between `hue` and `hue2` */
@@ -55,6 +57,31 @@ export type NatureKit = {
 };
 
 const CELL = 64;
+
+/**
+ * Foliage that reaches into the near camera plane (reeds, bush cards, low branches) dissolves
+ * with an ordered dither instead of filling the screen with one flat blade.
+ */
+export function nearCameraFade(mat: THREE.Material, near = 0.7, far = 2.2): void {
+  const prev = mat.onBeforeCompile;
+  const prevKey = mat.customProgramCacheKey();
+  mat.onBeforeCompile = (shader, renderer) => {
+    prev.call(mat, shader, renderer);
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <clipping_planes_fragment>',
+      `#include <clipping_planes_fragment>
+      {
+        vec2 ncP = mod(floor(gl_FragCoord.xy), 4.0);
+        vec2 ncLo = mod(ncP, 2.0);
+        vec2 ncHi = floor(ncP * 0.5);
+        float ncB = (4.0 * mod(2.0 * ncLo.x + 3.0 * ncLo.y, 4.0) + mod(2.0 * ncHi.x + 3.0 * ncHi.y, 4.0) + 0.5) / 16.0;
+        if (ncB > smoothstep(${near.toFixed(2)}, ${far.toFixed(2)}, vViewPosition.z)) discard;
+      }`,
+    );
+  };
+  mat.customProgramCacheKey = () => `${prevKey}|near-fade`;
+  mat.needsUpdate = true;
+}
 
 /** Sun-backlit foliage: light through thin leaves facing away from the camera toward the sun. */
 function foliageShader(mat: THREE.MeshStandardMaterial, o: { translucency: number; texMix: number }): void {
@@ -163,6 +190,7 @@ export async function loadNatureKit(): Promise<NatureKit> {
     });
     foliageShader(m, { translucency: src.name === 'Leaves' || src.name === 'Grass' ? 0.3 : 0.5, texMix: src.name === 'Leaves' ? 0.6 : src.name === 'Grass' ? 0 : 0.3 });
     m.userData.src = src;
+    nearCameraFade(m);
     return m;
   };
   // our materials, keyed by source material name
@@ -242,10 +270,15 @@ export async function loadNatureKit(): Promise<NatureKit> {
   const matrixFor = (x: number, y: number, z: number, yaw = 0, s = 1, squash = 1) =>
     m4.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(Y, yaw), new THREE.Vector3(s, s * squash, s));
 
-  const keepTris = (geo: THREE.BufferGeometry, avoid: PlaceOpts['avoid']): number[] | null => {
+  /**
+   * Foliage triangles to keep: outside every avoid sphere and, when `gaps` > 0, outside coherent
+   * noise holes (~`gaps` of the crown) so crowns layer into separate masses with sky and
+   * branches showing through instead of one solid puff.
+   */
+  const keepTris = (geo: THREE.BufferGeometry, avoid: PlaceOpts['avoid'], gaps = 0, seed = 0, freq = 0.45): number[] | null => {
     const idx = geo.getIndex();
     const pos = geo.getAttribute('position');
-    if (!idx || !avoid?.length) return null;
+    if (!idx || (!avoid?.length && gaps <= 0)) return null;
     const keep: number[] = [];
     for (let t = 0; t < idx.count; t += 3) {
       const a = idx.getX(t);
@@ -256,7 +289,8 @@ export async function loadNatureKit(): Promise<NatureKit> {
         (pos.getY(a) + pos.getY(b) + pos.getY(d)) / 3,
         (pos.getZ(a) + pos.getZ(b) + pos.getZ(d)) / 3,
       );
-      if (!avoid.some((s) => tmp.distanceTo(new THREE.Vector3(s.x, s.y, s.z)) < s.r)) keep.push(a, b, d);
+      if (gaps > 0 && vnoise3(tmp.x * freq + seed, tmp.y * freq * 1.3, tmp.z * freq - seed) < gaps) continue;
+      if (!avoid?.some((s) => tmp.distanceTo(new THREE.Vector3(s.x, s.y, s.z)) < s.r)) keep.push(a, b, d);
     }
     return keep;
   };
@@ -322,7 +356,7 @@ export async function loadNatureKit(): Promise<NatureKit> {
         }
         g.setAttribute('color', new THREE.BufferAttribute(col, 3));
         if (part.mat.userData.foliage) {
-          const keep = keepTris(g, o.avoid);
+          const keep = keepTris(g, o.avoid, o.gaps ?? 0, r() * 100, 0.45 / (o.scale ?? 1));
           if (keep) g.setIndex(keep);
         }
         const cast = o.cast ?? true;

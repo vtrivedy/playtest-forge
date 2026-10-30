@@ -231,6 +231,8 @@ async function boot() {
     enableGTAO: quality.gtao,
     bloom: quality.bloom,
     smaa: quality.smaa,
+    // soft brush-dab finish toward the key art's painted look (GPU tiers only)
+    painterly: quality.bloom ? 0.55 : 0,
     pixelRatio: renderer.getPixelRatio(),
   });
 
@@ -403,6 +405,7 @@ async function boot() {
   fLook.add(post.params, 'highlightCap', 1, 6, 0.05);
   fLook.add(post.params, 'vignette', 0, 1, 0.01);
   fLook.add(post.params, 'grain', 0, 0.05, 0.001);
+  fLook.add(post.params, 'painterly', 0, 1, 0.01);
   fLook.add(fog, 'density', 0, 0.012, 0.0001).name('fog').onChange(() => syncFog(scene, fog));
   for (const k of ['sepia', 'restored'] as const) {
     const f = fLook.addFolder(`grade ${k}`);
