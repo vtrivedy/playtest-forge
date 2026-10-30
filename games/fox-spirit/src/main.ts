@@ -371,7 +371,7 @@ async function boot() {
   const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
   // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
   let frontFxT = 0;
-  const growth = createGrowth(scene, world.rootSpots, [], world.collision, {
+  const growth = createGrowth(scene, world.rootSpots, world.padSpots, world.collision, {
     gui,
     onIgnite: (r) => {
       const byDash = r.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);

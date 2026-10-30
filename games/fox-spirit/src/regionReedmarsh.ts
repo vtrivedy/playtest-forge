@@ -95,8 +95,9 @@ export function createReedmarshRegion(
   for (const [x, z, h] of [[106, 42, 3.6], [114, 42, 2.7], [106, 37, 1.8], [114, 37, 3.2]]) ruinColumn(stone, x!, -6, z!, h!, 1000 + x! + z!, 0.5);
   const stoneMesh = stone.toMesh(stoneMaterial, { boxUV: 3 });
   if (stoneMesh) { stoneMesh.name = 'Reed recovery and sunken ruin'; parent.add(stoneMesh); }
+  let restored = false;
   return {
-    restore() { for (const c of routeColliders) c.enabled = true; if (causewayMesh) causewayMesh.visible = true; },
+    restore() { if (restored) return; restored = true; for (const c of routeColliders) c.enabled = true; if (causewayMesh) causewayMesh.visible = true; },
     causeway,
     ruinPage: new THREE.Vector3(110, -5.9, 42),
   };

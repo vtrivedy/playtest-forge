@@ -83,3 +83,6 @@ wonder/challenge: spill discovery 3 → wash crossing 4 → marsh pause 2
 - [ ] Show far landmark before/after plus source/front/basin screenshots; inspect every image, fix named failures and retest.
 - [x] No orb threshold; restoration opens a physical way to the hill.
 - [ ] Fresh-player explanation of why color stayed remains unassessed until observed.
+
+## Tower approach repair (Reed ownership15:30)
+The near aqueduct stair from(91,10) to(94.5,16.1) crosses the earlier island-entry stair at(92.4,12.6), presenting its four-metre side to the incoming fox. Move the aqueduct stair to the east side: (98.5,10)y2→(96,16.1)y6, ten0.4m risers. Island-entry(90,15)→(92.4,12.6)y2 stays. Route first onto the island basin, around its east edge, up the pier stair, then HP thermal→aqueduct lip. Standing at(100,15,19) naturally feeds source probes at(100,15,18); SW2 must fill only from arriving water. Shader/physics unchanged.

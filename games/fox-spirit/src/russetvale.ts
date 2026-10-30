@@ -40,7 +40,8 @@ import type { HearthSpot } from './chem/updraft';
 import type { InletSpot } from './chem/inlet';
 import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
-import type { RootSpot } from './chem/growth';
+import type { RootSpot, PadSpot } from './chem/growth';
+import { createReedmarshRegion, reedRuinGround, type ReedmarshRegion } from './regionReedmarsh';
 import { waterSpots } from './chem/water';
 import type { ShadeSpot } from './encounters/shades';
 export type { ShadeSpot } from './encounters/shades';
@@ -97,6 +98,8 @@ export type Realm = {
   windSpots: WindSpot[];
   /** Growth-element placements: root knots and their authored bridge splines (chem/growth.ts) */
   rootSpots: RootSpot[];
+  padSpots: PadSpot[];
+  reedRegion: ReedmarshRegion;
   /** An inlet's seal filled: light the Seedwell (permanent colour, checkpoint, its route) */
   latchSeedwell: (index: number) => RealmEvent[];
   respawnPos: () => THREE.Vector3;
@@ -176,7 +179,7 @@ function groundRaw(x: number, z: number): number {
     const bed = CREEK.bed + across * across * 0.45 + (fbm3(x * 0.4, 3, z * 0.4, 2) - 0.5) * 0.25;
     h = THREE.MathUtils.lerp(h, bed, ck);
   }
-  return h;
+  return reedRuinGround(x, z, h);
 }
 
 // ---------------------------------------------------------------- trees (x, z, height, crown hue)
@@ -833,6 +836,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // ==================================================================== CHEMISTRY placements (world-1.md §3.3)
   const hearthSpots: HearthSpot[] = [];
   const rootSpots: RootSpot[] = [];
+  const padSpots: PadSpot[] = [];
   {
     // H-a meadow step: a 5 m shelf with no ramp beside the opening path; the hearth at its foot is the way up
     const sx = 13;
@@ -960,18 +964,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   hummock(98, 30, 2.6, 0.3, 54);
   hummock(84, 36, 3.2, 0.4, 55);
 
-  // ghost-ink stepping stones: faint sketches until the fox's colour touches them
-  type Ghost = { c: Collider; mesh: THREE.Mesh; mat: THREE.MeshStandardMaterial; solid: number };
-  const ghosts: Ghost[] = [];
-  for (const [x, z] of [[73.5, 25], [77.5, 22.5], [81.5, 20], [85.5, 17.5]] as const) {
-    const c = col.add(cylCollider({ x, z, r: 1.15, top: 0.25, bottom: -2.5, tag: 'ghost' }));
-    const gb = new Bucket();
-    rockSlab(gb, { x: 0, z: 0, w: 2.3, d: 2.3, top: 0.25, bottom: -2.2, round: true, rough: 0.2, seed: x, topColor: PAL.stone });
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, transparent: true, opacity: 0.3, color: 0xe8dcc4 });
-    const mesh = gb.toMesh(mat)!;
-    mesh.position.set(x, 0, z);
-    group.add(mesh);
-    ghosts.push({ c, mesh, mat, solid: 0 });
+  // Lily pads are the same Growth reactor as Creek Root: color unfolds a
+  // temporary support, and an occupied chain stays until stable ground.
+  for (const [i, [x, z]] of [[73.5, 25], [77.5, 22.5], [81.5, 20], [85.5, 17.5]].entries()) {
+    padSpots.push({ id: `reed-pad-${i}`, x: x!, z: z!, top: 0.25, sunk: MARSH.ink - 0.15, r: 1.35, restoredBy: 'SW2' });
   }
   // stair from the H2 hummock onto the SW2 ruin island
   flight({ x: 90.0, z: 15.0, y: 1.2 }, { x: 92.4, z: 12.6, y: 2.0 }, 2.2, 21);
@@ -982,6 +978,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   archAt(bk('stone', 99, 6), 99.5, 2, 6.5, 0.8, { span: 2.6, pillarH: 3, seed: 71, broken: 0.6 });
   ruinColumn(bk('stone', 91, 5), 91, 2, 6.5, 2.2, 72);
   ruinColumn(bk('stone', 100, 13), 99.5, 2, 13.5, 3.4, 73);
+
+  const reedRegion = createReedmarshRegion(group, col, M.stone);
 
   // reeds: rooted stands of bent, tapering blades (some cattails), clustered by a noise mask
   // so the ink keeps open water between them; copper/tan when restored
@@ -2282,6 +2280,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     shadeSpots,
     windSpots,
     rootSpots,
+    padSpots,
+    reedRegion,
     latchSeedwell(i) {
       const s = seedwells[i]!;
       if (s.lit) return [];
@@ -2290,7 +2290,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       // seedwell doubles as checkpoint
       checkpoints.push({ pos: s.pos.clone().add(new THREE.Vector3(0, 0, 2.6)), lit: true });
       lastCheckpoint = checkpoints.length - 1;
-      if (s.id === 'SW2') inkActive = false;
+      if (s.id === 'SW2') { inkActive = false; reedRegion.restore(); }
       // SW3's permanent route up the hill base is the root bridge (world-1.md §3.6)
       if (s.id === 'SW3' && !bridgeGrowing) {
         bridgeGrowing = true;
@@ -2312,6 +2312,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     },
     setFlood(k, pulse = 0) {
       flood = k;
+      if (k >= 0.99) { inkActive = false; reedRegion.restore(); }
       const arr = loneCol.array as Float32Array;
       for (let i = 0; i < arr.length; i++) arr[i] = loneFaded[i]! + (loneFull[i]! - loneFaded[i]!) * k;
       loneCol.needsUpdate = true;
@@ -2357,17 +2358,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       if (!inkActive && ink.position.y > MARSH.floor - 1.2) {
         ink.position.y -= dt * 0.35;
         inkMat.roughness = Math.min(0.9, inkMat.roughness + dt * 0.2);
-      }
-
-      // ghost-ink stones: solid while touched by colour (aura/trail/restored)
-      for (const g of ghosts) {
-        const c = Math.max(colorAt(new THREE.Vector3(g.c.x, 0.3, g.c.z)), inkActive ? 0 : 1);
-        g.c.enabled = c > 0.4;
-        g.solid += ((g.c.enabled ? 1 : 0) - g.solid) * Math.min(1, dt * 6);
-        g.mat.opacity = 0.22 + g.solid * 0.78;
-        g.mat.transparent = g.solid < 0.98;
-        g.mat.depthWrite = g.solid > 0.6;
-        g.mat.color.setRGB(0.92 - g.solid * 0.12, 0.86 - g.solid * 0.14, 0.77 - g.solid * 0.17);
       }
 
       // windmills: turn while in colour before SW1, for good after

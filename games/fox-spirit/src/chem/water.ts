@@ -42,7 +42,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   block(95, 5.65, 18, 5, 0.7, 4.2, 0, true);
   for (let i = 0; i < 10; i++) {
     const f = (i + 1) / 10, top = 2 + f * 4;
-    block(91 + f * 3.5, (2 + top) / 2, 10 + f * 6.1, 2.4, top - 2 + 0.05, 0.8, 0, true);
+    block(98.5 - f * 2.5, (2 + top) / 2, 10 + f * 6.1, 2.4, top - 2 + 0.05, 0.8, 0, true);
   }
   // S1: a small roofed grotto behind the pond falls, with stable ground on both sides.
   for (const x of [-31.65, -28.35]) block(x, 1.35, 60.4, 0.75, 3.3, 4.8, 0, true);
