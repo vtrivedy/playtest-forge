@@ -37,18 +37,18 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .35,
+    minStanceRatio: .35, bodyBob: .45, spineFlex: 1, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .8,
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .8, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, weightRoll: .05, spineSway: .045, breath: .022,
+    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .025, gallopFlex: .2, gallopFlexPhase: .8, strideFlex: .025, weightRoll: .05, spineSway: .045, breath: .022,
     runningGather: .45, tailAir: .05, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
-    headHold: 1.2, gallopHeadHold: .8, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
+    headHold: .8, gallopHeadHold: 1.5, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
     headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .16, landPitch: 1, landFrequency: 3, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
-    earlyTouches: 0, maxSwingLift: 0, airPose: 0, pelvisRoll: 0, spineSway: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
+    earlyTouches: 0, spineFlexCommand: 0, maxSwingLift: 0, airPose: 0, pelvisRoll: 0, spineSway: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock: THREE.Object3D; pole: number;
     padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; correction: THREE.Vector3; strength: number; replantTime: number; releaseCorrection: THREE.Vector3; releaseProgress: number; phaseRelease: boolean; dot: THREE.Mesh }[] = [];
@@ -780,10 +780,21 @@ export class AuthoredLocomotion {
     worldOverlay(chest,forward.clone(),chestRoll-pelvisRoll-idle*.02*shift);
     worldOverlay(chest,up.clone(),-2*sway);
     if(this.necks[0])worldOverlay(this.necks[0],up.clone(),sway*.8);
+    // Gallop back: rounds through the gathered flight (legs folded under), lengthens through the extended one.
+    // Positive about the actor right axis lowers a forward-pointing bone: spines curl the chest down, pelvis tucks.
+    const run=locomoting ? this.weights.get('run') ?? 0 : 0;
+    const flexPhase=Math.cos(2*Math.PI*(this.phase-this.params.gallopFlexPhase));
+    const flex=run*this.params.gallopFlex*flexPhase+(walk+trot)*this.params.strideFlex*Math.cos(4*Math.PI*(this.phase-.15));
+    if(Math.abs(flex)>1e-4) {
+      worldOverlay(this.spine,right.clone(),-flex*.5);
+      for(const spine of this.spines)worldOverlay(spine,right.clone(),flex/this.spines.length*1.5);
+    }
+    this.metrics.spineFlexCommand=flex;
     // Breath: ribcage lifts, withers ease, root rises a few mm.
     worldOverlay(chest,right.clone(),-idle*this.params.breath*breath);
     worldOverlay(withers,right.clone(),idle*this.params.breath*.6*breath);
-    this.root.position.y+=idle*.004*breath;
+    // Standing soft, not locked: hips and shoulders settle a little so elbows and hocks keep a bend.
+    this.root.position.y+=idle*(.004*breath-this.params.idleSettle);
     // Air pose: forelegs tuck on the rise and reach on the fall, hind legs stream back off the push, body arcs.
     const airborne=!this.input.grounded && /^jump_/.test(active);
     const a=this.air.step(airborne ? THREE.MathUtils.clamp(this.input.verticalSpeed/6,-1,1) : 0,dt,3.2,.9);
