@@ -359,8 +359,9 @@ async function boot() {
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
   fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
-  const actionFeel = { jumpWindup: .05 };
+  const actionFeel = { jumpWindup: .05, jumpGatherBlend: .12 };
   fFeel.add(actionFeel,'jumpWindup',0,.066,.001);
+  fFeel.add(actionFeel,'jumpGatherBlend',.04,.2,.01);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
@@ -1452,7 +1453,8 @@ async function boot() {
       } else {
         const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
         if (windupT >= 0) {
-          anim='jump_up'; fade=.04;
+          anim='jump_up';
+          fade=THREE.MathUtils.lerp(actionFeel.jumpGatherBlend,.04,THREE.MathUtils.smoothstep(speed,1,3));
         } else if (dashing) {
           anim = 'dash';
           fade = 0.05;
