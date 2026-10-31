@@ -694,7 +694,7 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
-  if (wants('restoration')) {
+  if (wants('restoration') || wants('water')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
@@ -702,8 +702,9 @@ try {
     await H('teleport', 0, y, 70, Math.PI);
     await H('photo', [10, y + 12, 82], [0, y, 68], 50);
     await advance(60); await shot('restoration-aura');
-    await H('setStick', 0, -1); await H('setKeys', ['ShiftLeft']);
-    await advance(18); await shot('restoration-dash');
+    await H('setStick', -1, 0); await H('setKeys', ['ShiftLeft']);
+    await advance(6); await shot('restoration-dash');
+    await advance(12);
     await H('setKeys', []); await H('setStick', null);
     await advance(60); await shot('restoration-wake');
     await advance(360); await shot('restoration-wake-decayed');
@@ -718,6 +719,7 @@ try {
     }
     save('restoration-provenance.json', {
       label: 'STAGED fixed-lens visual review: real dash input, then staged public Seedwell latches',
+      note: 'All three staged latches activate their normal Shade encounters; actors may enter the Reed frame.',
       state: await H('state'), game: await page.evaluate(() => window.__game),
     });
   }

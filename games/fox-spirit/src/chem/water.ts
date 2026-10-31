@@ -154,8 +154,26 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         for (const side of [-1, 1]) block(p.x + Math.cos(yaw) * side * spot.width * 0.53, p.y + 0.1, p.z - Math.sin(yaw) * side * spot.width * 0.53, 0.2, 0.48, length / cells + 0.03, yaw);
         if (i % 16 === 0) block(p.x, (p.y - 2) / 2, p.z, 0.7, p.y + 2, 0.8, yaw);
       }
-      return { d, p, bed, yaw, index: i, collider, wet: false };
+      return { d, p, bed, yaw, index: i, collider, wet: false, visualY: p.y, visualPitch: 0, visualLength: 1 };
     });
+    if (spot.channel === false) {
+      // A bank can bury the authored simulation path. Grade only its visible skin;
+      // keep arc distances, drain probes, beds and colliders on the authored path.
+      for (const [i, s] of samples.entries()) {
+        const across = spot.width * 0.4;
+        const dx = Math.cos(s.yaw) * across, dz = -Math.sin(s.yaw) * across;
+        const bank = Math.max(collision.terrain(s.p.x, s.p.z), collision.terrain(s.p.x + dx, s.p.z + dz), collision.terrain(s.p.x - dx, s.p.z - dz));
+        s.visualY = Math.max(s.p.y, bank + 0.08);
+        if (i > 0) s.visualY = Math.min(samples[i - 1]!.visualY, s.visualY);
+      }
+      for (const [i, s] of samples.entries()) {
+        const before = samples[Math.max(0, i - 1)]!, after = samples[Math.min(samples.length - 1, i + 1)]!;
+        const grade = (before.visualY - after.visualY) / Math.max(0.001, after.d - before.d);
+        s.visualPitch = Math.atan(grade);
+        // Tilt without shortening the horizontal cell footprint or opening seams.
+        s.visualLength = Math.hypot(1, grade);
+      }
+    }
     return { spot, reactor, gate, fall, animation, glass, light, length, surface, wetState, stamp, samples, parcels: [] as Parcel[], flowing: false, arriving: false };
   });
   const masonryMesh = new THREE.Mesh(mergeGeometries(masonry.map(g => g.index ? g.toNonIndexed() : g)), stone); masonryMesh.castShadow = true; masonryMesh.receiveShadow = true; scene.add(masonryMesh);
@@ -202,8 +220,10 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         for (const s of w.samples) {
           s.wet = w.parcels.some(p => s.d <= p.head && s.d >= p.tail);
           s.bed.visible = !w.spot.wash || s.wet; s.collider.enabled = true;
-          w.stamp.position.copy(s.p); w.stamp.position.y += 0.06 + Math.sin(s.d * 3 - time * 7) * 0.018;
-          w.stamp.rotation.set(-Math.PI / 2, 0, s.yaw); w.stamp.scale.setScalar(s.wet || w.spot.wash ? 1 : 0); w.stamp.updateMatrix();
+          w.stamp.position.copy(s.p); w.stamp.position.y = s.visualY + 0.06 + Math.sin(s.d * 3 - time * 7) * 0.018;
+          w.stamp.rotation.set(-Math.PI / 2, 0, s.yaw); w.stamp.rotateX(s.visualPitch);
+          const visible = s.wet || w.spot.wash ? 1 : 0;
+          w.stamp.scale.set(visible, visible * s.visualLength, visible); w.stamp.updateMatrix();
           w.surface.setMatrixAt(s.index, w.stamp.matrix);
           w.wetState.setX(s.index, s.wet ? 1 : 0);
           if (s.wet) { foamColor.setRGB(0.12, 0.20, 0.16); foamColor.lerp(warningColor, warning * 0.55); }
@@ -221,7 +241,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         w.glass.opacity = (w.spot.gate ? 0.82 : 0.68) - (w.spot.gate ? 0.22 : 0.08) * w.reactor.heat;
         w.glass.emissiveIntensity = (w.spot.gate ? 0.09 : 0.025) + w.reactor.heat * 0.025 + warning * (0.12 + Math.sin(time * 12) * 0.07);
         w.light.intensity = 0.8 + w.reactor.heat * 1.2;
-        const fallBottom = flowing ? w.spot.path[0]!.y : w.spot.foot.y;
+        const fallBottom = flowing ? (w.spot.channel === false ? w.samples[0]!.visualY : w.spot.path[0]!.y) : w.spot.foot.y;
         w.fall.scale.y = (w.spot.lip.y - fallBottom) / (w.spot.lip.y - w.spot.foot.y);
         w.fall.position.y = (w.spot.lip.y + fallBottom) / 2;
         w.fall.scale.x = 1 + (flowing ? Math.sin(time * 9) * 0.035 : 0);
