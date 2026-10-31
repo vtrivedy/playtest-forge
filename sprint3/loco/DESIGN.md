@@ -21,3 +21,8 @@ Second Opus review: retain incoming signed/lateral momentum on landing, transpor
 
 ## Transition rig diagnostic
 CPU ramp (1.4→9→1.4m/s over 5s repeated) revealed inherited large contact-solver failures. Baseline peak reported residual 1.14m; broad candidate 1.00m. Narrowed speed blend half-widths to .35m/s, retained longer temporal easing, raised release threshold from .30 to .45: ramp peak 0.46m; steady 6m/s turn residual ~40mm versus broad pass ~90mm, baseline ~36mm. These are failures requiring GPU inspection, not acceptance. Prefer narrower candidate; do not merge on CPU results.
+
+## Round 2 — contact handoff correction
+Returned 90483ad capture personally inspected: deep gathered gallop, elevated tail, almost invisible anticipation. Cadence only 3% below baseline is insufficient. Parallel Opus branch supplies a separate phase-warp candidate; evaluate it rather than duplicating authored work.
+
+For this branch's remaining mixed-gait failure, contact votes alone cannot establish support when the rendered mixed pad is high in recovery. Gate touchdown against actual rendered pad height and retain support only while the requested vertical correction remains in the bounded IK envelope. Explicitly report rejected support votes and their maximum height: no residual suppression disguised as success. Preserve existing IK correction bound, report missed support, and verify CPU ramp + captured transitions before any acceptance. Reject this approach if it trades a stretch/pop for unsupported floating.
