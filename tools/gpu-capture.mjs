@@ -417,22 +417,26 @@ try {
       return saved;
     });
     const applyOcclusion=async saved=>page.evaluate(saved=>{
-      const h=window.__gameHooks,values=new Map(saved.map(s=>[s.material,s.value]));
+      const h=window.__gameHooks,values=new Map(saved.map(s=>[s.material,s.value])),actual=[];
       h.debug.scene.traverse(o=>{
         if(!o.isMesh)return;
         for(const material of Array.isArray(o.material)?o.material:[o.material])if(values.has(material.uuid)){
           const uniform=h.debug.renderer.properties.get(material).uniforms?.uOccStrength;
-          if(uniform)uniform.value=values.get(material.uuid);
+          if(uniform){uniform.value=values.get(material.uuid);actual.push({material:material.uuid,uniform});}
         }
       });
       h.debug.post.render();
+      return actual.map(s=>({material:s.material,value:s.uniform.value}));
     },saved);
     try {
       await applyOcclusion(occlusionSaved.map(s=>({...s,value:0})));
       await shot('shade-wash-occlusion-disabled-diagnostic');
-      save('shade-occlusion-isolation.json',{label:'Same simulation time, temporary renderer-uniform diagnostic only; zero touched uniforms is inconclusive',touched:occlusionSaved.length,saved:occlusionSaved});
+      save('shade-occlusion-isolation.json',{label:'Same simulation time, temporary renderer-uniform diagnostic only; zero touched or already-inactive uniforms is inconclusive',touched:occlusionSaved.length,inconclusive:!occlusionSaved.some(s=>s.value>.001),saved:occlusionSaved});
     } finally {
-      await applyOcclusion(occlusionSaved);
+      const restored=await applyOcclusion(occlusionSaved);
+      const matched=restored.length===occlusionSaved.length&&occlusionSaved.every(s=>restored.some(r=>r.material===s.material&&r.value===s.value));
+      save('shade-occlusion-restore.json',{matched,restored});
+      if(!matched)throw Error('Shade occlusion diagnostic did not restore exact uniform values');
     }
     await advance(180);
     await shot('shade-leaf-litter');
@@ -495,7 +499,7 @@ try {
       await advance(600,false);await advance(0);await shot('shade-clear-empty');
       const end=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(end.actors.find(a=>a.id==='shade-hill-high').leaves!==0)throw Error('Edge dissolve did not end empty');
-      save('shade-clear-acceptance.json',{label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
+      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0,releasePassed:true,contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
     }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
