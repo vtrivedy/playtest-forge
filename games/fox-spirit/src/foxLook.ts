@@ -30,7 +30,7 @@ export const FOX_LOOK = {
   lickIntensity: 1.0,
   lickStream: 0.35,
   coreRadiance: 4.0,
-  tailRadiance: 3.0,
+  tailRadiance: 1.5,
   emberRadiance: 3.0,
   /** embers per second at rest / extra per m/s of speed; size in metres */
   emberRate: 3,
@@ -207,7 +207,8 @@ ${NOISE_GLSL}`,
   ` : ''}
   float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
-  outgoingLight += uRimColor * ${fringeLength ? "0.0" : "1.0"} * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
+  float rimPigment = smoothstep(1.6, 2.2, diffuseColor.r / max(0.001, diffuseColor.g));
+  outgoingLight += uRimColor * ${shell || tail ? "0.0" : "1.0"} * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a * rimPigment;
   ${tail ? `
   #ifdef USE_MAP
     // Brush UV: V=1 at the buried root, V=0 at the capped terminal extension.
@@ -354,7 +355,7 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
   for (const { mesh, mat } of coats) {
     const R = FOX_RIG;
     const heatBones = new Set<string>([...R.spine, ...R.neck]);
-    const ruffBones = new Set<string>(R.neck);
+    const throatBones = new Set<string>(R.neck.slice(0, 2));
     const pawBones = new Set<string>(['l', 'r'].flatMap((s) => [R.foreleg(s as 'l' | 'r').paw, R.hindleg(s as 'l' | 'r').paw]));
     const earHeat = new Map<string, number>(['l', 'r'].flatMap((s) => R.ear(s as 'l' | 'r').slice(2).map((name, index) => [name, index === 0 ? 0.45 : 1] as const)));
     const full = new Set<string>([R.pelvis, ...R.spine, ...R.neck]);
@@ -382,10 +383,12 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
         if (pawBones.has(name)) { spirit[i * 4 + 1] += weight; pawFloorSum += weight * pawFloor.get(name)!; }
         if (heatBones.has(name)) spirit[i * 4 + 2] += weight;
         if (heatBones.has(name) || name === R.pelvis) spirit[i * 4 + 3] += weight;
-        let ruffAmount = ruffBones.has(name) ? 1 : 0;
+        let ruffAmount = throatBones.has(name)
+          ? THREE.MathUtils.smoothstep(restNormals.getZ(i), 0.15, 0.65) * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.25, 2.60)) : 0;
         if (name === R.head) ruffAmount = THREE.MathUtils.smoothstep(Math.abs(p.getX(i)), 0.24, 0.40)
           * (1 - THREE.MathUtils.smoothstep(p.getZ(i), 1.20, 1.48))
-          * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.50, 2.78));
+          * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.50, 2.78))
+          * THREE.MathUtils.smoothstep(Math.abs(restNormals.getX(i)), 0.25, 0.65);
         ruff[i] += sw.getComponent(i, k) * ruffAmount;
         let amount = full.has(name) ? 1 : short.has(name) ? 0.5 : 0;
         if (name === R.head) amount = 0.5 * (1 - THREE.MathUtils.smoothstep(p.getZ(i), 0.85, 1.28)) * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.6, 2.85));
