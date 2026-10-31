@@ -326,6 +326,12 @@ async function boot() {
     folder.add(params,'brakePitch',0,.2,.005);
     folder.add(params,'landSquash',0,.2,.005);
     folder.add(params,'landFrequency',2,6,.1);
+    folder.add(params, 'walkHz', 1, 3, .05);
+    folder.add(params, 'trotHz', 1.2, 4, .05);
+    folder.add(params, 'gallopHz', 1.5, 5, .05);
+    folder.add(params, 'cadenceExponent', 0, 1, .05);
+    folder.add(params, 'minStanceRatio', .2, 1, .01);
+    folder.add(params, 'bodyBob', 0, 1, .01);
     folder.add(params, 'trotSpeed', 2, 6, .1);
     folder.add(params, 'gallopSpeed', 4, 10, .1);
     folder.add(params, 'plantStrength', 0, 1, .01);
