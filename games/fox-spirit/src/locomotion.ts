@@ -37,7 +37,7 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .85, headBob: .35,
+    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .35,
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .09, liftHindTrot: .12, carpalFlex: .95, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
@@ -588,7 +588,8 @@ export class AuthoredLocomotion {
       let stance=this.input.grounded && (locomoting ? normalizedSupport>(foot.planted ? .45 : .55) : (active==='idle' || active==='land' || windup));
       let earlyTouch=false;
       const swingProgress=this.swingProgress[i]/Math.max(.001,gaitWeight);
-      if(!stance && locomoting && this.input.grounded && swingProgress>this.params.earlyContact) {
+      // The gallop's touchdowns are authored to the frame; an early catch there plants a pad that then outruns the cap.
+      if(!stance && locomoting && this.input.grounded && swingProgress>this.params.earlyContact && (this.metrics.clipWeights.run ?? 0)<.5) {
         const floor=this.input.groundAt(paw.x,paw.z,this.group.position.y+.6);
         if(foot.planted || (Number.isFinite(floor) && paw.y<floor+foot.clearance+.01)) {stance=true;earlyTouch=true;}
       }
