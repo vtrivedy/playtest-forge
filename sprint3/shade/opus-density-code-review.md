@@ -1,0 +1,25 @@
+I found no hard blockers in 9d94871 or 282f8b4. There are four real code risks: three can make the capture fail or produce misleading evidence, and one is cosmetic. I read the diffs and the code they depend on (`gpu-capture.mjs`, the `__gameHooks` `advance`/`photo`/`draw` path in `main.ts`, and `shades.ts`). Per your brief, I ran nothing and rendered nothing, so none of this is visual approval.
+
+## Code risks
+
+1. **Density stills include the HUD and Feel panel.** `video()` adds the style tag that hides the HUD and lil-gui panel (`tools/gpu-capture.mjs:166`), but that tag only lasts for the current page. The Shade section starts a fresh page (`:222`), and the density gallery (`:379-384`) takes its `shot()`s before the first `video()` on that page. So `shade-density-{2,3,4}.png` probably show the HUD and the Feel panel, which could cover the Shade. Fix: add the same style tag before the gallery, or inside `shot()`.
+2. **The far-observer search can now abort the whole run.** The far radius changed from 8 m to 4.8 m, and the same-floor check (`|floor-y|<.3`) now applies to far positions too (`:403-407`). If none of the 64 ring samples at 4.8 m is on the Shade's floor and unblocked, the run throws `No safe staged shade behavior observer`. That bypasses the "framing failure goes into `report.failures`, diagnostics continue" design. The flume and balcony patrol makes this plausible. Consider trying a few radii (for example 4.3–5.5 m) before throwing.
+3. **The hill-release camera starts from a stale lens.** `lens` isn't reset before `camera('shade-hill-high')` (`:585`), so the first candidate is the old flume-release camera position. It will normally fail the fit test and get skipped, so this is harmless today. It is still wrong; set `lens=null` before `shade-clear-free`.
+4. **The pre-check uses guessed body boxes; only the post-check measures the real mesh.** Camera choice tests made-up boxes: a 2.8 m-wide fox box (about 2× the real fox), a 3.1 m Shade measured from `actor.pos` with no bob offset, and a >0.19/0.18 height threshold. `validatePair` then checks the real posed mesh against 0.15. The extra-wide fox box makes the 30% overlap rejection and the in-frame test stricter than they need to be, which pushes toward `noFit` or a wider FOV. Expect framing failures that are artifacts of the guessed boxes; the report will show them, but they're not real misses.
+
+Things I checked that hold up:
+- **Projected measurement is correct.** `getVertexPosition` followed by `matrixWorld` is right for skinned meshes, and the photo camera is applied in `draw()` before `measurePair` reads `debug.camera`. The NDC height/2 does give the frame-height fraction, and the `shadePresent` filter is sensible.
+- **The gallery really is fixed-time.** `advance(1,0)` adds 0 to `visualDt` and the fixed clock, and `advance(0)` steps nothing. The tunable and the uniforms stay consistent, and the `finally` block restores both.
+- **Restarting the session doesn't break the hill release.** `shade-hill-high` has no latch gate, so it is still active after the fresh boot.
+
+## GPU-dependent judgments (not verified)
+
+- **The absorption alpha is much denser than before.** Core alpha was `0.7·density`, ranging 0.14–0.70. With `1-exp(-3·density)` and density between 0.2 and 1, it ranges about 0.45–0.95. Even the thinnest noise regions are now about 3× as opaque, which works against the shader comment "broad translucent wash, never a black plate". Only the rim fade and leg fade keep it airy.
+- **The variants differ mainly in the thin areas.** `uDensity` doesn't touch the shell layers (`0.11·density`), and the dense regions saturate at all three values (0.86 / 0.95 / 0.98). Whether density 3 reads as smoke rather than a dark silhouette against bright sky can only be judged on the GPU.
+- **Something not checked:** whether bloom, SMAA or any temporal pass carries frame history between the draw-only variant renders.
+
+## Freed Shade: charcoal to amber before fading?
+
+**Not in the reviewed commits.** At 282f8b4 the body and shell colour is always charcoal (`core` mixed toward `light`). Only the smoke particles (`inkWisps`, which go toward `.42,.23,.095`) and the pool ripple warm up on release.
+
+**In the current working tree, yes, mostly.** This is newer than 282f8b4; I couldn't confirm with git because git commands were blocked for approval mid-session. `shades.ts:157-159` blends the colour to amber as `releaseWarmth = smoothstep(0.08, 0.32, uReleaseAge)`. `uReleaseAge` is fed correctly to the body and all four shells (`:503`, `:508`), and is -1 while not freed. Presence falls as `1 − age/1.2`, so warmth is fully in by 0.32 s, when presence is still about 0.73. The fade does overlap the warm-up, though: the body is already about 7–27% faded and dissolving while it turns amber. If the driver wants an amber beat that holds before the fade, delay presence decay by about 0.3 s. Whether that amber (linear values up to `0.65,0.30,0.075`, after sRGB/ACES/bloom) reads as warm amber or orange-hot is a GPU judgment.

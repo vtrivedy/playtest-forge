@@ -29,6 +29,7 @@ import {
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createHubDusk, hubDuskWeight, HUB_DUSK } from './hubDusk';
+import { createReachMood } from './reachMood';
 import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
@@ -116,7 +117,6 @@ async function boot() {
     exposure: 1.18,
     shadows: quality.shadows,
     pixelRatio: quality.pixelRatio,
-    softShadows: quality.softShadows,
   });
   const { renderer, backend } = forge;
 
@@ -149,6 +149,7 @@ async function boot() {
   });
   matchFogToSky(scene, fog, sky.params.mist);
   const hubDusk = createHubDusk(scene, lights, sky, fog);
+  const reachMood = createReachMood(scene, lights, sky, fog);
   const distant = createDistantLand(scene, {
     silhouette: new THREE.Color(0x4a3a3c),
     haze: sky.params.mist,
@@ -372,15 +373,16 @@ async function boot() {
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
   fAudio.close();
-  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
+  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height };
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
   fCam.add(cam.params, 'runDistance', 2.6, 5, 0.1);
   fCam.add(cam.params, 'framingHeight', 0, 1, 0.05);
   fCam.add(cam.params, 'minDistance', 1.8, 3.2, 0.1).name('minimum terrain boom');
   fCam.add(baseCam, 'height', 0.5, 4, 0.05);
+  fCam.add(cam.params, 'groundLift', 0, 0.6, 0.01);
   fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
-  fCam.add(baseCam, 'glideDistance', 3, 12, 0.1);
+  fCam.add(cam.params, 'glideDistance', 3, 12, 0.1);
   fCam.add(cam.params, 'fov', 35, 80, 0.5);
   fCam.add(cam.params, 'lag', 0.04, 0.5, 0.01);
   fCam.add(cam.params, 'lookAhead', 0, 4, 0.05);
@@ -691,7 +693,7 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
+    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
@@ -876,6 +878,7 @@ async function boot() {
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         dusk: { ...hubDusk.state(), practical: world.hubState() },
+        reachMood: reachMood.state(),
         crown: crown.state(),
         reach: reach.state(),
         albumPages: world.reedRegion.pageFound ? ['reed-ruin'] : [],
@@ -1320,8 +1323,7 @@ async function boot() {
     const riding = inColumn || (gliding && lift.k > 0);
     cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, riding ? 1 : baseCam.jumpTrack, 3, dt);
     // A small rise preserves the chase silhouette instead of craning over the column.
-    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 0.4 : baseCam.height, 2.2, dt);
-    cam.params.glideDistance = THREE.MathUtils.damp(cam.params.glideDistance, riding ? baseCam.glideDistance - 0.9 : baseCam.glideDistance, 2.2, dt);
+    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 0.15 : baseCam.height, 2.2, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
     glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
@@ -1662,6 +1664,7 @@ async function boot() {
     autumnFX.update(dt, fox.position);
     emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
     hubDusk.update(fox.position.x, fox.position.z);
+    reachMood.update(fox.position.x, fox.position.z);
     world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
     sky.update(dt);
     distant.update(dt);
@@ -1791,6 +1794,7 @@ async function boot() {
       contactShadow.scale.set(1, 1, 1);
       (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
       hubDusk.update(fox.position.x, fox.position.z);
+      reachMood.update(fox.position.x, fox.position.z);
       world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
       sky.update(rawDt);
       post.render();
