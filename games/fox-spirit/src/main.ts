@@ -49,13 +49,13 @@ import type { ColorStroke } from '../../../src/render/colorField';
  * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
  * `fallGravity` gives weight on the way down; `apexHang` floats the top of a held jump.
  */
-type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number };
+type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number; groundAccel: number; groundTurnRate: number };
 const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
   spring: {
     ...PRESET_SPRING,
     moveSpeed: 8.4,
-    accel: 5.5,
-    turnRate: 6,
+    groundAccel: 5.5,
+    groundTurnRate: 6,
     jumpVelocity: 9.6,
     gravity: 21,
     fallGravity: 1.35,
@@ -71,8 +71,8 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
   brisk: {
     ...PRESET_BRISK,
     moveSpeed: 9,
-    accel: 6,
-    turnRate: 6,
+    groundAccel: 6,
+    groundTurnRate: 6,
     jumpVelocity: 10.2,
     gravity: 27,
     fallGravity: 1.5,
@@ -305,6 +305,8 @@ async function boot() {
   gui.add({ spring: () => usePreset('spring') }, 'spring');
   gui.add({ brisk: () => usePreset('brisk') }, 'brisk');
   const fFeel = gui.addFolder('Fox');
+  fFeel.add(feel, 'groundAccel', 3, 16, .25);
+  fFeel.add(feel, 'groundTurnRate', 2, 12, .25);
   fFeel.add(feel, 'moveSpeed', 4, 14, 0.1).listen();
   fFeel.add(feel, 'jumpVelocity', 6, 16, 0.1).listen();
   fFeel.add(feel, 'gravity', 10, 40, 0.5).listen();
@@ -545,6 +547,7 @@ async function boot() {
   });
 
   const vel = new THREE.Vector3();
+  let groundYawRate = 0;
   let grounded = false;
   let dashT = 0;
   let gliding = false;
@@ -724,6 +727,7 @@ async function boot() {
       foxActor.group.position.set(x, y + foxActor.feetOffset + 0.05, z);
       foxActor.group.rotation.y = yaw;
       windupT=-1;
+      groundYawRate=0;
       foxActor.locomotion?.reset();
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
@@ -1315,13 +1319,24 @@ async function boot() {
       if(grounded && wish.lengthSq()>.001) {
         const targetYaw=Math.atan2(wish.x,wish.z);
         const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
-        const turnStep=error*(1-Math.exp(-feel.turnRate*dt));
-        fox.rotation.y+=THREE.MathUtils.clamp(turnStep,-3.2*dt,3.2*dt);
+        const targetRate=3.2*Math.tanh(error*feel.groundTurnRate/3.2);
+        groundYawRate=THREE.MathUtils.damp(groundYawRate,targetRate,10,dt);
+        const turnStep=groundYawRate*dt;
+        fox.rotation.y+=Math.sign(turnStep)===Math.sign(error) && Math.abs(turnStep)>Math.abs(error) ? error : turnStep;
         // Brake through a reversal; forward drive returns as the body points into the input.
         const drive=Math.max(0,Math.cos(error));
         desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
       }
-      cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
+      if(grounded) {
+        if(wish.lengthSq()<=.001)groundYawRate=THREE.MathUtils.damp(groundYawRate,0,10,dt);
+        // Dampen speed, not the velocity direction: planted paws must travel
+        // along the sagittal plane of the turning body.
+        const groundSpeed=THREE.MathUtils.damp(cur.length(),desired.length(),feel.groundAccel,dt);
+        cur.set(Math.sin(fox.rotation.y)*groundSpeed,0,Math.cos(fox.rotation.y)*groundSpeed);
+      } else {
+        groundYawRate=0;
+        cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
+      }
       vel.x = cur.x;
       vel.z = cur.z;
     }

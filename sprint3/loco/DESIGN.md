@@ -13,3 +13,6 @@ TypeScript and fox Vite build. Remote GPU gait gym at walk/trot/run, side and ch
 
 ## Risks
 Longer cadence can outpace authored stance sweep; bounded IK is only a small correction, not permission for skating. Broad blends can disagree on support: use actual evaluated weights and preserve contacts only while support remains. Keep the extension small pending captures; do not introduce a separate animation path.
+
+## Opus code review follow-up
+Separate ground acceleration/turn tunables from inherited air parameters. Damped angular velocity turns the heading; scalar ground speed follows that heading to prevent lateral skating. Normalize contact votes, add stance hysteresis, and keep IK strength consistent through a stance. Blend head bob from evaluated run weight, never the gait label. CPU A/B found 8% extension increases trot reach residual; reduce to 3% until captured foot contact can justify more. Preserve fast authored landing/air exit fades.
