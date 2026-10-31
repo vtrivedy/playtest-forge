@@ -80,7 +80,8 @@ says success, and `report.json` has no failures/errors. It records the raw clien
 exit and transport warning. Gameplay failures stay nonzero.
 
 For a 720p milestone from an existing shot, use
-`python3 tools/review-capture.py <ref> --shots showcase --size 1280x720 --fps 30`.
+`python3 tools/review-capture.py <ref> --shots showcase --size 1280x720 --fps 60`.
+Showcase dense landing offsets and worldgait require60fps.
 The same report verification and fetching apply. Gait requires60fps.
 
 Durable recovery verifies commit/shot, size/fps, route bounds, and matching

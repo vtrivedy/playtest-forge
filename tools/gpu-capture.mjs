@@ -206,7 +206,7 @@ try {
       const sheetPage = await context.newPage();
       try {
         await sheetPage.setViewportSize({ width: 1920, height: 1080 });
-        const cards = options.keyFrames.filter(frame => frame < count).map(frame => {
+        const cards = (options.sheetFrames ?? options.keyFrames).filter(frame => frame < count).map(frame => {
           const filename = `${name}-${String(frame).padStart(5, '0')}.png`;
           const label = options.label?.(frame, trace.find(sample => sample.frame === frame)?.state) ?? `${name} frame ${frame}`;
           return `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, filename)).toString('base64')}"></figure>`;
@@ -566,6 +566,7 @@ try {
     save('feel-acceptance.json',{label:'60s scripted live-input movement loop, one staged start, no resets/forced poses; not human fun approval',seconds:60,initial,end,deaths:end.deaths-initial.deaths});
   }
   if (wants('showcase')) {
+    if(fps!==60)throw Error('Showcase dense landing comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
     await H('photoOff');
@@ -583,21 +584,31 @@ try {
       {name:'Meadow dash',seconds:1,stick:[0,-1],dash:true,reset:[0,null,86]},
       {name:'Meadow brake and settle',seconds:2,stick:[0,0]},
       {name:'Meadow long drop and landing',seconds:2,stick:[0,0],reset:[0,null,80],drop:8,settle:0},
-      {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true},
+      {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6},
     ];
+    const landingDefaults=await page.evaluate(()=>{const p=window.__gameHooks.locomotion.params;return {landSquash:p.landSquash,landPitch:p.landPitch}});
+    for(const [label,landSquash,landPitch] of [['baseline',.11,0],['squash',.20,0],['squash-pitch',.20,1]]) {
+      segments.push({name:`Landing A/B long drop ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],drop:8,settle:0,landingAB:{label,landSquash,landPitch}});
+      segments.push({name:`Landing A/B standing jump ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6,landingAB:{label,landSquash,landPitch}});
+    }
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
-    const keyFrames=segments.flatMap(segment=>segment.standing ? [0,1,2,3,5,8,15,30,45,65].map(f=>segment.start+f).concat(segment.end-1) : segment.drop ? [.08,.25,.4,.55,.7,1,1.5].map(t=>segment.start+Math.round(fps*t)).concat(segment.end-1) : [segment.start+Math.round(fps*.25),segment.end-1]);
-    save('showcase-script.json',{label:'World1 live controller, staged segment cuts, fixed world-offset tracking photo lens; view angle varies with heading, no forced poses or grade',segments});
+    const keyFrames=segments.flatMap(segment=>segment.standing ? [...new Set([0,3,5,6,7,8,9,11,14,21,36,51,71,105,...Array.from({length:22},(_,j)=>36+j)])].map(f=>segment.start+f).concat(segment.end-1) : segment.drop ? [...Array.from({length:33},(_,j)=>segment.start+28+j),segment.start+90,segment.end-1] : [segment.start+Math.round(fps*.25),segment.end-1]);
+    const sheetFrames=segments.flatMap(segment=>segment.standing ? [0,8,14,42,44,48,54].map(f=>segment.start+f) : segment.drop ? [28,37,38,40,44,50].map(f=>segment.start+f).concat(segment.end-1) : [segment.start+Math.round(fps*.25),segment.end-1]);
+    save('showcase-script.json',{label:'World1 live controller, staged segment cuts, fixed world-offset tracking photo lens; view angle varies with heading, no forced poses or grade',landingDefaults,segments});
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
       if(segment.turn){const angle=local/fps*2;stick=[Math.sin(angle)*.45,-Math.cos(angle)*.45];}
+      if(local===0 && segment.landingAB)await page.evaluate(({landSquash,landPitch})=>Object.assign(window.__gameHooks.locomotion.params,{landSquash,landPitch}),segment.landingAB);
       if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);reset[1]+=segment.drop??0;const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(segment.settle??18);}
       await H('setStick',...stick);
-      await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
-    },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);}});
+      await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local>=(segment.leadIn??0) && local<(segment.leadIn??0)+Math.round(.25*fps)?['Space']:[]);
+    },undefined,{traceEveryFrame:true,keyFrames,sheetFrames,afterStep:async(i,state)=>{
+      const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);
+    },sample:async()=>({label:'Evaluated world-space bone landmarks; mesh shape judged from retained PNGs',bones:await page.evaluate(()=>{const fox=window.__gameHooks.debug.fox;return Object.fromEntries(['pelvis','spine_04','head'].map(name=>{const b=fox.getObjectByName(name);return [name,b?.getWorldPosition(b.position.clone()).toArray()??null]}))})})});
     await H('setKeys',[]);await H('setStick',null);
+    await page.evaluate(config=>Object.assign(window.__gameHooks.locomotion.params,config),landingDefaults);
     const result=report.videos.showcase;
     const slope=segments.find(segment=>segment.name==='Windmill slope jump and land');
     const rows=result.trace.filter(row=>row.frame>=slope.start && row.frame<slope.end);
@@ -616,7 +627,25 @@ try {
     const standingJumpAirborne=standingRows.some(row=>!row.state.grounded);
     const standingJumpLanded=standingRows.at(-1)?.state.grounded ?? false;
     const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'fixed world-offset tracking photo lens, rear on boardwalk/front-side on Windmill; not gameplay camera',longDropHeight:drop.drop,longDropFallSeconds,longDropLanded,longDropHeldFrames,standingWindupFrames,standingJumpAirborne,standingJumpLanded,slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
+    const landingTakes=segments.filter(segment=>segment.landingAB).map(segment=>{
+      const rows=result.trace.filter(row=>row.frame>=segment.start && row.frame<segment.end);
+      const firstAir=rows.findIndex(row=>!row.state.grounded);
+      const landedIndex=firstAir>=0?rows.findIndex((row,index)=>index>firstAir && row.state.grounded):-1;
+      const recovery=landedIndex>=0?rows.slice(landedIndex,landedIndex+12):[];
+      const relative=(row,bone)=>row.state.capture?.bones?.[bone]?.[1]-row.state.pos[1];
+      const before=landedIndex>0?rows[landedIndex-1]:null;
+      return {name:segment.name,config:segment.landingAB,firstAir,landedIndex,frames:rows.length,
+        firstChestStep:before?relative(rows[landedIndex],'spine_04')-relative(before,'spine_04'):null,
+        peakChestDrop:before?relative(before,'spine_04')-Math.min(...recovery.map(row=>relative(row,'spine_04'))):null,
+        peakHeadDrop:before?relative(before,'head')-Math.min(...recovery.map(row=>relative(row,'head'))):null,
+        compressionMaxResidual:Math.max(...recovery.map(row=>row.state.locomotion.maxResidual)),
+        minCompressionContacts:Math.min(...recovery.map(row=>row.state.locomotion.stanceFeet)),
+        landed:firstAir>=0 && landedIndex>firstAir && rows.at(-1).state.grounded};
+    });
+    const landingPass=take=>take.landed && take.frames===2*fps && take.minCompressionContacts===4 && take.compressionMaxResidual<.001 && [take.firstChestStep,take.peakChestDrop,take.peakHeadDrop].every(Number.isFinite);
+    save('landing-ab-acceptance.json',{label:'Same build/lens/live physics, three tunable sets; pose heights relative actor pivot and last airborne frame, not idle; no visual approval',takes:landingTakes,passed:landingTakes.every(landingPass)});
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
+    if(!landingTakes.every(landingPass))throw Error('Landing A/B must land with four compression contacts and submillimeter compression residual; visual review still required');
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
   if (wants('worldgait')) {
