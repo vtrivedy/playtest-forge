@@ -1902,6 +1902,20 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
     group.userData.shadeKilnLitter = { attempted: 58, cards: kilnLeafCards.length, positions: kilnLeafCards };
   }
+  // A quiet optional memory on the open meadow edge, clear of village doors and H2's puzzle.
+  // The supported habitat lets a dash release read against autumn ground rather than ruin pillars.
+  {
+    const patrol: Array<[number,number,number]>=[];
+    for(let i=0;i<10;i++){
+      const angle=i/10*Math.PI*2,x=25+Math.cos(angle)*1.8,z=80+Math.sin(angle)*1.4;
+      patrol.push([x,col.groundAt(x,z,2).y,z]);
+    }
+    shadeSpots.push({id:'shade-meadow',patrol,speed:.65});
+    const dry=(x:number,z:number)=>((x-POND.x)/POND.rx)**2+((z-POND.z)/POND.rz)**2>1.5;
+    const floor=(x:number,z:number)=>{const y=col.groundAt(x,z,2).y;return dry(x,z)&&Number.isFinite(y)&&!col.blocked(x,z,y)?y:NaN;};
+    litterPatch(bk('litter',25,80,false),rng(3662),25,80,3.4,64,floor,[PAL.leafBrown,PAL.russet,PAL.gold]);
+    group.userData.shadeMeadowHabitat={center:[25,80],waterExclusion:{center:[POND.x,POND.z],radii:[POND.rx,POND.rz],minimumEllipse:1.5}};
+  }
   // Wind river (§3.3 beat 6): from the top of H2's column over the Kiln, east above the Amberwood crowns,
   // down onto the arena's west rim. Woken briefly by colour at the Seedwell; flows for good once SW1 latches
   // (permanent route 1 up the hill: a plain glide from the column top covers ≈ 50 m of the ≈ 95 m).

@@ -20,8 +20,10 @@ export function installShadeLens() {
       for(let i=0;i<mesh.geometry.attributes.position.count;i++){
         mesh.getVertexPosition(i,p);
         if(!skinnedOnly){
-          const a=turn*smooth(p.y,1.45,2.05)*smooth(p.z,.15,.55),x=p.x,z=p.z-.48;
+          const head=smooth(p.y,1.45,2.05)*smooth(p.z,.15,.55),a=turn*head,x=p.x,z=p.z-.48;
           p.x=Math.cos(a)*x+Math.sin(a)*z;p.z=-Math.sin(a)*x+Math.cos(a)*z+.48;
+          const droop=(.10+.025*Math.sin(time*.55+seed))*head,qy=p.y-1.45,qz=p.z-.48;
+          p.y=1.45+Math.cos(droop)*qy-Math.sin(droop)*qz;p.z=.48+Math.sin(droop)*qy+Math.cos(droop)*qz;
           p.x+=Math.sin(time*1.7+p.y*2+seed)*.075;
           normal.fromBufferAttribute(mesh.geometry.attributes.normal,i);p.addScaledVector(normal,(1-presence)*.035);
         }
@@ -58,16 +60,18 @@ export function installShadeLens() {
   };
   const inspect=(id,lens)=>{
     const s=snapshot(id),camera=virtual(lens),fox=project(s.foxPoints,camera),shade=project(s.shadePoints,camera),contactOverlap=!!h().state().dash?.collisionActiveLastStep||(s.actor.freed&&s.actor.releaseAge<.7),shared=fox&&shade?overlap(fox,shade):1;
-    const fits=!!fox&&!!shade&&fox.heightFraction>.17&&shade.heightFraction>.18&&fox.inFrame&&shade.inFrame&&(contactOverlap||shared<.3);
-    return{...lens,fox,shade,overlap:shared,contactOverlap,noFit:!fits,clear:fits&&clear(lens.pos,s.targets)};
+    const present=!s.actor.freed||s.actor.presence>.5;
+    const fits=!!fox&&fox.heightFraction>.15&&fox.inFrame&&(!present||(!!shade&&shade.heightFraction>.18&&shade.inFrame&&(contactOverlap||shared<.3)));
+    return{...lens,fox,shade,overlap:shared,contactOverlap,noFit:!fits,clear:fits&&clear(lens.pos,present?s.targets:s.targets.slice(-3))};
   };
   const current=(id,previous,held)=>{
     if(held)return inspect(id,held);
     const s=snapshot(id),[x,y,z]=s.actor.pos,[fx,fy,fz]=s.fox,look=[x*.35+fx*.65,(y+s.actor.height*.5)*.35+(fy+(h().debug.foxHeight??1.25)*.5)*.65,z*.35+fz*.65],side=Math.atan2((fx-x)/Math.max(.01,Math.hypot(fx-x,fz-z)),-(fz-z)/Math.max(.01,Math.hypot(fx-x,fz-z)));
     const angles=[side-.65,side+Math.PI+.65,...Array.from({length:16},(_,i)=>i*Math.PI/8)],positions=[...(previous?[previous]:[]),...[2.5,4].flatMap(eye=>angles.flatMap(a=>[5.2,6,6.8].map(r=>[look[0]+Math.cos(a)*r,Math.max(y,fy)+eye,look[2]+Math.sin(a)*r])))];
+    const foxBox=boxOf(s.foxPoints),shadeBox=boxOf(s.shadePoints);
     let fallback;
     for(const pos of positions){let visibility;for(const fov of [42,48,52,56]){
-      const lens={pos,look,fov},camera=virtual(lens),fb=project(boxOf(s.foxPoints).corners,camera),sb=project(boxOf(s.shadePoints).corners,camera);
+      const lens={pos,look,fov},camera=virtual(lens),fb=project(foxBox.corners,camera),sb=project(shadeBox.corners,camera);
       if(!fb||!sb||fb.heightFraction<.17||sb.heightFraction<.18)continue;
       const fox=project(s.foxPoints,camera),shade=project(s.shadePoints,camera),contactOverlap=!!h().state().dash?.collisionActiveLastStep||(s.actor.freed&&s.actor.releaseAge<.7),shared=overlap(fox,shade);
       if(!fox.inFrame||!shade.inFrame||fox.heightFraction<=.17||shade.heightFraction<=.18||(!contactOverlap&&shared>=.3))continue;
@@ -86,11 +90,11 @@ export function installShadeLens() {
     }
     const union=[...s.shadePoints];for(const angle of [-.45,.45])union.push(...posed(s.core,false,angle));
     const drift=Math.min(.3,(h().shades.tun.speed??1.25)*.2),forward=[Math.sin(s.actor.heading??0)*drift,0,Math.cos(s.actor.heading??0)*drift],shade=[...union];for(let i=0;i<union.length;i+=3)shade.push(union[i]+forward[0],union[i+1],union[i+2]+forward[2]);
-    const all=boxOf([...shade,...frames.flatMap(f=>f.points)]),look=all.lo.map((v,i)=>(v+all.hi[i])/2),highestFloor=Math.max(y,...frames.map(f=>f.pos[1])),stats={candidates:0,exactFits:0,sightTests:0,foxHullVertices:local.length/3,forecastSamples:frames.length},fitted=[];
-    for(const fov of [42,48,52,56])for(const eye of [1.6,2.5,3.5])for(let angle=0;angle<16;angle++)for(const factor of [.78,.9,1]){
+    const all=boxOf([...shade,...frames.flatMap(f=>f.points)]),look=all.lo.map((v,i)=>(v+all.hi[i])/2),highestFloor=Math.max(y,...frames.map(f=>f.pos[1])),stats={candidates:0,exactFits:0,sightTests:0,foxHullVertices:local.length/3,forecastSamples:frames.length,rejected:{shade:0,smallFox:0,croppedFox:0,overlap:0}},fitted=[];
+    for(const fov of [42,48,52,56])for(const eye of [1.6,2.5,3.5])for(let angle=0;angle<16;angle++)for(const factor of [.78,.9,1,1.1,1.2]){
       const r=(h().debug.foxHeight??1.25)/(.21*2*Math.tan(fov*Math.PI/360))*factor,a=angle*Math.PI/8,lens={pos:[look[0]+Math.cos(a)*r,highestFloor+eye,look[2]+Math.sin(a)*r],look,fov};stats.candidates++;
-      const camera=virtual(lens),sh=project(shade,camera,.9);if(!sh?.inFrame||sh.heightFraction<=.18)continue;let minimum=Infinity,ok=true;const projected=[];
-      for(const f of frames){const broad=project(f.box.corners,camera,.9);if(!broad||broad.heightFraction<.17){ok=false;break;}const fox=project(f.points,camera,.9);const contact=Math.abs(f.distance-setup.startDistance)<(h().shades.tun.hitRadius+.6);if(!fox.inFrame||fox.heightFraction<=.17||(!contact&&overlap(fox,sh)>=.3)){ok=false;break;}minimum=Math.min(minimum,fox.heightFraction);projected.push({distance:f.distance,foxHeight:fox.heightFraction});}
+      const camera=virtual(lens),sh=project(shade,camera,.94);if(!sh?.inFrame||sh.heightFraction<=.18){stats.rejected.shade++;continue;}let minimum=Infinity,ok=true;const projected=[];
+      for(const f of frames){const broad=project(f.box.corners,camera,.94);if(!broad||broad.heightFraction<.155){stats.rejected.smallFox++;ok=false;break;}const fox=project(f.points,camera,.94);const contact=Math.abs(f.distance-setup.startDistance)<(h().shades.tun.hitRadius+.6);if(!fox.inFrame||fox.heightFraction<=.155||(!contact&&overlap(fox,sh)>=.3)){stats.rejected[!fox.inFrame?'croppedFox':fox.heightFraction<=.155?'smallFox':'overlap']++;ok=false;break;}minimum=Math.min(minimum,fox.heightFraction);projected.push({distance:f.distance,foxHeight:fox.heightFraction});}
       if(ok){stats.exactFits++;fitted.push({lens,minimum,projected,shadeHeight:sh.heightFraction});}
     }
     fitted.sort((a,b)=>b.minimum-a.minimum);

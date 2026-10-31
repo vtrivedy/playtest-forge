@@ -1,3 +1,4 @@
+import { captureShadeHero } from './shade-hero-capture.mjs';
 import { createShadeLensReview } from './shade-lens-capture.mjs';
 import { captureReportSummary } from './capture-report-summary.mjs';
 import { blackFrameIntervals } from './hub-black-frames.mjs';
@@ -437,6 +438,11 @@ try {
     }
     return state;
   }
+  if(wants('shadehero')){
+    if(fps!==60)throw Error('Shade hero review requires60fps');
+    await boot(quality,true);
+    await captureShadeHero({repo,getPage:()=>page,H,advance,video,shot,save,report});
+  }
   if (wants('shade')) {
     if(fps!==60)throw Error('Shade encounter review requires60fps for fixed-step contact and every-six-frame release strips');
     await boot(quality, true);
@@ -487,23 +493,27 @@ try {
         const sample=await page.evaluate(({id,startDistance})=>{
           const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
           if(!actor||actor.freed)return {failure:'No live Kiln Shade'};
-          const [x,y,z]=actor.pos,col=h.debug.world.collision;
+          const [x,y,z]=actor.pos,col=h.debug.world.collision,setups=[];
           for(let k=0;k<128;k++){
             const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
             for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){
               const px=x+dx*r-dz*width,pz=z+dz*r+dx*width,floor=col.groundAt(px,pz,y+.1).y;
               if(!Number.isFinite(floor)||col.blocked(px,pz,y)||Math.abs(floor-y)>.2){safe=false;break;}
             }
-            if(safe)return {actor:actor.pos,mode:actor.mode,setup:{pos:[x+dx*startDistance,y,z+dz*startDistance],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz),startDistance}};
+            if(safe)setups.push({pos:[x+dx*startDistance,y,z+dz*startDistance],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz),startDistance});
           }
-          return {actor:actor.pos,mode:actor.mode,setup:null};
+          return {actor:actor.pos,mode:actor.mode,setup:setups[0]??null,setups};
         },{id:actors[0].id,startDistance});
         trace.push({waitFrames,...sample});
         if(sample.failure)throw Error(sample.failure);
         if(sample.setup&&requireHeld){
-          const plan=await lensReview.plan(actors[0].id,sample.setup);
-          trace[trace.length-1].heldPlan=plan;
-          if(plan.lens)sample.setup.heldLens=plan.lens;else sample.setup=null;
+          const candidates=sample.setups.filter((_,i)=>i%Math.max(1,Math.ceil(sample.setups.length/8))===0);
+          sample.setup=null;trace[trace.length-1].heldPlans=[];
+          for(const setup of candidates){
+            const plan=await lensReview.plan(actors[0].id,setup);
+            trace[trace.length-1].heldPlans.push(plan);
+            if(plan.lens){sample.setup={...setup,heldLens:plan.lens};break;}
+          }
         }
         if(sample.setup){
           save(`${label}-runway-wait.json`,{passed:true,label:'Staged fox moved to world spawn only if needed; live animal returns/patrols until full supported runway exists',movedFoxAway,waitFrames,trace});
