@@ -853,6 +853,7 @@ async function boot() {
           fov: cam.camera.fov,
           yaw: cam.getYaw(),
           occlusion: occlusion.strength,
+          sightBlocked: occlusion.detected,
           photo: !!photo,
           foxNdc: cam.debug.fox,
           landingNdc: cam.debug.landing,
