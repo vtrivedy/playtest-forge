@@ -1429,6 +1429,50 @@ try {
           if (framing.failures.length < 16) framing.failures.push(failure);
         }
         Object.assign(audit, { foxFocusNdc: serialNdc, foxFocusFinite: finite, foxFocusInFrame: inFrame });
+        if (i === 300 || i === 600) {
+          // Forced render-only A/B: same pose/time, never advance or alter inputs.
+          const diagnostic = await page.evaluate(() => {
+            const { renderer, scene, post } = window.__gameHooks.debug;
+            const before = window.__gameHooks.state();
+            const records = new Map();
+            scene.traverse(o => {
+              if (!o.isMesh) return;
+              for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+                const u = renderer.properties.get(m).uniforms;
+                if (!u?.uOccFootFade || !u.uOccFox || !u.uOccStrength || records.has(u.uOccFox.value)) continue;
+                records.set(u.uOccFox.value, { u, w: u.uOccFox.value.w, strength: u.uOccStrength.value });
+              }
+            });
+            if (!records.size) return { available: false, images: {} };
+            const images = {};
+            try {
+              for (const r of records.values()) r.u.uOccStrength.value = 1;
+              post.render(); images.footline = renderer.domElement.toDataURL('image/png');
+              for (const r of records.values()) r.u.uOccFox.value.w = -1e6;
+              post.render(); images.legacyEllipse = renderer.domElement.toDataURL('image/png');
+              for (const r of records.values()) r.u.uOccStrength.value = 0;
+              post.render(); images.cutoutOff = renderer.domElement.toDataURL('image/png');
+            } finally {
+              for (const r of records.values()) {
+                r.u.uOccFox.value.w = r.w;
+                r.u.uOccStrength.value = r.strength;
+              }
+              post.render();
+            }
+            const after = window.__gameHooks.state();
+            if (before.t !== after.t || before.pos.some((v, axis) => v !== after.pos[axis])) throw Error('Underfoot render diagnostic changed simulation state');
+            return { available: true, originalStrength: [...records.values()].map(r => r.strength), images };
+          });
+          const files = [];
+          for (const [mode, data] of Object.entries(diagnostic.images)) {
+            const file = `${name}-underfoot-forced-${i}-${mode}.png`;
+            fs.writeFileSync(path.join(out, file), Buffer.from(data.split(',')[1], 'base64'));
+            files.push(file);
+          }
+          const proof = { frame: i, scope: 'Forced shader stress A/B; render only at unchanged pose/time, uniforms restored before video encoding', available: diagnostic.available, originalStrength: diagnostic.originalStrength, files, time: st.t, pos: st.pos };
+          save(`${name}-underfoot-forced-${i}.json`, proof);
+          audit.underfootDiagnostic = proof;
+        }
       }
       // Bounded diagnostics for the camera stream's recorded hidden-wedge and
       // over-compressed stair frames. Run only on the remote capture worker.
