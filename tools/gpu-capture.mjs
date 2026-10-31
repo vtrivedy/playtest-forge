@@ -581,14 +581,14 @@ try {
       {name:'Windmill entrance ascent',seconds:3,stick:td.map(v=>v*.18),reset:sp(-6,0,.1+1.9*.5/6.9)},
       {name:'Windmill slope jump and land',seconds:3,stick:td.map(v=>v*.18),jump:true,reset:sp(-4,0,.1+1.9*2.5/6.9)},
       {name:'Meadow dash',seconds:1,stick:[0,-1],dash:true,reset:[0,null,86]},
-      {name:'Windmill brake and settle',seconds:2,stick:[0,0]},
+      {name:'Meadow brake and settle',seconds:2,stick:[0,0]},
       {name:'Meadow long drop and landing',seconds:2,stick:[0,0],reset:[0,null,80],drop:8,settle:0},
       {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true},
     ];
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
     const keyFrames=segments.flatMap(segment=>segment.standing ? [0,1,2,3,5,8,15,30,45,65].map(f=>segment.start+f).concat(segment.end-1) : segment.drop ? [.08,.25,.4,.55,.7,1,1.5].map(t=>segment.start+Math.round(fps*t)).concat(segment.end-1) : [segment.start+Math.round(fps*.25),segment.end-1]);
-    save('showcase-script.json',{label:'World1 live controller, staged segment cuts, tracked three-quarter review camera, no forced poses or grade',segments});
+    save('showcase-script.json',{label:'World1 live controller, staged segment cuts, fixed world-offset tracking photo lens; view angle varies with heading, no forced poses or grade',segments});
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
@@ -615,7 +615,7 @@ try {
     const standingWindupFrames=standingRows.filter(row=>row.state.locomotion?.windupActive).length;
     const standingJumpAirborne=standingRows.some(row=>!row.state.grounded);
     const standingJumpLanded=standingRows.at(-1)?.state.grounded ?? false;
-    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'tracked three-quarter review lens',longDropHeight:drop.drop,longDropFallSeconds,longDropLanded,longDropHeldFrames,standingWindupFrames,standingJumpAirborne,standingJumpLanded,slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
+    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'fixed world-offset tracking photo lens, rear on boardwalk/front-side on Windmill; not gameplay camera',longDropHeight:drop.drop,longDropFallSeconds,longDropLanded,longDropHeldFrames,standingWindupFrames,standingJumpAirborne,standingJumpLanded,slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
@@ -625,8 +625,8 @@ try {
     const segments=[];
     for(const lens of ['side','three-quarter']) for(const [gait,stick,seconds] of [['walk',.18,3],['trot',.45,3],['run',1,2]]) {
       await H('setKeys',[]);await H('setStick',0,0);await H('photoOff');
-      const y=await page.evaluate(()=>window.__gameHooks.debug.world.collision.highestAt(0,88));
-      await H('teleport',0,y,88,Math.PI);await advance(30);
+      const y=await page.evaluate(()=>window.__gameHooks.debug.world.collision.highestAt(40,88));
+      await H('teleport',40,y,88,Math.PI);await advance(30);
       const name=`worldgait-${lens}-${gait}`, initial=await H('state');
       const frameLens=async st=>{
         const [x,y,z]=st.pos;
@@ -638,9 +638,12 @@ try {
         afterStep:async(i,st)=>{if(st.deaths!==initial.deaths)throw Error(`${name}: death`);await frameLens(st);}
       });
       await H('setStick',0,0);await H('setKeys',[]);await shot(`${name}-end`);
-      const end=await H('state');segments.push({name,gait,stick,seconds,initial,end,camera:`staged ${lens} tracking photo lens, live controller`,reset:[0,y,88]});
+      const end=await H('state');
+      const rows=report.videos[name].trace.filter(r=>r.frame>=fps),speeds=rows.map(r=>Math.hypot(r.state.vel[0],r.state.vel[2])).sort((a,b)=>a-b);
+      const measured={medianSpeed:speeds[Math.floor(speeds.length/2)],groundedFraction:rows.filter(r=>r.state.grounded).length/rows.length,gaits:Object.fromEntries([...new Set(rows.map(r=>r.state.locomotion?.gait??r.state.anim))].map(g=>[g,rows.filter(r=>(r.state.locomotion?.gait??r.state.anim)===g).length]))};
+      segments.push({name,gait,stick,seconds,initial,end,measured,camera:`staged ${lens} tracking photo lens, live controller`,reset:[40,y,88]});
     }
-    save('worldgait-acceptance.json',{label:'Six staged movement segments in Arrival Meadow; no forced animation poses; not a continuous route or gameplay-camera proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths)});
+    save('worldgait-acceptance.json',{label:'Six staged movement segments on the east Arrival Meadow line (40,88); no forced animation poses; not a continuous route or gameplay-camera proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths)});
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');

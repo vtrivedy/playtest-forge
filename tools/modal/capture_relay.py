@@ -22,6 +22,11 @@ def capture_request(stream, request, folder):
     ref=request.get('ref', request.get('sha',''))
     if not isinstance(ref,str): raise ValueError('ref must be a string')
     ref=ref.lower()
+    latest_file=folder.parents[1]/f'{stream}-request.json'
+    if latest_file.exists() and request.get('stage')!='before':
+        latest=json.loads(latest_file.read_text())
+        if isinstance(latest,dict) and latest.get('ref',latest.get('sha'))!=ref:
+            return {'status':'superseded','reason':'Newer immutable ref queued before this job started; no GPU launched'}
     shots=request.get('shots','stills')
     if isinstance(shots,list) and all(isinstance(s,str) for s in shots): shots=','.join(shots)
     if not isinstance(shots,str): raise ValueError('shots must be a string or list of strings')
