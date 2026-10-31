@@ -148,7 +148,7 @@ export class ColorField {
 
   /** Soft-edge half-width of a restore front at its current radius (m). */
   static edgeOf(r: RestoreRegion): number {
-    return Math.min(r.radius * 0.22, r.edgeMax * (1 + 0.6 * THREE.MathUtils.smoothstep(r.t, 0.8, 1)));
+    return Math.min(r.radius * 0.18, r.edgeMax);
   }
 
   update(dt: number): void {
@@ -287,7 +287,7 @@ export class ColorField {
         varying vec2 vWorld;
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
-          // world-space brush noise (two octaves, slow drift): neighbouring stamps share one ragged,
+          // Stationary world-space brush noise: neighbouring stamps share one ragged,
           // organic edge instead of each repeating the same disc outline
           float n = ((noise(vWorld * 0.55) - 0.5) * 1.6 + (noise(vWorld * 2.1) - 0.5) * 0.7) * vNoise;
           // Reserve an unpainted border for outward brush variation. Without it,
@@ -354,7 +354,7 @@ export class ColorField {
 
     for (const r of this.restores) {
       if (r.radius > 0.01) {
-        // full strength inside radius - edge, fading to 0 by radius + edge (matches the analytic front)
+        // Extra support around the analytic front keeps brush bleed inside the stamp quad.
         const edge = Math.max(0.3, ColorField.edgeOf(r));
         const outer = (r.radius + edge * 1.8) / 0.88;
         stamps.push({
