@@ -335,8 +335,8 @@ async function boot() {
     folder.add(params, 'minStanceRatio', .2, 1, .01);
     folder.add(params, 'bodyBob', 0, 1, .01);
     folder.add(params, 'swingEase', 0, 1, .05);
-    folder.add(params, 'trotLift', 0, .05, .002);
-    folder.add(params, 'gallopLift', 0, .06, .002);
+    folder.add(params, 'swingTuck', 0, .8, .01);
+    folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
     folder.add(params, 'takeoffPitch', 0, .2, .005);
     folder.add(params, 'rockDamp', 0, 2, .05);
@@ -514,6 +514,7 @@ async function boot() {
   fFox.add(FOX_LOOK, 'furValue', 0.5, 1.5, 0.01);
   fFox.add(FOX_LOOK, 'strokeStrength', 0, 0.5, 0.01);
   fFox.add(FOX_LOOK, 'strokeScale', 0.25, 4, 0.01);
+  fFox.add(FOX_LOOK, 'furFringe', 0, 1.5, 0.01);
   fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
   fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
