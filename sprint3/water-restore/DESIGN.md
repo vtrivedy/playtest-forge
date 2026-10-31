@@ -119,3 +119,7 @@ The d99 dash/wake frames contain a large white H-a shelf arc at the right/bottom
 ## Remote harness import repair (391499c GPU startup failure)
 
 The integrated capture script statically imports new water-wade-capture.mjs, but the existing Modal image does not package that file. GPU68fa397eaf49 fails at Node module resolution before any render/report, so it is not game/exposure evidence. Load the optional wade helper from the immutable fetched repo tools directory inside its existing water-coverage branch. This avoids a stale image dependency and binds the helper to the requested commit. No browser run locally; node syntax check only, then fresh remote request.
+
+## Fresh-scene wading capture validation
+
+Independent Sol audit of ebffd87 finds that the new wade helper boots three fresh scenes after the existing pond GL gate, but checks only deaths. Add per-view evidence and assertions for scene-colour copy progress, supported first/current PCF, matching half-float composer dimensions, and zero GL/invalid-target errors. Rearm copy diagnostics before each video frame to check later copies too; preserve boot errors rather than clearing them. Record reflection counters but do not require a mirror from a below-surface/culled lens. Save each view's renderer summary before a failure throws. No game renderer, camera path, collision or appearance changes. Keep the already pending ebffd87 request immutable; apply the stronger evidence gate to the next requested ref.
