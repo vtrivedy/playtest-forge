@@ -221,6 +221,7 @@ async function boot() {
   const cam = createFollowCamera({
     scenery: world.group,
     surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
+    lensBlocked: (x, y, z, radius) => col.cameraOccupied(x, y, z, radius),
   });
   cam.snapBehind(spawnYaw);
   cam.camera.far = quality.far;

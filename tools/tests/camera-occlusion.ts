@@ -311,6 +311,31 @@ assert.ok(highestEars < .9, 'nose protection retains the ears');
 assert.ok(steepestView < 40, `nose protection avoids top-down framing: ${steepestView}`);
 console.log('Downhill front proxy:', JSON.stringify({ lowestNose, highestEars, steepestView }));
 
+// Isolate authored-volume clearance from the earlier mesh-ray solver. A clear
+// spring endpoint crosses this solid; the final lens must slide continuously.
+const volumeWorld = new CollisionWorld(() => 0);
+volumeWorld.add(cylCollider({ x: 0, z: 3.2, r: .55, top: 3, bottom: 0 }));
+const volumeCamera = createFollowCamera({ surfaceAt: () => 0,
+  lensBlocked: (x, y, z, radius) => volumeWorld.cameraOccupied(x, y, z, radius) });
+volumeCamera.resize(1280, 720);
+const volumeTarget = new THREE.Vector3(-4, 0, 0);
+for (let i = 0; i < 120; i++) volumeCamera.update(1 / 60, { ...idleFrame, target: volumeTarget });
+const volumePrevious = volumeCamera.camera.position.clone();
+let volumeMaxStep = 0, volumeActiveFrames = 0;
+for (let i = 0; i < 240; i++) {
+  volumeTarget.x = -4 + i * 2 / 60;
+  volumeCamera.update(1 / 60, { ...idleFrame, target: volumeTarget, vel: new THREE.Vector3(2, 0, 0), facing: Math.PI / 2 });
+  const lens = volumeCamera.camera.position;
+  assert.equal(volumeWorld.cameraOccupied(lens.x, lens.y, lens.z, .2), false, 'rendered lens stays outside authored solid');
+  assert.match(volumeCamera.debug.internals(), /lensUnresolved=false/);
+  volumeMaxStep = Math.max(volumeMaxStep, lens.distanceTo(volumePrevious));
+  if (Math.abs(lens.z - 3.23918266122983) > .15) volumeActiveFrames++;
+  volumePrevious.copy(lens);
+}
+assert.ok(volumeMaxStep < .3, `volume clearance does not jump across a solid: ${volumeMaxStep}`);
+assert.ok(volumeActiveFrames > 10, 'volume test actually changes the lens path');
+console.log('Volume clearance CPU probe:', JSON.stringify({ volumeMaxStep, volumeActiveFrames }));
+
 for (const velocity of [new THREE.Vector3(0, 0, 9), new THREE.Vector3(4.5, 0, -7.8)]) {
   const follow = createFollowCamera();
   const reference = createFollowCamera({ params: { minDistance: 0 } });
