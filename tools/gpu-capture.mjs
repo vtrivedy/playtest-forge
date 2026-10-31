@@ -1188,36 +1188,44 @@ try {
     const start = await H('state');
     const spawnDistanceToFirst = Math.hypot(start.pos[0] - route[0].x, start.pos[1] - route[0].y, start.pos[2] - route[0].z);
     if (kilnRoute && start.seedwells.some(s => s.id === 'SW1' && s.lit)) throw Error('Kiln proof requires an initially unlit SW1');
-    save('route-plan.json', { schemaVersion: 2, start: { pos: start.pos, seedwells: start.seedwells, deaths: start.deaths, auto: start.auto }, spawnDistanceToFirst, from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
+    save('route-plan.json', { schemaVersion: 2, start: { pos: start.pos, seedwells: start.seedwells, deaths: start.deaths, auto: start.auto }, spawnDistanceToFirst, from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : kilnRoute ? 'Continuous first-Kiln clear plus authored onward gameplay; no full-realm claim' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
     await H('autopilot', true, from, { assist: false });
-    let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion;
-    let kilnStopped = false;
+    let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt;
+    const continuity = { maxStepMeters: 0, maxStepFrame: null, jumpLimitMeters: Math.max(3, 90 / fps), firstLargeStep: null };
+    const encounter = { initialHits: start.shades.hits, minWisps: start.shades.wisps, knockbackTravelMeters: 0 };
+    let previousPos = start.pos, previousKnockback = start.shades.knockbackTravel ?? 0;
     const framing = { samples: 0, outside: 0, maxAbsX: 0, maxAbsY: 0, firstFailure: null, failures: [] };
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const budgetFrames = Number(arg('route-seconds', '360')) * fps;
     if (kilnRoute && budgetFrames < 60 * fps) throw Error('Kiln proof requires a capture budget of at least 60 seconds');
-    const state = await video(name, budgetFrames, async () => {
-      if (kilnCompletedAt !== undefined && !kilnStopped) {
-        await H('autopilot', false, kilnCompletion.idx, { assist: false });
-        await H('setKeys', []);
-        await H('setStick', null);
-        kilnStopped = true;
-      }
-    }, (st, i) => {
+    const state = await video(name, budgetFrames, async () => {}, (st, i) => {
       if (kilnLatchedAt === undefined && st.seedwells.some(s => s.id === 'SW1' && s.lit)) kilnLatchedAt = i;
       if (kilnRoute) {
-        if (kilnCompletedAt === undefined && st.auto.idx >= to && st.seedwells.some(s => s.id === 'SW1' && s.lit)) {
+        const endpoint = route[to - 1];
+        const distanceToFeed = Math.hypot(st.pos[0] - endpoint.x, st.pos[2] - endpoint.z);
+        const nearFeed = distanceToFeed <= 3 && Math.abs(st.pos[1] - endpoint.y) <= 1;
+        if (firstFeedCrossing === undefined && st.auto.idx >= to) firstFeedCrossing = { frame: i, pos: st.pos, distanceToFeed, grounded: st.grounded, kilnLit: st.seedwells.some(s => s.id === 'SW1' && s.lit) };
+        if (kilnCompletedAt === undefined && st.auto.idx >= to && st.seedwells.some(s => s.id === 'SW1' && s.lit) && st.grounded && nearFeed) {
           kilnCompletedAt = i;
-          kilnCompletion = { idx: st.auto.idx, pos: st.pos, t: st.t };
+          kilnCompletion = { idx: st.auto.idx, pos: st.pos, t: st.t, distanceToFeed, grounded: st.grounded, shades: { hits: st.shades.hits, wisps: st.shades.wisps } };
         }
-        // Hold the real endpoint under live physics for the remainder of the minute.
-        // Stalls remain short failed captures; a stopped successful bot is intentional.
-        return st.deaths > 0 || kilnCompletedAt === undefined && !st.auto.active || kilnCompletedAt !== undefined && i + 1 >= budgetFrames;
+        if (kilnCompletedAt !== undefined && departedAt === undefined && distanceToFeed > 3) departedAt = i;
+        // Keep playing the authored onward route after the independently observed Kiln arrival.
+        // Standing idle here is unsafe: the existing Shade patrol crosses the feed landing.
+        return st.deaths > 0 || !st.auto.active || kilnCompletedAt !== undefined && i + 1 >= 60 * fps;
       }
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
-    }, kilnRoute ? { sample: async i => {
+    }, kilnRoute ? { sample: async (i, st) => {
+      const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
+      if (step > continuity.maxStepMeters) { continuity.maxStepMeters = step; continuity.maxStepFrame = i; }
+      if ((!Number.isFinite(step) || step > continuity.jumpLimitMeters) && continuity.firstLargeStep === null) continuity.firstLargeStep = { frame: i, meters: Number.isFinite(step) ? step : String(step), from: previousPos, to: st.pos };
+      previousPos = st.pos;
+      encounter.minWisps = Math.min(encounter.minWisps, st.shades.wisps);
+      const knockback = st.shades.knockbackTravel ?? 0;
+      encounter.knockbackTravelMeters += Math.max(0, knockback - previousKnockback);
+      previousKnockback = knockback;
       const ndc = await page.evaluate(() => {
         const { fox, camera } = window.__gameHooks.debug;
         const focus = fox.getWorldPosition(fox.position.clone());
@@ -1239,15 +1247,16 @@ try {
       return { foxFocusNdc: serialNdc, foxFocusFinite: finite, foxFocusInFrame: inFrame };
     } } : {});
     if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
-    await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
+    await H('autopilot', false, state.auto.idx, { assist: false });
+    await H('setKeys', []); await H('setStick', null); await shot('route-end');
     const endpointReached = kilnRoute ? kilnCompletion !== undefined && kilnCompletion.idx >= to : bounded ? state.auto.idx >= to : state.restored;
     const endpoint = route[to - 1];
     const endpointDistance = Math.hypot(state.pos[0] - endpoint.x, state.pos[2] - endpoint.z);
     const endpointStable = endpointDistance <= 3 && Math.abs(state.pos[1] - endpoint.y) <= 1 && state.grounded;
     const kilnLit = state.seedwells.some(s => s.id === 'SW1' && s.lit);
-    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && endpointStable && framing.samples === report.videos[name].frames && framing.outside === 0 && report.videos[name].frames >= 60 * fps) && !state.auto.assists && !state.deaths;
-    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnCompletion && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : endpointReached && kilnRoute && framing.outside > 0 ? 'fox-out-of-frame' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
-    save('route-acceptance.json', { schemaVersion: 2, passed, reason, from, to, staged: regional, kilnLatchedAt, kilnCompletedAt, kilnCompletion, endpointDistance, endpointStable, framing: kilnRoute ? { samples: framing.samples, outside: framing.outside, maxAbsX: framing.maxAbsX, maxAbsY: framing.maxAbsY, firstFailure: framing.firstFailure } : null, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && !state.auto.stalled && continuity.firstLargeStep === null && framing.samples === report.videos[name].frames && framing.outside === 0 && report.videos[name].frames >= 60 * fps) && !state.auto.assists && !state.deaths;
+    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : state.auto.stalled ? 'stalled' : kilnRoute && continuity.firstLargeStep ? 'position-jump' : endpointReached && kilnRoute && framing.outside > 0 ? 'fox-out-of-frame' : kilnRoute && !endpointReached && firstFeedCrossing ? 'arrival-missing' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
+    save('route-acceptance.json', { schemaVersion: 3, passed, reason, from, to, staged: regional, postKiln: kilnRoute ? 'Continues authored onward gameplay to the clip budget; no idle hold' : null, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt, failurePhase: passed ? null : kilnCompletedAt === undefined ? 'pre-arrival' : 'post-arrival', postArrivalSeconds: kilnCompletedAt === undefined ? null : (report.videos[name].frames - kilnCompletedAt - 1) / fps, finalDistanceToFeed: endpointDistance, finalNearFeedStable: endpointStable, continuity: kilnRoute ? continuity : null, encounter: kilnRoute ? { ...encounter, finalHits: state.shades.hits, hitsBeforeArrival: kilnCompletion ? kilnCompletion.shades.hits - encounter.initialHits : state.shades.hits - encounter.initialHits, hitsAfterArrival: kilnCompletion ? state.shades.hits - kilnCompletion.shades.hits : null } : null, framing: kilnRoute ? { samples: framing.samples, outside: framing.outside, maxAbsX: framing.maxAbsX, maxAbsY: framing.maxAbsY, firstFailure: framing.firstFailure } : null, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
     if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
