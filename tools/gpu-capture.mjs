@@ -940,7 +940,7 @@ try {
     save('water-scene-capture.json', {before:pondCaptureStart,...waterCapture});
     const d = waterCapture.after, expected = waterCapture.expected;
     if (!d || !pondCaptureStart || d.copies <= pondCaptureStart.copies || d.reflections <= pondCaptureStart.reflections || d.checkedCopies <= pondCaptureStart.checkedCopies
-      || expected.shadowType !== 1 || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.bootGlError || d.invalidTargets) {
+      || d.shadowTypeAtFirstPrepare !== 1 || expected.shadowType !== 1 || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.bootGlError || d.bootPriorGlError || d.invalidTargets) {
       report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
     }
   }
