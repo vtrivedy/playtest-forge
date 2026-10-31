@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import assert from 'node:assert/strict';
 import { createLanternhollow, HUB_HOUSES, HUB_PATHS, HUB_FESTOON_POSTS, hubPathDistance } from '../../games/fox-spirit/src/regionLanternhollow.ts';
-import { outlineR } from '../../games/fox-spirit/src/russetvale.ts';
+import { outlineR, MEADOW_TREES } from '../../games/fox-spirit/src/russetvale.ts';
 import { Bucket } from '../../games/fox-spirit/src/russetKit.ts';
 import { CollisionWorld, colliderTopAt } from '../../games/fox-spirit/src/collision.ts';
 // CPU geometry only. Canvas drawing is stubbed; no renderer/browser is created.
@@ -41,10 +41,16 @@ const probe = new THREE.Raycaster();
 let smokeProbes = 0;
 group.traverse(o => { if ((o as THREE.Sprite).isSprite) { o.raycast(probe, spriteHits); smokeProbes++; } });
 if(smokeProbes !== 8 || spriteHits.length) throw Error('Decorative smoke entered camera-free blocker probes');
-const edgeDoor = [-9.7,102.3];
-assert.ok(outlineR(Math.atan2(edgeDoor[1],edgeDoor[0]))-Math.hypot(...edgeDoor) >= 4.5, 'Arrival doorstep crowds cliff');
+for (const path of HUB_PATHS.filter(p => p[1] >= 100 || p[3] >= 100)) {
+  for (const [x,z] of [[path[0],path[1]],[path[2],path[3]]]) {
+    assert.ok(outlineR(Math.atan2(z,x))-Math.hypot(x,z) >= 4.5, `Arrival lane crowds cliff: ${x},${z}`);
+  }
+}
 let maxError=0;
 for (const house of HUB_HOUSES) {
+  for (const [x,z] of MEADOW_TREES) {
+    assert.ok(Math.abs(x-house.x) > house.w/2+.8 || Math.abs(z-house.z) > house.d/2+.8, `Fixed tree overlaps cottage roof: ${x},${z}`);
+  }
   // The jagged island edge is tighter than its nominal ellipse at the south-west.
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     const x = house.x + sx * (house.w / 2 + .6), z = house.z + sz * (house.d / 2 + .6);

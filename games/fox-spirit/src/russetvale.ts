@@ -221,7 +221,8 @@ const AMBER_TREES: Array<[number, number, number, number]> = [
   [20, -16, 16, 1],
 ];
 
-const MEADOW_TREES: Array<[number, number, number, number]> = [
+export const MEADOW_TREES: Array<[number, number, number, number]> = [
+  [-44, 83, 9, 1], // relocated from the new cottage plot; stable index preserves other tree seeds
   [16, 82, 8, 2],
   [-34, 76, 10, 0],
   [30, 70, 9, 3],

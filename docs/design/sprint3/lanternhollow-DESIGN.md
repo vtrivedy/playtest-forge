@@ -14,14 +14,14 @@ Lanternhollow occupies the existing arrival meadow within continuous Russetvale.
 | Pond-side cottage | -18,84.6 | 4.2 × 3.8 m; eave2.3 m, ridge3.5 m | Body box,12 roof strips |
 | Arrival cottage | -9,99.6 | 4.4 × 3.6 m; eave2.3 m, ridge3.55 m | Body box,12 roof strips |
 | Outer cottage | -37,86 | 5 × 4 m; eave2.5 m, ridge3.95 m | Body box,12 roof strips |
-| Market stores | -23.6,85.2 / -22.4,85.1 | Low timber crate and open barrel | Box/cylinder |
+| Market stores | -23.6,85.2 / -22.4,85.1 | Low timber crate and lidded barrel | Box/cylinder |
 | Great Well | -8,85 | Outer radius about 1.6 m; parapet 0.93 m; pulley arch about 3.6 m | 12 masonry boxes, low post cylinders; overhead rig decorative |
 | Rest bench | -10,91 | 2.2 × 0.7 m; seat 0.8 m | Box; feet sunk into slope |
 | Rise fingerboard | -10,67 | 2.3 × 0.42 m at height 1.65 m | Decorative; points toward (-34,56) |
 | Reedmarsh fingerboard | 25,88 | Same | Decorative; points toward (57,40) |
 | Amberwood fingerboard | -3,78 | Same | Decorative; points toward (0,12) |
 
-Six cottages form a western crescent and arrival edge around the well; the east cottage frames arrival. Their footprints stay outside the central lane. The prior maple at(-19,82) is removed because the new pond-side cottage occupies its roof/canopy gap; the existing(-34,76) maple remains. The large arch remains; the purely decorative arrival stone ring is removed to clear the natural chase view.
+Six cottages form a western crescent and arrival edge around the well; the east cottage frames arrival. Their footprints stay outside the central lane. The prior maple moves from(-19,82) to(-44,83), preserving all other tree seeds because the new pond-side cottage occupies its roof/canopy gap; the existing(-34,76) maple remains. The large arch remains; the purely decorative arrival stone ring is removed to clear the natural chase view.
 
 Bramble's doorstep path bends through (-18,95), (-14,95), (-12.5,89.5) and (-8,88), clearing its wall corner and the bench. Archive connects(-29.2,87.5) through(-24,88.3),(-18.7,87.2),(-14,87.8) to(-12.5,89.5), clearing Bramble’s winter store. The outer cottage joins via(-37.7,88.7),(-34,90),(-32,88.5). Arrival cottage joins(-9.7,102.3) through(-5.7,102.3),(-5,100.5) to(0,94). East connects (12,98) through (8,99) to (0,94). Branches continue toward the existing realm destinations. Softly feathered terrain paint marks the trails; extra packed-earth contrast fades out between z80 and z72. There is no raised path geometry, hard color disc, scene change or new gate.
 

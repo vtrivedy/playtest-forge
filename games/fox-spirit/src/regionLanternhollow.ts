@@ -183,10 +183,8 @@ export function createLanternhollow(
     }
     col.add(boxCollider({ x, z, w: .95, d: .8, top: y + .66, bottom: y - .15, tag: 'hub-market' }));
     const bx = -22.4, bz = 85.1, by = ground(bx, bz), r = .38;
-    const shell = new THREE.CylinderGeometry(r, r * .82, .56, 12, 1, true);
+    const shell = new THREE.CylinderGeometry(r, r * .82, .56, 12);
     b.wood.add(shell, trs(bx, by + .28, bz), PAL.wood.clone().multiplyScalar(.9)); shell.dispose();
-    const base = new THREE.CylinderGeometry(r * .82, r * .82, .06, 12);
-    b.dark.add(base, trs(bx, by + .04, bz), dark); base.dispose();
     for (const yy of [.10, .49]) {
       const band = new THREE.TorusGeometry(yy < .2 ? r * .86 : r * .98, .025, 4, 12);
       const matrix = new THREE.Matrix4().makeRotationX(Math.PI / 2); matrix.setPosition(bx, by + yy, bz);
@@ -198,6 +196,7 @@ export function createLanternhollow(
   for (let i = 0; i < 7; i++) {
     const t = (i + .5) / 7, x = THREE.MathUtils.lerp(-12.5, -8, t), z = THREE.MathUtils.lerp(89.5, 88, t);
     const g = new THREE.CylinderGeometry(.24 + (i % 3) * .035, .27, .1, 7);
+    g.rotateY(i * 1.17); // rotate before sampling terrain, never after the fit
     const p = g.getAttribute('position');
     for (let v = 0; v < p.count; v++) p.setY(v, ground(x + p.getX(v), z + p.getZ(v)) + p.getY(v) - .025);
     g.computeVertexNormals(); b.stone.add(g, trs(x, 0, z), PAL.stone.clone().multiplyScalar(.8)); g.dispose();
