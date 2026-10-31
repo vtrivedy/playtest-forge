@@ -740,17 +740,18 @@ try {
     save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
     // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
     const orbitCameras = [];
-    const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-7, 90));
-    const orbitTarget = [-7, targetGround + 1.2, 90];
+    const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-10, 88));
+    const orbitTarget = [-10, targetGround + 2, 88];
     const orbitLens = (angle, height) => [-9 + Math.sin(angle) * 30, height, 88 + Math.cos(angle) * 24];
     // One fixed clearance height avoids frame-to-frame camera pops. The ellipse
     // stays >2m outside every cottage roof footprint; low close/chase shots above
     // retain the player-scale views. Every captured pose is checked and logged.
-    let orbitHeight = targetGround + 14;
-    for (const height of [6, 8, 10, 12, 14].map(h => targetGround + h)) {
+    let orbitHeight = targetGround + 26;
+    let orbitHeightSearchClear = false;
+    for (const height of [6, 8, 10, 12, 14, 18, 22, 26].map(h => targetGround + h)) {
       let clear = true;
       for (let j = 0; j < 36 && clear; j++) clear = !(await H('photoBlocker', orbitLens(j / 36 * Math.PI * 2, height), orbitTarget));
-      if (clear) { orbitHeight = height; break; }
+      if (clear) { orbitHeight = height; orbitHeightSearchClear = true; break; }
     }
     let orbitBlocked = 0;
     await video('hub-orbit', 18 * fps, async i => {
@@ -760,7 +761,7 @@ try {
       orbitCameras.push({ frame: i, lens, target: orbitTarget, blocker });
       await H('photo', lens, orbitTarget, 58);
     }, undefined, {keyFrames: [0, 3*fps, 6*fps, 9*fps, 12*fps, 15*fps, 18*fps-1]});
-    save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, blockedFrames: orbitBlocked, cameras: orbitCameras });
+    save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, heightSearchClear: orbitHeightSearchClear, probeAngles: 36, blockedFrames: orbitBlocked, cameras: orbitCameras });
     if (orbitBlocked) report.failures.push(`Hub context orbit has ${orbitBlocked} blocked review frames`);
     await H('photoOff');
 
