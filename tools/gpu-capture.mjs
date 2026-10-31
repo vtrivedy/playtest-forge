@@ -1011,7 +1011,7 @@ try {
     if(!landingTakes.every(landingPass))throw Error('Landing A/B must land with four compression contacts and submillimeter compression residual; visual review still required');
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
-  if (wants('worldgait') && !hipDiagnostic) {
+  if ((wants('worldgait') || wants('worldstrides')) && !hipDiagnostic) {
     if(fps!==60)throw Error('World gait comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
@@ -1059,13 +1059,15 @@ try {
     save('worldgait-preflight.json',preflight);
     if(preflight.x===null)throw Error('No clear terrain-only meadow review corridor');
     const segments=[];
+    const shortGlide=wants('worldstrides') && !wants('worldgait');
     const profiles=[
       {gait:'walk',stick:.18,seconds:3},
       {gait:'trot',stick:.45,seconds:3},
       {gait:'run',stick:1,seconds:2},
       {gait:'turn',stick:.45,seconds:3},
       {gait:'jump',stick:.45,seconds:3},
-    ];
+    ].filter(profile=>!shortGlide || ['walk','trot','run'].includes(profile.gait))
+      .map(profile=>shortGlide ? {...profile,seconds:2} : profile);
     for(const lens of ['side','three-quarter']) for(const {gait,stick,seconds} of profiles) {
       await H('setKeys',[]);await H('setStick',0,0);await H('photoOff');
       const y=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[preflight.x,preflight.z]);
@@ -1129,8 +1131,8 @@ try {
       const passed=end.deaths===initial.deaths && !visibility.blocked.length && motionPassed && measured.speedFraction>.9 && measured.speedFraction<1.1;
       segments.push({name,gait,stick,seconds,initial,end,measured,visibility,passed,camera:`staged west-side ${lens} world-offset tracking photo lens, relative angle changes during turn; live controller`,reset:[preflight.x,y,preflight.z]});
     }
-    save('worldgait-acceptance.json',{label:'Ten staged live-input movement segments on a disclosed preflighted Arrival Meadow line, including turns and jumps; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof',segments,passed:segments.every(s=>s.passed)});
-    if(segments.some(s=>!s.passed))throw Error('World gait review requires clear chest/head/feet sight lines, measured requested movement, observed jump air and grounded recovery');
+    save('worldgait-acceptance.json',{selection:shortGlide?'worldstrides':'worldgait',label:`${shortGlide?'Six straight':'Ten including turns and jumps'} staged live-input movement segments on a disclosed preflighted Arrival Meadow line; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof`,segments,passed:segments.every(s=>s.passed)});
+    if(segments.some(s=>!s.passed))throw Error('World gait review failed requested movement or clear chest/head/feet sight lines; action profiles additionally require jump air and grounded recovery');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
