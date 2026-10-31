@@ -64,17 +64,25 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   const warningColor = new THREE.Color(0xb09b67);
   const waters = waterSpots.map(spot => {
     const reactor = new Reactor(spot.id, 'water', spot.probes ?? [spot.lip.clone(), spot.foot.clone().setY(0.6)], tun);
-    const glass = new THREE.MeshPhysicalMaterial({ color: 0xc7c6af, roughness: 0.22, metalness: 0, transmission: 0, thickness: 0.3, transparent: true, opacity: 0.88, emissive: 0x775832, emissiveIntensity: 0.18, side: THREE.DoubleSide });
-    const animation = { uWaterTime: { value: 0 }, uWaterFlow: { value: 0 } };
+    const glass = new THREE.MeshPhysicalMaterial({ color: 0x6b7566, roughness: 0.25, metalness: 0, transmission: 0, thickness: 0.3, transparent: true, opacity: 0.64, depthWrite: false, emissive: 0x302a1c, emissiveIntensity: 0.04, side: THREE.DoubleSide });
+    const animation = { uWaterTime: { value: 0 }, uWaterFlow: { value: 0 }, uWaterHalfWidth: { value: spot.width * 0.4 } };
     glass.onBeforeCompile = shader => {
       Object.assign(shader.uniforms, animation);
       shader.vertexShader = 'uniform float uWaterTime; uniform float uWaterFlow; varying vec2 vWaterP;\n' + shader.vertexShader;
-      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterP = position.xy; transformed.z += sin(position.y * 3.4 - uWaterTime * 8.0) * 0.045 * uWaterFlow;');
-      shader.fragmentShader = 'uniform float uWaterTime; uniform float uWaterFlow; varying vec2 vWaterP;\n' + shader.fragmentShader;
-      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\nfloat streak = pow(max(0.0, sin(vWaterP.x * 22.0 + sin(vWaterP.y * 1.5 - uWaterTime * 7.0))), 10.0); diffuseColor.rgb += vec3(0.12, 0.115, 0.095) * streak * uWaterFlow;');
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterP = position.xy; transformed.z += sin(position.y * 2.4 - uWaterTime * 3.5) * 0.025 * uWaterFlow;');
+      shader.fragmentShader = 'uniform float uWaterTime; uniform float uWaterFlow; uniform float uWaterHalfWidth; varying vec2 vWaterP;\n' + shader.fragmentShader;
+      shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+        float ribbon = sin(vWaterP.x * 13.0 + sin(vWaterP.y * 1.1 - uWaterTime * 3.2) * 0.45) * 0.5 + 0.5;
+        float streak = pow(ribbon, 12.0);
+        float travelling = sin(vWaterP.y * 4.0 + vWaterP.x * 2.0 + uWaterTime * 5.0) * 0.5 + 0.5;
+        diffuseColor.rgb += vec3(0.16, 0.14, 0.10) * streak * uWaterFlow;
+        // Dark gaps and soft margins let the bank show through the moving sheet.
+        float margin = 1.0 - smoothstep(0.66, 1.0, abs(vWaterP.x) / uWaterHalfWidth);
+        diffuseColor.a *= margin * mix(1.0, 0.36 + ribbon * 0.35 + streak * travelling * 0.25, uWaterFlow);
+      `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float fallFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
-        outgoingLight = mix(outgoingLight, vec3(0.48, 0.40, 0.28), fallFresnel * 0.4 * uWaterFlow);
+        outgoingLight = mix(outgoingLight, vec3(0.38, 0.33, 0.24), fallFresnel * 0.55 * uWaterFlow);
         #include <opaque_fragment>`);
     };
     const gate = spot.gate ? collision.add(boxCollider({ x: spot.lip.x, z: spot.lip.z, w: spot.width, d: 0.2, top: spot.lip.y, bottom: spot.foot.y, tag: 'frozen-water' })) : null;
@@ -87,12 +95,12 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     }
     fallGeo.computeVertexNormals();
     const fall = new THREE.Mesh(fallGeo, glass);
-    fall.position.copy(spot.lip).lerp(spot.foot, 0.5); fall.castShadow = true; scene.add(fall);
+    fall.position.copy(spot.lip).lerp(spot.foot, 0.5); fall.castShadow = !!spot.gate; scene.add(fall);
     const light = new THREE.PointLight(0xffb55e, 0.8, 7, 2); light.position.copy(fall.position); scene.add(light);
     const curve = new THREE.CatmullRomCurve3(spot.path, false, 'centripetal');
     const length = curve.getLength();
     const cells = Math.ceil(length / 0.25);
-    const surfaceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.04, transparent: true, opacity: 0.85, emissive: 0x263d36, emissiveIntensity: 0.12 });
+    const surfaceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.04, transparent: true, opacity: 0.72, depthWrite: false, emissive: 0x263d36, emissiveIntensity: 0.12 });
     const surface = new THREE.InstancedMesh(new THREE.PlaneGeometry(spot.width * 0.94, length / cells + 0.03), surfaceMat, cells);
     const flowD = new THREE.InstancedBufferAttribute(new Float32Array(cells), 1);
     const wetState = new THREE.InstancedBufferAttribute(new Float32Array(cells), 1);
@@ -101,14 +109,16 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     surface.geometry.setAttribute('aFlowD', flowD); surface.geometry.setAttribute('aWet', wetState);
     surfaceMat.onBeforeCompile = shader => {
       shader.uniforms.uWaterTime = animation.uWaterTime;
-      shader.vertexShader = 'attribute float aFlowD; attribute float aWet; varying float vFlowD; varying float vWet; varying vec2 vWaterUV; uniform float uWaterTime;\n' + shader.vertexShader;
-      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\nvFlowD = aFlowD - (uv.y - 0.5) * ${(length / cells).toFixed(6)}; vWet = aWet; vWaterUV = uv;`);
+      shader.uniforms.uWaterCellLength = { value: length / cells };
+      shader.vertexShader = 'attribute float aFlowD; attribute float aWet; varying float vFlowD; varying float vWet; varying vec2 vWaterUV; uniform float uWaterTime; uniform float uWaterCellLength;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\nvFlowD = aFlowD - (uv.y - 0.5) * uWaterCellLength; vWet = aWet; vWaterUV = uv;`);
       shader.fragmentShader = 'uniform float uWaterTime; varying float vFlowD; varying float vWet; varying vec2 vWaterUV;\n' + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
         float drift = vFlowD - uWaterTime * 8.0;
         float foam = pow(max(0.0, sin(drift * 2.2 + sin(vWaterUV.x * 11.0) * 0.6)), 14.0);
         float edgeFoam = pow(abs(vWaterUV.x - 0.5) * 2.0, 10.0) * (0.5 + 0.5 * sin(drift * 3.0));
-        diffuseColor.rgb += vec3(0.23, 0.22, 0.17) * (foam * 0.65 + edgeFoam * 0.35) * vWet;
+        diffuseColor.rgb += vec3(0.12, 0.105, 0.075) * (foam * 0.65 + edgeFoam * 0.35) * vWet;
+        diffuseColor.a *= 1.0 - smoothstep(0.78, 1.0, abs(vWaterUV.x - 0.5) * 2.0);
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float waterFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
@@ -205,10 +215,11 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         if (w.surface.instanceColor) w.surface.instanceColor.needsUpdate = true;
         w.arriving = w.parcels.some(p => p.head >= w.length && p.tail < w.length);
         w.animation.uWaterTime.value = time; w.animation.uWaterFlow.value = flowing ? 1 : 0;
-        w.glass.color.set(0xc7c6af).lerp(foamColor.set(w.reactor.restored ? 0x9d8d66 : 0x81988a), w.reactor.heat);
+        w.glass.color.set(0x6b7566).lerp(foamColor.set(w.reactor.restored ? 0x6b735b : 0x53695e), w.reactor.heat);
+        w.fall.castShadow = !!w.gate && !flowing;
         w.glass.roughness = flowing ? 0.18 : 0.25;
-        w.glass.opacity = 0.88 - 0.36 * w.reactor.heat;
-        w.glass.emissiveIntensity = 0.12 + w.reactor.heat * 0.18 + warning * (0.12 + Math.sin(time * 12) * 0.07);
+        w.glass.opacity = (w.spot.gate ? 0.82 : 0.68) - (w.spot.gate ? 0.22 : 0.08) * w.reactor.heat;
+        w.glass.emissiveIntensity = (w.spot.gate ? 0.09 : 0.025) + w.reactor.heat * 0.025 + warning * (0.12 + Math.sin(time * 12) * 0.07);
         w.light.intensity = 0.8 + w.reactor.heat * 1.2;
         const fallBottom = flowing ? w.spot.path[0]!.y : w.spot.foot.y;
         w.fall.scale.y = (w.spot.lip.y - fallBottom) / (w.spot.lip.y - w.spot.foot.y);

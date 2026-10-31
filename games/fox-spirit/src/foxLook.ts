@@ -10,10 +10,10 @@ export const FOX_LOOK = {
   furSaturation: 0.85,
   furValue: 0.95,
   /** painterly value strokes (object-space clumps laid along the body) */
-  strokeStrength: 0.25,
+  strokeStrength: 0.12,
   strokeScale: 1.0,
   /** broken amber rim at grazing angles = the spirit glow at the silhouette */
-  rimStrength: 0.3,
+  rimStrength: 0.22,
   rimPower: 2.5,
   rimColor: [1.0, 0.72, 0.42] as [number, number, number], // pale gold: separates the fox from orange ground
   eyeGlow: 0.025,
@@ -23,8 +23,8 @@ export const FOX_LOOK = {
   lickStream: 0.35,
   /** embers per second at rest / extra per m/s of speed; size in metres */
   emberRate: 3,
-  emberRateSpeed: 2,
-  emberSize: 0.035,
+  emberRateSpeed: 3,
+  emberSize: 0.04,
 };
 
 type FurUniforms = {
@@ -82,11 +82,14 @@ ${NOISE_GLSL}`,
       )
       .replace(
         '#include <map_fragment>',
-        `#include <map_fragment>
+        `#ifdef USE_MAP
+  // Prefer broad painted values over the baked fine fur speckle.
+  diffuseColor = vec4(diffuse, opacity) * texture2D(map, vMapUv, 1.0);
+#endif
 {
   // clumps elongated along the body (+Z forward in rest space) and down the legs
   vec3 q = vRest * uStroke.y;
-  float clump = fxNoise(q * vec3(5.0, 4.0, 1.6)) * 0.65 + fxNoise(q * vec3(13.0, 9.0, 3.5)) * 0.35;
+  float clump = fxNoise(q * vec3(2.5, 2.0, 0.8)) * 0.65 + fxNoise(q * vec3(6.0, 5.0, 1.6)) * 0.35;
   diffuseColor.rgb *= 1.0 + uStroke.x * (clump - 0.5) * 2.0;
   // grade only the saturated fur (rust / umber); cream bib, muzzle and ear insides keep their warm white
   vec3 c = diffuseColor.rgb;
@@ -100,16 +103,19 @@ ${NOISE_GLSL}`,
         '#include <opaque_fragment>',
         `{
   float facing = saturate(dot(normal, normalize(vViewPosition)));
-  ${shell ? "float coverage = 1.0 - smoothstep(0.25, 0.65, facing); if (fxNoise(vRest * vec3(73.0, 41.0, 61.0)) > coverage) discard;" : ""}
+  ${shell ? "diffuseColor.a *= (1.0 - smoothstep(0.12, 0.7, facing)) * 0.22; if (diffuseColor.a < 0.01) discard;" : ""}
   float fres = pow(1.0 - facing, uRim.y);
-  float strands = smoothstep(0.35, 0.8, fxNoise(vRest * vec3(40.0, 22.0, 9.0)));
+  float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
   outgoingLight += uRimColor * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
   ${tail ? `
   #ifdef USE_MAP
-    float tipHeat = smoothstep(0.72, 1.0, vMapUv.y);
-    outgoingLight += uRimColor * 0.12 * tipHeat;
-    float tipCoverage = 1.0 - smoothstep(0.92, 1.0, vMapUv.y);
-    if (fxNoise(vRest * vec3(93.0, 71.0, 87.0)) > tipCoverage) discard;
+    // Authored tail UV: V=1 at the root, V=0 at tail_08.
+    float tailAlong = 1.0 - vMapUv.y;
+    float tipHeat = smoothstep(0.60, 1.0, tailAlong);
+    outgoingLight += uRimColor * 0.25 * tipHeat;
+    float tipCoverage = 1.0 - smoothstep(0.60, 1.0, tailAlong);
+    diffuseColor.a *= tipCoverage;
+    if (diffuseColor.a < 0.02) discard;
   #endif` : ''}
 }
 #include <opaque_fragment>`,
@@ -136,6 +142,7 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
     r = Math.max(r, Math.hypot(v.y - c.y, v.z - c.z));
   }
   mat.map = null;
+  mat.emissiveMap = null;
   mat.color.setHex(0xffffff);
   mat.roughness = 0.4;
   mat.emissive = new THREE.Color(0xffffff);
@@ -146,23 +153,32 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
       .replace('#include <common>', '#include <common>\nvarying vec3 vRest;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vRest;\nuniform vec3 uEyeL; uniform vec3 uEyeR; uniform float uEyeR0;\nvec3 eyeIris;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRest;\nuniform vec3 uEyeL; uniform vec3 uEyeR; uniform float uEyeR0;\nvec3 eyeIris; float eyeLid; float eyeGlint;')
       .replace(
         '#include <map_fragment>',
         `{
   vec3 c = vRest.x > 0.0 ? uEyeL : uEyeR;
   vec2 q = (vRest.zy - c.zy) / uEyeR0;          // forward, up in units of the eye radius
   float d = length(q);
+  float aperture = length(q / vec2(1.0, 0.62));
   float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.2, 0.78)));
   vec3 iris = mix(vec3(0.48, 0.23, 0.055), vec3(0.22, 0.075, 0.018), smoothstep(0.15, 0.85, d));
   iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.7, 0.95, d));   // limbal ring + lid shadow
   iris = mix(iris, vec3(0.02, 0.01, 0.008), pupil);
   float glint = 1.0 - smoothstep(0.08, 0.14, length(q - vec2(0.3, 0.32)));
-  diffuseColor.rgb = mix(iris, vec3(1.0, 0.95, 0.85), glint);
-  eyeIris = vec3(1.0, 0.55, 0.15) * (1.0 - pupil) * (1.0 - smoothstep(0.6, 0.9, d));
+  // Warm lid rim encloses an almond aperture; no white sclera ring.
+  float lid = smoothstep(0.72, 0.98, aperture);
+  iris = mix(iris, vec3(0.045, 0.019, 0.009), lid);
+  vec2 tearCorner = q - vec2(0.8, -0.25);
+  float tear = exp(-40.0 * dot(tearCorner, tearCorner)) * lid;
+  iris = mix(iris, vec3(0.095, 0.038, 0.016), tear * 0.45);
+  diffuseColor.rgb = mix(iris, vec3(1.0, 0.88, 0.62), glint * (1.0 - lid));
+  eyeLid = lid; eyeGlint = glint * (1.0 - lid);
+  eyeIris = vec3(1.0, 0.55, 0.15) * (1.0 - pupil) * (1.0 - smoothstep(0.6, 0.9, d)) * (1.0 - lid);
 }`,
       )
-      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= eyeIris;');
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(0.3, 0.85, eyeLid);')
+      .replace('#include <emissivemap_fragment>', 'totalEmissiveRadiance *= eyeIris; totalEmissiveRadiance += vec3(1.0, 0.88, 0.62) * eyeGlint * 0.12;');
   };
   mat.customProgramCacheKey = () => 'fox-eye';
   mat.needsUpdate = true;
@@ -191,10 +207,34 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.emissiveIntensity = 0;
       } else if (n.includes('fur')) {
         // The opaque coat supplies the soft shadow; shell shadow maps ignore our grazing-angle fade.
-        if (n.includes('shell')) mesh.castShadow = false;
+        if (n.includes('shell')) {
+          mesh.castShadow = false;
+          mesh.renderOrder = 2;
+          mat.transparent = true;
+          mat.depthWrite = false;
+          mat.alphaTest = 0;
+        }
+        if (n.startsWith('foxtailfur')) {
+          mat.transparent = true;
+          mat.depthWrite = !n.includes('shell');
+          if (!n.includes('shell')) {
+            mesh.renderOrder = 1;
+            // Match the shadow silhouette to the visible disappearing tip.
+            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.02 });
+            depth.onBeforeCompile = (shader) => {
+              shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', `
+#ifdef USE_MAP
+  diffuseColor.a *= 1.0 - smoothstep(0.60, 1.0, 1.0 - vMapUv.y);
+#endif
+#include <alphatest_fragment>`);
+            };
+            depth.customProgramCacheKey = () => 'fox-tail-depth';
+            mesh.customDepthMaterial = depth;
+          }
+        }
         mat.color.setHex(0xffffff);
         mat.roughness = 0.85;
-        mat.normalScale.setScalar(0.35);
+        mat.normalScale.setScalar(0.2);
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
         patchFur(mat);
@@ -233,8 +273,16 @@ attribute float aAlpha;
 varying vec2 vUv; varying float vSeed; varying float vAlpha;
 void main() {
   vUv = uv; vSeed = aShape.z; vAlpha = aAlpha;
-  vec3 side = normalize(cross(aDir, cameraPosition - aPos));
-  vec3 p = aPos + side * (uv.x - 0.5) * aShape.x + aDir * uv.y * aShape.y;
+  vec3 viewDir = normalize(cameraPosition - aPos);
+  vec3 across = cross(aDir, viewDir);
+  // A nearly head-on wisp still has a stable width.
+  vec3 fallback = cross(aDir, vec3(0.0, 0.0, 1.0));
+  if (length(fallback) < 0.01) fallback = cross(aDir, vec3(0.0, 1.0, 0.0));
+  fallback = normalize(fallback);
+  if (dot(fallback, across) < 0.0) fallback = -fallback;
+  vec3 side = normalize(mix(fallback, across, smoothstep(0.0, 0.05, length(across))));
+  float bend = sin(uv.y * 4.5 + aShape.z) * uv.y * uv.y * aShape.x * 0.65;
+  vec3 p = aPos + side * ((uv.x - 0.5) * aShape.x + bend) + aDir * uv.y * aShape.y;
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
 const LICK_FRAG = /* glsl */ `
@@ -246,14 +294,14 @@ void main() {
   float curl = sin(y * 6.0 - uTime * 1.2 + vSeed * 2.1) * 0.22 * y;
   curl += sin(y * 11.0 - uTime * 0.8 + vSeed) * 0.065 * y;
   float x = vUv.x - 0.5 + curl;
-  float width = mix(0.22, 0.055, y);
+  float width = mix(0.36, 0.07, y);
   float body = exp(-2.0 * x * x / (width * width));
   body *= smoothstep(0.0, 0.12, y) * (1.0 - smoothstep(0.6, 1.0, y));
-  float breathe = 0.2 + 0.8 * pow(0.5 + 0.5 * sin(uTime * 1.1 + vSeed * 3.0), 2.0);
-  vec3 col = mix(vec3(1.0, 0.25, 0.055), vec3(1.0, 0.65, 0.28), smoothstep(0.1, 0.85, y)) * 1.5;
-  float a = body * vAlpha * uIntensity * 0.45 * breathe;
+  float breathe = 0.4 + 0.6 * pow(0.5 + 0.5 * sin(uTime * 1.1 + vSeed * 3.0), 2.0);
+  vec3 col = mix(vec3(1.0, 0.25, 0.055), vec3(1.0, 0.65, 0.28), smoothstep(0.1, 0.85, y)) * 1.2;
+  float a = body * vAlpha * uIntensity * 0.32 * breathe;
   if (a < 0.003) discard;
-  gl_FragColor = vec4(col * a, a);
+  gl_FragColor = vec4(col * a, a * 0.3);
 }`;
 const EMBER_VERT = /* glsl */ `
 attribute float aSize; attribute float aHeat;
@@ -261,7 +309,7 @@ varying float vHeat;
 uniform float uScale;
 void main() {
   vHeat = aHeat;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec4 mv = viewMatrix * vec4(position, 1.0); // positions are already world-space
   gl_PointSize = aSize * uScale / max(0.05, -mv.z);
   gl_Position = projectionMatrix * mv;
 }`;
@@ -269,11 +317,11 @@ const EMBER_FRAG = /* glsl */ `
 varying float vHeat;
 void main() {
   float d = length(gl_PointCoord - 0.5) * 2.0;
-  float a = (1.0 - smoothstep(0.2, 1.0, d)) * vHeat;
+  float a = (1.0 - smoothstep(0.0, 0.75, d)) * vHeat;
   if (a < 0.004) discard;
   vec3 col = mix(vec3(0.75, 0.12, 0.02), vec3(1.0, 0.55, 0.15), smoothstep(0.1, 0.6, vHeat));
   col = mix(col, vec3(1.0, 0.85, 0.55), smoothstep(0.75, 1.0, vHeat) * (1.0 - d));
-  gl_FragColor = vec4(col * a * 2.5, a);
+  gl_FragColor = vec4(col * a * 1.7, a * 0.3);
 }`;
 
 export type SpiritFx = {
@@ -289,13 +337,13 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const body = skinned.find((m) => matName(m) === 'foxfur');
   const tail = skinned.find((m) => matName(m) === 'foxtailfur');
   const R = FOX_RIG;
-  // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — calm at idle: nothing on the ears / head
+  // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — small ear smoulders, broad tail wake
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
-    [body, [R.spine[3], R.neck[0]], 0.65, 0, 0.16, 0.06, 0.7],
+    [body, [R.spine[3], R.neck[0]], 0.45, 3, 0.12, 0.09, 0.7],
     [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 0, 0.18, 0.06, 0.8],
-    [tail, R.tail.slice(3), 0.0, 8, 0.34, 0.15, 0.9],
-    [body, R.ear("l").slice(2), -1.0, 0, 0.12, 0.06, 0.4],
-    [body, R.ear("r").slice(2), -1.0, 0, 0.12, 0.06, 0.4],
+    [tail, R.tail.slice(2, 6), 0.15, 12, 0.36, 0.22, 0.9],
+    [body, R.ear("l").slice(2), -1.0, 2, 0.065, 0.05, 0.4],
+    [body, R.ear("r").slice(2), -1.0, 2, 0.065, 0.05, 0.4],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
@@ -309,14 +357,17 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       const index = pts[Math.floor(rnd() * pts.length)]!;
       licks.push({ a: { mesh, index }, h: h * (0.7 + 0.6 * rnd()), w: w * (0.8 + 0.4 * rnd()), seed: rnd() * 10, lean, tailFlow: mesh === tail });
     }
-    const sparkPts = mesh === tail ? surfacePoints(mesh, R.tail.slice(6), -1) : pts;
+    const sparkPts = mesh === tail ? surfacePoints(mesh, R.tail.slice(2, 6), -1) : pts;
     const sourcePts = sparkPts.length ? sparkPts : pts;
-    const count = mesh === tail ? 160 : 20;
+    const count = mesh === tail ? 90 : 20;
     for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(rnd() * sourcePts.length)]! });
   }
 
+  const diagnostics = { wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  group.userData.spiritFx = diagnostics;
+
   // flame licks: one instanced billboard per lick
-  const quad = new THREE.PlaneGeometry(1, 1).translate(0.5, 0.5, 0);
+  const quad = new THREE.PlaneGeometry(1, 1, 4, 10).translate(0.5, 0.5, 0);
   const lg = new THREE.InstancedBufferGeometry();
   lg.index = quad.index;
   lg.setAttribute('position', quad.getAttribute('position'));
@@ -355,11 +406,15 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
   });
   const embers = new THREE.Points(eg, emberMat);
+  const drawingBufferSize = new THREE.Vector2();
+  embers.onBeforeRender = (renderer, _scene, camera) => {
+    emberMat.uniforms.uScale!.value = renderer.getDrawingBufferSize(drawingBufferSize).y * 0.5 * camera.projectionMatrix.elements[5]!;
+  };
   embers.frustumCulled = false;
   embers.renderOrder = 3;
 
   const tmp = new THREE.Vector3(), prev = new THREE.Vector3(), vel = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  const dir = new THREE.Vector3();
+  const dir = new THREE.Vector3(), backward = new THREE.Vector3();
   let hasPrev = false, visible = true, spawnAcc = 0, pending = 0, next = 0, time = 0, speed = 0;
   const anchorPos = (a: Anchor, out: THREE.Vector3) => a.mesh.getVertexPosition(a.index, out).applyMatrix4(a.mesh.matrixWorld);
   const anchorMeshes = [...new Set([...licks.map((l) => l.a.mesh), ...emberPool.map((a) => a.mesh)])];
@@ -374,11 +429,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       anchorPos(lk.a, tmp);
       aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
       dir.copy(up);
-      if (lk.tailFlow) dir.multiplyScalar(0.7).add(new THREE.Vector3(0, 0, -1).transformDirection(group.matrixWorld).multiplyScalar(0.8));
+      if (lk.tailFlow) dir.multiplyScalar(0.55).add(backward.set(0, 0, -1).transformDirection(group.matrixWorld).multiplyScalar(0.9));
       dir.addScaledVector(vel, -L.lickStream * lk.lean * 0.25).normalize();
       aDir.setXYZ(i, dir.x, dir.y, dir.z);
       const flick = 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
-      const stretch = 1 + Math.min(1, speed * 0.12) * lk.lean;
+      const stretch = (0.65 + 0.35 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (1 + Math.min(1, speed * 0.12) * lk.lean);
       aShape.setXYZ(i, lk.w * L.lickScale, lk.h * L.lickScale * flick * stretch, lk.seed);
       aAlpha.setX(i, 0.45 + 0.35 * flick);
     });
@@ -390,6 +445,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       eVel[i * 3] = vel.x * 0.3 + (rnd() - 0.5) * 0.25;
       eVel[i * 3 + 1] = 0.25 + rnd() * 0.35;
       eVel[i * 3 + 2] = vel.z * 0.3 + (rnd() - 0.5) * 0.25;
+      eHeat[i] = 0;
       eAge[i] = 0; eLife[i] = 2.2 + rnd();
       eSize[i] = L.emberSize * (0.5 + rnd());
     }
@@ -399,7 +455,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
 
   return {
     setVisible(on) {
-      visible = on;
+      visible = diagnostics.visible = on;
       lickMesh.visible = embers.visible = on;
     },
     update(dt, t, gliding) {
@@ -413,14 +469,16 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       const L = FOX_LOOK;
       time = t;
       speed = Math.hypot(vel.x, vel.z);
+      diagnostics.speed = Number(speed.toFixed(2));
+      diagnostics.liveEmbers = 0;
       lickMat.uniforms.uTime!.value = t;
-      lickMat.uniforms.uIntensity!.value = L.lickIntensity * (gliding ? 1.25 : 1);
-      emberMat.uniforms.uScale!.value = innerHeight * 1.1;
+      lickMat.uniforms.uIntensity!.value = L.lickIntensity * (0.5 + 0.5 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (gliding ? 1.25 : 1);
       spawnAcc += dt * (L.emberRate + L.emberRateSpeed * speed) * (gliding ? 1.6 : 1);
       pending = Math.min(N, pending + Math.floor(spawnAcc));
       spawnAcc -= Math.floor(spawnAcc);
       for (let i = 0; i < N; i++) {
         if (eAge[i]! >= eLife[i]!) { eHeat[i] = 0; continue; }
+        diagnostics.liveEmbers++;
         eAge[i] += dt;
         const u = eAge[i]! / eLife[i]!;
         const drag = Math.exp(-1.6 * dt);
