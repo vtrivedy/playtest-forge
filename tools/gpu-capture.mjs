@@ -560,7 +560,7 @@ try {
       await H('setStick',dx/d*speed,dz/d*speed);
       const phase=t%10;
       await H('setKeys',phase<.35?['Space']:phase>5&&phase<5.06?['ShiftLeft']:[]);
-    },undefined,{keyFrames:Array.from({length:12},(_,i)=>i*5*fps)});
+    },undefined,{traceEveryFrame:true,keyFrames:Array.from({length:12},(_,i)=>i*5*fps)});
     await H('setKeys',[]);await H('setStick',null);
     const end=await H('state');
     save('feel-acceptance.json',{label:'60s scripted live-input movement loop, one staged start, no resets/forced poses; not human fun approval',seconds:60,initial,end,deaths:end.deaths-initial.deaths});
@@ -753,6 +753,9 @@ try {
   if (wants('hub')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '.lil-gui,#hud{visibility:hidden!important}' });
+    // Natural spawn, gravity warm-up and untouched chase before any staging.
+    await advance(60); await shot('hub-spawn-chase');
+    save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
     await H('teleport', 0, y, 94, Math.PI);
     const hubViews = [
@@ -846,13 +849,23 @@ try {
     await advance(360); await shot('restoration-wake-decayed');
     // Reed Seedwell is at (95, 10), radius 35: the south front crosses z=45.
     // The meadow lens cannot see it, so use a separate fixed lens for the matched front pair.
-    const reedY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(95, 10));
-    if (!Number.isFinite(reedY) || reedY < -24) throw Error('Restore front has no safe Reed island surface');
-    await H('teleport', 95, reedY, 10, Math.PI);
-    const restoreLens = [68, 21, 44];
-    const restoreLook = [91, 1, 15];
-    save('restoration-framing.json', { lens: restoreLens, look: restoreLook, fox: [95, reedY, 10], blocker: await H('photoBlocker', restoreLens, [95, reedY + 0.5, 10]) });
-    await H('photo', restoreLens, restoreLook, 60);
+    const framing = await page.evaluate(() => {
+      const h = window.__gameHooks, attempts = [];
+      for (const [x,z] of [[95,13],[93,10],[97,10],[95,7],[90,15]]) {
+        const y = h.debug.world.collision.highestAt(x,z);
+        if (!Number.isFinite(y) || y < -.5 || y > 4) continue;
+        for (const lens of [[68,34,44],[65,34,18],[112,35,0],[78,40,-6],[95,45,30]]) {
+          const blocker = h.photoBlocker(lens,[x,y+.6,z]);
+          attempts.push({fox:[x,y,z],lens,blocker});
+          if (!blocker) return {fox:[x,y,z],lens,look:[(x+95)/2,y+.6,(z+10)/2],attempts};
+        }
+      }
+      return {attempts};
+    });
+    save('restoration-framing.json', framing);
+    if (!framing.fox) throw Error('No unobstructed safe Reed restoration review lens');
+    await H('teleport', ...framing.fox, Math.PI);
+    await H('photo', framing.lens, framing.look, 60);
     await advance(1); await shot('restoration-front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
@@ -912,6 +925,9 @@ try {
     await H('photo', [-7, 7, 79], [-23, 0, 66], 52); await advance(2); await shot('water-pond-vista');
     await H('photo', [-6, 1.3, 78], [-24, -0.22, 68], 52); await advance(2); await shot('water-pond-grazing');
     await H('photo', [8, 3, 3], [8, -3.2, -7], 52); await advance(2); await shot('water-creek');
+    const waterCapture = await page.evaluate(() => window.__gameHooks.debug.scene.userData.waterCapture ?? null);
+    save('water-scene-capture.json', waterCapture);
+    if (waterCapture?.glError) report.failures.push(`Water framebuffer copy GL error ${waterCapture.glError}`);
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
