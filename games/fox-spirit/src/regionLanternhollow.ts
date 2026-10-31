@@ -6,12 +6,12 @@ import { boxCollider, cylCollider, type CollisionWorld } from './collision';
 /** Domestic scale, kept outside the existing arrival/hearth route. Original geometry. */
 export const HUB_HOUSES = [
   { x: -24, z: 89, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: true },
-  { x: -31, z: 84, w: 5.6, d: 4.6, eave: 2.8, rise: 1.6, chimney: false },
+  { x: -34, z: 84, w: 5.6, d: 4.6, eave: 2.8, rise: 1.6, chimney: false },
   { x: 17, z: 93, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: false },
 ];
 export const HUB_PATHS = [
-  [-24, 92, -8, 88], [-31, 87, -24, 92], [-8, 88, 0, 88],
-  [17, 96, 8, 98], [8, 98, 0, 90], [0, 88, 25, 88],
+  [-24, 92, -20, 92], [-20, 92, -8, 88], [-34, 87, -28, 93], [-28, 93, -24, 92], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
+  [17, 96, 8, 98], [8, 98, 0, 94], [0, 80, 9, 88], [9, 88, 25, 88],
   [25, 88, 40, 68], [40, 68, 57, 40], [0, 80, -3, 45], [-3, 45, 0, 12],
 ] as const;
 
@@ -20,15 +20,14 @@ export function hubPathDistance(x: number, z: number): number {
   for (const [ax, az, bx, bz] of HUB_PATHS) {
     const dx = bx - ax, dz = bz - az;
     const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
-    d = Math.min(d, Math.hypot(x - ax - t * dx, z - az - t * dz));
+    d = Math.min(d, Math.hypot(x - ax - t * dx, z - az - t * dz) * (Math.min(az, bz) < 72 ? 1.8 : 1));
   }
   return d;
 }
 
 /** Exclude random vegetation/rocks from doorsteps, the well and new paths. */
 export function hubClearance(x: number, z: number): boolean {
-  if (z < 72) return false;
-  return hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
+  return Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
     HUB_HOUSES.some(h => Math.abs(x - h.x) < h.w / 2 + 1.2 && Math.abs(z - h.z) < h.d / 2 + 1.2);
 }
 
@@ -66,7 +65,7 @@ export function createLanternhollow(
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
       box(b.wood, h.x + sx * (h.w / 2 - .08), y + h.eave / 2, h.z + sz * h.d / 2, .14, h.eave, .18, PAL.wood);
     }
-    box(b.wood, h.x, y + .43, h.z + h.d / 2 + .025, h.w, .14, .12, PAL.wood);
+    box(b.wood, h.x, y + .65, h.z + h.d / 2 + .025, h.w, .14, .12, PAL.wood);
     box(b.wood, h.x, y + h.eave - .12, h.z + h.d / 2 + .025, h.w, .16, .15, PAL.wood);
     // Inset door/shutters sit on solid walls; this slice does not imply enterable interiors.
     box(b.dark, h.x - .7, y + .83, h.z + h.d / 2 + .07, 1.05, 1.65, .08, dark);
@@ -78,6 +77,7 @@ export function createLanternhollow(
     box(b.wood, h.x + 1.15, y + 1.45, h.z + h.d / 2 + .15, .8, .075, .07, PAL.wood);
     for (const dx of [-.58, .58]) box(b.wood, h.x + 1.15 + dx, y + 1.45, h.z + h.d / 2 + .12, .25, .85, .1, PAL.wood);
     lamp(h.x - 1.65, y + 1.9, h.z + h.d / 2 + .3);
+    beam(new THREE.Vector3(h.x - 1.65, y + 2.55, h.z + h.d / 2), new THREE.Vector3(h.x - 1.65, y + 2.55, h.z + h.d / 2 + .3), .04);
 
     // Broad bowed roof, sampled once for BOTH mesh and collision (no floating roof collider).
     const halfD = h.d / 2 + .46, halfW = h.w / 2 + .45, steps = 12;
@@ -103,7 +103,7 @@ export function createLanternhollow(
       for (let k = 0; k <= steps; k++) { const zz = -h.d / 2 + k / steps * h.d; shape.lineTo(zz, height(zz) - .12); }
       shape.lineTo(h.d / 2, y + h.eave); shape.closePath();
       const g = new THREE.ExtrudeGeometry(shape, { depth: .12, bevelEnabled: false });
-      b.plaster.add(g, trs(h.x + sx * h.w / 2, 0, h.z, -Math.PI / 2), plaster); g.dispose();
+      b.plaster.add(g, trs(h.x + sx * h.w / 2 + (sx < 0 ? .12 : 0), 0, h.z, -Math.PI / 2), plaster); g.dispose();
     }
     if (h.chimney) {
       box(b.stone, h.x - 1.6, y + 3.8, h.z - .4, .75, 3.6, .75, PAL.stoneDark);
@@ -116,8 +116,8 @@ export function createLanternhollow(
   const wx = -8, wz = 85, wy = ground(wx, wz);
   for (let k = 0; k < 12; k++) {
     const a = k / 12 * Math.PI * 2, x = wx + Math.sin(a) * 1.3, z = wz + Math.cos(a) * 1.3;
-    const g = new RoundedBoxGeometry(.69, .85, .43, 2, .06);
-    b.stone.add(g, trs(x, wy + .425, z, a), PAL.stone.clone().multiplyScalar(.88 + .1 * Math.sin(k * 4))); g.dispose();
+    const g = new RoundedBoxGeometry(.69, 1.05, .43, 2, .06);
+    b.stone.add(g, trs(x, wy + .325, z, a), PAL.stone.clone().multiplyScalar(.88 + .1 * Math.sin(k * 4))); g.dispose();
     col.add(boxCollider({ x, z, w: .75, d: .54, yaw: a, top: wy + .93, bottom: wy - .5, tag: 'hub-well' }));
     const coping = new RoundedBoxGeometry(.75, .16, .54, 2, .04);
     b.stone.add(coping, trs(x, wy + .85, z, a), PAL.stone); coping.dispose();
@@ -125,36 +125,42 @@ export function createLanternhollow(
   }
   for (const sx of [-1, 1]) {
     const x = wx + sx * 1.9;
-    beam(new THREE.Vector3(x, wy, wz), new THREE.Vector3(x - sx * .15, wy + 3.15, wz), .13);
-    col.add(cylCollider({ x, z: wz, r: .18, top: wy + 3.2, bottom: wy - .5, tag: 'hub-pulley-post' }));
+    beam(new THREE.Vector3(x, wy - .15, wz), new THREE.Vector3(x - sx * .15, wy + 3.15, wz), .13);
+    col.add(cylCollider({ x, z: wz, r: .18, top: wy + 1.2, bottom: wy - .5, tag: 'hub-pulley-post' }));
   }
-  const arch = new THREE.QuadraticBezierCurve3(new THREE.Vector3(wx - 2, wy + 3.05, wz), new THREE.Vector3(wx, wy + 4, wz), new THREE.Vector3(wx + 2, wy + 3.05, wz));
+  const arch = new THREE.QuadraticBezierCurve3(new THREE.Vector3(wx - 1.75, wy + 3.15, wz), new THREE.Vector3(wx, wy + 4, wz), new THREE.Vector3(wx + 1.75, wy + 3.15, wz));
   const archGeo = new THREE.TubeGeometry(arch, 16, .14, 8, false); b.wood.add(archGeo, undefined, PAL.wood); archGeo.dispose();
   const pulley = new THREE.TorusGeometry(.24, .05, 8, 16); b.wood.add(pulley, trs(wx, wy + 3.25, wz), PAL.wood); pulley.dispose();
   beam(new THREE.Vector3(wx + .2, wy + 3.25, wz), new THREE.Vector3(wx + .2, wy + .35, wz), .018);
-  lamp(wx + 1.7, wy + 2.1, wz + .22);
+  lamp(wx + 1.35, wy + 2.1, wz + .22);
+  beam(new THREE.Vector3(wx + 1.77, wy + 2.75, wz), new THREE.Vector3(wx + 1.35, wy + 2.75, wz + .22), .04);
 
   const by = ground(-10, 91);
   box(b.wood, -10, by + .72, 91, 2.2, .16, .7, PAL.wood);
-  for (const dx of [-.85, .85]) box(b.wood, -10 + dx, by + .35, 91, .16, .7, .58, PAL.wood);
+  for (const dx of [-.85, .85]) box(b.wood, -10 + dx, by + .275, 91, .16, .85, .58, PAL.wood);
   col.add(boxCollider({ x: -10, z: 91, w: 2.2, d: .7, top: by + .8, bottom: by, tag: 'hub-bench' }));
 
   // Three modest hand-lettered fingerposts; letters are generated locally, never downloaded.
-  for (const [name, x, z, yaw] of [
-    ['WINDMILL RISE', -10, 67, -1.9], ['REEDMARSH', 25, 88, 2.3], ['AMBERWOOD', -3, 78, Math.PI],
+  for (const [name, x, z, tx, tz] of [
+    ['WINDMILL RISE', -10, 67, -34, 56], ['REEDMARSH', 25, 88, 57, 40], ['AMBERWOOD', -3, 78, 0, 12],
   ] as const) {
-    const y = ground(x, z);
+    const y = ground(x, z), yaw = Math.atan2(-(tz - z), tx - x);
     beam(new THREE.Vector3(x, y - .15, z), new THREE.Vector3(x, y + 1.9, z), .09);
     const board = new THREE.BoxGeometry(1.9, .36, .12);
     b.wood.add(board, trs(x, y + 1.65, z, yaw), PAL.wood); board.dispose();
-    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 96;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#6a4a32'; ctx.fillRect(0, 0, 512, 96);
-    ctx.fillStyle = '#dac39a'; ctx.font = '36px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(name + '  →', 256, 49);
-    const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4;
-    const mat = new THREE.MeshStandardMaterial({ name: 'hub-sign', map: texture, roughness: .95, side: THREE.DoubleSide });
-    labelMaterials.push(mat);
-    const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.8, .32), mat); sign.position.set(x + Math.sin(yaw) * .067, y + 1.65, z + Math.cos(yaw) * .067); sign.rotation.y = yaw;
-    parent.add(sign);
+    for (const back of [false, true]) {
+      const faceYaw = yaw + (back ? Math.PI : 0);
+      const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 96;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#6a4a32'; ctx.fillRect(0, 0, 512, 96);
+      ctx.fillStyle = '#dac39a'; ctx.font = '36px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(back ? '←  ' + name : name + '  →', 256, 49);
+      const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4;
+      const mat = new THREE.MeshStandardMaterial({ name: 'hub-sign', map: texture, roughness: .95 });
+      labelMaterials.push(mat);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.8, .32), mat);
+      sign.position.set(x + Math.sin(faceYaw) * .067, y + 1.65, z + Math.cos(faceYaw) * .067); sign.rotation.y = faceYaw;
+      parent.add(sign);
+    }
   }
 }
