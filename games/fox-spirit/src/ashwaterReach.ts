@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
-import { createColorField } from '../../../src/render';
+import { createColorField, type PaintLayer } from '../../../src/render';
 import { boxCollider } from './collision';
 import type { Realm } from './russetvale';
 import { Bucket, PAL, rockSlab, stairFlight, ruinArch, stoneBlock, trs, kilnBowl, hangingRoot, hangingSpire, rng } from './russetKit';
@@ -174,7 +174,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     contains:(p:THREE.Vector3)=>p.x>68&&p.z<-80,
     recoveryAt:(p:THREE.Vector3)=>recoveryVisited&&p.x>68&&p.z<-80?bankCheckpoint.pos.clone():null,
     supplyAt:(p:THREE.Vector3)=>Math.hypot(p.x-113,p.z+128)<1.5&&p.y<32?(fill>.2?0:field.strokeAt(p)):field.sample(p),
-    init(renderer:THREE.WebGLRenderer){field.initMask(renderer);},
+    init(renderer:THREE.WebGLRenderer,paint:PaintLayer){field.initMask(renderer);field.paint=paint;},
     attach(w:typeof water,gui:GUI){water=w;
       inlet=createInlets(scene,[{seedwell:0,source,pos:new THREE.Vector3(122.2,36,-118),sealAt:new THREE.Vector3(122.2,36.12,-118),pillar:new THREE.Vector3(122.7,30,-118),latchTime:tun.latchTime}],new THREE.MeshStandardMaterial({color:0x6d5036,roughness:.8}));
       if(restored){inlet.inlets[0]!.latched=true;inlet.inlets[0]!.seal=1;}
