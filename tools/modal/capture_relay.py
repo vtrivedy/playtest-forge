@@ -23,7 +23,7 @@ def capture_request(stream, request, folder):
     if time.time() >= DEADLINE: raise ValueError('Relay deadline reached; request expired')
     if request.get('gpu','A10') not in {'A10','L4'}: raise ValueError('Only A10 or L4 GPUs supported')
     for key,limit in [('route_seconds',600),('orbit_seconds',60)]:
-        val=request.get(key,request.get(key.replace('_','-'),1))
+        val=request.get(key.replace('_','-'),request.get(key,1))
         if not isinstance(val,(int,float)) or not 0 < val <= limit: raise ValueError(f'{key} must be between 1 and {limit}')
     if not re.fullmatch('[0-9a-fA-F]{40}',ref) or not set(shots.split(',')) <= SHOTS:
         result={'status':'rejected','reason':'ref must be an immutable pushed 40-character SHA; shots must be supported'}
@@ -35,7 +35,7 @@ def capture_request(stream, request, folder):
         source_root=Path(source.name)
         bundle=subprocess.check_output(['git','archive',ref,'tools'],cwd=ROOT)
         with tarfile.open(fileobj=io.BytesIO(bundle)) as tar:tar.extractall(source_root,filter='data')
-        if 'gait' in shots.split(',') and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
+        if shots == 'gait' and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
             (source_root/'tools/gpu-capture.mjs').write_bytes(Path(os.environ['FOX_GAIT_CAPTURE_SCRIPT']).read_bytes())
         command=['modal','run','--detach',str(source_root/'tools/modal/gpu_capture.py'),'--ref',ref,'--shots',shots,'--out',str(folder/'evidence')]
         options={'size':'1920x1080' if 'gait' in shots.split(',') else '1280x720','fps':60,'route-seconds':120}
@@ -46,8 +46,7 @@ def capture_request(stream, request, folder):
             value=request.get(key,request.get(key.replace('-','_')))
             if value is not None:command+=['--'+key,str(value)]
         capture_env=dict(os.environ)
-        if 'gait' in shots.split(',') and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
-            capture_env['FOX_CAPTURE_SCRIPT']=os.environ['FOX_GAIT_CAPTURE_SCRIPT']
+        capture_env.pop('FOX_CAPTURE_SCRIPT',None)
         with (folder/'modal.log').open('w') as log:
             proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env)
         source.cleanup()
@@ -101,6 +100,12 @@ def process(stream, request, folder):
         (folder/'result.json').write_text(json.dumps(result,indent=2))
         print(json.dumps(result),flush=True)
 
+def republish_safe(stream,folder,result=None):
+    try:
+        if result is None:result=json.loads((folder/'result.json').read_text())
+        if not result.get('feedbackUploaded') or (folder/'evidence.tar').exists() and not result.get('archive'):publish(stream,folder,result)
+    except Exception as exc:print(f'republish {stream}/{folder.name}: {exc}',flush=True)
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out',type=Path,required=True)
@@ -122,11 +127,10 @@ def main():
             folder=args.out/stream/key
             if folder in active:continue
             if (folder/'result.json').exists():
-                result=json.loads((folder/'result.json').read_text())
-                if not result.get('feedbackUploaded') or (folder/'evidence.tar').exists() and not result.get('archive'):publish(stream,folder,result)
+                republish_safe(stream,folder)
                 continue
             if (folder/'modal.log').exists():
-                publish(stream,folder,{'status':'interrupted','reason':'Prior client interrupted; recover printed durable run ID instead of duplicating GPU work'})
+                republish_safe(stream,folder,{'status':'interrupted','reason':'Prior client interrupted; recover printed durable run ID instead of duplicating GPU work'})
                 continue
             folder.mkdir(parents=True,exist_ok=True);active.add(folder);(folder/'queued.json').write_text(json.dumps(request,indent=2))
             print(f'queued {stream} {key}',flush=True)
