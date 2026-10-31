@@ -23,9 +23,9 @@ class Spring {
 
 /** Authored pose is evaluated first; contact correction only moves a two-bone chain. */
 export class AuthoredLocomotion {
-  params = { trotSpeed: 2.6, gallopSpeed: 6.5,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
-  metrics = { brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
+  params = { trotSpeed: 2.6, gallopSpeed: 6.5, strideScale: 1.08, gaitBlendSeconds: .32, headBob: .35,
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .025, brakePitch: .06, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+  metrics = { brakeLoad: 0, contactModel: 'weighted-mesh-pad', cycleHz: 0, effectiveStride: 0, landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
@@ -33,7 +33,6 @@ export class AuthoredLocomotion {
   private debugGroup = new THREE.Group();
   private phase = 0;
   private lastActive = '';
-  private lastGait = '';
   reset() {
     this.beforeMixer();
     for (const foot of this.feet) foot.planted=false;
@@ -139,22 +138,36 @@ export class AuthoredLocomotion {
   fadeSeconds = .16;
   private weights = new Map<string,number>([['idle',1]]);
   blend(dt: number, active: string) {
-    if (active!==this.lastActive) { for (const foot of this.feet) foot.planted=false; this.lastActive=active; }
+    if (active!==this.lastActive) {
+      // A gait label changes at the blend midpoint; it is not a new touchdown.
+      const groundGaits=['run','walk','trot'];
+      if(!groundGaits.includes(active) || !groundGaits.includes(this.lastActive))
+        for (const foot of this.feet) foot.planted=false;
+      this.lastActive=active;
+    }
     const locomoting=['run','walk','trot'].includes(active);
     const speed=this.input.speed;
-    const walkToTrot=THREE.MathUtils.smoothstep(speed,this.params.trotSpeed-.3,this.params.trotSpeed+.3);
-    const trotToGallop=THREE.MathUtils.smoothstep(speed,this.params.gallopSpeed-.25,this.params.gallopSpeed+.25);
+    const walkToTrot=THREE.MathUtils.smoothstep(speed,this.params.trotSpeed-.65,this.params.trotSpeed+.65);
+    const trotToGallop=THREE.MathUtils.smoothstep(speed,this.params.gallopSpeed-.8,this.params.gallopSpeed+.8);
     const weights = {walk:1-walkToTrot,trot:walkToTrot*(1-trotToGallop),run:trotToGallop};
     let dominant: Gait='walk';
     for (const name of Object.keys(GAITS) as Gait[]) if (weights[name]>weights[dominant]) dominant=name;
-    const stride = (Object.keys(GAITS) as Gait[]).reduce((sum,name) =>
-      sum + weights[name]*GAITS[name].stride*this.armScale, 0);
-    if(locomoting) this.phase=(this.phase+dt*speed/Math.max(.01,stride))%1;
-    const alpha=this.fadeSeconds<=0 ? 1 : 1-Math.exp(-4*dt/this.fadeSeconds);
-    for(const [name,action] of this.actions) {
+    // All grounded clips share one phase. Cadence must use the evaluated blend,
+    // otherwise contact timing changes before the visible legs have blended.
+    const fade=locomoting ? this.params.gaitBlendSeconds : this.fadeSeconds;
+    const alpha=fade<=0 ? 1 : 1-Math.exp(-4*dt/fade);
+    for(const name of this.actions.keys()) {
       const target=locomoting ? (weights[name as Gait] ?? 0) : name===active ? 1 : 0;
-      const weight=THREE.MathUtils.lerp(this.weights.get(name) ?? 0,target,alpha);
-      this.weights.set(name,weight);
+      this.weights.set(name,THREE.MathUtils.lerp(this.weights.get(name) ?? 0,target,alpha));
+    }
+    const gaitWeight=(Object.keys(GAITS) as Gait[]).reduce((sum,name)=>sum+(this.weights.get(name) ?? 0),0);
+    const stride = (Object.keys(GAITS) as Gait[]).reduce((sum,name) =>
+      sum + (this.weights.get(name) ?? 0)*GAITS[name].stride*this.armScale*this.params.strideScale, 0)/Math.max(.001,gaitWeight);
+    this.metrics.effectiveStride=stride;
+    this.metrics.cycleHz=locomoting ? speed/Math.max(.01,stride) : 0;
+    if(locomoting) this.phase=(this.phase+dt*this.metrics.cycleHz)%1;
+    for(const [name,action] of this.actions) {
+      const weight=this.weights.get(name) ?? 0;
       if(weight>1e-5 && !action.isScheduled()) action.play();
       action.enabled=true;
       action.setEffectiveWeight(weight);
@@ -165,7 +178,6 @@ export class AuthoredLocomotion {
         if(name===dominant)this.metrics.playback=speed*action.getClip().duration/Math.max(.01,stride);
       }
     }
-    if (this.lastGait!==dominant) { for(const foot of this.feet)foot.planted=false; this.lastGait=dominant; }
     this.metrics.gait=locomoting ? dominant : active;
     this.metrics.clipWeights=Object.fromEntries(this.weights);
   }
@@ -230,7 +242,7 @@ export class AuthoredLocomotion {
     const right=new THREE.Vector3(Math.cos(this.input.yaw),0,-Math.sin(this.input.yaw));
     for(const neck of this.necks)worldOverlay(neck,right.clone(),.10);
     worldOverlay(this.head,right.clone(),-.10*this.necks.length);
-    const nod=this.nodSpring.step(-landOffset*2-this.brake*.10+(this.input.grounded ? Math.sin(this.phase*Math.PI*(this.metrics.gait==='run' ? 2 : 4))*(this.metrics.gait==='run' ? .22 : .06) : THREE.MathUtils.clamp(-this.input.verticalSpeed*.012,-.1,.1)),dt,6,.7);
+    const nod=this.nodSpring.step(-landOffset*2-this.brake*.10+(this.input.grounded ? Math.sin(this.phase*Math.PI*(this.metrics.gait==='run' ? 2 : 4))*(this.metrics.gait==='run' ? .22 : .06)*this.params.headBob : THREE.MathUtils.clamp(-this.input.verticalSpeed*.012,-.1,.1)),dt,6,.7);
     worldOverlay(this.head,right,-this.pitch*this.params.headStabilize+nod);
     const tailLoad=this.tailLoadSpring.step(this.params.tailLoad+this.input.speed*.005-landOffset*3+this.brake*.10+(this.input.grounded ? 0 : THREE.MathUtils.clamp(this.input.verticalSpeed*.015,-.1,.15)),dt,2.8,.8);
     overlay(this.tailBone,new THREE.Vector3(1,0,0),tailLoad);
@@ -289,8 +301,9 @@ export class AuthoredLocomotion {
         }
         const delta=foot.anchor.clone().sub(paw);
         this.metrics.maxPlantError=Math.max(this.metrics.maxPlantError,Math.hypot(delta.x,delta.z));
-        const gaitWeight=this.metrics.clipWeights[gait] ?? 1;
-        const plantBlend=locomoting ? THREE.MathUtils.smoothstep(gaitWeight,.55,.9) : 1;
+        // Support is already the actual weighted contact vote; a dominant-name
+        // fade would turn IK off at precisely the walk/trot handoff.
+        const plantBlend=locomoting ? THREE.MathUtils.smoothstep(support,.55,.85) : 1;
         delta.clampLength(0,this.params.maxCorrection).multiplyScalar(this.params.plantStrength*plantBlend);
         this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,delta.length());
         // Save both joints so correction cannot accumulate when a clip doesn't key that bone.

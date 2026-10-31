@@ -54,6 +54,8 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
   spring: {
     ...PRESET_SPRING,
     moveSpeed: 8.4,
+    accel: 5.5,
+    turnRate: 6,
     jumpVelocity: 9.6,
     gravity: 21,
     fallGravity: 1.35,
@@ -69,6 +71,8 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
   brisk: {
     ...PRESET_BRISK,
     moveSpeed: 9,
+    accel: 6,
+    turnRate: 6,
     jumpVelocity: 10.2,
     gravity: 27,
     fallGravity: 1.5,
@@ -317,6 +321,9 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
+    folder.add(params,'strideScale',1,1.16,.01);
+    folder.add(params,'gaitBlendSeconds',.12,.6,.01);
+    folder.add(params,'headBob',0,1,.05);
     folder.add(params,'headLead',0,.5,.01);
     folder.add(params,'headFrequency',1,6,.1);
     folder.add(params,'headDamping',.4,1.5,.05);
@@ -1308,7 +1315,8 @@ async function boot() {
       if(grounded && wish.lengthSq()>.001) {
         const targetYaw=Math.atan2(wish.x,wish.z);
         const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
-        fox.rotation.y+=THREE.MathUtils.clamp(error,-4.5*dt,4.5*dt);
+        const turnStep=error*(1-Math.exp(-feel.turnRate*dt));
+        fox.rotation.y+=THREE.MathUtils.clamp(turnStep,-3.2*dt,3.2*dt);
         // Brake through a reversal; forward drive returns as the body points into the input.
         const drive=Math.max(0,Math.cos(error));
         desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
