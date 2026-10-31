@@ -97,12 +97,14 @@ def main():
     ap.add_argument('--streams',default='loco,loco-glide,fox-ember,hub,reach,route-clear,camera,water-restore,shade')
     ap.add_argument('--once',action='store_true')
     args=ap.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True)
-    pool=concurrent.futures.ThreadPoolExecutor(max_workers=1);pending=[]
+    pool=concurrent.futures.ThreadPoolExecutor(max_workers=1);pending={}
     active=set()
     while time.time()<DEADLINE:
         for stream in args.streams.split(','):
             target=args.out/f'{stream}-request.json'
-            got=cli(['modal','volume','get','fox-agent-streams',f'{stream}/capture-request.json',str(target),'--force'])
+            try:got=cli(['modal','volume','get','fox-agent-streams',f'{stream}/capture-request.json',str(target),'--force'])
+            except (subprocess.TimeoutExpired,OSError) as exc:
+                print(f'poll {stream}: {exc}',flush=True);continue
             if got.returncode:continue
             try:request=json.loads(target.read_text())
             except (ValueError,OSError):continue
@@ -118,10 +120,12 @@ def main():
                 continue
             folder.mkdir(parents=True,exist_ok=True);active.add(folder);(folder/'queued.json').write_text(json.dumps(request,indent=2))
             print(f'queued {stream} {key}',flush=True)
-            pending.append(pool.submit(process,stream,request,folder))
-        for task in pending:
-            if task.done():task.result()
-        pending=[p for p in pending if not p.done()]
+            pending[pool.submit(process,stream,request,folder)]=folder
+        for task,folder in list(pending.items()):
+            if task.done():
+                try:task.result()
+                except Exception as exc:print(f'relay worker: {exc}',flush=True)
+                active.discard(folder);del pending[task]
         if args.once:break
         time.sleep(60)
     pool.shutdown(wait=True,cancel_futures=True)
