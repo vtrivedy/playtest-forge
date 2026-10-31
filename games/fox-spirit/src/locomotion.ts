@@ -40,7 +40,7 @@ export class AuthoredLocomotion {
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     headHold: 1.2, gallopHeadHold: .8, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, brakeSquat: .04, brakePitch: .09, landSquash: .20, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .28, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -394,14 +394,18 @@ export class AuthoredLocomotion {
     if(!this.input.grounded || run<1e-3 || this.params.suspensionLift<=0)return 0;
     const intervals=GAITS.run.contacts.map(c=>[c.phase,c.phase+c.duty*this.stanceRatio.run] as [number,number]).sort((a,b)=>a[0]-b[0]);
     let lift=0;
+    // Forelegs are contacts 0,1: the window after the fore stance is the gathered flight (legs folded under),
+    // which needs the larger lift or it reads as the lowest, hunched pose of the cycle.
+    const fore=GAITS.run.contacts.slice(0,2).map(c=>c.phase+c.duty*this.stanceRatio.run);
     intervals.forEach(([,end],k)=>{
       const covered=intervals.reduce((e,[s0,e0])=>s0<=e+1e-6 && e0>e ? e0 : e,end);
       const next=k+1<intervals.length ? intervals[k+1][0] : intervals[0][0]+1;
       if(next<=covered)return;
       const t=((this.phase-covered)%1+1)%1/(next-covered);
-      if(t<1)lift=Math.max(lift,Math.sin(Math.PI*t));
+      const gathered=fore.some(f=>Math.abs(f-covered)<1e-6);
+      if(t<1)lift=Math.max(lift,Math.sin(Math.PI*t)*(gathered ? this.params.gatherLift : this.params.suspensionLift));
     });
-    return lift*this.params.suspensionLift*run;
+    return lift*run;
   }
   /** Pitch of a bone's +Y in the world (chain bones point toward their child along +Y). */
   private static pitchOf(bone:THREE.Object3D) {

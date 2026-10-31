@@ -47,3 +47,12 @@ Walk pivot (1.62 m/s) and every straight gait unchanged (cadence 1.85/2.15/2.40,
 Root lift = sin envelope over each authored zero-support window of the run gait (gathered .72–1.0 and extended .27–.46 at 9 m/s),
 × run weight, grounded only. CPU (tools/loco-suspension-probe.ts): 9 m/s pelvis no longer sinks to its 59 cm low through the gather
 (peaks ~65 cm mid-flight), stance residual 12.9 mm and slide .78 m/s unchanged; zero at every touchdown/lift-off.
+
+## Capture review of main be5ce07 (relay loco-r2 d32ee2ff3573, partial worldgait; side lens) — 04:30 ET
+Personally inspected dense crops (artifacts/evidence-be5/{run-gather,turn-dense,jump-dense}.png) + per-frame __game.
+Live telemetry: turn (0.6 rad/s trot) pelvis bank 6–9°, slide p95 .06 m/s, 0 forced re-steps, touchdown shift ≤2 mm; gallop suspension 4 cm;
+moving-jump landing −4 cm; cadence 1.85/2.14/2.40 Hz. Sol visual critique unavailable (Codex quota exhausted until Nov 4) →
+independent game-feel-critic subagent (fresh context): gather still the LOWEST pose (hunch) — NEEDS REVISION; turn skate PASS by telemetry,
+bank not visible at 0.6 rad/s; jump air pose PASS, landing compression invisible; hind-thigh flap FAIL (skin seam, mesh owner).
+Follow-up (branch only, not landed — no capture yet): gatherLift .09 for the window after fore stance (gathered flight) vs .04 extended;
+CPU 9 m/s pelvis gather peak 68 cm vs extended 65 cm (was 64 vs 66); residual 12.9→15.2 mm, slide .78→.91 m/s. landSquash .20→.28.
