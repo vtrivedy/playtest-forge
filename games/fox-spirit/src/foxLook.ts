@@ -42,7 +42,9 @@ export const FOX_LOOK = {
   emberSize: 0.04,
 };
 
-const LIMB_HEAT_BAND = { inStart: 0.31, inEnd: 0.35, outStart: 0.39, outEnd: 0.45, frontOffset: 0.02 } as const;
+/** Ember glow on the outer/back limb just above the stocking (metres above the pad). The ramps are each ~15-20% of
+ * leg length so the glow feathers into the coat; narrow ramps read as a pale cuff with a hard cut onto the sock. */
+const LIMB_HEAT_BAND = { inStart: 0.24, inEnd: 0.34, outStart: 0.38, outEnd: 0.50, frontOffset: 0.02 } as const;
 
 type FurUniforms = {
   uTime: { value: number };
@@ -200,7 +202,7 @@ ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
   vec3 charcoal = min(diffuseColor.rgb, vec3(0.055, 0.046, 0.040) + diffuseColor.rgb * 0.25);
   diffuseColor.rgb = mix(diffuseColor.rgb, charcoal, undercoat);
   float lowerLimb = 1.0 - smoothstep(1.20, 1.65, vRest.y);
-  float darkStocking = lowerLimb * (1.0 - smoothstep(0.035, 0.10, lum));
+  float darkStocking = lowerLimb * (1.0 - smoothstep(0.025, 0.13, lum));
   // Stockings stay dark but warm umber, lightening up the leg into the rust coat (no tube seam), so wrist and hock angles read at gameplay distance.
   vec3 stocking = mix(vec3(0.085, 0.045, 0.024), vec3(0.30, 0.11, 0.035), smoothstep(0.25, 1.55, vRest.y));
   diffuseColor.rgb = mix(diffuseColor.rgb, stocking, darkStocking * 0.85 * clamp(coatAmount, 0.0, 1.0));
@@ -251,7 +253,7 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
   // Buried heat spreads through thin ear tissue and softly through the outer limb/back coat.
   // Broad skin weights provide the feather; only the opaque coat emits this layer.
   float throughCoat = ${fringeLength ? '1.0' : 'mix(0.60, 1.0, pow(1.0 - facing, 1.2))'};
-  float emberHeat = vSpiritCoat.x * 2.8 ${fringeLength ? '' : '+ vSpiritCoat.y * 0.50 * foxRustPigment'} + vSpiritCoat.z * 0.40;
+  float emberHeat = vSpiritCoat.x * 2.8 ${fringeLength ? '' : '+ vSpiritCoat.y * 0.30 * foxRustPigment'} + vSpiritCoat.z * 0.40;
   outgoingLight += vec3(0.80, 0.23, 0.025) * emberHeat * throughCoat * heatBreath * clamp(uBodyEmber, 0.0, 1.5);
   float furlPulse = 0.94 + 0.06 * sin(uTime * 0.8 + vRest.z);
   vec3 furlColor = mix(vec3(0.85, 0.22, 0.03), vec3(1.0, 0.35, 0.06), foxFurls);
@@ -645,7 +647,8 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const R = FOX_RIG;
   // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — small ear smoulders, tapered tail brush
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number, boolean?, number?][] = [
-    [body, [R.neck[0], R.spine[3]], 0.65, 3, 0.14, 0.07, 0.7],
+    // Crest smoulders up on the poll behind the ears, clear of the withers (a wick parked on the spine reads as a glitch).
+    [body, [R.neck[2]], 0.65, 3, 0.14, 0.07, 0.7],
     [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 0, 0.18, 0.06, 0.8],
     [tail, R.tail.slice(4, 7), 0.15, 8, 0.58, 0.13, 0.8],
     [body, R.ear("l").slice(3), -1.0, 2, 0.14, 0.035, 0.8],
@@ -754,7 +757,8 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
 
   const tmp = new THREE.Vector3(), prev = new THREE.Vector3(), vel = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const dir = new THREE.Vector3(), backward = new THREE.Vector3(), curve = new THREE.Vector3(), lateral = new THREE.Vector3();
-  let hasPrev = false, visible = true, spawnAcc = 0, pending = 0, next = 0, time = 0, speed = 0;
+  let hasPrev = false, visible = true, spawnAcc = 0, pending = 0, next = 0, time = 0, speed = 0, air = 0;
+  const flat = new THREE.Vector3();
   const anchorPos = (a: Anchor, out: THREE.Vector3) => a.mesh.getVertexPosition(a.index, out).applyMatrix4(a.mesh.matrixWorld);
   const anchorMeshes = [...new Set([...licks.map((l) => l.a.mesh), ...emberPool.map((a) => a.mesh)])];
 
@@ -769,13 +773,14 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       if (lk.flow) {
         dir.setFromMatrixPosition(lk.flow.to.matrixWorld);
         backward.setFromMatrixPosition(lk.flow.from.matrixWorld);
-        dir.sub(backward).normalize().addScaledVector(up, 0.12);
+        // Airborne the plume hugs the brush line: no buoyant lift off the tip (it read as a detached flame).
+        dir.sub(backward).normalize().addScaledVector(up, 0.12 * (1 - air));
         if (lk.flow.after) {
           curve.setFromMatrixPosition(lk.flow.after.matrixWorld);
           backward.setFromMatrixPosition(lk.flow.to.matrixWorld);
           curve.sub(backward).normalize();
         } else curve.copy(dir);
-        curve.addScaledVector(up, 0.5).normalize();
+        curve.addScaledVector(up, 0.5 * (1 - 0.8 * air)).normalize();
       } else {
         backward.set(0, 0, -1).transformDirection(group.matrixWorld);
         if (lk.spineFlow) {
@@ -783,7 +788,9 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
           dir.copy(up).multiplyScalar(0.65).addScaledVector(backward, 0.85).addScaledVector(lateral, i % 2 ? -0.3 : 0.3);
         } else dir.copy(up).multiplyScalar(0.8).addScaledVector(backward, 0.65);
       }
-      dir.addScaledVector(vel, -L.lickStream * lk.lean * (lk.tailFlow ? 0.04 : 0.25)).normalize();
+      // Stream with ground speed only; the jump's vertical speed would bend wisps off their roots.
+      flat.set(vel.x, 0, vel.z);
+      dir.addScaledVector(flat, -L.lickStream * lk.lean * (lk.tailFlow ? 0.04 : 0.25)).normalize();
       if (lk.flow) curve.sub(dir).multiplyScalar(0.5);
       else curve.set(0, 0, 0);
       aBend.setXYZ(i, curve.x, curve.y, curve.z);
@@ -793,7 +800,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       aDir.setXYZ(i, dir.x, dir.y, dir.z);
       const flick = lk.spineFlow ? 0.925 + 0.075 * Math.sin(time * 1.1 + lk.seed * 3) : 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
       const restScale = lk.tailFlow ? 0.65 : 0.95;
-      const stretch = THREE.MathUtils.lerp(restScale, 1, THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (1 + Math.min(1, speed * 0.12) * lk.lean);
+      const stretch = THREE.MathUtils.lerp(restScale, 1, THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (1 + Math.min(1, speed * 0.12) * lk.lean) * (lk.tailFlow ? 1 - 0.4 * air : 1);
       aShape.setXYZW(i, lk.w * L.lickScale, lk.h * L.lickScale * flick * stretch, lk.seed, lk.tailFlow ? 0 : lk.spineFlow ? 2 : 1);
       aAlpha.setX(i, (0.45 + 0.35 * flick) * (lk.spineFlow ? L.spineHeat : 1));
     });
@@ -803,7 +810,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       anchorPos(emberPool[Math.floor(rnd() * emberPool.length)]!, tmp);
       ePos[i * 3] = tmp.x; ePos[i * 3 + 1] = tmp.y; ePos[i * 3 + 2] = tmp.z;
       eVel[i * 3] = vel.x * 0.3 + (rnd() - 0.5) * 0.25;
-      eVel[i * 3 + 1] = 0.25 + rnd() * 0.35;
+      eVel[i * 3 + 1] = vel.y * 0.3 + 0.25 + rnd() * 0.35;
       eVel[i * 3 + 2] = vel.z * 0.3 + (rnd() - 0.5) * 0.25;
       eHeat[i] = 0;
       eAge[i] = 0; eLife[i] = 2.2 + rnd();
@@ -838,6 +845,9 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       emberMat.uniforms.uRadiance!.value = L.emberRadiance;
       time = t;
       speed = Math.hypot(vel.x, vel.z);
+      // Airborne weight: quick attack, slow release so it holds through the apex where vertical speed crosses zero.
+      const airTarget = THREE.MathUtils.smoothstep(Math.abs(vel.y), 0.8, 3);
+      air = airTarget > air ? THREE.MathUtils.damp(air, airTarget, 20, dt) : THREE.MathUtils.damp(air, airTarget, 3, dt);
       diagnostics.speed = Number(speed.toFixed(2));
       diagnostics.liveEmbers = 0;
       lickMat.uniforms.uIntensity!.value = L.lickIntensity * (0.8 + 0.4 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (gliding ? 1.25 : 1);
