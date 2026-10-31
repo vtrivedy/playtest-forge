@@ -40,9 +40,9 @@ export class AuthoredLocomotion {
     minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .35,
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
-    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .95, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
+    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .8, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
     carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, weightRoll: .05, spineSway: .045, breath: .022,
-    runningGather: .45, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
+    runningGather: .45, tailAir: .05, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     headHold: 1.2, gallopHeadHold: .8, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
@@ -72,7 +72,7 @@ export class AuthoredLocomotion {
     this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
     this.leanSpring.value=0;this.leanSpring.velocity=0;
     this.pitchSpring.value=0;this.pitchSpring.velocity=0;
-    for(const spring of this.tailSprings){spring.value=0;spring.velocity=0;}
+    for(const spring of [...this.tailSprings,...this.tailPitchSprings]){spring.value=0;spring.velocity=0;}
     this.previousSpeed=this.input.speed;this.terrainOffset=0;
   }
   /** A deliberate dash-facing snap is not a physical turn impulse. */
@@ -91,6 +91,7 @@ export class AuthoredLocomotion {
   private leanSpring=new Spring();
   private pitchSpring=new Spring();
   private tailSprings=Array.from({length:8},()=>new Spring());
+  private tailPitchSprings=Array.from({length:8},()=>new Spring());
   private tails: THREE.Object3D[]=[];
   readonly footfalls: THREE.Vector3[]=[];
   private previousSpeed=0;
@@ -531,11 +532,17 @@ export class AuthoredLocomotion {
     const groundBob=this.params.headBob*(Math.sin(this.phase*Math.PI*4)*.03*(1-runWeight)+Math.sin(this.phase*Math.PI*2)*.06*runWeight);
     const nod=this.nodSpring.step(-landOffset*2-this.brake*.10+(this.input.grounded ? groundBob : THREE.MathUtils.clamp(-this.input.verticalSpeed*.012,-.1,.1)),dt,6,.7);
     worldOverlay(this.head,right,-this.pitch*this.params.headStabilize+nod);
-    const tailLoad=this.tailLoadSpring.step(this.params.tailLoad-this.input.speed*this.params.tailStream-landOffset*3+this.brake*.10+(this.input.grounded ? 0 : THREE.MathUtils.clamp(this.input.verticalSpeed*.015,-.1,.15)),dt,2.8,.8);
+    const tailLoad=this.tailLoadSpring.step(this.params.tailLoad-this.input.speed*this.params.tailStream-landOffset*3+this.brake*.10,dt,2.8,.8);
     overlay(this.tailBone,new THREE.Vector3(1,0,0),tailLoad);
     this.ribbon=THREE.MathUtils.damp(this.ribbon,this.input.grounded && ['run','walk','trot'].includes(active) ? 1 : 0,4,dt);
     let tailTarget=THREE.MathUtils.clamp(-this.turn*this.params.tailLag,-.25,.25);
+    // Vertical follow-through (+X droops): the brush trails a rise, lifts on the fall, whips down on landing;
+    // each segment chases the one before it, so the motion travels to the flame tip instead of moving as a rod.
+    let pitchTarget=THREE.MathUtils.clamp((this.input.grounded ? 0 : this.input.verticalSpeed*this.params.tailAir)-landOffset*4,-.45,.45);
     for(let i=0;i<this.tails.length;i++) {
+      const pitch=this.tailPitchSprings[i].step(pitchTarget,dt,Math.max(1.1,2.6-i*.2),.55);
+      overlay(this.tails[i],new THREE.Vector3(1,0,0),pitch*(i===0 ? .5 : .22));
+      pitchTarget=pitch;
       const bone=this.tails[i]; const spring=this.tailSprings[i];
       const angle=spring.step(tailTarget,dt,Math.max(1.2,this.params.springFrequency-i*.16),this.params.springDamping);
       overlay(bone,new THREE.Vector3(0,0,1),angle*(i===0 ? 1 : .35));
