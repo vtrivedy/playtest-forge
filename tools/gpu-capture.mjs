@@ -368,16 +368,23 @@ try {
       await H('advance',1,0,true);
       const pose=await H('state');
       const variants=[];
+      const setDensity=async value=>page.evaluate(value=>{
+        const h=window.__gameHooks;h.shades.tun.inkDensity=value;
+        for(const actor of h.shades.state().actors)h.debug.scene.getObjectByName(actor.id)?.traverse(mesh=>{
+          if(!mesh.isMesh)return;
+          for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material])if(material.uniforms?.uDensity)material.uniforms.uDensity.value=value;
+        });
+      },value);
       try{
         for(const density of [2,3,4]){
-          await page.evaluate(value=>{window.__gameHooks.shades.tun.inkDensity=value;},density);
-          await H('advance',1,0,true);
+          await setDensity(density);
+          await advance(0);
           const shotName=`shade-density-${density}`;
           await shot(shotName);variants.push({density,shot:shotName,framing:await measurePair(actors[0].id)});
         }
       }finally{
-        await page.evaluate(value=>{window.__gameHooks.shades.tun.inkDensity=value;},originalDensity);
-        await H('advance',1,0,true);
+        await setDensity(originalDensity);
+        await advance(0);
       }
       save('shade-density-variants.json',{label:'Same pose/time/camera, core absorption only; variants are not acceptance',chosenDefault:originalDensity,pose:{time:pose.t,fox:pose.pos,foxYaw:pose.foxYaw},variants});
     }
