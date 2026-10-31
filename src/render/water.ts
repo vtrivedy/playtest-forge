@@ -24,6 +24,7 @@ export function createStylizedWater(
     uReflectionOn: { value: 0 },
     uDepthTint: { value: THREE.MathUtils.clamp(opts.depthTint ?? 0.12, 0.025, 0.4) },
     uTime: { value: 0 },
+    uReveal: { value: 1 },
     uHalf: { value: size * 0.5 },
     uShoreRadius: { value: shoreRadius },
     uDeep: { value: new THREE.Color(opts.colorDeep ?? 0x3a4038) },
@@ -58,7 +59,7 @@ export function createStylizedWater(
       }`,
     fragmentShader: sceneWaterFragment + /* glsl */ `
       uniform vec3 uDeep, uShallow, uSky;
-      uniform float uShoreRadius, uTime, uReflectionOn, uDepthTint;
+      uniform float uShoreRadius, uTime, uReflectionOn, uDepthTint, uReveal;
       uniform sampler2D uReflectionMap;
       varying vec3 vWorld;
       varying vec3 vN;
@@ -74,7 +75,10 @@ export function createStylizedWater(
         float r = length(vLocal);
         float depth = 1.0 - smoothstep(0.15, 1.0, r);
         vec3 rippleView = mat3(viewMatrix) * vec3(N.x - vN.x, 0.0, N.z - vN.z);
-        float shore = 1.0 - smoothstep(uShoreRadius * 0.90, uShoreRadius, r);
+        // Recede inside the existing mesh support; outward noise would expose
+        // the square plane boundary at the ellipse's four axis intercepts.
+        float shoreBrush = (2.0 + sin(q.x * 0.41 + sin(q.y * 0.23)) + sin(q.y * 0.57 + q.x * 0.19)) * 0.004;
+        float shore = (1.0 - smoothstep(uShoreRadius * 0.90, uShoreRadius, r + shoreBrush)) * uReveal;
         vec3 bed = sceneWaterColor(rippleView.xy * 0.06 * shore);
         vec3 tint = mix(vec3(0.94, 0.97, 0.91), vec3(0.66, 0.82, 0.73), depth);
         vec3 absorption = mix(uShallow, uDeep * 0.85, depth);

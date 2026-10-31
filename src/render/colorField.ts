@@ -332,7 +332,8 @@ export class ColorField {
             // Same metres, stationary noise and feather as the analytic material front.
             // Leaves sampling this RT must not see a larger circular restore halo.
             float edge = vRestore.y;
-            float brush = ((noise(vWorld * 0.35) - 0.5) * 0.8 + (noise(vWorld * 1.7) - 0.5) * 0.35) * edge * 1.6;
+            float brush = ((noise(vWorld * 0.35) - 0.5) * 0.8 + (noise(vWorld * 1.7) - 0.5) * 0.35) * edge * 1.6
+              + (noise(vWorld * 0.075 + 17.0) - 0.5) * edge * 3.0;
             ink = 1.0 - smoothstep(vRestore.x - edge + brush, vRestore.x + edge * 0.5 + brush, distance(vWorld, vCenter));
           } else {
             // Stationary world-space brush noise makes neighbouring stains coherent.
@@ -414,8 +415,8 @@ export class ColorField {
       if (r.radius > 0.01) {
         // Extra support around the analytic front keeps brush bleed inside the stamp quad.
         const edge = Math.max(0.001, ColorField.edgeOf(r));
-        // Noise can extend the analytic feather to R + 1.42e; keep it inside the quad.
-        const outer = r.radius + edge * 1.5;
+        // Fine + broad noise can extend the feather to R + 2.92e.
+        const outer = r.radius + edge * 3.1;
         stamps.push({
           x: r.center.x,
           z: r.center.z,
@@ -623,7 +624,8 @@ export class ColorField {
               float d = distance(p.xz, c.xz);
               float edge = max(0.001, uRestoreEdge[i]);
               // painterly ragged front: two octaves so a crisp front still reads as brushwork
-              float n = ((noise21(p.xz * 0.35) - 0.5) * 0.8 + (noise21(p.xz * 1.7) - 0.5) * 0.35) * edge * 1.6;
+              float n = ((noise21(p.xz * 0.35) - 0.5) * 0.8 + (noise21(p.xz * 1.7) - 0.5) * 0.35) * edge * 1.6
+                + (noise21(p.xz * 0.075 + 17.0) - 0.5) * edge * 3.0;
               float local = 1.0 - smoothstep(rad - edge + n, rad + edge * 0.5 + n, d);
               s = max(s, local);
               cfPermanent = max(cfPermanent, local);

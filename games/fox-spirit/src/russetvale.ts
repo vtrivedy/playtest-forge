@@ -989,6 +989,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   reedWater.mesh.position.set(MARSH.x, MARSH.floor + 0.18, MARSH.z);
   reedWater.mesh.scale.set(MARSH.rx / 30, MARSH.rz / 30, 1);
   reedWater.mesh.visible = false;
+  reedWater.material.uniforms.uReveal!.value = 0;
   waterVisuals.push(reedWater);
 
   // boardwalk on stilts (56,37)→(65,31)
@@ -2605,12 +2606,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         if (bridgeT >= 1) bridgeC.enabled = true;
       }
 
-      reedWater.mesh.visible = !inkActive;
       // Ink sinks after SW2, revealing the shallow clear water and original floor.
       if (!inkActive && ink.position.y > MARSH.floor - 1.2) {
         ink.position.y -= dt * 0.35;
         inkMat.roughness = Math.min(0.9, inkMat.roughness + dt * 0.2);
       }
+      // Wait until the sinking opaque sheet clears the deepest ripple trough:
+      // intersecting the two skins reveals disconnected flat-looking teal ovals.
+      const reedClearance = MARSH.floor + 0.18 - 0.05 - ink.position.y;
+      reedWater.mesh.visible = !inkActive && reedClearance > 0;
+      reedWater.material.uniforms.uReveal!.value = THREE.MathUtils.smoothstep(reedClearance, 0, 0.3);
 
       // windmills: turn while in colour before SW1, for good after
       const sw1 = seedwells[0]!.lit;

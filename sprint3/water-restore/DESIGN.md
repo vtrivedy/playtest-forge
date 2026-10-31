@@ -127,3 +127,15 @@ Independent Sol audit of ebffd87 finds that the new wade helper boots three fres
 ## Main integration ac86a80
 
 Merge current main as requested by driver01:35. Preserve the deferred immutable-repo water-wade import in the single capture conflict. Main adds a projected-visibility helper whose static import has the same stale Modal-image risk; load it from the immutable repo immediately before route-only use. Preserve main's camera, fox, shade and route changes. Required tsc/fox build and capture syntax checks before backup push. Appearance remains gated on fresh combined-ref GPU review.
+
+## 7240f4c actual-image follow-up: continuous reveal and broad wash
+
+All47 captured PNGs personally scanned on four sheets, with pond/settled/Reed vista full-size. Independent Sol actual-image critique agrees PASS improvement vs baseline, FAIL final: near-circular restore sector, disconnected teal water ovals at mid, heavy murky reflection. Opus still rate-limited until06:40UTC. Renderer report is clean PCF1/HDR1016/copy/mirror/GL0; no current white-out.
+
+The disconnected ovals occur while the globally sinking opaque ink intersects the +/-0.043m water ripple. Keep restored water hidden until ink is below its trough, then fade water uniformly from0 to1 over the next0.3m of existing sink travel. Do not change sink rate, hazard, pad/collision, latch or water level. A shader uniform defaults1 for other skins. Add a restrained world-space shoreline variation (<=0.55m) within the existing feather so lake edges are not mathematically perfect ellipses.
+
+Restore contour: add a stationary broad13m-scale noise octave, bounded +/-1.5 feather widths, to both analytic and RT permanent fronts. Retain existing finer brush octaves and soft transition. Expand permanent stamp support to radius+3.1edge so the broader bleed never clips into rectangles. CPU gameplay sampling and restore timing stay untouched; leaves and terrain still use matched fronts. No extra rings, particles or discs.
+
+Capture perf bug: water fixed-clock boot overrides performance.now, so perf(6) reports0ms. Preserve a native bound clock before overriding, make the override configurable, and temporarily restore native performance.now only inside synchronous render-only perf hooks, then restore fixed time in finally. Record warmed median samples for the Reed vista and reject nonpositive timings. No game-time/simulation changes or local render. Request combined-ref retest after required builds and independent source check.
+
+Sol source follow-up catches outward shoreline perturbation at the plane's axis intercepts. Keep all shoreline displacement inward (0..0.016 normalized radius) so original outer-boundary alpha is exactly zero; no exposed square support. Other reveal/noise/support/clock changes pass source review, not visual acceptance.
