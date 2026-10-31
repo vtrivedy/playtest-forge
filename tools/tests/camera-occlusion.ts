@@ -2,9 +2,23 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createFollowCamera } from '../../games/fox-spirit/src/camera';
 import { createOcclusionFader } from '../../games/fox-spirit/src/occlusion';
+import { CollisionWorld, boxCollider, cylCollider } from '../../games/fox-spirit/src/collision';
 
 // CPU geometry probes only; this never creates a renderer or browser.
 const scenery = new THREE.Group();
+const lensWorld = new CollisionWorld(() => -20);
+const lensBox = lensWorld.add(boxCollider({ x: 0, z: 0, w: 2, d: 4, yaw: .6, top: 3, bottom: 1 }));
+assert.equal(lensWorld.cameraOccupied(0, 2, 0), true);
+assert.equal(lensWorld.cameraOccupied(0, 3.21, 0), false, 'lens above a slab is clear');
+assert.equal(lensWorld.cameraOccupied(0, .79, 0), false, 'lens below a slab is clear');
+assert.equal(lensWorld.cameraOccupied(5, 2, 0), false);
+lensBox.enabled = false;
+assert.equal(lensWorld.cameraOccupied(0, 2, 0), false, 'disabled solid cannot occupy the lens');
+lensWorld.add(cylCollider({ x: 10, z: 0, r: 1, top: 5, bottom: 3 }));
+assert.equal(lensWorld.cameraOccupied(10, 4, 0), true);
+assert.equal(lensWorld.cameraOccupied(11.25, 4, 0), false);
+assert.equal(lensWorld.cameraOccupied(10, 2.75, 0), false);
+assert.equal(lensWorld.cameraOccupied(0, -20.1, 0), true, 'terrain remains solid below its surface');
 const material = new THREE.MeshStandardMaterial();
 const wall = new THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]>(new THREE.PlaneGeometry(20, 20), material);
 wall.position.z = 2; // normal +Z: focus sees the back of this single-sided plane
@@ -13,7 +27,7 @@ scenery.add(wall);
 const follow = createFollowCamera({ scenery });
 follow.resize(1280, 720);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=single-sided-wall/);
 assert.equal(material.side, THREE.FrontSide, 'query must preserve rendered material side');
 
@@ -21,12 +35,24 @@ assert.equal(material.side, THREE.FrontSide, 'query must preserve rendered mater
 wall.position.x = 100;
 scenery.updateMatrixWorld(true);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=$/, 'moved wall must not leave a phantom blocker');
+const ordinaryDiagnostics = follow.debug.internals();
+wall.position.set(4, .7, 0);
+scenery.updateWorldMatrix(true, true);
+assert.equal(follow.debug.viewBlocked(new THREE.Vector3(0, .62, 0), new THREE.Vector3(0, .62, 4)), false, 'follow view remains clear');
+// Turn the decorative plane toward the photo lens; the gameplay lens is elsewhere.
+wall.rotation.y = Math.PI / 2;
+scenery.updateWorldMatrix(true, true);
+assert.equal(follow.debug.viewBlocked(new THREE.Vector3(0, .62, 0), new THREE.Vector3(8, .62, 0)), true, 'actual photo view catches decorative wall');
+assert.equal(follow.debug.internals(), ordinaryDiagnostics, 'photo query preserves gameplay diagnostics');
+assert.equal(wall.material, material, 'photo query preserves render material identity');
+wall.rotation.y = 0;
+wall.position.set(0, 0, 2);
 wall.position.x = 0;
 scenery.updateMatrixWorld(true);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=single-sided-wall/);
 
 // A multi-material mesh only draws geometry groups. Ungrouped triangles must
@@ -35,11 +61,11 @@ wall.material = [material];
 wall.geometry.clearGroups();
 const groupedFollow = createFollowCamera({ scenery });
 groupedFollow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(groupedFollow.debug.internals(), /blocker=$/, 'ungrouped solid triangles are not drawn');
 wall.geometry.addGroup(0, wall.geometry.index!.count, 0);
 groupedFollow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(groupedFollow.debug.internals(), /blocker=single-sided-wall/);
 
 const scene = new THREE.Scene();
@@ -138,7 +164,7 @@ const celebration = createFollowCamera();
 celebration.resize(1280, 720);
 const hero = new THREE.Vector3();
 const idleFrame = { target: hero, vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null };
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null };
 celebration.update(1 / 60, idleFrame);
 celebration.playShot({ subjects: [hero.clone(), new THREE.Vector3(100, 20, -70)], holdS: 1.7 });
 for (let i = 0; i < 60; i++) celebration.update(1 / 60, idleFrame);
@@ -221,13 +247,13 @@ stringScene.add(stringPlane);
 const stringCamera = createFollowCamera({ scenery: stringScene });
 stringCamera.resize(1280, 720);
 stringCamera.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(stringCamera.debug.internals(), /blocker=$/, 'decorations must not compress the solid boom');
 stringPlane.userData.cameraDecoration = false;
 const solidPostCamera = createFollowCamera({ scenery: stringScene });
 solidPostCamera.resize(1280, 720);
 solidPostCamera.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(solidPostCamera.debug.internals(), /blocker=decorative-string-test/, 'solid scenery must still block');
 console.log('Decorative string / solid post camera distinction PASS');
 // Ground-only elevation must not leak into sustained flight. Compare two live
@@ -276,6 +302,52 @@ for (const runDistance of [3.0, 3.3]) for (const speed of [0, 3.8, 9]) {
 }
 console.log('Chase composition CPU proxies:', JSON.stringify(composition));
 
+// A downhill fox moving toward the lens extends beyond its root-line guard.
+// This proxy is deliberately below the root to reserve the pitched snout.
+const descentCamera = createFollowCamera();
+descentCamera.resize(1280, 720);
+const descentTarget = new THREE.Vector3(0, 20, 0);
+let lowestNose = 1, highestEars = -1, steepestView = 0;
+for (let i = 0; i < 240; i++) {
+  descentTarget.z = i * 4.5 / 60;
+  descentTarget.y = 20 - descentTarget.z * .5;
+  descentCamera.update(1 / 60, { ...idleFrame, target: descentTarget, facing: 0, vel: new THREE.Vector3(0, 0, 4.5) });
+  const nose = descentTarget.clone().add(new THREE.Vector3(0, -.1, .85)).project(descentCamera.camera);
+  const ears = descentTarget.clone().add(new THREE.Vector3(0, 1.25, 0)).project(descentCamera.camera);
+  const view = descentCamera.camera.getWorldDirection(new THREE.Vector3());
+  lowestNose = Math.min(lowestNose, nose.y); highestEars = Math.max(highestEars, ears.y);
+  steepestView = Math.max(steepestView, THREE.MathUtils.radToDeg(Math.asin(-view.y)));
+}
+assert.ok(lowestNose > -.9, `descending front silhouette stays above viewport edge: ${lowestNose}`);
+assert.ok(highestEars < .9, 'nose protection retains the ears');
+assert.ok(steepestView < 40, `nose protection avoids top-down framing: ${steepestView}`);
+console.log('Downhill front proxy:', JSON.stringify({ lowestNose, highestEars, steepestView }));
+
+// Isolate authored-volume clearance from the earlier mesh-ray solver. A clear
+// spring endpoint crosses this solid; the final lens must slide continuously.
+const volumeWorld = new CollisionWorld(() => 0);
+volumeWorld.add(cylCollider({ x: 0, z: 3.2, r: .55, top: 3, bottom: 0 }));
+const volumeCamera = createFollowCamera({ surfaceAt: () => 0,
+  lensBlocked: (x, y, z, radius) => volumeWorld.cameraOccupied(x, y, z, radius) });
+volumeCamera.resize(1280, 720);
+const volumeTarget = new THREE.Vector3(-4, 0, 0);
+for (let i = 0; i < 120; i++) volumeCamera.update(1 / 60, { ...idleFrame, target: volumeTarget });
+const volumePrevious = volumeCamera.camera.position.clone();
+let volumeMaxStep = 0, volumeActiveFrames = 0;
+for (let i = 0; i < 240; i++) {
+  volumeTarget.x = -4 + i * 2 / 60;
+  volumeCamera.update(1 / 60, { ...idleFrame, target: volumeTarget, vel: new THREE.Vector3(2, 0, 0), facing: Math.PI / 2 });
+  const lens = volumeCamera.camera.position;
+  assert.equal(volumeWorld.cameraOccupied(lens.x, lens.y, lens.z, .2), false, 'rendered lens stays outside authored solid');
+  assert.match(volumeCamera.debug.internals(), /lensUnresolved=false/);
+  volumeMaxStep = Math.max(volumeMaxStep, lens.distanceTo(volumePrevious));
+  if (Math.abs(lens.z - 3.23918266122983) > .15) volumeActiveFrames++;
+  volumePrevious.copy(lens);
+}
+assert.ok(volumeMaxStep < .3, `volume clearance does not jump across a solid: ${volumeMaxStep}`);
+assert.ok(volumeActiveFrames > 10, 'volume test actually changes the lens path');
+console.log('Volume clearance CPU probe:', JSON.stringify({ volumeMaxStep, volumeActiveFrames }));
+
 for (const velocity of [new THREE.Vector3(0, 0, 9), new THREE.Vector3(4.5, 0, -7.8)]) {
   const follow = createFollowCamera();
   const reference = createFollowCamera({ params: { minDistance: 0 } });
@@ -306,3 +378,12 @@ for (let i = 0; i < 120; i++) wallCamera.update(1 / 60, { ...idleFrame, target: 
 assert.ok(wallCamera.camera.position.z < 2, 'compressed lens stays on the hero side of the wall');
 assert.ok(wallCamera.camera.position.distanceTo(new THREE.Vector3(0, wallCamera.params.lookHeight, 0)) < wallCamera.params.minDistance,
   'safe wall compression may take precedence over the open-ground minimum');
+
+const nearCliff = new THREE.Group();
+const overhang = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial());
+overhang.position.z = .16; overhang.name = 'close visual rock overhang'; nearCliff.add(overhang);
+const closeCliffCamera = createFollowCamera({ scenery: nearCliff });
+closeCliffCamera.resize(1280, 720);
+closeCliffCamera.update(1 / 60, { ...idleFrame, target: new THREE.Vector3() });
+assert.equal(closeCliffCamera.debug.blocked(), true, 'a 16cm visual overhang must not be skipped as footing');
+assert.match(closeCliffCamera.debug.internals(), /blocker=close visual rock overhang/);

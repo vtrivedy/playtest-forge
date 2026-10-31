@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {blackFrameIntervals} from '../hub-black-frames.mjs';
+const log='[blackframe] frame:598 pblack:100 pts:598 t:9.966667\n[blackframe] frame:599 pblack:100 pts:599 t:9.983333';
+const terminal=blackFrameIntervals(log,60);
+assert.equal(terminal.length,1);
+assert.equal(terminal[0].end,10,'Terminal frame display time must reach full video duration');
+assert.ok(terminal[0].duration>=.02,'Two EOF black frames at60fps must fail .02s gate');
+assert.ok(blackFrameIntervals('frame:599 pblack:100',60)[0].duration<.02);
+assert.ok(blackFrameIntervals('frame:299 pblack:100',30)[0].duration>=.02);
+assert.equal(blackFrameIntervals('frame:1 pblack:98',30).length,0);
+assert.equal(blackFrameIntervals('frame:1 pblack:100\nframe:3 pblack:100',30).length,2);
+assert.deepEqual(blackFrameIntervals('',30),[]);
+console.log('Hub black-frame CPU audit PASS: EOF,30/60fps threshold, gaps, pixel gate, empty footage.');

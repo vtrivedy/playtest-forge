@@ -477,7 +477,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   W(-106.4, 20, -22.2, { ground: false });
   W(-104.9, 15, -22.5, { ground: false, label: 'drop:HE' });
   W(-103.9, 15, -24, { ground: false, act: 'glide', label: 'lift:HE', rise: 6.8 });
-  W(-108.6, 20, -23.2, { ground: false, label: 'SW1-feed' });
+  W(-109, 20, -25.4, { ground: false, label: 'SW1-feed' });
   // glide off SW1 east, over the terraces' north shoulder, into Amberwood
   W(-108, 20, -25, { ground: false, act: 'glide' });
   W(-72, 0, -26, { ground: false });
@@ -804,7 +804,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // Its cap preserves the visible footing over the foundation's eroded corners.
   {
     const p = sp(63.3, 10.375);
-    col.add(boxCollider({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 18, bottom: 13, tag: 'r5-landing' }));
+    col.add(boxCollider({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 18, bottom: 13, tag: 'stair-r5-landing' }));
     slab({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 17.8, bottom: 13, rough: 0.3, seed: 77, topColor: null });
     stoneBlock(bk('stone', p.x, p.z), trs(p.x, 17.9, p.z, T_YAW), 1.25, 0.2, 3.3, 7701, 0);
   }
@@ -1866,6 +1866,27 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       patrol.push([h2.x + Math.cos(a) * r, h2.y, h2.z + Math.sin(a) * r]);
     }
     shadeSpots.push({ id: 'shade-kiln', patrol });
+    // Small caught-leaf drifts give the draining memory real autumn color to release.
+    // Use the existing litter material/mask; the stone itself stays restrained.
+    const kilnLeafCards: number[][] = [];
+    const leafFloor = (x: number, z: number) => {
+      const floor = col.groundAt(x, z, h2.y + 0.05).y;
+      if (!Number.isFinite(floor) || Math.abs(floor - h2.y) > 0.15 || col.blocked(x, z, floor)) return NaN;
+      if (Math.hypot(x - h2.x, z - h2.z) < 1.2) return NaN;
+      for (const [dx, dz] of [[0.24, 0], [-0.24, 0], [0, 0.24], [0, -0.24],
+        [0.24, 0.24], [-0.24, 0.24], [0.24, -0.24], [-0.24, -0.24]] as const) {
+        const nearby = col.groundAt(x + dx, z + dz, floor + 0.05).y;
+        if (!Number.isFinite(nearby) || Math.abs(nearby - floor) > 0.15 || col.blocked(x + dx, z + dz, floor)) return NaN;
+      }
+      kilnLeafCards.push([x, floor, z]);
+      return floor;
+    };
+    for (const [index, count, radius] of [[1, 18, 0.8], [4, 24, 1.0], [7, 16, 0.75]] as const) {
+      const [x, , z] = patrol[index]!;
+      litterPatch(bk('litter', x, z, false), rng(3640 + index), x, z, radius, count, leafFloor,
+        [PAL.leafBrown, PAL.russet, PAL.gold]);
+    }
+    group.userData.shadeKilnLitter = { attempted: 58, cards: kilnLeafCards.length, positions: kilnLeafCards };
   }
   // Wind river (§3.3 beat 6): from the top of H2's column over the Kiln, east above the Amberwood crowns,
   // down onto the arena's west rim. Woken briefly by colour at the Seedwell; flows for good once SW1 latches

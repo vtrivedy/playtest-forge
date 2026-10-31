@@ -1,3 +1,4 @@
+import { HUB_PRACTICAL } from './regionLanternhollow';
 import { createWind, type WindForce } from './chem/wind';
 import { createShades } from './encounters/shades';
 import { ShadeContact } from './encounters/contact';
@@ -34,6 +35,7 @@ import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
+import { createCameraVisibilityProbe } from './cameraVisibility';
 import type { FoxAnimState } from './fox';
 import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
@@ -211,6 +213,8 @@ async function boot() {
       opacity: 0.85,
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), mat);
+    // GTAO's normal override ignores the radial alpha and would occlude as a solid card.
+    mesh.userData.forgeSkipAO = true;
     mesh.rotation.x = -Math.PI / 2;
     mesh.renderOrder = 1;
     scene.add(mesh);
@@ -220,6 +224,7 @@ async function boot() {
   const cam = createFollowCamera({
     scenery: world.group,
     surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
+    lensBlocked: (x, y, z, radius) => col.cameraOccupied(x, y, z, radius),
   });
   cam.snapBehind(spawnYaw);
   cam.camera.far = quality.far;
@@ -463,7 +468,7 @@ async function boot() {
   // Patch only after every world builder has added its materials and shader
   // hooks. In particular the grotto roof is built by water outside world.group.
   const occlusion = createOcclusionFader(scene, {
-    blocked: () => !photo && cam.debug.blocked(),
+    blocked: (camera, focus) => photo ? cam.debug.viewBlocked(focus, camera.position) : cam.debug.blocked(),
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
@@ -535,6 +540,7 @@ async function boot() {
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'eyeSocketLift', 0, 1, 0.01);
   fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
+  fFox.add(FOX_LOOK, 'bodyEmber', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
@@ -547,11 +553,14 @@ async function boot() {
   fFox.close();
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
   const fDusk = fLook.addFolder('Lanternhollow dusk');
+  fDusk.add(HUB_PRACTICAL, 'strength', .5, 4, .1).name('practical light strength');
   fDusk.add(HUB_DUSK, 'kOverride', -1, 1, .01).name('override (-1 auto)');
   fDusk.add(HUB_DUSK, 'key', .8, 2.5, .01);
   fDusk.add(HUB_DUSK, 'hemi', .2, .8, .01);
   fDusk.add(HUB_DUSK, 'rim', .4, 1.6, .01);
   fDusk.add(HUB_DUSK, 'skyScale', .5, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunScale', .1, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunSize', .0001, .006, .0001);
   fDusk.add(HUB_DUSK, 'sunBloom', 0, .3, .01);
   fDusk.add(HUB_DUSK, 'godRays', 0, .5, .01);
   fDusk.add(HUB_DUSK, 'horizonGlow', 0, .6, .01);
@@ -698,7 +707,10 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world },
+    debug: { scene, renderer, post, colorField, camera: cam.camera,
+      // Explicit capture-only mutable tuning handle; other debug handles remain read-only.
+      hubPractical: HUB_PRACTICAL, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world,
+      cameraVisibility: createCameraVisibilityProbe(scene, renderer, cam.camera, foxActor.group) },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
@@ -885,7 +897,7 @@ async function boot() {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
-        dusk: { ...hubDusk.state(), practical: world.hubState() },
+        dusk: { ...hubDusk.state(), practical: world.hubState(), practicalStrength: HUB_PRACTICAL.strength },
         reachMood: reachMood.state(),
         crown: crown.state(),
         reach: reach.state(),
@@ -924,6 +936,7 @@ async function boot() {
           occlusion: occlusion.strength,
           sightBlocked: occlusion.detected,
           photo: !!photo,
+          lensTouchesCollider: col.cameraOccupied(cam.camera.position.x, cam.camera.position.y, cam.camera.position.z),
           foxNdc: cam.debug.fox,
           landingNdc: cam.debug.landing,
           internals: cam.debug.internals(),
@@ -1490,9 +1503,7 @@ async function boot() {
       }
     }
 
-    colorField.visualDrains = shades.state().filter(actor => !actor.freed).map(actor => ({
-      center: new THREE.Vector3().fromArray(actor.pos), radius: shades.tun.drainRadius,
-    }));
+    shades.writeDrainVolumes(colorField.visualDrains);
 
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
     const speed = Math.hypot(vel.x, vel.z);
@@ -1623,6 +1634,7 @@ async function boot() {
     cam.update(rawDt, {
       target: feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
       vel,
+      facing: fox.rotation.y,
       grounded,
       gliding,
       dashing,
@@ -1755,7 +1767,7 @@ async function boot() {
         `dashes=${feelMetrics.dashesUsed}`,
         `preset=${feelPreset}`,
         `quality=${quality.tier}`,
-        `dusk=${JSON.stringify({ ...hubDusk.state(), practical: world.hubState() })}`,
+        `dusk=${JSON.stringify({ ...hubDusk.state(), practical: world.hubState(), practicalStrength: HUB_PRACTICAL.strength })}`,
         `spirit=${JSON.stringify(foxActor.group.userData.spiritFx)}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',
