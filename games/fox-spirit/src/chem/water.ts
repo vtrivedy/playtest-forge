@@ -126,7 +126,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         float foam = pow(max(0.0, sin(drift * 2.2 + sin(vWaterUV.x * 11.0) * 0.6)), 14.0);
         float edgeFoam = pow(abs(vWaterUV.x - 0.5) * 2.0, 10.0) * (0.5 + 0.5 * sin(drift * 3.0));
         diffuseColor.rgb += vec3(0.12, 0.105, 0.075) * (foam * 0.65 + edgeFoam * 0.35) * vWet;
-        diffuseColor.a *= 1.0 - smoothstep(0.5, 1.0, abs(vWaterUV.x - 0.5) * 2.0);
+        diffuseColor.a = mix(diffuseColor.a, 1.0, vWet) * (1.0 - smoothstep(0.5, 1.0, abs(vWaterUV.x - 0.5) * 2.0));
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float waterFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
@@ -139,7 +139,8 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         float kneeLuma = min(waterLuma, 0.12) + excess / (1.0 + excess / 0.18);
         outgoingLight -= waterDiffuse * (1.0 - kneeLuma / max(waterLuma, 0.0001)) * vWet;
         outgoingLight = mix(outgoingLight, waterSky, (0.06 + waterFresnel * 0.35) * vWet);
-        vec3 bed = sceneWaterColor(normal.xy * 0.004);
+        vec3 rippleView = (viewMatrix * vec4(ripple, 0.0)).xyz;
+        vec3 bed = sceneWaterColor(rippleView.xy * 0.004 * vWet);
         float channelDepth = 1.0 - abs(vWaterUV.x - 0.5) * 2.0;
         vec3 clearBody = bed * mix(vec3(0.95, 0.97, 0.91), vec3(0.67, 0.83, 0.73), channelDepth);
         outgoingLight = mix(outgoingLight, clearBody, (0.84 - waterFresnel * 0.40) * vWet);

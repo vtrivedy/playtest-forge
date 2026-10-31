@@ -9,7 +9,7 @@ export type StylizedWater = {
   dispose: () => void;
 };
 
-/** Soft stylized water plane — reflections approximated via sky tint + fresnel. */
+/** Gentle scene-refracted water with an optional planar scenery reflection. */
 export function createStylizedWater(
   scene: THREE.Scene,
   opts: { size?: number; y?: number; colorDeep?: number; colorShallow?: number; shoreRadius?: number; reflection?: boolean } = {},
@@ -47,7 +47,7 @@ export function createStylizedWater(
         vLocal = position.xy / uHalf;
         float w1 = sin(p.x * 0.55 + uTime * 0.65) * 0.025;
         float w2 = cos(p.y * 0.43 + uTime * 0.48) * 0.018;
-        // plane is XZ; geometry PlaneGeometry → local y is up after rot
+        // PlaneGeometry is local XY; local Z displaces along the water normal.
         p.z += w1 + w2;
         vec4 wpos = modelMatrix * vec4(p, 1.0);
         vWorld = wpos.xyz;
@@ -72,8 +72,8 @@ export function createStylizedWater(
         float fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 5.0);
         float r = length(vLocal);
         float depth = 1.0 - smoothstep(0.15, 1.0, r);
-        vec3 viewNormal = mat3(viewMatrix) * N;
-        vec3 bed = sceneWaterColor(viewNormal.xy * 0.005);
+        vec3 rippleView = mat3(viewMatrix) * vec3(N.x - vN.x, 0.0, N.z - vN.z);
+        vec3 bed = sceneWaterColor(rippleView.xy * 0.005);
         vec3 tint = mix(vec3(0.94, 0.97, 0.91), vec3(0.66, 0.82, 0.73), depth);
         vec3 absorption = mix(uShallow, uDeep * 0.85, depth);
         vec3 refracted = mix(bed * tint, absorption, 0.025 + depth * 0.095);
@@ -111,12 +111,14 @@ export function createStylizedWater(
     const view = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld).sub(new THREE.Vector3().setFromMatrixPosition(mesh.matrixWorld));
     uniforms.uReflectionOn.value = planeNormal.dot(view) > 0 ? 1 : 0;
     if (!uniforms.uReflectionOn.value) return;
-    const target = renderer.getRenderTarget(), xr = renderer.xr.enabled, shadows = renderer.shadowMap.autoUpdate;
+    const target = renderer.getRenderTarget(), xr = renderer.xr.enabled, shadows = renderer.shadowMap.autoUpdate, shadowRequested = renderer.shadowMap.needsUpdate;
+    reflector.getReflectionCamera(camera).layers.mask = camera.layers.mask;
+    renderer.shadowMap.needsUpdate = false;
     // Reflector's implementation consumes the first three standard hook arguments.
     const renderMirror = reflector.onBeforeRender as (renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) => void;
     sceneSampler.withoutSkins(() => {
       try { renderMirror.call(reflector, renderer, scene, camera); }
-      finally { renderer.xr.enabled = xr; renderer.shadowMap.autoUpdate = shadows; renderer.setRenderTarget(target); }
+      finally { renderer.xr.enabled = xr; renderer.shadowMap.autoUpdate = shadows; renderer.shadowMap.needsUpdate = shadowRequested; renderer.setRenderTarget(target); }
     });
   } : undefined);
   mesh.onBeforeRender = renderer => sceneSampler.capture(renderer);

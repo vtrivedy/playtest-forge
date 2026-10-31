@@ -884,6 +884,12 @@ try {
     });
     save('water-reed-result.json', await H('state'));
     await H('teleport', -30, 0, 65, Math.PI); await H('setStick', 0, 0);
+    const pondCaptureStart = await page.evaluate(() => {
+      const d = window.__gameHooks.debug.scene.userData.waterCapture;
+      if (!d) return null;
+      d.checkNextCopy = true;
+      return {copies:d.copies,reflectionAttempts:d.reflectionAttempts,checkedCopies:d.checkedCopies};
+    });
     await H('photo', [-23, 5, 70], [-30, 1, 61], 48); await advance(2); await shot('water-pond-frozen');
     await video('water-pond-grotto', 8 * fps, async i => {
       if (i === 15) { await H('setStick', 0, -1); await H('setKeys', ['ShiftLeft']); }
@@ -895,10 +901,18 @@ try {
     save('water-pond-result.json', await H('state'));
     await H('photo', [-7, 7, 79], [-23, 0, 66], 52); await advance(2); await shot('water-pond-vista');
     await H('photo', [-6, 1.3, 78], [-24, -0.22, 68], 52); await advance(2); await shot('water-pond-grazing');
-    await H('photo', [8, 3, 3], [8, -3.2, -7], 52); await advance(2); await shot('water-creek');
-    const waterCapture = await page.evaluate(() => window.__gameHooks.debug.scene.userData.waterCapture ?? null);
-    save('water-scene-capture.json', waterCapture);
-    if (waterCapture?.glError) report.failures.push(`Water framebuffer copy GL error ${waterCapture.glError}`);
+    await H('photo', [8, 12, 4], [8, -3.2, -7], 52); await advance(2); await shot('water-creek');
+    const waterCapture = await page.evaluate(() => {
+      const h = window.__gameHooks, d = h.debug.scene.userData.waterCapture;
+      const buffer = h.debug.post.composer.readBuffer;
+      return {after:d ?? null,expected:{width:buffer.width,height:buffer.height,type:buffer.texture.type}};
+    });
+    save('water-scene-capture.json', {before:pondCaptureStart,...waterCapture});
+    const d = waterCapture.after, expected = waterCapture.expected;
+    if (!d || !pondCaptureStart || d.copies <= pondCaptureStart.copies || d.reflectionAttempts <= pondCaptureStart.reflectionAttempts || d.checkedCopies <= pondCaptureStart.checkedCopies
+      || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.invalidTargets) {
+      report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
+    }
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
