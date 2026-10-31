@@ -384,7 +384,7 @@ async function boot() {
   fCam.add(cam.params, 'lag', 0.04, 0.5, 0.01);
   fCam.add(cam.params, 'lookAhead', 0, 4, 0.05);
   fCam.add(cam.params, 'recenterRate', 0, 4, 0.05);
-  fCam.add(cam.params, 'sideBias', -0.6, 0.6, 0.01);
+  fCam.add(cam.params, 'sideBias', -0.9, 0.9, 0.01);
   fCam.add(baseCam, 'jumpTrack', 0, 1, 0.01);
   fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
   fCam.add(cam.params, 'shake', 0, 2, 0.05);

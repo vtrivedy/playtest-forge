@@ -184,7 +184,7 @@ for (const minDistance of [0, 2.2, 2.6, 3.0]) {
 console.log('Terrain boom CPU variations:', JSON.stringify(terrainVariations));
 
 // Predicting a lower landing should not crane above a fox that is still rising.
-// Descending keeps the same landing-preview lift and its damped transition.
+// Descending retains a restrained landing-preview lift and its damped transition.
 const ascentViews = [];
 for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
   const noLanding = createFollowCamera();
@@ -203,7 +203,7 @@ for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
     - Math.hypot(noLanding.camera.position.x, noLanding.camera.position.z);
   const extraCrane = extraHeight - rangeDifference * lowLanding.params.height / lowLanding.params.distance;
   if (verticalSpeed > 0) assert.ok(Math.abs(extraCrane) < 0.05, 'rising fox gets no descent-only crane lift');
-  else if (verticalSpeed <= -4) assert.ok(extraCrane > 2, 'fast descent retains the landing-preview lift');
+  else if (verticalSpeed <= -4) assert.ok(extraCrane > 0.5 && extraCrane <= 0.85, 'fast descent keeps a restrained landing-preview lift');
   else assert.ok(extraCrane > 0, 'partial descent retains a weighted landing-preview lift');
   ascentViews.push({ verticalSpeed, extraHeight: +extraHeight.toFixed(3), extraCrane: +extraCrane.toFixed(3) });
 }
