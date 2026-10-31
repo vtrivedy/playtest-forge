@@ -1960,7 +1960,8 @@ try {
       let sx=len>.2?vx/len*Math.min(1,len):0,sz=len>.2?vz/len*Math.min(1,len):0;
       // Board with a walking approach; a dash carries momentum past the rising ferry.
       if(q.board){const speed=Math.min(.6,len*.35);sx=len>.12?vx/len*speed:0;sz=len>.12?vz/len*speed:0;}
-      const keys=q.jump?['Space']:[];
+      const boardingJump=q.board&&st.reach.supportedBy!==0&&st.reach.raftHeight>st.pos[1]+.25;
+      const keys=q.jump||boardingJump?['Space']:[];
       if((q.dash||q.shade)&&len<3&&!painted&&(!q.shade||st.grounded)){if(Math.hypot(sx,sz)<.1){sx=1;sz=0;}keys.push('ShiftLeft');painted=true;dashAttempt=age;}
       await RH('setStick',sx,sz);await RH('setKeys',keys);
     },st=>reached&&st.reach.restored||st.deaths>0||age>12,{keyFrames:[0,10*fps,20*fps,25*fps]});
