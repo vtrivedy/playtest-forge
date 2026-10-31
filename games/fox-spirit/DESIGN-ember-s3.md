@@ -28,7 +28,7 @@ Stocking darkening uses height and source luminance independently of the heat ma
 
 ## Face
 
-Recover the old baked dark eye paint and amber footprint to rust while preserving cream pigment. Full recovery extends to two socket apertures and feathers to 3.2; the original socket coordinates remain independent of the visible eye shape.
+Recover the old baked dark eye paint and amber footprint to rust while preserving cream pigment. Full recovery extends to 2.4 socket apertures and feathers to 3.2; the original socket coordinates remain independent of the visible eye shape.
 
 The visible cap has a narrow almond aperture: width .70, lower height .26, upper height .32, and approximately 10 degrees of outer-corner rise. Keep a short .07 × .15 pupil, a fine umber lid, tear corner and small catchlight. Eye emission is .04. The head supplies real occlusion. Do not add a white eye ring or enlarge the black socket to hide the original paint.
 
@@ -56,6 +56,20 @@ Preserve the soft contact shadow and original animation/controller behavior. Exc
 
 Run root `npx tsc --noEmit` and `npx vite build --config games/fox-spirit/vite.config.ts` after game changes. Rendering occurs only on the Modal GPU relay. Push immutable refs, request short fox captures first and a separate turntable on the same stable ref. Inspect every returned still, decoded motion frames and `window.__game` personally; obtain an Opus critique, fix concrete failures and retest. Build success alone does not establish visual quality.
 
-Current reviewed GPU evidence is still a873351: all 22 stills and all 240 run-video frames inspected, with zero capture errors. It fails the art lock. The newer coat/eye candidate 836e5eb is queued; the root checkpoint and limb placement require later capture too. Do not claim current beauty approval or land game changes on that basis. Keep status and capture requests in `/streams/fox-ember-r2/`; stop at 09:40 UTC / 05:40 ET.
+Current reviewed GPU evidence is c2adbd0: all 22 stills and all 240 run-video frames inspected, with zero capture errors. Opus and personal review fail the plush muzzle, painted eye ring, neck fringe seam, plain body and tail root. The newer complete candidate 67ed755 is queued with separate fox/turntable jobs; its body, eye and root fixes remain visually unverified. Do not claim current beauty approval or land game changes on that basis. Keep status and capture requests in `/streams/fox-ember-r2/`; stop at 09:40 UTC / 05:40 ET.
 
 No external assets, API keys or paid services were added. The fox scaffold remains Quaternius-derived CC0; procedural surfaces and shaders are original project work.
+
+## Next face/seam pass — proposal under review
+
+The verified c2 face still has a puppy-like deep muzzle, an orange/dark eye ring and a jagged jaw/neck line. CPU connectivity confirms the head and neck belong to one connected fur surface; the fringe casts no shadow. Opus identifies discontinuous head/neck fringe offsets and downward comb bias as the likely line, to be isolated with the new GPU comparisons.
+
+Prepare a bounded bind-space muzzle edit on the existing rig: move the front up to .10 model units forward (about3.5cm), reduce muzzle width up to15%, and lift only the lower muzzle toward its midline. Keep eyes fixed and move the nose rigidly. Evaluate look masks on the original bind positions, recompute smooth welded normals, and preserve actor-fit bounds. Before enabling: verify nose contact, UV seam coincidence/normals, no inverted faces, unchanged eyes/pads/weights, and16run poses without jaw/chest intersection. No rig or clip edits.
+
+Replace the head/neck fringe step with a continuous ramp, remove downward/back comb bias in the ventral crease, and keep offsets outside the core. Fade fringe coverage over the crease rather than stacking a second collar. GPU A/B must identify whether the remaining core crease is acceptable before further sculpting.
+
+For the eye ring, first measure actual unpainted boundary pigment in linear color. The current dark/amber-only classification leaves the mid-value orange ring intact. Prefer one continuous pigment recovery over the whole painted footprint while preserving cream, matched to surrounding coat, then delete the old dark/amber special cases. No new bitmap generation or external asset. Retain one thin physical lid and the smaller current aperture. GPU face/side/three-quarter review remains mandatory.
+
+## Eye pigment phase selected after c2 review
+
+Opus approves one bounded material pass before any face sculpt. Source sampling uses the same socket metric/radius as the shader: unpainted rust annulus3.2–5 gives linear(.384,.127,.031). Replace the entire painted footprint below2.4apertures, feather to3.2, retaining the x-depth limit. Classify rust by linear r/g plus b/g, and include a low-luminance override so neutral black liner cannot masquerade as cream. Luminance determines only the recovery mask, never the replacement value; this removes the old ring's value swings. Preserve genuine cream and the current narrow visible aperture. Delete old dark/amber special cases. Broad coat value clumps run afterward. GPU comparisons must reject a smooth orange concealer patch or any remaining goggles. Source sampling and Opus critique are saved beside artifacts; no bitmap modified.
