@@ -596,7 +596,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const pathK = smooth01(2.6, 0.9, pd);
         c.lerp(PAL.pathEarth, pathK * 0.85);
         // Hub trails need a value cue even while all world colour is pressed.
-        const hubWear = smooth01(2.1, .7, hubPathDistance(x, z));
+        const hubWear = smooth01(2.1, .7, hubPathDistance(x, z)) * smooth01(72, 80, z);
         c.lerp(PAL.soilUmber, hubWear * .65);
         c.multiplyScalar(1 - hubWear * .2);
         leafy = THREE.MathUtils.lerp(leafy, 0.06, pathK * 0.9) + smooth01(1.6, 3.2, pd) * smooth01(4.5, 3.0, pd) * 0.35; // leaves banked at the verge
@@ -1962,7 +1962,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   if (lanternMesh) group.add(lanternMesh);
 
   // Lanternhollow shares the realm, terrain paint and material buckets; no chapter transition.
-  createLanternhollow(group, col, groundRaw, {
+  const updateLanternhollow = createLanternhollow(group, col, groundRaw, {
     stone: bk('stone', -8, 85), wood: bk('wood', -8, 85),
     plaster: bk('hubPlaster', -8, 85), roof: bk('hubRoof', -8, 85),
     lamp: bk('hubLamp', -8, 85, false), dark: bk('hubDark', -8, 85),
@@ -2485,6 +2485,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
+      updateLanternhollow(t);
       M.hubLamp.emissiveIntensity = 0.5 + Math.sin(t * 1.3) * 0.025;
       for (const water of waterVisuals) water.update(t);
       inkTime.value = t;

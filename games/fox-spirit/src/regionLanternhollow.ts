@@ -94,13 +94,6 @@ export function createLanternhollow(
       box(b.wood, side + sx * .09, y + .98, h.z + .55, .19, .1, 1.02, PAL.wood);
     }
 
-    // A shallow stack is tucked into the solid wall footprint, never in the lane.
-    for (let row = 0; row < 2; row++) for (let log = 0; log < 3 - row; log++) {
-      const zz = h.z - .7 + log * .22 + row * .11;
-      beam(new THREE.Vector3(h.x + h.w / 2 - .45, y + .48 + row * .18, zz),
-        new THREE.Vector3(h.x + h.w / 2 + .08, y + .48 + row * .18, zz), .1);
-    }
-
     // Broad bowed roof, sampled once for BOTH mesh and collision (no floating roof collider).
     const halfD = h.d / 2 + .46, halfW = h.w / 2 + .45, steps = 12;
     const height = (z: number) => y + h.eave + h.rise * Math.cos(z / halfD * Math.PI / 2);
@@ -174,12 +167,29 @@ export function createLanternhollow(
   for (const dx of [-.85, .85]) box(b.wood, -10 + dx, by + .275, 91, .16, .85, .58, PAL.wood);
   col.add(boxCollider({ x: -10, z: 91, w: 2.2, d: .7, top: by + .8, bottom: by, tag: 'hub-bench' }));
 
+  // Soft domestic smoke, distinct from a reactor/updraft: no bright ribbon or glow.
+  const smokeCanvas = document.createElement('canvas');
+  smokeCanvas.width = smokeCanvas.height = 32;
+  const smokeCtx = smokeCanvas.getContext('2d')!;
+  const gradient = smokeCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gradient.addColorStop(0, 'rgba(255,255,255,.7)');
+  gradient.addColorStop(.45, 'rgba(255,255,255,.3)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  smokeCtx.fillStyle = gradient; smokeCtx.fillRect(0, 0, 32, 32);
+  const smokeTexture = new THREE.CanvasTexture(smokeCanvas);
+  const chimney = HUB_HOUSES.find(h => h.chimney)!;
+  const chimneyY = ground(chimney.x, chimney.z) + 5.7;
+  const smoke = Array.from({ length: 8 }, () => {
+    const mat = new THREE.SpriteMaterial({ map: smokeTexture, color: 0x6e5a44, transparent: true, opacity: 0, depthWrite: false });
+    const puff = new THREE.Sprite(mat); parent.add(puff); return puff;
+  });
+
   // Three modest hand-lettered fingerposts; letters are generated locally, never downloaded.
   for (const [name, x, z, tx, tz] of [
     ['WINDMILL RISE', -10, 67, -34, 56], ['REEDMARSH', 25, 88, 57, 40], ['AMBERWOOD', -3, 78, 0, 12],
   ] as const) {
     const y = ground(x, z), yaw = Math.atan2(-(tz - z), tx - x);
-    beam(new THREE.Vector3(x, y - .15, z), new THREE.Vector3(x, y + 1.9, z), .09);
+    beam(new THREE.Vector3(x, y - .15, z), new THREE.Vector3(x, y + 1.44, z), .09);
     const board = new THREE.BoxGeometry(2.3, .42, .12);
     b.wood.add(board, trs(x, y + 1.65, z, yaw), PAL.wood); board.dispose();
     for (const back of [false, true]) {
@@ -197,4 +207,15 @@ export function createLanternhollow(
       parent.add(sign);
     }
   }
+  return (time: number) => {
+    for (const [i, puff] of smoke.entries()) {
+      const age = (time / 4.5 + i / smoke.length) % 1;
+      puff.position.set(chimney.x - 1.6 + age * .7 + Math.sin(age * 5 + i) * .08,
+        chimneyY + age * 2.7, chimney.z - .4 + age * .2);
+      const size = .3 + age * 1.1;
+      puff.scale.set(size, size * 1.15, 1);
+      puff.material.opacity = Math.sin(age * Math.PI) * .16;
+      puff.material.rotation = i * 1.7 + age * .3;
+    }
+  };
 }
