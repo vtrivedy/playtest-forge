@@ -155,6 +155,7 @@ export function createFollowCamera(opts: {
   let shot: (CameraShot & { t: number; end: number; yielding?: boolean }) | null = null;
   let shotStill = 1;
   let landW = 0;
+  let compositionLandW = 0;
   let liftNow = 0;
   let boomT = 1;
   let boomLift = 0;
@@ -163,7 +164,6 @@ export function createFollowCamera(opts: {
   let sceneryName = '';
   let sceneryFade = 0;
   let terrainFade = false;
-  let bodyRoomFade = false;
   let floorLift = 0;
   const landAt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
@@ -171,7 +171,7 @@ export function createFollowCamera(opts: {
   const debug = {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
-    blocked: () => terrainFade || bodyRoomFade || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
+    blocked: () => terrainFade || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
     internals: () =>
       `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} floorLift=${floorLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
   };
@@ -572,7 +572,11 @@ export function createFollowCamera(opts: {
       landW = THREE.MathUtils.damp(landW, hasLanding ? 1 : 0, hasLanding ? 6 : 4, dt);
       const baseY = f.grounded ? Math.max(focusY, p.y - 0.3) : focusY;
       const descending = THREE.MathUtils.smoothstep(-f.vel.y, 0, 4);
-      aim.set(p.x + lead.x * (1 - landW * 0.6), baseY + params.lookHeight + params.framingHeight * (1 - landW * descending * 0.65), p.z + lead.z * (1 - landW * 0.6));
+      // Short hops retain the ground composition. Sustained descending glides
+      // ease toward more landing room, then release gently after touchdown.
+      const compositionGoal = landW * descending * THREE.MathUtils.smoothstep(f.airTime, 0.75, 1.5);
+      compositionLandW = THREE.MathUtils.damp(compositionLandW, compositionGoal, compositionGoal > compositionLandW ? 6 : 4, dt);
+      aim.set(p.x + lead.x * (1 - landW * 0.6), baseY + params.lookHeight + params.framingHeight * (1 - compositionLandW * 0.65), p.z + lead.z * (1 - landW * 0.6));
       if (landW > 0.001) {
         const spread = Math.hypot(landAt.x - p.x, landAt.z - p.z);
         const drop = Math.max(0, p.y - landAt.y);
@@ -620,24 +624,23 @@ export function createFollowCamera(opts: {
       // Test the spring's actual pose, not just its destination. Otherwise a turn's
       // interpolated arc can pass straight through a pillar even with a safe goal.
       boomFocus.set(p.x, p.y + params.lookHeight, p.z);
-      sceneryLimit = sceneryFraction(boomFocus, rig);
+      // Correct open-ground spring lag before testing scenery, so wall
+      // compression still has the final say and cannot be undone afterward.
+      safeLens.copy(rig);
+      const bodyRange = safeLens.distanceTo(boomFocus);
+      if (bodyRange > 0.01 && bodyRange < params.minDistance) {
+        safeLens.sub(boomFocus).multiplyScalar(params.minDistance / bodyRange).add(boomFocus);
+      }
+      sceneryLimit = sceneryFraction(boomFocus, safeLens);
       // A very short boom cannot fit the full animal. Ease into the existing world
       // cutout instead of zooming through the fox's ears. The overlap is continuous:
       // distant posts pull in, close bowls fade, and the damped transition stays covered.
-      const clearRange = boomFocus.distanceTo(rig) * sceneryLimit;
+      const clearRange = boomFocus.distanceTo(safeLens) * sceneryLimit;
       sceneryFade = sceneryLimit < 0.999 ? 1 - THREE.MathUtils.smoothstep(clearRange, 1.1, 1.8) : 0;
       const sceneryGoal = THREE.MathUtils.lerp(sceneryLimit, 1, sceneryFade);
       if (firstFrame) sceneryT = sceneryGoal;
       else sceneryT = THREE.MathUtils.damp(sceneryT, sceneryGoal, sceneryGoal < sceneryT ? 24 : 2.2, dt);
-      safeLens.lerpVectors(boomFocus, rig, sceneryT);
-      // The target may run back toward a lagging lens even on open ground.
-      // Preserve actual body room without feeding the correction into the spring.
-      bodyRoomFade = false;
-      const bodyRange = safeLens.distanceTo(boomFocus);
-      if (bodyRange > 0.01 && bodyRange < params.minDistance) {
-        safeLens.sub(boomFocus).multiplyScalar(params.minDistance / bodyRange).add(boomFocus);
-        bodyRoomFade = sceneryFraction(boomFocus, safeLens) < 0.999;
-      }
+      safeLens.lerpVectors(boomFocus, safeLens, sceneryT);
       // Keep the spring independent of compression: release returns along the same
       // boom smoothly, rather than feeding a new collision impulse into its velocity.
       guardFraming(p, safeLens);

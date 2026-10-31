@@ -191,13 +191,31 @@ console.log('Chase composition CPU proxies:', JSON.stringify(composition));
 
 for (const velocity of [new THREE.Vector3(0, 0, 9), new THREE.Vector3(4.5, 0, -7.8)]) {
   const follow = createFollowCamera();
+  const reference = createFollowCamera({ params: { minDistance: 0 } });
   follow.resize(1280, 720);
+  reference.resize(1280, 720);
   const target = new THREE.Vector3();
   let minimumRange = Infinity;
+  let referenceRange = Infinity;
   for (let i = 0; i < 180; i++) {
     target.addScaledVector(velocity, 1 / 60);
     follow.update(1 / 60, { ...idleFrame, target, vel: velocity });
+    reference.update(1 / 60, { ...idleFrame, target, vel: velocity });
     minimumRange = Math.min(minimumRange, follow.camera.position.distanceTo(target.clone().setY(target.y + follow.params.lookHeight)));
+    referenceRange = Math.min(referenceRange, reference.camera.position.distanceTo(target.clone().setY(target.y + reference.params.lookHeight)));
   }
   assert.ok(minimumRange >= follow.params.minDistance - 1e-6, 'toward-lens and off-axis motion retain actual body room');
+  if (velocity.z > 0) assert.ok(referenceRange < follow.params.minDistance, 'backpedal probe must actually need the body-room correction');
 }
+
+// Solid compression has final authority after the open-ground lag correction.
+// The minimum must not push a wall-compressed lens through the wall again.
+const wallScene = new THREE.Group();
+const closeWall = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial());
+closeWall.position.z = 2.1; wallScene.add(closeWall);
+const wallCamera = createFollowCamera({ scenery: wallScene });
+wallCamera.resize(1280, 720);
+for (let i = 0; i < 120; i++) wallCamera.update(1 / 60, { ...idleFrame, target: new THREE.Vector3() });
+assert.ok(wallCamera.camera.position.z < 2, 'compressed lens stays on the hero side of the wall');
+assert.ok(wallCamera.camera.position.distanceTo(new THREE.Vector3(0, wallCamera.params.lookHeight, 0)) < wallCamera.params.minDistance,
+  'safe wall compression may take precedence over the open-ground minimum');
