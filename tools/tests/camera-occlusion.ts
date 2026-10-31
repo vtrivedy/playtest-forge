@@ -6,7 +6,7 @@ import { createOcclusionFader } from '../../games/fox-spirit/src/occlusion';
 // CPU geometry probes only; this never creates a renderer or browser.
 const scenery = new THREE.Group();
 const material = new THREE.MeshStandardMaterial();
-const wall = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), material);
+const wall = new THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]>(new THREE.PlaneGeometry(20, 20), material);
 wall.position.z = 2; // normal +Z: focus sees the back of this single-sided plane
 wall.name = 'single-sided-wall';
 scenery.add(wall);
@@ -29,11 +29,24 @@ follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), g
   gliding: false, dashing: false, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=single-sided-wall/);
 
+// A multi-material mesh only draws geometry groups. Ungrouped triangles must
+// not become phantom blockers when the query substitutes double-sided materials.
+wall.material = [material];
+wall.geometry.clearGroups();
+const groupedFollow = createFollowCamera({ scenery });
+groupedFollow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
+  gliding: false, dashing: false, airTime: 0, landing: null });
+assert.match(groupedFollow.debug.internals(), /blocker=$/, 'ungrouped solid triangles are not drawn');
+wall.geometry.addGroup(0, wall.geometry.index!.count, 0);
+groupedFollow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
+  gliding: false, dashing: false, airTime: 0, landing: null });
+assert.match(groupedFollow.debug.internals(), /blocker=single-sided-wall/);
+
 const scene = new THREE.Scene();
 const parent = new THREE.Group();
 const crownMat = new THREE.MeshStandardMaterial();
 crownMat.name = 'autumn-leaves';
-const crown = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), crownMat);
+const crown = new THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]>(new THREE.PlaneGeometry(4, 4), crownMat);
 crown.position.set(0, 0.5, 2);
 crown.rotation.y = Math.PI; // the camera sees the back of the rendered leaf card
 parent.add(crown); scene.add(parent); scene.updateMatrixWorld(true);
@@ -52,4 +65,15 @@ step(); step();
 assert.equal(fader.detected, false, 'hidden ancestor must not trigger canopy ray');
 for (let i = 0; i < 120; i++) step();
 assert.ok(fader.strength < 0.01, 'cutout must restore after obstruction clears');
-console.log('PASS: back-face boom, render material isolation, unproxied crown, hidden ancestor, fade release');
+
+parent.visible = true;
+const crownMaterials = [crownMat];
+crown.material = crownMaterials;
+crown.geometry.clearGroups();
+step(); step();
+assert.equal(fader.detected, false, 'ungrouped canopy triangles are not drawn');
+assert.equal(crown.material, crownMaterials, 'query restores the exact material array');
+crown.geometry.addGroup(0, crown.geometry.index!.count, 0);
+step(); step();
+assert.equal(fader.detected, true, 'grouped back-facing canopy triangles block sight');
+console.log('PASS: back-face boom/crown, render material isolation, live props, material groups, hidden ancestor, fade release');

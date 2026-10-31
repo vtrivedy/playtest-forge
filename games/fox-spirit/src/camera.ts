@@ -289,6 +289,7 @@ export function createFollowCamera(opts: {
   // Query back faces too: the focus can enter a thin wall during a turn.
   // Never change render materials (shared buckets would change their appearance).
   const queryMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const queryArrays = new WeakMap<THREE.Material[], THREE.Material[]>();
   opts.scenery?.updateWorldMatrix(true, true);
   opts.scenery?.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -366,7 +367,14 @@ export function createFollowCamera(opts: {
         if (probe !== mesh) probe.matrixWorld.copy(mesh.matrixWorld);
         const renderMaterial = probe.material;
         try {
-          probe.material = queryMaterial;
+          if (Array.isArray(renderMaterial)) {
+            let queryArray = queryArrays.get(renderMaterial);
+            if (!queryArray || queryArray.length !== renderMaterial.length) {
+              queryArray = renderMaterial.map(() => queryMaterial);
+              queryArrays.set(renderMaterial, queryArray);
+            }
+            probe.material = queryArray;
+          } else probe.material = queryMaterial;
           probe.raycast(sight, sightHits);
         } finally {
           probe.material = renderMaterial;
