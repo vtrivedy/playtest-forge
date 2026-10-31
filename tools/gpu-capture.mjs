@@ -399,19 +399,23 @@ try {
       if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
     } catch(error) { markIncomplete(error,count); throw error; }
     let blackDetect;
-    if(name.startsWith('hub-')) {
+    if(name.startsWith('hub-') || name === 'route-continuous-kiln') {
+      // Encoded main32 frame616 has Y15..22: Y20 misses it, Y24 flags it.
+      const pixelThreshold = name === 'route-continuous-kiln' ? 0.04 : 0.02;
+      const frameThreshold = name === 'route-continuous-kiln' ? 24 : 20;
       const scan=spawnSync('ffmpeg',['-hide_banner','-nostats','-threads','1','-i',output,
-        '-vf','blackdetect=d=0.02:pix_th=0.02:pic_th=0.999,blackframe=amount=99:threshold=20','-an','-f','null','-'],
+        '-vf',`blackdetect=d=0.02:pix_th=${pixelThreshold}:pic_th=0.999,blackframe=amount=99:threshold=${frameThreshold}`,'-an','-f','null','-'],
         {encoding:'utf8',maxBuffer:4*1024*1024,timeout:60000,killSignal:'SIGKILL'});
       const log=scan.stderr??String(scan.error??'');
       fs.writeFileSync(path.join(out,name+'-blackdetect.log'),log);
       const intervals=[...log.matchAll(/black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/g)]
         .map(m=>({start:Number(m[1]),end:Number(m[2]),duration:Number(m[3])}));
       const frameIntervals=blackFrameIntervals(log,fps);
-      blackDetect={status:scan.status,error:scan.error?.message??null,signal:scan.signal,
-        thresholds:{duration:.02,pixel:.02,frame:.999,frameAuditPercent:99,frameAuditY:20},
+      blackDetect={passed:scan.status===0 && !scan.error && intervals.length===0 && frameIntervals.length===0,
+        status:scan.status,error:scan.error?.message??null,signal:scan.signal,
+        thresholds:{duration:.02,pixel:pixelThreshold,frame:.999,frameAuditPercent:99,frameAuditY:frameThreshold},
         intervals,frameIntervals};
-      if(scan.status!==0 || scan.error || intervals.length || frameIntervals.some(run=>run.duration>=.02)) report.failures.push(name+': black video frame detected or detector failed');
+      if(!blackDetect.passed) report.failures.push(name+': black video frame detected or detector failed');
     }
     report.videos[name] = { blackDetect, frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
@@ -1062,7 +1066,7 @@ try {
     if(!landingTakes.every(landingPass))throw Error('Landing A/B must land with four compression contacts and submillimeter compression residual; visual review still required');
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
-  if (wants('worldgait') && !hipDiagnostic) {
+  if ((wants('worldgait') || wants('worldstrides')) && !hipDiagnostic) {
     if(fps!==60)throw Error('World gait comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
@@ -1110,13 +1114,15 @@ try {
     save('worldgait-preflight.json',preflight);
     if(preflight.x===null)throw Error('No clear terrain-only meadow review corridor');
     const segments=[];
+    const shortGlide=wants('worldstrides') && !wants('worldgait');
     const profiles=[
       {gait:'walk',stick:.18,seconds:3},
       {gait:'trot',stick:.45,seconds:3},
       {gait:'run',stick:1,seconds:2},
       {gait:'turn',stick:.45,seconds:3},
       {gait:'jump',stick:.45,seconds:3},
-    ];
+    ].filter(profile=>!shortGlide || ['walk','trot','run'].includes(profile.gait))
+      .map(profile=>shortGlide ? {...profile,seconds:2} : profile);
     for(const lens of ['side','three-quarter']) for(const {gait,stick,seconds} of profiles) {
       await H('setKeys',[]);await H('setStick',0,0);await H('photoOff');
       const y=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[preflight.x,preflight.z]);
@@ -1180,8 +1186,8 @@ try {
       const passed=end.deaths===initial.deaths && !visibility.blocked.length && motionPassed && measured.speedFraction>.9 && measured.speedFraction<1.1;
       segments.push({name,gait,stick,seconds,initial,end,measured,visibility,passed,camera:`staged west-side ${lens} world-offset tracking photo lens, relative angle changes during turn; live controller`,reset:[preflight.x,y,preflight.z]});
     }
-    save('worldgait-acceptance.json',{label:'Ten staged live-input movement segments on a disclosed preflighted Arrival Meadow line, including turns and jumps; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof',segments,passed:segments.every(s=>s.passed)});
-    if(segments.some(s=>!s.passed))throw Error('World gait review requires clear chest/head/feet sight lines, measured requested movement, observed jump air and grounded recovery');
+    save('worldgait-acceptance.json',{selection:shortGlide?'worldstrides':'worldgait',label:`${shortGlide?'Six straight':'Ten including turns and jumps'} staged live-input movement segments on a disclosed preflighted Arrival Meadow line; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof`,segments,passed:segments.every(s=>s.passed)});
+    if(segments.some(s=>!s.passed))throw Error('World gait review failed requested movement or clear chest/head/feet sight lines; action profiles additionally require jump air and grounded recovery');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
@@ -2410,11 +2416,14 @@ try {
     const endpointDistance = Math.hypot(state.pos[0] - endpoint.x, state.pos[2] - endpoint.z);
     const endpointStable = endpointDistance <= 3 && Math.abs(state.pos[1] - endpoint.y) <= 1 && state.grounded;
     const kilnLit = state.seedwells.some(s => s.id === 'SW1' && s.lit);
-    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && kilnStopped && report.videos[name].frames - kilnCompletedAt - 1 >= minimumIdleFrames && departedAt === undefined && endpointStable && !state.auto.stalled && continuity.firstLargeStep === null && framing.samples === report.videos[name].frames && framing.outside === 0 && report.videos[name].frames >= budgetFrames) && !state.auto.assists && !state.deaths;
-    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnRoute && endpointReached && (!kilnStopped || report.videos[name].frames - kilnCompletedAt - 1 < minimumIdleFrames) ? 'insufficient-idle' : kilnRoute && endpointReached && departedAt !== undefined ? 'idle-drift' : kilnRoute && endpointReached && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : kilnRoute && continuity.firstLargeStep ? 'position-jump' : endpointReached && kilnRoute && framing.outside > 0 ? 'fox-out-of-frame' : kilnRoute && !endpointReached && firstFeedCrossing ? 'arrival-missing' : report.videos[name].frames >= budgetFrames ? 'budget' : 'incomplete';
-    const failureFrame = reason === 'idle-drift' ? departedAt : reason === 'fox-out-of-frame' ? framing.firstFailure.frame : reason === 'position-jump' ? continuity.firstLargeStep.frame : report.videos[name].frames - 1;
+    const videoAudit = report.videos[name].blackDetect;
+    const videoAuditPassed = videoAudit?.passed === true;
+    const firstBlackFrame = videoAudit?.frameIntervals[0]?.firstFrame ?? (videoAudit?.intervals.length ? Math.round(videoAudit.intervals[0].start * fps) : undefined);
+    const passed = endpointReached && (!kilnRoute || videoAuditPassed && kilnLit && kilnLatchedAt !== undefined && kilnStopped && report.videos[name].frames - kilnCompletedAt - 1 >= minimumIdleFrames && departedAt === undefined && endpointStable && !state.auto.stalled && continuity.firstLargeStep === null && framing.samples === report.videos[name].frames && framing.outside === 0 && report.videos[name].frames >= budgetFrames) && !state.auto.assists && !state.deaths;
+    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : kilnRoute && !videoAuditPassed ? (!videoAudit ? 'video-audit-missing' : videoAudit.intervals.length || videoAudit.frameIntervals.length ? 'black-video' : 'video-audit-failed') : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnRoute && endpointReached && (!kilnStopped || report.videos[name].frames - kilnCompletedAt - 1 < minimumIdleFrames) ? 'insufficient-idle' : kilnRoute && endpointReached && departedAt !== undefined ? 'idle-drift' : kilnRoute && endpointReached && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : kilnRoute && continuity.firstLargeStep ? 'position-jump' : endpointReached && kilnRoute && framing.outside > 0 ? 'fox-out-of-frame' : kilnRoute && !endpointReached && firstFeedCrossing ? 'arrival-missing' : report.videos[name].frames >= budgetFrames ? 'budget' : 'incomplete';
+    const failureFrame = reason === 'black-video' && firstBlackFrame !== undefined ? firstBlackFrame : reason === 'idle-drift' ? departedAt : reason === 'fox-out-of-frame' ? framing.firstFailure.frame : reason === 'position-jump' ? continuity.firstLargeStep.frame : report.videos[name].frames - 1;
     const failurePhase = passed ? null : kilnCompletedAt === undefined || failureFrame < kilnCompletedAt ? 'pre-arrival' : 'post-arrival';
-    save('route-acceptance.json', { schemaVersion: 3, passed, reason, from, to, staged: regional, postKiln: kilnRoute ? `Live endpoint idle through ${budgetFrames / fps}s; bot and keys cleared, physics/rendering continue` : null, requestedDuration: budgetFrames / fps, minimumPostArrivalSeconds: kilnRoute ? minimumIdleFrames / fps : null, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt, failurePhase, failureFrame: passed ? null : failureFrame, postArrivalSeconds: kilnCompletedAt === undefined ? null : (report.videos[name].frames - kilnCompletedAt - 1) / fps, finalDistanceToFeed: endpointDistance, finalNearFeedStable: endpointStable, continuity: kilnRoute ? continuity : null, encounter: kilnRoute ? { ...encounter, finalHits: state.shades.hits, hitsBeforeArrival: kilnCompletion ? kilnCompletion.shades.hits - encounter.initialHits : state.shades.hits - encounter.initialHits, hitsAfterArrival: kilnCompletion ? state.shades.hits - kilnCompletion.shades.hits : null } : null, framing: kilnRoute ? { samples: framing.samples, outside: framing.outside, maxAbsX: framing.maxAbsX, maxAbsY: framing.maxAbsY, firstFailure: framing.firstFailure } : null, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startZone: start.zone, startWaypoint: route[0].label ?? null, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    save('route-acceptance.json', { schemaVersion: 4, passed, reason, videoAudit: kilnRoute ? videoAudit ?? { passed: false, reason: 'missing' } : null, from, to, staged: regional, postKiln: kilnRoute ? `Live endpoint idle through ${budgetFrames / fps}s; bot and keys cleared, physics/rendering continue` : null, requestedDuration: budgetFrames / fps, minimumPostArrivalSeconds: kilnRoute ? minimumIdleFrames / fps : null, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt, failurePhase, failureFrame: passed ? null : failureFrame, postArrivalSeconds: kilnCompletedAt === undefined ? null : (report.videos[name].frames - kilnCompletedAt - 1) / fps, finalDistanceToFeed: endpointDistance, finalNearFeedStable: endpointStable, continuity: kilnRoute ? continuity : null, encounter: kilnRoute ? { ...encounter, finalHits: state.shades.hits, hitsBeforeArrival: kilnCompletion ? kilnCompletion.shades.hits - encounter.initialHits : state.shades.hits - encounter.initialHits, hitsAfterArrival: kilnCompletion ? state.shades.hits - kilnCompletion.shades.hits : null } : null, framing: kilnRoute ? { samples: framing.samples, outside: framing.outside, maxAbsX: framing.maxAbsX, maxAbsY: framing.maxAbsY, firstFailure: framing.firstFailure } : null, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startZone: start.zone, startWaypoint: route[0].label ?? null, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
     if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {

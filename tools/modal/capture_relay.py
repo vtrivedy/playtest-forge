@@ -10,7 +10,7 @@ def request_stop(*_):
     STOP_REQUESTED = True
 
 DEADLINE = 1793439600  # 2026-10-31 05:40 ET; final packaging is separate.
-SHOTS = set('probe perf route kilnroute hub orbit fox gait worldgait stills water shade turntable updraft wind growth levels windgap marshmouth reed crown flow showcase reach reachview reachsafe finale feel'.split())
+SHOTS = set('probe perf route kilnroute hub orbit fox gait worldgait worldstrides stills water shade turntable updraft wind growth levels windgap marshmouth reed crown flow showcase reach reachview reachsafe finale feel'.split())
 
 def cli(args, **kw):
     return subprocess.run(args, text=True, capture_output=True, timeout=60, **kw)

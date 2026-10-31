@@ -88,7 +88,18 @@ exit and transport warning. Gameplay failures stay nonzero.
 
 For a 720p milestone from an existing shot, use
 `python3 tools/review-capture.py <ref> --shots showcase --size 1280x720 --fps 60`.
-Showcase dense landing offsets and worldgait require60fps.
+Showcase dense landing offsets, worldgait and worldstrides require60fps.
+
+`worldstrides` is the short straight-motion subset of `worldgait`: two-second walk,
+trot and run clips from both close side and three-quarter tracking lenses (12s
+total). It retains preflight, live input, per-frame sight checks and movement
+acceptance. It omits turns/jumps and uses the existing `worldgait-*` output names;
+use separate output directories. Acceptance explicitly records `selection`.
+Paired captures must use one frozen capture module and the same selection on
+both game SHAs. Medians from the shorter window cannot be compared directly with
+the full three-second walk/trot clips; compare matching frame windows instead.
+The relay's running process must load the new `worldstrides` allowlist before
+dispatching it. This is a locomotion capture, not the airborne glide action.
 The same report verification and fetching apply. Gait requires60fps.
 
 Durable recovery verifies commit/shot, size/fps, route bounds, and matching
