@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import * as THREE from 'three';
-import { createShades } from '../games/fox-spirit/src/encounters/shades';
+import { createShades } from '../../games/fox-spirit/src/encounters/shades';
 
 const originalFetch = globalThis.fetch;
 THREE.DefaultLoadingManager.setURLModifier(url => url.startsWith('/assets/') ? `http://shade.test${url}` : url);

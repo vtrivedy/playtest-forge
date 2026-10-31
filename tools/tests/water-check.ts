@@ -1,8 +1,8 @@
 /** Headless simulation only: GPU capture checks visuals and real controls separately. */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { createWater } from '../games/fox-spirit/src/chem/water';
-import { CollisionWorld } from '../games/fox-spirit/src/collision';
+import { createWater } from '../../games/fox-spirit/src/chem/water';
+import { CollisionWorld } from '../../games/fox-spirit/src/collision';
 // Simulation checks do not load or judge the world's image assets.
 THREE.TextureLoader.prototype.load = function () { return new THREE.Texture(); };
 const water = createWater(new THREE.Scene(), new CollisionWorld(() => -2));
@@ -75,7 +75,7 @@ assert.equal(flume.arriving, true, 'Released drain resumes with a travelling fro
 console.log('Shade split/tail/recovery: PASS');
 
 // A restored Reed basin must never colour the distant kiln or maple.
-const { ColorField } = await import('../src/render/colorField');
+const { ColorField } = await import('../../src/render/colorField');
 const field = new ColorField(); field.fox.set(0, 1000, 0);
 field.restore(new THREE.Vector3(95, 2, 10), 35, 0.2); field.update(0.3);
 assert.equal(field.sample(new THREE.Vector3(95, 2, 10)), 1);
@@ -83,7 +83,7 @@ assert.equal(field.sample(new THREE.Vector3(-112, 20, -24)), 0);
 assert.equal(field.sample(new THREE.Vector3(-10, 17.5, -36)), 0);
 console.log('Restored-region locality: PASS');
 
-const { createInlets } = await import('../games/fox-spirit/src/chem/inlet');
+const { createInlets } = await import('../../games/fox-spirit/src/chem/inlet');
 function reedTrial(supplySeconds: number) {
   const scene = new THREE.Scene(), w = createWater(scene, new CollisionWorld(() => -2));
   const inlet = createInlets(scene, [{ seedwell: 1, source: 'reed-falls', pos: new THREE.Vector3(95, 2.3, 10), sealAt: new THREE.Vector3(), pillar: new THREE.Vector3(), latchTime: 7 }], new THREE.MeshStandardMaterial());
@@ -102,7 +102,7 @@ console.log('Reed near-miss and dash-duration latch: PASS', dashLatch);
 
 // The authored Reed patrol must leave a real solve window while the source is
 // sustained. This catches permanently-on-flume layouts that block every slug.
-const { REED_SHADE_PATROL } = await import('../games/fox-spirit/src/regionReedmarsh');
+const { REED_SHADE_PATROL } = await import('../../games/fox-spirit/src/regionReedmarsh');
 const patrol = new THREE.CatmullRomCurve3(REED_SHADE_PATROL.patrol.map(p => new THREE.Vector3(...p)), true, 'centripetal');
 const liveWater = createWater(new THREE.Scene(), new CollisionWorld(() => -2));
 const liveInlet = createInlets(new THREE.Scene(), [{seedwell:1, source:'reed-falls',pos:new THREE.Vector3(),sealAt:new THREE.Vector3(),pillar:new THREE.Vector3(),latchTime:7}],new THREE.MeshStandardMaterial());
