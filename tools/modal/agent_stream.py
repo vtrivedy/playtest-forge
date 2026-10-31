@@ -229,17 +229,47 @@ Your task follows:\n{brief}'''
         command_args = (['codex', 'exec', '-m', 'gpt-6.1-sol', '--dangerously-bypass-approvals-and-sandbox', '--color', 'never', '-']
                         if model == 'sol' else ['claude', '-p', '--model', 'claude-opus-5-5', '--dangerously-skip-permissions', '--verbose', '--output-format', 'stream-json'])
         save(status='running', started=time.time())
-        proc = subprocess.Popen(['runuser', '-u', 'agent', '--', *command_args], cwd=repo, env=env,
-                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
-        proc.stdin.write(context)
-        proc.stdin.close()
-        thread = threading.Thread(target=monitor, daemon=True)
-        thread.start()
-        for line in proc.stdout:
-            emit(line)
-        code = proc.wait()
-        done.set()
-        thread.join(timeout=90)
+        rounds = 0
+        while True:
+            rounds += 1
+            prompt = context if rounds == 1 else (context + f"""
+
+CONTINUATION ROUND {rounds}: your previous agent session ended its turn, but the sprint keeps going until the supervisor stops you (duration or driver stop).
+Writing DONE.md does not end the stream. Re-read /streams/{stream}/feedback.md, your STATUS.md/DONE.md, and the latest DRIVER NOTE / OPUS CRITIQUE sections in the brief above,
+then pick the highest-value open failure and keep improving, committing and pushing to {branch}. If waiting on a capture, work on the next item meanwhile.""")
+            if rounds > 1:
+                try:
+                    volume.reload()
+                except Exception as exc:
+                    emit(f'VOLUME_RELOAD_ERROR {type(exc).__name__}')
+                fresh = Path(f'/streams/{stream}/driver-brief.md')
+                if fresh.exists():
+                    prompt += '\n\nLATEST BRIEF FROM DRIVER (supersedes the task above where it differs):\n' + fresh.read_text()
+            done = threading.Event()
+            round_start = time.monotonic()
+            proc = subprocess.Popen(['runuser', '-u', 'agent', '--', *command_args], cwd=repo, env=env,
+                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+            thread = threading.Thread(target=monitor, daemon=True)
+            thread.start()
+            for line in proc.stdout:
+                emit(line)
+            code = proc.wait()
+            done.set()
+            thread.join(timeout=90)
+            if state.get('stop_reason') or stop_requested() or time.monotonic() - start >= duration - 300:
+                break
+            emit(f'AGENT_ROUND_END {rounds} code={code}; continuing')
+            try:
+                push()
+            except Exception as exc:
+                emit(f'ROUND_PUSH_ERROR {type(exc).__name__}')
+            if time.monotonic() - round_start < 300:
+                time.sleep(180)
+            if stop_requested() or time.monotonic() - start >= duration - 300:
+                break
+            save(heartbeat=time.time(), rounds=rounds)
         state.update(status='stopped' if (state.get('stop_reason') or stop_requested()) else ('complete' if code == 0 else 'failed'), exit_code=code)
     except BaseException:
         emit(traceback.format_exc())
