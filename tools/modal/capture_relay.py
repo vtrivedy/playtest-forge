@@ -81,24 +81,27 @@ def capture_request(stream, request, folder):
             if value is not None:command+=['--'+key,str(value)]
         capture_env=dict(os.environ)
         capture_env.pop('FOX_CAPTURE_SCRIPT',None)
+        capture_env['FOX_CAPTURE_APP']=f'fox-relay-{stream}-{folder.name}'
         with (folder/'modal.log').open('w') as log:
             proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env)
         source.cleanup()
         evidence=folder/'evidence'
         result={'status':'captured' if proc.returncode==0 else 'capture-failed','exit':proc.returncode,'ref':ref,'shots':shots,'path':str(evidence),'moduleMounts':mounts}
+        metadata={}
         for name in ['run.json','report.json']:
             p=evidence/name
-            if p.exists():
-                data=json.loads(p.read_text())
+            try:
+                data=json.loads(p.read_text()) if p.exists() else {}
+                metadata[name]=data
                 result[name]={k:data[k] for k in ['status','commit','gpu','failures','errors','captureToolSha'] if k in data}
-        run=json.loads((evidence/'run.json').read_text()) if (evidence/'run.json').exists() else {}
-        report=json.loads((evidence/'report.json').read_text()) if (evidence/'report.json').exists() else {}
-        missing_reports=[name for name in ['run.json','report.json'] if not (evidence/name).exists()]
-        failed_identity=identity_failures(run,report,ref,shots)
-        if missing_reports or failed_identity:
-            result.update(status='capture-failed',verificationError='Missing or mismatched commit, shot or tool identity')
-            result['missingCompletionReports']=missing_reports
-            result['identityFailures']=failed_identity
+            except (ValueError,OSError) as exc:
+                metadata[name]={}
+                result.setdefault('metadataErrors',{})[name]=str(exc)
+        run=metadata['run.json'];report=metadata['report.json']
+        if not run or not report:
+            result.update(status='capture-incomplete',verificationError='Completion metadata absent or unreadable; inspect cancellation/download log, not an identity verdict')
+        elif identity_failures(run,report,ref,shots):
+            result.update(status='capture-failed',verificationError='Commit, shot or tool identity disagreement',identity={'requestedRef':ref,'actualCommit':run.get('commit'),'requestedShots':shots,'actualShots':run.get('shots'),'runTool':run.get('captureToolSha'),'reportTool':report.get('captureToolSha')})
         elif run.get('status')=='failed' or report.get('failures') or report.get('errors'):
             result['status']='capture-failed'
         elif run.get('status')=='success':
