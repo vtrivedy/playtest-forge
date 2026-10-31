@@ -863,6 +863,7 @@ try {
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
     await H('setFeelPreset','brisk');
+    const lensOffsets={side:[-4.7,1.2,.25],'three-quarter':[-3.3,1.15,2.1]};
     // Freeze the same physical sight query for old and new game SHAs.
     await page.evaluate(async()=>{
       const {Vector3,Raycaster}=await import('/gpu-three.js');
@@ -880,7 +881,7 @@ try {
         });
       };
     });
-    const preflight=await page.evaluate(()=>{
+    const preflight=await page.evaluate(lenses=>{
       const h=window.__gameHooks,col=h.debug.world.collision,attempts=[];
       for(const x of [40]) {
         const failures=[];
@@ -889,8 +890,8 @@ try {
           const floor=col.highestAt(x,z),terrain=h.debug.world.terrainY(x,z),y=floor+.02;
           if(!Number.isFinite(floor) || Math.abs(floor-terrain)>.2 || (previousY!==null && Math.abs(floor-previousY)>.4))failures.push({z,footing:[floor,terrain,previousY]});
           previousY=floor;
-          for(const lens of ['side','three-quarter']) {
-            const camera=[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+          for(const [lens,offset] of Object.entries(lenses)) {
+            const camera=[x+offset[0],y+offset[1],z+offset[2]];
             const targets=[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]];
             const blockers=window.__captureWorldSight(camera,targets);
             if(blockers.some(Boolean))failures.push({z,lens,blockers});
@@ -900,7 +901,8 @@ try {
         if(!failures.length)return {x,z:88,attempts};
       }
       return {x:null,z:88,attempts};
-    });
+    },lensOffsets);
+    preflight.lensOffsets=lensOffsets;
     save('worldgait-preflight.json',preflight);
     if(preflight.x===null)throw Error('No clear terrain-only meadow review corridor');
     const segments=[];
@@ -917,9 +919,10 @@ try {
       await H('teleport',preflight.x,y,preflight.z,Math.PI);await advance(30);
       const name=`worldgait-${lens}-${gait}`, initial=await H('state');
       const visibility={sampledFrames:0,blocked:[]};
+      const offset=lensOffsets[lens];
       const frameLens=async st=>{
         const [x,y,z]=st.pos;
-        await H('photo',[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
+        await H('photo',[x+offset[0],y+offset[1],z+offset[2]],[x,y+.6,z],38);
       };
       await frameLens(initial);
       await video(name,seconds*fps,async i=>{
@@ -932,12 +935,19 @@ try {
           if(st.deaths!==initial.deaths)throw Error(`${name}: death`);
           await frameLens(st);
           {
-            const [x,y,z]=st.pos, camera=[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const [x,y,z]=st.pos, camera=[x+offset[0],y+offset[1],z+offset[2]];
             const blockers=await page.evaluate(([camera,targets])=>window.__captureWorldSight(camera,targets),[camera,[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]]]);
             visibility.sampledFrames++;
             if(blockers.some(Boolean))visibility.blocked.push({frame:i,blockers});
           }
-        }
+        },
+        sample:async()=>({framing:await page.evaluate(()=>{
+          const h=window.__gameHooks,root=h.debug.fox,camera=h.debug.camera;
+          const names=['head','pelvis','spine_04','front_paw_l','front_paw_r','hind_paw_l','hind_paw_r','tail_08','ear_04_l','ear_04_r'];
+          const points=names.map(name=>{const bone=root.getObjectByName(name);return bone?{name,ndc:bone.getWorldPosition(bone.position.clone()).project(camera).toArray()}:null;}).filter(Boolean);
+          const bounds=selected=>selected.length ? {widthFraction:(Math.max(...selected.map(p=>p.ndc[0]))-Math.min(...selected.map(p=>p.ndc[0])))/2,heightFraction:(Math.max(...selected.map(p=>p.ndc[1]))-Math.min(...selected.map(p=>p.ndc[1])))/2,inFrame:selected.every(p=>Math.abs(p.ndc[0])<1 && Math.abs(p.ndc[1])<1 && p.ndc[2]>-1 && p.ndc[2]<1)} : null;
+          return {label:'Projected skeleton proxies, not a full rendered silhouette',sampledBones:points.map(p=>p.name),body:bounds(points.filter(p=>!p.name.startsWith('tail_')&&!p.name.startsWith('ear_'))),headToTail:bounds(points)};
+        })})
       });
       await H('setStick',0,0);await H('setKeys',[]);await shot(`${name}-end`);
       const end=await H('state');
@@ -960,6 +970,8 @@ try {
       measured.bankTelemetryAvailable=measured.maxBankCommand!==null && measured.maxPelvisBank!==null;
       measured.bankObserved=measured.bankTelemetryAvailable ? measured.maxBankCommand>.04 && measured.maxPelvisBank>.01 : null;
       measured.headingChange=Math.abs(Math.atan2(Math.sin(end.foxYaw-initial.foxYaw),Math.cos(end.foxYaw-initial.foxYaw)));
+      const widths=rows.map(row=>row.state.capture?.framing?.headToTail?.widthFraction).filter(Number.isFinite).sort((a,b)=>a-b);
+      measured.medianHeadToTailWidthFraction=widths.length ? widths[Math.floor(widths.length/2)] : null;
       const motionPassed=gait==='jump' ? measured.groundedAtJumpInput && measured.firstAirFrame<=64 && measured.airFrames>=6 && measured.groundedRecoveryFrames>=6 && measured.landedAfterAir : measured.groundedFraction>.95 && measured.expectedGaitFraction>.9 && (gait!=='turn'||measured.headingChange>.6 && measured.bankObserved!==false);
       const passed=end.deaths===initial.deaths && !visibility.blocked.length && motionPassed && measured.speedFraction>.9 && measured.speedFraction<1.1;
       segments.push({name,gait,stick,seconds,initial,end,measured,visibility,passed,camera:`staged west-side ${lens} world-offset tracking photo lens, relative angle changes during turn; live controller`,reset:[preflight.x,y,preflight.z]});
