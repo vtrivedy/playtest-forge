@@ -46,11 +46,23 @@ const scene = new THREE.Scene();
 const parent = new THREE.Group();
 const crownMat = new THREE.MeshStandardMaterial();
 crownMat.name = 'autumn-leaves';
+crownMat.onBeforeCompile = (shader) => {
+  shader.fragmentShader = '#define BUILDER_PATCH\n' + shader.fragmentShader;
+};
 const crown = new THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]>(new THREE.PlaneGeometry(4, 4), crownMat);
 crown.position.set(0, 0.5, 2);
 crown.rotation.y = Math.PI; // the camera sees the back of the rendered leaf card
 parent.add(crown); scene.add(parent); scene.updateMatrixWorld(true);
 const fader = createOcclusionFader(scene, { solidAt: () => -Infinity });
+// Material builders (growth, water, color field) finish before the fader wraps
+// their hooks. Check composition without compiling or creating a GPU renderer.
+fader.patchScene();
+const shader = { vertexShader: THREE.ShaderLib.standard.vertexShader,
+  fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} } as Parameters<typeof crownMat.onBeforeCompile>[0];
+crownMat.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+assert.match(shader.fragmentShader, /#define BUILDER_PATCH/);
+assert.equal(shader.fragmentShader.match(/uniform float uOccStrength/g)?.length, 1, 'cutout patch composes once with builder hook');
+assert.ok(shader.uniforms.uOccFox, 'built material receives live cutout uniforms');
 const camera = new THREE.PerspectiveCamera(54, 16 / 9, 0.1, 100);
 camera.position.set(0, 0.6, 4); camera.lookAt(0, 0.3, 0);
 const renderer = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(1280, 720) } as THREE.WebGLRenderer;
