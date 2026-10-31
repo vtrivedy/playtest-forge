@@ -1238,7 +1238,7 @@ try {
     await advance(1); await shot('restoration-front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
-    for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['settled', 240]]) {
+    for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['water-reveal', 39], ['settled', 201]]) {
       await advance(frames); await shot(`restoration-${name}`);
     }
     await H('photo', [64, 3, 43], [82, -1.7, 20], 52); await advance(2); await shot('restoration-water-vista');

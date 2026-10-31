@@ -153,3 +153,7 @@ Full-size restoration-dash.png still shows a dark brown scorch streak despite th
 ## Main9003dd8 packaging check maintenance
 
 Merged main's automatic *.mjs mount loop. Its new capture-module test still recognizes only literal add_local_file destinations and falsely flags every static helper as missing. Extend the AST-only check to recognize the explicit tools/*.mjs loop plus /opt/browser/{loop-variable.name} destination. Preserve recursive static-import source existence and tools-directory escape checks; no Modal/browser execution or environment reads. This validates main's current packaging structure, not GPU output.
+
+## Capture the continuous reveal itself
+
+Current fixed-camera stages are0,.3,1,5seconds and skip the new fade at1.2..2.06seconds. Add restoration-water-reveal at1.65seconds (39frames after mid), then201frames to retain the unchanged5second settled state. Same lens, real existing latch event and identical total simulation time. This is next-candidate evidence only; keep already pendingb389 request immutable.
