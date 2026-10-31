@@ -37,11 +37,11 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .85, headBob: .35,
+    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .35,
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .09, liftHindTrot: .12, carpalFlex: .95, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, weightRoll: .05, spineSway: .045, breath: .022,
+    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, weightRoll: .05, spineSway: .045, breath: .022,
     runningGather: .45, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
@@ -144,7 +144,8 @@ export class AuthoredLocomotion {
     const padHeights:number[]=[];
     for (const [upper, lower, paw] of chains) {
       const a=root.getObjectByName(upper), b=root.getObjectByName(lower), c=root.getObjectByName(paw);
-      if (!a || !b || !c) throw new Error(`FOX rig is missing locomotion chain ${upper}/${lower}/${paw}`);
+      const hock=root.getObjectByName(upper.startsWith('thigh') ? upper.replace('thigh','hind_foot') : carpusName(upper.endsWith('_l') ? 'l' : 'r'));
+      if (!a || !b || !c || !hock) throw new Error(`FOX rig is missing locomotion chain ${upper}/${lower}/${paw} (carpus needs applyFoxLimbRig)`);
       const padPoints:THREE.Vector3[]=[];
       root.traverse(object=>{
         const mesh=object as THREE.SkinnedMesh;
@@ -167,7 +168,7 @@ export class AuthoredLocomotion {
       padHeights.push(padWorld.y-floor);
       const dot = new THREE.Mesh(new THREE.SphereGeometry(.025,6,4), new THREE.MeshBasicMaterial({color:0xffcc44, depthTest:false}));
       this.debugGroup.add(dot);
-      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:root.getObjectByName(upper.startsWith('thigh') ? upper.replace('thigh','hind_foot') : carpusName(upper.endsWith('_l') ? 'l' : 'r'))!,pole:upper.startsWith('thigh') ? 1 : -1,planted:false,anchor:v(),previousSolved:v(),correction:v(),strength:1,replantTime:0,releaseCorrection:v(),releaseProgress:0,phaseRelease:false,clearance:.005,dot});
+      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock,pole:upper.startsWith('thigh') ? 1 : -1,planted:false,anchor:v(),previousSolved:v(),correction:v(),strength:1,replantTime:0,releaseCorrection:v(),releaseProgress:0,phaseRelease:false,clearance:.005,dot});
     }
     root.position.y-=padHeights.reduce((a,b)=>a+b,0)/padHeights.length;
     this.rootPosition.copy(root.position);
@@ -587,7 +588,8 @@ export class AuthoredLocomotion {
       let stance=this.input.grounded && (locomoting ? normalizedSupport>(foot.planted ? .45 : .55) : (active==='idle' || active==='land' || windup));
       let earlyTouch=false;
       const swingProgress=this.swingProgress[i]/Math.max(.001,gaitWeight);
-      if(!stance && locomoting && this.input.grounded && swingProgress>this.params.earlyContact) {
+      // The gallop's touchdowns are authored to the frame; an early catch there plants a pad that then outruns the cap.
+      if(!stance && locomoting && this.input.grounded && swingProgress>this.params.earlyContact && (this.metrics.clipWeights.run ?? 0)<.5) {
         const floor=this.input.groundAt(paw.x,paw.z,this.group.position.y+.6);
         if(foot.planted || (Number.isFinite(floor) && paw.y<floor+foot.clearance+.01)) {stance=true;earlyTouch=true;}
       }
@@ -757,10 +759,11 @@ export class AuthoredLocomotion {
     const walk=w('walk'), trot=w('trot');
     const mid=(g:Gait,leg:number)=>{const c=GAITS[g].contacts[leg];return c.phase+c.duty*this.stanceRatio[g]/2;};
     const wave=(leg:number,fn:(x:number)=>number)=>walk*fn(2*Math.PI*(this.phase-mid('walk',leg)))+trot*.6*fn(2*Math.PI*(this.phase-mid('trot',leg)));
-    // Lowest just after each footfall pair.
-    this.root.position.y-=this.params.strideBob*(walk*.6+trot)*Math.cos(4*Math.PI*(this.phase-.1));
     // Stance-side hip and shoulder ride up (+roll about forward raises the fox's left).
     const pelvisRoll=this.params.weightRoll*wave(2,Math.cos), chestRoll=this.params.weightRoll*wave(0,Math.cos);
+    // Bob and roll only ever lower the body: legs already near full reach can't follow a rise (floating pads).
+    // Lowest just after each footfall pair; the roll's raised side is paid back with a matching drop.
+    this.root.position.y-=this.params.strideBob*(walk*.6+trot)*(1+Math.cos(4*Math.PI*(this.phase-.1)))*.5+(Math.abs(pelvisRoll)+Math.abs(chestRoll))*.5*.09+this.params.rideDrop*(walk+trot);
     const sway=this.params.spineSway*wave(2,Math.sin);
     const idle=this.input.grounded ? this.weights.get('idle') ?? 0 : 0;
     const breath=Math.sin(2*Math.PI*.27*this.time), shift=Math.sin(2*Math.PI*.07*this.time+1);

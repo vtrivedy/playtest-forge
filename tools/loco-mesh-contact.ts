@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import GAITS from '../assets/hero/spirit_fox.loco.json';
 import { AuthoredLocomotion } from '../games/fox-spirit/src/locomotion';
+import { applyFoxLimbRig } from '../games/fox-spirit/src/foxLimbRig';
 Object.assign(globalThis,{self:globalThis,ProgressEvent:class extends Event {constructor(type:string,init:Record<string,unknown>){super(type);Object.assign(this,init);}}});
 const bytes=fs.readFileSync('assets/hero/spirit_fox.glb');
 const jsonLength=bytes.readUInt32LE(12);
@@ -22,6 +23,7 @@ const box=new THREE.Box3().setFromObject(root);root.scale.setScalar(1.25/(box.ma
 const scaled=new THREE.Box3().setFromObject(root);root.position.y-=scaled.min.y;
 const center=scaled.getCenter(new THREE.Vector3());root.position.x-=center.x;root.position.z-=center.z;
 const mixer=new THREE.AnimationMixer(root);const actions=new Map(gltf.animations.map(c=>[c.name,mixer.clipAction(c)]));
+applyFoxLimbRig(root, gltf.animations);
 const loco=new AuthoredLocomotion(root,group,actions);
 const solvedFeet=(loco as unknown as {feet:{planted:boolean;upper:THREE.Object3D;lower:THREE.Object3D;paw:THREE.Object3D;hock?:THREE.Object3D;padLocal:THREE.Vector3;anchor:THREE.Vector3}[]}).feet;
 for(const [i,[name,max]] of ([['swingEase',1],['releaseSwing',.4],['carpalFlex',2]] as const).entries()) {

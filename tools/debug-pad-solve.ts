@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AuthoredLocomotion } from '../games/fox-spirit/src/locomotion';
+import { applyFoxLimbRig } from '../games/fox-spirit/src/foxLimbRig';
 Object.assign(globalThis,{self:globalThis,ProgressEvent:class extends Event {constructor(type:string,init:Record<string,unknown>){super(type);Object.assign(this,init);}}});
 const bytes=fs.readFileSync('assets/hero/spirit_fox.glb');
 const jsonLength=bytes.readUInt32LE(12);
@@ -17,6 +18,7 @@ const box=new THREE.Box3().setFromObject(root);root.scale.setScalar(1.25/(box.ma
 const scaled=new THREE.Box3().setFromObject(root);root.position.y-=scaled.min.y;
 const center=scaled.getCenter(new THREE.Vector3());root.position.x-=center.x;root.position.z-=center.z;
 const mixer=new THREE.AnimationMixer(root);const actions=new Map(gltf.animations.map(c=>[c.name,mixer.clipAction(c)]));
+applyFoxLimbRig(root, gltf.animations);
 const loco=new AuthoredLocomotion(root,group,actions);
 
 for(let i=0;i<120;i++){loco.input={speed:0,grounded:true,yaw:0,verticalSpeed:0,groundAt:()=>0};loco.beforeMixer();loco.blend(1/60,'idle');mixer.update(1/60);loco.afterMixer(1/60,'idle');}
