@@ -1,4 +1,4 @@
-import { captureShadeHero } from './shade-hero-capture.mjs';
+import { captureShadeHero, captureShadeBehavior } from './shade-hero-capture.mjs';
 import { createShadeLensReview } from './shade-lens-capture.mjs';
 import { captureReportSummary } from './capture-report-summary.mjs';
 import { blackFrameIntervals } from './hub-black-frames.mjs';
@@ -63,7 +63,7 @@ const server = http.createServer((req, res) => {
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
 const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
-report.captureHelperSha = Object.fromEntries(['water-wade-capture.mjs', 'projected-visibility-capture.mjs'].map(file =>
+report.captureHelperSha = Object.fromEntries(['water-wade-capture.mjs', 'projected-visibility-capture.mjs', 'shade-lens-capture.mjs', 'shade-hero-capture.mjs'].map(file =>
   [file, createHash('sha256').update(fs.readFileSync(path.join(repo, 'tools', file))).digest('hex')]));
 let browser;
 try {
@@ -379,12 +379,17 @@ try {
     }
     return state;
   }
-  if(wants('shadehero')){
+  if(wants('shadebehavior')){
+    if(fps!==60)throw Error('Shade behavior review requires60fps');
+    await boot(quality,true);
+    await captureShadeBehavior({repo,getPage:()=>page,H,video,save,report});
+  }
+  if(wants('shade')&&selected!=='all'){
     if(fps!==60)throw Error('Shade hero review requires60fps');
     await boot(quality,true);
     await captureShadeHero({repo,getPage:()=>page,H,advance,video,shot,save,report});
   }
-  if (wants('shade')) {
+  if (selected==='all') {
     if(fps!==60)throw Error('Shade encounter review requires60fps for fixed-step contact and every-six-frame release strips');
     await boot(quality, true);
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
@@ -601,46 +606,7 @@ try {
     validatePair('shade-patrol');
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
     await page.evaluate(value => { if(typeof value==='number')window.__gameHooks.shades.tun.chaseDistance=value; }, chaseDistance);
-    if(typeof chaseDistance==='number') {
-      save('shade-behavior-staging.json', {label:'10-second staged observer placement; live modes, terrain checks and attraction; no forced actor state', nearFrames:[90,300]});
-      const transitions=[];
-      let missingObserver=false;
-      await video('shade-behavior', 600, async frame => {
-        if(frame%15===0) {
-          const observer = await page.evaluate(near => {
-            const h=window.__gameHooks, actor=h.shades.state().actors[0];
-            const [x,y,z]=actor.pos, col=h.debug.world.collision;
-            const radii=near?[2.9]:[4.8,4.3,5.3,5.5];
-            for(const radius of radii)for(let k=0;k<64;k++) {
-              const a=k/64*Math.PI*2,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
-              const floor=col.groundAt(px,pz,y+.5).y;
-              if(Number.isFinite(floor)&&Math.abs(floor-y)<.3&&!col.blocked(px,pz,floor))
-                return {pos:[px,floor,pz,Math.atan2(x-px,z-pz)],mode:actor.mode};
-            }
-            return null;
-          },frame>=90&&frame<300);
-          if(!observer){
-            if(!missingObserver)report.failures.push('No safe staged shade behavior observer; release diagnostics continue');
-            missingObserver=true;
-          }else{
-            if(transitions.at(-1)?.mode!==observer.mode)transitions.push({frame,mode:observer.mode});
-            await H('teleport',...observer.pos);
-          }
-        }
-      },undefined,pairOptions('Behavior',actors[0].id,[0,89,180,299,390,480,599]));
-      validatePair('shade-behavior');
-      const behavior=await page.evaluate(()=>window.__gameHooks.shades.state());
-      save('shade-behavior-state.json',{transitions,state:behavior});
-      const expected=['patrol','chase','return','patrol'];
-      let observed=0;
-      for(const transition of transitions)if(transition.mode===expected[observed])observed++;
-      if(observed!==expected.length)report.failures.push(`Missing ordered live shade behavior cycle ${JSON.stringify(transitions)}`);
-      if(behavior.hits!==0)report.failures.push('Staged behavior observer was hit');
-    }
-    await H('photoOff');
-    await advance(30);
-    await shot('shade-post-observer');
-    // A separate fresh session preserves the actual sepia-to-local-color release moment.
+    if(typeof chaseDistance==='number')await captureShadeBehavior({repo,getPage:()=>page,H,video,save,report,id:actors[0].id,name:'shade-behavior',review:lensReview});
     await boot(quality,true);lensReview.reset();
     save('shade-release-session-start.json',{label:'Fresh sepia session after behavior review; the next two dash releases share this session, with staged fox starts only',state:await H('state'),game:await page.evaluate(()=>window.__game)});
     await H('setKeys', []);
