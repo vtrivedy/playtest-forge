@@ -714,6 +714,8 @@ try {
       ['shade-flume',120,[0,30,60,90,119]],
       ['shade-hill-low',90,[0,30,60,89]],
       ['shade-hill-high',90,[0,30,60,89]],
+      ['crown-shade',90,[0,30,60,89]],
+      ['reach-drinker',90,[0,30,60,89]],
     ]){
       const setup=await page.evaluate(id=>{
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
