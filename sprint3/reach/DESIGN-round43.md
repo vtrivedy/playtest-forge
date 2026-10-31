@@ -9,7 +9,7 @@ Scoped improvement: Reach rock currently explicitly skips weatheredSurface.
 Add an explicit rock mineral mode to the existing shared surface projection,
 using existing licensed CC0 ambientCG Rock035 on all three axes rather than
 painting Bricks085 on cliffs. Keep default masonry/timber behavior unchanged.
-Rock gets subdued scan luminance, soft derivative relief and slate runoff;
+Rock gets subdued scan luminance, soft derivative relief and slate damp patches;
 no green masonry moss or new asset. Use on Reach rock before color-field patch.
 No geometry, collision, water state, source, boarding or controls changes.
 
@@ -18,3 +18,8 @@ or builds. Other-model critique, root TypeScript + fox Vite, immutable pushed
 GPU request with matched HIGH/LOW and hero views; inspect PNGs and window.__game,
 then fix/retest before any game merge. Current water/shoreline redesign remains
 open rather than adding fall-through decorative shoulders.
+
+Opus code critique received: default shaders preserved, no compile issue found.
+Follow-up reduces darkening and broadens rock tiles4m→8.33m; comment corrected
+to damp patches, no claimed strata/sheen. GPU must still check crushed values
+and distant shimmer; roughness remains deliberately restrained.

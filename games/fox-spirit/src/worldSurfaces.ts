@@ -31,12 +31,12 @@ export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec3 wsWeights = pow(abs(normalize(vWSNormal)), vec3(4.0));
         wsWeights /= max(dot(wsWeights, vec3(1.0)), 0.001);
-        vec3 wsP = vWSPoint * ${hullTimber ? 'vec3(0.72, 0.16, 0.08)' : timber ? 'vec3(0.72, 0.16, 0.72)' : 'vec3(0.25)'};
+        vec3 wsP = vWSPoint * ${hullTimber ? 'vec3(0.72, 0.16, 0.08)' : timber ? 'vec3(0.72, 0.16, 0.72)' : rock ? 'vec3(0.12)' : 'vec3(0.25)'};
         vec3 wsScan = texture2D(uWSScan, wsP.zy).rgb * wsWeights.x
           + texture2D(uWSTop, wsP.xz).rgb * wsWeights.y
           + texture2D(uWSScan, wsP.xy).rgb * wsWeights.z;
         float wsValue = dot(wsScan, vec3(0.3, 0.59, 0.11));
-        diffuseColor.rgb *= ${rock ? 'clamp(0.72 + wsValue * 0.65, 0.72, 1.12)' : 'clamp(0.38 + wsValue * 2.2, 0.36, 1.3)'};
+        diffuseColor.rgb *= ${rock ? 'clamp(0.88 + wsValue * 0.45, 0.88, 1.12)' : 'clamp(0.38 + wsValue * 2.2, 0.36, 1.3)'};
         ${hullTimber ? `
         // Hull-space grain follows the physical lengthwise planks as they rise.
         // Geometry supplies board seams; avoid painting diagonal joints over it.
@@ -50,9 +50,9 @@ export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false
         float wsJoint = smoothstep(0.014, 0.042, abs(fract((vWSPoint.x + vWSPoint.z) / 0.28) - 0.5));
         diffuseColor.rgb *= mix(0.58, 1.0, wsJoint) * (0.91 + sin(wsBoard * 7.13) * 0.09);
         ` : rock ? `
-        // Slate strata and broad damp patches; no brick joints or green moss.
+        // Broad damp slate patches; no brick joints or green moss.
         float wsWet = smoothstep(0.15, 0.8, sin(vWSPoint.x * 0.37 + sin(vWSPoint.z * 0.29)) * sin(vWSPoint.y * 0.43 + vWSPoint.z * 0.21));
-        diffuseColor.rgb *= 1.0 - wsWet * 0.12;
+        diffuseColor.rgb *= 1.0 - wsWet * 0.08;
         ` : `
         float wsPatch = sin(vWSPoint.x * 1.3 + sin(vWSPoint.z * 1.8)) * sin(vWSPoint.z * 0.8 + vWSPoint.y * 0.7);
         float wsMoss = smoothstep(0.0, 0.6, wsPatch) * (0.2 + 0.8 * smoothstep(0.3, 0.85, vWSNormal.y));
