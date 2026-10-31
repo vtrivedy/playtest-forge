@@ -3,6 +3,7 @@
 // lives in fox.ts / locomotion/. Every knob is in FOX_LOOK (lil-gui "Look > fox", window.__game.foxLook).
 import * as THREE from 'three';
 import { FOX_RIG } from './foxRig';
+import { rebuildTailBrush } from './foxTailBrush';
 
 export const FOX_LOOK = {
   /** fur albedo multiplier (linear) — pulls the ACES-reddened vermilion back to burnt orange / ochre */
@@ -131,7 +132,7 @@ ${NOISE_GLSL}`,
         `#ifdef USE_MAP
   // Prefer broad painted values over the baked fine fur speckle.
   diffuseColor = vec4(diffuse, opacity) * texture2D(map, vMapUv, 0.4);
-  ${tail && !shell ? "diffuseColor.a = opacity;" : ""}
+  ${tail ? "diffuseColor.a = opacity;" : ""}
   ${coat ? `{
     vec3 center = vRest.x > 0.0 ? uEyeL : uEyeR;
     float aperture = foxEyeAperture(foxEyeCoordinates(vRest, center, uEyeR0));
@@ -166,7 +167,7 @@ ${NOISE_GLSL}`,
         '#include <opaque_fragment>',
         `{
   float facing = saturate(dot(${fringeLength ? 'normalize(vNormal)' : 'normal'}, normalize(vViewPosition)));
-  ${shell ? `diffuseColor.a *= (1.0 - smoothstep(0.05, 0.45, facing)) * ${tail ? "0.075" : fringeAlpha.toFixed(3)}; if (diffuseColor.a < 0.01) discard;` : ""}
+  ${shell && !tail ? `diffuseColor.a *= (1.0 - smoothstep(0.05, 0.45, facing)) * ${fringeAlpha.toFixed(3)}; if (diffuseColor.a < 0.01) discard;` : ""}
   ${fringeLength ? `float tuft = fxNoise(vRest * vec3(10.0, 10.0, 3.0)); diffuseColor.a *= smoothstep(${fringeLength > 0.04 ? "0.4, 0.8" : "0.1, 0.5"}, tuft) * vFurMask * uFringe; if (diffuseColor.a < 0.001) discard;` : ''}
   ${innerHeat ? `
   float chroma = (max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b))) / max(0.0001, max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)));
@@ -184,9 +185,12 @@ ${NOISE_GLSL}`,
     float tailAlong = 1.0 - vMapUv.y;
     float tipHeat = smoothstep(0.68, 0.88, tailAlong);
     outgoingLight += vec3(1.0, 0.4, 0.075) * 0.4 * tipHeat;
-    float tipCoverage = 1.0 - smoothstep(0.70, 0.90, tailAlong);
-    ${shell ? "diffuseColor.a *= tipCoverage;" : "diffuseColor.a = tipCoverage;"}
-    if (diffuseColor.a < ${shell ? "0.01" : "0.45"}) discard;
+    ${shell ? `float tipCoverage = 1.0 - smoothstep(0.65, 1.0, tailAlong);
+    float furTuft = smoothstep(0.20, 0.78, fxNoise(vRest * vec3(12.0, 12.0, 3.0)));
+    float coverage = tipCoverage * furTuft * (1.0 - smoothstep(0.05, 0.60, facing));
+    // Alpha testing above this chunk cannot see our procedural coverage.
+    if (coverage < ${mat.alphaTest.toFixed(3)}) discard;
+    diffuseColor.a = 1.0;` : 'diffuseColor.a = 1.0;'}
   #endif` : ''}
 }
 #include <opaque_fragment>`,
@@ -260,7 +264,9 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
 }
 
 /** Material pass over the loaded GLB (spirit FX cards, eyes, nose, fur). */
-export function applyFoxLook(root: THREE.Object3D) {
+export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
+  const authoredSize = new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3());
+  rebuildTailBrush(root, targetHeight / Math.max(0.001, authoredSize.y));
   const coats: { mesh: THREE.SkinnedMesh; mat: THREE.MeshStandardMaterial }[] = [];
   root.traverse((c) => {
     if (!(c as THREE.Mesh).isMesh) return;
@@ -291,27 +297,16 @@ export function applyFoxLook(root: THREE.Object3D) {
           mesh.userData.forgeSkipAO = true;
           mesh.castShadow = false;
           mesh.renderOrder = 2;
-          mat.transparent = true;
-          mat.depthWrite = false;
-          mat.alphaTest = 0;
+          mat.transparent = !n.startsWith('foxtailfur');
+          mat.depthWrite = n.startsWith('foxtailfur');
+          if (!n.startsWith('foxtailfur')) mat.alphaTest = 0;
         }
         if (n.startsWith('foxtailfur')) {
-          mesh.userData.forgeSkipAO = true;
-          mat.transparent = n.includes('shell');
-          mat.depthWrite = !n.includes('shell');
-          if (!n.includes('shell')) {
-            mesh.renderOrder = 1;
-            // Match the shadow silhouette to the visible disappearing tip.
-            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-            depth.defines = { USE_UV: '' };
-            depth.onBeforeCompile = (shader) => {
-              shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', `
-// ShadowMap overwrites alphaTest from the opaque source material; use an explicit cutoff.
-if (1.0 - smoothstep(0.70, 0.90, 1.0 - vUv.y) < 0.45) discard;`);
-            };
-            depth.customProgramCacheKey = () => 'fox-tail-depth';
-            mesh.customDepthMaterial = depth;
-          }
+          // The new core is a capped physical volume; only its alpha-tested fringe dissolves.
+          mesh.userData.forgeSkipAO = n.includes('shell');
+          mat.transparent = false;
+          mat.depthWrite = true;
+          if (!n.includes('shell')) mesh.renderOrder = 1;
         }
         mat.color.setHex(0xffffff);
         mat.roughness = 0.85;
@@ -534,7 +529,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(random() * sourcePts.length)]! });
   }
 
-  const diagnostics = { spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  const diagnostics = { tailBrush: root.userData.tailBrush, spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
   group.userData.spiritFx = diagnostics;
 
   // flame licks: one instanced billboard per lick

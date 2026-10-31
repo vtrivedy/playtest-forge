@@ -50,7 +50,9 @@ export async function createFox(): Promise<FoxActor> {
   try {
     const gltf = await new GLTFLoader().loadAsync('/assets/hero/spirit_fox.glb');
     const root = gltf.scene;
-    applyFoxLook(root);
+    const targetHeight = 1.25; // gameplay scale stays authored even when the tail surface is restyled
+    const authoredBox = new THREE.Box3().setFromObject(root);
+    applyFoxLook(root, targetHeight);
 
     const spiritFxMeshes: THREE.Object3D[] = [];
     root.traverse((c) => {
@@ -69,18 +71,17 @@ export async function createFox(): Promise<FoxActor> {
       }
     });
 
-    // Proportions (plume tail, snout, ears, fur shells) are authored in the GLB
-    // by the Opus Blender pass — do not re-inflate meshes/bones here.
+    // Body proportions and bones stay authored. Look restyles the tail surface on the same rig;
+    // its new bounds must not recenter or rescale the actor relative to the controller.
 
     // Scale by height so the slender quadruped proportions stay — not max-axis (was puffing width)
-    const box0 = new THREE.Box3().setFromObject(root);
+    const box0 = authoredBox;
     const size0 = new THREE.Vector3();
     box0.getSize(size0);
-    const targetHeight = 1.25; // ~keyart fox at gameplay scale
     const s = targetHeight / Math.max(size0.y, 0.001);
     root.scale.setScalar(s);
 
-    const box = new THREE.Box3().setFromObject(root);
+    const box = authoredBox.clone().applyMatrix4(new THREE.Matrix4().makeScale(s, s, s));
     const center = new THREE.Vector3();
     box.getCenter(center);
     root.position.x -= center.x;
