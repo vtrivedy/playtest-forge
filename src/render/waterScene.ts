@@ -7,7 +7,7 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
   let texture = new THREE.FramebufferTexture(1, 1);
   let captureArmed = false;
   const reflections = new Map<THREE.Object3D, (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => boolean>();
-  const diagnostics = { prepared: 0, copies: 0, reflectionAttempts: 0, reflections: 0, width: 0, height: 0, type: 0, glError: 0, priorGlError: 0, invalidTargets: 0, checkedCopies: 0, checkNextCopy: true };
+  const diagnostics = { shadowTypeAtFirstPrepare: -1, prepared: 0, copies: 0, reflectionAttempts: 0, reflections: 0, width: 0, height: 0, type: 0, glError: 0, priorGlError: 0, invalidTargets: 0, checkedCopies: 0, checkNextCopy: true };
   scene.userData.waterCapture = diagnostics;
   const skins = new Set<THREE.Object3D>();
   const uniforms = {
@@ -21,6 +21,7 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
       if (reflect) reflections.set(skin, reflect);
     },
     prepare(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
+      if (diagnostics.prepared === 0) diagnostics.shadowTypeAtFirstPrepare = renderer.shadowMap.type;
       captureArmed = false;
       scene.updateMatrixWorld(true); camera.updateMatrixWorld(true);
       let shadowsReady = true;
