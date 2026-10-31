@@ -5,13 +5,13 @@ import { boxCollider, cylCollider, type CollisionWorld } from './collision';
 
 /** Domestic scale, kept outside the existing arrival/hearth route. Original geometry. */
 export const HUB_HOUSES = [
-  { x: -24, z: 89, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: true },
-  { x: -34, z: 84, w: 5.6, d: 4.6, eave: 2.8, rise: 1.6, chimney: false },
-  { x: 17, z: 93, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: false },
+  { x: -18, z: 92, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: true },
+  { x: -26, z: 88, w: 5.6, d: 4.6, eave: 2.8, rise: 1.6, chimney: false },
+  { x: 12, z: 95, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: false },
 ];
 export const HUB_PATHS = [
-  [-24, 92, -20, 92], [-20, 92, -8, 88], [-34, 87, -28, 93], [-28, 93, -24, 92], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
-  [17, 96, 8, 98], [8, 98, 0, 94], [0, 80, 9, 88], [9, 88, 25, 88],
+  [-18, 95, -14, 95], [-14, 95, -12.5, 89.5], [-12.5, 89.5, -8, 88], [-26, 91, -24, 95], [-24, 95, -18, 95], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
+  [12, 98, 8, 99], [8, 99, 0, 94], [0, 80, 9, 88], [9, 88, 25, 88],
   [25, 88, 40, 68], [40, 68, 57, 40], [0, 80, -3, 45], [-3, 45, 0, 12],
 ] as const;
 
@@ -101,13 +101,13 @@ export function createLanternhollow(
       const z0 = -halfD + k / steps * halfD * 2, z1 = -halfD + (k + 1) / steps * halfD * 2;
       const y0 = height(z0), y1 = height(z1);
       const profile = new THREE.Shape();
-      profile.moveTo(z0, y0); profile.lineTo(z1, y1); profile.lineTo(z1, y1 - .15); profile.lineTo(z0, y0 - .15); profile.closePath();
+      profile.moveTo(z0, y0); profile.lineTo(z1, y1); profile.lineTo(z1, y1 - .25); profile.lineTo(z0, y0 - .25); profile.closePath();
       const g = new THREE.ExtrudeGeometry(profile, { depth: halfW * 2, bevelEnabled: false, steps: 1 });
       // profile x -> world z, extrusion -> world x; yaw -pi/2 gives z=profile x.
       b.roof.add(g, trs(h.x + halfW, 0, h.z, -Math.PI / 2), roof.clone().multiplyScalar(.95 + .05 * Math.sin(k * 2.3)));
       g.dispose();
       col.add(boxCollider({ x: h.x, z: h.z + (z0 + z1) / 2, w: halfW * 2, d: z1 - z0, top: y0, top1: y1, bottom: y + h.eave - .18, tag: 'hub-roof' }));
-      for (const sx of [-1, 1]) beam(new THREE.Vector3(h.x + sx * halfW, y0 - .04, h.z + z0), new THREE.Vector3(h.x + sx * halfW, y1 - .04, h.z + z1), .065);
+      for (const sx of [-1, 1]) beam(new THREE.Vector3(h.x + sx * halfW, y0 - .04, h.z + z0), new THREE.Vector3(h.x + sx * halfW, y1 - .04, h.z + z1), .10);
     }
     // Broad, low-contrast course lips break the smooth roof shell without a
     // noisy tile grid. All trim stays within 3 cm of the authored roof surface.
@@ -150,6 +150,16 @@ export function createLanternhollow(
     b.stone.add(coping, trs(x, wy + .85, z, a), PAL.stone); coping.dispose();
 
   }
+  // A worn stone maple relief identifies the Great Well without Seedwell glow.
+  box(b.stone, wx, wy + .52, wz + 1.56, .7, .55, .1, PAL.stoneDark);
+  const crest = new THREE.Shape();
+  const leaf = [[0, .26], [.055, .13], [.17, .2], [.14, .07], [.27, .08],
+    [.19, -.03], [.25, -.1], [.07, -.13], [.025, -.17], [.025, -.25],
+    [-.025, -.25], [-.025, -.17], [-.07, -.13], [-.25, -.1], [-.19, -.03],
+    [-.27, .08], [-.14, .07], [-.17, .2], [-.055, .13]];
+  leaf.forEach(([x, y], i) => i ? crest.lineTo(x!, y!) : crest.moveTo(x!, y!)); crest.closePath();
+  const relief = new THREE.ExtrudeGeometry(crest, { depth: .025, bevelEnabled: true, bevelSize: .012, bevelThickness: .008, bevelSegments: 1, steps: 1 });
+  b.stone.add(relief, trs(wx, wy + .53, wz + 1.62), PAL.stone); relief.dispose();
   for (const sx of [-1, 1]) {
     const x = wx + sx * 1.9;
     beam(new THREE.Vector3(x, wy - .15, wz), new THREE.Vector3(x - sx * .15, wy + 3.15, wz), .13);

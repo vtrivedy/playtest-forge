@@ -632,6 +632,7 @@ try {
     await H('teleport', 0, y, 94, Math.PI);
     const hubViews = [
       ['arrival', [16, 10, 108], [-5, 2, 81], 52],
+      ['arrival-close', [8, 3.8, 98], [-10, 2, 85], 55],
       ['well', [-2, 4, 91], [-9, 2, 82], 52],
       ['west-exit', [-7, 7, 96], [-23, 2, 71], 56],
       ['east-exit', [2, 6, 99], [18, 2, 80], 56],
@@ -640,11 +641,11 @@ try {
     for (const [name, lens, target, fov] of hubViews) {
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
     }
-    await H('photo', [12, 7, 105], [-10, 2, 85], 55); await advance(30);
+    await H('photo', [8, 4.5, 101], [-8, 2, 86], 55); await advance(30);
     const initial = await H('state');
     await video('hub-arrive-idle', 15 * fps, async i => {
       // One staged starting point, then the live controller. Arrival pauses at the well lane.
-      if (i < 3 * fps) await H('setStick', 0, -.25); else await H('setStick', null);
+      if (i < 3 * fps) await H('setStick', -.2, -.2); else await H('setStick', null);
     }, undefined, {keyFrames: [0, 2*fps, 4*fps, 7*fps, 10*fps, 14*fps]});
     await H('setStick', null);
     const end = await H('state');
