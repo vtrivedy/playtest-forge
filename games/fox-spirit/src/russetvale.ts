@@ -62,6 +62,8 @@ export type Waypoint = {
   x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string;
   /** lift waypoints: metres to rise above the lift before steering off (default: 0.5 m above the next waypoint) */
   rise?: number;
+  /** Scripted ground-stick magnitude (0..1); manual controls and physics are unchanged. */
+  pace?: number;
 };
 
 export type SeedwellState = {
@@ -432,6 +434,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     W(p.x, y, p.z, { ground: false, ...o });
   };
 
+  // Lanternhollow plaza: walk past the village well before joining Arrival Meadow.
+  W(-6, groundRaw(-6, 92), 92, { label: 'hub-plaza' });
+  W(-7.2, groundRaw(-7.2, 87), 87, { pace: 0.35 });
+  W(-4, groundRaw(-4, 88), 88, { pace: 0.5 });
   // A · Arrival Meadow
   W(0, 0, 90, { label: 'portal' });
   W(0, 0, 80, { label: 'cp-meadow' });
@@ -445,8 +451,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(1.5, 0, 2);
   WS(6, 6, 2);
   WS(10.5, 12.8, 2);
-  WS(10.5, 0.5, 6); // stand on the R2 landing before turning onto terrace 2
-  WS(14.5, 2.4, 6);
+  // Reach the authored R2 landing before turning; gentle real stick input on the climb/exit.
+  WS(10.5, 0.5, 6, { pace: 0.4 });
+  WS(14.5, 2.4, 6, { pace: 0.4 });
   WS(17.2, 6.5, 6, { label: 'cp-mills' });
   WS(24.2, 9.7, 6, { act: 'dash', label: 'hearth-brush' });
   WS(27.2, 9.7, 6, { act: 'glide', label: 'lift:H0' });
@@ -760,10 +767,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   };
   // R1 entrance stair (0 → 2), straight up the front
   flightT(-6.5, 0, 0.1, 0.4, 0, 2, 3.4, 1);
-  // R2 lateral flight on k1 (2 → 6)
-  flightT(10.5, 11.2, 2, 10.5, 2.0, 6, 2.6, 2);
-  // The stair top is at s10.5; the upper terrace begins at s12. Join them
-  // beyond the last riser so a turn cannot drop the fox back to the y2 floor.
+  // R2 lateral flight on k1 (2 → 6). Its s12.05 high edge overlaps the
+  // s12 terrace support by 5cm; masonry and collider share the same flight.
+  flightT(10.75, 11.2, 2, 10.75, 2.0, 6, 2.6, 2);
+  // The top landing meets the last riser at t2 and upper terrace at s12.
   {
     const p = sp(10.6, 0.4);
     col.add(boxCollider({ x: p.x, z: p.z, w: 3.2, d: 2.8, yaw: T_YAW, top: 6, bottom: 1.5, tag: 'r2-landing' }));
@@ -790,8 +797,17 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x: p.x, z: p.z, w: 2.6, d: 2.9, yaw: T_YAW, top: 14, bottom: 9.5, rough: 0.3, seed: 75, topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
   }
   // Wind gap: twenty flat metres, with the y10 terrace four metres below for recovery.
-  // R5 lateral flight on k4b (14 → 18)
-  flightT(62.3, 0.4, 14, 62.3, 9.8, 18, 2.4, 6);
+  // R5 lateral flight on k4b (14 → 18). Its s64.05 high edge overlaps the
+  // s64 terrace support by 5cm; masonry and collider share the same flight.
+  flightT(62.85, 0.4, 14, 62.85, 9.8, 18, 2.4, 6);
+  // A dressed-stone turn landing joins the last riser to the terrace and R6.
+  // Its cap preserves the visible footing over the foundation's eroded corners.
+  {
+    const p = sp(63.3, 10.375);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 18, bottom: 13, tag: 'r5-landing' }));
+    slab({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 17.8, bottom: 13, rough: 0.3, seed: 77, topColor: null });
+    stoneBlock(bk('stone', p.x, p.z), trs(p.x, 17.9, p.z, T_YAW), 1.25, 0.2, 3.3, 7701, 0);
+  }
   // R6 lateral flight on k5 (18 → 22)
   flightT(66, 9.8, 18, 66, 0.4, 22, 2.4, 7);
 
@@ -2448,7 +2464,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   console.info(`[russetvale] merged ${buckets.size} buckets, ${verts} verts, ${col.colliders.length} colliders`, JSON.stringify(perMat));
 
   // ==================================================================== runtime
-  const spawnPos = new THREE.Vector3(0, groundRaw(0, 90), 90);
+  const spawnPos = new THREE.Vector3(route[0]!.x, route[0]!.y, route[0]!.z);
   let lastCheckpoint = 0;
   let wellLit = false;
   let flood = 0;
