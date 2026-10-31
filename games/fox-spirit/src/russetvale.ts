@@ -434,6 +434,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     W(p.x, y, p.z, { ground: false, ...o });
   };
 
+  // Lanternhollow plaza: walk past the village well before joining Arrival Meadow.
+  W(-6, groundRaw(-6, 92), 92, { label: 'hub-plaza' });
+  W(-7.2, groundRaw(-7.2, 87), 87, { pace: 0.35 });
+  W(-4, groundRaw(-4, 88), 88, { pace: 0.5 });
   // A · Arrival Meadow
   W(0, 0, 90, { label: 'portal' });
   W(0, 0, 80, { label: 'cp-meadow' });
@@ -2450,7 +2454,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   console.info(`[russetvale] merged ${buckets.size} buckets, ${verts} verts, ${col.colliders.length} colliders`, JSON.stringify(perMat));
 
   // ==================================================================== runtime
-  const spawnPos = new THREE.Vector3(0, groundRaw(0, 90), 90);
+  const spawnPos = new THREE.Vector3(route[0]!.x, route[0]!.y, route[0]!.z);
   let lastCheckpoint = 0;
   let wellLit = false;
   let flood = 0;

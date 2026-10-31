@@ -188,7 +188,9 @@ async function boot() {
   scene.add(foxActor.group);
   foxActor.group.position.copy(gaitGym?.spawn ?? world.spawnPos);
   foxActor.group.position.y += foxActor.feetOffset;
-  foxActor.group.rotation.y = Math.PI; // face north: Wellspring Hill on frame 1
+  const firstWalk = world.route[1]!;
+  const spawnYaw = gaitGym ? Math.PI : Math.atan2(firstWalk.x - world.spawnPos.x, firstWalk.z - world.spawnPos.z);
+  foxActor.group.rotation.y = spawnYaw;
 
   // Soft contact shadow — grounds the hero without relying on shadow maps alone
   const contactShadow = (() => {
@@ -219,7 +221,7 @@ async function boot() {
     scenery: world.group,
     surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
   });
-  cam.snapBehind(Math.PI);
+  cam.snapBehind(spawnYaw);
   cam.camera.far = quality.far;
   cam.resize(innerWidth, innerHeight);
 
