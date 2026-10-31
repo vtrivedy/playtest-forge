@@ -34,6 +34,7 @@ import { createReachMood } from './reachMood';
 import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
+import { FOX_RIG } from './foxRig';
 import { createFollowCamera } from './camera';
 import { createCameraVisibilityProbe } from './cameraVisibility';
 import type { FoxAnimState } from './fox';
@@ -187,6 +188,9 @@ async function boot() {
   lights.key.castShadow = quality.shadows;
   scene.add(lights.key.target);
   const foxActor = await createFox();
+  const foxHeadBone = foxActor.group.getObjectByName(FOX_RIG.head)!;
+  if (!foxHeadBone) throw Error('Authored fox head bone missing');
+  const foxHeadPosition = new THREE.Vector3();
   scene.add(foxActor.group);
   foxActor.group.position.copy(gaitGym?.spawn ?? world.spawnPos);
   foxActor.group.position.y += foxActor.feetOffset;
@@ -475,7 +479,8 @@ async function boot() {
   // Patch only after every world builder has added its materials and shader
   // hooks. In particular the grotto roof is built by water outside world.group.
   const occlusion = createOcclusionFader(scene, {
-    blocked: (camera, focus) => photo ? cam.debug.viewBlocked(focus, camera.position) : cam.debug.blocked(),
+    blocked: (camera, focus) => photo ? cam.sightBlocked(camera.position, focus, foxActor.group.position.y - foxActor.feetOffset) : cam.debug.blocked(),
+    sight: (lens, target, feetY) => cam.sightBlocked(lens, target, feetY),
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
@@ -1742,7 +1747,7 @@ async function boot() {
     // Simulation can run several steps without drawing in the capture harness.
     occlusion.update(dt, cam.camera, renderer,
       feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
-      foxActor.height, fox.rotation.y);
+      foxActor.height, fox.rotation.y, foxHeadBone.getWorldPosition(foxHeadPosition));
     // grade follows the flood: faded sepia → rich autumn over the 6 s wave
     // exposure stays put; the grade only follows once the front has left the summit
     post.params.restore = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;
