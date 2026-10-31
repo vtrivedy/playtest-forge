@@ -1,6 +1,4 @@
 import { captureFinale } from './finale-capture.mjs';
-import { captureWadeVisibility } from './water-wade-capture.mjs';
-import { projectedVisibilityReview } from './projected-visibility-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
@@ -15,8 +13,13 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
+import { pathToFileURL } from 'node:url';
 const arg = (k, d) => process.argv.includes(`--${k}`) ? process.argv[process.argv.indexOf(`--${k}`) + 1] : d;
 const repo = arg('repo', process.cwd()), out = arg('out', '/tmp/gpu-capture');
+// Modal's fixed image contains older helpers. These new dependency-free modules
+// belong to the immutable game checkout, rather than the mutable image manifest.
+const { captureWadeVisibility } = await import(pathToFileURL(path.resolve(repo, 'tools/water-wade-capture.mjs')).href);
+const { projectedVisibilityReview } = await import(pathToFileURL(path.resolve(repo, 'tools/projected-visibility-capture.mjs')).href);
 const selected = arg('shots', 'all');
 const backend = arg('backend', 'egl'), quality = arg('quality', 'high'), fps = Number(arg('fps', '60'));
 const [width, height] = arg('size', '1920x1080').split('x').map(Number);
@@ -58,6 +61,8 @@ const server = http.createServer((req, res) => {
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
 const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
+report.captureHelperSha = Object.fromEntries(['water-wade-capture.mjs', 'projected-visibility-capture.mjs'].map(file =>
+  [file, createHash('sha256').update(fs.readFileSync(path.join(repo, 'tools', file))).digest('hex')]));
 let browser;
 try {
   const headed = backend === 'gl';
