@@ -100,7 +100,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     const curve = new THREE.CatmullRomCurve3(spot.path, false, 'centripetal');
     const length = curve.getLength();
     const cells = Math.ceil(length / 0.25);
-    const surfaceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.04, transparent: true, opacity: 0.72, depthWrite: false, emissive: 0x263d36, emissiveIntensity: 0.12 });
+    const surfaceMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0, ior: 1.333, specularIntensity: 0.2, transparent: true, opacity: 0.72, depthWrite: false, emissive: 0x263d36, emissiveIntensity: 0.06 });
     const surface = new THREE.InstancedMesh(new THREE.PlaneGeometry(spot.width * 0.94, length / cells + 0.03), surfaceMat, cells);
     const flowD = new THREE.InstancedBufferAttribute(new Float32Array(cells), 1);
     const wetState = new THREE.InstancedBufferAttribute(new Float32Array(cells), 1);
@@ -123,7 +123,10 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float waterFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
         float skyBand = 0.5 + 0.5 * sin(vFlowD * 0.38 + sin(vWaterUV.x * 5.0) - uWaterTime * 0.35);
-        vec3 waterSky = mix(vec3(0.28, 0.23, 0.16), vec3(0.68, 0.54, 0.34), skyBand);
+        vec3 waterSky = mix(vec3(0.065, 0.052, 0.034), vec3(0.26, 0.20, 0.12), skyBand);
+        // Keep the strong world lights from turning the entire wet ribbon into cream.
+        float waterLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
+        outgoingLight *= 0.24 / (0.24 + waterLuma);
         outgoingLight = mix(outgoingLight, waterSky, (0.18 + waterFresnel * 0.52) * vWet);
         #include <opaque_fragment>`);
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
