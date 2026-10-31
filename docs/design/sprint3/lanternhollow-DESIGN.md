@@ -38,3 +38,5 @@ Original procedural geometry, lettering, maple relief and smoke alpha. Reuse exi
 Remote immutable capture requested for b791be5: matched overview, lower close arrival, well, three exits,15s live diagonal arrival/idle and natural chase, plus fox photography and the continuous Kiln route. Personal PNG/state inspection and Opus visual agreement are required before landing. First GPU candidate ee9459d was rejected for sparse grouping, blank walls, faint trails and unlit-looking lamps; the current pass addresses those specific defects but has no visual acceptance yet.
 
 CPU verification:16 path segments clear at.4m of cottage/bench/well/post footprints;970 meadow-route sweep samples clear at.55m of new colliders;36 roof strips align within1.66e-7m;8 decorative sprite camera-free raycasts return no hits/errors. TypeScript and fox Vite build pass. These checks supplement remote play evidence.
+
+Reproduce CPU checks with `npx tsx tools/tests/hub-geometry.ts`. The canvas stub only constructs CPU geometry and procedural materials; it never opens a browser or renderer. The raycast check specifically guards the smoke/photoBlocker integration defect found by Opus.
