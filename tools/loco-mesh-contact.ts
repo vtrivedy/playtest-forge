@@ -38,7 +38,7 @@ const pads=['front_paw_l','front_paw_r','hind_paw_l','hind_paw_r'].map(name=>{
  const v=mesh.localToWorld(mesh.getVertexPosition(i,new THREE.Vector3()));if(v.y<low){low=v.y;found={mesh,index:i}}}}
  if(!found)throw new Error(name);return found;
 });
-const stats=(xs:number[])=>{xs.sort((a,b)=>a-b);return {n:xs.length,median:xs[Math.floor(xs.length*.5)],p95:xs[Math.floor(xs.length*.95)],max:xs[xs.length-1]}};
+const stats=(xs:number[])=>{xs.sort((a,b)=>a-b);return {n:xs.length,min:xs[0],median:xs[Math.floor(xs.length*.5)],p95:xs[Math.floor(xs.length*.95)],max:xs[xs.length-1]}};
 for(const speed of [1.62,4.05,9]) {
  loco.reset();group.position.set(0,0,0);group.rotation.y=0;
  let previous:THREE.Vector3[]=[];const near:number[]=[],flatNear:number[]=[],height:number[]=[],cadence:number[]=[]; let noSupport=0,maxResidual=0;
