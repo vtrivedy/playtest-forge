@@ -1,0 +1,9 @@
+# Sol review — worldgait14582be, archive4743543c2069
+
+Personally inspected all six complete contact sheets plus dense24-card side walk/trot/run extracts (recorded MP4,30fps sampling from0.6s). Parsed all six __game traces and machine acceptance. No local renderer.
+
+NEEDS REVISION / milestone candidate, not final. Warm textured meadow and unobstructed fox now replace the failed6db washout/false-visibility result. No pillar/signpost covers the fox. The distant stilt hut remains behind three-quarter view, but no sign text and no occlusion in these clips. Trot is long-striding and calm; fore swing visibly folds then reaches. Gallop has long extension and distinct gathered suspension; hind paws crowd under belly and pale hip deformation remains. Walk lift is restrained and looks stiff compared with trot. Ear flame tips separate from ear surface in some frames; character owner scope. Tail still resembles a broad upward leaf/ribbon in this older captured SHA (main now contains newer brush work, not assessed here).
+
+Trace medians walk1.849/trot2.147/run2.400Hz at1.620/4.050/8.999m/s; all requested gait fractions1.0 and zero deaths. No sampled blockers. Max steady slide walk0.570/0.523m/s, side run0.661 vs rear-side run0.000022m/s; different initial phases mean these peaks are not a lens-dependent physics effect. Trot residual submicrometer. Run residual11mm at side phase.023; walk residual~13mm phase.14. Independent gait-plane comparison already established cadence improvement from2e, but matched World1 baseline is still missing.
+
+Do not call full glide PASS: no current Opus review (CLI quota until06:40UTC, failed attempt saved), no matched world baseline, no bank/jump in these six segments. Next fixture adds both actions on current main. Separate unchanged145 landingAB showcase requested after this archive returned; do not churn request while pending.

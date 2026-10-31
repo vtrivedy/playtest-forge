@@ -179,7 +179,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       inlet=createInlets(scene,[{seedwell:0,source,pos:new THREE.Vector3(122.2,36,-118),sealAt:new THREE.Vector3(122.2,36.12,-118),pillar:new THREE.Vector3(122.7,30,-118),latchTime:tun.latchTime}],new THREE.MeshStandardMaterial({color:0x6d5036,roughness:.8}));
       if(restored){inlet.inlets[0]!.latched=true;inlet.inlets[0]!.seal=1;}
       const f=gui.addFolder('Ashwater Reach');f.add(tun,'fillRate',.05,.5,.01);f.add(tun,'drainRate',.02,1,.01);f.add(tun,'warningTime',.8,4,.1);f.add(tun,'latchTime',.5,5,.1).onChange((v:number)=>{inlet.inlets[0]!.latchTime=v;});f.close();if(restored)restoreSource(.2);},
-    sync(dt:number,base:ReturnType<typeof createColorField>){field.trail=[];field.strokes=[];field.update(dt);field.setFox(base.fox);field.trail=base.trail.map(t=>({...t}));field.strokes=base.strokes.map(t=>({...t}));field.renderMask(dt);for(const m of mats)field.syncMaterial(m);},
+    sync(dt:number,base:ReturnType<typeof createColorField>){field.trail=[];field.strokes=[];field.update(dt);field.setFox(base.fox);field.trail=base.trail.map(t=>({...t}));field.strokes=base.strokes.map(t=>({...t}));field.visualDrains=base.visualDrains;field.renderMask(dt);for(const m of mats)field.syncMaterial(m);},
     update(dt:number,fox:THREE.Vector3,feetY:number,grounded:boolean,flood:boolean,dashing:boolean,drained:boolean){
       const localFox=fox.clone();localFox.x-=offsetX;
       if(flood&&grounded&&fox.x>68&&fox.z<-80)recoveryVisited=true;

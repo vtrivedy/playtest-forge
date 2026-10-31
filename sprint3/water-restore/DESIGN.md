@@ -123,3 +123,7 @@ The integrated capture script statically imports new water-wade-capture.mjs, but
 ## Fresh-scene wading capture validation
 
 Independent Sol audit of ebffd87 finds that the new wade helper boots three fresh scenes after the existing pond GL gate, but checks only deaths. Add per-view evidence and assertions for scene-colour copy progress, supported first/current PCF, matching half-float composer dimensions, and zero GL/invalid-target errors. Rearm copy diagnostics before each video frame to check later copies too; preserve boot errors rather than clearing them. Record reflection counters but do not require a mirror from a below-surface/culled lens. Save each view's renderer summary before a failure throws. No game renderer, camera path, collision or appearance changes. Keep the already pending ebffd87 request immutable; apply the stronger evidence gate to the next requested ref.
+
+## Main integration ac86a80
+
+Merge current main as requested by driver01:35. Preserve the deferred immutable-repo water-wade import in the single capture conflict. Main adds a projected-visibility helper whose static import has the same stale Modal-image risk; load it from the immutable repo immediately before route-only use. Preserve main's camera, fox, shade and route changes. Required tsc/fox build and capture syntax checks before backup push. Appearance remains gated on fresh combined-ref GPU review.
