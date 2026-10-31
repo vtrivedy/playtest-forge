@@ -41,3 +41,17 @@ Before code, 2026-10-31. The current candidate remains pending remote GPU review
 Personally inspected the prior HIGH-arrival PNG again: stone is absent, basin appears suspended and fox is clipped at the lower image edge. Do not accept the frame. Sampler-error evidence means the pending PCF initialization retest is essential before further bank shading changes. Source waypoint inspection confirms the latest harness now observes actual source flow before advancing; phaseTrace/finalWaypoint will expose whether the pending run stalls at source, boarding or rise.
 
 GPU review order: (1) requested SHA/tool identity and no sampler warnings, (2) bank geometry visible in HIGH and LOW, with cool sky / mid-grey ground / dark teal water separated, (3) no continuous vertical glass wall, (4) hero-orchard comparison fox/basin framing, (5) real crossing event order plus completed reversible cycle and recovery. Complete reports remain required; the CPU summary does not satisfy these gates. Leave the existing immutable request stable rather than resetting an in-flight capture merely for this documentation audit.
+
+## Round16 — capture supply continuity
+
+Before code, 2026-10-31 05:43 UTC. Driver enabled reach-r2 polling at01:35ET; explicitly reissued current pushed tip. Feedback remains absent. Existing waypoint samples omit water loss between source departure and ferry arrival. Add half-second state samples to the real-input crossing acceptance report, using the existing crossingSample shape; include final sample. Keep transitions separately, retain all source/controls/timing/pass predicates. This provides supply continuity evidence without a local renderer or speculative game change. Node syntax and diff checks validate this capture-only edit; remote PNGs/window.__game remain required.
+
+## Round17: observed GPU image packaging failure
+
+The ac86a80 relay archive contains no PNGs or game report. Its capture.log identifies ERR_MODULE_NOT_FOUND for /opt/browser/projected-visibility-capture.mjs, statically imported by gpu-capture.mjs but absent from the Modal image. Repair: include the existing helper beside the runner, with no game or capture behavior changes. All nine relative runner imports must have image destinations; Python and helper syntax must pass. Remote recapture remains mandatory before visual/controller acceptance.
+
+Process correction: the intended pre-edit scoped design write used a nonexistent sprint3/reach directory and failed; that failure was missed before the one-line packaging commit. This records the rationale after that commit without rewriting branch history.
+
+## Round23 — driver-requested main integration
+
+Before conflict resolution: merge origin/main4bacc15 on s3-reach. The only conflict is the capture packaging regression checker. Keep main's inert RecordingImage execution of the local mount block: it follows actual computed mounts and the new modal.is_local guard, replacing our earlier AST shape matcher. Preserve Reach supply/cycle traces from the automatic merge. No new game art or tuning. Run packaging check, TypeScript and fox Vite before pushing branch and integrating main as explicitly requested by driver02:07. Re-request immutable landed SHA; relay failures are not visual evidence.
