@@ -831,8 +831,9 @@ export class ColorField {
             float tide = smoothstep(0.44, 0.56, cfPaint + (gran - 0.5) * 0.08) * (1.0 - smoothstep(0.6, 0.78, cfPaint)) * mix(0.2, 1.0, rimBreak);
             // each wash dried at its own strength / hue: overlapping blooms read as separate passes
             float wash = clamp((cfWash - 0.15) / 0.85, 0.0, 1.0);
-            float h1 = clamp(fbm4(spP * 0.075) * 1.5 - 0.25 + ((wash - 0.5) * 0.5 + (noise21(spP * 0.55 + 9.0) - 0.5) * 0.4) * uHueJitter, 0.0, 1.0);
-            float h2 = noise21(spP * 0.21 + 5.0);
+            // hue zones a few metres across, so a run crosses ochre → sage → moss → sienna washes
+            float h1 = clamp(fbm4(spP * 0.13) * 1.8 - 0.4 + ((wash - 0.5) * 0.5 + (noise21(spP * 0.55 + 9.0) - 0.5) * 0.4) * uHueJitter, 0.0, 1.0);
+            float h2 = noise21(spP * 0.17 + 5.0);
             float h3 = noise21(spP * 0.33 + 47.0);
             vec3 pO = uPal[0] / dot(uPal[0], vec3(0.2126, 0.7152, 0.0722));
             vec3 pS = uPal[1] / dot(uPal[1], vec3(0.2126, 0.7152, 0.0722));
@@ -841,7 +842,7 @@ export class ColorField {
             vec3 pR = uPal[4] / dot(uPal[4], vec3(0.2126, 0.7152, 0.0722));
             vec3 pal = mix(pO, pS, smoothstep(0.32, 0.58, h1));
             pal = mix(pal, pM, smoothstep(0.62, 0.86, h1));
-            pal = mix(pal, pB, smoothstep(0.58, 0.84, h2) * 0.75);
+            pal = mix(pal, pB, smoothstep(0.62, 0.86, h2) * 0.7);
             pal = mix(pal, pR, smoothstep(0.82, 0.95, h3) * 0.55);
             float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
             // pigment density: settled pools and thin passages; granulation settles in paper valleys
@@ -851,16 +852,19 @@ export class ColorField {
             // cauliflower back-runs: faint darker lines where one wash crept into another
             float backrun = 1.0 - smoothstep(0.0, 0.035, abs(noise21(spP * 0.42 + 23.0) - 0.5));
             vec3 own = max(mix(vec3(chromaLuma), chroma, 1.25), 0.0);
-            vec3 groundPaint = mix(own, chromaLuma * pal * 1.12, uPalette) * dens * (1.0 - backrun * 0.12);
+            // watercolour on paper sits a little lighter and cleaner than the dead soil it covers
+            vec3 groundPaint = mix(own, chromaLuma * pal * 1.22, uPalette) * dens * (1.0 - backrun * 0.12);
             float up = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
             // lichen patches follow the surface (gp folds height in), not horizontal bands
             float lichen = smoothstep(0.55, 0.75, noise21(gpP * 0.9 + 3.0) * 0.7 + noise21(gpP * 3.1) * 0.3);
-            vec3 stone = chromaLuma * mix(vec3(0.92, 0.97, 1.06), vec3(1.03, 0.99, 0.94), noise21(gpP * 0.5)) * 1.1;
-            vec3 lichenC = chromaLuma * pO * 1.05;
+            // stone comes back as warm sunlit sandstone (against the grey paper the warmth is the life),
+            // with gold lichen patches and moss on the tops
+            vec3 stone = chromaLuma * mix(vec3(1.2, 1.0, 0.76), vec3(1.1, 1.0, 0.86), noise21(gpP * 0.5)) * 1.15;
+            vec3 lichenC = chromaLuma * pO * 1.1;
             vec3 moss = chromaLuma * pM * 1.08;
-            float mossK = smoothstep(0.55, 0.9, up) * smoothstep(0.45, 0.7, noise21(spP * 0.8 + 6.0));
+            float mossK = smoothstep(0.5, 0.85, up) * smoothstep(0.4, 0.66, noise21(spP * 0.8 + 6.0));
             vec3 ownPaint = own * mix(0.95, 1.1, dens - 0.8);
-            vec3 stonePaint = mix(mix(mix(stone, ownPaint, 0.35), lichenC, lichen * 0.5), moss, mossK);
+            vec3 stonePaint = mix(mix(stone, lichenC, lichen * 0.7), moss, mossK);
             // kept litter piles come back as warm leaves, lighter than their dead value
             vec3 litterPaint = ownPaint * 1.2;
             vec3 paintC = uPaintKind < 0.5 ? groundPaint : uPaintKind < 1.5 ? stonePaint : uPaintKind < 2.5 ? ownPaint : litterPaint;
@@ -1000,11 +1004,11 @@ export function paintLookUniforms() {
     uSpeckDebug: { value: 0 },
     uPal: {
       value: [
-        new THREE.Color(1.42, 1.0, 0.46), // ochre
-        new THREE.Color(0.94, 1.05, 0.8), // sage
-        new THREE.Color(0.86, 1.08, 0.56), // moss
-        new THREE.Color(1.6, 0.86, 0.52), // burnt sienna
-        new THREE.Color(1.55, 0.8, 0.82), // madder
+        new THREE.Color(1.6, 1.0, 0.3), // golden ochre
+        new THREE.Color(0.82, 1.08, 0.72), // sage
+        new THREE.Color(0.74, 1.1, 0.4), // moss
+        new THREE.Color(1.8, 0.8, 0.42), // burnt sienna
+        new THREE.Color(1.75, 0.7, 0.78), // madder
       ],
     },
   };
