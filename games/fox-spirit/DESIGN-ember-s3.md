@@ -119,3 +119,19 @@ Ruff retest outcome:9603850 fullface shows a smooth collar behind the jaw, so re
 Returned archive3b21c1c9b8eb contains noPNG/game report: Node exits beforebrowser startup because /opt/browser/water-wade-capture.mjs was not packaged. This is not game shader evidence. Mainac86a80 includes the missingmount; merged it. Add a CPU-only static modulegraph check that every relative .mjs dependency of tools/gpu-capture.mjs is mounted into the Modal browser image. This protects required GPUverification from futurehelper drift, without importingPlaywright/Modal, readingcredentials/env, launchingbrowser or rendering. Check transitive static/dynamicliteral imports and preserve immutable capture refs.
 
 Preflight also catches newly imported projected-visibility-capture.mjs missing from the current Modalimage manifest. Package that helper too; otherwise the water-helper fix merely exposes the next startup failure. Standalone modulegraph check and CAPTURE.md command are CPU-only and do not import the ModalSDK or browser.
+
+## Interrupted a873 visual triage — fur relief, socket and warm flare
+
+Partialcapture5004d385 contains23PNGs+2completedrunclips, personallyinspected16decodedframes/fullface. Externallycancelledmidturntable, nofinalreport/identity, so NOTacceptance evidence. It shows smoothcontinuousattachedtail, warmernativeears andnarroweriris; remainingblacksocket, darkjawmargin, flatclaycoat, yellow-white runflare. FOXONLY thenTURNtableONLYsameSHArequested for completeverification.
+
+JawUVaudit ofcurrentembeddedcolour:300brightinterioredges,0belowhalfluma, medianedge/interior0.9999. Reject UVbleedhypothesis; do noteditUVs. Add onlyshort lower-jaw fuzz (≤1cm) to soften anatomicaloutline, not whole-neck collar.
+
+Expand bakedeyepigment recovery fullcoverage to2.0apertures, feather to3.2; current1.05→2.15 maskleaves outerpaint dark. Setlift1.0 andrustdetailfloor0.85 (current0.45 retainsblackloop). Keepproceduraliris/lid/tearseparate andnarrow.
+
+Tailfireonly: deepen envelope root/tip toorange(1,.12,.015)/(1,.24,.035),hotcore(1,.18,.025),radiance0.8. Counts/anchors/shape/crestcolour unchanged; reducewhiteoverlapwithoutlosingfilledvolume.
+
+Try one bounded broadfur-relief pass on opaque rustcoat only: physicalnoise-cell3.5cmacross/16cmalong,1.2mmpeak-to-trough atamount1, default0.75,max10deg normaltilt. Separatelyfilteredslopes per octave/body-throatflow, relativeconditioning/grazingfade. Masks afterderivativesexcludeeyes/cream/paws; preserveunperturbednormal forrim/emberfacing. No geometry/contact changes, finefrost or extraemission. Existingpreparedprototype/Solreview corrections applied. GUIbrushRelief0/1; GPU mustrejectpebbles/engravedskin/creambands/crawl. Currentcapturecompletionstillrequired; Opusretreset06:40UTC.
+
+Socketcleanup also removes saturated bakedamber pixels immediately around the old iris footprint while protecting cream byitsblue/greenratio. Narrowing only the procedural cap can otherwise reveal a second painted iris underneath. Keep one renderedeye representation: actualcap suppliesamber/slit/tear, coat suppliesrust/cream and realshading.
+
+Verifieda873fox-only capture67a9072 nowcompletes:22PNGs+16decodedframes personallyread,fullface,__gameprofile/masks,0errors/failures. Fur stillhas plastic-wrap ghostedges; low-opacitycontinuous shells fail thefurbar. Switch existing2bodyfringe layers to opaque noise-cut coverage atsilhouette (no extra layers), no rim/emission copies. Lateexplicitcutoffs0.28/0.46,depthwrite,trueFrontSide. Filter unresolvedcoverage towardmean0.5 usingfootprint toavoidcrawlingfur/frost atchase. Longruffremainsonly530throat/cheeks, shortjawfuzz≤1cm. UnderlyingcorestillgroundsAO/shadow; bodyfringeexcludedfromGTAO. Reject solidcollartubes/plates/plushinflation; preservebodyEmber/brushReliefcomparisons. Modecutout reportedforcapture.
