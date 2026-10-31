@@ -1,6 +1,13 @@
 # GPU reviews
 
-No local browser. From the repository root:
+No local browser. Check the remote helper package before submitting a capture request:
+
+```sh
+python3 tools/tests/capture-module-packaging.py
+```
+
+This reads the literal capture module graph and Modal file mounts without starting a browser or importing Modal.
+From the repository root:
 
 ```sh
 python3 tools/review-capture.py s2-loco
