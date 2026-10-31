@@ -46,6 +46,17 @@ def capture_request(stream, request, folder):
         source_root=Path(source.name)
         bundle=subprocess.check_output(['git','archive',ref,'tools'],cwd=ROOT)
         with tarfile.open(fileobj=io.BytesIO(bundle)) as tar:tar.extractall(source_root,filter='data')
+        wrapper=source_root/'tools/modal/gpu_capture.py'
+        requested_wrapper=wrapper.read_text()
+        canonical=(ROOT/'tools/modal/gpu_capture.py').read_text()
+        ca=canonical.index('\nif modal.is_local():\n');cb=canonical.index('\n@app.function',ca)
+        wa=requested_wrapper.index('\nif modal.is_local():\n');wb=requested_wrapper.index('\n@app.function',wa)
+        (folder/'requested-gpu_capture.py').write_text(requested_wrapper)
+        applied_wrapper=requested_wrapper[:wa]+canonical[ca:cb]+requested_wrapper[wb:]
+        wrapper.write_text(applied_wrapper)
+        (folder/'applied-gpu_capture.py').write_text(applied_wrapper)
+        mounts=sorted(p.name for p in (source_root/'tools').glob('*.mjs'))
+        (folder/'packaging.json').write_text(json.dumps({'patch':'automatic capture module mounts','modules':mounts,'gameSha':ref},indent=2))
         if shots == 'gait' and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
             (source_root/'tools/gpu-capture.mjs').write_bytes(Path(os.environ['FOX_GAIT_CAPTURE_SCRIPT']).read_bytes())
         command=['modal','run','--detach',str(source_root/'tools/modal/gpu_capture.py'),'--ref',ref,'--shots',shots,'--out',str(folder/'evidence')]
@@ -62,7 +73,7 @@ def capture_request(stream, request, folder):
             proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env)
         source.cleanup()
         evidence=folder/'evidence'
-        result={'status':'captured' if proc.returncode==0 else 'capture-failed','exit':proc.returncode,'ref':ref,'shots':shots,'path':str(evidence)}
+        result={'status':'captured' if proc.returncode==0 else 'capture-failed','exit':proc.returncode,'ref':ref,'shots':shots,'path':str(evidence),'moduleMounts':mounts}
         for name in ['run.json','report.json']:
             p=evidence/name
             if p.exists():
@@ -81,6 +92,8 @@ def capture_request(stream, request, folder):
         with tarfile.open(archive,'w') as tar:
             if evidence.exists():tar.add(evidence,arcname='evidence')
             tar.add(folder/'modal.log',arcname='modal.log')
+            for provenance in ['request.json','packaging.json','requested-gpu_capture.py','applied-gpu_capture.py']:
+                if (folder/provenance).exists():tar.add(folder/provenance,arcname=provenance)
         uploaded=cli(['modal','volume','put','fox-agent-streams',str(archive),f'{stream}/captures/{folder.name}.tar','--force'])
         result['archive']=f'{stream}/captures/{folder.name}.tar' if uploaded.returncode==0 else None
     return result
@@ -88,7 +101,10 @@ def capture_request(stream, request, folder):
 def publish(stream, folder, result):
     result.update({'requestId':folder.name})
     request=json.loads((folder/'request.json').read_text())
-    if isinstance(request,dict):result.update({k:request[k] for k in ['ref','reason','stage'] if k in request})
+    if isinstance(request,dict):
+        result.update({k:request[k] for k in ['ref','stage'] if k in request})
+        result['requestReason']=request.get('reason')
+        if 'reason' not in result:result['reason']=request.get('reason')
     archive=folder/'evidence.tar'
     if archive.exists() and not result.get('archive'):
         remote=f'{stream}/captures/{folder.name}.tar'
