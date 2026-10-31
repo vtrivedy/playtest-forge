@@ -416,6 +416,39 @@ try {
       }
       save('shade-density-variants.json',{label:'Same pose/time/camera, core absorption only; variants are not acceptance',chosenDefault:originalDensity,pose:{time:pose.t,fox:pose.pos,foxYaw:pose.foxYaw},variants});
     }
+    if(await page.evaluate(()=>Array.isArray(window.__gameHooks.debug.colorField.visualDrains))){
+      await page.evaluate(id=>{
+        const h=window.__gameHooks,field=h.debug.colorField,actor=h.shades.state().actors.find(a=>a.id===id),V=field.fox.constructor;
+        window.__shadeVisualDiagnostic={field,center:new V(...actor.pos),radius:h.shades.tun.drainRadius,saved:{fox:field.fox.clone(),trail:field.trail,strokes:field.strokes,restores:field.restores,glows:field.glows,visualDrains:field.visualDrains,globalColor:field.globalColor}};
+      },actors[0].id);
+      const variants=[];
+      try{
+        for(const variant of ['weak-no-drain','weak-drained','strong-drained','permanent-drained']){
+          const source=await page.evaluate(variant=>{
+            const {field,center,radius}=window.__shadeVisualDiagnostic;
+            field.trail=[];field.strokes=[];field.restores=[];field.glows=[];field.globalColor=0;field.fox.copy(center);
+            field.visualDrains=variant==='weak-no-drain'?[]:[{center:center.clone(),radius}];
+            if(variant==='strong-drained')field.stroke(center,center,{life:6,strength:1.5,radius});
+            if(variant==='permanent-drained'){const restore=field.restore(center,radius,.2);restore.radius=radius;restore.t=1;restore.rim=0;}
+            return {variant,center:center.toArray(),radius,drains:field.visualDrains.length,strokeStrength:field.strokes[0]?.strength??0,permanent:field.restores.length};
+          },variant);
+          await advance(0);
+          const name=`shade-visual-${variant}`;await shot(name);variants.push({...source,shot:name});
+        }
+      }finally{
+        const restored=await page.evaluate(()=>{
+          const diagnostic=window.__shadeVisualDiagnostic,{field,saved}=diagnostic;
+          field.fox.copy(saved.fox);
+          for(const key of ['trail','strokes','restores','glows','visualDrains','globalColor'])field[key]=saved[key];
+          const result={passed:field.fox.equals(saved.fox)&&['trail','strokes','restores','glows','visualDrains','globalColor'].every(key=>field[key]===saved[key]),label:'Exact original source references, fox position and global fill restored; no simulation step in gallery'};
+          delete window.__shadeVisualDiagnostic;return result;
+        });
+        save('shade-visual-source-restoration.json',restored);
+        await advance(0);
+        if(!restored.passed)report.failures.push('Visual-source diagnostic failed to restore field');
+      }
+      save('shade-visual-source-variants.json',{label:'Controlled ColorField sources at frozen actor pose/time; shader diagnostic, not natural release or visual acceptance',variants});
+    }
     await video('shade-patrol', 120, ()=>camera(), undefined, pairOptions('Patrol',actors[0].id,[0,30,60,90,119]));
     validatePair('shade-patrol');
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
