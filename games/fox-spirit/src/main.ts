@@ -316,7 +316,7 @@ async function boot() {
   fFeel.add(feel, 'glideForward', 4, 12, 0.1).listen();
   fFeel.add(feel, 'dashSpeed', 10, 30, 0.5).listen();
   fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
-  if (foxActor.locomotion) {
+  {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
     folder.add(params,'headLead',0,.5,.01);
@@ -766,7 +766,7 @@ async function boot() {
       foxActor.group.rotation.y = yaw;
       windupT=-1;
       groundYawRate=0;
-      foxActor.locomotion?.reset();
+      foxActor.locomotion.reset();
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
       photo = null;
@@ -891,7 +891,7 @@ async function boot() {
         pos: [p.x, p.y - foxActor.feetOffset, p.z],
         vel: [vel.x, vel.y, vel.z],
         foxYaw: foxActor.group.rotation.y,
-        locomotion: foxActor.locomotion?.metrics,
+        locomotion: foxActor.locomotion.metrics,
         airT,
         anim: foxActor.getAnim(),
         grounded,
@@ -1272,7 +1272,7 @@ async function boot() {
       vel.z = wish.z * feel.dashSpeed;
       if(grounded) {
         fox.rotation.y=Math.atan2(wish.x,wish.z); groundYawRate=0;
-        foxActor.locomotion?.syncYaw(fox.rotation.y);
+        foxActor.locomotion.syncYaw(fox.rotation.y);
       }
       if (!grounded) {
         airDashUsed = true;
@@ -1498,8 +1498,8 @@ async function boot() {
           anim='skid'; fade=.06;
         } else if (skidT > 0 && wish.lengthSq() < .01) {
           anim = 'skid'; fade = .06;
-        } else if (speed < .6 && Math.abs(foxActor.locomotion?.metrics.turnRate ?? 0) > .8) {
-          anim = (foxActor.locomotion?.metrics.turnRate ?? 0) > 0 ? 'turn_left' : 'turn_right';
+        } else if (speed < .6 && Math.abs(foxActor.locomotion.metrics.turnRate) > .8) {
+          anim = (foxActor.locomotion.metrics.turnRate) > 0 ? 'turn_left' : 'turn_right';
         } else if (speed > 0.08) {
           anim = 'run';
           // Authored locomotion computes cadence from stance sweep and blended stride length.
@@ -1573,7 +1573,7 @@ async function boot() {
 
     // Quiet leaf contacts belong to planted paws, not a periodic emitter behind the body.
     if (grounded && speed > 2) {
-      for (const paw of foxActor.locomotion?.footfalls ?? []) autumnFX.kick(paw, .18);
+      for (const paw of foxActor.locomotion.footfalls) autumnFX.kick(paw, .18);
     }
 
     if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
@@ -1737,8 +1737,8 @@ async function boot() {
         extra: {
           preset: feelPreset,
           anim: foxActor.getAnim(),
-          gait: foxActor.locomotion?.metrics.gait ?? 'none',
-          plantError: foxActor.locomotion?.metrics.maxPlantError ?? 0,
+          gait: foxActor.locomotion.metrics.gait,
+          plantError: foxActor.locomotion.metrics.maxPlantError,
           lastJumpDist: jumpStats.lastDist,
           lastLandImpact: jumpStats.lastImpact,
           lastDashDist: jumpStats.lastDashDist,
