@@ -1101,7 +1101,9 @@ try {
     const route = await H('route');
     save('route-waypoints.json', route);
     const from = Number(arg('route-from', '0')), requestedTo = Number(arg('route-to', '-1'));
-    const kilnRoute = wants('kilnroute');
+    const kilnRoute = selected.split(',').includes('kilnroute');
+    if (kilnRoute && selected.split(',').includes('route')) throw Error('Capture route and kilnroute separately to preserve distinct proof');
+    if (kilnRoute && (from !== 0 || requestedTo !== -1)) throw Error('Kiln route requires natural spawn and its named endpoint; omit route-from/route-to');
     const kilnFeed = route.findIndex(w => w.label === 'SW1-feed');
     if (kilnRoute && kilnFeed < 0) throw Error('Kiln route requires an authored SW1-feed waypoint');
     const to = kilnRoute ? kilnFeed + 1 : requestedTo < 0 ? route.length : requestedTo;
@@ -1115,11 +1117,15 @@ try {
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
-    save('route-plan.json', { from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
+    const start = await H('state');
+    const spawnDistanceToFirst = Math.hypot(start.pos[0] - route[0].x, start.pos[1] - route[0].y, start.pos[2] - route[0].z);
+    if (kilnRoute && start.seedwells.some(s => s.id === 'SW1' && s.lit)) throw Error('Kiln proof requires an initially unlit SW1');
+    save('route-plan.json', { schemaVersion: 2, start: { pos: start.pos, seedwells: start.seedwells, deaths: start.deaths, auto: start.auto }, spawnDistanceToFirst, from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
     await H('autopilot', true, from, { assist: false });
-    let restoredAt;
+    let restoredAt, kilnLatchedAt;
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const state = await video(name, Number(arg('route-seconds', '360')) * fps, async () => {}, (st, i) => {
+      if (kilnLatchedAt === undefined && st.seedwells.some(s => s.id === 'SW1' && s.lit)) kilnLatchedAt = i;
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
@@ -1127,9 +1133,9 @@ try {
     await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
     const endpointReached = bounded ? state.auto.idx >= to : state.restored;
     const kilnLit = state.seedwells.some(s => s.id === 'SW1' && s.lit);
-    const passed = endpointReached && (!kilnRoute || kilnLit) && !state.auto.assists && !state.deaths;
-    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : state.auto.stalled ? 'stalled' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
-    save('route-acceptance.json', { passed, reason, from, to, staged: regional, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined) && !state.auto.assists && !state.deaths;
+    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : state.auto.stalled ? 'stalled' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
+    save('route-acceptance.json', { schemaVersion: 2, passed, reason, from, to, staged: regional, kilnLatchedAt, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
     if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
