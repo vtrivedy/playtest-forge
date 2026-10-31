@@ -1,4 +1,4 @@
-# Packed plaza floor — branch prototype, GPU gate pending
+# Packed plaza floor — integrated prototype, GPU gate pending
 
 Opus06:40 observes unorganized dark ground across40–50percent of the b458 lower view and rejects more density/noise/emissives/shader exemptions. Its07:14 source/design review is recorded in lanternhollow-opus-plaza-design.md. The initial no-code condition applied while paint/hearth were unseen. The07:27 shared32d5 opening review below satisfies that condition for one branch prototype; dedicated1950 hero/well/orbit/materialpair judgment and final visual gate remain open.
 
@@ -25,3 +25,7 @@ Use one exported config strength.18; local weight fades hubWear by(1-weight), th
 Opus source review (lanternhollow-opus-plaza-source.md) keeps full wear cancellation for the first capture; partial cancellation would retain the predicted ring. Removal also recovers underlying meadow hue, so capture must reject olive/gold blotches if it reads as meadow instead of packed earth. Total per-channel change can exceed18percent: actual pinned full-terrain comparison26825vertices,26693outside bit-identical,132inside changed,50above1.18ratio; p50inside1.15728,p95 2.37049,max2.38817. These are CPU albedo ratios, not rendered luminance or art acceptance.
 
 Corrected harness archives the full immutable pre-floor source dependency trees to a temporary directory, separately copies current source trees, and executes the verbatim actual terrain/route slice. No asset loads, renderer, browser or workspace temporary modules. All outside colors, positions/normals/UV/leafy/topology/route bit-identical. Existing1104approach samples/24paths/72roofstrips/106colliders/540fireposes pass; roottsc and foxVite pass. Branch prototype must remain OFFMAIN until dedicated1950 baseline and floor PNG/window.__game comparison are personally reviewed with Opus.
+
+## Driver integration status
+
+Driver independently landed d40 asbd97310 before prototypeGPUcomparison; integratedmain e460 includesit. This is not own/Opus artistic acceptance.1950baseline nowpersonallyALL41PNG/proofreviewed, butpackagecancelled/integrityFAIL(9blackvideoframes), finalreportmissing. Its actualstillssettlemodestcreampaint/hearthdirectionandconfirmfloorneed. CapturetoolJPEGguardnowaddressesobservedblackinput; requestcompletecurrent-mainfloor+guardreplay. Do not claimfloorimprovementuntilnewPNG/gameproof andOpusreview. Earlieroffmainnotesarehistoricalgateinstructions, notcurrentgitstate.

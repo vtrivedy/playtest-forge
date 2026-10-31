@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {blackFrameIntervals} from '../hub-black-frames.mjs';
+import {blackFrameIntervals,classifyBlackPixels} from '../hub-black-frames.mjs';
 const log='[blackframe] frame:598 pblack:100 pts:598 t:9.966667\n[blackframe] frame:599 pblack:100 pts:599 t:9.983333';
 const terminal=blackFrameIntervals(log,60);
 assert.equal(terminal.length,1);
@@ -10,4 +10,18 @@ assert.ok(blackFrameIntervals('frame:299 pblack:100',30)[0].duration>=.02);
 assert.equal(blackFrameIntervals('frame:1 pblack:98',30).length,0);
 assert.equal(blackFrameIntervals('frame:1 pblack:100\nframe:3 pblack:100',30).length,2);
 assert.deepEqual(blackFrameIntervals('',30),[]);
+const sample=(value,bright=0)=>{
+  const data=new Uint8Array(100*100*4);
+  for(let i=0;i<10000;i++) data.set([i<bright?255:value,i<bright?255:value,i<bright?255:value,255],i*4);
+  return classifyBlackPixels(data,100,100);
+};
+assert.equal(sample(0).black,true);
+assert.equal(sample(4).black,true,'Near-black RGB must be caught before encoding');
+assert.equal(sample(5).black,true,'Conservative limited-Y threshold covers rounding');
+assert.equal(sample(6).black,false);
+assert.equal(sample(0,100).darkRatio,.99);
+assert.equal(sample(0,100).black,true,'One-percent bright patch must not hide a black frame');
+assert.equal(sample(0,101).black,false);
+assert.equal(sample(128).black,false);
+assert.throws(()=>classifyBlackPixels(new Uint8Array(4),2,2),/RGBA/);
 console.log('Hub black-frame CPU audit PASS: EOF,30/60fps threshold, gaps, pixel gate, empty footage.');

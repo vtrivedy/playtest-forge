@@ -49,6 +49,10 @@ const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'text/javascript');
     fs.createReadStream(path.join(repo, 'node_modules/three/build', req.url === '/gpu-three.js' ? 'three.module.js' : 'three.core.js')).pipe(res); return;
   }
+  if(req.url==='/gpu-hub-black-frames.js') {
+    res.setHeader('Content-Type','text/javascript');
+    fs.createReadStream(new URL('./hub-black-frames.mjs',import.meta.url)).pipe(res); return;
+  }
   if (req.url === '/favicon.ico') { res.writeHead(204).end(); return; }
   const url = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   const builtFile = path.resolve(repo, 'dist/fox-spirit', `.${url}`);
@@ -64,6 +68,8 @@ await once(server, 'listening');
 const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
 report.captureHelperSha = Object.fromEntries(['water-wade-capture.mjs', 'projected-visibility-capture.mjs'].map(file =>
   [file, createHash('sha256').update(fs.readFileSync(path.join(repo, 'tools', file))).digest('hex')]));
+report.captureHelperSha['hub-black-frames.mjs']=createHash('sha256')
+  .update(fs.readFileSync(new URL('./hub-black-frames.mjs',import.meta.url))).digest('hex');
 let browser;
 try {
   const headed = backend === 'gl';
@@ -146,17 +152,15 @@ try {
     if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error('WebGL context lost after warmup');
     return H('state');
   }
-  async function screenshotPixels(buffer) {
-    return page.evaluate(async encoded => {
+  async function screenshotPixels(buffer, mime = 'image/png') {
+    return page.evaluate(async ({encoded,mime}) => {
       const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
-      const bitmap=await createImageBitmap(new Blob([bytes],{type:'image/png'}));
-      const canvas=new OffscreenCanvas(128,72), ctx=canvas.getContext('2d',{willReadFrequently:true});
-      ctx.drawImage(bitmap,0,0,128,72); bitmap.close();
-      const data=ctx.getImageData(0,0,128,72).data;
-      let maxChannel=0;
-      for(let i=0;i<data.length;i+=4) maxChannel=Math.max(maxChannel,data[i],data[i+1],data[i+2]);
-      return {width:128,height:72,maxChannel,black:maxChannel<=3};
-    },buffer.toString('base64'));
+      const bitmap=await createImageBitmap(new Blob([bytes],{type:mime}));
+      const {classifyBlackPixels}=await import('/gpu-hub-black-frames.js');
+      const canvas=new OffscreenCanvas(480,270), ctx=canvas.getContext('2d',{willReadFrequently:true});
+      ctx.drawImage(bitmap,0,0,480,270); bitmap.close();
+      return classifyBlackPixels(ctx.getImageData(0,0,480,270).data,480,270);
+    },{encoded:buffer.toString('base64'),mime});
   }
   async function hubStillInvariant() {
     const state=await H('state');
@@ -164,27 +168,35 @@ try {
       const {camera,fox}=window.__gameHooks.debug;
       camera.updateMatrixWorld(true); fox.updateWorldMatrix(true,true);
       const bones=[]; fox.traverse(o=>{if(o.isBone)bones.push([o.name,o.matrixWorld.toArray()]);});
-      return {camera:{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),
+      return {clock:{fixed:window.__gpuFixedClock===true,timeMs:window.__gpuTime},
+        camera:{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),
         projection:camera.projectionMatrix.toArray()},fox:{position:fox.position.toArray(),
         quaternion:fox.quaternion.toArray(),scale:fox.scale.toArray()},bones};
     });
     const fixed={pose,t:state.t,anim:state.anim,grounded:state.grounded,deaths:state.deaths,
       assists:state.auto.assists,restored:state.restored,seedwells:state.seedwells,restore:state.restore,
       grade:state.look.grade,dusk:state.dusk};
-    return {state,pose,digest:createHash('sha256').update(JSON.stringify(fixed)).digest('hex')};
+    return {state,pose,fixedClock:pose.clock.fixed,digest:createHash('sha256').update(JSON.stringify(fixed)).digest('hex')};
+  }
+  async function assertHubContext(name) {
+    if(!name.startsWith('hub-')) return;
+    const healthy=await page.evaluate(()=>!window.__gpuContextLost &&
+      !window.__gameHooks.debug.renderer.getContext().isContextLost());
+    if(!healthy) throw Error(name+': WebGL context loss invalidates capture evidence');
+  }
+  async function settleHubCompositor() {
+    await H('advance',0,1/60,true);
+    await page.evaluate(()=>new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(Error('Native compositor barrier timed out')),5000);
+      window.__gpuNativeRaf(()=>window.__gpuNativeRaf(()=>{clearTimeout(timer);resolve();}));
+    }));
   }
   async function captureStill(name) {
-    const assertHealthy=async()=>{
-      if(!name.startsWith('hub-')) return;
-      const healthy=await page.evaluate(()=>!window.__gpuContextLost &&
-        !window.__gameHooks.debug.renderer.getContext().isContextLost());
-      if(!healthy) throw Error(name+': WebGL context loss invalidates still evidence');
-    };
-    await assertHealthy();
+    await assertHubContext(name);
     const filename=path.join(out,name+'.png');
     const first=await page.screenshot({path:filename,animations:'disabled'});
     if(!name.startsWith('hub-')) return;
-    await assertHealthy();
+    await assertHubContext(name);
     const pixels=await screenshotPixels(first);
     if(!pixels.black) return;
     const attemptName=name+'-attempt-1-black.png', before=await hubStillInvariant(), started=Date.now();
@@ -192,19 +204,50 @@ try {
     report.hubStillAttempts??={};
     const attempt=report.hubStillAttempts[name]={preserved:attemptName,first:pixels,before};
     save('hub-still-attempts.json',report.hubStillAttempts);
-    await H('advance',0,1/60,true);
-    await page.evaluate(()=>new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>reject(Error('Native compositor barrier timed out')),5000);
-      window.__gpuNativeRaf(()=>window.__gpuNativeRaf(()=>{clearTimeout(timer);resolve();}));
-    }));
+    if(!before.fixedClock) throw Error(name+': fixed clock required for a same-frame retry');
+    await settleHubCompositor();
     const retry=await page.screenshot({path:filename,animations:'disabled'});
-    await assertHealthy();
+    await assertHubContext(name);
     attempt.retry=await screenshotPixels(retry); attempt.after=await hubStillInvariant();
     attempt.hostElapsedMs=Date.now()-started;
     attempt.recovered=!attempt.retry.black;
     attempt.invariantsMatch=attempt.before.digest===attempt.after.digest;
     save('hub-still-attempts.json',report.hubStillAttempts);
     if(!attempt.recovered || !attempt.invariantsMatch) report.failures.push(name+': black still recovery failed or changed pose/camera/state');
+  }
+  async function captureVideoJpeg(name, frame) {
+    await assertHubContext(name);
+    const options={type:'jpeg',quality:96,animations:'disabled'};
+    const first=await page.screenshot(options);
+    if(!name.startsWith('hub-')) return first;
+    await assertHubContext(name);
+    const pixels=await screenshotPixels(first,'image/jpeg');
+    if(!pixels.black) return first;
+    const key=name+'-frame-'+String(frame).padStart(5,'0');
+    const preserved=key+'-attempt-1-black.jpg', started=Date.now();
+    fs.writeFileSync(path.join(out,preserved),first);
+    report.hubVideoAttempts??={};
+    const attempt=report.hubVideoAttempts[key]={video:name,frame,preserved,first:pixels};
+    save('hub-video-attempts.json',report.hubVideoAttempts);
+    try {
+      attempt.before=await hubStillInvariant();
+      save('hub-video-attempts.json',report.hubVideoAttempts);
+      if(!attempt.before.fixedClock) throw Error(key+': fixed clock required for a same-frame retry');
+      await settleHubCompositor();
+      const retry=await page.screenshot(options);
+      await assertHubContext(name);
+      attempt.retry=await screenshotPixels(retry,'image/jpeg'); attempt.after=await hubStillInvariant();
+      attempt.recovered=!attempt.retry.black;
+      attempt.invariantsMatch=attempt.before.digest===attempt.after.digest;
+      if(!attempt.recovered || !attempt.invariantsMatch)
+        throw Error(key+': black video recovery failed or changed pose/camera/state');
+      return retry;
+    } catch(error) {
+      attempt.error=String(error); throw error;
+    } finally {
+      attempt.hostElapsedMs=Date.now()-started;
+      save('hub-video-attempts.json',report.hubVideoAttempts);
+    }
   }
   async function capturePlasterComparison(label) {
     await H('advance',0,1/60,true);
@@ -309,6 +352,11 @@ try {
     await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const started = Date.now(), trace = [], frames = [], start = await H('state');
     const output = path.join(out, `${name}.mp4`);
+    const markIncomplete=(error,count)=>{
+      const filename=name+'-incomplete.mp4';
+      if(fs.existsSync(output)) fs.renameSync(output,path.join(out,filename));
+      save(name+'-incomplete.json',{filename,error:String(error),capturedFrames:count,requestedFrames:frameCount});
+    };
     const encoder = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-vcodec', 'mjpeg', '-i', 'pipe:0', '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', output], { stdio: ['pipe', 'ignore', 'inherit'] });
     let encoderError;
     encoder.stdin.on('error', e => { encoderError = e; });
@@ -325,7 +373,7 @@ try {
         if (options.sample) state.capture = await options.sample(i, state);
         if (options.traceEveryFrame) trace.push({ frame: i, dt, state, ...(i % fps === 0 ? { game: await page.evaluate(() => window.__game) } : {}) });
         if (state.look.quality !== quality) throw Error(`Capture quality changed: ${JSON.stringify(state.look)}`);
-        const jpeg = await page.screenshot({ type: 'jpeg', quality: 96, animations: 'disabled' });
+        const jpeg = await captureVideoJpeg(name, i);
         if (encoderError) throw encoderError;
         if (!encoder.stdin.write(jpeg)) await once(encoder.stdin, 'drain');
         count++;
@@ -337,12 +385,19 @@ try {
         if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; if(name.startsWith('hub-')) await captureStill(filename.replace(/\.png$/,'')); else await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
         if (stop?.(state, i)) break;
       }
-    } finally { encoder.stdin.end(); }
+    } catch(error) {
+      encoder.stdin.end();
+      await completed.catch(()=>{});
+      markIncomplete(error,count); throw error;
+    } finally { if(!encoder.stdin.writableEnded) encoder.stdin.end(); }
     const [code] = await completed;
-    if (code !== 0) throw Error(`ffmpeg ${name} exited ${code}`);
-    const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
-    const stream = probe.streams[0];
-    if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
+    if (code !== 0) { const error=Error(`ffmpeg ${name} exited ${code}`); markIncomplete(error,count); throw error; }
+    let probe;
+    try {
+      probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
+      const stream = probe.streams[0];
+      if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
+    } catch(error) { markIncomplete(error,count); throw error; }
     let blackDetect;
     if(name.startsWith('hub-')) {
       const scan=spawnSync('ffmpeg',['-hide_banner','-nostats','-threads','1','-i',output,
