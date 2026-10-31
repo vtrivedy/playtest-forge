@@ -29,7 +29,15 @@ export function createCameraVisibilityProbe(scene: THREE.Scene, renderer: THREE.
     if (signatures.get(clone) !== signature) { clone.needsUpdate = true; signatures.set(clone, signature); }
     const previous = original.onBeforeCompile;
     clone.onBeforeCompile = (shader, r) => {
-      previous.call(original, shader, r);
+      // ColorField's hook closes over the live material. Diagnostic compilation
+      // must not redirect its next uniform sync into this mask shader.
+      const hadColorShader = Object.prototype.hasOwnProperty.call(original.userData, 'colorFieldShader');
+      const liveColorShader = original.userData.colorFieldShader;
+      try { previous.call(original, shader, r); }
+      finally {
+        if (hadColorShader) original.userData.colorFieldShader = liveColorShader;
+        else delete original.userData.colorFieldShader;
+      }
       // Standard/Basic fragment main is the final block. Keep all alpha/discard
       // logic, including scenery cutout, but remove lighting/grade from the count.
       shader.fragmentShader = shader.fragmentShader.replace(/}\s*$/, `gl_FragColor.rgb = vec3(${white ? '1.0' : '0.0'});\n}`);
