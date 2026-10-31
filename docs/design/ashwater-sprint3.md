@@ -20,3 +20,9 @@ Keep move, jump/hold glide and dash. Existing source → water transit → six m
 Run npx tsc --noEmit and fox Vite production build. Push immutable branch SHA, request reachview,reach,reachsafe remote GPU shots and window.__game reports. Compare baseline and after from matching views. Inspect actual PNGs personally; solicit Opus critique, fix concrete failures, request one retest. Never merge until visual and telemetry evidence reviewed. Source setup/photo cameras are disclosed staged views; route/cycle use real controller inputs.
 
 Missing checkout references: sprint3/briefs/_style-update-1105.md, COMMON.md, sprint2/critic/STATUS.md and external sprint2 lessons/concept path. Supplied brief and docs/design/art-direction.md govern until driver supplies them.
+
+
+## Pass 1 Opus response
+Code critique: avoid floating water-sheet edges, rigid elevator motion, W1 maple silhouettes and warm restored masonry. Replaced the main mist disc with small bank patches; added partial cistern banks while preserving west boarding and south LOW-lane spillways. Visual hull heave (under 2 cm steady, damped 4.5 cm landing dip) does not move collision. Added support index, actual fill derivative, water surface and freeboard to Reach state. Willow/reed tips use anchored, low-amplitude breeze; bark uses existing CC0 scan with original tint.
+
+Existing CC0 surface sources reused: Poly Haven bark_brown_02 (https://polyhaven.com/a/bark_brown_02), ambientCG Bricks085 and Rock035 (https://ambientcg.com/view?id=Bricks085 and https://ambientcg.com/view?id=Rock035). See assets/library/CREDITS.md. All added geometry/shader code is original repository work; no external model, generated image, API key or new download.
