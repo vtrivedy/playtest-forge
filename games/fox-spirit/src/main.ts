@@ -28,6 +28,7 @@ import {
   createAutumnParticles,
   detectQuality,
   createEmberMotes,
+  createPaintSprouts,
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createHubDusk, hubDuskWeight, HUB_DUSK } from './hubDusk';
@@ -248,6 +249,16 @@ async function boot() {
   const paint = new PaintLayer({ minX: -140, maxX: 165, minZ: -165, maxZ: 115 });
   paint.init(renderer);
   colorField.paint = paint;
+  const sprouts = createPaintSprouts(scene);
+  /** A big wet splash of paint with a ring of new growth in it */
+  const splash = (x: number, z: number, r: number, life?: number) => {
+    paint.splash(x, z, r, life);
+    const g = col.highestAt(x, z);
+    sprouts.sprout(x, z, r * 0.9, Math.round(r * 5), (sx, sz) => {
+      const h = col.groundAt(sx, sz, g + 1.5);
+      return !h.collider && Math.abs(h.y - g) < 2.5 ? h.y : NaN;
+    }, 0.4);
+  };
   crown.init(renderer, paint);
   reach.init(renderer, paint);
   colorField.groundAt = (x, z) => col.highestAt(x, z);
@@ -427,7 +438,7 @@ async function boot() {
       const byDash = h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
       if (byDash) dashStruck.add(h);
       h.flare = byDash ? 1.6 : 1;
-      paint.splash(h.base.x, h.base.z, byDash ? 6.5 : 5);
+      splash(h.base.x, h.base.z, byDash ? 6.5 : 5);
       emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: byDash ? 60 : 26, speed: byDash ? [2, 5] : [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: byDash ? 1.4 : 0.8, size: [0.04, 0.1], heat: 0.7 });
       audio.play('checkpoint');
       // the breath lets go: ground leaves round the hearth lift into the column
@@ -448,7 +459,7 @@ async function boot() {
       if (byDash) rootStruck.add(r);
       r.flare = byDash ? 1.6 : 1;
       const k = r.spot.knot;
-      paint.splash(k.x, k.z, byDash ? 5 : 4);
+      splash(k.x, k.z, byDash ? 5 : 4);
       emberMotes.burst(k.clone().setY(k.y + 0.6), { count: byDash ? 40 : 20, speed: [0.8, 2.4], lift: 0.6, buoyancy: 0.5, life: [0.8, 1.6], flash: byDash ? 1.2 : 0.7, size: [0.03, 0.08], heat: 0.6 });
       autumnFX.swirl(k.clone().setY(k.y + 0.2), byDash ? 30 : 18, 1.4);
       audio.play('checkpoint');
@@ -507,7 +518,7 @@ async function boot() {
     const ev = world.latchSeedwell(i);
     if (quiet) colorField.restore(sw.pos, sw.radius, 0.05);
     else {
-      paint.splash(sw.pos.x, sw.pos.z, 7);
+      splash(sw.pos.x, sw.pos.z, 7);
       handleEvents(ev);
     }
     saveLatches();
@@ -556,9 +567,16 @@ async function boot() {
   let dripDist = 0;
   let idleT = 0;
   let paintLocal = 0;
+  let sproutFeetY = 0;
+  /** Soil under (x, z) near the fox's feet; NaN on props, water or a different level */
+  const soilAt = (x: number, z: number) => {
+    const g = col.groundAt(x, z, sproutFeetY + 0.6);
+    return !g.collider && Math.abs(g.y - sproutFeetY) < 0.8 ? g.y : NaN;
+  };
   function layPaint(dt: number, dashing: boolean) {
     const fox = foxActor.group;
     const feetY = fox.position.y - foxActor.feetOffset;
+    sproutFeetY = feetY;
     const gy = col.groundAt(fox.position.x, fox.position.z, feetY + 0.3).y;
     // the brush touches paper only near the ground: a high glide leaves no band
     const nearK = Number.isFinite(gy) ? 1 - THREE.MathUtils.smoothstep(feetY - gy, 0.6, 2.8) : 0;
@@ -574,6 +592,8 @@ async function boot() {
       paintDist = 0;
       const r = T.ribbonRadius * THREE.MathUtils.lerp(0.85, 1, Math.min(1, speed / 8)) * (dashing ? 1.3 : 1);
       if (nearK > 0.02) paint.bloom(fox.position.x + (Math.random() - 0.5) * 0.5, fox.position.z + (Math.random() - 0.5) * 0.5, r, T.strength * nearK);
+      // life springs up in the fresh wash
+      if (nearK > 0.8 && grounded) sprouts.sprout(fox.position.x, fox.position.z, r * 0.85, 2, soilAt);
     }
     if (dripDist >= T.dripSpacing) {
       dripDist = Math.random() * T.dripSpacing * 0.4;
@@ -581,13 +601,20 @@ async function boot() {
         // a drip runs off the brush to one side and spreads past the path
         const side = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 1.4);
         const yaw = fox.rotation.y;
-        paint.bloom(fox.position.x + Math.cos(yaw) * side, fox.position.z - Math.sin(yaw) * side, T.dripRadius * (0.7 + Math.random() * 0.5), T.strength * 0.95, T.bloomLife * 1.6);
+        const dx = fox.position.x + Math.cos(yaw) * side;
+        const dz = fox.position.z - Math.sin(yaw) * side;
+        const dr = T.dripRadius * (0.7 + Math.random() * 0.5);
+        paint.bloom(dx, dz, dr, T.strength * 0.95, T.bloomLife * 1.6);
+        sprouts.sprout(dx, dz, dr * 0.7, 5, soilAt, 0.4);
       }
     }
     // standing still: the colour keeps soaking out from under the paws
     idleT = grounded && speed < 0.4 ? idleT + dt : 0;
-    if (idleT > 0.5 && Math.floor((idleT - dt) / 0.7) !== Math.floor(idleT / 0.7))
-      paint.bloom(fox.position.x, fox.position.z, Math.min(PAINT_FEEL.idlePool, 1.2 + idleT * 0.3), T.strength, 2);
+    if (idleT > 0.5 && Math.floor((idleT - dt) / 0.7) !== Math.floor(idleT / 0.7)) {
+      const r = Math.min(PAINT_FEEL.idlePool, 1.2 + idleT * 0.3);
+      paint.bloom(fox.position.x, fox.position.z, r, T.strength, 2);
+      if (r < PAINT_FEEL.idlePool) sprouts.sprout(fox.position.x, fox.position.z, r, 3, soilAt, 0.35);
+    }
     // pawfalls: each planted paw blooms where it lands
     if (grounded)
       for (const paw of foxActor.locomotion?.footfalls ?? [])
@@ -1576,7 +1603,7 @@ async function boot() {
         const wash = e.pos.clone().setY(e.pos.y - 1.4);
         colorField.stroke(wash, wash.clone(), { life: 6, strength: 1.2, radius: shades.tun.drainRadius });
         // the memory it held spills back into the paper for good
-        paint.splash(e.pos.x, e.pos.z, shades.tun.drainRadius * 2.2, 2.6);
+        splash(e.pos.x, e.pos.z, shades.tun.drainRadius * 2.2, 2.6);
         hitstop = 0.08;
         cam.shake(0.12);
         audio.play('bridge');
@@ -1780,6 +1807,7 @@ async function boot() {
     if (quality.shadowEvery > 1) renderer.shadowMap.needsUpdate = drawFrame % quality.shadowEvery === 0;
     drawFrame++;
     paint.render(dt);
+    sprouts.update(dt);
     colorField.renderMask(dt);
     for (const m of world.materials) colorField.syncMaterial(m);
 
@@ -1850,7 +1878,7 @@ async function boot() {
       backend,
       crown: crown.state(),
       reach: reach.state(),
-      paint: { laid: paint.laid, areaM2: paint.paintedArea, local: Number(paintLocal.toFixed(3)), wet: paint.blooms.length, grade: Number(post.params.restore.toFixed(3)) },
+      paint: { laid: paint.laid, sprouts: sprouts.planted, areaM2: paint.paintedArea, local: Number(paintLocal.toFixed(3)), wet: paint.blooms.length, grade: Number(post.params.restore.toFixed(3)) },
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
       chem: { water: water.state(), growth: growth.state().roots, updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [

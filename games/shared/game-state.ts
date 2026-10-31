@@ -28,7 +28,7 @@ export type GameState = {
   chem?: unknown;
   reach?: unknown;
   /** Fox-spirit persistent paint trail: blooms laid, painted ground (m²), painted fraction round the fox. */
-  paint?: { laid: number; areaM2: number; local: number; wet: number; grade: number };
+  paint?: { laid: number; sprouts: number; areaM2: number; local: number; wet: number; grade: number };
   /** Fox-spirit summit extension: shrine seal and permanent return route. */
   crown?: { restored: boolean; seal: number; fed: boolean; bowl: number[]; hearths: string[]; returnWind: string };
 };
