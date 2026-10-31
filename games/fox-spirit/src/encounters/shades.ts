@@ -88,13 +88,10 @@ async function animalGeometry(): Promise<THREE.BufferGeometry> {
   const box = g.boundingBox!;
   const size = box.getSize(new THREE.Vector3());
   const centre = box.getCenter(new THREE.Vector3());
-  const headPoint=gltf.scene.getObjectByName('Head')!.getWorldPosition(new THREE.Vector3());
   g.translate(-centre.x, -box.min.y, -centre.z);
   // An elongated ink memory: a tall narrow animal, still recognisably mid-stride.
   const scale = 3.1 / size.y;
   g.scale(scale * 0.82, scale, scale * 0.82);
-  headPoint.sub(new THREE.Vector3(centre.x,box.min.y,centre.z)).multiply(new THREE.Vector3(scale*.82,scale,scale*.82));
-  g.userData.headPoint=headPoint;
   g.computeVertexNormals();
   g.computeBoundingBox();
   mixer.stopAllAction();
