@@ -1130,6 +1130,8 @@ try {
     const state = await video(name, budgetFrames, async () => {
       if (kilnCompletedAt !== undefined && !kilnStopped) {
         await H('autopilot', false, to, { assist: false });
+        await H('setKeys', []);
+        await H('setStick', null);
         kilnStopped = true;
       }
     }, (st, i) => {
@@ -1138,7 +1140,7 @@ try {
         if (kilnCompletedAt === undefined && st.auto.idx >= to && st.seedwells.some(s => s.id === 'SW1' && s.lit)) kilnCompletedAt = i;
         // Hold the real endpoint under live physics for the remainder of the minute.
         // Stalls remain short failed captures; a stopped successful bot is intentional.
-        return st.deaths > 0 || kilnCompletedAt === undefined && !st.auto.active || kilnCompletedAt !== undefined && i + 1 >= 60 * fps;
+        return st.deaths > 0 || kilnCompletedAt === undefined && !st.auto.active || kilnCompletedAt !== undefined && i + 1 >= budgetFrames;
       }
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
@@ -1149,7 +1151,7 @@ try {
     const kilnLit = state.seedwells.some(s => s.id === 'SW1' && s.lit);
     const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && report.videos[name].frames >= 60 * fps) && !state.auto.assists && !state.deaths;
     const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : state.auto.stalled ? 'stalled' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
-    save('route-acceptance.json', { schemaVersion: 2, passed, reason, from, to, staged: regional, kilnLatchedAt, kilnCompletedAt, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    save('route-acceptance.json', { schemaVersion: 2, passed, reason, from, to, staged: regional, kilnLatchedAt, kilnCompletedAt, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
     if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
