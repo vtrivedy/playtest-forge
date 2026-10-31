@@ -247,8 +247,8 @@ async function boot() {
   colorField.paint = paint;
   const sprouts = createPaintSprouts(scene);
   /** A big wet splash of paint with a ring of new growth in it */
-  const splash = (x: number, z: number, r: number, life?: number) => {
-    paint.splash(x, z, r, life);
+  const splash = (x: number, z: number, r: number) => {
+    paint.splash(x, z, r);
     const g = col.highestAt(x, z);
     sprouts.sprout(x, z, r * 0.9, Math.round(r * 5), (sx, sz) => {
       const h = col.groundAt(sx, sz, g + 1.5);
@@ -434,7 +434,7 @@ async function boot() {
       const byDash = h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
       if (byDash) dashStruck.add(h);
       h.flare = byDash ? 1.6 : 1;
-      splash(h.base.x, h.base.z, byDash ? 6.5 : 5);
+      splash(h.base.x, h.base.z, byDash ? 13 : 11);
       emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: byDash ? 60 : 26, speed: byDash ? [2, 5] : [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: byDash ? 1.4 : 0.8, size: [0.04, 0.1], heat: 0.7 });
       audio.play('checkpoint');
       // the breath lets go: ground leaves round the hearth lift into the column
@@ -455,7 +455,7 @@ async function boot() {
       if (byDash) rootStruck.add(r);
       r.flare = byDash ? 1.6 : 1;
       const k = r.spot.knot;
-      splash(k.x, k.z, byDash ? 5 : 4);
+      splash(k.x, k.z, byDash ? 10 : 9);
       emberMotes.burst(k.clone().setY(k.y + 0.6), { count: byDash ? 40 : 20, speed: [0.8, 2.4], lift: 0.6, buoyancy: 0.5, life: [0.8, 1.6], flash: byDash ? 1.2 : 0.7, size: [0.03, 0.08], heat: 0.6 });
       autumnFX.swirl(k.clone().setY(k.y + 0.2), byDash ? 30 : 18, 1.4);
       audio.play('checkpoint');
@@ -514,7 +514,7 @@ async function boot() {
     const ev = world.latchSeedwell(i);
     if (quiet) colorField.restore(sw.pos, sw.radius, 0.05);
     else {
-      splash(sw.pos.x, sw.pos.z, 7);
+      splash(sw.pos.x, sw.pos.z, 15);
       handleEvents(ev);
     }
     saveLatches();
@@ -587,7 +587,11 @@ async function boot() {
     if (paintDist >= T.ribbonSpacing) {
       paintDist = 0;
       const r = T.ribbonRadius * THREE.MathUtils.lerp(0.85, 1, Math.min(1, speed / 8)) * (dashing ? 1.3 : 1);
-      if (nearK > 0.02) paint.bloom(fox.position.x + (Math.random() - 0.5) * 0.5, fox.position.z + (Math.random() - 0.5) * 0.5, r, T.strength * nearK);
+      // the wash leads the fox a little: colour blooms out under its chest, not only behind it
+      const lead = Math.min(0.9, speed * 0.18);
+      const fx = fox.position.x + Math.sin(fox.rotation.y) * lead;
+      const fz = fox.position.z + Math.cos(fox.rotation.y) * lead;
+      if (nearK > 0.02) paint.bloom(fx + (Math.random() - 0.5) * 0.5, fz + (Math.random() - 0.5) * 0.5, r, T.strength * nearK);
       // life springs up in the fresh wash
       if (nearK > 0.8 && grounded) sprouts.sprout(fox.position.x, fox.position.z, r * 0.85, 2, soilAt);
     }
@@ -595,7 +599,7 @@ async function boot() {
       dripDist = Math.random() * T.dripSpacing * 0.4;
       if (nearK > 0.5) {
         // a drip runs off the brush to one side and spreads past the path
-        const side = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 1.4);
+        const side = (Math.random() < 0.5 ? -1 : 1) * (0.9 + Math.random() * 0.8);
         const yaw = fox.rotation.y;
         const dx = fox.position.x + Math.cos(yaw) * side;
         const dz = fox.position.z - Math.sin(yaw) * side;
@@ -1599,7 +1603,7 @@ async function boot() {
         const wash = e.pos.clone().setY(e.pos.y - 1.4);
         colorField.stroke(wash, wash.clone(), { life: 6, strength: 1.2, radius: shades.tun.drainRadius });
         // the memory it held spills back into the paper for good
-        splash(e.pos.x, e.pos.z, shades.tun.drainRadius * 2.2, 2.6);
+        splash(e.pos.x, e.pos.z, 12);
         hitstop = 0.08;
         cam.shake(0.12);
         audio.play('bridge');
