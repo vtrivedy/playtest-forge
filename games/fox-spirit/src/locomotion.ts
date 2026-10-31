@@ -315,7 +315,8 @@ export class AuthoredLocomotion {
     // Long back line: pull the clip's per-stride pelvis/spine flexion toward its cycle mean.
     const flex=(1-this.params.spineFlex)*Math.min(1,total), mean=q();
     this.flexBones.forEach((bone,i)=>{
-      const sum=new THREE.Vector4();
+      // Vector4 defaults w to1; the quaternion accumulator must start at zero.
+      const sum=new THREE.Vector4(0,0,0,0);
       for(const g of GAIT_NAMES){const w=this.weights.get(g) ?? 0, m=this.parts.get(g)!.flexMean[i];
         const sign=sum.x*m.x+sum.y*m.y+sum.z*m.z+sum.w*m.w<0 ? -1 : 1;
         sum.x+=sign*w*m.x;sum.y+=sign*w*m.y;sum.z+=sign*w*m.z;sum.w+=sign*w*m.w;}

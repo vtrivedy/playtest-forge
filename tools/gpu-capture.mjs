@@ -1,3 +1,4 @@
+import { createShadeLensReview } from './shade-lens-capture.mjs';
 import { captureReportSummary } from './capture-report-summary.mjs';
 import { blackFrameIntervals } from './hub-black-frames.mjs';
 import { captureFinale } from './finale-capture.mjs';
@@ -23,6 +24,8 @@ const backend = arg('backend', 'egl'), quality = arg('quality', 'high'), fps = N
 const [width, height] = arg('size', '1920x1080').split('x').map(Number);
 if (![30, 60].includes(fps) || ![width, height].every(n => Number.isInteger(n) && n > 0)) throw Error('Invalid size/fps');
 if (!['vulkan', 'egl', 'gl', 'swiftshader'].includes(backend)) throw Error('Unknown backend');
+// Compound hip diagnostics deliberately omit the long standard galleries.
+const hipDiagnostic = selected !== 'all' && selected.split(',').length === 2 && selected.split(',').includes('worldgait') && selected.split(',').includes('fox');
 const wants = k => selected === 'all' || selected.split(',').includes(k);
 fs.mkdirSync(out, { recursive: true });
 const save = (name, data) => fs.writeFileSync(path.join(out, name), JSON.stringify(data, null, 2));
@@ -392,95 +395,12 @@ try {
       const points=window.__gameHooks.debug.world.shadeSpots[0].patrol;
       return points.reduce((sum,p)=>[sum[0]+p[0]/points.length,sum[1]+p[2]/points.length],[0,0]);
     });
-    let lens = null;
     const releaseStagingFailures=[];
-    const latestReviewLens=new Map();
-    const camera = async (actorId=actors[0].id) => {
-      const framing=await page.evaluate(({previous,actorId})=>{
-        const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===actorId),fox=h.debug.fox.position;
-        const [x,y,z]=actor.pos,fy=fox.y-(h.debug.foxFeetOffset??.02),V=fox.constructor;
-        const contactOverlap=!!h.state().dash?.collisionActiveLastStep||(actor.freed&&actor.releaseAge<.7);
-        const dx=fox.x-x,dz=fox.z-z,d=Math.hypot(dx,dz)||1,ux=dx/d,uz=dz/d;
-        const look=[x*.35+fox.x*.65,(y+(actor.height||3.1)*.5)*.35+(fy+(h.debug.foxHeight||1.25)*.5)*.65,z*.35+fox.z*.65];
-        const side=Math.atan2(ux,-uz);
-        const angles=[side-.65,side+Math.PI+.65,...[0,1,2,3,4,5,6,7].map(k=>k*Math.PI/4)];
-        const positions=[...(previous?[previous]:[]),...[2.5,4].flatMap(eye=>angles.flatMap(a=>[5.2,6,6.8].map(radius=>[look[0]+Math.cos(a)*radius,Math.max(y,fy)+eye,look[2]+Math.sin(a)*radius])))];
-        const testCamera=h.debug.camera.clone();
-        const point=new V(),right=new V();
-        let fallback=null;
-        for(const pos of positions){
-          let clearance;
-          for(const fov of [42,48,52,56]){
-          testCamera.position.fromArray(pos);testCamera.fov=fov;testCamera.lookAt(new V(...look));testCamera.updateProjectionMatrix();testCamera.updateMatrixWorld(true);
-          right.setFromMatrixColumn(testCamera.matrixWorld,0);
-          const bounds=(px,py,pz,height,width)=>{
-            let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-            for(const side of [-1,1])for(const up of [0,height]){
-              point.set(px,py+up,pz).addScaledVector(right,side*width/2).project(testCamera);
-              minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);minY=Math.min(minY,point.y);maxY=Math.max(maxY,point.y);
-            }
-            return {height:(maxY-minY)/2,inFrame:minX>-.94&&maxX<.94&&minY>-.94&&maxY<.94,bounds:[minX,maxX,minY,maxY]};
-          };
-          const foxBounds=bounds(fox.x,fy,fox.z,h.debug.foxHeight||1.25,2.8),shadeBounds=bounds(x,y,z,actor.height||3.1,2.4);
-          const a=foxBounds.bounds,b=shadeBounds.bounds;
-          const shared=Math.max(0,Math.min(a[1],b[1])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[2],b[2]));
-          const overlap=shared/Math.max(1e-6,Math.min((a[1]-a[0])*(a[3]-a[2]),(b[1]-b[0])*(b[3]-b[2])));
-          const fits=foxBounds.height>.21&&shadeBounds.height>.18&&foxBounds.inFrame&&shadeBounds.inFrame&&(contactOverlap||overlap<.3);
-          if(!fits)continue;
-          clearance??=!!h.photoBlocker&&[
-            [x,y+1.3,z],
-            [x+right.x*.5,y+1.3,z+right.z*.5],
-            [x-right.x*.5,y+1.3,z-right.z*.5],
-            [x+Math.sin(actor.heading??0)*.6,y+2.4,z+Math.cos(actor.heading??0)*.6],
-            [fox.x,fy+.6,fox.z],
-            [fox.x+Math.sin(h.debug.fox.rotation.y)*.6,fy+.9,fox.z+Math.cos(h.debug.fox.rotation.y)*.6],
-          ].every(target=>!h.photoBlocker(pos,target));
-          const clear=clearance;
-          const result={pos,look,fov,clear,noFit:false,overlap,contactOverlap,fox:foxBounds,shade:shadeBounds};
-          fallback??=result;
-          if(clear)return result;
-          }
-        }
-        return fallback||{pos:positions[1]||positions[0],look,fov:56,clear:false,noFit:true};
-      },{previous:lens,actorId});
-      latestReviewLens.set(actorId,{clear:framing.clear,noFit:framing.noFit,overlap:framing.overlap??null,contactOverlap:framing.contactOverlap??false});
-      lens=framing.pos;
-      report.shadeReviewQuality??={};
-      const counts=report.shadeReviewQuality[actorId]??={noFit:0,occluded:0};
-      if(framing.noFit)counts.noFit++;else if(!framing.clear)counts.occluded++;
-      await H('photo',framing.pos,framing.look,framing.fov);
-    };
-    const measurePair=async actorId=>page.evaluate(id=>{
-      const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id),V=h.debug.fox.position.constructor;
-      const point=new V();
-      const bounds=(root,skinnedOnly)=>{
-        if(!root)return null;
-        root.updateWorldMatrix(true,true);
-        let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,minZ=Infinity,maxZ=-Infinity,vertices=0;
-        root.traverse(mesh=>{
-          if(!mesh.isMesh||(skinnedOnly&&!mesh.isSkinnedMesh))return;
-          let ancestor=mesh;while(ancestor){if(!ancestor.visible)return;ancestor=ancestor.parent;}
-          const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
-          if(materials.every(m=>!m.visible||m.opacity===0))return;
-          if(skinnedOnly&&/spirit[_-]?fx|wisps?|ember[_-]?wisp|smoulder|flame|spark|lick/i.test(mesh.name+' '+materials.map(m=>m.name).join(' ')))return;
-          if(mesh.isSkinnedMesh)mesh.skeleton.update();
-          for(let k=0;k<mesh.geometry.attributes.position.count;k++){
-            mesh.getVertexPosition(k,point).applyMatrix4(mesh.matrixWorld).project(h.debug.camera);
-            minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);minY=Math.min(minY,point.y);maxY=Math.max(maxY,point.y);minZ=Math.min(minZ,point.z);maxZ=Math.max(maxZ,point.z);vertices++;
-          }
-        });
-        return vertices?{heightFraction:(maxY-minY)/2,inFrame:minX>=-1&&maxX<=1&&minY>=-1&&maxY<=1&&minZ>=-1&&maxZ<=1,vertices,bounds:[minX,maxX,minY,maxY]}:null;
-      };
-      const core=h.debug.scene.getObjectByName(id)?.getObjectByName('shade-density-core');
-      return {actorId:id,freed:actor.freed,method:'posed mesh vertices, shader displacement/alpha excluded',fox:bounds(h.debug.fox,true),shade:bounds(core,false),shadePresent:!actor.freed||actor.presence>.5,presence:actor.presence};
-    },actorId);
-    const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,afterStep:()=>camera(id),sample:async frame=>({
-      ...(keyFrames.includes(frame)?await measurePair(id):{actorId:id,lensOnly:true}),
-      lens:latestReviewLens.get(id)??{clear:false,noFit:true},
-    }),label:(frame,state)=>{
-      const p=state?.capture;
-      return `${id} f${frame} p${p?.presence??'?'} fox ${p?.fox?(p.fox.heightFraction*100).toFixed(0):'?'}% shade ${p?.shade?(p.shade.heightFraction*100).toFixed(0):'?'}%`;
-    }});
+    const lensReview=await createShadeLensReview({repo,getPage:()=>page,H,report,save});
+    const camera=(id=actors[0].id,held=null)=>lensReview.camera(id,held);
+    const measurePair=lensReview.measure;
+    const pairOptions=lensReview.options;
+    save('shade-ink-profiles.json',await page.evaluate(()=>window.__gameHooks.shades.state().actors.map(a=>({id:a.id,ink:window.__gameHooks.debug.scene.getObjectByName(a.id)?.userData.shadeInk}))));
     const validateRunout=async(name,setup,maxDrop=.25)=>{
       const take=report.videos[name],rows=take.trace.map(row=>row.state);
       let airborne=0,longestAirborne=0,maxLateral=0;
@@ -504,7 +424,7 @@ try {
       for(const reason of reasons){const failure=`${name} staging: ${reason}`;releaseStagingFailures.push(failure);report.failures.push(failure);}
       return result;
     };
-    const stageSupportedKilnDash=async(label,startDistance=2.7)=>{
+    const stageSupportedKilnDash=async(label,startDistance=2.7,requireHeld=true)=>{
       const trace=[];
       let movedFoxAway=false;
       try {
@@ -519,12 +439,17 @@ try {
               const px=x+dx*r-dz*width,pz=z+dz*r+dx*width,floor=col.groundAt(px,pz,y+.1).y;
               if(!Number.isFinite(floor)||col.blocked(px,pz,y)||Math.abs(floor-y)>.2){safe=false;break;}
             }
-            if(safe)return {actor:actor.pos,mode:actor.mode,setup:{pos:[x+dx*startDistance,y,z+dz*startDistance],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)}};
+            if(safe)return {actor:actor.pos,mode:actor.mode,setup:{pos:[x+dx*startDistance,y,z+dz*startDistance],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz),startDistance}};
           }
           return {actor:actor.pos,mode:actor.mode,setup:null};
         },{id:actors[0].id,startDistance});
         trace.push({waitFrames,...sample});
         if(sample.failure)throw Error(sample.failure);
+        if(sample.setup&&requireHeld){
+          const plan=await lensReview.plan(actors[0].id,sample.setup);
+          trace[trace.length-1].heldPlan=plan;
+          if(plan.lens)sample.setup.heldLens=plan.lens;else sample.setup=null;
+        }
         if(sample.setup){
           save(`${label}-runway-wait.json`,{passed:true,label:'Staged fox moved to world spawn only if needed; live animal returns/patrols until full supported runway exists',movedFoxAway,waitFrames,trace});
           return sample.setup;
@@ -710,7 +635,7 @@ try {
     await advance(30);
     await shot('shade-post-observer');
     // A separate fresh session preserves the actual sepia-to-local-color release moment.
-    await boot(quality,true);lens=null;
+    await boot(quality,true);lensReview.reset();
     save('shade-release-session-start.json',{label:'Fresh sepia session after behavior review; the next two dash releases share this session, with staged fox starts only',state:await H('state'),game:await page.evaluate(()=>window.__game)});
     await H('setKeys', []);
     let p = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
@@ -729,7 +654,7 @@ try {
     }, p);
     save('shade-contact-setup.json', contactSetup);
     await H('teleport', ...contactSetup.pos, Math.atan2(-contactSetup.direction[0],-contactSetup.direction[1]));
-    lens=null;
+    lensReview.reset();
     await camera();
     let contactFrame=null;
     await H('setStick', -contactSetup.direction[0], -contactSetup.direction[1]);
@@ -755,12 +680,19 @@ try {
     const dashControllerBefore=await H('state');
     await H('setStick', ...dashSetup.direction);
     await H('setKeys', ['ShiftLeft']);
-    lens=null;
-    await camera();
+    lensReview.reset();
+    await camera(actors[0].id,dashSetup.heldLens);
+    await shot('shade-held-before');
+    save('shade-held-before.json',{matrixHash:await lensReview.matrix(),framing:await measurePair(actors[0].id),setup:dashSetup});
     const releaseKeyFrames=[...Array.from({length:30},(_,i)=>i*6),179];
     const dashControllerAfter=await video('shade-free', 180, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
-    }, undefined, pairOptions('Release',actors[0].id,releaseKeyFrames));
+    }, undefined, pairOptions('Release',actors[0].id,releaseKeyFrames,dashSetup.heldLens));
+    await shot('shade-held-after');
+    save('shade-held-after.json',{matrixHash:await lensReview.matrix(),framing:await measurePair(actors[0].id)});
+    const heldHashes=new Set(report.videos['shade-free'].trace.map(r=>r.state.capture?.lens?.matrixHash));
+    save('shade-held-continuity.json',{passed:heldHashes.size===1,frames:report.videos['shade-free'].trace.length,matrixHashes:[...heldHashes],label:'One unchanged camera for all180 release frames'});
+    if(heldHashes.size!==1)report.failures.push('Primary release camera moved during held180-frame take');
     const releaseFramingPassed=validatePair('shade-free');
     await validateRunout('shade-free',dashSetup);
     save('shade-dash-controller.json',{before:dashControllerBefore.dash,after:dashControllerAfter.dash,label:'Actual controller activation; collisionActiveLastStep is the preceding simulated movement tick'});
@@ -858,7 +790,7 @@ try {
       await H('teleport',...setup.pos,setup.yaw);
       const edgeControllerBefore=await H('state');
       await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
-      lens=null;
+      lensReview.reset();
       const edgeControllerAfter=await video('shade-clear-free',180,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,pairOptions('Hill release','shade-hill-high',releaseKeyFrames));
       const edgeFramingPassed=validatePair('shade-clear-free');
       await validateRunout('shade-clear-free',setup,null);
@@ -878,7 +810,7 @@ try {
     }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
-    const live = await stageSupportedKilnDash('shade-play',2.6);
+    const live = await stageSupportedKilnDash('shade-play',2.6,false);
     await H('teleport', ...live.pos, live.yaw);
     await H('advance', 1, 0, true);
     await page.keyboard.down('w');
@@ -916,7 +848,7 @@ try {
       },id);
       save(`${id}-observer-setup.json`,setup);
       if(setup.failure){report.failures.push(setup.failure);continue;}
-      await H('teleport',...setup.pos,setup.yaw);lens=null;
+      await H('teleport',...setup.pos,setup.yaw);lensReview.reset();
       await camera(id);
       await video(id,frames,async()=>{},undefined,pairOptions('Regional',id,keyFrames));
       const framingPassed=validatePair(id);
@@ -1079,7 +1011,7 @@ try {
     if(!landingTakes.every(landingPass))throw Error('Landing A/B must land with four compression contacts and submillimeter compression residual; visual review still required');
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
-  if (wants('worldgait')) {
+  if (wants('worldgait') && !hipDiagnostic) {
     if(fps!==60)throw Error('World gait comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
@@ -2162,7 +2094,20 @@ try {
       if(d<.55 && q.pos[1]>=p[1]-.5 && q.grounded && walkIdx<walk.length-1) {walkIdx++; walkAge=0; console.log('CROWN WALK',walkIdx,JSON.stringify(q.pos));}
       const target=walk[walkIdx], vx=target[0]-q.pos[0], vz=target[2]-q.pos[2], len=Math.hypot(vx,vz);
       await H('setKeys',[]); await H('setStick',len>.2?vx/len*Math.min(.65,len):0,len>.2?vz/len*Math.min(.65,len):0);
-    }, q => q.deaths>0 || walkAge>9 || walkIdx===walk.length-1 && q.grounded && Math.hypot(q.pos[0]+12,q.pos[2]+93)<.7, {keyFrames:[0,5*fps,10*fps,15*fps]});
+    }, q => q.deaths>0 || walkAge>9 || walkIdx===walk.length-1 && q.grounded && Math.hypot(q.pos[0]+12,q.pos[2]+93)<.7, { traceEveryFrame: true, keyFrames: [0,5*fps,10*fps,15*fps, ...[744,745,746].map(frame => Math.round(frame / 30 * fps))],
+      sample: async frame => {
+        if (frame < Math.floor(24.5 * fps) || frame > Math.ceil(25.1 * fps)) return {};
+        const rendererState = await page.evaluate(() => {
+          const r = window.__gameHooks.debug.renderer, target = r.getRenderTarget();
+          // Minimal Vector4-compatible output avoids importing or modifying the renderer.
+          const read = method => { const v = { x:0,y:0,z:0,w:0,copy(o){this.x=o.x;this.y=o.y;this.z=o.z;this.w=o.w;return this;} }; r[method](v); return [v.x,v.y,v.z,v.w]; };
+          return { target: target ? {width:target.width,height:target.height} : null,
+            viewport: read('getViewport'), scissor: read('getScissor'), scissorTest:r.getScissorTest(),
+            glError:r.getContext().getError(), contextLost:r.getContext().isContextLost() };
+        });
+        if (rendererState.glError || rendererState.contextLost) report.failures.push(`Crown renderer error frame${frame}: ${JSON.stringify(rendererState)}`);
+        return { rendererState };
+      } });
     await H('setStick',null); await advance(30); await shot('crown-walk-end');
     const walkEnd=await H('state'); save('crown-walk-acceptance.json',{walkIdx,of:walk.length,grounded:walkEnd.grounded,deaths:walkEnd.deaths,end:walkEnd.pos});
     if(walkIdx!==walk.length-1 || walkEnd.deaths) report.failures.push('Crown permanent walking fallback incomplete');
@@ -2434,7 +2379,7 @@ try {
     });
     await shot('orbit-end');
   }
-  if (wants('fox')) {
+  if (wants('fox') && !hipDiagnostic) {
     // Character review: staged stills around the fox (concept turnaround angles + face), then the real chase cam.
     for (const state of ['sepia', 'restored']) {
       await boot(quality, true);
@@ -2477,6 +2422,11 @@ try {
       });
       await H('setKeys', []); await H('photoOff');
     }
+  }
+  if(hipDiagnostic) {
+    const {captureHipWeightAB}=await import(pathToFileURL(path.resolve(repo,'tools/hip-weight-capture.mjs')).href);
+    report.captureHelperSha['hip-weight-capture.mjs']=createHash('sha256').update(fs.readFileSync(path.join(repo,'tools/hip-weight-capture.mjs'))).digest('hex');
+    await captureHipWeightAB({repo,H,boot,video,save,getPage:()=>page,fps,quality,out});
   }
   if (wants('turntable')) {
     // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).

@@ -19,6 +19,7 @@ const fader = createOcclusionFader(scene, { solidAt: () => -Infinity, exclude: h
 for (const material of [shell, smoke]) {
   assert.equal(material.uniforms.uCameraHero, core.uniforms.uCameraHero, 'all tagged shells/points share final-camera focus');
   assert.equal(material.uniforms.uCameraHeroRadius, core.uniforms.uCameraHeroRadius);
+  assert.equal(material.uniforms.uCameraHeroHead, core.uniforms.uCameraHeroHead);
 }
 assert.notEqual(untouched.uniforms.uCameraHero, core.uniforms.uCameraHero, 'untagged volume remains untouched');
 assert.notEqual(excluded.uniforms.uCameraHero, core.uniforms.uCameraHero, 'hero subtree remains excluded');
@@ -30,13 +31,13 @@ const canvasSize = { width: 1280, height: 720 };
 const dimensions = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(canvasSize.width, canvasSize.height),
   domElement: canvasSize, getRenderTarget: () => target,
   getCurrentViewport: (out: THREE.Vector4) => out.copy(viewport) } as unknown as THREE.WebGLRenderer;
-fader.update(1 / 60, camera, dimensions, new THREE.Vector3(), 1.25, Math.PI);
+fader.update(1 / 60, camera, dimensions, new THREE.Vector3(), 1.25, Math.PI, new THREE.Vector3(0, 1, -.75));
 const focus = core.uniforms.uCameraHero!.value as THREE.Vector4, radius = core.uniforms.uCameraHeroRadius!.value as THREE.Vector2;
 assert.ok(focus.x > 0 && focus.x < 1280 && focus.y > 0 && focus.y < 720 && focus.z > 0);
 assert.ok(radius.x > 0 && radius.y > 0);
 const previous = focus.clone();
 camera.position.set(6, 1.3, 0); camera.lookAt(0, .8, 0);
-fader.update(1 / 60, camera, dimensions, new THREE.Vector3(), 1.25, Math.PI);
+fader.update(1 / 60, camera, dimensions, new THREE.Vector3(), 1.25, Math.PI, new THREE.Vector3(0, 1, -.75));
 assert.ok(focus.clone().sub(previous).length() > .1, 'soft uniforms track the final photo camera');
 assert.equal(fader.strength, 0, 'custom volume transparency does not activate world dither');
 const drawCore = (view: THREE.Camera) => coreMesh.onBeforeRender(dimensions, scene, view, geo, core, null as never);
@@ -58,7 +59,7 @@ assert.equal(fader.softBindings().cameraReady, true);
 assert.equal(fader.softBindings().meshes, 2); assert.equal(fader.softBindings().aoExcluded, 1, 'runtime count exposes a missing AO exclusion');
 canvasSize.width = 1707; canvasSize.height = 960;
 target = { width: 1707.5, height: 960 }; viewport.set(0, 0, 1707.5, 960);
-fader.update(1 / 60, camera, dimensions, new THREE.Vector3(), 1.25, Math.PI);
+fader.update(1 / 60, camera, dimensions, new THREE.Vector3(), 1.25, Math.PI, new THREE.Vector3(0, 1, -.75));
 drawCore(camera);
 assert.equal(core.uniforms.uCameraHeroEnabled!.value, 1, 'fractional composer size matches floored native pixels');
 target.width = 1706.5; drawCore(camera);

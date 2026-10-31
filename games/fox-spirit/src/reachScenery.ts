@@ -126,6 +126,52 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
 
 /** Local basin surface: quiet teal depth with restrained moving reflection, no pale foam disc. */
 export function createReachWater(group: THREE.Group) {
+  // Receiving marsh below the safe cistern floor. Unlike the puzzle surface,
+  // this has no fill state or collider; distant water dissolves into scene fog.
+  const marshTime={value:0};
+  const marshMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
+    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),uTime:marshTime,
+      uDeep:{value:new THREE.Color(0x354a50)},uReflection:{value:new THREE.Color(0x829a9c)}},
+    vertexShader:`#include <fog_pars_vertex>
+      varying vec3 vMarshWorld; varying vec2 vMarshLocal;
+      void main(){vMarshLocal=position.xz;
+        vec4 w=modelMatrix*vec4(position,1.);vMarshWorld=w.xyz;
+        vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader:`#include <fog_pars_fragment>
+      uniform float uTime;uniform vec3 uDeep,uReflection;
+      varying vec3 vMarshWorld;varying vec2 vMarshLocal;
+      void main(){
+        float boundary=sin(vMarshLocal.y*.035)*3.+sin(vMarshLocal.y*.091)*1.2;
+        float edge=smoothstep(156.,170.,vMarshLocal.x+boundary)
+          *(1.-smoothstep(-96.,-78.,vMarshLocal.y));
+        // The distant sheet belongs to Reach's view, including its transition.
+        // cameraPosition is world space; the geometry boundary above is local.
+        edge*=smoothstep(66.,80.,cameraPosition.x)
+          *(1.-smoothstep(-94.,-78.,cameraPosition.z));
+        float distanceToEye=distance(cameraPosition,vMarshWorld);
+        edge*=1.-smoothstep(450.,720.,distanceToEye);
+        if(edge<.002)discard;
+        float a=dot(vMarshWorld.xz,vec2(.19,.27))-uTime*.12;
+        float b=dot(vMarshWorld.xz,vec2(-.41,.14))+uTime*.09;
+        float detail=1.-smoothstep(80.,240.,distanceToEye);
+        vec3 normal=normalize(vec3(cos(a)*.018*detail,1.,sin(b)*.014*detail));
+        vec3 eye=normalize(cameraPosition-vMarshWorld);
+        float fres=pow(1.-max(0.,dot(eye,normal)),3.);
+        float bands=smoothstep(.35,.85,sin(a*.35+sin(b*.24)))*.025;
+        vec3 color=mix(uDeep,uReflection,.12+fres*.5+bands*detail);
+        gl_FragColor=vec4(color,edge);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        #include <fog_fragment>
+      }`});
+  // Bake plane orientation/translation so the vertex x is in Reach-local metres.
+  // 1600m extent surrounds the explicit 720m view fade, beyond the cistern.
+  const marshGeo=new THREE.PlaneGeometry(1600,1600);
+  marshGeo.rotateX(-Math.PI/2);marshGeo.translate(850,24,-118);
+  const marsh=new THREE.Mesh(marshGeo,marshMat);marsh.name='reach-distant-marsh';
+  marsh.renderOrder=-2;group.add(marsh);
   const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
     uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),...{uTime:{value:0},uDeep:{value:new THREE.Color(0x1d3635)},uSky:{value:new THREE.Color(0x7f9690)}}},
     vertexShader:`#include <fog_pars_vertex>
@@ -209,5 +255,5 @@ export function createReachWater(group: THREE.Group) {
     const geo=new THREE.RingGeometry(.97,1,32,1,.15*Math.PI,.6*Math.PI);geo.scale(rx,rz,1);
     const wake=new THREE.Mesh(geo,wakeMat);wake.rotation.x=-Math.PI/2;wake.position.set(x,30,z);wake.renderOrder=1;group.add(wake);wakes.push(wake);
   }
-  return {mesh,update(time:number,fill:number,rise=6,fillRate=0){mat.uniforms.uTime!.value=time;mesh.position.y=29.8+rise*fill;curtain.visible=mesh.position.y>30.06;curtainMat.uniforms.uHeight!.value=Math.max(.001,mesh.position.y-30.02);curtain.scale.y=Math.max(.001,mesh.position.y-30.02);wakeMat.opacity=.025+Math.min(.08,Math.abs(fillRate)*.16);for(const [i,w] of wakes.entries()){w.position.y=mesh.position.y+.025;w.scale.setScalar(1+Math.sin(time*.8+i)*.025);w.visible=fill>.035;}}};
+  return {mesh,update(time:number,fill:number,rise=6,fillRate=0){marshTime.value=time;mat.uniforms.uTime!.value=time;mesh.position.y=29.8+rise*fill;curtain.visible=mesh.position.y>30.06;curtainMat.uniforms.uHeight!.value=Math.max(.001,mesh.position.y-30.02);curtain.scale.y=Math.max(.001,mesh.position.y-30.02);wakeMat.opacity=.025+Math.min(.08,Math.abs(fillRate)*.16);for(const [i,w] of wakes.entries()){w.position.y=mesh.position.y+.025;w.scale.setScalar(1+Math.sin(time*.8+i)*.025);w.visible=fill>.035;}}};
 }

@@ -1,4 +1,4 @@
-import { createLanternhollow, hubPathDistance, hubClearance, hubHearthClearance, HUB_HOUSES } from './regionLanternhollow';
+import { createLanternhollow, hubPathDistance, hubPlazaWeight, HUB_PLAZA_LIFT, hubClearance, hubHearthClearance, HUB_HOUSES } from './regionLanternhollow';
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { routeRemnant } from './routeRemnants';
@@ -605,9 +605,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const pathK = smooth01(2.6, 0.9, pd);
         c.lerp(PAL.pathEarth, pathK * 0.85);
         // Hub trails need a value cue even while all world colour is pressed.
-        const hubWear = smooth01(2.1, .7, hubPathDistance(x, z)) * smooth01(72, 80, z);
+        const plaza = hubPlazaWeight(x, z);
+        const hubWear = smooth01(2.1, .7, hubPathDistance(x, z)) * smooth01(72, 80, z) * (1 - plaza);
         c.lerp(PAL.soilUmber, hubWear * .65);
         c.multiplyScalar(1 - hubWear * .2);
+        // A flat, soft-edged packed-earth square; no grade or restoration exemption.
+        if (plaza > 0) c.multiplyScalar(1 + HUB_PLAZA_LIFT * plaza);
         leafy = THREE.MathUtils.lerp(leafy, 0.06, pathK * 0.9) + smooth01(1.6, 3.2, pd) * smooth01(4.5, 3.0, pd) * 0.35; // leaves banked at the verge
         // damp dark banks at the pond and marsh
         const bank = Math.max(smooth01(1.25, 0.85, me), smooth01(1.5, 0.95, pe));
@@ -986,7 +989,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   group.add(ink);
   let inkActive = true;
   // Restoring Reed clears the ink into ankle-deep water, with the same safe floor.
-  const reedWater = createStylizedWater(scene, { size: 60, y: MARSH.floor + 0.18, colorDeep: 0x247b74, colorShallow: 0x668779, reflection: true, reflectionDistance: 70, depthTint: 0.22 });
+  const reedWater = createStylizedWater(scene, { size: 60, y: MARSH.floor + 0.18, colorDeep: 0x247b74, colorShallow: 0x668779, reflection: true, reflectionDistance: 70, depthTint: 0.22, shoreRadius: 0.94 });
   reedWater.mesh.position.set(MARSH.x, MARSH.floor + 0.18, MARSH.z);
   reedWater.mesh.scale.set(MARSH.rx / 30, MARSH.rz / 30, 1);
   reedWater.mesh.visible = false;
@@ -1125,6 +1128,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const d = Math.sqrt(rr()) * spread;
         const px = x + Math.cos(a) * d;
         const pz = z + Math.sin(a) * d;
+        // The drained water sits below the old ink level. Extend roots into
+        // the bed while retaining original tips/heads and random placement.
+        const rootY = e < 0.85 ? Math.min(base, groundRaw(px, pz) - 0.08) : base;
         const cattail = rr() < 0.18;
         const h = (cattail ? 1.9 : 1.1) + rr() * 1.4;
         const bendA = a + (rr() - 0.5) * 1.2;
@@ -1145,7 +1151,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
           const off = bend * t * t * h;
           const cx = px + Math.cos(bendA) * off;
           const cz = pz + Math.sin(bendA) * off;
-          const cy = base + h * t - off * 0.35;
+          const cy = base + h * t - off * 0.35 + (rootY - base) * (1 - t) ** 2;
           const tw = 1 - t * 0.92;
           const L = new THREE.Vector3(cx - wx * tw, cy, cz - wz * tw);
           const R = new THREE.Vector3(cx + wx * tw, cy, cz + wz * tw);

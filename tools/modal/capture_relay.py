@@ -173,11 +173,17 @@ def main():
         if (folder/'modal.log').exists():
             republish_safe(stream,folder,{'status':'interrupted','reason':'Prior client interrupted; recover printed durable run ID instead of duplicating GPU work'})
             return
+        if len(pending)>=args.workers:return
         folder.mkdir(parents=True,exist_ok=True);active.add(folder);(folder/'queued.json').write_text(json.dumps(request,indent=2))
         print(f'queued {stream} {key}',flush=True)
         pending[pool.submit(process,stream,request,folder)]=folder
     signal.signal(signal.SIGTERM,request_stop);signal.signal(signal.SIGINT,request_stop)
     while time.time()<DEADLINE and not STOP_REQUESTED:
+        for task,folder in list(pending.items()):
+            if task.done():
+                try:task.result()
+                except Exception as exc:print(f'relay worker: {exc}',flush=True)
+                active.discard(folder);del pending[task]
         roster=args.out/'streams.txt'
         names=roster.read_text().replace(',',' ').split() if roster.exists() else args.streams.split(',')
         for stream in names:

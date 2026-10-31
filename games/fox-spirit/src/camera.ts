@@ -101,8 +101,9 @@ export type FollowCamera = {
    */
   getYaw: () => number;
   resize: (w: number, h: number) => void;
-  debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string; blocked: () => boolean;
-    viewBlocked: (focus: THREE.Vector3, lens: THREE.Vector3) => boolean };
+  /** Exact world sight segment, excluding supporting floor; preserves boom state. */
+  sightBlocked: (lens: THREE.Vector3, target: THREE.Vector3, feetY: number) => boolean;
+  debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string; blocked: () => boolean };
 };
 
 const TAU = Math.PI * 2;
@@ -182,11 +183,6 @@ export function createFollowCamera(opts: {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
     blocked: () => terrainFade || relocatedSightBlocked || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
-    viewBlocked(focus: THREE.Vector3, lens: THREE.Vector3) {
-      const name = sceneryName;
-      try { return sceneryFraction(focus, lens) < .999; }
-      finally { sceneryName = name; }
-    },
     internals: () =>
       `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} floorLift=${floorLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} lensUnresolved=${lensUnresolved} blocker=${sceneryName}`,
   };
@@ -419,6 +415,70 @@ export function createFollowCamera(opts: {
     return Number.isFinite(best);
   }
 
+  function traceScenery(nearest: number, accept?: (hit: THREE.Intersection) => boolean) {
+    for (const { source: mesh, probe } of scenery) {
+      if (!mesh.visible) continue;
+      // Parent visibility matters (e.g. a restored bridge replaces its dormant scenery).
+      let parent = mesh.parent;
+      while (parent && parent.visible) parent = parent.parent;
+      if (parent) continue;
+      sightHits.length = 0;
+      // Live props retain transforms, instance buffers and morph state. A
+      // synchronous query-only material swap is restored before any render.
+      if (probe !== mesh) probe.matrixWorld.copy(mesh.matrixWorld);
+      const renderMaterial = probe.material;
+      try {
+        if (Array.isArray(renderMaterial)) {
+          let queryArray = queryArrays.get(renderMaterial);
+          if (!queryArray || queryArray.length !== renderMaterial.length) {
+            queryArray = renderMaterial.map(() => queryMaterial);
+            queryArrays.set(renderMaterial, queryArray);
+          }
+          probe.material = queryArray;
+        } else probe.material = queryMaterial;
+        probe.raycast(sight, sightHits);
+      } finally {
+        probe.material = renderMaterial;
+      }
+      for (const hit of sightHits) {
+        if (hit.distance < nearest && (!accept || accept(hit))) {
+          nearest = hit.distance;
+          sceneryName = mesh.name || (Array.isArray(mesh.material) ? mesh.material[0]?.name : mesh.material.name) || 'world';
+          sight.far = nearest;
+        }
+      }
+    }
+    return nearest;
+  }
+  const sightNormal = new THREE.Vector3();
+  const sightNormalMatrix = new THREE.Matrix3();
+  const sightInstance = new THREE.Matrix4();
+  const sightWorld = new THREE.Matrix4();
+  function sightBlocked(lens: THREE.Vector3, target: THREE.Vector3, feetY: number) {
+    sightDir.subVectors(target, lens);
+    const length = sightDir.length(), far = length - .03;
+    if (far <= camera.near + .05) return false;
+    const name = sceneryName;
+    try {
+      sightDir.divideScalar(length);
+      sight.set(lens, sightDir); sight.near = camera.near + .05; sight.far = far;
+      return traceScenery(far, hit => {
+        if (hit.point.y <= feetY + .02) return false;
+        if (hit.face && hit.point.y < feetY + .65) {
+          sightWorld.copy(hit.object.matrixWorld);
+          if (hit.instanceId !== undefined && (hit.object as THREE.InstancedMesh).isInstancedMesh) {
+            (hit.object as THREE.InstancedMesh).getMatrixAt(hit.instanceId, sightInstance);
+            sightWorld.multiply(sightInstance);
+          }
+          sightNormalMatrix.getNormalMatrix(sightWorld);
+          sightNormal.copy(hit.face.normal).applyNormalMatrix(sightNormalMatrix);
+          if (sightNormal.y >= .8 && hit.point.y <= feetY + .45) return false;
+        }
+        return true;
+      }) < far;
+    } finally { sceneryName = name; }
+  }
+
   /** A narrow three-ray boom catches posts at the edge of the lens as well as its centre. */
   function sceneryFraction(focus: THREE.Vector3, lens: THREE.Vector3) {
     sightDir.subVectors(lens, focus);
@@ -435,38 +495,7 @@ export function createFollowCamera(opts: {
       sightOrigin.copy(focus).addScaledVector(sightSide, side);
       sight.set(sightOrigin, sightDir);
       sight.far = nearest;
-      for (const { source: mesh, probe } of scenery) {
-        if (!mesh.visible) continue;
-        // Parent visibility matters (e.g. a restored bridge replaces its dormant scenery).
-        let parent = mesh.parent;
-        while (parent && parent.visible) parent = parent.parent;
-        if (parent) continue;
-        sightHits.length = 0;
-        // Live props retain transforms, instance buffers and morph state. A
-        // synchronous query-only material swap is restored before any render.
-        if (probe !== mesh) probe.matrixWorld.copy(mesh.matrixWorld);
-        const renderMaterial = probe.material;
-        try {
-          if (Array.isArray(renderMaterial)) {
-            let queryArray = queryArrays.get(renderMaterial);
-            if (!queryArray || queryArray.length !== renderMaterial.length) {
-              queryArray = renderMaterial.map(() => queryMaterial);
-              queryArrays.set(renderMaterial, queryArray);
-            }
-            probe.material = queryArray;
-          } else probe.material = queryMaterial;
-          probe.raycast(sight, sightHits);
-        } finally {
-          probe.material = renderMaterial;
-        }
-        for (const hit of sightHits) {
-          if (hit.distance < nearest) {
-            nearest = hit.distance;
-            sceneryName = mesh.name || (Array.isArray(mesh.material) ? mesh.material[0]?.name : mesh.material.name) || 'world';
-            sight.far = nearest;
-          }
-        }
-      }
+      nearest = traceScenery(nearest);
     }
     // Begin contracting before a wall reaches the near plane. This reserve lets the
     // damping absorb thin posts instead of changing the lens position at contact.
@@ -530,6 +559,7 @@ export function createFollowCamera(opts: {
 
   return {
     camera,
+    sightBlocked,
     params,
     setPullBack(amount, durationS = 1.8) {
       pullGoal = Number.isFinite(amount) ? Math.max(0, amount) : 0;
