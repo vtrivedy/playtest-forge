@@ -77,22 +77,20 @@ function patchFur(mat: THREE.MeshStandardMaterial, fringeLength = 0, fringeAlpha
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
 varying vec3 vRest;
-${fringeLength ? `uniform float uFringe;
-${NOISE_GLSL}` : ''}`)
+${fringeLength ? `uniform float uFringe; attribute float aFurMask; varying float vFurMask;` : ''}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vRest = position;
 ${fringeLength ? `
   // Offset in bind space before skinning, so fringe follows the exact authored pose.
-  float furMask = smoothstep(0.30, 0.85, position.y) * (1.0 - smoothstep(1.35, 1.9, position.z));
-  furMask *= 1.0 - smoothstep(2.9, 3.4, position.y) * 0.65;
-  float furClump = 0.45 + 0.55 * fxNoise(position * vec3(7.0, 9.0, 3.0));
-  transformed += normalize(normal + vec3(0.0, -0.2, -0.2)) * ${fringeLength.toFixed(3)} * uFringe * furMask * furClump;
+  vFurMask = aFurMask;
+  transformed += normalize(normal + vec3(0.0, -0.2, -0.2)) * ${fringeLength.toFixed(3)} * uFringe * aFurMask;
 ` : ''}`);
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
 varying vec3 vRest;
+${fringeLength ? 'uniform float uFringe; varying float vFurMask;' : ''}
 uniform vec3 uTint; uniform vec2 uSatVal; uniform vec2 uStroke; uniform vec4 uRim; uniform vec3 uRimColor;
 ${NOISE_GLSL}`,
       )
@@ -118,20 +116,20 @@ ${NOISE_GLSL}`,
       .replace(
         '#include <opaque_fragment>',
         `{
-  float facing = saturate(dot(normal, normalize(vViewPosition)));
-  ${shell ? `diffuseColor.a *= (1.0 - smoothstep(0.12, 0.7, facing)) * ${tail ? "0.075" : fringeAlpha.toFixed(3)}; if (diffuseColor.a < 0.01) discard;` : ""}
-  ${fringeLength ? `diffuseColor.a *= 0.35 + 0.65 * fxNoise(vRest * vec3(35.0, 20.0, 3.0));` : ''}
+  float facing = saturate(dot(${fringeLength ? 'normalize(vNormal)' : 'normal'}, normalize(vViewPosition)));
+  ${shell ? `diffuseColor.a *= (1.0 - smoothstep(0.05, 0.45, facing)) * ${tail ? "0.075" : fringeAlpha.toFixed(3)}; if (diffuseColor.a < 0.01) discard;` : ""}
+  ${fringeLength ? `float tuft = fxNoise(vRest * vec3(10.0, 10.0, 3.0)); diffuseColor.a *= smoothstep(${fringeLength > 0.04 ? "0.4, 0.8" : "0.1, 0.5"}, tuft) * vFurMask * uFringe; if (diffuseColor.a < 0.001) discard;` : ''}
   float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
-  outgoingLight += uRimColor * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
+  outgoingLight += uRimColor * ${fringeLength ? "0.0" : "1.0"} * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
   ${tail ? `
   #ifdef USE_MAP
     // Authored tail UV: V=1 at the root, V=0 at tail_08.
     float tailAlong = 1.0 - vMapUv.y;
-    float tipHeat = smoothstep(0.75, 1.0, tailAlong);
+    float tipHeat = smoothstep(0.68, 0.88, tailAlong);
     outgoingLight += uRimColor * 0.4 * tipHeat;
-    float tipCoverage = 1.0 - smoothstep(0.82, 1.0, tailAlong);
-    diffuseColor.a *= tipCoverage;
+    float tipCoverage = 1.0 - smoothstep(0.70, 0.90, tailAlong);
+    ${shell ? "diffuseColor.a *= tipCoverage;" : "diffuseColor.a = tipCoverage;"}
     if (diffuseColor.a < ${shell ? "0.01" : "0.45"}) discard;
   #endif` : ''}
 }
@@ -178,18 +176,17 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
   vec2 q = (vRest.zy - c.zy) / uEyeR0;          // forward, up in units of the eye radius
   float d = length(q);
   float aperture = length(q / vec2(1.0, 0.5));
-  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.13, 0.39)));
+  if (aperture > 0.86) discard;
+  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.12, 0.30)));
   vec3 iris = mix(vec3(0.48, 0.23, 0.055), vec3(0.22, 0.075, 0.018), smoothstep(0.15, 0.85, d));
   iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.62, 0.74, aperture));   // fine umber iris boundary
   iris = mix(iris, vec3(0.02, 0.01, 0.008), pupil);
   float glint = 1.0 - smoothstep(0.045, 0.085, length(q - vec2(0.22, 0.14)));
-  // A fine lid line gives way to rust fur, rather than filling the large authored disc with black.
+  // The head is closed under the eye: outside the fine lid, reveal real coat geometry.
   float lid = smoothstep(0.70, 0.79, aperture);
   iris = mix(iris, vec3(0.055, 0.024, 0.012), lid);
-  float coat = smoothstep(0.82, 1.08, aperture);
-  iris = mix(iris, vec3(0.32, 0.09, 0.025), coat);
   vec2 tearCorner = q - vec2(0.8, -0.25);
-  float tear = exp(-40.0 * dot(tearCorner, tearCorner)) * lid * (1.0 - coat);
+  float tear = exp(-40.0 * dot(tearCorner, tearCorner)) * lid;
   iris = mix(iris, vec3(0.095, 0.038, 0.016), tear * 0.45);
   diffuseColor.rgb = mix(iris, vec3(1.0, 0.88, 0.62), glint * (1.0 - lid));
   eyeLid = lid; eyeGlint = glint * (1.0 - lid);
@@ -241,12 +238,11 @@ export function applyFoxLook(root: THREE.Object3D) {
           if (!n.includes('shell')) {
             mesh.renderOrder = 1;
             // Match the shadow silhouette to the visible disappearing tip.
-            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.45 });
+            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, alphaTest: 0.45 });
+            depth.defines = { USE_UV: '' };
             depth.onBeforeCompile = (shader) => {
               shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', `
-#ifdef USE_MAP
-  diffuseColor.a *= 1.0 - smoothstep(0.82, 1.0, 1.0 - vMapUv.y);
-#endif
+diffuseColor.a = 1.0 - smoothstep(0.70, 0.90, 1.0 - vUv.y);
 #include <alphatest_fragment>`);
             };
             depth.customProgramCacheKey = () => 'fox-tail-depth';
@@ -264,13 +260,31 @@ export function applyFoxLook(root: THREE.Object3D) {
   });
   // Append after traversal: each surface shares the source skeleton and bind matrices, never new bones.
   for (const { mesh, mat } of coats) {
-    for (const [i, [length, alpha]] of [[0.025, 0.22], [0.045, 0.14]].entries()) {
+    const R = FOX_RIG;
+    const full = new Set<string>([R.pelvis, ...R.spine, ...R.neck]);
+    const short = new Set<string>(['l', 'r'].flatMap((side) => {
+      const s = side as 'l' | 'r', f = R.foreleg(s), h = R.hindleg(s);
+      return [f.scapula, f.upper, h.hip, h.thigh];
+    }));
+    const g = mesh.geometry, si = g.getAttribute('skinIndex'), sw = g.getAttribute('skinWeight'), p = g.getAttribute('position');
+    const mask = new Float32Array(si.count);
+    for (let i = 0; i < si.count; i++) {
+      for (let k = 0; k < 4; k++) {
+        const name = mesh.skeleton.bones[si.getComponent(i, k)]?.name ?? '';
+        let amount = full.has(name) ? 1 : short.has(name) ? 0.5 : 0;
+        if (name === R.head) amount = 0.5 * (1 - THREE.MathUtils.smoothstep(p.getZ(i), 0.85, 1.28)) * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.6, 2.85));
+        mask[i] += sw.getComponent(i, k) * amount;
+      }
+    }
+    g.setAttribute('aFurMask', new THREE.BufferAttribute(mask, 1));
+    for (const [i, [length, alpha]] of [[0.03, 0.35], [0.06, 0.25]].entries()) {
       const fringe = mesh.clone(false);
       const material = mat.clone();
       material.name = `FoxFurShellCoat${i + 1}`;
       material.transparent = true;
       material.depthWrite = false;
       material.alphaTest = 0;
+      material.normalMap = null;
       patchFur(material, length, alpha);
       fringe.name = `FoxCoatFringe${i + 1}`;
       fringe.material = material;
