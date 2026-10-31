@@ -49,7 +49,9 @@ import type { ColorStroke } from '../../../src/render/colorField';
  * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
  * `fallGravity` gives weight on the way down; `apexHang` floats the top of a held jump.
  */
-type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number };
+/** `groundEase` (rad/s) is the critically damped ground-velocity response and `turnEase` the yaw-rate response:
+ * the body path accelerates and turns in smooth curves instead of first-order snaps. */
+type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number; groundEase: number; turnEase: number };
 const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
   spring: {
     ...PRESET_SPRING,
@@ -65,6 +67,8 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     glideSink: 2.5,
     glideForward: 7.9,
     glideDelay: 0.1,
+    groundEase: 10,
+    turnEase: 7,
   },
   brisk: {
     ...PRESET_BRISK,
@@ -82,6 +86,8 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     glideSink: 2.7,
     glideForward: 8.4,
     glideDelay: 0.08,
+    groundEase: 11,
+    turnEase: 7,
   },
 };
 const presetParam = new URLSearchParams(location.search).get('feel');
@@ -302,6 +308,8 @@ async function boot() {
   gui.add({ brisk: () => usePreset('brisk') }, 'brisk');
   const fFeel = gui.addFolder('Fox');
   fFeel.add(feel, 'moveSpeed', 4, 14, 0.1).listen();
+  fFeel.add(feel, 'groundEase', 4, 30, 0.5).listen();
+  fFeel.add(feel, 'turnEase', 2, 20, 0.5).listen();
   fFeel.add(feel, 'jumpVelocity', 6, 16, 0.1).listen();
   fFeel.add(feel, 'gravity', 10, 40, 0.5).listen();
   fFeel.add(feel, 'fallGravity', 1, 2.2, 0.05).listen();
@@ -544,6 +552,11 @@ async function boot() {
   });
 
   const vel = new THREE.Vector3();
+  // Ground body-path state: acceleration of the horizontal velocity, the velocity it last produced
+  // (anything else wrote vel since — wall, teleport, knockback — so the spring restarts), and yaw rate.
+  const groundAccel = new THREE.Vector3();
+  const groundVelOut = new THREE.Vector3();
+  let yawRate = 0;
   let grounded = false;
   let dashT = 0;
   let gliding = false;
@@ -1314,12 +1327,27 @@ async function boot() {
       if(grounded && wish.lengthSq()>.001) {
         const targetYaw=Math.atan2(wish.x,wish.z);
         const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
-        fox.rotation.y+=THREE.MathUtils.clamp(error,-4.5*dt,4.5*dt);
+        // Yaw rate eases in and out (ζ≈.7 with turnRate) so the spine carves arcs, never snaps.
+        yawRate=THREE.MathUtils.damp(yawRate,THREE.MathUtils.clamp(error*feel.turnEase,-4.5,4.5),feel.turnRate,dt);
+        fox.rotation.y+=yawRate*dt;
         // Brake through a reversal; forward drive returns as the body points into the input.
         const drive=Math.max(0,Math.cos(error));
         desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
+      } else yawRate=0;
+      if (grounded) {
+        // Critically damped: velocity changes with continuous acceleration (no first-frame jerk).
+        if (cur.distanceToSquared(groundVelOut) > 1e-4) groundAccel.set(0, 0, 0);
+        const w = feel.groundEase;
+        const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n;
+        for (let i = 0; i < n; i++) {
+          groundAccel.addScaledVector(desired.clone().sub(cur), w * w * h).multiplyScalar(1 - 2 * w * h);
+          cur.addScaledVector(groundAccel, h);
+        }
+        groundVelOut.copy(cur);
+      } else {
+        groundAccel.set(0, 0, 0);
+        cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
       }
-      cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
       vel.x = cur.x;
       vel.z = cur.z;
     }

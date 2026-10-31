@@ -9,7 +9,7 @@ import GAITS from '../../../assets/hero/spirit_fox.loco.json';
 type Gait = keyof typeof GAITS;
 const GAIT_NAMES = Object.keys(GAITS) as Gait[];
 /** Speed each gait's designed cadence is quoted at (gait-gym bands). */
-const CADENCE_REF: Record<Gait, number> = { walk: 1.5, trot: 3.8, run: 8.4 };
+const CADENCE_REF: Record<Gait, number> = { walk: 1.5, trot: 3.8, run: 9 };
 type GaitParts = { body: THREE.AnimationAction; legs: THREE.AnimationAction[]; bobMean: THREE.Vector3[] };
 const v = () => new THREE.Vector3();
 const q = () => new THREE.Quaternion();
