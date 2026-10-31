@@ -228,7 +228,9 @@ try {
         const cards = (options.sheetFrames ?? options.keyFrames).filter(frame => frame < count).map(frame => {
           const filename = `${name}-${String(frame).padStart(5, '0')}.png`;
           const label = options.label?.(frame, trace.find(sample => sample.frame === frame)?.state) ?? `${name} frame ${frame}`;
-          return `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, filename)).toString('base64')}"></figure>`;
+          // Native PNGs remain archived; do not send hundreds of MB through the sheet page.
+          const thumbnail=execFileSync('ffmpeg',['-v','error','-i',path.join(out,filename),'-vf','scale=480:-2','-frames:v','1','-f','image2pipe','-vcodec','mjpeg','-q:v','3','-threads','1','pipe:1'],{maxBuffer:4*1024*1024});
+          return `<figure><figcaption>${label}</figcaption><img src="data:image/jpeg;base64,${thumbnail.toString('base64')}"></figure>`;
         }).join('');
         await sheetPage.setContent(`<style>*{box-sizing:border-box}body{margin:0;background:#211b16;color:#eadfc8;font:16px sans-serif;display:grid;grid-template-columns:repeat(4,1fr)}figure{margin:0}figcaption{height:30px;padding:6px}img{display:block;width:100%}</style>${cards}`);
         await sheetPage.evaluate(() => Promise.all([...document.images].map(image => image.decode())));
