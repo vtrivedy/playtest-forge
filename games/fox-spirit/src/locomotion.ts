@@ -41,14 +41,14 @@ export class AuthoredLocomotion {
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .65, carpalFlexRun: .6, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .2, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .02, idleRestLift: .04, idleRestFold: .6, idleForeUnder: .75, trackNarrow: .03, earTwitch: .5, idleHipShot: .07, idleLook: .16, gallopFlex: .32, gallopFlexPhase: .85, gatherHindReach: .4, gallopHeadPitch: .1, jumpHeadPitch: .14, earBank: .6, weightRoll: .04, spineSway: .08, breath: .04,
+    carpalGive: .2, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .02, idleRestLift: .04, idleRestFold: .6, idleForeUnder: .75, trackNarrow: .03, earTwitch: .5, idleHipShot: .07, idleLook: .16, gallopFlex: .36, gallopFlexPhase: .85, gatherHindReach: .4, gallopHeadPitch: .12, jumpHeadPitch: .14, earBank: .6, weightRoll: .04, spineSway: .08, breath: .04,
     runningGather: .9, tailAir: .05, airTuck: 1.25, airForeSwing: .55, airHindSwing: .45, airReach: 0, airHindStream: .45, airArch: .12,
     // World-space limb aims: hinds drive back off the push, fores open and reach from the apex, glide hangs the legs loose.
-    airPushHind: .75, airForeOpen: .65, glideLegs: .7,
+    airPushHind: .75, airForeOpen: .95, glideLegs: .7,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .15, takeoffPitch: .07,
     headHold: .8, gallopHeadHold: 1.5, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .45, landPitch: 1, landFrequency: 2.6, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .08, bankMax: .18, rootBank: 1, pelvisBank: .45, headRollStabilize: .2, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .55, landPitch: 1, landFrequency: 2.6, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .1, bankMax: .22, rootBank: 1, pelvisBank: .55, headRollStabilize: .2, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     earlyTouches: 0, spineFlexCommand: 0, maxSwingLift: 0, airPose: 0, pelvisRoll: 0, spineSway: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -900,7 +900,10 @@ export class AuthoredLocomotion {
     this.metrics.airPose=a;
     if(Math.abs(a)>1e-3 || airborne) {
       // Paws curl only while rising; from the apex on the forelegs open and reach so nothing hangs limp.
-      const tuck=THREE.MathUtils.lerp(this.params.airReach,this.params.airTuck,THREE.MathUtils.smoothstep(a,.3,.8));
+      // Fore opening from the live arc (computed here so the paw curl releases with it; a curled carpus under an
+      // opened forearm still read as a vertical hang at the apex).
+      const open=airborne ? this.params.airForeOpen*(1-THREE.MathUtils.smoothstep(airTarget,.3,.7)) : 0;
+      const tuck=THREE.MathUtils.lerp(this.params.airReach,this.params.airTuck,THREE.MathUtils.smoothstep(a,.3,.8))*(1-Math.min(1,open));
       // Reach opens before the true apex (the spring lags the arc), so the fores are never caught hanging.
       const reach=1-THREE.MathUtils.smoothstep(a,.1,.5);
       const hind=this.params.airHindStream*(a>0 ? a : .6*a);
@@ -928,10 +931,10 @@ export class AuthoredLocomotion {
         const push=this.params.airPushHind*Math.max(0,a)*(1-THREE.MathUtils.smoothstep(this.airTime,.12,.35));
         // Apex/fall: fores open forward-down, nearly straight, paws leading (no limp vertical hang).
         // Driven by the live arc, not the lagging spring, so they are already open as the rise tops out.
-        const open=this.params.airForeOpen*(1-THREE.MathUtils.smoothstep(airTarget,.15,.55));
         for(let i=0;i<4;i++){
           const foot=this.feet[i];
-          if(i<2 && open>1e-3){this.aimLimb(foot,forward,50,45,open);}
+          // Right fore leads (reaches furthest), left a touch behind: an open, staggered reach, not a pair of posts.
+          if(i<2 && open>1e-3){this.aimLimb(foot,forward,i===1 ? 28 : 38,i===1 ? 22 : 34,Math.min(1,open));}
           if(i>=2 && push>1e-3){
             this.aimLimb(foot,forward,-62,-28,push);
             // Hock opens so the metatarsus carries the shin's line back (+X extends): a driving leg, not a dangling one.

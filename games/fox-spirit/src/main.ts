@@ -399,8 +399,9 @@ async function boot() {
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
   fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
   // Standing jumps load the haunches for ~8 frames; at speed the windup shrinks back to 3 so running jumps stay immediate.
-  const actionFeel = { jumpWindup: .05, standingWindup: .13, jumpGatherBlend: .12 };
-  fFeel.add(actionFeel,'jumpWindup',0,.066,.001);
+  // Running windup ~6 frames @60: a visible haunch load before the push (brief: 6-9 frames).
+  const actionFeel = { jumpWindup: .1, standingWindup: .15, jumpGatherBlend: .12 };
+  fFeel.add(actionFeel,'jumpWindup',0,.16,.001);
   fFeel.add(actionFeel,'standingWindup',0,.2,.005);
   fFeel.add(actionFeel,'jumpGatherBlend',.04,.2,.01);
   const fAudio = gui.addFolder('Audio');
