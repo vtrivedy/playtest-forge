@@ -560,7 +560,7 @@ try {
       await H('setStick',dx/d*speed,dz/d*speed);
       const phase=t%10;
       await H('setKeys',phase<.35?['Space']:phase>5&&phase<5.06?['ShiftLeft']:[]);
-    },undefined,{keyFrames:Array.from({length:12},(_,i)=>i*5*fps)});
+    },undefined,{traceEveryFrame:true,keyFrames:Array.from({length:12},(_,i)=>i*5*fps)});
     await H('setKeys',[]);await H('setStick',null);
     const end=await H('state');
     save('feel-acceptance.json',{label:'60s scripted live-input movement loop, one staged start, no resets/forced poses; not human fun approval',seconds:60,initial,end,deaths:end.deaths-initial.deaths});
