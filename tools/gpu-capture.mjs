@@ -1,3 +1,4 @@
+import { blackFrameIntervals } from './hub-black-frames.mjs';
 import { captureFinale } from './finale-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
@@ -11,7 +12,7 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { pathToFileURL } from 'node:url';
 const arg = (k, d) => process.argv.includes(`--${k}`) ? process.argv[process.argv.indexOf(`--${k}`) + 1] : d;
@@ -96,7 +97,9 @@ try {
   await context.addInitScript(() => {
     let seed = 42;
     Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-    document.addEventListener('webglcontextlost', e => console.warn('CONTEXT LOSS EVENT', e.target.width, e.target.height, e.target.isConnected, e.statusMessage), true);
+    window.__gpuContextLost = false;
+    document.addEventListener('webglcontextlost', e => { window.__gpuContextLost = true; console.warn('CONTEXT LOSS EVENT', e.target.width, e.target.height, e.target.isConnected, e.statusMessage); }, true);
+    window.__gpuNativeRaf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = () => 0;
     window.cancelAnimationFrame = () => {};
   });
@@ -136,8 +139,68 @@ try {
     if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error('WebGL context lost after warmup');
     return H('state');
   }
+  async function screenshotPixels(buffer) {
+    return page.evaluate(async encoded => {
+      const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      const bitmap=await createImageBitmap(new Blob([bytes],{type:'image/png'}));
+      const canvas=new OffscreenCanvas(128,72), ctx=canvas.getContext('2d',{willReadFrequently:true});
+      ctx.drawImage(bitmap,0,0,128,72); bitmap.close();
+      const data=ctx.getImageData(0,0,128,72).data;
+      let maxChannel=0;
+      for(let i=0;i<data.length;i+=4) maxChannel=Math.max(maxChannel,data[i],data[i+1],data[i+2]);
+      return {width:128,height:72,maxChannel,black:maxChannel<=3};
+    },buffer.toString('base64'));
+  }
+  async function hubStillInvariant() {
+    const state=await H('state');
+    const pose=await page.evaluate(()=>{
+      const {camera,fox}=window.__gameHooks.debug;
+      camera.updateMatrixWorld(true); fox.updateWorldMatrix(true,true);
+      const bones=[]; fox.traverse(o=>{if(o.isBone)bones.push([o.name,o.matrixWorld.toArray()]);});
+      return {camera:{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),
+        projection:camera.projectionMatrix.toArray()},fox:{position:fox.position.toArray(),
+        quaternion:fox.quaternion.toArray(),scale:fox.scale.toArray()},bones};
+    });
+    const fixed={pose,t:state.t,anim:state.anim,grounded:state.grounded,deaths:state.deaths,
+      assists:state.auto.assists,restored:state.restored,seedwells:state.seedwells,restore:state.restore,
+      grade:state.look.grade,dusk:state.dusk};
+    return {state,pose,digest:createHash('sha256').update(JSON.stringify(fixed)).digest('hex')};
+  }
+  async function captureStill(name) {
+    const assertHealthy=async()=>{
+      if(!name.startsWith('hub-')) return;
+      const healthy=await page.evaluate(()=>!window.__gpuContextLost &&
+        !window.__gameHooks.debug.renderer.getContext().isContextLost());
+      if(!healthy) throw Error(name+': WebGL context loss invalidates still evidence');
+    };
+    await assertHealthy();
+    const filename=path.join(out,name+'.png');
+    const first=await page.screenshot({path:filename,animations:'disabled'});
+    if(!name.startsWith('hub-')) return;
+    await assertHealthy();
+    const pixels=await screenshotPixels(first);
+    if(!pixels.black) return;
+    const attemptName=name+'-attempt-1-black.png', before=await hubStillInvariant(), started=Date.now();
+    fs.renameSync(filename,path.join(out,attemptName));
+    report.hubStillAttempts??={};
+    const attempt=report.hubStillAttempts[name]={preserved:attemptName,first:pixels,before};
+    save('hub-still-attempts.json',report.hubStillAttempts);
+    await H('advance',0,1/60,true);
+    await page.evaluate(()=>new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(Error('Native compositor barrier timed out')),5000);
+      window.__gpuNativeRaf(()=>window.__gpuNativeRaf(()=>{clearTimeout(timer);resolve();}));
+    }));
+    const retry=await page.screenshot({path:filename,animations:'disabled'});
+    await assertHealthy();
+    attempt.retry=await screenshotPixels(retry); attempt.after=await hubStillInvariant();
+    attempt.hostElapsedMs=Date.now()-started;
+    attempt.recovered=!attempt.retry.black;
+    attempt.invariantsMatch=attempt.before.digest===attempt.after.digest;
+    save('hub-still-attempts.json',report.hubStillAttempts);
+    if(!attempt.recovered || !attempt.invariantsMatch) report.failures.push(name+': black still recovery failed or changed pose/camera/state');
+  }
   async function shot(name) {
-    await page.screenshot({ path: path.join(out, `${name}.png`), animations: 'disabled' });
+    await captureStill(name);
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
     if (name.startsWith('reachview-')) {
       // Validate the snapshot belonging to this PNG, after its staged teleport/lens.
@@ -216,7 +279,7 @@ try {
           if (!options.traceEveryFrame) trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
           console.log('FRAME', name, i, 'sim', state.t.toFixed(2), 'wp', state.auto.idx, 'restored', state.restored);
         }
-        if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
+        if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; if(name.startsWith('hub-')) await captureStill(filename.replace(/\.png$/,'')); else await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
         if (stop?.(state, i)) break;
       }
     } finally { encoder.stdin.end(); }
@@ -225,7 +288,22 @@ try {
     const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
     const stream = probe.streams[0];
     if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
-    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
+    let blackDetect;
+    if(name.startsWith('hub-')) {
+      const scan=spawnSync('ffmpeg',['-hide_banner','-nostats','-threads','1','-i',output,
+        '-vf','blackdetect=d=0.02:pix_th=0.02:pic_th=0.999,blackframe=amount=99:threshold=20','-an','-f','null','-'],
+        {encoding:'utf8',maxBuffer:4*1024*1024,timeout:60000,killSignal:'SIGKILL'});
+      const log=scan.stderr??String(scan.error??'');
+      fs.writeFileSync(path.join(out,name+'-blackdetect.log'),log);
+      const intervals=[...log.matchAll(/black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/g)]
+        .map(m=>({start:Number(m[1]),end:Number(m[2]),duration:Number(m[3])}));
+      const frameIntervals=blackFrameIntervals(log,fps);
+      blackDetect={status:scan.status,error:scan.error?.message??null,signal:scan.signal,
+        thresholds:{duration:.02,pixel:.02,frame:.999,frameAuditPercent:99,frameAuditY:20},
+        intervals,frameIntervals};
+      if(scan.status!==0 || scan.error || intervals.length || frameIntervals.some(run=>run.duration>=.02)) report.failures.push(name+': black video frame detected or detector failed');
+    }
+    report.videos[name] = { blackDetect, frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
     if (options.keyFrames) {
       const sheetPage = await context.newPage();
@@ -1145,14 +1223,33 @@ try {
     }
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
     // Portrait staging only; natural spawn above is untouched. Real idle rig, no bone override.
-    const heroYaw = Math.atan2(3.1, .8) - Math.PI / 4;
+    const heroYaw = Math.atan2(4.2, 1.1) - Math.PI / 4;
     await H('teleport', 0, y, 94, heroYaw); await advance(30);
-    const heroLens = [3.1, y + 1.3, 94.8], heroLook = [-6.5, y + .9, 89.5];
+    const heroLens = [4.2, y + 1.5, 95.1], heroLook = [-6.5, y + .6, 89.5];
     const compositionBlocker = await H('photoBlocker', heroLens, heroLook);
     const foxSightBlocker = await H('photoBlocker', heroLens, [0, y + .35, 94]);
     await H('photo', heroLens, heroLook, 46); await advance(2);
     await shot('hub-hero-three-q');
     const heroState = await H('state');
+    const heroFraming = await page.evaluate(async () => {
+      const {Box3, Vector3} = await import('/gpu-three.js');
+      const {fox, camera} = window.__gameHooks.debug;
+      fox.updateWorldMatrix(true, true); camera.updateMatrixWorld(true);
+      const bounds = new Box3();
+      fox.traverse(o => { if (o.isSkinnedMesh && o.visible) {
+        o.computeBoundingBox(); bounds.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld));
+      } });
+      if (bounds.isEmpty()) return null;
+      const projected = [];
+      for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y])
+        for (const z of [bounds.min.z, bounds.max.z]) projected.push(new Vector3(x,y,z).project(camera).toArray());
+      return { label: 'Conservative posed skinned-mesh world bounds; all eight corners projected',
+        worldMin: bounds.min.toArray(), worldMax: bounds.max.toArray(), projected,
+        inFrame: projected.every(p => Math.abs(p[0]) < 1 && Math.abs(p[1]) < 1 && p[2] > -1 && p[2] < 1) };
+    });
+    save('hub-hero-framing.json', heroFraming);
+    if (!heroFraming?.inFrame) report.failures.push('Hub hero posed body bounds are cropped');
+
     save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
     if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
     const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
@@ -1173,6 +1270,51 @@ try {
     for (const [name, lens, target, fov] of hubViews) {
       hubViewCameras.push({ name, lens, target, fov, blocker: await H('photoBlocker', lens, target) });
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
+      if (name === 'well') {
+        // Same camera and posed skeleton; zero simulation steps between variants.
+        await H('advance', 0, 1/60, true);
+        const snapshot = async () => {
+          const state = await H('state');
+          const pose = await page.evaluate(() => {
+            const {camera, fox, hubPractical} = window.__gameHooks.debug;
+            camera.updateMatrixWorld(true); fox.updateWorldMatrix(true,true);
+            const bones = [];
+            fox.traverse(o => { if (o.isBone) bones.push({name:o.name,matrix:o.matrixWorld.toArray()}); });
+            return {strength:hubPractical.strength, camera:{position:camera.position.toArray(),
+              quaternion:camera.quaternion.toArray(), projection:camera.projectionMatrix.toArray()},
+              fox:{position:fox.position.toArray(),quaternion:fox.quaternion.toArray(),scale:fox.scale.toArray()},bones};
+          });
+          const fixed = {camera:pose.camera,fox:pose.fox,bones:pose.bones,t:state.t,
+            anim:state.anim,grounded:state.grounded,deaths:state.deaths,assists:state.auto.assists,
+            restored:state.restored,seedwells:state.seedwells,restore:state.restore,grade:state.look.grade};
+          return {pose,state,fixedDigest:createHash('sha256').update(JSON.stringify(fixed)).digest('hex'),
+            game:await page.evaluate(() => window.__game)};
+        };
+        const entry = await snapshot(), variants = [];
+        if (entry.pose.strength !== 2.5) report.failures.push('Hub practical comparison default must match reviewed 2.5x candidate');
+        try {
+          for (const strength of [1,2.5,4]) {
+            await page.evaluate(value => { window.__gameHooks.debug.hubPractical.strength=value; }, strength);
+            await H('advance',0,1/60,true);
+            const sample = await snapshot();
+            const filename = `hub-practical-${String(strength).replace('.','p')}`;
+            await shot(filename);
+            variants.push({filename,strength,...sample});
+            if (sample.fixedDigest !== entry.fixedDigest) report.failures.push(`Hub practical ${strength} comparison camera/pose/state changed`);
+          }
+        } finally {
+          await page.evaluate(value => { window.__gameHooks.debug.hubPractical.strength=value; }, entry.pose.strength);
+          await H('advance',0,1/60,true);
+          const restored = await snapshot();
+          save('hub-practical-comparison.json',{label:'Staged well-camera light-strength comparison; zero simulation steps; shipped default unchanged',
+            requestedCamera:{lens,target,fov},entry,variants,restored});
+          if (restored.pose.strength !== entry.pose.strength || restored.fixedDigest !== entry.fixedDigest ||
+            JSON.stringify(restored.state.dusk.practical) !== JSON.stringify(entry.state.dusk.practical)) {
+            report.failures.push('Hub practical comparison failed exact strength/state/light restoration');
+          }
+        }
+      }
+
     }
     save('hub-view-cameras.json', hubViewCameras);
     const arrivalCamera = { lens: [8, 4.5, 101], target: [-8, 2, 86], fov: 55, blocker: await H('photoBlocker', [8, 4.5, 101], [-8, 2, 86]) };
@@ -1189,7 +1331,7 @@ try {
     // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
     const orbitCameras = [];
     const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-10, 88));
-    const orbitTarget = [-10, targetGround + 2, 88];
+    const orbitTarget = [-10, targetGround + 4.8, 88];
     const orbitLens = (angle, height) => [-9 + Math.sin(angle) * 30, height, 88 + Math.cos(angle) * 24];
     // One fixed clearance height avoids frame-to-frame camera pops. The ellipse
     // stays >2m outside every cottage roof footprint; low close/chase shots above
@@ -1210,6 +1352,7 @@ try {
       await H('photo', lens, orbitTarget, 58);
     }, undefined, {keyFrames: [0, 3*fps, 6*fps, 9*fps, 12*fps, 15*fps, 18*fps-1]});
     save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, heightSearchClear: orbitHeightSearchClear, probeAngles: 36, blockedFrames: orbitBlocked, cameras: orbitCameras });
+    if (!orbitHeightSearchClear) report.failures.push('Hub context orbit found no clear fixed review height');
     if (orbitBlocked) report.failures.push(`Hub context orbit has ${orbitBlocked} blocked review frames`);
     await H('photoOff');
 
@@ -1868,6 +2011,22 @@ try {
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
+    const rendererSnapshot = () => page.evaluate(() => {
+      const { renderer, scene, post } = window.__gameHooks.debug;
+      const rt = renderer.getRenderTarget();
+      const output = post.composer.passes.find(p => p.isOutputPass);
+      if (!output || !Number.isFinite(output.uniforms?.toneMappingExposure?.value)) throw Error('Route renderer snapshot requires OutputPass exposure');
+      return {
+        exposure: renderer.toneMappingExposure, toneMapping: renderer.toneMapping,
+        outputColorSpace: renderer.outputColorSpace,
+        renderTarget: rt ? { uuid: rt.uuid, width: rt.width, height: rt.height, samples: rt.samples, type: rt.texture.type, colorSpace: rt.texture.colorSpace } : null,
+        outputExposure: output.uniforms.toneMappingExposure.value,
+        post: { ...post.params },
+        fog: scene.fog ? { color: scene.fog.color.toArray(), density: scene.fog.density ?? null, near: scene.fog.near ?? null, far: scene.fog.far ?? null } : null,
+        water: scene.userData.waterCapture ? { ...scene.userData.waterCapture } : null,
+      };
+    });
+    const rendererBefore = kilnRoute ? await rendererSnapshot() : null;
     const start = await H('state');
     const spawnDistanceToFirst = Math.hypot(start.pos[0] - route[0].x, start.pos[1] - route[0].y, start.pos[2] - route[0].z);
     if (kilnRoute && (!Number.isFinite(spawnDistanceToFirst) || spawnDistanceToFirst > 1)) throw Error('Kiln proof must begin within one metre of the authored plaza spawn');
@@ -1878,6 +2037,7 @@ try {
     await H('autopilot', true, from, { assist: false });
     let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt;
     let kilnStopped = false;
+    const pawSupport = [];
     const continuity = { maxStepMeters: 0, maxStepFrame: null, jumpLimitMeters: Math.max(3, 90 / fps), firstLargeStep: null };
     const encounter = { initialHits: start.shades.hits, minWisps: start.shades.wisps, knockbackTravelMeters: 0 };
     let previousPos = start.pos, previousKnockback = start.shades.knockbackTravel ?? 0, previousHits = start.shades.hits;
@@ -1923,6 +2083,44 @@ try {
       } else lensSafety.missing++;
       const visibility = await visibilityReview.sample(i);
       if (visibility) audit.projectedVisibility = visibility;
+      const [px, py, pz] = st.pos, axisLength = Math.hypot(.684, .729);
+      const terraceS = ((px + 48) * -.684 + (pz - 52) * -.729) / axisLength;
+      const terraceT = ((px + 48) * .729 + (pz - 52) * -.684) / axisLength;
+      if (kilnRoute && st.grounded && py >= 17.9 && py <= 18.1 && terraceS >= 61 && terraceS <= 66.5 && terraceT >= 8.8 && terraceT <= 10.8) {
+        const contacts = await page.evaluate(async () => {
+          const { Vector3, Matrix3, Raycaster } = await import('/gpu-three.js');
+          const hooks = window.__gameHooks, { world, fox } = hooks.debug;
+          const feet = hooks.locomotion?.feet;
+          if (!Array.isArray(feet) || feet.length !== 4) throw Error('Paw audit requires four solved locomotion feet');
+          const before = { t: hooks.state().t, pos: fox.position.toArray(), quaternion: fox.quaternion.toArray() };
+          const native = [];
+          const isNative = m => m?.isMeshStandardMaterial && m.visible && m.depthWrite && !m.transparent && /stone|rock|ground|terrain/i.test(m.name);
+          world.group.traverse(o => {
+            if (!o.isMesh || o.isInstancedMesh) return;
+            for (let p = o; p; p = p.parent) if (!p.visible) return;
+            const materials = Array.isArray(o.material) ? o.material : [o.material];
+            if (materials.some(isNative)) native.push(o);
+          });
+          const ray = new Raycaster(), normalMatrix = new Matrix3();
+          ray.near = 0; ray.far = 2.5;
+          const result = feet.map(foot => {
+            const pad = foot.paw.localToWorld(foot.padLocal.clone());
+            if (![pad.x, pad.y, pad.z].every(Number.isFinite)) throw Error('Nonfinite solved paw pad');
+            ray.set(pad.clone().add(new Vector3(0, .5, 0)), new Vector3(0, -1, 0));
+            const hit = ray.intersectObjects(native, false).find(h => {
+              const material = Array.isArray(h.object.material) ? h.object.material[h.face?.materialIndex ?? 0] : h.object.material;
+              return isNative(material) && h.face && h.face.normal.clone().applyNormalMatrix(normalMatrix.getNormalMatrix(h.object.matrixWorld)).y > .25;
+            });
+            return { id: foot.paw.name, stance: foot.planted, pad: pad.toArray(), anchor: foot.anchor.toArray(),
+              surface: hit ? { y: hit.point.y, gap: pad.y - hit.point.y, object: hit.object.name } : null };
+          });
+          const after = { t: hooks.state().t, pos: fox.position.toArray(), quaternion: fox.quaternion.toArray() };
+          if (JSON.stringify(before) !== JSON.stringify(after)) throw Error('Paw audit changed simulation time or root pose');
+          return result;
+        });
+        const sample = { frame: i, time: st.t, terraceS, terraceT, contacts };
+        pawSupport.push(sample); audit.pawSupport = sample;
+      }
       if (kilnRoute) {
         const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
         if (step > continuity.maxStepMeters) { continuity.maxStepMeters = step; continuity.maxStepFrame = i; }
@@ -2022,7 +2220,11 @@ try {
     save('route-lens-safety.json', { ...lensSafety, passed: lensSafety.samples > 0 && lensSafety.occupied === 0 && lensSafety.missing === 0,
       scope: 'Every encoded frame, conservative .2m authored box/cylinder/terrain proximity; not exact visual mesh containment' });
     if (projectedVisibility.invalid || projectedVisibility.errors) report.failures.push(`Invalid GPU visibility masks: ${JSON.stringify(projectedVisibility)}`);
-    if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+    if (kilnRoute) {
+      save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+      save('route-renderer-state.json', { scope: 'Read-only snapshots bracketing the route across many reflection passes; not an atomic reflection-state leak test', before: rendererBefore, after: await rendererSnapshot() });
+      save('route-paw-support.json', { available: pawSupport.length > 0, scope: 'Bounded R5 turn: actual solved pad centres and stance flags vs upward opaque native stone/rock/ground triangles. Excludes full pad footprints, shader discard/displacement, instanced props, foliage, transparency and other support materials; no artistic contact or gameplay acceptance verdict', samples: pawSupport });
+    }
     await H('autopilot', false, state.auto.idx, { assist: false });
     await H('setKeys', []); await H('setStick', null); await shot('route-end');
 

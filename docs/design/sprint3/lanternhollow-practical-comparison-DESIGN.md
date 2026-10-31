@@ -1,0 +1,15 @@
+# Lanternhollow practical-light comparison
+
+Personally inspected cd3c723 GPU images show warm lamp glass but weak ground pools; live reports confirm the three lights are active at4/3/3. Current code retains those exact intensities and adds a fourth hearth light. Sun correction changes sky, not these light strengths. Avoid choosing brightness solely from source.
+
+Add one shared development multiplier `HUB_PRACTICAL.strength`, default1, exposed in the existing dusk lil-gui folder and read-only-by-convention capture debug handle. Scale the four existing light intensities during their existing update; do not add lights, change positions/ranges, add floor meshes, alter color masks or bypass sepia. Default1 keeps the current gameplay appearance. Include strength in captured dusk state/notes.
+
+Add three labelled stills from the exact existing well review camera at strengths1,2.5,4. Freeze simulation and pose during the comparison; run zero-step render after setting strength so only illumination changes. Save exact camera, strength, live intensities and window.__game for every still, then restore original strength and render before other clips. This is a staged lighting comparison, not traversal proof. Preserve natural-spawn chase and route-start evidence.
+
+Judge value pools, well-wall warmth, nearby ground and clipping/bloom in returnedPNG; retain1 unless a candidate reads softer and clearer. Brighter is not automatically better. Sol fallback design/source review while Opus quota unavailable, followed by tsc/foxbuild/dusk/geometry/JS checks and exactSHA GPU review. Any later default change must cite inspected comparison and receive Opus visual critique when available.
+
+Sol design contracts applied: comparison runs inside the existing well-view setup after draining visualDt, using advance(0,1/60,true). Snapshot actual camera position/quaternion/projection and bone matrices, plus simulation/restore/grade/death/assist state; assert equality across variants. Save entry strength/intensities, restore in finally, render and verify exact restoration. Initial default must be1. The explicitly capture-writable debug strength object is the sole exception to the nearby read-only debug-handle convention. No per-candidate camera/pose/input change.
+
+## Captured decision proposal — 2d87a28 / ec09a83a45c6
+
+Personally inspected comparison PNGs and proof JSON: all three use the same t17.133333/camera/bone/fixed-state digest; entry/default1 restored exactly. Prefer2.5x: well rim/nearby ground gain readable warmth without4x's pale stone shoulder. One fixed ground patch rises in linear median luminance .044784→.063517(+42%);4x reaches.082202(+84%). Metrics support, not replace, visual judgment. Proposal: set sole default to2.5, update comparison/default guard and multiplier test to restore the actual entry value, then recapture whole hub (including hearth/porch) because the original comparison covers well only. No new light, shader, mask or geometry change. Sol visual cross-critique and eventual Opus visual agreement remain required before self-landing.

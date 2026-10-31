@@ -1,3 +1,4 @@
+import { HUB_PRACTICAL } from './regionLanternhollow';
 import { createWind, type WindForce } from './chem/wind';
 import { createShades } from './encounters/shades';
 import { ShadeContact } from './encounters/contact';
@@ -551,11 +552,14 @@ async function boot() {
   fFox.close();
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
   const fDusk = fLook.addFolder('Lanternhollow dusk');
+  fDusk.add(HUB_PRACTICAL, 'strength', .5, 4, .1).name('practical light strength');
   fDusk.add(HUB_DUSK, 'kOverride', -1, 1, .01).name('override (-1 auto)');
   fDusk.add(HUB_DUSK, 'key', .8, 2.5, .01);
   fDusk.add(HUB_DUSK, 'hemi', .2, .8, .01);
   fDusk.add(HUB_DUSK, 'rim', .4, 1.6, .01);
   fDusk.add(HUB_DUSK, 'skyScale', .5, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunScale', .1, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunSize', .0001, .006, .0001);
   fDusk.add(HUB_DUSK, 'sunBloom', 0, .3, .01);
   fDusk.add(HUB_DUSK, 'godRays', 0, .5, .01);
   fDusk.add(HUB_DUSK, 'horizonGlow', 0, .6, .01);
@@ -702,7 +706,9 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world,
+    debug: { scene, renderer, post, colorField, camera: cam.camera,
+      // Explicit capture-only mutable tuning handle; other debug handles remain read-only.
+      hubPractical: HUB_PRACTICAL, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world,
       cameraVisibility: createCameraVisibilityProbe(scene, renderer, cam.camera, foxActor.group) },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
@@ -890,7 +896,7 @@ async function boot() {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
-        dusk: { ...hubDusk.state(), practical: world.hubState() },
+        dusk: { ...hubDusk.state(), practical: world.hubState(), practicalStrength: HUB_PRACTICAL.strength },
         reachMood: reachMood.state(),
         crown: crown.state(),
         reach: reach.state(),
@@ -1760,7 +1766,7 @@ async function boot() {
         `dashes=${feelMetrics.dashesUsed}`,
         `preset=${feelPreset}`,
         `quality=${quality.tier}`,
-        `dusk=${JSON.stringify({ ...hubDusk.state(), practical: world.hubState() })}`,
+        `dusk=${JSON.stringify({ ...hubDusk.state(), practical: world.hubState(), practicalStrength: HUB_PRACTICAL.strength })}`,
         `spirit=${JSON.stringify(foxActor.group.userData.spiritFx)}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',
