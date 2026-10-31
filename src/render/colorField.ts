@@ -840,9 +840,9 @@ export class ColorField {
             vec3 pM = uPal[2] / dot(uPal[2], vec3(0.2126, 0.7152, 0.0722));
             vec3 pB = uPal[3] / dot(uPal[3], vec3(0.2126, 0.7152, 0.0722));
             vec3 pR = uPal[4] / dot(uPal[4], vec3(0.2126, 0.7152, 0.0722));
-            vec3 pal = mix(pO, pS, smoothstep(0.32, 0.58, h1));
-            pal = mix(pal, pM, smoothstep(0.62, 0.86, h1));
-            pal = mix(pal, pB, smoothstep(0.62, 0.86, h2) * 0.7);
+            vec3 pal = mix(pO, pS, smoothstep(0.22, 0.46, h1));
+            pal = mix(pal, pM, smoothstep(0.58, 0.82, h1));
+            pal = mix(pal, pB, smoothstep(0.66, 0.88, h2) * 0.55);
             pal = mix(pal, pR, smoothstep(0.82, 0.95, h3) * 0.55);
             float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
             // pigment density: settled pools and thin passages; granulation settles in paper valleys
