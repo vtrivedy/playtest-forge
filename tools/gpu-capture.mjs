@@ -13,8 +13,13 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
+import { pathToFileURL } from 'node:url';
 const arg = (k, d) => process.argv.includes(`--${k}`) ? process.argv[process.argv.indexOf(`--${k}`) + 1] : d;
 const repo = arg('repo', process.cwd()), out = arg('out', '/tmp/gpu-capture');
+// Modal's fixed image contains older helpers. These new dependency-free modules
+// belong to the immutable game checkout, rather than the mutable image manifest.
+const { captureWadeVisibility } = await import(pathToFileURL(path.resolve(repo, 'tools/water-wade-capture.mjs')).href);
+const { projectedVisibilityReview } = await import(pathToFileURL(path.resolve(repo, 'tools/projected-visibility-capture.mjs')).href);
 const selected = arg('shots', 'all');
 const backend = arg('backend', 'egl'), quality = arg('quality', 'high'), fps = Number(arg('fps', '60'));
 const [width, height] = arg('size', '1920x1080').split('x').map(Number);
@@ -56,6 +61,8 @@ const server = http.createServer((req, res) => {
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
 const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
+report.captureHelperSha = Object.fromEntries(['water-wade-capture.mjs', 'projected-visibility-capture.mjs'].map(file =>
+  [file, createHash('sha256').update(fs.readFileSync(path.join(repo, 'tools', file))).digest('hex')]));
 let browser;
 try {
   const headed = backend === 'gl';
@@ -244,6 +251,7 @@ try {
     return state;
   }
   if (wants('shade')) {
+    if(fps!==60)throw Error('Shade encounter review requires60fps for fixed-step contact and every-six-frame release strips');
     await boot(quality, true);
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
     if (!actors.length) throw Error('No Shade encounter authored');
@@ -262,17 +270,18 @@ try {
       const framing=await page.evaluate(({previous,actorId})=>{
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===actorId),fox=h.debug.fox.position;
         const [x,y,z]=actor.pos,fy=fox.y-(h.debug.foxFeetOffset??.02),V=fox.constructor;
+        const contactOverlap=!!h.state().dash?.collisionActiveLastStep||(actor.freed&&actor.releaseAge<.7);
         const dx=fox.x-x,dz=fox.z-z,d=Math.hypot(dx,dz)||1,ux=dx/d,uz=dz/d;
         const look=[x*.35+fox.x*.65,(y+(actor.height||3.1)*.5)*.35+(fy+(h.debug.foxHeight||1.25)*.5)*.65,z*.35+fox.z*.65];
         const side=Math.atan2(ux,-uz);
         const angles=[side-.65,side+Math.PI+.65,...[0,1,2,3,4,5,6,7].map(k=>k*Math.PI/4)];
-        const positions=[...(previous?[previous]:[]),...angles.map(a=>[look[0]+Math.cos(a)*6,Math.max(y,fy)+2.5,look[2]+Math.sin(a)*6])];
+        const positions=[...(previous?[previous]:[]),...[2.5,4].flatMap(eye=>angles.flatMap(a=>[5.2,6,6.8].map(radius=>[look[0]+Math.cos(a)*radius,Math.max(y,fy)+eye,look[2]+Math.sin(a)*radius])))];
         const testCamera=h.debug.camera.clone();
         const point=new V(),right=new V();
         let fallback=null;
         for(const pos of positions){
           let clearance;
-          for(const fov of [48,52,56]){
+          for(const fov of [42,48,52,56]){
           testCamera.position.fromArray(pos);testCamera.fov=fov;testCamera.lookAt(new V(...look));testCamera.updateProjectionMatrix();testCamera.updateMatrixWorld(true);
           right.setFromMatrixColumn(testCamera.matrixWorld,0);
           const bounds=(px,py,pz,height,width)=>{
@@ -287,18 +296,25 @@ try {
           const a=foxBounds.bounds,b=shadeBounds.bounds;
           const shared=Math.max(0,Math.min(a[1],b[1])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[2],b[2]));
           const overlap=shared/Math.max(1e-6,Math.min((a[1]-a[0])*(a[3]-a[2]),(b[1]-b[0])*(b[3]-b[2])));
-          const fits=foxBounds.height>.19&&shadeBounds.height>.18&&foxBounds.inFrame&&shadeBounds.inFrame&&overlap<.3;
+          const fits=foxBounds.height>.21&&shadeBounds.height>.18&&foxBounds.inFrame&&shadeBounds.inFrame&&(contactOverlap||overlap<.3);
           if(!fits)continue;
-          clearance??=!h.photoBlocker||(!h.photoBlocker(pos,[x,y+1.3,z])&&!h.photoBlocker(pos,[fox.x,fy+.6,fox.z]));
+          clearance??=!!h.photoBlocker&&[
+            [x,y+1.3,z],
+            [x+right.x*.5,y+1.3,z+right.z*.5],
+            [x-right.x*.5,y+1.3,z-right.z*.5],
+            [x+Math.sin(actor.heading??0)*.6,y+2.4,z+Math.cos(actor.heading??0)*.6],
+            [fox.x,fy+.6,fox.z],
+            [fox.x+Math.sin(h.debug.fox.rotation.y)*.6,fy+.9,fox.z+Math.cos(h.debug.fox.rotation.y)*.6],
+          ].every(target=>!h.photoBlocker(pos,target));
           const clear=clearance;
-          const result={pos,look,fov,clear,noFit:false,overlap,fox:foxBounds,shade:shadeBounds};
+          const result={pos,look,fov,clear,noFit:false,overlap,contactOverlap,fox:foxBounds,shade:shadeBounds};
           fallback??=result;
           if(clear)return result;
           }
         }
         return fallback||{pos:positions[1]||positions[0],look,fov:56,clear:false,noFit:true};
       },{previous:lens,actorId});
-      latestReviewLens.set(actorId,{clear:framing.clear,noFit:framing.noFit});
+      latestReviewLens.set(actorId,{clear:framing.clear,noFit:framing.noFit,overlap:framing.overlap??null,contactOverlap:framing.contactOverlap??false});
       lens=framing.pos;
       report.shadeReviewQuality??={};
       const counts=report.shadeReviewQuality[actorId]??={noFit:0,occluded:0};
@@ -329,7 +345,10 @@ try {
       const core=h.debug.scene.getObjectByName(id)?.getObjectByName('shade-density-core');
       return {actorId:id,freed:actor.freed,method:'posed mesh vertices, shader displacement/alpha excluded',fox:bounds(h.debug.fox,true),shade:bounds(core,false),shadePresent:!actor.freed||actor.presence>.5,presence:actor.presence};
     },actorId);
-    const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,sample:frame=>keyFrames.includes(frame)?measurePair(id):undefined,label:(frame,state)=>{
+    const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,afterStep:()=>camera(id),sample:async frame=>({
+      ...(keyFrames.includes(frame)?await measurePair(id):{actorId:id,lensOnly:true}),
+      lens:latestReviewLens.get(id)??{clear:false,noFit:true},
+    }),label:(frame,state)=>{
       const p=state?.capture;
       return `${id} f${frame} p${p?.presence??'?'} fox ${p?.fox?(p.fox.heightFraction*100).toFixed(0):'?'}% shade ${p?.shade?(p.shade.heightFraction*100).toFixed(0):'?'}%`;
     }});
@@ -356,12 +375,53 @@ try {
       for(const reason of reasons){const failure=`${name} staging: ${reason}`;releaseStagingFailures.push(failure);report.failures.push(failure);}
       return result;
     };
+    const stageSupportedKilnDash=async(label,startDistance=2.7)=>{
+      const trace=[];
+      let movedFoxAway=false;
+      try {
+      for(let waitFrames=0;waitFrames<=1200;waitFrames+=15){
+        const sample=await page.evaluate(({id,startDistance})=>{
+          const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
+          if(!actor||actor.freed)return {failure:'No live Kiln Shade'};
+          const [x,y,z]=actor.pos,col=h.debug.world.collision;
+          for(let k=0;k<128;k++){
+            const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+            for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){
+              const px=x+dx*r-dz*width,pz=z+dz*r+dx*width,floor=col.groundAt(px,pz,y+.1).y;
+              if(!Number.isFinite(floor)||col.blocked(px,pz,y)||Math.abs(floor-y)>.2){safe=false;break;}
+            }
+            if(safe)return {actor:actor.pos,mode:actor.mode,setup:{pos:[x+dx*startDistance,y,z+dz*startDistance],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)}};
+          }
+          return {actor:actor.pos,mode:actor.mode,setup:null};
+        },{id:actors[0].id,startDistance});
+        trace.push({waitFrames,...sample});
+        if(sample.failure)throw Error(sample.failure);
+        if(sample.setup){
+          save(`${label}-runway-wait.json`,{passed:true,label:'Staged fox moved to world spawn only if needed; live animal returns/patrols until full supported runway exists',movedFoxAway,waitFrames,trace});
+          return sample.setup;
+        }
+        if(waitFrames===1200)break;
+        if(!movedFoxAway){
+          await H('setKeys',[]);await H('setStick',null);
+          const spawn=await page.evaluate(()=>window.__gameHooks.debug.world.spawnPos.toArray());
+          await H('teleport',...spawn);movedFoxAway=true;
+        }
+        await advance(15,false);
+      }
+      throw Error(`No supported Kiln dash runway after20s of live patrol: ${label}`);
+      } catch(error) {
+        save(`${label}-runway-wait.json`,{passed:false,movedFoxAway,trace,error:String(error)});
+        throw error;
+      }
+    };
     const validatePair=name=>{
       const rows=report.videos[name].trace.filter(row=>row.state.capture?.shadePresent).map(row=>({frame:row.frame,...row.state.capture}));
       const failed=rows.filter(row=>!row.fox||!row.shade||row.fox.heightFraction<=.15||row.shade.heightFraction<=.15||!row.fox.inFrame||!row.shade.inFrame);
-      save(`${name}-framing.json`,{passed:rows.length>0&&failed.length===0,minimumHeightFraction:.15,rows,failedFrames:failed.map(row=>row.frame)});
+      const blocked=report.videos[name].trace.filter(row=>!row.state.capture?.lens?.clear||row.state.capture.lens.noFit).map(row=>row.frame);
+      if(blocked.length)report.failures.push(`Shade review lacks an unobstructed fitted pair lens in ${name}: frames ${blocked.join(',')}`);
+      save(`${name}-framing.json`,{passed:rows.length>0&&failed.length===0&&blocked.length===0,minimumHeightFraction:.15,rows,failedFrames:failed.map(row=>row.frame),blockedFrames:blocked});
       if(!rows.length||failed.length)report.failures.push(`Shade pair framing below director bar in ${name}: ${JSON.stringify(failed.map(row=>({frame:row.frame,fox:row.fox,shade:row.shade})))}`);
-      return rows.length>0&&failed.length===0;
+      return rows.length>0&&failed.length===0&&blocked.length===0;
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(({start:[x,y,z],center:[cx,cz],actorId}) => {
@@ -477,7 +537,7 @@ try {
       }
       save('shade-visual-source-variants.json',{label:'Controlled ColorField sources at frozen actor pose/time; shader diagnostic, not natural release or visual acceptance',variants});
     }
-    await video('shade-patrol', 120, ()=>camera(), undefined, pairOptions('Patrol',actors[0].id,[0,30,60,90,119]));
+    await video('shade-patrol', 120, async()=>{}, undefined, pairOptions('Patrol',actors[0].id,[0,30,60,90,119]));
     validatePair('shade-patrol');
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
     await page.evaluate(value => { if(typeof value==='number')window.__gameHooks.shades.tun.chaseDistance=value; }, chaseDistance);
@@ -507,7 +567,6 @@ try {
             await H('teleport',...observer.pos);
           }
         }
-        await camera();
       },undefined,pairOptions('Behavior',actors[0].id,[0,89,180,299,390,480,599]));
       validatePair('shade-behavior');
       const behavior=await page.evaluate(()=>window.__gameHooks.shades.state());
@@ -561,15 +620,7 @@ try {
     const contactFailure=contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1 ? `Shade contact failed: ${JSON.stringify(contact)}` : null;
     if(contactFailure){shadeContactFailures.push(contactFailure);report.failures.push(contactFailure);}
     save('shade-contact-acceptance.json',{passed:!contactFailure,failure:contactFailure,contact,label:'Strict contact gate retained; release diagnostics continue before final failure'});
-    p = contact.actors[0].pos;
-    const dashSetup = await page.evaluate(([x,y,z]) => {
-      const col=window.__gameHooks.debug.world.collision;
-      for(let k=0;k<128;k++){
-        const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2){safe=false;break;}}
-        if(safe)return {pos:[x+dx*2.7,y,z+dz*2.7], direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
-      }throw Error('No clear dash approach');
-    },p);
+    const dashSetup = await stageSupportedKilnDash('shade-free');
     save('shade-dash-setup.json',dashSetup);
     await H('teleport', ...dashSetup.pos, dashSetup.yaw);
     const dashControllerBefore=await H('state');
@@ -577,11 +628,11 @@ try {
     await H('setKeys', ['ShiftLeft']);
     lens=null;
     await camera();
-    const dashControllerAfter=await video('shade-free', 120, async i => {
+    const releaseKeyFrames=[...Array.from({length:30},(_,i)=>i*6),179];
+    const dashControllerAfter=await video('shade-free', 180, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
-      await camera();
-    }, undefined, pairOptions('Release',actors[0].id,[0,5,12,24,45,75,119]));
-    validatePair('shade-free');
+    }, undefined, pairOptions('Release',actors[0].id,releaseKeyFrames));
+    const releaseFramingPassed=validatePair('shade-free');
     await validateRunout('shade-free',dashSetup);
     save('shade-dash-controller.json',{before:dashControllerBefore.dash,after:dashControllerAfter.dash,label:'Actual controller activation; collisionActiveLastStep is the preceding simulated movement tick'});
     if(dashControllerBefore.dash&&dashControllerAfter.dash.used<=dashControllerBefore.dash.used)throw Error(`Shade dash input never activated controller ${JSON.stringify(dashControllerAfter.dash)}`);
@@ -592,10 +643,10 @@ try {
       const wash=await page.evaluate(()=>{
         const h=window.__gameHooks,actor=h.shades.state().actors[0],field=h.debug.colorField;
         const stroke=field.strokes.find(s=>Math.abs(s.radius-h.shades.tun.drainRadius)<.001&&Math.abs(s.strength-1.2)<.001&&Math.hypot(s.a.x-actor.pos[0],s.a.z-actor.pos[2])<.05);
-        return stroke?{life:stroke.life,strength:field.strokeStrength(stroke),radius:stroke.radius,center:stroke.a.toArray()}:null;
+        return stroke?{life:stroke.life,releaseAge:actor.releaseAge,strength:field.strokeStrength(stroke),radius:stroke.radius,center:stroke.a.toArray()}:null;
       });
       save('shade-release-wash.json',wash);
-      if(!wash||wash.life<3.8||wash.strength<1)throw Error(`Missing six-second shade release wash ${JSON.stringify(wash)}`);
+      if(!wash||Math.abs(wash.life+wash.releaseAge-6)>.06||wash.strength<1)throw Error(`Missing six-second shade release wash ${JSON.stringify(wash)}`);
     }
     await shot('shade-wash-normal');
     const occlusionSaved=await page.evaluate(()=>{
@@ -638,7 +689,7 @@ try {
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
     await advance(0);
     await shot('shade-after-free');
-    save('shade-acceptance.json', { passed:!contactFailure&&releaseStagingFailures.length===0, stagingFailures:[...releaseStagingFailures], releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    save('shade-acceptance.json', { passed:!contactFailure&&releaseStagingFailures.length===0&&releaseFramingPassed, framingPassed:releaseFramingPassed, stagingFailures:[...releaseStagingFailures], releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
     let edge = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
     if(!edge || edge.freed)throw Error('No live high-hill Shade for clear encounter evidence');
     if(edge && !edge.freed){
@@ -679,8 +730,8 @@ try {
       const edgeControllerBefore=await H('state');
       await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
       lens=null;
-      const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}await camera('shade-hill-high');},undefined,pairOptions('Hill release','shade-hill-high',[0,5,12,24,36,48,75,119]));
-      validatePair('shade-clear-free');
+      const edgeControllerAfter=await video('shade-clear-free',180,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,pairOptions('Hill release','shade-hill-high',releaseKeyFrames));
+      const edgeFramingPassed=validatePair('shade-clear-free');
       await validateRunout('shade-clear-free',setup,null);
       save('shade-edge-dash-controller.json',{before:edgeControllerBefore.dash,after:edgeControllerAfter.dash});
       if(edgeControllerBefore.dash&&edgeControllerAfter.dash.used<=edgeControllerBefore.dash.used)throw Error(`Second Shade dash input never activated controller ${JSON.stringify(edgeControllerAfter.dash)}`);
@@ -688,25 +739,17 @@ try {
       if(after.frees!==before.frees+1||after.hits!==before.hits||!after.actors.find(a=>a.id==='shade-hill-high')?.freed)throw Error(`Restored-edge dash failed ${JSON.stringify(after)}`);
       const releasedIds=after.actors.filter(a=>a.freed).map(a=>a.id);
       if(after.frees<2||releasedIds.length<2)throw Error(`Two distinct dash releases missing ${JSON.stringify(after)}`);
-      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0,releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
+      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0&&releaseFramingPassed&&edgeFramingPassed,framing:{first:releaseFramingPassed,second:edgeFramingPassed},releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
       await shot('shade-two-freed');
       await advance(180,false);await advance(0);await shot('shade-clear-litter');
       await advance(600,false);await advance(0);await shot('shade-clear-empty');
       const end=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(end.actors.find(a=>a.id==='shade-hill-high').leaves!==0)throw Error('Edge dissolve did not end empty');
-      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0,releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
+      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0&&releaseFramingPassed&&edgeFramingPassed,framing:{first:releaseFramingPassed,second:edgeFramingPassed},releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
     }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
-    const live = await page.evaluate(() => {
-      const actor=window.__gameHooks.shades.state().actors[0];
-      const [x,y,z]=actor.pos,col=window.__gameHooks.debug.world.collision;
-      for(let k=0;k<128;k++){
-        const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2){safe=false;break;}}
-        if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
-      }throw Error('No clear live dash approach');
-    });
+    const live = await stageSupportedKilnDash('shade-play',2.6);
     await H('teleport', ...live.pos, live.yaw);
     await H('advance', 1, 0, true);
     await page.keyboard.down('w');
@@ -730,12 +773,14 @@ try {
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
         if(!actor)return {failure:`Missing ${id}`};
         const [x,y,z]=actor.pos,col=h.debug.world.collision;
+        const floorBand=id.startsWith('shade-hill-')?2.4:.6;
         for(const radius of [4.3,4.8,3.4,3.1,2.8])for(let k=0;k<64;k++){
           const a=k*Math.PI*2/64,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
           const floor=col.groundAt(px,pz,y+.6).y;
-          if(!Number.isFinite(floor)||Math.abs(floor-y)>.6||col.blocked(px,pz,floor))continue;
+          if(!Number.isFinite(floor)||Math.abs(floor-y)>floorBand||col.blocked(px,pz,floor))continue;
           // Reject unsupported edges across the fox's footprint.
           if([[.3,0],[-.3,0],[0,.3],[0,-.3]].some(([dx,dz])=>Math.abs(col.groundAt(px+dx,pz+dz,floor+.2).y-floor)>.3))continue;
+          if(!h.photoBlocker||h.photoBlocker([px,floor+.9,pz],[x,y+1.3,z]))continue;
           return {pos:[px,floor,pz],yaw:Math.atan2(x-px,z-pz),actor:actor.pos,label:'Staged nearby observer on actual actor floor; live behavior preserved'};
         }
         return {failure:`No nearby supported observer for ${id}`,actor:actor.pos};
@@ -744,10 +789,10 @@ try {
       if(setup.failure){report.failures.push(setup.failure);continue;}
       await H('teleport',...setup.pos,setup.yaw);lens=null;
       await camera(id);
-      const lensTrace=[];
-      await video(id,frames,async frame=>{await camera(id);lensTrace.push({frame,...latestReviewLens.get(id)});},undefined,pairOptions('Regional',id,keyFrames));
+      await video(id,frames,async()=>{},undefined,pairOptions('Regional',id,keyFrames));
       const framingPassed=validatePair(id);
       const take=report.videos[id],rows=take.trace.map(row=>row.state);
+      const lensTrace=take.trace.map(row=>({frame:row.frame,...row.state.capture.lens}));
       const support=await page.evaluate(positions=>positions.map(p=>{
         const floor=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;
         return {floor:Number.isFinite(floor)?floor:null,gap:Number.isFinite(floor)?p[1]-floor:null};
@@ -1698,13 +1743,14 @@ try {
     const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
-    const phaseTrace=[];
+    const phaseTrace=[],supplyTrace=[];let nextSupplySample=0;
     const crossingSample=(st,p,phase,age)=>{
       const water=st.chem.water.find(w=>w.id==='reach-spout');
       return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
     };
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
+      if(st.t>=nextSupplySample){supplyTrace.push(crossingSample(st,p,phase,age));nextSupplySample=st.t+.5;}
       const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
       const sourceWater=st.chem.water.find(w=>w.id==='reach-spout');
       if(drinker?.freed&&events.shadeFreedAt===null)events.shadeFreedAt=st.t;
@@ -1726,19 +1772,23 @@ try {
     await RH('setKeys',[]);await RH('setStick',null);await advance(30);await shot('reach-end');
     const end=await RH('state');if(end.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=end.t;
     const eventOrder=Object.values(events).every(t=>t!==null)&&events.shadeFreedAt<events.sourceActivatedAt&&events.sourceActivatedAt<events.firstArrivalAt&&events.firstArrivalAt<events.bellLatchedAt;
-    save('reach-acceptance.json',{phase,reached,phaseTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
+    supplyTrace.push(crossingSample(end,points[phase],phase,age));
+    save('reach-acceptance.json',{phase,reached,phaseTrace,supplyTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(!eventOrder)report.failures.push('Reach release/source/arrival/latch event order not observed');
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
       let cycle=0,cycleAge=0,cyclePaint=false,ventHopIssued=false;
       const lowSeen={value:false};let lowLaneVisited=false,steamRise=false;
+      const cycleTrace=[];let nextCycleSample=0;
+      const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
+      const sampleCycle=(st,reason)=>({reason,t:st.t,cycle,age:cycleAge,waypoint:targets[cycle],distance:Math.hypot(targets[cycle][0]-st.pos[0],targets[cycle][2]-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,dashIssued:cyclePaint,ventHopIssued,steam:st.chem.hearths.find(h=>h.id==='reach-steam')??null,reach:st.reach});
       await video('reach-level-cycle',30*fps,async()=>{
         const st=await RH('state');cycleAge+=1/fps;
-        const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
+        if(st.t>=nextCycleSample){cycleTrace.push(sampleCycle(st,'interval'));nextCycleSample=st.t+.5;}
         const p=targets[cycle],dx=p[0]-st.pos[0],dz=p[2]-st.pos[2],d=Math.hypot(dx,dz);
         const atFooting=d<.8&&st.grounded&&Math.abs(st.pos[1]-p[1])<.6;
         const ready=cycle===0?st.reach.level==='low':cycle===1?st.reach.fill<.02:cycle===2?atFooting:cycle===3?cycleAge>1.2&&st.pos[1]>34:cycle===4?st.reach.level==='high':st.reach.fill>.99;
-        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
+        if(ready&&cycleAge>.2&&cycle<5){cycleTrace.push(sampleCycle(st,'transition'));if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
         const t=targets[cycle],vx=t[0]-st.pos[0],vz=t[2]-st.pos[2],len=Math.hypot(vx,vz);
         let sx=len>.25?vx/len*Math.min(.8,len):0,sz=len>.25?vz/len*Math.min(.8,len):0;
         const steamHot=st.chem.hearths.some(h=>h.id==='reach-steam'&&h.heat>=.5);
@@ -1753,7 +1803,7 @@ try {
         await RH('setKeys',keys);
       },st=>cycle===5&&st.reach.level==='high'&&st.reach.fill>.99||st.deaths>end.deaths||cycleAge>10,{keyFrames:[0,4*fps,8*fps,12*fps,16*fps]});
       await RH('setKeys',[]);await RH('setStick',null);await shot('reach-cycle-end');
-      const cy=await RH('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
+      const cy=await RH('state');cycleTrace.push(sampleCycle(cy,'final'));save('reach-cycle-acceptance.json',{cycle,cycleTrace,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
       if(cycle!==5||!lowSeen.value||!lowLaneVisited||!steamRise||cy.reach.level!=='high'||!cy.reach.restored||cy.reach.fill<.99)report.failures.push('Reach reversible water cycle incomplete');
     }
     // Staged architecture views are separate from the real summit-to-basin traversal above.
@@ -1847,6 +1897,7 @@ try {
     const encounter = { initialHits: start.shades.hits, minWisps: start.shades.wisps, knockbackTravelMeters: 0 };
     let previousPos = start.pos, previousKnockback = start.shades.knockbackTravel ?? 0, previousHits = start.shades.hits;
     const framing = { samples: 0, outside: 0, maxAbsX: 0, maxAbsY: 0, firstFailure: null, failures: [] };
+    const lensSafety = { samples: 0, occupied: 0, missing: 0, firstFailure: null };
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const budgetFrames = Number(arg('route-seconds', kilnRoute ? '60' : '360')) * fps;
     const minimumIdleFrames = 10 * fps;
@@ -1879,6 +1930,13 @@ try {
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     }, { traceEveryFrame: kilnRoute || budgetFrames <= 60 * fps, sample: async (i, st) => {
       const audit = {};
+      if (typeof st.camera.lensTouchesCollider === 'boolean') {
+        lensSafety.samples++;
+        if (st.camera.lensTouchesCollider) {
+          lensSafety.occupied++;
+          lensSafety.firstFailure ??= { frame: i, pos: st.camera.pos };
+        }
+      } else lensSafety.missing++;
       const visibility = await visibilityReview.sample(i);
       if (visibility) audit.projectedVisibility = visibility;
       if (kilnRoute) {
@@ -1977,6 +2035,8 @@ try {
       return { ...audit, cameraDiagnostic: `${name}-camera-frame-${i}.json` };
     } });
     const projectedVisibility = await visibilityReview.finish();
+    save('route-lens-safety.json', { ...lensSafety, passed: lensSafety.samples > 0 && lensSafety.occupied === 0 && lensSafety.missing === 0,
+      scope: 'Every encoded frame, conservative .2m authored box/cylinder/terrain proximity; not exact visual mesh containment' });
     if (projectedVisibility.invalid || projectedVisibility.errors) report.failures.push(`Invalid GPU visibility masks: ${JSON.stringify(projectedVisibility)}`);
     if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
     await H('autopilot', false, state.auto.idx, { assist: false });

@@ -52,6 +52,12 @@ export function projectedVisibilityReview({ getPage, fs, path, out, name, save, 
         minimumProjectedHeight: heights.length ? Math.min(...heights) : null,
         framesAtLeast12PercentHeight: heights.filter(value => value >= .12).length,
         viewportEdgeFrames: edgeFrames,
+        diagnosticChecks: {
+          validMasks: samples > 0 && invalid === 0 && errors === 0,
+          halfBodyIn95PercentFrames: samples > 0 && fractions.filter(value => value >= .5).length / samples >= .95,
+          height12PercentIn95PercentFrames: samples > 0 && heights.filter(value => value >= .12).length / samples >= .95,
+          noViewportEdgeContact: samples > 0 && edgeFrames === 0,
+        },
         evidence, scope: 'Opaque/alpha-tested Standard/Basic world vs physical Standard fox; excludes refraction, glass, volumes and wisps. Masks must be inspected. Not artistic readability.' };
       save(`${name}-projected-visibility.json`, result);
       await getPage().evaluate(() => window.__gameHooks.debug.cameraVisibility?.dispose());

@@ -17,7 +17,7 @@ export function createOcclusionFader(
     /** Subtree that must never be cut (the fox) */
     exclude?: THREE.Object3D;
     /** Geometry-aware follow boom: close props and in-flight compression need a cutout. */
-    blocked?: () => boolean;
+    blocked?: (camera: THREE.Camera, focus: THREE.Vector3) => boolean;
   },
 ) {
   // xy = projected bounds centre (px), z = view depth (m), w = feet world height.
@@ -199,7 +199,7 @@ export function createOcclusionFader(
         }
         if (!lastBlocked) lastBlocked = sightBlocked(camera.position, flank);
       }
-      if (lastBlocked || opts.blocked?.()) blockedHold = 0.35;
+      if (lastBlocked || opts.blocked?.(camera, chest)) blockedHold = 0.35;
       else blockedHold -= dt;
       const goal = blockedHold > 0 ? 1 : 0;
       uOccStrength.value = THREE.MathUtils.damp(uOccStrength.value, goal, goal > uOccStrength.value ? 40 : 4, dt);
