@@ -1224,7 +1224,10 @@ async function boot() {
       dashT = feel.dashDuration;
       vel.x = wish.x * feel.dashSpeed;
       vel.z = wish.z * feel.dashSpeed;
-      if(grounded) { fox.rotation.y=Math.atan2(wish.x,wish.z); groundYawRate=0; }
+      if(grounded) {
+        fox.rotation.y=Math.atan2(wish.x,wish.z); groundYawRate=0;
+        foxActor.locomotion?.syncYaw(fox.rotation.y);
+      }
       if (!grounded) {
         airDashUsed = true;
         vel.y = Math.max(vel.y, 0);

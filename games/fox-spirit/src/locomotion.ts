@@ -47,6 +47,8 @@ export class AuthoredLocomotion {
     for(const spring of this.tailSprings){spring.value=0;spring.velocity=0;}
     this.previousSpeed=this.input.speed;this.terrainOffset=0;
   }
+  /** A deliberate facing snap is not a physical turn impulse. */
+  syncYaw(yaw:number) { this.yaw=yaw; this.turn=0; }
   private brake=0;
   private landSpring=new Spring();
   private wasGrounded=true;
@@ -316,7 +318,7 @@ export class AuthoredLocomotion {
         // Carry a decaying world correction into recovery; releasing an anchor
         // must not pop the paw straight back to its uncorrected authored pose.
         foot.correction.multiplyScalar(Math.exp(-dt/.04));
-        if(!this.input.grounded || foot.correction.lengthSq()<1e-8)foot.correction.set(0,0,0);
+        if(foot.correction.lengthSq()<1e-8)foot.correction.set(0,0,0);
       }
       if(stance || foot.correction.lengthSq()>0) {
         this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,foot.correction.length());
