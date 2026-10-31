@@ -458,6 +458,7 @@ async function boot() {
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
+  const occlusionFeet = Array.from({ length: 4 }, () => new THREE.Vector3());
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
@@ -1675,9 +1676,10 @@ async function boot() {
     }
     // Fit the cutout to the rendered lens, including review/photo overrides.
     // Simulation can run several steps without drawing in the capture harness.
+    foxActor.locomotion.writeFootPoints(occlusionFeet);
     occlusion.update(dt, cam.camera, renderer,
       feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
-      foxActor.height, fox.rotation.y);
+      foxActor.height, fox.rotation.y, occlusionFeet);
     // grade follows the flood: faded sepia → rich autumn over the 6 s wave
     // exposure stays put; the grade only follows once the front has left the summit
     post.params.restore = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;

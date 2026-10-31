@@ -66,7 +66,7 @@ assert.ok(shader.uniforms.uOccFox, 'built material receives live cutout uniforms
 const camera = new THREE.PerspectiveCamera(54, 16 / 9, 0.1, 100);
 camera.position.set(0, 0.6, 4); camera.lookAt(0, 0.3, 0);
 const renderer = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(1280, 720) } as THREE.WebGLRenderer;
-const step = () => fader.update(1 / 60, camera, renderer, new THREE.Vector3(), 0.55, 0);
+const step = () => fader.update(1 / 60, camera, renderer, new THREE.Vector3(), 0.55, 0, [new THREE.Vector3()]);
 step();
 assert.equal(fader.detected, true, 'unproxied leaf material must block sight');
 assert.equal(crown.material, crownMat, 'canopy query must restore the rendered material');

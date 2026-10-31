@@ -49,6 +49,15 @@ export class AuthoredLocomotion {
   private debugGroup = new THREE.Group();
   private phase = 0;
   private lastActive = '';
+  /** Renderer-only read of the existing mesh-derived pads; caller reuses its vectors. */
+  writeFootPoints(out: THREE.Vector3[]) {
+    for (let i = 0; i < this.feet.length; i++) {
+      const foot = this.feet[i];
+      foot.paw.updateWorldMatrix(true, false);
+      (out[i] ??= new THREE.Vector3()).copy(foot.padLocal).applyMatrix4(foot.paw.matrixWorld);
+    }
+    out.length = this.feet.length;
+  }
   reset() {
     this.beforeMixer();
     for (const foot of this.feet) { foot.planted=false; foot.correction.set(0,0,0); foot.replantTime=0; }

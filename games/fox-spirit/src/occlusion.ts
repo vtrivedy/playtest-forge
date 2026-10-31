@@ -114,6 +114,7 @@ export function createOcclusionFader(
   const pt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   const size = new THREE.Vector2();
+  const cameraUp = new THREE.Vector3();
   let blockedHold = 0;
   let frame = 0;
   let lastBlocked = false;
@@ -173,6 +174,7 @@ export function createOcclusionFader(
       foxPos: THREE.Vector3,
       foxHeight: number,
       foxYaw: number,
+      footPoints: readonly THREE.Vector3[],
     ) {
       camera.updateMatrixWorld();
       chest.copy(foxPos).y += foxHeight * 0.45;
@@ -217,13 +219,16 @@ export function createOcclusionFader(
       const pad = size.y * 0.03;
       uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 1.05 + pad), Math.max(size.y * 0.05, (y1 - y0) * 1.05 + pad));
       const depth = chest.applyMatrix4(camera.matrixWorldInverse).z * -1;
-      // Paw width matters in side-on and low lenses. Only lower the trim edge;
-      // keep the existing side/top ellipse and its camera clearance unchanged.
+      // Follow the posed pads instead of a fixed stride rectangle. Preserve the
+      // existing ellipse; the trim must not reduce its current paw clearance.
       let cutoutBottom = y0;
-      for (const along of [0.4, -0.5]) for (const side of [-0.12, 0.12]) {
-        ndc.set(foxPos.x + fx * along + fz * foxHeight * side, foxPos.y,
-          foxPos.z + fz * along - fx * foxHeight * side).project(camera);
-        cutoutBottom = Math.min(cutoutBottom, (ndc.y * 0.5 + 0.5) * size.y);
+      cameraUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+      const pawRadius = foxHeight * 0.144; // 0.18m at authored scale; measured mesh maximum 0.169m.
+      for (const foot of footPoints) {
+        ndc.copy(foot).addScaledVector(cameraUp, -pawRadius).project(camera);
+        if (Number.isFinite(ndc.y) && ndc.z >= -1 && ndc.z <= 1) {
+          cutoutBottom = Math.min(cutoutBottom, (ndc.y * 0.5 + 0.5) * size.y);
+        }
       }
       const footFade = Math.max(1, size.y * 0.005);
       uOccFootFade.value = footFade;

@@ -21,7 +21,7 @@ export type FoxAnimState =
 
 export type FoxActor = {
   group: THREE.Group;
-  locomotion?: AuthoredLocomotion;
+  locomotion: AuthoredLocomotion;
   setMotion?: (input: MotionInput) => void;
   /** Approximate feet offset below group origin */
   feetOffset: number;

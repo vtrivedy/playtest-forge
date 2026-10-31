@@ -27,7 +27,10 @@ for (const screenHeight of [360, 720, 1440]) {
     camera.lookAt(feet.clone().add(new THREE.Vector3(0, height * .45, 0)));
     camera.rotateZ(roll);
     camera.updateMatrixWorld();
-    fader.update(1 / 60, camera, renderer, feet, height, yaw);
+    const pads = [-.45, .7].flatMap(along => [-.1, .1].map(side => new THREE.Vector3(
+      feet.x + Math.sin(yaw) * along + Math.cos(yaw) * side, feet.y,
+      feet.z + Math.cos(yaw) * along - Math.sin(yaw) * side)));
+    fader.update(1 / 60, camera, renderer, feet, height, yaw, pads);
     const fox = shader.uniforms.uOccFox.value as THREE.Vector4;
     const fade = shader.uniforms.uOccFootFade.value as number;
     assert.ok(fade >= 1 && Number.isFinite(fox.w));

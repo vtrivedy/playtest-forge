@@ -125,7 +125,7 @@ for (const y of [6, 7.25]) {
 assert(bowlCam.debug.blocked(), 'Close decorative bowl must activate the cutout');
 const fader = createOcclusionFader(bowlScene, { solidAt: () => -Infinity, blocked: bowlCam.debug.blocked });
 const dimensionsOnly = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(1280, 720) } as unknown as THREE.WebGLRenderer;
-for (let i = 0; i < 60; i++) fader.update(1 / 60, bowlCam.camera, dimensionsOnly, bowlFrame.target, 1.25, Math.PI);
+for (let i = 0; i < 60; i++) fader.update(1 / 60, bowlCam.camera, dimensionsOnly, bowlFrame.target, 1.25, Math.PI, [bowlFrame.target]);
 assert(fader.strength > 0.99, 'Geometry blocker must fade even without a gameplay height collider');
 
 // A steady diagonal must not cause camera-relative steering to spiral.
