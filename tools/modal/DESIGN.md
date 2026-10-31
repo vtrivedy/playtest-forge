@@ -4,3 +4,6 @@ Generate a separate, unrigged candidate from the top-row standing three-quarter 
 
 ## Visual review update
 TRELLIS fails: opaque torn wisp sheets and lost eyes. Hunyuan preserves the face and fur better but turns the tail into a solid lobe and grows antlers above the ears. Keep both raw exports. Make a separate conservative Blender cleanup variant: trim only the high ear-wisp geometry, reduce/taper the exaggerated tail volume with continuous deformation, preserve UVs and texture, and render/review it before recommending. No rigging, adoption or GPU reroll.
+
+## 01:47 ET — include the water-wade capture module in GPU image
+The close meadow bf50cf8 job fails before browser boot: gpu-capture.mjs now statically imports water-wade-capture.mjs, but the Modal image copies only the older sibling modules. Include that sibling in the image at /opt/browser/water-wade-capture.mjs, matching the existing module packaging convention. This changes capture packaging only, not game behavior. Check the complete top-level import list against image copies and Python syntax before pushing; then retry the same ten-segment close fixture on the new immutable SHA. Preserve failed archive3409647f as evidence.
