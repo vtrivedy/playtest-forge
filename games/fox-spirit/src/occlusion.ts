@@ -45,8 +45,8 @@ export function createOcclusionFader(
           uniform float uOccStrength;`,
         )
         .replace(
-          '#include <clipping_planes_fragment>',
-          `#include <clipping_planes_fragment>
+          '#include <normal_fragment_begin>',
+          `#include <normal_fragment_begin>
           if (uOccStrength > 0.001) {
             float occR = length((gl_FragCoord.xy - uOccFox.xy) / uOccRad);
             float occNear = uOccFox.z - vViewPosition.z; // vViewPosition = -mvPosition → +depth
@@ -55,6 +55,11 @@ export function createOcclusionFader(
             // vViewPosition is minus view-space position, so inverse-rotate its Y.
             float occWorldY = cameraPosition.y - dot(viewMatrix[1].xyz, vViewPosition);
             float occAboveFeet = smoothstep(uOccFox.w + 0.02, uOccFox.w + 0.20, occWorldY);
+            // Keep nearby uphill ground/stair treads as well as a flat floor.
+            // Use the standard unperturbed normal (flat and smooth materials).
+            float occUp = smoothstep(0.65, 0.80, dot(viewMatrix[1].xyz, normal));
+            float occStepFloor = 1.0 - smoothstep(uOccFox.w + 0.45, uOccFox.w + 0.65, occWorldY);
+            occAboveFeet *= 1.0 - occUp * occStepFloor;
             float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear) * occAboveFeet;
             // 4x4 Bayer stipple — no sorting, no blending, keeps a ghost of the occluder
             vec2 occP = mod(floor(gl_FragCoord.xy), 4.0);

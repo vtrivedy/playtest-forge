@@ -583,6 +583,7 @@ async function boot() {
   });
 
   const vel = new THREE.Vector3();
+  const maxGroundYawRate = 3.2;
   let groundYawRate = 0;
   let grounded = false;
   let dashT = 0;
@@ -1105,7 +1106,15 @@ async function boot() {
     else {
       // Full-stick steering orbits tight targets with the fox's smooth turn arc.
       // Use ordinary analog braking; keep action takeoffs and airborne control full.
-      const approach = onGround && auto.phase === 'run' && !auto.dashQueued && !wp.act ? Math.min(1, d / 3) : 1;
+      let approach = 1;
+      if (onGround && auto.phase === 'run' && !auto.dashQueued && !wp.act) {
+        const bearing = Math.atan2(dx, dz) - foxActor.group.rotation.y;
+        const error = Math.atan2(Math.sin(bearing), Math.cos(bearing));
+        const turnRate = maxGroundYawRate * Math.tanh(Math.abs(error) * feel.groundTurnRate / maxGroundYawRate);
+        const turnSpeed = 0.75 * turnRate * d / (2 * Math.max(0.05, Math.abs(Math.sin(error))));
+        const turnBrake = THREE.MathUtils.smoothstep(Math.abs(error), 0.12, 0.5);
+        approach = THREE.MathUtils.lerp(1, Math.min(1, turnSpeed / feel.moveSpeed), turnBrake);
+      }
       auto.wish.set(dx / Math.max(d, 0.001) * approach, 0, dz / Math.max(d, 0.001) * approach);
     }
     if (auto.phase === 'run') auto.space = false;
@@ -1369,7 +1378,7 @@ async function boot() {
       if(grounded && wish.lengthSq()>.001) {
         const targetYaw=Math.atan2(wish.x,wish.z);
         const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
-        const targetRate=3.2*Math.tanh(error*feel.groundTurnRate/3.2);
+        const targetRate=maxGroundYawRate*Math.tanh(error*feel.groundTurnRate/maxGroundYawRate);
         groundYawRate=THREE.MathUtils.damp(groundYawRate,targetRate,10,dt);
         const turnStep=groundYawRate*dt;
         const yawStep=Math.sign(turnStep)===Math.sign(error) && Math.abs(turnStep)>Math.abs(error) ? error : turnStep;
