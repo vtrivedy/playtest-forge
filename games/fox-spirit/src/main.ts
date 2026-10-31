@@ -1105,6 +1105,9 @@ async function boot() {
     const liftTop = liftWp?.rise !== undefined ? liftWp.y + liftWp.rise : wp.y + 0.5;
     if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= liftTop) auto.liftReady = true;
     const waitLift = !!prevLabel?.startsWith('lift:') && !auto.liftReady;
+    // The final lift ends on a stand: release the real jump input once its rise
+    // is complete, rather than gliding at the column's equilibrium above it.
+    if (auto.act === 'glide' && liftWp?.rise !== undefined && auto.liftReady) auto.space = false;
     const waitFinale = prevLabel === 'wellspring' && !shrineOn;
     const waitWind = !!prevLabel?.startsWith('wind-ready:') && (wind.state().find(w => w.id === prevLabel.slice(11))?.heat ?? 0) < 0.98;
     const waitBridge = waitWind || waitLift || waitWash || waitFinale || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
