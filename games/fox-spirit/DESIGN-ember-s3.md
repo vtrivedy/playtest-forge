@@ -13,3 +13,9 @@ Controls/feel remain move + jump + dash, hold-jump glide. No gameplay parameter 
 Validation: npx tsc --noEmit and fox Vite build, then push immutable stream SHA. Request GPU turntable, fox close-up and chase/probe evidence with window.__game and console errors. Personally inspect returned PNGs against concept; request Opus critique, fix concrete failures and request a retest. No local browser/render and no main landing before capture review. Record missing inputs and pending evidence honestly.
 
 Capture diagnostics: expose resolved wisp/source counts and live embers in actor userData and window.__game.notes, so missing emitters cannot masquerade as a visual pass.
+
+## Round 2 — evidence-led readability correction
+
+Personally reviewed GPU stills and run report at 8a975c2 (artifacts in fox-ember-r2). Machine reports no errors and 19 wisps/170 sources, yet ear/nape fire disappears in idle views. Tail reads as transparent laminated bands. Eyes lost white rings but baked socket remains too broad; coat lacks silhouette softness. No visual pass.
+
+First correction isolates spirit readability: modestly enlarge ear/nape plumes; increase low-state wisp emission above the brown background; use warm ember cores with soft irregular smoke edges; retain sparse world-space motes. Keep tail core solid through the proximal two thirds and dissolve only the outer third; reduce tail shell opacity to avoid stacked bands. Tail geometry and pose remain owned by the authored asset/locomotion. Review before further anatomy or coat changes. Require matching remote stills and Opus visual verdict.
