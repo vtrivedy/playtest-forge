@@ -20,10 +20,9 @@ export function createOcclusionFader(
     blocked?: () => boolean;
   },
 ) {
-  // xy = projected centre (px), z = view depth (m), w = lower cutout edge (px).
+  // xy = projected bounds centre (px), z = view depth (m), w = feet world height.
   const uOccFox = { value: new THREE.Vector4(0, 0, 0, 1) };
   const uOccRad = { value: new THREE.Vector2(1, 1) };
-  const uOccFootFade = { value: 1 };
   const uOccStrength = { value: 0 };
   const patched = new WeakSet<THREE.Material>();
 
@@ -37,26 +36,31 @@ export function createOcclusionFader(
       shader.uniforms.uOccFox = uOccFox;
       shader.uniforms.uOccStrength = uOccStrength;
       shader.uniforms.uOccRad = uOccRad;
-      shader.uniforms.uOccFootFade = uOccFootFade;
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
           `#include <common>
           uniform vec4 uOccFox;
           uniform vec2 uOccRad;
-          uniform float uOccFootFade;
           uniform float uOccStrength;`,
         )
         .replace(
-          '#include <clipping_planes_fragment>',
-          `#include <clipping_planes_fragment>
+          '#include <normal_fragment_begin>',
+          `#include <normal_fragment_begin>
           if (uOccStrength > 0.001) {
             float occR = length((gl_FragCoord.xy - uOccFox.xy) / uOccRad);
             float occNear = uOccFox.z - vViewPosition.z; // vViewPosition = -mvPosition → +depth
             // soft-edged ellipse fitted to the fox; nearby geometry counts from 0.45 m in front
-            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear);
-            // Trim the ellipse's lower skirt beneath the projected footing.
-            occCut *= smoothstep(uOccFox.w, uOccFox.w + uOccFootFade, gl_FragCoord.y);
+            // Preserve the supporting floor, including instanced/skinned geometry:
+            // vViewPosition is minus view-space position, so inverse-rotate its Y.
+            float occWorldY = cameraPosition.y - dot(viewMatrix[1].xyz, vViewPosition);
+            float occAboveFeet = smoothstep(uOccFox.w + 0.02, uOccFox.w + 0.20, occWorldY);
+            // Keep nearby uphill ground/stair treads as well as a flat floor.
+            // Use the standard unperturbed normal (flat and smooth materials).
+            float occUp = smoothstep(0.65, 0.80, dot(viewMatrix[1].xyz, normal));
+            float occStepFloor = 1.0 - smoothstep(uOccFox.w + 0.45, uOccFox.w + 0.65, occWorldY);
+            occAboveFeet *= 1.0 - occUp * occStepFloor;
+            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear) * occAboveFeet;
             // 4x4 Bayer stipple — no sorting, no blending, keeps a ghost of the occluder
             vec2 occP = mod(floor(gl_FragCoord.xy), 4.0);
             vec2 occLo = mod(occP, 2.0);
@@ -66,7 +70,7 @@ export function createOcclusionFader(
           }`,
         );
     };
-    mat.customProgramCacheKey = () => `${prevKey}|occ-cutout-footline`;
+    mat.customProgramCacheKey = () => `${prevKey}|occ-cutout`;
     mat.needsUpdate = true;
   }
 
@@ -114,7 +118,6 @@ export function createOcclusionFader(
   const pt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   const size = new THREE.Vector2();
-  const cameraUp = new THREE.Vector3();
   let blockedHold = 0;
   let frame = 0;
   let lastBlocked = false;
@@ -174,7 +177,6 @@ export function createOcclusionFader(
       foxPos: THREE.Vector3,
       foxHeight: number,
       foxYaw: number,
-      footPoints: readonly THREE.Vector3[],
     ) {
       camera.updateMatrixWorld();
       chest.copy(foxPos).y += foxHeight * 0.45;
@@ -219,20 +221,7 @@ export function createOcclusionFader(
       const pad = size.y * 0.03;
       uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 1.05 + pad), Math.max(size.y * 0.05, (y1 - y0) * 1.05 + pad));
       const depth = chest.applyMatrix4(camera.matrixWorldInverse).z * -1;
-      // Follow the posed pads instead of a fixed stride rectangle. Preserve the
-      // existing ellipse; the trim must not reduce its current paw clearance.
-      let cutoutBottom = y0;
-      cameraUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
-      const pawRadius = foxHeight * 0.144; // 0.18m at authored scale; measured mesh maximum 0.169m.
-      for (const foot of footPoints) {
-        ndc.copy(foot).addScaledVector(cameraUp, -pawRadius).project(camera);
-        if (Number.isFinite(ndc.y) && ndc.z >= -1 && ndc.z <= 1) {
-          cutoutBottom = Math.min(cutoutBottom, (ndc.y * 0.5 + 0.5) * size.y);
-        }
-      }
-      const footFade = Math.max(1, size.y * 0.005);
-      uOccFootFade.value = footFade;
-      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, cutoutBottom - 2 * footFade);
+      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, foxPos.y);
     },
   };
 }

@@ -88,3 +88,25 @@ run/report capture-tool hashes. Failed Modal retries preserve previous files in
 `attempt-NNN/` before writing fresh root artifacts. Route acceptance records an
 explicit reason in `route-acceptance.json`; sheets put the endpoint last and add
 waypoint/death labels from the captured state.
+
+## Close World 1 locomotion pairs
+
+`worldgait` records six disclosed staged segments: walk/trot/run from east Arrival
+Meadow `(40,88)` with close side and three-quarter tracking photo lenses. It uses
+live controller inputs, not forced animation poses. Each segment retains every-frame
+state, actual speed/gait/grounded summaries, PNGs and MP4. It does not prove the
+ordinary gameplay camera or continuous route progression. The broader `showcase`
+probe includes turns, jumps and slopes; its fixed world-offset lens varies with heading.
+
+Freeze the exact module for both game SHAs before running the pair:
+
+```sh
+cp tools/gpu-capture.mjs /tmp/fox-worldgait.mjs
+FOX_CAPTURE_SCRIPT=/tmp/fox-worldgait.mjs python3 tools/review-capture.py GAME_SHA --shots worldgait --out /absolute/pair/before
+FOX_CAPTURE_SCRIPT=/tmp/fox-worldgait.mjs python3 tools/review-capture.py CANDIDATE_SHA --shots worldgait --out /absolute/pair/after
+```
+
+Inspect all views and compare tool hashes/settings before judging motion.
+`python3 tools/video-review-sheets.py VIDEO --out REVIEW` decodes every retained
+video frame into numbered sheets with a source hash and frame-range index. It
+provides evidence for manual visibility review and makes no automatic visibility claim.

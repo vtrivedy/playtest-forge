@@ -316,7 +316,7 @@ async function boot() {
   fFeel.add(feel, 'glideForward', 4, 12, 0.1).listen();
   fFeel.add(feel, 'dashSpeed', 10, 30, 0.5).listen();
   fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
-  {
+  if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
     folder.add(params,'headLead',0,.5,.01);
@@ -337,6 +337,8 @@ async function boot() {
     folder.add(params, 'swingEase', 0, 1, .05);
     folder.add(params, 'headBob', 0, 1, .05);
     folder.add(params, 'swingTuck', 0, .8, .01);
+    folder.add(params, 'releaseSwing', .12, .4, .01);
+    folder.add(params, 'carpalCurl', 0, .7, .01);
     folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
@@ -369,20 +371,21 @@ async function boot() {
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
   fAudio.close();
+  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
   fCam.add(cam.params, 'runDistance', 2.6, 5, 0.1);
   fCam.add(cam.params, 'framingHeight', 0, 1, 0.05);
   fCam.add(cam.params, 'minDistance', 1.8, 3.2, 0.1).name('minimum terrain boom');
-  fCam.add(cam.params, 'height', 0.5, 4, 0.05);
+  fCam.add(baseCam, 'height', 0.5, 4, 0.05);
   fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
-  fCam.add(cam.params, 'glideDistance', 3, 12, 0.1);
+  fCam.add(baseCam, 'glideDistance', 3, 12, 0.1);
   fCam.add(cam.params, 'fov', 35, 80, 0.5);
   fCam.add(cam.params, 'lag', 0.04, 0.5, 0.01);
   fCam.add(cam.params, 'lookAhead', 0, 4, 0.05);
   fCam.add(cam.params, 'recenterRate', 0, 4, 0.05);
   fCam.add(cam.params, 'sideBias', -0.6, 0.6, 0.01);
-  fCam.add(cam.params, 'jumpTrack', 0, 1, 0.01);
+  fCam.add(baseCam, 'jumpTrack', 0, 1, 0.01);
   fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
   fCam.add(cam.params, 'shake', 0, 2, 0.05);
   fCam.close();
@@ -458,7 +461,6 @@ async function boot() {
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
-  const occlusionFeet = Array.from({ length: 4 }, () => new THREE.Vector3());
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
@@ -501,7 +503,6 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
   let inColumn = false;
-  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
   let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
   const dashStruck = new Set<Hearth>();
@@ -526,11 +527,15 @@ async function boot() {
   fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
   fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'eyeSocketLift', 0, 1, 0.01);
   fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
   fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickStream', 0, 1, 0.01);
+  fFox.add(FOX_LOOK, 'coreRadiance', 0, 8, 0.1);
+  fFox.add(FOX_LOOK, 'tailRadiance', 0, 8, 0.1);
+  fFox.add(FOX_LOOK, 'emberRadiance', 0, 6, 0.1);
   fFox.add(FOX_LOOK, 'emberRate', 0, 60, 1);
   fFox.add(FOX_LOOK, 'emberSize', 0.005, 0.08, 0.001);
   fFox.close();
@@ -584,6 +589,7 @@ async function boot() {
   });
 
   const vel = new THREE.Vector3();
+  const maxGroundYawRate = 3.2;
   let groundYawRate = 0;
   let grounded = false;
   let dashT = 0;
@@ -766,7 +772,7 @@ async function boot() {
       foxActor.group.rotation.y = yaw;
       windupT=-1;
       groundYawRate=0;
-      foxActor.locomotion.reset();
+      foxActor.locomotion?.reset();
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
       photo = null;
@@ -891,7 +897,7 @@ async function boot() {
         pos: [p.x, p.y - foxActor.feetOffset, p.z],
         vel: [vel.x, vel.y, vel.z],
         foxYaw: foxActor.group.rotation.y,
-        locomotion: foxActor.locomotion.metrics,
+        locomotion: foxActor.locomotion?.metrics,
         airT,
         anim: foxActor.getAnim(),
         grounded,
@@ -1104,9 +1110,20 @@ async function boot() {
     const waitBridge = waitWind || waitLift || waitWash || waitFinale || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else {
-      // Authored analog input for tight ground turns; keep real controller/air physics.
-      const pace = onGround && auto.phase === 'run' && !auto.dashQueued ? THREE.MathUtils.clamp(wp.pace ?? 1, 0.1, 1) : 1;
-      const scale = d > 1e-6 ? pace / d : 0;
+      // Full-stick steering orbits tight targets with the fox's smooth turn arc.
+      // Use ordinary analog braking; keep action takeoffs and airborne control full.
+      let approach = 1;
+      if (onGround && auto.phase === 'run' && !auto.dashQueued && !wp.act) {
+        const bearing = Math.atan2(dx, dz) - foxActor.group.rotation.y;
+        const error = Math.atan2(Math.sin(bearing), Math.cos(bearing));
+        const turnRate = maxGroundYawRate * Math.tanh(Math.abs(error) * feel.groundTurnRate / maxGroundYawRate);
+        const turnSpeed = 0.75 * turnRate * d / (2 * Math.max(0.05, Math.abs(Math.sin(error))));
+        const turnBrake = THREE.MathUtils.smoothstep(Math.abs(error), 0.12, 0.5);
+        approach = THREE.MathUtils.lerp(1, Math.min(1, turnSpeed / feel.moveSpeed), turnBrake);
+      }
+      // Authored stair pacing is a cap on the shared turn-aware approach input.
+      const pace = onGround && auto.phase === 'run' && !auto.dashQueued && !wp.act ? THREE.MathUtils.clamp(wp.pace ?? 1, 0.1, 1) : 1;
+      const scale = Math.min(approach, pace) / Math.max(d, 0.001);
       auto.wish.set(dx * scale, 0, dz * scale);
     }
     if (auto.phase === 'run') auto.space = false;
@@ -1272,7 +1289,7 @@ async function boot() {
       vel.z = wish.z * feel.dashSpeed;
       if(grounded) {
         fox.rotation.y=Math.atan2(wish.x,wish.z); groundYawRate=0;
-        foxActor.locomotion.syncYaw(fox.rotation.y);
+        foxActor.locomotion?.syncYaw(fox.rotation.y);
       }
       if (!grounded) {
         airDashUsed = true;
@@ -1304,8 +1321,8 @@ async function boot() {
     // ride framing: the lens follows the full rise in a column (normal jumps keep the partial track)
     const riding = inColumn || (gliding && lift.k > 0);
     cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, riding ? 1 : baseCam.jumpTrack, 3, dt);
-    // and rides above the fox, pulled in, looking down the column (the source stays in frame, the sun leaves it)
-    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 2.4 : baseCam.height, 2.2, dt);
+    // A small rise preserves the chase silhouette instead of craning over the column.
+    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 0.4 : baseCam.height, 2.2, dt);
     cam.params.glideDistance = THREE.MathUtils.damp(cam.params.glideDistance, riding ? baseCam.glideDistance - 0.9 : baseCam.glideDistance, 2.2, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
@@ -1370,7 +1387,7 @@ async function boot() {
       if(grounded && wish.lengthSq()>.001) {
         const targetYaw=Math.atan2(wish.x,wish.z);
         const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
-        const targetRate=3.2*Math.tanh(error*feel.groundTurnRate/3.2);
+        const targetRate=maxGroundYawRate*Math.tanh(error*feel.groundTurnRate/maxGroundYawRate);
         groundYawRate=THREE.MathUtils.damp(groundYawRate,targetRate,10,dt);
         const turnStep=groundYawRate*dt;
         const yawStep=Math.sign(turnStep)===Math.sign(error) && Math.abs(turnStep)>Math.abs(error) ? error : turnStep;
@@ -1498,8 +1515,8 @@ async function boot() {
           anim='skid'; fade=.06;
         } else if (skidT > 0 && wish.lengthSq() < .01) {
           anim = 'skid'; fade = .06;
-        } else if (speed < .6 && Math.abs(foxActor.locomotion.metrics.turnRate) > .8) {
-          anim = (foxActor.locomotion.metrics.turnRate) > 0 ? 'turn_left' : 'turn_right';
+        } else if (speed < .6 && Math.abs(foxActor.locomotion?.metrics.turnRate ?? 0) > .8) {
+          anim = (foxActor.locomotion?.metrics.turnRate ?? 0) > 0 ? 'turn_left' : 'turn_right';
         } else if (speed > 0.08) {
           anim = 'run';
           // Authored locomotion computes cadence from stance sweep and blended stride length.
@@ -1573,7 +1590,7 @@ async function boot() {
 
     // Quiet leaf contacts belong to planted paws, not a periodic emitter behind the body.
     if (grounded && speed > 2) {
-      for (const paw of foxActor.locomotion.footfalls) autumnFX.kick(paw, .18);
+      for (const paw of foxActor.locomotion?.footfalls ?? []) autumnFX.kick(paw, .18);
     }
 
     if (dt > 0) handleEvents(world.update(dt, elapsed, fox.position, fox.position.y - foxActor.feetOffset, (q) => colorField.sample(q)));
@@ -1676,10 +1693,9 @@ async function boot() {
     }
     // Fit the cutout to the rendered lens, including review/photo overrides.
     // Simulation can run several steps without drawing in the capture harness.
-    foxActor.locomotion.writeFootPoints(occlusionFeet);
     occlusion.update(dt, cam.camera, renderer,
       feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
-      foxActor.height, fox.rotation.y, occlusionFeet);
+      foxActor.height, fox.rotation.y);
     // grade follows the flood: faded sepia → rich autumn over the 6 s wave
     // exposure stays put; the grade only follows once the front has left the summit
     post.params.restore = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;
@@ -1737,8 +1753,8 @@ async function boot() {
         extra: {
           preset: feelPreset,
           anim: foxActor.getAnim(),
-          gait: foxActor.locomotion.metrics.gait,
-          plantError: foxActor.locomotion.metrics.maxPlantError,
+          gait: foxActor.locomotion?.metrics.gait ?? 'none',
+          plantError: foxActor.locomotion?.metrics.maxPlantError ?? 0,
           lastJumpDist: jumpStats.lastDist,
           lastLandImpact: jumpStats.lastImpact,
           lastDashDist: jumpStats.lastDashDist,
