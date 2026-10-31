@@ -109,9 +109,15 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   const rr=rng(1050); for(let i=0;i<12;i++) hangingRoot(roots,rr,165+rr()*48,29.8,-132+rr()*2,4+rr()*5,new THREE.Vector2(0,1),.13);
   for(const [bucket,name] of [[rock,'rv-rock'],[stone,'rv-stone'],[roots,'rv-bark']] as const) {
     // Keep the shared geometry grammar, but give Reach its own wet slate palette.
-    const tint = new THREE.Color(name === 'rv-rock' ? 0x79999b : name === 'rv-stone' ? 0xa7aaa0 : 0x505b55);
+    const tint = new THREE.Color(name === 'rv-rock' ? 0x62777b : name === 'rv-stone' ? 0x89928e : 0x505b55);
+    const tintValue = tint.r*.3+tint.g*.59+tint.b*.11;
     for (let i=0; i<bucket.col.length; i+=3) {
-      const value = (bucket.col[i]!*.3+bucket.col[i+1]!*.59+bucket.col[i+2]!*.11) / (tint.r*.3+tint.g*.59+tint.b*.11);
+      const original = bucket.col[i]!*.3+bucket.col[i+1]!*.59+bucket.col[i+2]!*.11;
+      // Preserve surface variation within mid-value bands, rather than keeping
+      // W1's pale luminance and merely shifting its hue toward slate.
+      const luminance = name === 'rv-bark' ? original
+        : THREE.MathUtils.clamp(original, .08, .65) * (name === 'rv-rock' ? .32 : .42) + .035;
+      const value = luminance / tintValue;
       bucket.col[i]=tint.r*value;bucket.col[i+1]=tint.g*value;bucket.col[i+2]=tint.b*value;
     }
     const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86});mat.name=`reach-${name}`;

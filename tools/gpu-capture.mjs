@@ -1,4 +1,5 @@
 import { captureFinale } from './finale-capture.mjs';
+import { captureWadeVisibility } from './water-wade-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
@@ -132,6 +133,24 @@ try {
   async function shot(name) {
     await page.screenshot({ path: path.join(out, `${name}.png`), animations: 'disabled' });
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
+    if (name.startsWith('reachview-')) {
+      // Validate the snapshot belonging to this PNG, after its staged teleport/lens.
+      // This observes the same simulated water; it never sets a puzzle state.
+      const { reach, reachMood } = report.shots[name].state;
+      const expectedLevel = name.startsWith('reachview-low-') ? 'low' : 'high';
+      const fillMatches = Number.isFinite(reach?.fill) && (expectedLevel === 'high' ? reach.fill >= .99 : reach.fill <= .02);
+      const checks = {
+        expectedLevel,
+        actualLevel: reach?.level,
+        fill: reach?.fill,
+        moodWeight: reachMood?.k,
+        waterMatches: reach?.level === expectedLevel && fillMatches,
+        moodMatches: reachMood?.k === 1,
+      };
+      save(`${name}-acceptance.json`, checks);
+      if (!checks.waterMatches) report.failures.push(`${name}: labelled ${expectedLevel.toUpperCase()} water state does not match PNG snapshot`);
+      if (!checks.moodMatches) report.failures.push(`${name}: Reach mood is not fully blended at photo position`);
+    }
   }
   await boot(quality);
   await shot('hardware-probe');
@@ -205,8 +224,8 @@ try {
     if (options.keyFrames) {
       const sheetPage = await context.newPage();
       try {
-        await sheetPage.setViewportSize({ width: 1920, height: 1080 });
-        const cards = options.keyFrames.filter(frame => frame < count).map(frame => {
+        await sheetPage.setViewportSize({ width: 1920, height: 1 });
+        const cards = (options.sheetFrames ?? options.keyFrames).filter(frame => frame < count).map(frame => {
           const filename = `${name}-${String(frame).padStart(5, '0')}.png`;
           const label = options.label?.(frame, trace.find(sample => sample.frame === frame)?.state) ?? `${name} frame ${frame}`;
           return `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, filename)).toString('base64')}"></figure>`;
@@ -228,6 +247,8 @@ try {
       return points.reduce((sum,p)=>[sum[0]+p[0]/points.length,sum[1]+p[2]/points.length],[0,0]);
     });
     let lens = null;
+    const releaseStagingFailures=[];
+    const latestReviewLens=new Map();
     const camera = async (actorId=actors[0].id) => {
       const framing=await page.evaluate(({previous,actorId})=>{
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===actorId),fox=h.debug.fox.position;
@@ -268,6 +289,7 @@ try {
         }
         return fallback||{pos:positions[1]||positions[0],look,fov:56,clear:false,noFit:true};
       },{previous:lens,actorId});
+      latestReviewLens.set(actorId,{clear:framing.clear,noFit:framing.noFit});
       lens=framing.pos;
       report.shadeReviewQuality??={};
       const counts=report.shadeReviewQuality[actorId]??={noFit:0,occluded:0};
@@ -302,11 +324,35 @@ try {
       const p=state?.capture;
       return `${id} f${frame} p${p?.presence??'?'} fox ${p?.fox?(p.fox.heightFraction*100).toFixed(0):'?'}% shade ${p?.shade?(p.shade.heightFraction*100).toFixed(0):'?'}%`;
     }});
+    const validateRunout=async(name,setup,maxDrop=.25)=>{
+      const take=report.videos[name],rows=take.trace.map(row=>row.state);
+      let airborne=0,longestAirborne=0,maxLateral=0;
+      for(const row of rows){
+        airborne=row.grounded?0:airborne+1;longestAirborne=Math.max(longestAirborne,airborne);
+        const dx=row.pos[0]-setup.pos[0],dz=row.pos[2]-setup.pos[2];
+        maxLateral=Math.max(maxLateral,Math.abs(dx*setup.direction[1]-dz*setup.direction[0]));
+      }
+      const firstMoving=rows.find(row=>Math.hypot(row.vel[0],row.vel[2])>.5),v=firstMoving?.vel;
+      const direction=v?[v[0]/Math.hypot(v[0],v[2]),v[2]/Math.hypot(v[0],v[2])]:null;
+      const minimumY=Math.min(...rows.map(row=>row.pos[1]));
+      const support=await page.evaluate(positions=>positions.map(p=>{const floor=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;return {floor:Number.isFinite(floor)?floor:null,gap:Number.isFinite(floor)?p[1]-floor:null};}),rows.map(row=>row.pos));
+      const reasons=[];
+      if(rows.some(row=>row.deaths>take.start.deaths))reasons.push('death during release take');
+      if(maxDrop!==null&&minimumY<setup.pos[1]-maxDrop)reasons.push('dropped below validated floor band');
+      if(support.some(sample=>sample.gap===null||sample.gap>.55))reasons.push('more than0.55m above supporting floor');
+      if(!take.end.grounded||longestAirborne>Math.ceil(fps*.2))reasons.push('unsupported beyond brief stair settling');
+      if(maxLateral>.35)reasons.push('left validated runway corridor');
+      const result={passed:!reasons.length,label:'Staged runway support/trajectory check; no controller intervention',reasons,setup,maxDrop,minimumY,maximumFloorGap:Math.max(...support.map(sample=>sample.gap??Infinity)),longestAirborneFrames:longestAirborne,maxLateral,actualInitialDirection:direction,finalPosition:take.end.pos,finalGrounded:take.end.grounded};
+      save(`${name}-runout.json`,result);
+      for(const reason of reasons){const failure=`${name} staging: ${reason}`;releaseStagingFailures.push(failure);report.failures.push(failure);}
+      return result;
+    };
     const validatePair=name=>{
       const rows=report.videos[name].trace.filter(row=>row.state.capture?.shadePresent).map(row=>({frame:row.frame,...row.state.capture}));
       const failed=rows.filter(row=>!row.fox||!row.shade||row.fox.heightFraction<=.15||row.shade.heightFraction<=.15||!row.fox.inFrame||!row.shade.inFrame);
       save(`${name}-framing.json`,{passed:rows.length>0&&failed.length===0,minimumHeightFraction:.15,rows,failedFrames:failed.map(row=>row.frame)});
       if(!rows.length||failed.length)report.failures.push(`Shade pair framing below director bar in ${name}: ${JSON.stringify(failed.map(row=>({frame:row.frame,fox:row.fox,shade:row.shade})))}`);
+      return rows.length>0&&failed.length===0;
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(({start:[x,y,z],center:[cx,cz],actorId}) => {
@@ -388,6 +434,39 @@ try {
         await advance(0);
       }
       save('shade-density-variants.json',{label:'Same pose/time/camera, core absorption only; variants are not acceptance',chosenDefault:originalDensity,pose:{time:pose.t,fox:pose.pos,foxYaw:pose.foxYaw},variants});
+    }
+    if(await page.evaluate(()=>Array.isArray(window.__gameHooks.debug.colorField.visualDrains))){
+      await page.evaluate(id=>{
+        const h=window.__gameHooks,field=h.debug.colorField,actor=h.shades.state().actors.find(a=>a.id===id),V=field.fox.constructor;
+        window.__shadeVisualDiagnostic={field,center:new V(...actor.pos),radius:h.shades.tun.drainRadius,saved:{fox:field.fox.clone(),trail:field.trail,strokes:field.strokes,restores:field.restores,glows:field.glows,visualDrains:field.visualDrains,globalColor:field.globalColor}};
+      },actors[0].id);
+      const variants=[];
+      try{
+        for(const variant of ['weak-no-drain','weak-drained','strong-drained','permanent-drained']){
+          const source=await page.evaluate(variant=>{
+            const {field,center,radius}=window.__shadeVisualDiagnostic;
+            field.trail=[];field.strokes=[];field.restores=[];field.glows=[];field.globalColor=0;field.fox.copy(center);
+            field.visualDrains=variant==='weak-no-drain'?[]:[{center:center.clone(),radius}];
+            if(variant==='strong-drained')field.stroke(center,center,{life:6,strength:1.5,radius});
+            if(variant==='permanent-drained'){const restore=field.restore(center,radius,.2);restore.radius=radius;restore.t=1;restore.rim=0;}
+            return {variant,center:center.toArray(),radius,drains:field.visualDrains.length,strokeStrength:field.strokes[0]?.strength??0,permanent:field.restores.length};
+          },variant);
+          await advance(0);
+          const name=`shade-visual-${variant}`;await shot(name);variants.push({...source,shot:name});
+        }
+      }finally{
+        const restored=await page.evaluate(()=>{
+          const diagnostic=window.__shadeVisualDiagnostic,{field,saved}=diagnostic;
+          field.fox.copy(saved.fox);
+          for(const key of ['trail','strokes','restores','glows','visualDrains','globalColor'])field[key]=saved[key];
+          const result={passed:field.fox.equals(saved.fox)&&['trail','strokes','restores','glows','visualDrains','globalColor'].every(key=>field[key]===saved[key]),label:'Exact original source references, fox position and global fill restored; no simulation step in gallery'};
+          delete window.__shadeVisualDiagnostic;return result;
+        });
+        save('shade-visual-source-restoration.json',restored);
+        await advance(0);
+        if(!restored.passed)report.failures.push('Visual-source diagnostic failed to restore field');
+      }
+      save('shade-visual-source-variants.json',{label:'Controlled ColorField sources at frozen actor pose/time; shader diagnostic, not natural release or visual acceptance',variants});
     }
     await video('shade-patrol', 120, ()=>camera(), undefined, pairOptions('Patrol',actors[0].id,[0,30,60,90,119]));
     validatePair('shade-patrol');
@@ -478,7 +557,7 @@ try {
       const col=window.__gameHooks.debug.world.collision;
       for(let k=0;k<128;k++){
         const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=.1;r<3.1;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+        for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2){safe=false;break;}}
         if(safe)return {pos:[x+dx*2.7,y,z+dz*2.7], direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
       }throw Error('No clear dash approach');
     },p);
@@ -494,6 +573,7 @@ try {
       await camera();
     }, undefined, pairOptions('Release',actors[0].id,[0,5,12,24,45,75,119]));
     validatePair('shade-free');
+    await validateRunout('shade-free',dashSetup);
     save('shade-dash-controller.json',{before:dashControllerBefore.dash,after:dashControllerAfter.dash,label:'Actual controller activation; collisionActiveLastStep is the preceding simulated movement tick'});
     if(dashControllerBefore.dash&&dashControllerAfter.dash.used<=dashControllerBefore.dash.used)throw Error(`Shade dash input never activated controller ${JSON.stringify(dashControllerAfter.dash)}`);
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
@@ -549,7 +629,7 @@ try {
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
     await advance(0);
     await shot('shade-after-free');
-    save('shade-acceptance.json', { passed:!contactFailure, releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    save('shade-acceptance.json', { passed:!contactFailure&&releaseStagingFailures.length===0, stagingFailures:[...releaseStagingFailures], releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
     let edge = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
     if(!edge || edge.freed)throw Error('No live high-hill Shade for clear encounter evidence');
     if(edge && !edge.freed){
@@ -580,7 +660,8 @@ try {
         const col=window.__gameHooks.debug.world.collision;
         for(let k=0;k<128;k++){
           const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-          for(let r=-2;r<3;r+=.1){const px=x+dx*r,pz=z+dz*r,fy=col.groundAt(px,pz,y+2.5).y;if(!Number.isFinite(fy)||Math.abs(fy-y)>2.4||col.blocked(px,pz,fy+.01)){safe=false;break;}}
+          const previousFloors=new Map();
+          for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width,fy=col.groundAt(px,pz,y+2.5).y,previous=previousFloors.get(width);if(!Number.isFinite(fy)||Math.abs(fy-y)>2.4||(previous!==undefined&&Math.abs(fy-previous)>.3)||col.blocked(px,pz,fy+.01)){safe=false;break;}previousFloors.set(width,fy);}
           if(safe)return{pos:[x+dx*2.7,col.groundAt(x+dx*2.7,z+dz*2.7,y+2.5).y,z+dz*2.7],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
         }throw Error('No safe restored-edge dash runway');
       },edge.pos);
@@ -591,19 +672,20 @@ try {
       lens=null;
       const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}await camera('shade-hill-high');},undefined,pairOptions('Hill release','shade-hill-high',[0,5,12,24,36,48,75,119]));
       validatePair('shade-clear-free');
+      await validateRunout('shade-clear-free',setup,null);
       save('shade-edge-dash-controller.json',{before:edgeControllerBefore.dash,after:edgeControllerAfter.dash});
       if(edgeControllerBefore.dash&&edgeControllerAfter.dash.used<=edgeControllerBefore.dash.used)throw Error(`Second Shade dash input never activated controller ${JSON.stringify(edgeControllerAfter.dash)}`);
       const after=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(after.frees!==before.frees+1||after.hits!==before.hits||!after.actors.find(a=>a.id==='shade-hill-high')?.freed)throw Error(`Restored-edge dash failed ${JSON.stringify(after)}`);
       const releasedIds=after.actors.filter(a=>a.freed).map(a=>a.id);
       if(after.frees<2||releasedIds.length<2)throw Error(`Two distinct dash releases missing ${JSON.stringify(after)}`);
-      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0,releasePassed:true,contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
+      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0,releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
       await shot('shade-two-freed');
       await advance(180,false);await advance(0);await shot('shade-clear-litter');
       await advance(600,false);await advance(0);await shot('shade-clear-empty');
       const end=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(end.actors.find(a=>a.id==='shade-hill-high').leaves!==0)throw Error('Edge dissolve did not end empty');
-      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0,releasePassed:true,contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
+      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0,releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
     }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
@@ -612,8 +694,8 @@ try {
       const [x,y,z]=actor.pos,col=window.__gameHooks.debug.world.collision;
       for(let k=0;k<128;k++){
         const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=-2;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
-        if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],yaw:Math.atan2(-dx,-dz)};
+        for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2){safe=false;break;}}
+        if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
       }throw Error('No clear live dash approach');
     });
     await H('teleport', ...live.pos, live.yaw);
@@ -623,30 +705,54 @@ try {
     await video('shade-play', 120, async i => {
       if(i===12){await page.keyboard.up('w');await page.keyboard.up('Shift');}
     }, undefined, {traceEveryFrame:true,keyFrames:[0,6,12,24,45,90,119]});
+    const liveRunout=await validateRunout('shade-play',live);
     const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
     if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
-    save('shade-live-acceptance.json',{label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
-    const flume = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
-    if(flume){
-      await H('teleport',95,6,18,0);
-      await H('photo',[103,10,31],[99,5,23],48);
-      await video('shade-flume',120,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,90,119]});
-      const result=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
-      if(result.pos[1]<3.5||result.pos[1]>7)throw Error('Flume Shade left elevated channel');
-      save('shade-flume-acceptance.json',{actor:result,game:await page.evaluate(()=>window.__game)});
-      for(const [id,observer,lens,target] of [
-        ['shade-hill-low',[8,12,-67],[11,20,-60],[0,15,-68.7]],
-        ['shade-hill-high',[8,32.8,-79.5],[12,41,-73],[0,35,-80.5]],
-      ]){
-        await H('teleport',...observer,0);await H('photo',lens,target,48);
-        await video(id,90,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,89]});
-        const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
-        if(!actor)throw Error(`Missing ${id}`);
-        save(`${id}-acceptance.json`,actor);
-      }
-
+    save('shade-live-acceptance.json',{passed:liveRunout.passed,runout:liveRunout,label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
+    // Regional review uses the same close actor-aware lens as patrol, not distant fixed vistas.
+    for(const [id,frames,keyFrames] of [
+      ['shade-flume',120,[0,30,60,90,119]],
+      ['shade-hill-low',90,[0,30,60,89]],
+      ['shade-hill-high',90,[0,30,60,89]],
+    ]){
+      const setup=await page.evaluate(id=>{
+        const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
+        if(!actor)return {failure:`Missing ${id}`};
+        const [x,y,z]=actor.pos,col=h.debug.world.collision;
+        for(const radius of [4.3,4.8,3.4,3.1,2.8])for(let k=0;k<64;k++){
+          const a=k*Math.PI*2/64,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
+          const floor=col.groundAt(px,pz,y+.6).y;
+          if(!Number.isFinite(floor)||Math.abs(floor-y)>.6||col.blocked(px,pz,floor))continue;
+          // Reject unsupported edges across the fox's footprint.
+          if([[.3,0],[-.3,0],[0,.3],[0,-.3]].some(([dx,dz])=>Math.abs(col.groundAt(px+dx,pz+dz,floor+.2).y-floor)>.3))continue;
+          return {pos:[px,floor,pz],yaw:Math.atan2(x-px,z-pz),actor:actor.pos,label:'Staged nearby observer on actual actor floor; live behavior preserved'};
+        }
+        return {failure:`No nearby supported observer for ${id}`,actor:actor.pos};
+      },id);
+      save(`${id}-observer-setup.json`,setup);
+      if(setup.failure){report.failures.push(setup.failure);continue;}
+      await H('teleport',...setup.pos,setup.yaw);lens=null;
+      await camera(id);
+      const lensTrace=[];
+      await video(id,frames,async frame=>{await camera(id);lensTrace.push({frame,...latestReviewLens.get(id)});},undefined,pairOptions('Regional',id,keyFrames));
+      const framingPassed=validatePair(id);
+      const take=report.videos[id],rows=take.trace.map(row=>row.state);
+      const support=await page.evaluate(positions=>positions.map(p=>{
+        const floor=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;
+        return {floor:Number.isFinite(floor)?floor:null,gap:Number.isFinite(floor)?p[1]-floor:null};
+      }),rows.map(row=>row.pos));
+      let airborne=0,longestAirborne=0;
+      for(const row of rows){airborne=row.grounded?0:airborne+1;longestAirborne=Math.max(longestAirborne,airborne);}
+      const failures=framingPassed?[]:['projected pair framing failed'];
+      if(lensTrace.some(row=>!row.clear||row.noFit))failures.push('no unobstructed fitted pair lens');
+      if(rows.some(row=>row.deaths>take.start.deaths))failures.push('observer died');
+      if(support.some(row=>row.gap===null||row.gap>.55)||longestAirborne>Math.ceil(fps*.2)||!take.end.grounded)failures.push('observer lost supporting floor');
+      save(`${id}-visibility-support.json`,{passed:!failures.length,failures,lensTrace,support,longestAirborneFrames:longestAirborne,label:'Actual regional lens decisions and traced floor support; no forced animal state'});
+      for(const failure of failures)report.failures.push(`${id}: ${failure}`);
+      const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
+      if(id==='shade-flume'&&(actor.pos[1]<3.5||actor.pos[1]>7))report.failures.push('Flume Shade left elevated channel');
+      save(`${id}-acceptance.json`,{passed:!failures.length,failures,actor,setup,game:await page.evaluate(()=>window.__game)});
     }
-
 
     // Stored contact failures survive later exceptions and keep the final process result failed.
   }
@@ -670,6 +776,7 @@ try {
     save('feel-acceptance.json',{label:'60s scripted live-input movement loop, one staged start, no resets/forced poses; not human fun approval',seconds:60,initial,end,deaths:end.deaths-initial.deaths});
   }
   if (wants('showcase')) {
+    if(fps!==60)throw Error('Showcase dense landing comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
     await H('photoOff');
@@ -687,21 +794,31 @@ try {
       {name:'Meadow dash',seconds:1,stick:[0,-1],dash:true,reset:[0,null,86]},
       {name:'Meadow brake and settle',seconds:2,stick:[0,0]},
       {name:'Meadow long drop and landing',seconds:2,stick:[0,0],reset:[0,null,80],drop:8,settle:0},
-      {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true},
+      {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6},
     ];
+    const landingDefaults=await page.evaluate(()=>{const p=window.__gameHooks.locomotion.params;return {landSquash:p.landSquash,landPitch:p.landPitch}});
+    for(const [label,landSquash,landPitch] of [['baseline',.11,0],['squash',.20,0],['squash-pitch',.20,1]]) {
+      segments.push({name:`Landing A/B long drop ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],drop:8,settle:0,landingAB:{label,landSquash,landPitch}});
+      segments.push({name:`Landing A/B standing jump ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6,landingAB:{label,landSquash,landPitch}});
+    }
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
-    const keyFrames=segments.flatMap(segment=>segment.standing ? [0,1,2,3,5,8,15,30,45,65].map(f=>segment.start+f).concat(segment.end-1) : segment.drop ? [.08,.25,.4,.55,.7,1,1.5].map(t=>segment.start+Math.round(fps*t)).concat(segment.end-1) : [segment.start+Math.round(fps*.25),segment.end-1]);
-    save('showcase-script.json',{label:'World1 live controller, staged segment cuts, fixed world-offset tracking photo lens; view angle varies with heading, no forced poses or grade',segments});
+    const keyFrames=segments.flatMap(segment=>segment.standing ? [...new Set([0,3,5,6,7,8,9,11,14,21,36,51,71,105,...Array.from({length:22},(_,j)=>36+j)])].map(f=>segment.start+f).concat(segment.end-1) : segment.drop ? [...Array.from({length:33},(_,j)=>segment.start+28+j),segment.start+90,segment.end-1] : [segment.start+Math.round(fps*.25),segment.end-1]);
+    const sheetFrames=segments.flatMap(segment=>segment.standing ? [0,8,14,42,44,48,54].map(f=>segment.start+f) : segment.drop ? [28,37,38,40,44,50].map(f=>segment.start+f).concat(segment.end-1) : [segment.start+Math.round(fps*.25),segment.end-1]);
+    save('showcase-script.json',{label:'World1 live controller, staged segment cuts, fixed world-offset tracking photo lens; view angle varies with heading, no forced poses or grade',landingDefaults,segments});
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
       if(segment.turn){const angle=local/fps*2;stick=[Math.sin(angle)*.45,-Math.cos(angle)*.45];}
+      if(local===0 && segment.landingAB)await page.evaluate(({landSquash,landPitch})=>Object.assign(window.__gameHooks.locomotion.params,{landSquash,landPitch}),segment.landingAB);
       if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);reset[1]+=segment.drop??0;const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(segment.settle??18);}
       await H('setStick',...stick);
-      await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
-    },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);}});
+      await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local>=(segment.leadIn??0) && local<(segment.leadIn??0)+Math.round(.25*fps)?['Space']:[]);
+    },undefined,{traceEveryFrame:true,keyFrames,sheetFrames,afterStep:async(i,state)=>{
+      const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);
+    },sample:async()=>({label:'Evaluated world-space bone landmarks; mesh shape judged from retained PNGs',bones:await page.evaluate(()=>{const fox=window.__gameHooks.debug.fox;return Object.fromEntries(['pelvis','spine_04','head'].map(name=>{const b=fox.getObjectByName(name);return [name,b?.getWorldPosition(b.position.clone()).toArray()??null]}))})})});
     await H('setKeys',[]);await H('setStick',null);
+    await page.evaluate(config=>Object.assign(window.__gameHooks.locomotion.params,config),landingDefaults);
     const result=report.videos.showcase;
     const slope=segments.find(segment=>segment.name==='Windmill slope jump and land');
     const rows=result.trace.filter(row=>row.frame>=slope.start && row.frame<slope.end);
@@ -720,7 +837,25 @@ try {
     const standingJumpAirborne=standingRows.some(row=>!row.state.grounded);
     const standingJumpLanded=standingRows.at(-1)?.state.grounded ?? false;
     const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'fixed world-offset tracking photo lens, rear on boardwalk/front-side on Windmill; not gameplay camera',longDropHeight:drop.drop,longDropFallSeconds,longDropLanded,longDropHeldFrames,standingWindupFrames,standingJumpAirborne,standingJumpLanded,slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
+    const landingTakes=segments.filter(segment=>segment.landingAB).map(segment=>{
+      const rows=result.trace.filter(row=>row.frame>=segment.start && row.frame<segment.end);
+      const firstAir=rows.findIndex(row=>!row.state.grounded);
+      const landedIndex=firstAir>=0?rows.findIndex((row,index)=>index>firstAir && row.state.grounded):-1;
+      const recovery=landedIndex>=0?rows.slice(landedIndex,landedIndex+12):[];
+      const relative=(row,bone)=>row.state.capture?.bones?.[bone]?.[1]-row.state.pos[1];
+      const before=landedIndex>0?rows[landedIndex-1]:null;
+      return {name:segment.name,config:segment.landingAB,firstAir,landedIndex,frames:rows.length,
+        firstChestStep:before?relative(rows[landedIndex],'spine_04')-relative(before,'spine_04'):null,
+        peakChestDrop:before?relative(before,'spine_04')-Math.min(...recovery.map(row=>relative(row,'spine_04'))):null,
+        peakHeadDrop:before?relative(before,'head')-Math.min(...recovery.map(row=>relative(row,'head'))):null,
+        compressionMaxResidual:Math.max(...recovery.map(row=>row.state.locomotion.maxResidual)),
+        minCompressionContacts:Math.min(...recovery.map(row=>row.state.locomotion.stanceFeet)),
+        landed:firstAir>=0 && landedIndex>firstAir && rows.at(-1).state.grounded};
+    });
+    const landingPass=take=>take.landed && take.frames===2*fps && take.minCompressionContacts===4 && take.compressionMaxResidual<.001 && [take.firstChestStep,take.peakChestDrop,take.peakHeadDrop].every(Number.isFinite);
+    save('landing-ab-acceptance.json',{label:'Same build/lens/live physics, three tunable sets; pose heights relative actor pivot and last airborne frame, not idle; no visual approval',takes:landingTakes,passed:landingTakes.every(landingPass)});
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
+    if(!landingTakes.every(landingPass))throw Error('Landing A/B must land with four compression contacts and submillimeter compression residual; visual review still required');
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
   if (wants('worldgait')) {
@@ -728,9 +863,26 @@ try {
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
     await H('setFeelPreset','brisk');
+    // Freeze the same physical sight query for old and new game SHAs.
+    await page.evaluate(async()=>{
+      const {Vector3,Raycaster}=await import('/gpu-three.js');
+      const world=window.__gameHooks.debug.world.group,ray=new Raycaster();
+      const visible=object=>{for(let node=object;node;node=node.parent)if(!node.visible)return false;return true;};
+      window.__captureWorldSight=(camera,targets)=>{
+        world.updateWorldMatrix(true,true);
+        return targets.map(target=>{
+          const origin=new Vector3(...target),lens=new Vector3(...camera),delta=lens.clone().sub(origin),distance=delta.length();
+          if(distance<.2)return null;
+          ray.near=.05;ray.far=distance-.05;delta.normalize();ray.set(origin,delta);
+          let hit=ray.intersectObject(world,true).find(item=>visible(item.object));
+          if(!hit){ray.set(lens,delta.clone().negate());hit=ray.intersectObject(world,true).find(item=>visible(item.object));}
+          return hit?{distance:hit.distance,name:hit.object.name,point:hit.point.toArray()}:null;
+        });
+      };
+    });
     const preflight=await page.evaluate(()=>{
       const h=window.__gameHooks,col=h.debug.world.collision,attempts=[];
-      for(const x of [6,40,24]) {
+      for(const x of [40,24,6]) {
         const failures=[];
         let previousY=null;
         for(let z=88;z>=68;z-=2) {
@@ -738,9 +890,9 @@ try {
           if(!Number.isFinite(floor) || Math.abs(floor-terrain)>.2 || (previousY!==null && Math.abs(floor-previousY)>.4))failures.push({z,footing:[floor,terrain,previousY]});
           previousY=floor;
           for(const lens of ['side','three-quarter']) {
-            const camera=[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const camera=[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)];
             const targets=[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]];
-            const blockers=targets.map(target=>h.photoBlocker(camera,target));
+            const blockers=window.__captureWorldSight(camera,targets);
             if(blockers.some(Boolean))failures.push({z,lens,blockers});
           }
         }
@@ -760,7 +912,7 @@ try {
       const visibility={sampledFrames:0,blocked:[]};
       const frameLens=async st=>{
         const [x,y,z]=st.pos;
-        await H('photo',[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
+        await H('photo',[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
       };
       await frameLens(initial);
       await video(name,seconds*fps,async()=>{await H('setStick',0,-stick);},undefined,{
@@ -769,8 +921,8 @@ try {
           if(st.deaths!==initial.deaths)throw Error(`${name}: death`);
           await frameLens(st);
           {
-            const [x,y,z]=st.pos, camera=[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)];
-            const blockers=await page.evaluate(([camera,targets])=>targets.map(target=>window.__gameHooks.photoBlocker(camera,target)),[camera,[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]]]);
+            const [x,y,z]=st.pos, camera=[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const blockers=await page.evaluate(([camera,targets])=>window.__captureWorldSight(camera,targets),[camera,[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]]]);
             visibility.sampledFrames++;
             if(blockers.some(Boolean))visibility.blocked.push({frame:i,blockers});
           }
@@ -783,7 +935,7 @@ try {
       measured.expectedGaitFraction=(measured.gaits[gait]??0)/rows.length;
       measured.expectedSpeed=9*stick;
       measured.speedFraction=measured.medianSpeed/measured.expectedSpeed;
-      segments.push({name,gait,stick,seconds,initial,end,measured,visibility,camera:`staged ${lens} tracking photo lens, live controller`,reset:[preflight.x,y,preflight.z]});
+      segments.push({name,gait,stick,seconds,initial,end,measured,visibility,camera:`staged west-side ${lens} tracking photo lens, live controller`,reset:[preflight.x,y,preflight.z]});
     }
     save('worldgait-acceptance.json',{label:'Six staged live-input movement segments on a disclosed preflighted Arrival Meadow line; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths && s.visibility.blocked.length===0 && s.measured.groundedFraction>.95 && s.measured.expectedGaitFraction>.9 && s.measured.speedFraction>.9 && s.measured.speedFraction<1.1)});
     if(segments.some(s=>s.visibility.blocked.length || s.measured.groundedFraction<=.95 || s.measured.expectedGaitFraction<=.9 || s.measured.speedFraction<=.9 || s.measured.speedFraction>=1.1))throw Error('World gait review requires clear chest/head/feet sight lines, grounded movement and measured requested gait/speed');
@@ -899,8 +1051,40 @@ try {
     // Natural spawn, gravity warm-up and untouched chase before any staging.
     await advance(60); await shot('hub-spawn-chase');
     save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
+    // Live player view from natural spawn, before any teleport or photo camera.
+    const naturalInitial = await H('state');
+    await video('hub-natural-arrive-chase', 15 * fps, async i => {
+      await H('setStick', i < 3 * fps ? 0 : null, -.2);
+    }, undefined, {keyFrames: [0, 2*fps, 4*fps, 7*fps, 10*fps, 14*fps]});
+    await H('setStick', null);
+    const naturalEnd = await H('state');
+    const naturalDeaths = naturalEnd.deaths - naturalInitial.deaths;
+    const naturalAssists = naturalEnd.auto.assists - naturalInitial.auto.assists;
+    save('hub-natural-arrive-chase-acceptance.json', { staged: false,
+      label: 'Natural spawn; live analog input for 3s then 12s idle; untouched chase camera; no teleport, photo or pose override',
+      initial: naturalInitial, end: naturalEnd, deaths: naturalDeaths, assists: naturalAssists,
+      game: await page.evaluate(() => window.__game) });
+    if (naturalDeaths || naturalAssists || naturalEnd.auto.active || !naturalEnd.grounded || naturalEnd.anim !== 'idle') {
+      report.failures.push('Hub natural chase arrival did not finish grounded idle without deaths or assists');
+    }
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
-    await H('teleport', 0, y, 94, Math.PI);
+    // Portrait staging only; natural spawn above is untouched. Real idle rig, no bone override.
+    const heroYaw = Math.atan2(3.1, .8) - Math.PI / 4;
+    await H('teleport', 0, y, 94, heroYaw); await advance(30);
+    const heroLens = [3.1, y + 1.3, 94.8], heroLook = [-6.5, y + .9, 89.5];
+    const compositionBlocker = await H('photoBlocker', heroLens, heroLook);
+    const foxSightBlocker = await H('photoBlocker', heroLens, [0, y + .35, 94]);
+    await H('photo', heroLens, heroLook, 46); await advance(2);
+    await shot('hub-hero-three-q');
+    const heroState = await H('state');
+    save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
+    if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
+    const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
+    save('hub-festoon-clearance.json', festoon);
+    if (festoon?.pendants.length !== 12 || festoon?.cords?.length !== 3) report.failures.push('Hub must expose twelve pendants on three supported cords');
+    if (festoon?.pendants.some(p => p.bottom < p.ground + 3)) report.failures.push('Hub pendant below 3m local clearance');
+    if (festoon?.cords?.some(c => c.cordClearance < 3)) report.failures.push('Hub cord below 3m local clearance');
+    await H('teleport', 0, y, 94, Math.atan2(-8, -9));
     const hubViews = [
       ['arrival', [16, 10, 108], [-5, 2, 81], 52],
       ['arrival-close', [8, 3.8, 98], [-10, 2, 85], 55],
@@ -909,10 +1093,14 @@ try {
       ['east-exit', [2, 6, 99], [18, 2, 80], 56],
       ['north-exit', [0, 5, 97], [0, 2, 65], 55],
     ];
+    const hubViewCameras = [];
     for (const [name, lens, target, fov] of hubViews) {
+      hubViewCameras.push({ name, lens, target, fov, blocker: await H('photoBlocker', lens, target) });
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
     }
-    await H('photo', [8, 4.5, 101], [-8, 2, 86], 55); await advance(30);
+    save('hub-view-cameras.json', hubViewCameras);
+    const arrivalCamera = { lens: [8, 4.5, 101], target: [-8, 2, 86], fov: 55, blocker: await H('photoBlocker', [8, 4.5, 101], [-8, 2, 86]) };
+    await H('photo', arrivalCamera.lens, arrivalCamera.target, arrivalCamera.fov); await advance(30);
     const initial = await H('state');
     await video('hub-arrive-idle', 15 * fps, async i => {
       // One staged starting point, then the live controller. Arrival pauses at the well lane.
@@ -921,7 +1109,7 @@ try {
     await H('setStick', null);
     const end = await H('state');
     await H('photoOff'); await advance(30); await shot('hub-chase-arrived');
-    save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
+    save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', arrivalCamera, initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
     // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
     const orbitCameras = [];
     const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-10, 88));
@@ -1088,6 +1276,8 @@ try {
       || d.shadowTypeAtFirstPrepare !== 1 || expected.shadowType !== 1 || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.bootGlError || d.bootPriorGlError || d.invalidTargets) {
       report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
     }
+
+    await captureWadeVisibility({ H, boot, video, shot, save, getPage: () => page, fps, quality });
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
@@ -1450,6 +1640,8 @@ try {
     await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-lower-islet');
     await RH('teleport',207,36,-123,-Math.PI/2);
     await RH('photo',[220,44,-122],[190,34,-119],52);await advance(2);await shot('reachview-payoff-vista');
+    // A closer comparison avoids the east-bank trunk without moving the scene.
+    await RH('photo',[213,39,-121],[192,34,-120],52);await advance(2);await shot('reachview-hero-orchard');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
@@ -1459,23 +1651,28 @@ try {
   if (wants('reach')) {
     await boot(quality,true); await RH('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
-    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115},{x:175,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
+    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
+    const phaseTrace=[];
+    const crossingSample=(st,p,phase,age)=>{
+      const water=st.chem.water.find(w=>w.id==='reach-spout');
+      return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
+    };
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
       const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
       const sourceWater=st.chem.water.find(w=>w.id==='reach-spout');
       if(drinker?.freed&&events.shadeFreedAt===null)events.shadeFreedAt=st.t;
-      if(sourceWater?.heat>.01&&events.sourceActivatedAt===null)events.sourceActivatedAt=st.t;
+      if(sourceWater?.flowing&&events.sourceActivatedAt===null)events.sourceActivatedAt=st.t;
       if(st.reach.arrived&&events.firstArrivalAt===null)events.firstArrivalAt=st.t;
       if(st.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=st.t;
       if(p.shade){if(!drinker)throw Error('Reach drinker missing');p.x=drinker.pos[0];p.z=drinker.pos[2];}
       const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
-      const ready=p.shade?drinker.freed:p.source?st.pos[0]>=103&&Math.abs(st.pos[2]+115)<1.2&&events.sourceActivatedAt!==null:d<.8&&st.pos[1]>=p.y-.4;
+      const ready=p.shade?drinker.freed:p.source?sourceWater?.flowing:p.settle?d<.3&&st.grounded&&Math.abs(st.pos[1]-p.y)<.6&&Math.hypot(st.vel[0],st.vel[2])<.7:d<.8&&st.pos[1]>=p.y-.4;
       if(p.shade&&drinker.freed&&!shadeShot){await shot('reach-drinker-released');shadeShot=true;}
-      if(ready&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
-      const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&events.sourceActivatedAt===null)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
+      if(ready&&age>.15){phaseTrace.push(crossingSample(st,p,phase,age));if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
+      const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&!sourceWater?.flowing)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
       const vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
       let sx=len>.2?vx/len*Math.min(1,len):0,sz=len>.2?vz/len*Math.min(1,len):0;
       const keys=q.jump?['Space']:[];
@@ -1485,7 +1682,7 @@ try {
     await RH('setKeys',[]);await RH('setStick',null);await advance(30);await shot('reach-end');
     const end=await RH('state');if(end.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=end.t;
     const eventOrder=Object.values(events).every(t=>t!==null)&&events.shadeFreedAt<events.sourceActivatedAt&&events.sourceActivatedAt<events.firstArrivalAt&&events.firstArrivalAt<events.bellLatchedAt;
-    save('reach-acceptance.json',{phase,reached,strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
+    save('reach-acceptance.json',{phase,reached,phaseTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(!eventOrder)report.failures.push('Reach release/source/arrival/latch event order not observed');
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
@@ -1594,9 +1791,11 @@ try {
     }
     const start = await H('state');
     const spawnDistanceToFirst = Math.hypot(start.pos[0] - route[0].x, start.pos[1] - route[0].y, start.pos[2] - route[0].z);
+    if (kilnRoute && (!Number.isFinite(spawnDistanceToFirst) || spawnDistanceToFirst > 1)) throw Error('Kiln proof must begin within one metre of the authored plaza spawn');
     if (kilnRoute && start.zone !== 'Lanternhollow') throw Error('Kiln proof requires natural spawn in the built Lanternhollow hub');
+    if (kilnRoute && route[0].label !== 'hub-plaza') throw Error('Kiln proof requires the authored village-plaza start');
     if (kilnRoute && start.seedwells.some(s => s.id === 'SW1' && s.lit)) throw Error('Kiln proof requires an initially unlit SW1');
-    save('route-plan.json', { schemaVersion: 2, start: { pos: start.pos, seedwells: start.seedwells, deaths: start.deaths, auto: start.auto }, spawnDistanceToFirst, from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : kilnRoute ? 'Continuous Lanternhollow-to-Kiln clear plus live endpoint idle; no full-realm claim' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
+    save('route-plan.json', { schemaVersion: 2, start: { zone: start.zone, waypoint: route[0].label ?? null, pos: start.pos, seedwells: start.seedwells, deaths: start.deaths, auto: start.auto }, spawnDistanceToFirst, from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : kilnRoute ? 'Continuous Lanternhollow-to-Kiln clear plus live endpoint idle; no full-realm claim' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
     await H('autopilot', true, from, { assist: false });
     let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt;
     let kilnStopped = false;
@@ -1605,7 +1804,8 @@ try {
     let previousPos = start.pos, previousKnockback = start.shades.knockbackTravel ?? 0, previousHits = start.shades.hits;
     const framing = { samples: 0, outside: 0, maxAbsX: 0, maxAbsY: 0, firstFailure: null, failures: [] };
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
-    const budgetFrames = Number(arg('route-seconds', '360')) * fps;
+    const budgetFrames = Number(arg('route-seconds', kilnRoute ? '60' : '360')) * fps;
+    const minimumIdleFrames = 10 * fps;
     if (kilnRoute && budgetFrames < 60 * fps) throw Error('Kiln proof requires a capture budget of at least 60 seconds');
     const state = await video(name, budgetFrames, async () => {
       if (kilnCompletedAt !== undefined && !kilnStopped) {
@@ -1625,13 +1825,13 @@ try {
           kilnCompletion = { idx: st.auto.idx, pos: st.pos, t: st.t, distanceToFeed, grounded: st.grounded, shades: { hits: st.shades.hits, wisps: st.shades.wisps } };
         }
         if (kilnCompletedAt !== undefined && departedAt === undefined && distanceToFeed > 3) departedAt = i;
-        // Explicit driver gate: real endpoint idle through 60s, never freeze physics/rendering.
-        return st.deaths > 0 || kilnCompletedAt === undefined && !st.auto.active || kilnCompletedAt !== undefined && i + 1 >= 60 * fps;
+        // Honor the requested continuous duration, including real endpoint idle.
+        return st.deaths > 0 || kilnCompletedAt === undefined && !st.auto.active || kilnCompletedAt !== undefined && i + 1 >= budgetFrames;
       }
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
-    }, { traceEveryFrame: budgetFrames <= 60 * fps, sample: async (i, st) => {
+    }, { traceEveryFrame: kilnRoute || budgetFrames <= 60 * fps, sample: async (i, st) => {
       const audit = {};
       if (kilnRoute) {
         const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
@@ -1661,6 +1861,50 @@ try {
           if (framing.failures.length < 16) framing.failures.push(failure);
         }
         Object.assign(audit, { foxFocusNdc: serialNdc, foxFocusFinite: finite, foxFocusInFrame: inFrame });
+        if ([300, 600, 775, 1110].includes(i)) {
+          // Forced render-only A/B: same pose/time, never advance or alter inputs.
+          const diagnostic = await page.evaluate(() => {
+            const { renderer, scene, post } = window.__gameHooks.debug;
+            const before = window.__gameHooks.state();
+            const records = new Map();
+            scene.traverse(o => {
+              if (!o.isMesh) return;
+              for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+                const u = renderer.properties.get(m).uniforms;
+                if (!u?.uOccFox || !u.uOccStrength || records.has(u.uOccFox.value)) continue;
+                records.set(u.uOccFox.value, { u, w: u.uOccFox.value.w, strength: u.uOccStrength.value });
+              }
+            });
+            if (!records.size) throw Error('Underfoot A/B has no compiled occlusion shader uniforms');
+            const images = {};
+            try {
+              for (const r of records.values()) r.u.uOccStrength.value = 1;
+              post.render(); images.floorGuard = renderer.domElement.toDataURL('image/png');
+              for (const r of records.values()) r.u.uOccFox.value.w = -1e6;
+              post.render(); images.legacyEllipse = renderer.domElement.toDataURL('image/png');
+              for (const r of records.values()) r.u.uOccStrength.value = 0;
+              post.render(); images.cutoutOff = renderer.domElement.toDataURL('image/png');
+            } finally {
+              for (const r of records.values()) {
+                r.u.uOccFox.value.w = r.w;
+                r.u.uOccStrength.value = r.strength;
+              }
+              post.render();
+            }
+            const after = window.__gameHooks.state();
+            if (before.t !== after.t || before.pos.some((v, axis) => v !== after.pos[axis])) throw Error('Underfoot render diagnostic changed simulation state');
+            return { available: true, originalStrength: [...records.values()].map(r => r.strength), images };
+          });
+          const files = [];
+          for (const [mode, data] of Object.entries(diagnostic.images)) {
+            const file = `${name}-underfoot-forced-${i}-${mode}.png`;
+            fs.writeFileSync(path.join(out, file), Buffer.from(data.split(',')[1], 'base64'));
+            files.push(file);
+          }
+          const proof = { frame: i, scope: 'Forced shader stress A/B; render only at unchanged pose/time, uniforms restored before video encoding', available: diagnostic.available, originalStrength: diagnostic.originalStrength, files, time: st.t, pos: st.pos };
+          save(`${name}-underfoot-forced-${i}.json`, proof);
+          audit.underfootDiagnostic = proof;
+        }
       }
       // Bounded diagnostics for the camera stream's recorded hidden-wedge and
       // over-compressed stair frames. Run only on the remote capture worker.
@@ -1693,11 +1937,11 @@ try {
     const endpointDistance = Math.hypot(state.pos[0] - endpoint.x, state.pos[2] - endpoint.z);
     const endpointStable = endpointDistance <= 3 && Math.abs(state.pos[1] - endpoint.y) <= 1 && state.grounded;
     const kilnLit = state.seedwells.some(s => s.id === 'SW1' && s.lit);
-    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && kilnStopped && kilnCompletedAt < 60 * fps - 1 && departedAt === undefined && endpointStable && !state.auto.stalled && continuity.firstLargeStep === null && framing.samples === report.videos[name].frames && framing.outside === 0 && report.videos[name].frames >= 60 * fps) && !state.auto.assists && !state.deaths;
-    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnRoute && endpointReached && (!kilnStopped || kilnCompletedAt >= 60 * fps - 1) ? 'arrival-too-late-for-idle' : kilnRoute && endpointReached && departedAt !== undefined ? 'idle-drift' : kilnRoute && endpointReached && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : kilnRoute && continuity.firstLargeStep ? 'position-jump' : endpointReached && kilnRoute && framing.outside > 0 ? 'fox-out-of-frame' : kilnRoute && !endpointReached && firstFeedCrossing ? 'arrival-missing' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
+    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && kilnStopped && report.videos[name].frames - kilnCompletedAt - 1 >= minimumIdleFrames && departedAt === undefined && endpointStable && !state.auto.stalled && continuity.firstLargeStep === null && framing.samples === report.videos[name].frames && framing.outside === 0 && report.videos[name].frames >= budgetFrames) && !state.auto.assists && !state.deaths;
+    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnRoute && endpointReached && (!kilnStopped || report.videos[name].frames - kilnCompletedAt - 1 < minimumIdleFrames) ? 'insufficient-idle' : kilnRoute && endpointReached && departedAt !== undefined ? 'idle-drift' : kilnRoute && endpointReached && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : kilnRoute && continuity.firstLargeStep ? 'position-jump' : endpointReached && kilnRoute && framing.outside > 0 ? 'fox-out-of-frame' : kilnRoute && !endpointReached && firstFeedCrossing ? 'arrival-missing' : report.videos[name].frames >= budgetFrames ? 'budget' : 'incomplete';
     const failureFrame = reason === 'idle-drift' ? departedAt : reason === 'fox-out-of-frame' ? framing.firstFailure.frame : reason === 'position-jump' ? continuity.firstLargeStep.frame : report.videos[name].frames - 1;
     const failurePhase = passed ? null : kilnCompletedAt === undefined || failureFrame < kilnCompletedAt ? 'pre-arrival' : 'post-arrival';
-    save('route-acceptance.json', { schemaVersion: 3, passed, reason, from, to, staged: regional, postKiln: kilnRoute ? 'Live endpoint idle through 60s; bot and keys cleared, physics/rendering continue' : null, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt, failurePhase, failureFrame: passed ? null : failureFrame, postArrivalSeconds: kilnCompletedAt === undefined ? null : (report.videos[name].frames - kilnCompletedAt - 1) / fps, finalDistanceToFeed: endpointDistance, finalNearFeedStable: endpointStable, continuity: kilnRoute ? continuity : null, encounter: kilnRoute ? { ...encounter, finalHits: state.shades.hits, hitsBeforeArrival: kilnCompletion ? kilnCompletion.shades.hits - encounter.initialHits : state.shades.hits - encounter.initialHits, hitsAfterArrival: kilnCompletion ? state.shades.hits - kilnCompletion.shades.hits : null } : null, framing: kilnRoute ? { samples: framing.samples, outside: framing.outside, maxAbsX: framing.maxAbsX, maxAbsY: framing.maxAbsY, firstFailure: framing.firstFailure } : null, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    save('route-acceptance.json', { schemaVersion: 3, passed, reason, from, to, staged: regional, postKiln: kilnRoute ? `Live endpoint idle through ${budgetFrames / fps}s; bot and keys cleared, physics/rendering continue` : null, requestedDuration: budgetFrames / fps, minimumPostArrivalSeconds: kilnRoute ? minimumIdleFrames / fps : null, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt, failurePhase, failureFrame: passed ? null : failureFrame, postArrivalSeconds: kilnCompletedAt === undefined ? null : (report.videos[name].frames - kilnCompletedAt - 1) / fps, finalDistanceToFeed: endpointDistance, finalNearFeedStable: endpointStable, continuity: kilnRoute ? continuity : null, encounter: kilnRoute ? { ...encounter, finalHits: state.shades.hits, hitsBeforeArrival: kilnCompletion ? kilnCompletion.shades.hits - encounter.initialHits : state.shades.hits - encounter.initialHits, hitsAfterArrival: kilnCompletion ? state.shades.hits - kilnCompletion.shades.hits : null } : null, framing: kilnRoute ? { samples: framing.samples, outside: framing.outside, maxAbsX: framing.maxAbsX, maxAbsY: framing.maxAbsY, firstFailure: framing.firstFailure } : null, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startZone: start.zone, startWaypoint: route[0].label ?? null, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
     if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {

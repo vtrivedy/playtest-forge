@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { ColorField } from './colorField';
+import { VISUAL_DRAIN_GLSL, type ColorField } from './colorField';
 
 export type AutumnParticles = {
   leaves: THREE.InstancedMesh;
@@ -150,8 +150,10 @@ function makeEmberTexture(): THREE.CanvasTexture {
 }
 
 /** Lambert leaf material: atlas cell per instance, ColorField sepia grade, shrink near camera. */
-function makeLeafMaterial(atlas: THREE.Texture) {
+function makeLeafMaterial(atlas: THREE.Texture, field?: ColorField) {
   const uniforms = {
+    uVisualDrains: field?.visualDrainUniforms.uVisualDrains ?? { value: Array.from({ length: 16 }, () => new THREE.Vector4()) },
+    uVisualDrainCount: field?.visualDrainUniforms.uVisualDrainCount ?? { value: 0 },
     uMask: { value: null as THREE.Texture | null },
     uUseMask: { value: 0 },
     uBounds: { value: new THREE.Vector4(-24, 24, -24, 24) },
@@ -188,6 +190,7 @@ function makeLeafMaterial(atlas: THREE.Texture) {
       .replace(
         '#include <common>',
         `#include <common>
+        ${VISUAL_DRAIN_GLSL}
         uniform sampler2D uMask;
         uniform float uUseMask;
         uniform vec4 uBounds;
@@ -204,7 +207,8 @@ function makeLeafMaterial(atlas: THREE.Texture) {
             vec2 muv = vec2((vLeafWorld.x - uBounds.x) / (uBounds.y - uBounds.x),
                             (vLeafWorld.z - uBounds.z) / (uBounds.w - uBounds.z));
             if (all(greaterThanEqual(muv, vec2(0.0))) && all(lessThanEqual(muv, vec2(1.0)))) {
-              m = max(m, texture2D(uMask, muv).r);
+              vec2 sources = texture2D(uMask, muv).rg;
+              m = max(m, max(sources.r * temporaryVisibilityAt(vLeafWorld), sources.g));
             }
           }
           m = clamp(m, 0.0, 1.0);
@@ -260,7 +264,7 @@ export function createAutumnParticles(
   // ~9–12 cm maple leaf at scale 1 (fox is 0.55 m to the ears)
   const leafGeo = new THREE.PlaneGeometry(0.11, 0.11);
   leafGeo.rotateX(-Math.PI / 2);
-  const { mat: leafMat, uniforms } = makeLeafMaterial(atlas);
+  const { mat: leafMat, uniforms } = makeLeafMaterial(atlas, opts.colorField);
   const leaves = new THREE.InstancedMesh(leafGeo, leafMat, total);
   leaves.frustumCulled = false;
   leaves.castShadow = false;

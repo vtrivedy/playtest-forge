@@ -1,4 +1,6 @@
-# Lanternhollow dusk and domestic dressing — driver22:35
+# Lanternhollow dusk — historical pre-festoon design
+
+Historical design record for pass8e04a92. Current implementation is specified in lanternhollow-DESIGN.md and lanternhollow-lantern-village-DESIGN.md; the later festoon pass supersedes the two-light count below.
 
 Before-code scope. Driver landed cabe639 and requests lit lanterns at dusk, denser autumn dressing, believable houses and a hub orbit. Prior hub correction b791be5 awaits remote review; no personal visual approval is inferred from driver landing. Current s3-hub has fast-forwarded origin/main9840f7b.
 
