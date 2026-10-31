@@ -764,26 +764,31 @@ export class ColorField {
           // the fox's paint is pigment, not just authored colour returning: richer, with a
           // low-frequency watercolour hue drift (ochre / olive / madder) across the wash
           // The fox's paint brings the valley back alive, not the authored rust louder: on the
-          // ground a wet-in-wet meadow (ochre / olive-gold / sage, madder leaf drifts) replaces the
-          // hue at the surface's own value; stone and wood take a warm glaze with moss on their tops.
+          // ground a wet-in-wet living meadow (yellow-green / sage / moss, ochre and madder only as
+          // accents) replaces the hue at the surface's own value; stone and wood come back as warm
+          // sandstone with moss on their tops and lichen patches on their faces.
           float paintK = cfPaint * cfPaintLead;
           if (paintK > 0.001) {
-            float hueA = noise21(vWorldPosCF.xz * 0.16 + 31.0) * 0.75 + noise21(vWorldPosCF.xz * 0.6 + 9.0) * 0.25;
-            float hueB = noise21(vWorldPosCF.xz * 0.45 + 5.0);
+            vec3 wp = vWorldPosCF;
+            float hueA = noise21(wp.xz * 0.16 + 31.0) * 0.75 + noise21(wp.xz * 0.6 + 9.0) * 0.25;
+            float hueB = noise21(wp.xz * 0.45 + 5.0);
             float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
             // pigment density: settled pools and thin, paper-lit passages (not a flat carpet)
-            float dens = mix(0.84, 1.18, noise21(vWorldPosCF.xz * 0.7 + 11.0) * 0.6 + noise21(vWorldPosCF.xz * 2.3 + 2.0) * 0.4);
+            float dens = mix(0.86, 1.16, noise21(wp.xz * 0.7 + 11.0) * 0.6 + noise21(wp.xz * 2.3 + 2.0) * 0.4);
             // unit-luma hues
-            vec3 meadow = mix(vec3(1.3, 0.95, 0.42), vec3(0.95, 1.05, 0.42), smoothstep(0.28, 0.5, hueA));
-            meadow = mix(meadow, vec3(0.78, 1.08, 0.58), smoothstep(0.58, 0.8, hueA));
-            meadow = mix(meadow, vec3(1.55, 0.8, 0.6), smoothstep(0.62, 0.88, hueB) * 0.75);
+            vec3 meadow = mix(vec3(0.95, 1.06, 0.4), vec3(0.8, 1.08, 0.62), smoothstep(0.35, 0.6, hueA));
+            meadow = mix(meadow, vec3(0.7, 1.1, 0.5), smoothstep(0.62, 0.82, hueA));
+            meadow = mix(meadow, vec3(1.3, 0.95, 0.42), smoothstep(0.7, 0.9, hueB) * 0.55);
+            meadow = mix(meadow, vec3(1.5, 0.8, 0.62), smoothstep(0.82, 0.95, 1.0 - hueB) * 0.4);
             vec3 own = max(mix(vec3(chromaLuma), chroma, 1.2), 0.0);
-            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.08, 0.62) * dens;
+            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.12, 0.8) * dens;
             float up = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
-            vec3 glaze = chromaLuma * vec3(1.18, 0.98, 0.72) * 1.1;
-            vec3 moss = chromaLuma * vec3(0.9, 1.08, 0.5) * 1.05;
-            vec3 propPaint = mix(own, mix(glaze, moss, smoothstep(0.55, 0.9, up) * smoothstep(0.4, 0.7, hueA)), 1.0 - uRestoredChroma * 0.5) * dens;
-            chroma = mix(chroma, mix(propPaint, groundPaint, uGroundSurface), paintK * 0.9);
+            float lichen = smoothstep(0.55, 0.75, noise21(wp.xz * 1.3 + wp.y * vec2(1.1, 0.7) + 3.0));
+            vec3 sandstone = chromaLuma * vec3(1.28, 0.93, 0.74) * 1.08;
+            vec3 moss = chromaLuma * vec3(0.78, 1.12, 0.48) * 1.1;
+            float mossK = max(smoothstep(0.45, 0.85, up), lichen * 0.75);
+            vec3 propPaint = mix(own, mix(sandstone, moss, mossK), 1.0 - uRestoredChroma * 0.5) * dens;
+            chroma = mix(chroma, mix(propPaint, groundPaint, uGroundSurface), paintK * 0.92);
           }
           outgoingLight = mix(washed, chroma, brushed);
           // watercolour: pigment pools at the drying edge of the fox's paint (burnt-sienna line),
@@ -888,7 +893,7 @@ export type PaintTuning = {
 export class PaintLayer {
   readonly bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   readonly tun: PaintTuning = {
-    ribbonRadius: 1.9,
+    ribbonRadius: 2.2,
     ribbonSpacing: 0.45,
     pawRadius: 0.8,
     dripSpacing: 3.5,
