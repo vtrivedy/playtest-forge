@@ -31,3 +31,6 @@ Height-gated contact experiment rejected: ramp peak residual only fell from .46m
 
 ## Round 2 integration candidate
 Frozen GPU traces confirm phase-warp alternative cadence 1.85/2.15/2.40 Hz versus baseline 2.97/4.22/4.87. Sol 90483ad only achieves 2.89/4.10/4.72. Provisional choice: adopt Opus phase-warp/carriage implementation with attribution from s3-loco-glide, retain Sol heading-aligned signed ground momentum and dash-facing fixes to avoid restoring vector-turn slide. Keep Opus cadence tunables, jump crouch input, and a single runtime. Merge on s3-loco only; no main landing before captured integration + critique. Validate captured mesh pad traces cautiously: lowest-vertex identity changes confound gallop slide, so inspect actual images and report this limit rather than treating a zero IK residual as proof.
+
+## Phase-warp contact continuity experiment
+Integrated phase-warp CPU ramp peaks at .077m residual / 4.63m/s solved-pad slide. Compare preserving stance across reporting-label changes, normalized contact vote hysteresis, stable plant strength, and 40ms correction release already developed on Sol. Keep these only if ramp/turn/reverse metrics do not regress materially; residual and slide remain visible. No acceptance based on metrics alone.
