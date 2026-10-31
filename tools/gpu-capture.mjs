@@ -293,7 +293,7 @@ try {
             for(let k=0;k<64;k++) {
               const a=k/64*Math.PI*2,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
               const floor=col.groundAt(px,pz,y+.5).y;
-              if(Number.isFinite(floor)&&Math.abs(floor-y)<.3&&!col.blocked(px,pz,floor))
+              if(Number.isFinite(floor)&&(!near||Math.abs(floor-y)<.3)&&!col.blocked(px,pz,floor))
                 return [px,floor,pz,Math.atan2(x-px,z-pz)];
             }
             return null;
