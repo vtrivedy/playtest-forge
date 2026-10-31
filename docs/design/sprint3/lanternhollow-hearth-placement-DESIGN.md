@@ -9,3 +9,9 @@ Use one exported HUB_HEARTH position for geometry, light, collider and vegetatio
 Captured natural lens is(-3.3126,2.3636,94.6866),FOV54. CPU plan estimate places candidate farther than fox and left of its silhouette, unlike old foreground hearth. This is only a projection hypothesis; require updated natural still/15s chase and hero. Do not hide/dither the hearth by special-case shader flags to force approval.
 
 Sol fallback level/source critique before code (Opus resets06:40). Run geometry paths, actual plaza prefix, fire bounds, tsc/fox build/dusk/camera as appropriate. Push immutableSHA, preserve any already-running paint-only capture as a separate reference. Own PNG/game inspection and Opus visual agreement still needed for final acceptance. Driver02:07 separately requested build-clean main landing; that is not art approval.
+
+Sol hard layout review accepts the candidate statically: nearest path1.403m minus ring.67 and actor.4 leaves.333m; bench ring-edge gap1.209m. This is actor clearance, not an additional.4m buffer. Implementation must include actual plaza prefix sweep and use one hearth clearance predicate for procedural and curated plants/litter. Camera framing remains a GPU hypothesis.
+
+Expanded sweep initially rejected the existing well approach at.55m inflation. The reviewed new plaza prefix uses.4m actor inflation; retain the existing.55m margin for all old meadow segments. Do not move the well or route merely to satisfy a mismatched test margin. Candidate still must pass the.4m prefix and all existing lanes.
+
+Source review found route and shrub-associated procedural litter bypassed plant rejection. Shared groundAtCover now rejects hearth clearance too, covering both generators as well as curated litter. No render/visual claim from this source correction.
