@@ -18,7 +18,7 @@ most of the offending foreground columns untouched or interfere with source,
 LOW passage and bell approach. Corner checks are necessary, not sufficient:
 full polygon intersections and route capsule clearance remain required. No
 claim that the six surviving patches are ready to build. A joined polygonal
-shore with matching ground/collision is preferable to sixteen independent
+shore with matching ground/collision is preferable to fourteen independent
 ramps once current horizon capture is reviewed. Keep unchanged wet edge until
 that surface can preserve HIGH mask and explicit passage polygons together.
 
