@@ -122,3 +122,5 @@ new downloads or API keys.
 The sprint 3 lantern-village pass adds original timber festoon posts/cord and four-face
 pendants; leaf drifts reuse the original procedural maple atlas. Low ferns/grass use
 the CC0 Quaternius pieces listed above. No new downloads or paid assets.
+
+Lanternhollow village density pass: additional original cottage variants, timber market crate/open barrel and ground-fitted flagstones; no external asset downloads. Existing CC0 material sources above remain unchanged.

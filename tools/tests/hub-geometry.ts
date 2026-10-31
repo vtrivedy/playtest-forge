@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import assert from 'node:assert/strict';
 import { createLanternhollow, HUB_HOUSES, HUB_PATHS, HUB_FESTOON_POSTS, hubPathDistance } from '../../games/fox-spirit/src/regionLanternhollow.ts';
+import { outlineR } from '../../games/fox-spirit/src/russetvale.ts';
 import { Bucket } from '../../games/fox-spirit/src/russetKit.ts';
 import { CollisionWorld, colliderTopAt } from '../../games/fox-spirit/src/collision.ts';
 // CPU geometry only. Canvas drawing is stubbed; no renderer/browser is created.
@@ -40,9 +41,24 @@ const probe = new THREE.Raycaster();
 let smokeProbes = 0;
 group.traverse(o => { if ((o as THREE.Sprite).isSprite) { o.raycast(probe, spriteHits); smokeProbes++; } });
 if(smokeProbes !== 8 || spriteHits.length) throw Error('Decorative smoke entered camera-free blocker probes');
+const edgeDoor = [-9.7,102.3];
+assert.ok(outlineR(Math.atan2(edgeDoor[1],edgeDoor[0]))-Math.hypot(...edgeDoor) >= 4.5, 'Arrival doorstep crowds cliff');
 let maxError=0;
 for (const house of HUB_HOUSES) {
-  const roofs=col.colliders.filter(c=>c.tag==='hub-roof' && Math.abs(c.x-house.x)<.01);
+  // The jagged island edge is tighter than its nominal ellipse at the south-west.
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = house.x + sx * (house.w / 2 + .6), z = house.z + sz * (house.d / 2 + .6);
+    assert.ok(outlineR(Math.atan2(z, x)) - Math.hypot(x, z) >= 2, `Cottage roof crowds cliff at ${x},${z}`);
+  }
+  // Pond transition ends at ellipse1.5. Include the rear winter-store footprint.
+  const pileX = house.x + house.w / 2 + .35, pileZ = house.z - house.d / 2 - .7;
+  for (const [cx,cz,w,d] of [[house.x,house.z,house.w,house.d],[pileX,pileZ,.8,.72]]) {
+    for (const sx of [-1,1]) for (const sz of [-1,1]) {
+      const x = cx + sx*w/2, z = cz + sz*d/2;
+      assert.ok(((x+18)/15)**2+((z-70)/9)**2 >= 1.5, `Cottage/store sinks into pond at ${x},${z}`);
+    }
+  }
+  const roofs=col.colliders.filter(c=>c.tag==='hub-roof' && Math.abs(c.x-house.x)<.01 && Math.abs(c.z-house.z)<house.d/2+.47);
   if(roofs.length!==12)throw Error('Missing roof strips');
   for(const c of roofs)for(const end of [-1,1]){
     const z=c.z+end*c.hz,y=colliderTopAt(c,c.x,z,1e-8)!;
@@ -74,7 +90,7 @@ for(const [ax,az,bx,bz] of HUB_PATHS) {
   const steps=Math.ceil(Math.hypot(bx-ax,bz-az)*10);
   for(let i=0;i<=steps;i++){
     const x=ax+(bx-ax)*i/steps,z=az+(bz-az)*i/steps;
-    for(const c of col.colliders)if(['hub-cottage','hub-bench','hub-well','hub-pulley-post','hub-woodpile','hub-festoon-post'].includes(c.tag ?? '') && colliderTopAt(c,x,z,.4)!==null)throw Error(`Path clips hub collider at ${x},${z}`);
+    for(const c of col.colliders)if(['hub-cottage','hub-bench','hub-well','hub-pulley-post','hub-woodpile','hub-festoon-post','hub-market'].includes(c.tag ?? '') && colliderTopAt(c,x,z,.4)!==null)throw Error(`Path clips ${c.tag} at ${x},${z}`);
   }
 }
-console.log(JSON.stringify({arrivalRouteSweepSamples:routeSweeps,smokeCameraFreeProbes:smokeProbes,pathSegmentsClear:HUB_PATHS.length,roofStrips:36,maxMeshColliderError:maxError,routePointsClear:8,colliders:col.colliders.length,vertices:Object.values(b).reduce((n,k)=>n+k.vertexCount,0)},null,2));
+console.log(JSON.stringify({arrivalRouteSweepSamples:routeSweeps,smokeCameraFreeProbes:smokeProbes,pathSegmentsClear:HUB_PATHS.length,roofStrips:HUB_HOUSES.length*12,maxMeshColliderError:maxError,routePointsClear:8,colliders:col.colliders.length,vertices:Object.values(b).reduce((n,k)=>n+k.vertexCount,0)},null,2));

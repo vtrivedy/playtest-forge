@@ -8,11 +8,16 @@ export const HUB_FESTOON_POSTS = [[-12, 86.4], [6.6, 89.4]] as const;
 
 export const HUB_HOUSES = [
   { x: -18, z: 92, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: true },
-  { x: -26, z: 88, w: 5.6, d: 4.6, eave: 2.8, rise: 2.1, chimney: false },
+  { x: -28.5, z: 84.4, w: 5.6, d: 4.6, eave: 2.8, rise: 2.1, chimney: false },
   { x: 12, z: 95, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: false },
+  { x: -18, z: 84.6, w: 4.2, d: 3.8, eave: 2.3, rise: 1.2, chimney: false },
+  { x: -9, z: 99.6, w: 4.4, d: 3.6, eave: 2.3, rise: 1.25, chimney: false },
+  { x: -37, z: 86, w: 5, d: 4, eave: 2.5, rise: 1.45, chimney: false },
 ];
 export const HUB_PATHS = [
-  [-18, 95, -14, 95], [-14, 95, -12.5, 89.5], [-12.5, 89.5, -8, 88], [-26, 91, -24, 95], [-24, 95, -18, 95], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
+  [-18, 95, -14, 95], [-14, 95, -12.5, 89.5], [-12.5, 89.5, -8, 88], [-29.2, 87.5, -24, 88.3], [-24, 88.3, -18.7, 87.2], [-18.7, 87.2, -14, 87.8], [-14, 87.8, -12.5, 89.5],
+  [-9.7, 102.3, -5.7, 102.3], [-5.7, 102.3, -5, 100.5], [-5, 100.5, 0, 94],
+  [-37.7, 88.7, -34, 90], [-34, 90, -32, 88.5], [-32, 88.5, -29.2, 87.5], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
   [12, 98, 8, 99], [8, 99, 0, 94], [0, 80, 9, 88], [9, 88, 25, 88],
   [25, 88, 40, 68], [40, 68, 57, 40], [0, 80, -3, 45], [-3, 45, 0, 12],
 ] as const;
@@ -29,7 +34,7 @@ export function hubPathDistance(x: number, z: number): number {
 
 /** Exclude random vegetation/rocks from doorsteps, the well and new paths. */
 export function hubClearance(x: number, z: number): boolean {
-  return HUB_FESTOON_POSTS.some(([px, pz]) => Math.hypot(x - px, z - pz) < .9) || Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
+  return Math.hypot(x + 23.6, z - 85.2) < 1.2 || Math.hypot(x + 22.4, z - 85.1) < 1 || HUB_FESTOON_POSTS.some(([px, pz]) => Math.hypot(x - px, z - pz) < .9) || Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
     HUB_HOUSES.some(h => Math.abs(x - h.x) < h.w / 2 + 1.2 && Math.abs(z - h.z) < h.d / 2 + 1.2);
 }
 
@@ -165,6 +170,37 @@ export function createLanternhollow(
       box(b.stone, h.x - 1.6, y + 4.45, h.z - .4, 1, .2, 1, PAL.stone);
       col.add(boxCollider({ x: h.x - 1.6, z: h.z - .4, w: 1, d: 1, top: y + 4.55, bottom: y + 2.3, tag: 'hub-chimney' }));
     }
+  }
+
+  // Low market stores occupy the gap between the western end walls.
+  {
+    const x = -23.6, z = 85.2, y = ground(x, z);
+    box(b.wood, x, y + .32, z, .85, .64, .7, PAL.wood);
+    for (const side of [-1, 1]) {
+      box(b.wood, x, y + .11, z + side * .365, .9, .12, .065, PAL.bark);
+      box(b.wood, x, y + .54, z + side * .365, .9, .12, .065, PAL.bark);
+      beam(new THREE.Vector3(x - .36, y + .16, z + side * .37), new THREE.Vector3(x + .36, y + .49, z + side * .37), .045);
+    }
+    col.add(boxCollider({ x, z, w: .95, d: .8, top: y + .66, bottom: y - .15, tag: 'hub-market' }));
+    const bx = -22.4, bz = 85.1, by = ground(bx, bz), r = .38;
+    const shell = new THREE.CylinderGeometry(r, r * .82, .56, 12, 1, true);
+    b.wood.add(shell, trs(bx, by + .28, bz), PAL.wood.clone().multiplyScalar(.9)); shell.dispose();
+    const base = new THREE.CylinderGeometry(r * .82, r * .82, .06, 12);
+    b.dark.add(base, trs(bx, by + .04, bz), dark); base.dispose();
+    for (const yy of [.10, .49]) {
+      const band = new THREE.TorusGeometry(yy < .2 ? r * .86 : r * .98, .025, 4, 12);
+      const matrix = new THREE.Matrix4().makeRotationX(Math.PI / 2); matrix.setPosition(bx, by + yy, bz);
+      b.dark.add(band, matrix, dark); band.dispose();
+    }
+    col.add(cylCollider({ x: bx, z: bz, r: r + .03, top: by + .56, bottom: by - .15, tag: 'hub-market' }));
+  }
+  // A few half-buried flagstones identify the well lane without creating steps.
+  for (let i = 0; i < 7; i++) {
+    const t = (i + .5) / 7, x = THREE.MathUtils.lerp(-12.5, -8, t), z = THREE.MathUtils.lerp(89.5, 88, t);
+    const g = new THREE.CylinderGeometry(.24 + (i % 3) * .035, .27, .1, 7);
+    const p = g.getAttribute('position');
+    for (let v = 0; v < p.count; v++) p.setY(v, ground(x + p.getX(v), z + p.getZ(v)) + p.getY(v) - .025);
+    g.computeVertexNormals(); b.stone.add(g, trs(x, 0, z), PAL.stone.clone().multiplyScalar(.8)); g.dispose();
   }
 
   // Domestic dry well: visible earth floor, low masonry ring, timber rope/pulley.

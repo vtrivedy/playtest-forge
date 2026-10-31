@@ -222,7 +222,6 @@ const AMBER_TREES: Array<[number, number, number, number]> = [
 ];
 
 const MEADOW_TREES: Array<[number, number, number, number]> = [
-  [-19, 82, 9, 1],
   [16, 82, 8, 2],
   [-34, 76, 10, 0],
   [30, 70, 9, 3],
