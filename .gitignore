@@ -9,3 +9,4 @@ agent-runs
 *.log
 .vite
 *.blend1
+tools/blender/tmp

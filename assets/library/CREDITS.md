@@ -50,15 +50,11 @@ Optimized GLB (decimated + JPEG textures ≤1k). Original glTF via Poly Haven AP
 
 Dropped from repo (too large; re-fetch if needed): fir_tree_01, tree_small_02, coast_rocks_01, coastal_cliff_01.
 
-## Kenney (CC0)
-Already in `assets/env/kenney/` — https://kenney.nl/assets/nature-kit — CC0. See `models/kenney/README.md`.
-
 ## Fox candidates
 | File | Source | License | Verdict |
 |------|--------|---------|---------|
 | `fox/quaternius_fox.glb` | Quaternius Ultimate Animated Animals — Fox (https://quaternius.com/packs/ultimateanimatedanimals.html); also Poly Pizza | **CC0 1.0** | **PICK** — 51-bone AnimalArmature, Walk/Gallop/Idle/Jump/Attack/Death… |
 | `fox/khronos_fox.glb` | [Khronos glTF Sample Models — Fox](https://github.com/KhronosGroup/glTF-Sample-Models/tree/main/2.0/Fox) | **CC-BY 4.0** (must credit) | Fallback only — low poly, Survey/Walk/Run |
-| `fox/blenderkit-free-refs/bk_*.glb` | BlenderKit free search (no login) | BlenderKit free tier | **REJECT** art lock — cute/chibi |
 
 Same Quaternius file already mirrored at `assets/hero/source/fox_quaternius_raw.glb`.
 
