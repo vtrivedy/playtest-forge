@@ -246,6 +246,9 @@ try {
     }, start);
     const observerYaw = Math.atan2(start[0]-safePosition[0],start[2]-safePosition[2]);
     await H('teleport', ...safePosition, observerYaw);
+    await camera();
+    await advance(0);
+    await shot('shade-preview-before-rule-probes');
     const probe = await H('shadesProbe');
     if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
     save('shade-drain-probe.json', probe);
