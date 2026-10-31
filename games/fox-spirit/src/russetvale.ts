@@ -706,6 +706,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       bottom: under - 1.5,
       rough: 0.7,
       seed: 10 + i,
+      faceGrade: 1,
       topColor: PAL.soilUmber.clone().lerp(PAL.grassDry, 0.45),
     });
   }

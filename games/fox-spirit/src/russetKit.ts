@@ -289,6 +289,8 @@ export type RockSpec = {
   overhang?: number;
   /** broken, non-flat top (m of relief) for crags that are not walk surfaces */
   roughTop?: number;
+  /** Bounded lip/foot value structure on authored terrace faces; tops stay unchanged. */
+  faceGrade?: number;
 };
 
 const _rc = new THREE.Color();
@@ -416,6 +418,18 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
   const m = trs(s.x, 0, s.z, s.yaw ?? 0);
   const nm = new THREE.Matrix3().getNormalMatrix(m);
   const topC = s.topColor === undefined ? PAL.soilTop : s.topColor;
+  const faceGrade = THREE.MathUtils.clamp(s.faceGrade ?? 0, 0, 1);
+  const shade = (q: THREE.Vector3, normal: THREE.Vector3, color: THREE.Color) => {
+    rockColor(q, normal, s.top, seed, topC, color);
+    if (faceGrade === 0 || Math.abs(normal.y) >= 0.4) return color;
+    const side = 1 - THREE.MathUtils.smoothstep(Math.abs(normal.y), 0.25, 0.4);
+    const below = s.top - q.y;
+    const depth = THREE.MathUtils.clamp(below / Math.max(0.01, h), 0, 1);
+    color.lerp(PAL.rockDeep, THREE.MathUtils.smoothstep(depth, 0.35, 1) * 0.3 * faceGrade * side);
+    // Follow the first side row (~0.65m); a thinner band falls between vertices.
+    const lip = THREE.MathUtils.smoothstep(below, 0.05, 0.3) * (1 - THREE.MathUtils.smoothstep(below, 0.7, 1));
+    return color.lerp(PAL.rockDust, lip * 0.22 * faceGrade * side);
+  };
   const W = (v: THREE.Vector3) => v.clone().applyMatrix4(m);
   const n = new THREE.Vector3();
   const e1 = new THREE.Vector3();
@@ -436,7 +450,7 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
       n.negate();
       [B, C] = [C, B];
     }
-    b.tri(A, B, C, n, rockColor(A, n, s.top, seed, topC, ca), rockColor(B, n, s.top, seed, topC, cb), rockColor(C, n, s.top, seed, topC, cc));
+    b.tri(A, B, C, n, shade(A, n, ca), shade(B, n, cb), shade(C, n, cc));
   };
   // sides: world-space grid, one normal per quad, then creased vertex normals — smooth across
   // gentle facets (an intact fracture plane), hard where the plane breaks (> ~38°)
@@ -488,10 +502,10 @@ export function rockSlab(b: Bucket, s: RockSpec): void {
       const nB = vn(i2, j, own);
       const nC = vn(i2, j + 1, own);
       const nD = vn(i, j + 1, own);
-      const cA = rockColor(A, nA, s.top, seed, topC, new THREE.Color());
-      const cB = rockColor(B, nB, s.top, seed, topC, new THREE.Color());
-      const cC = rockColor(C, nC, s.top, seed, topC, new THREE.Color());
-      const cD = rockColor(D, nD, s.top, seed, topC, new THREE.Color());
+      const cA = shade(A, nA, new THREE.Color());
+      const cB = shade(B, nB, new THREE.Color());
+      const cC = shade(C, nC, new THREE.Color());
+      const cD = shade(D, nD, new THREE.Color());
       // winding: outward-facing
       e1.subVectors(B, A);
       e2.subVectors(C, A);
