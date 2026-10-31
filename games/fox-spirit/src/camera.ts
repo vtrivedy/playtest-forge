@@ -573,7 +573,7 @@ export function createFollowCamera(opts: {
         aim.z += (landAt.z - aim.z) * w;
         // drops: tilt toward the landing height and raise the lens so the ground you'll hit is visible
         aim.y += (Math.max(landAt.y, focusY - 10) - focusY) * Math.min(0.7, 0.15 + drop * 0.07) * landW * descending;
-        dropLift = Math.min(3.5, drop * 0.3) * landW;
+        dropLift = Math.min(3.5, drop * 0.3) * landW * descending;
         goalDist += Math.min(2, Math.max(0, spread - 4) * 0.2 + drop * 0.1) * landW;
       }
       if (pullHold > 0) pullHold -= dt;

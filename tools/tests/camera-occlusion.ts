@@ -140,3 +140,28 @@ for (const minDistance of [0, 2.2, 2.6, 3.0]) {
     feetNdc: +feetNdc.toFixed(3), earsNdc: +earsNdc.toFixed(3), cutout: stair.debug.blocked() });
 }
 console.log('Terrain boom CPU variations:', JSON.stringify(terrainVariations));
+
+// Predicting a lower landing should not crane above a fox that is still rising.
+// Descending keeps the same landing-preview lift and its damped transition.
+const ascentViews = [];
+for (const verticalSpeed of [5, -4]) {
+  const noLanding = createFollowCamera();
+  const lowLanding = createFollowCamera();
+  for (const camera of [noLanding, lowLanding]) camera.resize(1280, 720);
+  for (let i = 0; i < 120; i++) {
+    const frame = { ...idleFrame, target: new THREE.Vector3(0, 10, 0), vel: new THREE.Vector3(0, verticalSpeed, 0),
+      grounded: false, gliding: true, airTime: 1 };
+    noLanding.update(1 / 60, frame);
+    lowLanding.update(1 / 60, { ...frame, landing: new THREE.Vector3(0, 0, 0) });
+  }
+  const extraHeight = lowLanding.camera.position.y - noLanding.camera.position.y;
+  // The landing view also widens the boom; its normal pitch scales with that
+  // distance. Subtract that expected rise to isolate the separate crane lift.
+  const rangeDifference = Math.hypot(lowLanding.camera.position.x, lowLanding.camera.position.z)
+    - Math.hypot(noLanding.camera.position.x, noLanding.camera.position.z);
+  const extraCrane = extraHeight - rangeDifference * lowLanding.params.height / lowLanding.params.distance;
+  if (verticalSpeed > 0) assert.ok(Math.abs(extraCrane) < 0.05, 'rising fox gets no descent-only crane lift');
+  else assert.ok(extraCrane > 2, 'descending fox retains the landing-preview lift');
+  ascentViews.push({ verticalSpeed, extraHeight: +extraHeight.toFixed(3), extraCrane: +extraCrane.toFixed(3) });
+}
+console.log('Landing-preview lift CPU probe:', JSON.stringify(ascentViews));
