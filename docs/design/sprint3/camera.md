@@ -12,7 +12,7 @@ Keep the burnt-orange spirit fox readable at a restrained three-quarter chase an
 - Preserve body room against spring lag by expanding a copy of the rig to minDistance BEFORE the solid-scenery test. The existing scenery compression/fade then has final authority; do not push a compressed camera through a wall afterward. The spring state remains independent.
 - Terrain fallback uses a2.6m minimum boom and explicit cutout signal instead of torso-only fixed-fraction compression. Reactive-shot sweeps opt out. Keep the final floor guarantee; report floorLift separately from the restrained.9m sweep lift. CPU pitch/ear/foot gates do not prove a smooth authored stair transition.
 - Landing-preview crane lift shares the descent weight already used by landing aim: zero while rising, partial during shallow descent, full by-4m/s. The lift remains damped. Intermediate wind/glide sink weights are intentional and require remote landing/apex review.
-- Reduce the extra composition offset only for sustained descending flight (airTime.75→1.5s), with its own damped weight and gentle release after touchdown. This keeps short hops from nodding the new grounded composition and prevents a velocity-reset snap at landing. Landing aim, glide distance and gameplay prediction remain unchanged.
+- Reduce the extra composition offset only for sustained descending flight (airTime.75→1.5s), with its own damped weight and gentle release after touchdown. This keeps short hops from nodding the new grounded composition and prevents a velocity-reset snap in this framing offset at landing. Landing aim, glide distance and gameplay prediction remain unchanged.
 
 ## Captured failures and established evidence
 
