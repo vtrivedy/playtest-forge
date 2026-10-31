@@ -158,6 +158,7 @@ export function createFollowCamera(opts: {
   let sceneryName = '';
   let sceneryFade = 0;
   let terrainFade = false;
+  let floorLift = 0;
   const landAt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   /** Where the fox / predicted landing sit on screen (NDC) — framing metrics for the harness */
@@ -166,7 +167,7 @@ export function createFollowCamera(opts: {
     landing: null as [number, number] | null,
     blocked: () => terrainFade || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
     internals: () =>
-      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
+      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} floorLift=${floorLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
   };
   let shotW = 0;
   /** Active authored path (restore cinematic) */
@@ -245,7 +246,7 @@ export function createFollowCamera(opts: {
    * fraction to keep and the lift to add (callers smooth these — no pops).
    */
   const boom = { t: 1, lift: 0, fade: false };
-  function sweepBoom(focus: THREE.Vector3, cam: THREE.Vector3) {
+  function sweepBoom(focus: THREE.Vector3, cam: THREE.Vector3, preserveBodyRoom = true) {
     boom.t = 1;
     boom.lift = 0;
     boom.fade = false;
@@ -279,7 +280,7 @@ export function createFollowCamera(opts: {
       }
     }
     const collisionT = Math.max(0.3, (firstBlocked - 1) / steps);
-    const readableT = Math.min(1, params.minDistance / Math.max(0.01, focus.distanceTo(cam)));
+    const readableT = preserveBodyRoom ? Math.min(1, params.minDistance / Math.max(0.01, focus.distanceTo(cam))) : 0;
     boom.t = Math.max(collisionT, readableT);
     boom.fade = readableT > collisionT;
     boom.lift = maxLift;
@@ -445,7 +446,7 @@ export function createFollowCamera(opts: {
       shotLook.y + Math.sin(elev) * need,
       shotLook.z + Math.cos(a) * Math.cos(elev) * need,
     );
-    const b = sweepBoom(shotLook, shotPos);
+    const b = sweepBoom(shotLook, shotPos, false);
     applyBoom(shotLook, shotPos, b.t, b.lift);
   }
 
@@ -572,7 +573,7 @@ export function createFollowCamera(opts: {
         aim.z += (landAt.z - aim.z) * w;
         // drops: tilt toward the landing height and raise the lens so the ground you'll hit is visible
         aim.y += (Math.max(landAt.y, focusY - 10) - focusY) * Math.min(0.7, 0.15 + drop * 0.07) * landW * descending;
-        dropLift = Math.min(3.5, drop * 0.3) * landW;
+        dropLift = Math.min(3.5, drop * 0.3) * landW * descending;
         goalDist += Math.min(2, Math.max(0, spread - 4) * 0.2 + drop * 0.1) * landW;
       }
       if (pullHold > 0) pullHold -= dt;
@@ -706,10 +707,14 @@ export function createFollowCamera(opts: {
       }
       shotW = Math.max(shotW, pathW);
       outPos.y += dip * (1 - shotW);
+      floorLift = 0;
       // the rendered lens (shot blend + dip) gets the same floor guarantee as the rig
       if (opts.surfaceAt) {
         const floor = opts.surfaceAt(outPos.x, outPos.z, outPos.y + 1.5);
-        if (Number.isFinite(floor) && outPos.y < floor + params.clearance * 0.8) outPos.y = floor + params.clearance * 0.8;
+        if (Number.isFinite(floor) && outPos.y < floor + params.clearance * 0.8) {
+          floorLift = floor + params.clearance * 0.8 - outPos.y;
+          outPos.y += floorLift;
+        }
       }
 
       // The final floor guarantee can raise the lens after compression / landing dip.

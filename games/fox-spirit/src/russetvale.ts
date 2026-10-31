@@ -1169,15 +1169,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
-  const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xe6cfa8, transparent: true, depthWrite: false, opacity: 0.55 });
+  const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xe6cfa8, transparent: true, depthWrite: false, opacity: 0.12 });
   const mists: THREE.Mesh[] = [];
   for (let i = 0; i < 14; i++) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mistMat);
     const a = r() * Math.PI * 2;
     const d = Math.sqrt(r()) * 0.9;
     m.position.set(MARSH.x + Math.cos(a) * MARSH.rx * d, -1.32 + r() * 0.2, MARSH.z + Math.sin(a) * MARSH.rz * d);
-    m.scale.setScalar(12 + r() * 12);
-    m.rotation.x = -Math.PI / 2 + 0.06; // hugs the ink: never veils the tussocks or boardwalk
+    m.scale.setScalar(8 + r() * 8);
+    m.rotation.x = -Math.PI / 2; // stays above the ink instead of clipping into straight bands
     m.userData.phase = r() * 6.28;
     mists.push(m);
     group.add(m);
@@ -2007,7 +2007,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     archAt(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
   }
   // Wen's pond
-  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x393c30, colorShallow: 0x827657 });
+  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x293730, colorShallow: 0x5b604b, shoreRadius: 1.18 });
   waterVisuals.push(pond);
   pond.mesh.position.set(POND.x, POND.water, POND.z);
   pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
@@ -2564,7 +2564,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       for (const m of mists) {
         const ph = m.userData.phase as number;
         m.position.x += Math.sin(t * 0.07 + ph) * dt * 0.4;
-        (m.material as THREE.MeshBasicMaterial).opacity = inkActive ? 0.55 : 0.3;
+        (m.material as THREE.MeshBasicMaterial).opacity = inkActive ? 0.12 : 0.04;
       }
 
       if (!wellLit) wsGlow.emissiveIntensity = 0.06 + flood;
