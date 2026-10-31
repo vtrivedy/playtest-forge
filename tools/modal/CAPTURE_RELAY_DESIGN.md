@@ -1,0 +1,3 @@
+# Sprint 3 GPU relay
+
+Poll configured stream folders for capture-request.json, validate immutable refs and supported shots, retain each distinct request by hash and run the GPU capture tool. Never run a local browser. Durable request records prevent duplicate launches after restart; failures remain evidence and can be retried by changing the request. Upload a tar of results plus feedback.md for remote agents to download and inspect. Automated feedback reports transport/machine evidence only; artistic verdict requires a person/agent to read PNGs. Default concurrency one to keep local RAM light; polling and processing are bounded by the sprint hard stop.
