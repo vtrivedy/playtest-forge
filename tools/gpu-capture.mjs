@@ -1787,6 +1787,22 @@ try {
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
+    const rendererSnapshot = () => page.evaluate(() => {
+      const { renderer, scene, post } = window.__gameHooks.debug;
+      const rt = renderer.getRenderTarget();
+      const output = post.composer.passes.find(p => p.isOutputPass);
+      if (!output || !Number.isFinite(output.uniforms?.toneMappingExposure?.value)) throw Error('Route renderer snapshot requires OutputPass exposure');
+      return {
+        exposure: renderer.toneMappingExposure, toneMapping: renderer.toneMapping,
+        outputColorSpace: renderer.outputColorSpace,
+        renderTarget: rt ? { uuid: rt.uuid, width: rt.width, height: rt.height, samples: rt.samples, type: rt.texture.type, colorSpace: rt.texture.colorSpace } : null,
+        outputExposure: output.uniforms.toneMappingExposure.value,
+        post: { ...post.params },
+        fog: scene.fog ? { color: scene.fog.color.toArray(), density: scene.fog.density ?? null, near: scene.fog.near ?? null, far: scene.fog.far ?? null } : null,
+        water: scene.userData.waterCapture ? { ...scene.userData.waterCapture } : null,
+      };
+    });
+    const rendererBefore = kilnRoute ? await rendererSnapshot() : null;
     const start = await H('state');
     const spawnDistanceToFirst = Math.hypot(start.pos[0] - route[0].x, start.pos[1] - route[0].y, start.pos[2] - route[0].z);
     if (kilnRoute && (!Number.isFinite(spawnDistanceToFirst) || spawnDistanceToFirst > 1)) throw Error('Kiln proof must begin within one metre of the authored plaza spawn');
@@ -1926,7 +1942,10 @@ try {
       await page.screenshot({ path: path.join(out, `${name}-camera-frame-${i}.png`) });
       return { ...audit, cameraDiagnostic: `${name}-camera-frame-${i}.json` };
     } });
-    if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+    if (kilnRoute) {
+      save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+      save('route-renderer-state.json', { scope: 'Read-only snapshots bracketing the route across many reflection passes; not an atomic reflection-state leak test', before: rendererBefore, after: await rendererSnapshot() });
+    }
     await H('autopilot', false, state.auto.idx, { assist: false });
     await H('setKeys', []); await H('setStick', null); await shot('route-end');
 
