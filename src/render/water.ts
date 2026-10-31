@@ -21,7 +21,7 @@ export function createStylizedWater(
     ...sceneSampler.uniforms,
     uReflectionMap: { value: null as THREE.Texture | null },
     uReflectionMatrix: { value: new THREE.Matrix4() },
-    uReflectionOn: { value: opts.reflection ? 1 : 0 },
+    uReflectionOn: { value: 0 },
     uTime: { value: 0 },
     uHalf: { value: size * 0.5 },
     uShoreRadius: { value: shoreRadius },

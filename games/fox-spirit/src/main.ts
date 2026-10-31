@@ -117,7 +117,6 @@ async function boot() {
     exposure: 1.18,
     shadows: quality.shadows,
     pixelRatio: quality.pixelRatio,
-    softShadows: quality.softShadows,
   });
   const { renderer, backend } = forge;
 
