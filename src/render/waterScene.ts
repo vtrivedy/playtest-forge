@@ -17,7 +17,7 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
   const sampler = {
     uniforms,
     register(skin: THREE.Object3D, reflect?: (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => boolean) {
-      skins.add(skin); skin.renderOrder = -20;
+      skins.add(skin); skin.renderOrder = -20; skin.userData.forgeSkipAO = true;
       if (reflect) reflections.set(skin, reflect);
     },
     prepare(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
