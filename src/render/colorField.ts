@@ -859,12 +859,12 @@ export class ColorField {
             float lichen = smoothstep(0.55, 0.75, noise21(gpP * 0.9 + 3.0) * 0.7 + noise21(gpP * 3.1) * 0.3);
             // stone comes back as warm sunlit sandstone (against the grey paper the warmth is the life),
             // with gold lichen patches and moss on the tops
-            vec3 stone = chromaLuma * mix(vec3(1.2, 1.0, 0.76), vec3(1.1, 1.0, 0.86), noise21(gpP * 0.5)) * 1.15;
+            vec3 stone = chromaLuma * mix(vec3(1.34, 1.0, 0.64), vec3(1.2, 1.0, 0.78), noise21(gpP * 0.5)) * 1.18;
             vec3 lichenC = chromaLuma * pO * 1.1;
-            vec3 moss = chromaLuma * pM * 1.08;
+            vec3 moss = chromaLuma * mix(pS, pM, 0.6) * 1.08;
             float mossK = smoothstep(0.5, 0.85, up) * smoothstep(0.4, 0.66, noise21(spP * 0.8 + 6.0));
             vec3 ownPaint = own * mix(0.95, 1.1, dens - 0.8);
-            vec3 stonePaint = mix(mix(stone, lichenC, lichen * 0.7), moss, mossK);
+            vec3 stonePaint = mix(mix(stone, lichenC, lichen * 0.75), moss, mossK * 0.8);
             // kept litter piles come back as warm leaves, lighter than their dead value
             vec3 litterPaint = ownPaint * 1.2;
             vec3 paintC = uPaintKind < 0.5 ? groundPaint : uPaintKind < 1.5 ? stonePaint : uPaintKind < 2.5 ? ownPaint : litterPaint;
@@ -998,7 +998,7 @@ export function paintLookUniforms() {
     /** World-XZ offset derived from the single paint seed (fBm never swims; same seed = same paper) */
     uPaintSeed: { value: new THREE.Vector2() },
     /** Metres paint climbs up props at full coverage; foliage climbs uClimbFoliage× further */
-    uClimbH: { value: 4.2 },
+    uClimbH: { value: 5.5 },
     uClimbFoliage: { value: 2.4 },
     /** 1 = tint litter magenta / sprout-free debug for speck hunts */
     uSpeckDebug: { value: 0 },

@@ -1023,6 +1023,22 @@ try {
     // from beyond the hearth looking back down the path: burst in front, ribbon receding
     await H('photo',[hx-ux*9+nx*4,hy+13,hz-uz*9+nz*4],[hx+ux*6,hy,hz+uz*6],55);await advance(2);await shot('paint-burst-hearth');
     const end={state:await H('state'),game:await page.evaluate(()=>window.__game)};
+    // paint-pass cost, GPU-synchronised (1-px readPixels): 30 live blooms + climb pass vs an idle frame; then whole-frame with paint shading off
+    const paintPerf=await page.evaluate(()=>{
+      const d=window.__gameHooks.debug,p=d.colorField.paint,gl=d.renderer.getContext(),px=new Uint8Array(4);
+      const sync=()=>gl.readPixels(0,0,1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+      const time=(f,n=12)=>{sync();const t=performance.now();for(let i=0;i<n;i++){f();sync();}return (performance.now()-t)/n;};
+      const idle=time(()=>{});
+      for(let i=0;i<30;i++)p.bloom(5+i*0.7,74+Math.sin(i)*2,2.2,1,30);
+      const loaded=time(()=>p.render(1/30));
+      return {syncOverheadMs:+idle.toFixed(3),paintPassMs:+(loaded-idle).toFixed(3),liveBlooms:p.blooms.length};
+    });
+    const frameOn=await H('perf',4);
+    await page.evaluate(()=>{window.__gameHooks.debug.colorField.paint.uniforms.uPaintOn.value=0;});
+    const frameOff=await H('perf',4);
+    await page.evaluate(()=>{window.__gameHooks.debug.colorField.paint.uniforms.uPaintOn.value=1;});
+    save('paint-perf.json',{...paintPerf,frameMsPaintOn:frameOn.msPerFrame,frameMsPaintOff:frameOff.msPerFrame,note:'SwiftShader low 1280x720; paintPassMs = stamp+wet+climb with 30 live blooms, GPU-synced'});
+    console.log('PAINT PERF',JSON.stringify(paintPerf),frameOn.msPerFrame,frameOff.msPerFrame);
     save('paint-acceptance.json',{label:'Staged sepia start; live-input straight walk→pause→trot to cold H-a hearth, stand until lit (dash fallback); same high lens before/after.',route:{S,E,L,dir:route.dir},arriveFrame:arriveI,litFrame:litI,dashFrame:dashI,initial,end,laid:end.game.paint?.laid,areaM2:end.game.paint?.areaM2,deaths:end.state.deaths-initial.state.deaths});
   }
   if (wants('showcase')) {
