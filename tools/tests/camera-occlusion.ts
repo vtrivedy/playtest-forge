@@ -118,7 +118,7 @@ console.log('PASS: remote celebration rejected, local idle shot retained, runnin
 // filling the image with the fox's torso. Compare minimum-distance variations
 // on identical CPU geometry; these metrics are not visual acceptance.
 const terrainVariations = [];
-for (const minDistance of [2.2, 2.6, 3.0]) {
+for (const minDistance of [0, 2.2, 2.6, 3.0]) {
   const stair = createFollowCamera({ params: { minDistance }, surfaceAt: (_x, z) => z > 0.5 ? 2 : 0 });
   stair.resize(1280, 720);
   for (let i = 0; i < 120; i++) stair.update(1 / 60, { ...idleFrame, target: new THREE.Vector3() });
@@ -126,8 +126,43 @@ for (const minDistance of [2.2, 2.6, 3.0]) {
   const horizontal = Math.hypot(pos.x, pos.z);
   assert.ok(horizontal > minDistance * 0.8, 'terrain fallback preserves horizontal body room');
   assert.ok(pos.y >= 2, 'readability floor retains the final ground clearance');
-  assert.equal(stair.debug.blocked(), true, 'unresolved terrain requests a cutout');
+  if (minDistance > 0) assert.equal(stair.debug.blocked(), true, 'unresolved terrain requests a cutout');
   assert.ok(stair.camera.projectionMatrix.elements.every(Number.isFinite));
-  terrainVariations.push({ minDistance, horizontal: +horizontal.toFixed(3), height: +pos.y.toFixed(3), cutout: stair.debug.blocked() });
+  const feetNdc = new THREE.Vector3().project(stair.camera).y;
+  const earsNdc = new THREE.Vector3(0, 1.25, 0).project(stair.camera).y;
+  const direction = stair.camera.getWorldDirection(new THREE.Vector3());
+  const pitch = THREE.MathUtils.radToDeg(Math.atan2(-direction.y, Math.hypot(direction.x, direction.z)));
+  if (minDistance >= 2.6) {
+    assert.ok(pitch < 40, 'selected terrain fallback avoids a steep overhead view');
+    assert.ok(Math.abs(feetNdc) < 0.92 && Math.abs(earsNdc) < 0.92, 'ears and feet remain inside the safe vertical frame');
+  }
+  terrainVariations.push({ minDistance, horizontal: +horizontal.toFixed(3), height: +pos.y.toFixed(3), pitch: +pitch.toFixed(2),
+    feetNdc: +feetNdc.toFixed(3), earsNdc: +earsNdc.toFixed(3), cutout: stair.debug.blocked() });
 }
 console.log('Terrain boom CPU variations:', JSON.stringify(terrainVariations));
+
+// Predicting a lower landing should not crane above a fox that is still rising.
+// Descending keeps the same landing-preview lift and its damped transition.
+const ascentViews = [];
+for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
+  const noLanding = createFollowCamera();
+  const lowLanding = createFollowCamera();
+  for (const camera of [noLanding, lowLanding]) camera.resize(1280, 720);
+  for (let i = 0; i < 120; i++) {
+    const frame = { ...idleFrame, target: new THREE.Vector3(0, 10, 0), vel: new THREE.Vector3(0, verticalSpeed, 0),
+      grounded: false, gliding: true, airTime: 1 };
+    noLanding.update(1 / 60, frame);
+    lowLanding.update(1 / 60, { ...frame, landing: new THREE.Vector3(0, 0, 0) });
+  }
+  const extraHeight = lowLanding.camera.position.y - noLanding.camera.position.y;
+  // The landing view also widens the boom; its normal pitch scales with that
+  // distance. Subtract that expected rise to isolate the separate crane lift.
+  const rangeDifference = Math.hypot(lowLanding.camera.position.x, lowLanding.camera.position.z)
+    - Math.hypot(noLanding.camera.position.x, noLanding.camera.position.z);
+  const extraCrane = extraHeight - rangeDifference * lowLanding.params.height / lowLanding.params.distance;
+  if (verticalSpeed > 0) assert.ok(Math.abs(extraCrane) < 0.05, 'rising fox gets no descent-only crane lift');
+  else if (verticalSpeed <= -4) assert.ok(extraCrane > 2, 'fast descent retains the landing-preview lift');
+  else assert.ok(extraCrane > 0, 'partial descent retains a weighted landing-preview lift');
+  ascentViews.push({ verticalSpeed, extraHeight: +extraHeight.toFixed(3), extraCrane: +extraCrane.toFixed(3) });
+}
+console.log('Landing-preview lift CPU probe:', JSON.stringify(ascentViews));

@@ -223,15 +223,29 @@ try {
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
     if (!actors.length) throw Error('No Shade encounter authored');
     save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
+    const reviewCenter=await page.evaluate(()=>{
+      const points=window.__gameHooks.debug.world.shadeSpots[0].patrol;
+      return points.reduce((sum,p)=>[sum[0]+p[0]/points.length,sum[1]+p[2]/points.length],[0,0]);
+    });
     let lens = null;
     const camera = async () => {
       const actor = await page.evaluate(() => window.__gameHooks.shades.state().actors[0]);
       const [x,y,z] = actor.pos;
-      if(!lens){
-        const dx=x+112,dz=z+24,d=Math.hypot(dx,dz)||1;
-        lens=[x+dx/d*8,y+3.6,z+dz/d*8];
-      }
-      await H('photo', lens, [x,y+1.2,z],48);
+      // Staged review lens stays outside the Kiln ring so masonry sits behind the animal.
+      const dx=x-reviewCenter[0],dz=z-reviewCenter[1],d=Math.hypot(dx,dz)||1;
+      const desired=[x+dx/d*6.5,y+2.8,z+dz/d*6.5];
+      lens=lens?lens.map((value,i)=>value+(desired[i]-value)*.12):desired;
+      const sight=await page.evaluate(({preferred,desired,look})=>{
+        const h=window.__gameHooks;
+        if(!h.photoBlocker)return {pos:preferred,checked:false};
+        const angle=Math.atan2(desired[2]-look[2],desired[0]-look[0]);
+        const candidates=[preferred,desired,...[.45,-.45,.9,-.9,1.4,-1.4,Math.PI].map(offset=>[look[0]+Math.cos(angle+offset)*6.5,look[1]+1.5,look[2]+Math.sin(angle+offset)*6.5])];
+        for(const pos of candidates)if(!h.photoBlocker(pos,look))return {pos,checked:true};
+        return {pos:preferred,checked:true,blocked:true};
+      },{preferred:lens,desired,look:[x,y+1.3,z]});
+      lens=sight.pos;
+      if(sight.blocked)report.shadeLensBlockedFrames=(report.shadeLensBlockedFrames||0)+1;
+      await H('photo', lens, [x,y+1.3,z],48);
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(([x,y,z]) => {
@@ -246,6 +260,9 @@ try {
     }, start);
     const observerYaw = Math.atan2(start[0]-safePosition[0],start[2]-safePosition[2]);
     await H('teleport', ...safePosition, observerYaw);
+    await camera();
+    await advance(0);
+    await shot('shade-preview-before-rule-probes');
     const probe = await H('shadesProbe');
     if (!probe.draining || probe.weak > 0) throw Error(`Drain probe failed ${JSON.stringify(probe)}`);
     save('shade-drain-probe.json', probe);
@@ -323,8 +340,8 @@ try {
       for (let k=0;k<128;k++) {
         const a=k/128*Math.PI*2, dx=Math.cos(a), dz=Math.sin(a);
         let safe=true;
-        for(let r=.55;r<4.6;r+=.1) {
-          const px=x+dx*r,pz=z+dz*r;
+        for(let r=.4;r<4.8&&safe;r+=.1) for(const width of [-.35,0,.35]) {
+          const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;
           if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2) { safe=false; break; }
         }
         if(safe)return {pos:[x+dx*1.45,y,z+dz*1.45], direction:[dx,dz]};
@@ -332,14 +349,19 @@ try {
       throw Error('No 3m wall-free contact direction');
     }, p);
     save('shade-contact-setup.json', contactSetup);
-    await H('teleport', ...contactSetup.pos, Math.PI);
+    await H('teleport', ...contactSetup.pos, Math.atan2(-contactSetup.direction[0],-contactSetup.direction[1]));
     lens=null;
     await camera();
     let contactFrame=null;
     await H('setStick', -contactSetup.direction[0], -contactSetup.direction[1]);
     await video('shade-contact', 110, async i => {
       const current=await page.evaluate(()=>window.__gameHooks.shades.state());
-      if(current.hits>0&&contactFrame===null){contactFrame=i-1;await H('setStick',null);}
+      if(current.hits>0&&contactFrame===null){
+        contactFrame=i-1;await H('setStick',null);
+        const state=await H('state'),actor=current.actors[0];
+        const dx=state.pos[0]-actor.pos[0],dz=state.pos[2]-actor.pos[2],length=Math.hypot(dx,dz)||1;
+        save('shade-contact-impact.json',{frame:contactFrame,fox:state.pos,actor:actor.pos,direction:[dx/length,dz/length],planned:contactSetup.direction,angleDegrees:Math.acos(Math.max(-1,Math.min(1,(dx*contactSetup.direction[0]+dz*contactSetup.direction[1])/length)))*180/Math.PI});
+      }
       await camera();
     }, (state,i)=>contactFrame!==null&&i>=contactFrame+61, { traceEveryFrame: true, keyFrames: [0, 6, 12, 18, 36, 60] });
     await H('setStick', null);
@@ -667,6 +689,32 @@ try {
     const end = await H('state');
     await H('photoOff'); await advance(30); await shot('hub-chase-arrived');
     save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
+    // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
+    const orbitCameras = [];
+    const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-7, 90));
+    const orbitTarget = [-7, targetGround + 1.2, 90];
+    const orbitLens = (angle, height) => [-9 + Math.sin(angle) * 30, height, 88 + Math.cos(angle) * 24];
+    // One fixed clearance height avoids frame-to-frame camera pops. The ellipse
+    // stays >2m outside every cottage roof footprint; low close/chase shots above
+    // retain the player-scale views. Every captured pose is checked and logged.
+    let orbitHeight = targetGround + 14;
+    for (const height of [6, 8, 10, 12, 14].map(h => targetGround + h)) {
+      let clear = true;
+      for (let j = 0; j < 36 && clear; j++) clear = !(await H('photoBlocker', orbitLens(j / 36 * Math.PI * 2, height), orbitTarget));
+      if (clear) { orbitHeight = height; break; }
+    }
+    let orbitBlocked = 0;
+    await video('hub-orbit', 18 * fps, async i => {
+      const lens = orbitLens(i / (18 * fps - 1) * Math.PI * 2, orbitHeight);
+      const blocker = await H('photoBlocker', lens, orbitTarget);
+      if (blocker) orbitBlocked++;
+      orbitCameras.push({ frame: i, lens, target: orbitTarget, blocker });
+      await H('photo', lens, orbitTarget, 58);
+    }, undefined, {keyFrames: [0, 3*fps, 6*fps, 9*fps, 12*fps, 15*fps, 18*fps-1]});
+    save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, blockedFrames: orbitBlocked, cameras: orbitCameras });
+    if (orbitBlocked) report.failures.push(`Hub context orbit has ${orbitBlocked} blocked review frames`);
+    await H('photoOff');
+
   }
   if (wants('stills')) {
     await boot(quality, true);
@@ -700,7 +748,7 @@ try {
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
     if (!Number.isFinite(y) || y < -24) throw Error('Restoration review has no safe meadow surface');
     await H('teleport', 0, y, 70, Math.PI);
-    await H('photo', [10, y + 12, 82], [0, y, 68], 50);
+    await H('photo', [5, y + 6, 79], [-1, y, 70], 48);
     await advance(60); await shot('restoration-aura');
     await H('setStick', -1, 0); await H('setKeys', ['ShiftLeft']);
     await advance(6); await shot('restoration-dash');
@@ -710,7 +758,13 @@ try {
     await advance(360); await shot('restoration-wake-decayed');
     // Reed Seedwell is at (95, 10), radius 35: the south front crosses z=45.
     // The meadow lens cannot see it, so use a separate fixed lens for the matched front pair.
-    await H('photo', [81, 23, 68], [83, 0, 41], 52);
+    const reedY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(95, 10));
+    if (!Number.isFinite(reedY) || reedY < -24) throw Error('Restore front has no safe Reed island surface');
+    await H('teleport', 95, reedY, 10, Math.PI);
+    const restoreLens = [68, 21, 44];
+    const restoreLook = [91, 1, 15];
+    save('restoration-framing.json', { lens: restoreLens, look: restoreLook, fox: [95, reedY, 10], blocker: await H('photoBlocker', restoreLens, [95, reedY + 0.5, 10]) });
+    await H('photo', restoreLens, restoreLook, 60);
     await advance(1); await shot('restoration-front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
@@ -768,6 +822,8 @@ try {
     await H('setStick', null); await H('setKeys', []);
     save('water-pond-result.json', await H('state'));
     await H('photo', [-7, 7, 79], [-23, 0, 66], 52); await advance(2); await shot('water-pond-vista');
+    await H('photo', [-6, 1.3, 78], [-24, -0.22, 68], 52); await advance(2); await shot('water-pond-grazing');
+    await H('photo', [8, 3, 3], [8, -3.2, -7], 52); await advance(2); await shot('water-creek');
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
@@ -1269,7 +1325,7 @@ try {
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
-    }, { sample: async (i, st) => {
+    }, { traceEveryFrame: budgetFrames <= 60 * fps, sample: async (i, st) => {
       const audit = {};
       if (kilnRoute) {
         const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
