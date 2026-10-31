@@ -106,3 +106,11 @@ feedback, keeping every current acceptance requirement intact. Do not accept
 partial frames or infer a current visual verdict. This diagnostic-only change
 must pass Python syntax and synthetic missing/mismatched/matching identity cases;
 request existing immutable game candidate without replacing in-flight work.
+
+## Round 33 — rising-ferry support evidence
+Opus round32 identified missing support evidence during the height wait. Add
+raftHeight to each crossing sample and aggregate every captured wait frame:
+count, grounded-and-ferry-supported count, longest unsupported interval, entry
+and exit height. This diagnoses loss of support between half-second samples.
+Preserve controller inputs, timeouts and acceptance gates; pending GPU footage
+must decide whether boarding succeeds. No visual or gameplay approval from logs.
