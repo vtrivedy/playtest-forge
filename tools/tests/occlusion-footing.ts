@@ -31,15 +31,22 @@ for (const screenHeight of [360, 720, 1440]) {
     const fox = shader.uniforms.uOccFox.value as THREE.Vector4;
     const fade = shader.uniforms.uOccFootFade.value as number;
     assert.ok(fade >= 1 && Number.isFinite(fox.w));
-    // The shader's lower trim must fully clear the projected paws, tail, muzzle
-    // and ears even with the camera below a terrace or rolled during flight.
+    // Projection invariants only: these proxies do not prove animated mesh clearance.
     for (const [along, up] of [[0, 0], [0, 1.05], [.75, .6], [-1.1, .5], [.4, 0], [-.5, 0]]) {
       const p = new THREE.Vector3(feet.x + Math.sin(yaw) * along, feet.y + height * up, feet.z + Math.cos(yaw) * along).project(camera);
       const py = (p.y * .5 + .5) * screenHeight;
       assert.ok(py >= fox.w + fade, 'silhouette samples retain full cutout clearance');
     }
+    // Independent interior paw-width envelope checks the side axes and guard,
+    // rather than checking only the six centreline points that define the ellipse.
+    for (const along of [-.45, -.15, .1, .35]) for (const side of [-.1, -.05, .05, .1]) {
+      const p = new THREE.Vector3(feet.x + Math.sin(yaw) * along + Math.cos(yaw) * height * side,
+        feet.y, feet.z + Math.cos(yaw) * along - Math.sin(yaw) * height * side).project(camera);
+      const py = (p.y * .5 + .5) * screenHeight;
+      assert.ok(py >= fox.w + fade, 'conservative paw-width envelope remains above the full-clearance line');
+    }
     assert.equal(THREE.MathUtils.smoothstep(fox.w - 1, fox.w, fox.w + fade), 0, 'pixels below guard keep their original surface');
     tested++;
   }
 }
-console.log(`PASS: ${tested} pitched/rolled/low-camera and resolution cases preserve projected feet/tail, floor guard, and builder shader hook`);
+console.log(`PASS: ${tested} camera/resolution projection cases, paw-width proxy envelope, lower guard, and builder hook; animated mesh clearance requires GPU review`);

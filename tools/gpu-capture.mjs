@@ -1429,7 +1429,7 @@ try {
           if (framing.failures.length < 16) framing.failures.push(failure);
         }
         Object.assign(audit, { foxFocusNdc: serialNdc, foxFocusFinite: finite, foxFocusInFrame: inFrame });
-        if (i === 300 || i === 600) {
+        if ([300, 600, 775, 1110].includes(i)) {
           // Forced render-only A/B: same pose/time, never advance or alter inputs.
           const diagnostic = await page.evaluate(() => {
             const { renderer, scene, post } = window.__gameHooks.debug;
@@ -1443,7 +1443,7 @@ try {
                 records.set(u.uOccFox.value, { u, w: u.uOccFox.value.w, strength: u.uOccStrength.value });
               }
             });
-            if (!records.size) return { available: false, images: {} };
+            if (!records.size) throw Error('Underfoot A/B has no compiled footline shader uniforms');
             const images = {};
             try {
               for (const r of records.values()) r.u.uOccStrength.value = 1;
