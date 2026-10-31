@@ -73,7 +73,8 @@ export function createStylizedWater(
         float r = length(vLocal);
         float depth = 1.0 - smoothstep(0.15, 1.0, r);
         vec3 rippleView = mat3(viewMatrix) * vec3(N.x - vN.x, 0.0, N.z - vN.z);
-        vec3 bed = sceneWaterColor(rippleView.xy * 0.005);
+        float shore = 1.0 - smoothstep(uShoreRadius * 0.90, uShoreRadius, r);
+        vec3 bed = sceneWaterColor(rippleView.xy * 0.06 * shore);
         vec3 tint = mix(vec3(0.94, 0.97, 0.91), vec3(0.66, 0.82, 0.73), depth);
         vec3 absorption = mix(uShallow, uDeep * 0.85, depth);
         vec3 refracted = mix(bed * tint, absorption, 0.025 + depth * 0.095);
@@ -81,11 +82,10 @@ export function createStylizedWater(
         refracted += bed * bedLight * (1.0 - depth) * 0.025;
         vec3 reflection = uSky * (0.75 + 0.10 * sin(a * 0.3 + b * 0.2));
         if (uReflectionOn > 0.5) {
-          vec2 mirrorUV = vReflection.xy / vReflection.w + N.xz * 0.007;
+          vec2 mirrorUV = vReflection.xy / vReflection.w + N.xz * 0.025;
           reflection = texture2D(uReflectionMap, clamp(mirrorUV, vec2(0.001), vec2(0.999))).rgb;
         }
         vec3 col = mix(refracted, reflection, 0.02 + fres * 0.94);
-        float shore = 1.0 - smoothstep(uShoreRadius * 0.90, uShoreRadius, r);
         // Scene colour already contains the bed: avoid blending it a second time.
         gl_FragColor = vec4(col, shore);
         #include <tonemapping_fragment>
@@ -110,7 +110,7 @@ export function createStylizedWater(
     const planeNormal = new THREE.Vector3(0, 0, 1).transformDirection(mesh.matrixWorld);
     const view = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld).sub(new THREE.Vector3().setFromMatrixPosition(mesh.matrixWorld));
     uniforms.uReflectionOn.value = planeNormal.dot(view) > 0 ? 1 : 0;
-    if (!uniforms.uReflectionOn.value) return;
+    if (!uniforms.uReflectionOn.value) return false;
     const target = renderer.getRenderTarget(), xr = renderer.xr.enabled, shadows = renderer.shadowMap.autoUpdate, shadowRequested = renderer.shadowMap.needsUpdate;
     reflector.getReflectionCamera(camera).layers.mask = camera.layers.mask;
     renderer.shadowMap.needsUpdate = false;
@@ -120,6 +120,7 @@ export function createStylizedWater(
       try { renderMirror.call(reflector, renderer, scene, camera); }
       finally { renderer.xr.enabled = xr; renderer.shadowMap.autoUpdate = shadows; renderer.shadowMap.needsUpdate = shadowRequested; renderer.setRenderTarget(target); }
     });
+    return true;
   } : undefined);
   mesh.onBeforeRender = renderer => sceneSampler.capture(renderer);
 

@@ -6,8 +6,8 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
   if (existing) return existing;
   let texture = new THREE.FramebufferTexture(1, 1);
   let captureArmed = false;
-  const reflections = new Map<THREE.Object3D, (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => void>();
-  const diagnostics = { prepared: 0, copies: 0, reflectionAttempts: 0, width: 0, height: 0, type: 0, glError: 0, priorGlError: 0, invalidTargets: 0, checkedCopies: 0, checkNextCopy: true };
+  const reflections = new Map<THREE.Object3D, (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => boolean>();
+  const diagnostics = { prepared: 0, copies: 0, reflectionAttempts: 0, reflections: 0, width: 0, height: 0, type: 0, glError: 0, priorGlError: 0, invalidTargets: 0, checkedCopies: 0, checkNextCopy: true };
   scene.userData.waterCapture = diagnostics;
   const skins = new Set<THREE.Object3D>();
   const uniforms = {
@@ -16,7 +16,7 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
   };
   const sampler = {
     uniforms,
-    register(skin: THREE.Object3D, reflect?: (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => void) {
+    register(skin: THREE.Object3D, reflect?: (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => boolean) {
       skins.add(skin); skin.renderOrder = -20;
       if (reflect) reflections.set(skin, reflect);
     },
@@ -27,7 +27,7 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
       for (const [skin, reflect] of reflections) {
         let visible = skin.visible;
         for (let parent = skin.parent; parent; parent = parent.parent) visible = visible && parent.visible;
-        if (visible && skin.layers.test(camera.layers) && skin instanceof THREE.Mesh && frustum.intersectsObject(skin)) { diagnostics.reflectionAttempts++; reflect(renderer, camera); }
+        if (visible && skin.layers.test(camera.layers) && skin instanceof THREE.Mesh && frustum.intersectsObject(skin)) { diagnostics.reflectionAttempts++; if (reflect(renderer, camera)) diagnostics.reflections++; }
       }
       diagnostics.prepared++;
       captureArmed = true;
@@ -88,7 +88,7 @@ type SceneWaterSampler = {
     uSceneWaterColor: { value: THREE.FramebufferTexture };
     uSceneWaterSize: { value: THREE.Vector2 };
   };
-  register(skin: THREE.Object3D, reflect?: (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => void): void;
+  register(skin: THREE.Object3D, reflect?: (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => boolean): void;
   prepare(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void;
   release(skin: THREE.Object3D): void;
   withoutSkins(render: () => void): void;
