@@ -1167,11 +1167,15 @@ try {
     // Staged source hold uses real colour supply; no basin, seal or float state is assigned.
     await RH('teleport',173,30,-116,Math.PI/2);await advance(900,false);
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
+    await RH('teleport',187,36,-118,Math.PI/2);await RH('photo',[151,49,-103],[188,33,-120],52);await advance(2);await shot('reachview-high-basin');
     await RH('teleport',214,31,-137,Math.PI/2);
-    await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-payoff-vista');
+    await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-lower-islet');
+    await RH('teleport',207,36,-123,-Math.PI/2);
+    await RH('photo',[216,42,-134],[184,34,-115],52);await advance(2);await shot('reachview-payoff-vista');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
+    await RH('teleport',187,30,-118,Math.PI/2);await RH('photo',[151,49,-103],[188,33,-120],52);await advance(2);await shot('reachview-low-basin');
     save('reachview-state.json',await RH('state'));
   }
   if (wants('reach')) {
@@ -1191,7 +1195,7 @@ try {
     const end=await RH('state');save('reach-acceptance.json',{phase,reached,end});
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
-      let cycle=0,cycleAge=0,cyclePaint=false;
+      let cycle=0,cycleAge=0,cyclePaint=false,ventHopIssued=false;
       const lowSeen={value:false};let lowLaneVisited=false,steamRise=false;
       await video('reach-level-cycle',30*fps,async()=>{
         const st=await RH('state');cycleAge+=1/fps;
@@ -1199,10 +1203,12 @@ try {
         const p=targets[cycle],dx=p[0]-st.pos[0],dz=p[2]-st.pos[2],d=Math.hypot(dx,dz);
         const atFooting=d<.8&&st.grounded&&Math.abs(st.pos[1]-p[1])<.6;
         const ready=cycle===0?st.reach.level==='low':cycle===1?st.reach.fill<.02:cycle===2?atFooting:cycle===3?cycleAge>1.2&&st.pos[1]>34:cycle===4?st.reach.level==='high':st.reach.fill>.99;
-        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
+        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
         const t=targets[cycle],vx=t[0]-st.pos[0],vz=t[2]-st.pos[2],len=Math.hypot(vx,vz);
         let sx=len>.25?vx/len*Math.min(.8,len):0,sz=len>.25?vz/len*Math.min(.8,len):0;
-        const keys=((cycle===2&&len>3)||(cycle===3&&cycleAge>.3))?['Space']:[];
+        const steamHot=st.chem.hearths.some(h=>h.id==='reach-steam'&&h.heat>=.5);
+        if(cycle===3&&cyclePaint&&cycleAge>.5&&st.grounded&&len<.8&&Math.hypot(st.vel[0],st.vel[2])<1&&steamHot)ventHopIssued=true;
+        const keys=((cycle===2&&len>3)||(cycle===3&&ventHopIssued))?['Space']:[];
         if([0,3,4].includes(cycle)&&len<2.8&&st.grounded&&Math.abs(st.pos[1]-t[1])<.6&&!cyclePaint){
           // A dash needs a direction even after the fox has stopped at the lever.
           if(Math.hypot(sx,sz)<.1){sx=-1;sz=0;}
