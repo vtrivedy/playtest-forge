@@ -4,11 +4,11 @@ Status: playable graybox / reversible-water revision, visual review in progress.
 
 ## Quick reference
 
-- Region: beyond the Wellspring's east causeway; rust-colored drowned orchard and broken aqueducts in warm mist.
+- Region: beyond the Wellspring's east causeway; cool slate drowned orchard and broken aqueducts in warm mist.
 - Type: exploration / environmental puzzle / waterborne traversal.
 - Play time: first slice 3–4 min; full realm target 12–15 min. Difficulty 4/10.
 - Prerequisite: World 1 Wellspring flood; existing move, jump/hold glide, dash. No extra input.
-- Art: still dark teal-umber mirror water, low mist, half-submerged rust maples, cool shadow and warm copper rim light. This continues the locked autumn palette; the earlier Frost realm proposal remains deferred.
+- Art: still dark teal-umber mirror water, low mist, sparse half-submerged alder and willow silhouettes, cool shadow and warm copper rim light. This continues the locked autumn palette; the earlier Frost realm proposal remains deferred.
 
 ## Questions answered and choice
 
@@ -18,7 +18,7 @@ Options: (1) a frost realm adds art/thermodynamic scope too early; (2) a bigger 
 
 ## Narrative / mood
 
-The orchard was flooded when its aqueduct stopped breathing. Ferrymen's stone bowls sit above motionless copper water. A high bell-tower holds one bent maple. Bringing water back raises an old ferry and lets the player see the drowned lanes below. Emotional arc: cautious approach → rising perspective → quiet release.
+The orchard was flooded when its aqueduct stopped breathing. Ferrymen's stone bowls sit above motionless copper water. A high bell-tower holds one bent willow. Bringing water back raises an old ferry and lets the player see the drowned lanes below. Emotional arc: cautious approach → rising perspective → quiet release.
 
 ## Layout
 
@@ -49,7 +49,7 @@ W1 summit [S] == east causeway == [G] flood-open arch
 | Path | Access | Reward | Spatial hint |
 |---|---|---|---|
 | Dry tunnel behind source | Before or after restore, side opening above water | Listening niche and view into the moving flume | Water sound behind a broken grate; no pickup glint |
-| Ferry at half height | Time a jump/glide during the rise | Side balcony with an old orchard map relief | A rust leaf tree glimpsed through an arch |
+| Ferry at half height | Time a jump/glide during the rise | Side balcony with an old orchard map relief | A copper-leaf willow glimpsed through an arch |
 | High return | After shrine | Glide from bell ledge to arrival shelf | Streaming leaves point back; walking stair remains |
 | Drowned orchard (later) | Permanent high ferry | Next puzzle about choosing between two basin destinations | Two broken aqueduct silhouettes, distinct bells |
 
@@ -76,7 +76,7 @@ One Shade drinks from the basin on an authored patrol. While present it opposes 
 
 ## Leading elements and recolor
 
-The bell tower is a single tall silhouette in a horizontal wetland. Lighter flume walls point from spout to dark basin. The raft's pale timber rim separates from umber water; a carved notch shows its destination. Restore reveals copper reflections, rust reeds and one deep red canopy. Warm leaf drift replaces glitter. The fox remains the strongest saturation cluster.
+The bell tower is a single tall silhouette in a horizontal wetland. Lighter flume walls point from spout to dark basin. The raft's pale timber rim separates from umber water; a carved notch shows its destination. Restore reveals copper reflections, rust reeds and sparse copper leaves. Warm leaf drift replaces glitter. The fox remains the strongest saturation cluster.
 
 ## Scope and acceptance
 
@@ -101,11 +101,14 @@ This supersedes the one-way ferry ending above. The shrine makes the source perm
 - **LOW:** timber settles on permanent cradles, and the sunken lane / ferryman's niche becomes accessible. The niche is deliberately under the high-water line: drain after filling to discover it. A dash-fed steam vent in the shallow low-water puddle provides a short updraft back toward the bell ledge, a traversal payoff and return shortcut. It uses existing updraft/glide; high water suppresses the vent.
 - **Tension:** one Shade crosses the basin and drinks its fill down while present. Free it with dash, time the refill between passes, or keep the source supplied. Restoration protects permanent access; it does not erase the low/high choice.
 - **Timing:** fill the6m basin in≤3s once water arrives. The choice, boarding, changing routes and draining for the secret are the play; waiting is not the centerpiece.
-- **Identity:** still dark teal-umber water, warm copper rims, cool shaded surfaces, low mist over the water and half-submerged maple silhouettes. No cyan or neon. Pale fixed basin piers and high-water marks make motion legible.
+- **Identity:** still dark teal-umber water, warm copper rims, cool shaded surfaces, low mist over the water and half-submerged willow silhouettes. No cyan or neon. Pale fixed basin piers and high-water marks make motion legible.
 - **Reveal:** the bell ledge looks across a second aqueduct to a lower orchard islet; the first slice ends in a reachable place with another view, not a door to future content.
 
 Acceptance now includes one arrival frame showing source, bell and a low-only destination; three visible buoyant bodies rising; `__game.reach.level`; HIGH→LOW→HIGH real dash input, a low-lane traversal / shortcut, and a recovery checkpoint within10s of a boarding miss. Retaining an occupied float never counts as water at the shrine inlet.
 
 Closing the sluice for HIGH sends water down the short flume again: a1.8s transit delay before the2.5s rise gives the fox time to board after restoration. LOW drains in1.67s after its1s warning. This keeps the ferry re-boardable after a fall; the source-bank checkpoint avoids replaying the long causeway.
 
-Spatial revision16:45: shortened causeway136→66m, basin shifted70m toward the summit; a lower fork joins the sunken lane when LOW. Four orchard trunks and a timber roofline cross the waterline. Shared pond shader supplies translucent cool water, soft sky reflection and a pale shoreline instead of the rejected opaque orange reflector. HUD names Ashwater Reach and shows LOW/HIGH.
+Spatial revision16:45: shortened causeway136→66m, basin shifted70m toward the summit; a lower fork joins the sunken lane when LOW. Four orchard trunks and a timber roofline cross the waterline. Reach-only water supplies deep teal depth, soft sky reflection and a broken tide edge. Local cistern banks meet HIGH water; the west boarding gap and south LOW lane remain broken spillways. Sparse original willow/alder geometry, reeds and grey wet masonry replace the W1 maple kit. Visual-only hull heave leaves deterministic collision unchanged. HUD names Ashwater Reach and shows LOW/HIGH.
+
+
+Sprint 3 scoped design and acceptance: [ashwater-sprint3.md](ashwater-sprint3.md). Cool slate and sparse willow silhouettes supersede earlier rust-maple identity prose. Copper remains an accent, with the fox the strongest saturation cluster.

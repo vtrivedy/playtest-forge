@@ -1060,7 +1060,10 @@ try {
     // Staged source hold uses real colour supply; no basin, seal or float state is assigned.
     await RH('teleport',173,30,-116,Math.PI/2);await advance(900,false);
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
+    await RH('teleport',214,31,-137,Math.PI/2);
+    await RH('photo',[204,35.5,-144],[216,35,-137],48);await advance(2);await shot('reachview-payoff-vista');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
+    await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
     save('reachview-state.json',await RH('state'));
   }

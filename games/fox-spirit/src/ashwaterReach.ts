@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
-import { createColorField, createStylizedWater } from '../../../src/render';
+import { createColorField } from '../../../src/render';
 import { boxCollider } from './collision';
 import type { Realm } from './russetvale';
 import { Bucket, PAL, rockSlab, stairFlight, ruinArch, stoneBlock, trs, kilnBowl, hangingRoot, hangingSpire, rng } from './russetKit';
 import { waterSpots, type createWater } from './chem/water';
 import { createInlets } from './chem/inlet';
-import { loadNatureKit } from './russetNature';
+import { createReachWater, dressReach } from './reachScenery';
 import { weatheredSurface } from './worldSurfaces';
 
 /** Water stores height: an arriving front fills a basin and raises its ferry. */
@@ -47,7 +47,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   bridge([82,38,-90],[148,38,-90],4.5,910);
   for (const x of [104,132]) {
     shelf(x,38,-90,9,9,920+x);
-    ruinArch(stone,x,38,-90,Math.PI/2,{span:4.7,pillarH:3.2,broken:x===76?.45:0,seed:940+x});
+    ruinArch(stone,x,38,-90,Math.PI/2,{span:4.7,pillarH:3.2,broken:0,seed:940+x});
   }
   // The shortened deck keeps its supports; ruined arches give its span a structural read.
   for (const x of [94, 130]) ruinArch(stone, x, 10.8, -90, 0, { span: 30, pillarH: 9, broken: x === 94 ? 0.18 : 0, seed: 4800 + x });
@@ -71,32 +71,42 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   // Basin rim and high-water notch. Supporting floor remains dry-safe stone.
   for (const z of [-123,-113]) stoneBlock(stone,trs(187,30.35,z),12,.7,.6,980+z,.08);
   for(let i=0;i<7;i++) stoneBlock(stone,trs(192.2,30.4+i*.9,-118),.4,.2,1.2,990+i,.04);
+  // Cistern banks meet HIGH water. Two broken spillways preserve source boarding
+  // and the LOW lane; the high-water surface no longer floats above an empty floor.
+  for (let i=0;i<24;i++) {
+    const a=i/24*Math.PI*2;
+    if (Math.cos(a)<-.9 || (Math.sin(a)<-.86 && Math.cos(a)<.55)) continue;
+    const x=187+Math.cos(a)*11.35,z=-118+Math.sin(a)*12.35;
+    const yaw=-a;
+    stoneBlock(stone,trs(x,33.1,z,yaw),.85,6.6,3.25,1300+i,.12);
+    col.add(boxCollider({x,z,w:.85,d:3.25,yaw,top:36.4,bottom:29.8,tag:'reach-bank'}));
+  }
   const raft = new THREE.Group(); raft.name='reach-ferry'; group.add(raft);
+  for (const x of [-2.35,2.35]) stoneBlock(wood,trs(x,-.52,0),.7,.65,6.6,1001+x,.08);
   for(let i=0;i<9;i++) stoneBlock(wood,trs(-2.8+i*.7,-.2,0),.65,.4,7,1010+i,.05);
   const timber = new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9}); weatheredSurface(timber,true); field.patchMaterial(timber); mats.push(timber);
   const ferry = wood.toMesh(timber,{cast:true,receive:true,boxUV:1.4}); if(ferry) raft.add(ferry);
   raft.position.set(187,30,-118);
   const raftCol=col.add(boxCollider({x:187,z:-118,w:6.2,d:7,top:30,bottom:29.5,tag:'reach-ferry'}));
-  const lake=createStylizedWater(scene,{size:26,y:29.8,colorDeep:0x263c42,colorShallow:0x6f9295});
-  const pool=lake.mesh;scene.remove(pool);group.add(pool);pool.position.set(187,29.8,-118);pool.scale.set(22/26,24/26,1);
-  (lake.material.uniforms.uSky!.value as THREE.Color).set(0xb2c3c7);
-  const foamPoints=Array.from({length:80},(_,i)=>{const a=i/80*Math.PI*2;return new THREE.Vector3(Math.cos(a)*9.2,0,Math.sin(a)*10);});
-  const foam=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(foamPoints),new THREE.LineBasicMaterial({color:0xd5ded5,transparent:true,opacity:.35}));foam.position.set(187,29.9,-118);group.add(foam);
+  const lake = createReachWater(group);
+  const pool = lake.mesh;
   // Portal leaf-seal opens after W1's flood; the bridge itself never vanishes.
   const gate=col.add(boxCollider({x:98,z:-90,w:1,d:4.5,top:42,bottom:37,tag:'reach-flood-gate'}));
   const gateMat=new THREE.MeshStandardMaterial({color:0x55412c,transparent:true,opacity:.8,roughness:1});
   const gateMesh=new THREE.Mesh(new THREE.BoxGeometry(.4,4.2,4.5),gateMat); gateMesh.position.set(98,40,-90); group.add(gateMesh);
   const rr=rng(1050); for(let i=0;i<12;i++) hangingRoot(roots,rr,165+rr()*48,29.8,-132+rr()*2,4+rr()*5,new THREE.Vector2(0,1),.13);
   for(const [bucket,name] of [[rock,'rv-rock'],[stone,'rv-stone'],[roots,'rv-bark']] as const) {
-    const mat=world.materials.find(m=>m.name===name)!.clone(); mat.userData.cfRestoredChroma=.6; field.patchMaterial(mat); mats.push(mat);
+    // Keep the shared geometry grammar, but give Reach its own wet slate palette.
+    const tint = new THREE.Color(name === 'rv-rock' ? 0x737e7c : name === 'rv-stone' ? 0xa7aaa0 : 0x505b55);
+    for (let i=0; i<bucket.col.length; i+=3) {
+      const value = Math.min(1.2, .5 + (bucket.col[i]!*.3+bucket.col[i+1]!*.59+bucket.col[i+2]!*.11));
+      bucket.col[i]=tint.r*value;bucket.col[i+1]=tint.g*value;bucket.col[i+2]=tint.b*value;
+    }
+    const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86});mat.name=`reach-${name}`;
+    weatheredSurface(mat,name==='rv-bark'); mat.userData.cfRestoredChroma=name==='rv-bark'?.45:.3; field.patchMaterial(mat); mats.push(mat);
     const mesh=bucket.toMesh(mat,{cast:true,receive:true,boxUV:name==='rv-rock'?4:1.6}); if(mesh)group.add(mesh);
   }
-  const nature=await loadNatureKit();
-  nature.place('twisted_3',211,36,-124,{scale:.5,yaw:1.2,gaps:.35,hue:PAL.russet,hue2:PAL.gold});
-  nature.place('twisted_1',174,30,-130,{scale:.4,yaw:2,gaps:.4,hue:PAL.leafBrown,hue2:PAL.copper});
-  nature.place('twisted_2',193,30,-127,{scale:.4,yaw:.8,gaps:.4,hue:PAL.russet,hue2:PAL.gold,avoid:[{x:187,y:35,z:-118,r:5}]});
-  for(const [x,z]of[[179,-112],[194,-110],[195,-124]])nature.place('twisted_1',x,30,z,{scale:.3,yaw:x,gaps:.4,hue:PAL.russet,hue2:PAL.copper});
-  for(const m of nature.build(group)){field.patchMaterial(m);mats.push(m);}
+  dressReach(group, mat => { field.patchMaterial(mat); mats.push(mat); });
   const bellMat=new THREE.MeshStandardMaterial({color:0x8b5832,metalness:.6,roughness:.5,emissive:0xc17530,emissiveIntensity:.02});
   const bell=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(.9,0),new THREE.Vector2(.65,.25),new THREE.Vector2(.55,1.05),new THREE.Vector2(.2,1.35),new THREE.Vector2(0,1.45)],20),bellMat);
   bell.position.set(207,40.5,-119);group.add(bell);field.patchMaterial(bellMat);mats.push(bellMat);
@@ -122,8 +132,11 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   for(const [x,y,z] of handles){const m=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,2.2,8),timber);m.position.set(x,y+1,z);m.rotation.z=.5;group.add(m);handleMeshes.push(m);}
   const mistCanvas=document.createElement('canvas');mistCanvas.width=mistCanvas.height=64;
   const mistCtx=mistCanvas.getContext('2d')!;const mistGradient=mistCtx.createRadialGradient(32,32,5,32,32,32);mistGradient.addColorStop(0,'rgba(255,255,255,.55)');mistGradient.addColorStop(.6,'rgba(255,255,255,.3)');mistGradient.addColorStop(1,'rgba(255,255,255,0)');mistCtx.fillStyle=mistGradient;mistCtx.fillRect(0,0,64,64);
-  const mistMat=new THREE.MeshBasicMaterial({color:0xb2b4a4,map:new THREE.CanvasTexture(mistCanvas),transparent:true,opacity:.25,depthWrite:false,side:THREE.DoubleSide});
-  const mist=new THREE.Mesh(new THREE.PlaneGeometry(25,27),mistMat);mist.rotation.x=-Math.PI/2;mist.position.set(187,30.1,-118);group.add(mist);
+  const mistMat=new THREE.MeshBasicMaterial({color:0x9daea5,map:new THREE.CanvasTexture(mistCanvas),transparent:true,opacity:.08,depthWrite:false,side:THREE.DoubleSide});
+  const mistBanks: THREE.Mesh[]=[];
+  for (const [x,z] of [[179,-110],[196,-113],[197,-126],[181,-130]]) {
+    const mist=new THREE.Mesh(new THREE.PlaneGeometry(5,2),mistMat);mist.rotation.x=-Math.PI/2;mist.position.set(x,30.1,z);group.add(mist);mistBanks.push(mist);
+  }
   const house=new Bucket();for(const x of[179.5,183.5])for(const z of[-126.5,-122.5])stoneBlock(house,trs(x,31.5,z),.25,3,.25,1250+x,.04);
   stoneBlock(house,trs(180.4,33,-124.5,0,1,1,1,0,-.4),2.5,.2,5.2,1260,.06);stoneBlock(house,trs(182.6,33,-124.5,0,1,1,1,0,.4),2.5,.2,5.2,1261,.06);
   const houseMesh=house.toMesh(timber,{cast:true,receive:true,boxUV:1.4});if(houseMesh)group.add(houseMesh);
@@ -132,6 +145,8 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   for(const h of world.hearthSpots.filter(h=>h.id==='reach-steam'))h.x+=offsetX;
   for(const sh of world.shadeSpots.filter(sh=>sh.id==='reach-drinker'))for(const p of sh.patrol)p[0]+=offsetX;
   world.checkpoints.at(-1)!.pos.x+=offsetX;
+  let supportedBy: number | null = null, actualFillRate=0;
+  const floatMotion=floats.map(()=>({occupied:false,dip:0,offset:0}));
   let inlet: ReturnType<typeof createInlets>;
   let water: ReturnType<typeof createWater>;
   function restoreSource(duration=3){const w=water.waters.find(w=>w.spot.id===source);if(w)w.reactor.restored=true;if(!field.restores.length)field.restore(new THREE.Vector3(120,30,-118),55,duration);}
@@ -153,7 +168,10 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       for(const h of handleMeshes)h.rotation.z=level==='high'?.5:-.5;
       refillDelay=Math.max(0,refillDelay-dt);
       arrived=level==='high'&&refillDelay<=0&&water.arriving(source);
-      const occupied=grounded&&floats.some(f=>Math.abs(localFox.x-f.x)<f.c.hx+.1&&Math.abs(fox.z-f.z)<f.c.hz+.1&&Math.abs(feetY-f.c.top0)<.7);
+      const occupied=grounded&&floats.some(f=>Math.abs(localFox.x-f.x)<f.c.hx+.1&&Math.abs(localFox.z-f.z)<f.c.hz+.1&&Math.abs(feetY-f.c.top0)<.7);
+      supportedBy=grounded?floats.findIndex(f=>Math.abs(localFox.x-f.x)<f.c.hx+.1&&Math.abs(localFox.z-f.z)<f.c.hz+.1&&Math.abs(feetY-f.c.top0)<.7):null;
+      if(supportedBy===-1)supportedBy=null;
+      const oldFill=fill;
       retained=false;
       if(level==='high'&&arrived){warning=tun.warningTime;fill=Math.min(1,fill+dt*tun.fillRate);}
       else if(warning>0)warning=Math.max(0,warning-dt);
@@ -162,11 +180,23 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       if(drinks&&!occupied)fill=Math.max(0,fill-dt*tun.drainRate*.5);
       const latched=inlet.update(dt,()=>level==='high'&&arrived&&fill>=.98&&!retained);seal=inlet.inlets[0]!.seal;if(!restored&&latched.length){restored=true;restoreSource();try{localStorage.setItem(saveKey,'1');}catch{}}
       bellMat.emissiveIntensity=.02+seal*.7;bell.rotation.z=restored?Math.sin(field.time*1.7)*.07:0;
-      for(const f of floats){f.mesh.position.y=f.base+tun.rise*fill;f.c.top0=f.c.top1=f.mesh.position.y;f.c.bottom=f.mesh.position.y-.5;}
-      pool.position.y=29.8+tun.rise*fill;foam.position.y=pool.position.y+.06;lake.update(field.time);
-      mist.position.y=pool.position.y+.2;
+      actualFillRate=dt>0?(fill-oldFill)/dt:0;
+      for(const [i,f] of floats.entries()){
+        const motion=floatMotion[i]!,on=supportedBy===i;
+        if(on&&!motion.occupied)motion.dip=-.045;
+        motion.occupied=on;motion.dip=THREE.MathUtils.damp(motion.dip,0,6,dt);
+        const buoyant=THREE.MathUtils.smoothstep(fill,0,.12)*(retained?.2:1);
+        motion.offset=(Math.sin(field.time*1.3+i*2.1)*.018+motion.dip)*buoyant;
+        f.mesh.position.y=f.base+tun.rise*fill;
+        f.c.top0=f.c.top1=f.mesh.position.y;f.c.bottom=f.mesh.position.y-.5;
+        // Only the render child heaves. The planted deck/collider stays deterministic.
+        const hull=f.mesh.children[0]!;hull.position.y=motion.offset;
+        hull.rotation.z=Math.sin(field.time*.9+i)*.004*buoyant;
+      }
+      lake.update(field.time,fill);
+      for(const [i,mist] of mistBanks.entries()){mist.position.y=pool.position.y+.15;mist.position.x+=(Math.sin(field.time*.2+i)*.015)*dt;}
     },
     submergedAt(p:THREE.Vector3,feet:number){return fill>.2&&((p.x-117)/11)**2+((p.z+118)/12)**2<.9&&feet<pool.position.y-.8;},
-    state(){return {offsetX,level,refillDelay:Number(refillDelay.toFixed(2)),drinks,floats:floats.map(f=>({x:f.x+offsetX,z:f.z,height:Number(f.mesh.position.y.toFixed(2))})),open,arrived,fill:Number(fill.toFixed(3)),raftHeight:Number(raft.position.y.toFixed(3)),warning:Number(warning.toFixed(2)),retained,seal:Number(seal.toFixed(3)),restored,source};},
+    state(){return {offsetX,waterSurface:Number(pool.position.y.toFixed(3)),buoyantRise:tun.rise*fill,supportedBy,actualFillRate:Number(actualFillRate.toFixed(3)),level,refillDelay:Number(refillDelay.toFixed(2)),drinks,floats:floats.map(f=>({x:f.x+offsetX,z:f.z,height:Number(f.mesh.position.y.toFixed(2)),freeboard:Number((f.mesh.position.y-pool.position.y).toFixed(3)),visualOffset:Number(floatMotion[floats.indexOf(f)]!.offset.toFixed(3))})),open,arrived,fill:Number(fill.toFixed(3)),raftHeight:Number(raft.position.y.toFixed(3)),warning:Number(warning.toFixed(2)),retained,seal:Number(seal.toFixed(3)),restored,source};},
   };
 }
