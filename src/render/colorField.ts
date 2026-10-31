@@ -81,6 +81,7 @@ export class ColorField {
   private stampStrength: THREE.InstancedBufferAttribute | null = null;
   private stampNoise: THREE.InstancedBufferAttribute | null = null;
   private stampInner: THREE.InstancedBufferAttribute | null = null;
+  private stampRestore: THREE.InstancedBufferAttribute | null = null;
   private static readonly MAX_STAMPS = 128;
   private readonly _stampMatrix = new THREE.Matrix4();
   private maskSize: number;
@@ -258,6 +259,9 @@ export class ColorField {
         attribute float aStrength;
         attribute float aNoise;
         attribute float aInner;
+        attribute vec2 aRestore;
+        varying vec2 vRestore;
+        varying vec2 vCenter;
         varying vec2 vUv;
         varying float vStrength;
         varying float vNoise;
@@ -269,6 +273,8 @@ export class ColorField {
           vStrength = aStrength;
           vNoise = aNoise;
           vInner = aInner;
+          vRestore = aRestore;
+          vCenter = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */ `
@@ -277,6 +283,8 @@ export class ColorField {
         varying float vStrength;
         varying float vNoise;
         varying float vInner;
+        varying vec2 vRestore;
+        varying vec2 vCenter;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
         float noise(vec2 p){
           vec2 i = floor(p); vec2 f = fract(p);
@@ -296,6 +304,13 @@ export class ColorField {
           float soft = 1.0 - smoothstep(vInner, 0.88, d);
           soft *= 1.0 - smoothstep(0.82, 1.0, length(p));
           float ink = soft * soft * (3.0 - 2.0 * soft) * vStrength;
+          if (vRestore.y > 0.0) {
+            // Same metres, stationary noise and feather as the analytic material front.
+            // Leaves sampling this RT must not see a larger circular restore halo.
+            float edge = vRestore.y;
+            float brush = ((noise(vWorld * 0.35) - 0.5) * 0.8 + (noise(vWorld * 1.7) - 0.5) * 0.35) * edge * 1.6;
+            ink = 1.0 - smoothstep(vRestore.x - edge + brush, vRestore.x + edge * 0.5 + brush, distance(vWorld, vCenter));
+          }
           gl_FragColor = vec4(ink, ink, ink, 1.0);
         }`,
     });
@@ -305,12 +320,15 @@ export class ColorField {
     this.stampStrength = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
     this.stampNoise = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
     this.stampInner = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+    this.stampRestore = new THREE.InstancedBufferAttribute(new Float32Array(N * 2), 2);
     this.stampStrength.setUsage(THREE.DynamicDrawUsage);
     this.stampNoise.setUsage(THREE.DynamicDrawUsage);
     this.stampInner.setUsage(THREE.DynamicDrawUsage);
+    this.stampRestore.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aStrength', this.stampStrength);
     geo.setAttribute('aNoise', this.stampNoise);
     geo.setAttribute('aInner', this.stampInner);
+    geo.setAttribute('aRestore', this.stampRestore);
     this.stampMesh = new THREE.InstancedMesh(geo, this.stampMat, N);
     this.stampMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.stampMesh.frustumCulled = false;
@@ -350,18 +368,20 @@ export class ColorField {
     renderer.clear();
     renderer.autoClear = false;
 
-    const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number; inner: number }> = [];
+    const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number; inner: number; restore?: RestoreRegion }> = [];
 
     for (const r of this.restores) {
       if (r.radius > 0.01) {
         // Extra support around the analytic front keeps brush bleed inside the stamp quad.
-        const edge = Math.max(0.3, ColorField.edgeOf(r));
-        const outer = (r.radius + edge * 1.8) / 0.88;
+        const edge = Math.max(0.001, ColorField.edgeOf(r));
+        // Noise can extend the analytic feather to R + 1.42e; keep it inside the quad.
+        const outer = r.radius + edge * 1.5;
         stamps.push({
           x: r.center.x,
           z: r.center.z,
           size: outer * 2,
           strength: 1,
+          restore: r,
           noise: Math.min(0.12, (edge * 0.5) / outer),
           inner: Math.max(0, (r.radius - edge) / outer),
         });
@@ -421,12 +441,14 @@ export class ColorField {
       this.stampStrength!.setX(i, s.strength);
       this.stampNoise!.setX(i, s.noise);
       this.stampInner!.setX(i, s.inner);
+      this.stampRestore!.setXY(i, s.restore?.radius ?? 0, s.restore ? Math.max(0.001, ColorField.edgeOf(s.restore)) : 0);
     }
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
     this.stampStrength!.needsUpdate = true;
     this.stampNoise!.needsUpdate = true;
     this.stampInner!.needsUpdate = true;
+    this.stampRestore!.needsUpdate = true;
     this.stampMat.uniforms.uTime!.value = this.time;
     renderer.render(this.maskScene, this.maskCam);
 
