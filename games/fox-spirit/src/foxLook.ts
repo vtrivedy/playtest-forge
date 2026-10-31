@@ -106,14 +106,16 @@ function patchFur(mat: THREE.MeshStandardMaterial, fringeLength = 0, fringeAlpha
       .replace('#include <common>', `#include <common>
 varying vec3 vRest;
 ${innerHeat ? 'attribute vec2 aInnerHeat; varying vec2 vInnerHeat;' : ''}
-${fringeLength ? `uniform float uFringe; attribute float aFurMask; varying float vFurMask;` : ''}`)
+${fringeLength ? `uniform float uFringe; attribute float aFurMask; attribute float aRuffMask; varying float vFurMask; varying float vRuffMask;` : ''}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vRest = position;
 ${innerHeat ? 'vInnerHeat = aInnerHeat;' : ''}
 ${fringeLength ? `
   // Offset in bind space before skinning, so fringe follows the exact authored pose.
   vFurMask = aFurMask;
-  transformed += normalize(normal + vec3(0.0, -0.2, -0.2)) * ${fringeLength.toFixed(3)} * uFringe * aFurMask;
+  vRuffMask = aRuffMask;
+  vec3 comb = normalize(normal + vec3(0.0, -0.2 - 0.45 * aRuffMask, -0.2));
+  transformed += comb * (${fringeLength.toFixed(3)} + aRuffMask * ${fringeLength > 0.04 ? '0.11' : '0.07'}) * uFringe * max(aFurMask, aRuffMask);
 ` : ''}`);
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -123,7 +125,7 @@ varying vec3 vRest;
 ${innerHeat ? 'uniform float uTime; varying vec2 vInnerHeat;' : ''}
 ${coat ? `uniform vec3 uEyeL; uniform vec3 uEyeR; uniform float uEyeR0; uniform float uSocketLift;
 ${EYE_APERTURE_GLSL}` : ''}
-${fringeLength ? 'uniform float uFringe; varying float vFurMask;' : ''}
+${fringeLength ? 'uniform float uFringe; varying float vFurMask; varying float vRuffMask;' : ''}
 uniform vec3 uTint; uniform vec2 uSatVal; uniform vec2 uStroke; uniform vec4 uRim; uniform vec3 uRimColor;
 ${NOISE_GLSL}`,
       )
@@ -171,7 +173,11 @@ ${NOISE_GLSL}`,
         `{
   float facing = saturate(dot(${fringeLength ? 'normalize(vNormal)' : 'normal'}, normalize(vViewPosition)));
   ${shell && !tail ? `diffuseColor.a *= (1.0 - smoothstep(0.05, 0.45, facing)) * ${fringeAlpha.toFixed(3)}; if (diffuseColor.a < 0.01) discard;` : ""}
-  ${fringeLength ? `float tuft = fxNoise(vRest * vec3(10.0, 10.0, 3.0)); diffuseColor.a *= smoothstep(${fringeLength > 0.04 ? "0.4, 0.8" : "0.1, 0.5"}, tuft) * vFurMask * uFringe; if (diffuseColor.a < 0.001) discard;` : ''}
+  ${fringeLength ? `float tuft = fxNoise(vRest * vec3(10.0, 10.0, 3.0));
+  float tuftCoverage = smoothstep(${fringeLength > 0.04 ? "0.4, 0.8" : "0.1, 0.5"}, tuft);
+  diffuseColor.a *= tuftCoverage * max(vFurMask, vRuffMask) * uFringe * (1.0 + 2.0 * vRuffMask);
+  diffuseColor.a = min(diffuseColor.a, 0.95);
+  if (diffuseColor.a < mix(0.001, 0.10, vRuffMask)) discard;` : ''}
   ${innerHeat ? `
   float chroma = (max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b))) / max(0.0001, max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)));
   float warmth = vInnerHeat.x * smoothstep(0.2, 0.7, vInnerHeat.y) * smoothstep(0.25, 0.55, chroma);
@@ -321,31 +327,39 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
     }
   });
   // Append after traversal: each surface shares the source skeleton and bind matrices, never new bones.
-  let coatHeatVertices = 0;
+  let coatHeatVertices = 0, coatRuffVertices = 0;
   for (const { mesh, mat } of coats) {
     const R = FOX_RIG;
     const heatBones = new Set<string>([...R.spine, ...R.neck]);
+    const ruffBones = new Set<string>(R.neck);
     const full = new Set<string>([R.pelvis, ...R.spine, ...R.neck]);
     const short = new Set<string>(['l', 'r'].flatMap((side) => {
       const s = side as 'l' | 'r', f = R.foreleg(s), h = R.hindleg(s);
       return [f.scapula, f.upper, h.hip, h.thigh];
     }));
     const g = mesh.geometry, si = g.getAttribute('skinIndex'), sw = g.getAttribute('skinWeight'), p = g.getAttribute('position');
-    const mask = new Float32Array(si.count), heat = new Float32Array(si.count * 2);
+    const mask = new Float32Array(si.count), ruff = new Float32Array(si.count), heat = new Float32Array(si.count * 2);
     const restNormals = g.getAttribute('normal');
     for (let i = 0; i < si.count; i++) {
       for (let k = 0; k < 4; k++) {
         const name = mesh.skeleton.bones[si.getComponent(i, k)]?.name ?? '';
         if (heatBones.has(name)) heat[i * 2] += sw.getComponent(i, k);
+        let ruffAmount = ruffBones.has(name) ? 1 : 0;
+        if (name === R.head) ruffAmount = THREE.MathUtils.smoothstep(Math.abs(p.getX(i)), 0.24, 0.40)
+          * (1 - THREE.MathUtils.smoothstep(p.getZ(i), 1.20, 1.48))
+          * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.50, 2.78));
+        ruff[i] += sw.getComponent(i, k) * ruffAmount;
         let amount = full.has(name) ? 1 : short.has(name) ? 0.5 : 0;
         if (name === R.head) amount = 0.5 * (1 - THREE.MathUtils.smoothstep(p.getZ(i), 0.85, 1.28)) * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.6, 2.85));
         mask[i] += sw.getComponent(i, k) * amount;
       }
       heat[i * 2 + 1] = restNormals.getY(i);
       if (heat[i * 2]! > 0.05 && restNormals.getY(i) > 0.2) coatHeatVertices++;
+      if (ruff[i]! > 0.05) coatRuffVertices++;
     }
     g.setAttribute('aInnerHeat', new THREE.BufferAttribute(heat, 2));
     g.setAttribute('aFurMask', new THREE.BufferAttribute(mask, 1));
+    g.setAttribute('aRuffMask', new THREE.BufferAttribute(ruff, 1));
     for (const [i, [length, alpha]] of [[0.03, 0.35], [0.06, 0.25]].entries()) {
       const fringe = mesh.clone(false);
       const material = mat.clone();
@@ -367,6 +381,7 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
   }
   root.userData.coatFringeLayers = coats.length * 2;
   root.userData.coatHeatVertices = coatHeatVertices;
+  root.userData.coatRuffVertices = coatRuffVertices;
   syncLook();
 }
 
@@ -534,7 +549,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(random() * sourcePts.length)]! });
   }
 
-  const diagnostics = { tailBrush: root.userData.tailBrush, spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  const diagnostics = { tailBrush: root.userData.tailBrush, spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, coatRuffVertices: root.userData.coatRuffVertices as number, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
   group.userData.spiritFx = diagnostics;
 
   // flame licks: one instanced billboard per lick
