@@ -1192,6 +1192,7 @@ try {
     await H('autopilot', true, from, { assist: false });
     let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion;
     let kilnStopped = false;
+    const framing = { samples: 0, outside: 0, maxAbsX: 0, maxAbsY: 0, firstFailure: null, failures: [] };
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const budgetFrames = Number(arg('route-seconds', '360')) * fps;
     if (kilnRoute && budgetFrames < 60 * fps) throw Error('Kiln proof requires a capture budget of at least 60 seconds');
@@ -1216,16 +1217,37 @@ try {
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
-    });
+    }, kilnRoute ? { sample: async i => {
+      const ndc = await page.evaluate(() => {
+        const { fox, camera } = window.__gameHooks.debug;
+        const focus = fox.getWorldPosition(fox.position.clone());
+        focus.y += 0.6;
+        return focus.project(camera).toArray();
+      });
+      const inFrame = ndc.every(v => Number.isFinite(v) && Math.abs(v) <= 1);
+      framing.samples++;
+      if (Number.isFinite(ndc[0])) framing.maxAbsX = Math.max(framing.maxAbsX, Math.abs(ndc[0]));
+      if (Number.isFinite(ndc[1])) framing.maxAbsY = Math.max(framing.maxAbsY, Math.abs(ndc[1]));
+      const finite = ndc.every(Number.isFinite);
+      const serialNdc = ndc.map(v => Number.isFinite(v) ? v : String(v));
+      if (!inFrame) {
+        framing.outside++;
+        const failure = { frame: i, ndc: serialNdc, finite };
+        framing.firstFailure ??= failure;
+        if (framing.failures.length < 16) framing.failures.push(failure);
+      }
+      return { foxFocusNdc: serialNdc, foxFocusFinite: finite, foxFocusInFrame: inFrame };
+    } } : {});
+    if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
     await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
     const endpointReached = kilnRoute ? kilnCompletion !== undefined && kilnCompletion.idx >= to : bounded ? state.auto.idx >= to : state.restored;
     const endpoint = route[to - 1];
     const endpointDistance = Math.hypot(state.pos[0] - endpoint.x, state.pos[2] - endpoint.z);
     const endpointStable = endpointDistance <= 3 && Math.abs(state.pos[1] - endpoint.y) <= 1 && state.grounded;
     const kilnLit = state.seedwells.some(s => s.id === 'SW1' && s.lit);
-    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && endpointStable && report.videos[name].frames >= 60 * fps) && !state.auto.assists && !state.deaths;
-    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnCompletion && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
-    save('route-acceptance.json', { schemaVersion: 2, passed, reason, from, to, staged: regional, kilnLatchedAt, kilnCompletedAt, kilnCompletion, endpointDistance, endpointStable, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && endpointStable && framing.samples === report.videos[name].frames && framing.outside === 0 && report.videos[name].frames >= 60 * fps) && !state.auto.assists && !state.deaths;
+    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnCompletion && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : endpointReached && kilnRoute && framing.outside > 0 ? 'fox-out-of-frame' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
+    save('route-acceptance.json', { schemaVersion: 2, passed, reason, from, to, staged: regional, kilnLatchedAt, kilnCompletedAt, kilnCompletion, endpointDistance, endpointStable, framing: kilnRoute ? { samples: framing.samples, outside: framing.outside, maxAbsX: framing.maxAbsX, maxAbsY: framing.maxAbsY, firstFailure: framing.firstFailure } : null, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
     if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
