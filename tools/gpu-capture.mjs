@@ -1721,13 +1721,16 @@ try {
       await RH('photo',[167,48,-99],[190,32,-121],52);
       let cycle=0,cycleAge=0,cyclePaint=false,ventHopIssued=false;
       const lowSeen={value:false};let lowLaneVisited=false,steamRise=false;
+      const cycleTrace=[];let nextCycleSample=0;
+      const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
+      const sampleCycle=(st,reason)=>({reason,t:st.t,cycle,age:cycleAge,waypoint:targets[cycle],distance:Math.hypot(targets[cycle][0]-st.pos[0],targets[cycle][2]-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,dashIssued:cyclePaint,ventHopIssued,steam:st.chem.hearths.find(h=>h.id==='reach-steam')??null,reach:st.reach});
       await video('reach-level-cycle',30*fps,async()=>{
         const st=await RH('state');cycleAge+=1/fps;
-        const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
+        if(st.t>=nextCycleSample){cycleTrace.push(sampleCycle(st,'interval'));nextCycleSample=st.t+.5;}
         const p=targets[cycle],dx=p[0]-st.pos[0],dz=p[2]-st.pos[2],d=Math.hypot(dx,dz);
         const atFooting=d<.8&&st.grounded&&Math.abs(st.pos[1]-p[1])<.6;
         const ready=cycle===0?st.reach.level==='low':cycle===1?st.reach.fill<.02:cycle===2?atFooting:cycle===3?cycleAge>1.2&&st.pos[1]>34:cycle===4?st.reach.level==='high':st.reach.fill>.99;
-        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
+        if(ready&&cycleAge>.2&&cycle<5){cycleTrace.push(sampleCycle(st,'transition'));if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
         const t=targets[cycle],vx=t[0]-st.pos[0],vz=t[2]-st.pos[2],len=Math.hypot(vx,vz);
         let sx=len>.25?vx/len*Math.min(.8,len):0,sz=len>.25?vz/len*Math.min(.8,len):0;
         const steamHot=st.chem.hearths.some(h=>h.id==='reach-steam'&&h.heat>=.5);
@@ -1742,7 +1745,7 @@ try {
         await RH('setKeys',keys);
       },st=>cycle===5&&st.reach.level==='high'&&st.reach.fill>.99||st.deaths>end.deaths||cycleAge>10,{keyFrames:[0,4*fps,8*fps,12*fps,16*fps]});
       await RH('setKeys',[]);await RH('setStick',null);await shot('reach-cycle-end');
-      const cy=await RH('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
+      const cy=await RH('state');cycleTrace.push(sampleCycle(cy,'final'));save('reach-cycle-acceptance.json',{cycle,cycleTrace,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
       if(cycle!==5||!lowSeen.value||!lowLaneVisited||!steamRise||cy.reach.level!=='high'||!cy.reach.restored||cy.reach.fill<.99)report.failures.push('Reach reversible water cycle incomplete');
     }
     // Staged architecture views are separate from the real summit-to-basin traversal above.
