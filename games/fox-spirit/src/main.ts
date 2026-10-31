@@ -211,6 +211,8 @@ async function boot() {
       opacity: 0.85,
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), mat);
+    // GTAO's normal override ignores the radial alpha and would occlude as a solid card.
+    mesh.userData.forgeSkipAO = true;
     mesh.rotation.x = -Math.PI / 2;
     mesh.renderOrder = 1;
     scene.add(mesh);

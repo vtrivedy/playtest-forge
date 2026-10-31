@@ -93,3 +93,7 @@ Root attachment audit follow-up: actual-controller CPU ray tests show root-cap c
 Root audit outcome: deeper curve resampling introduced folded faces at ring11, so reject that variation. Final fix keeps original7cm burial/curve and narrows only root radius to5cm. Actual-controller root-ring/cap containment now passes650samples acrossidle/run/glide/left/rightturn (0outside), and all14clips retain0foldedfaces. This is the selected current state; no deeper-burial path remains.
 
 Ruff code-review safety refinement: the lower/rear cheek mask can overlap the iris's rest-space ellipse (eye centreY2.702,Z1.385). Explicitly feather ruff tozero inside1.4× shared eye aperture, reaching full coverage only beyond2.8×. This prevents the longer coat layer entering the amber eye independent of viewpoint. Verify zero mask for every source vertex inside the protected ellipse; no eye material/appearance change.
+
+## Contact-shadow auxiliary-pass correction
+
+Read hub-shadow-handoff.md and personally inspected hub87d0732 hub-arrival-close.png. Current contact plane uses a radial-alpha canvas and MeshBasicMaterial, but still enters GTAO's normal override as a solid rectangle. Mark only that plane forgeSkipAO, using the existing visibility-safe guard. Keep its soft colour opacity, actual opaque fox/terrain AO and native shadows. This is a grounded-contact fix in scope, not a global AO/shadow change. New GPU capture must check no hard dark disc/rectangle and stable foot contact; old hub evidence is context, not current proof.
