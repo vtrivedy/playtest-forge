@@ -35,8 +35,14 @@ Kiln/Wellspring floods remain the crescendo (whole valley), not the only colour.
 
 ## Consumers
 - World materials (`patchMaterial`): `s = max(s, paint * visibility)` sampled at full res.
-  Watercolour look on painted surfaces: darker/saturated pigment-pooled rim where coverage
-  crosses ~0.5, and a warm wet sheen where fresh paint overlaps the live aura/trail.
+  Paint is life returning, not the authored rust made louder (GPU critic FAIL on that):
+  ground hue is replaced at its own value by a wet-in-wet living meadow (yellow-green /
+  sage / moss; ochre and madder as accents) with pigment-density variation; stone/wood come
+  back warm sandstone with moss on top faces and lichen patches. Darker pigment-pooled rim
+  where coverage crosses ~0.5; a glowing wet front on blooms while they spread (per-frame
+  half-res wet RT); warm sheen where fresh paint overlaps the live aura/trail.
+- Sprouts (`src/render/paintSprouts.ts`): grass tufts and autumn flowers spring up (0.45 s
+  ease-out-back) in ribbon/drip/idle blooms and splashes, on soil only (no props, no water).
 - Foliage materials (`userData.foliage`): vertex perk — painted clumps swell slightly along
   their clump normals and lift; fresh paint adds a short shiver.
 - Autumn leaves: sample paint → leaves drifting over painted ground are in colour.

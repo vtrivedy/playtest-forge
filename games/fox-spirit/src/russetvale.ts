@@ -92,6 +92,8 @@ export type Realm = {
   materials: THREE.MeshStandardMaterial[];
   collision: CollisionWorld;
   terrainY: (x: number, z: number) => number;
+  /** Highest still-water surface over (x, z), or -Infinity (bounding planes; compare with the ground) */
+  waterSurfaceAt: (x: number, z: number) => number;
   spawnPos: THREE.Vector3;
   wellspringPos: THREE.Vector3;
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
@@ -273,6 +275,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   scene.add(group);
   const r = rng(20261030);
   const waterVisuals: ReturnType<typeof createStylizedWater>[] = [];
+  const waterBoxes = new WeakMap<THREE.Object3D, THREE.Box3>();
+  const waterBox = (o: THREE.Object3D) => {
+    let b = waterBoxes.get(o);
+    if (!b) {
+      o.updateWorldMatrix(true, false);
+      b = new THREE.Box3().setFromObject(o);
+      waterBoxes.set(o, b);
+    }
+    return b;
+  };
 
   const terrainY = (x: number, z: number) => (insideIsland(x, z) ? groundRaw(x, z) : -1000);
   const col = new CollisionWorld(terrainY);
@@ -2539,6 +2551,14 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     materials: patchable,
     collision: col,
     terrainY,
+    waterSurfaceAt: (x: number, z: number) => {
+      let y = -Infinity;
+      for (const w of waterVisuals) {
+        const b = waterBox(w.mesh);
+        if (x >= b.min.x && x <= b.max.x && z >= b.min.z && z <= b.max.z) y = Math.max(y, b.max.y);
+      }
+      return y;
+    },
     spawnPos,
     wellspringPos: WSP.clone(),
     bounds: { minX: -140, maxX: 140, minZ: -110, maxZ: 110 },

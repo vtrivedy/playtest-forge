@@ -256,7 +256,7 @@ async function boot() {
     const g = col.highestAt(x, z);
     sprouts.sprout(x, z, r * 0.9, Math.round(r * 5), (sx, sz) => {
       const h = col.groundAt(sx, sz, g + 1.5);
-      return !h.collider && Math.abs(h.y - g) < 2.5 ? h.y : NaN;
+      return !h.collider && Math.abs(h.y - g) < 2.5 && world.waterSurfaceAt(sx, sz) < h.y ? h.y : NaN;
     }, 0.4);
   };
   crown.init(renderer, paint);
@@ -571,7 +571,7 @@ async function boot() {
   /** Soil under (x, z) near the fox's feet; NaN on props, water or a different level */
   const soilAt = (x: number, z: number) => {
     const g = col.groundAt(x, z, sproutFeetY + 0.6);
-    return !g.collider && Math.abs(g.y - sproutFeetY) < 0.8 ? g.y : NaN;
+    return !g.collider && Math.abs(g.y - sproutFeetY) < 0.8 && world.waterSurfaceAt(x, z) < g.y ? g.y : NaN;
   };
   function layPaint(dt: number, dashing: boolean) {
     const fox = foxActor.group;
