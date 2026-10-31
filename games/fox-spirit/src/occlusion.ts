@@ -20,7 +20,7 @@ export function createOcclusionFader(
     blocked?: () => boolean;
   },
 ) {
-  // x,y = centre of the fox's projected bounds (framebuffer px), z = fox view depth (m); radii in px
+  // xy = projected bounds centre (px), z = view depth (m), w = feet world height.
   const uOccFox = { value: new THREE.Vector4(0, 0, 0, 1) };
   const uOccRad = { value: new THREE.Vector2(1, 1) };
   const uOccStrength = { value: 0 };
@@ -45,18 +45,25 @@ export function createOcclusionFader(
           uniform float uOccStrength;`,
         )
         .replace(
-          '#include <clipping_planes_fragment>',
-          `#include <clipping_planes_fragment>
+          '#include <normal_fragment_begin>',
+          `#include <normal_fragment_begin>
           if (uOccStrength > 0.001) {
             float occR = length((gl_FragCoord.xy - uOccFox.xy) / uOccRad);
             float occNear = uOccFox.z - vViewPosition.z; // vViewPosition = -mvPosition → +depth
             // soft-edged ellipse fitted to the fox; nearby geometry counts from 0.45 m in front
-            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear);
-            // 4x4 Bayer stipple — no sorting, no blending, keeps a ghost of the occluder
-            vec2 occP = mod(floor(gl_FragCoord.xy), 4.0);
-            vec2 occLo = mod(occP, 2.0);
-            vec2 occHi = floor(occP * 0.5);
-            float occB = (4.0 * mod(2.0 * occLo.x + 3.0 * occLo.y, 4.0) + mod(2.0 * occHi.x + 3.0 * occHi.y, 4.0) + 0.5) / 16.0;
+            // Preserve the supporting floor, including instanced/skinned geometry:
+            // vViewPosition is minus view-space position, so inverse-rotate its Y.
+            float occWorldY = cameraPosition.y - dot(viewMatrix[1].xyz, vViewPosition);
+            float occAboveFeet = smoothstep(uOccFox.w + 0.02, uOccFox.w + 0.20, occWorldY);
+            // Keep nearby uphill ground/stair treads as well as a flat floor.
+            // Use the standard unperturbed normal (flat and smooth materials).
+            float occUp = smoothstep(0.65, 0.80, dot(viewMatrix[1].xyz, normal));
+            float occStepFloor = 1.0 - smoothstep(uOccFox.w + 0.45, uOccFox.w + 0.65, occWorldY);
+            occAboveFeet *= 1.0 - occUp * occStepFloor;
+            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear) * occAboveFeet;
+            // Stable one-pixel threshold; no coarse repeating checker or
+            // temporal jitter in the SMAA pipeline (which has no TAA history).
+            float occB = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
             if (occB < occCut) discard; // clear the hero completely; keep a dithered outer edge
           }`,
         );
@@ -79,12 +86,32 @@ export function createOcclusionFader(
 
   const canopies: THREE.Object3D[] = [];
   scene.traverse((o) => {
-    if (o.userData?.isOccluder && (o as THREE.Mesh).isMesh) canopies.push(o);
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    let ancestor: THREE.Object3D | null = mesh;
+    while (ancestor) {
+      if (ancestor === opts.exclude) return;
+      ancestor = ancestor.parent;
+    }
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    // Include real crown cards as well as authored coarse proxies. Some worlds
+    // build foliage without a proxy; low ground cover must not open a cutout.
+    if (o.userData?.isOccluder || materials.some((m) =>
+      !/grass|reed|litter/i.test(m.name) && (m.userData.foliage || /canopy|leaves|leaf/i.test(m.name))
+    )) canopies.push(o);
   });
 
   const ray = new THREE.Raycaster();
   const chest = new THREE.Vector3();
   const head = new THREE.Vector3();
+  const flank = new THREE.Vector3();
+  const visibleCanopies: THREE.Object3D[] = [];
+  const canopyHits: THREE.Intersection[] = [];
+  // A crown viewed from below still covers the hero. Keep render-sidedness
+  // untouched; this material is used synchronously for sight queries only.
+  const canopyQueryMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const canopyQueryArrays = new WeakMap<THREE.Material[], THREE.Material[]>();
+  let silhouetteSample = 0;
   const dir = new THREE.Vector3();
   const pt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
@@ -108,12 +135,35 @@ export function createOcclusionFader(
     // maple crowns: raycast (throttled by the caller)
     dir.multiplyScalar(1 / dist);
     ray.set(cam, dir);
+    ray.near = 0.05;
     ray.far = dist - 0.6;
-    return ray.intersectObjects(canopies, false).length > 0;
+    for (const canopy of visibleCanopies) {
+      canopyHits.length = 0;
+      // Stop on the first mesh hit; sorting every intersection in every crown
+      // provides no additional information for this boolean visibility query.
+      const mesh = canopy as THREE.Mesh;
+      const renderMaterial = mesh.material;
+      try {
+        if (Array.isArray(renderMaterial)) {
+          let queryArray = canopyQueryArrays.get(renderMaterial);
+          if (!queryArray || queryArray.length !== renderMaterial.length) {
+            queryArray = renderMaterial.map(() => canopyQueryMaterial);
+            canopyQueryArrays.set(renderMaterial, queryArray);
+          }
+          mesh.material = queryArray;
+        } else mesh.material = canopyQueryMaterial;
+        mesh.raycast(ray, canopyHits);
+      } finally {
+        mesh.material = renderMaterial;
+      }
+      if (canopyHits.length) return true;
+    }
+    return false;
   }
 
   return {
     patchScene,
+    get detected() { return lastBlocked; },
     /** Current cutout strength 0..1 (debug / metrics) */
     get strength() {
       return uOccStrength.value;
@@ -130,11 +180,29 @@ export function createOcclusionFader(
       chest.copy(foxPos).y += foxHeight * 0.45;
       head.copy(foxPos).y += foxHeight * 1.05;
       // sight test every other frame (canopy raycast is the expensive part)
-      if ((frame++ & 1) === 0) lastBlocked = sightBlocked(camera.position, chest) || sightBlocked(camera.position, head);
+      if ((frame++ & 1) === 0) {
+        visibleCanopies.length = 0;
+        for (const canopy of canopies) {
+          let ancestor: THREE.Object3D | null = canopy;
+          while (ancestor?.visible) ancestor = ancestor.parent;
+          if (!ancestor) visibleCanopies.push(canopy);
+        }
+        lastBlocked = sightBlocked(camera.position, chest);
+        // Keep at most two sight lines per tested frame. Cycle the second
+        // sample through ears and torso sides instead of doubling clear-view cost.
+        const sample = silhouetteSample++ % 3;
+        flank.copy(sample === 0 ? head : chest);
+        if (sample !== 0) {
+          const side = sample === 1 ? -1 : 1;
+          flank.x += Math.cos(foxYaw) * foxHeight * 0.35 * side;
+          flank.z -= Math.sin(foxYaw) * foxHeight * 0.35 * side;
+        }
+        if (!lastBlocked) lastBlocked = sightBlocked(camera.position, flank);
+      }
       if (lastBlocked || opts.blocked?.()) blockedHold = 0.35;
       else blockedHold -= dt;
       const goal = blockedHold > 0 ? 1 : 0;
-      uOccStrength.value = THREE.MathUtils.damp(uOccStrength.value, goal, goal > uOccStrength.value ? 10 : 4, dt);
+      uOccStrength.value = THREE.MathUtils.damp(uOccStrength.value, goal, goal > uOccStrength.value ? 40 : 4, dt);
 
       // screen bounds of the fox: feet, ears, snout and tail tip
       renderer.getDrawingBufferSize(size);
@@ -151,7 +219,7 @@ export function createOcclusionFader(
       const pad = size.y * 0.03;
       uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 1.05 + pad), Math.max(size.y * 0.05, (y1 - y0) * 1.05 + pad));
       const depth = chest.applyMatrix4(camera.matrixWorldInverse).z * -1;
-      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, 1);
+      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, foxPos.y);
     },
   };
 }

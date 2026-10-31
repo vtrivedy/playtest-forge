@@ -1,0 +1,77 @@
+# Sprint 3 — Ember spirit look
+
+Scope: foxLook.ts plus one main.ts telemetry note; preserve the authored Quaternius-derived skeleton, animation and controller contract. The creative target is a quiet burnt-orange hearth fox with broad soft coat values and a brush-like tail that releases floating heat. Concept: docs/design/img/fox-turnaround.jpg. No new third-party assets.
+
+Priority pass:
+1. Restore skinned nape/ear emitters and emit across tail bones 3–5. Use curved, softly faded additive wisps and buoyant world-space motes; preserve quiet idle and increase wake with speed. No static authored flame cards.
+2. Narrow amber eye aperture with umber lid/tear boundary, dark pupil and one small catchlight. Remove inherited eye emission textures.
+3. Broad low-frequency coat shading, softer texture sampling and reduced normal strength; remove stochastic frost from shell/rim/tip shaders. Preserve cream bib and dark socks.
+4. Tail fringe fades smoothly into warm wisps; locomotion owns tail pose. Anatomical thickening/hover require captured evidence before touching authored geometry or ground contact.
+
+Controls/feel remain move + jump + dash, hold-jump glide. No gameplay parameter changes; retain existing apex/air/dash telemetry.
+
+Validation: npx tsc --noEmit and fox Vite build, then push immutable stream SHA. Request GPU turntable, fox close-up and chase/probe evidence with window.__game and console errors. Personally inspect returned PNGs against concept; request Opus critique, fix concrete failures and request a retest. No local browser/render and no main landing before capture review. Record missing inputs and pending evidence honestly.
+
+Capture diagnostics: expose resolved wisp/source counts and live embers in actor userData and window.__game.notes, so missing emitters cannot masquerade as a visual pass.
+
+## Round 2 — evidence-led readability correction
+
+Personally reviewed GPU stills and run report at 8a975c2 (artifacts in fox-ember-r2). Machine reports no errors and 19 wisps/170 sources, yet ear/nape fire disappears in idle views. Tail reads as transparent laminated bands. Eyes lost white rings but baked socket remains too broad; coat lacks silhouette softness. No visual pass.
+
+First correction isolates spirit readability: modestly enlarge ear/nape plumes; increase low-state wisp emission above the brown background; use warm ember cores with soft irregular smoke edges; retain sparse world-space motes. Keep tail core solid through the proximal two thirds and dissolve only the outer third; reduce tail shell opacity to avoid stacked bands. Tail geometry and pose remain owned by the authored asset/locomotion. Review before further anatomy or coat changes. Require matching remote stills and Opus visual verdict.
+
+Opus visual critique independently confirms invisible wisps, transparent tail bands, black eye surround and over-smoothed coat (opus-visual-8a975c2.txt). Adopt its stronger tail fix: opaque brush core, terminal 18% cutoff with matching shadow, translucent fringe only. Add one extra wisp per ear (21 total) and lift roots 1.5cm from skin. First retest isolates plume/tail; eye/coat pass follows.
+
+## Round 2B — eye and coat follow-up
+
+Use Opus image critique: narrow the amber aperture, confine dark pigment to a fine lid boundary, blend the outer eye surface to coat rust. Do not remove geometry blindly. Restore moderate brush/normal detail and soft grazing fur coverage without stochastic frost; preserve the broad cream bib/socks. Existing CC0 source texture and geometry only, no new assets. Keep this a separate follow-up commit for review.
+
+## Round 2C — restrained skinned coat fringe
+
+Asset audit: there are four authored tail shells but no body shells. Moderate body normal/stroke tuning alone cannot break the silhouette. Add two thin surface-following coat layers sharing the FoxFur geometry, skeleton and bind matrices. Offset before skinning, about 0.8/1.6cm maximum at gameplay scale; shorten at feet/muzzle and vary length in broad combed clumps. Smooth grazing opacity, warm coat color, no random discard, no new shadows. This is a fur surface treatment, never a bone/proportion change. Expose fringe amount in existing look GUI and report layer count for capture auditing. Review against inflation/halo/seam regressions and retain only if remote evidence improves the concept read.
+
+Opus asset/code critique (opus-fringe-design.txt) found tail_col RGBA strand alpha perforating the intended opaque core; local pixel audit confirms 52% nearly transparent pixels. Core and shadow must ignore map alpha and use terminal mask alone (fade 70–90%, cut near 81%). Keep alpha only on fringe. Fringe masks move to smooth named-bone skin weights, excluding eyes/inner ears/tail stub/paws, with coarse tuft coverage, no normal map or repeated rim emission. Opus confirms head closed beneath eyes: safely discard outer eye disc beyond almond aperture instead of painting rust patches.
+
+Final code review: Three r186 overwrites custom depth material alphaTest/map from the source material each shadow pass. Match the terminal shadow with an explicit UV-based discard independent of material alphaTest. Also reset tail-core map alpha immediately after the color sample so the broken rim cannot reintroduce fine texture-alpha speckle. Other reviewed shader/skinning/mask items pass the code gate; GPU gate remains open.
+
+## Round 3 — idle crest placement
+
+015d6ce GPU stills show visible tail fire and no dapples, but ear/nape wisps disappear at idle and remain pale isolated curls at run. Source audit: ear_04 vertices span 2.3cm in world Y and random picks can put the visible flame below the silhouette. Current nape uses neck_01 at withers height rather than upper neck. Place ear wicks at the highest skinned tip points; nape at upper neck02/03 high-facing points. Retain random source points for free motes. Keep the smaller tail idle scale, but avoid shrinking the crest wisps by35% at rest. Preserve warm quiet breath and actual animation, no static glow stickers. Expected21wisps=3nape+12tail+6ear,170sources.
+
+Opus visual verdict on015d6ce: FAIL;52130f1 fixes core/fringe but not flame shape. Next correction follows the posed tail chain (each source bone→next bone) with slight lift and gentle velocity drag, instead of actor-back+up. Use8 narrower/longer strokes around tail04–07 (0.13m wide,0.58m long before state scale), warm fur handoff from50–80% and deeper orange coverage to avoid pale bloom blob. Ear wicks move to actual tips, narrow and trail back; nape moves to upper neck. Thin lid band to0.76–0.82 and tilt almond aperture subtly upward at rear. Expected15wisps=3nape+8tail+4ear,170sources; source count unchanged. Capture still must show continuous brush and crest identity; no acceptance inferred from code.
+
+Round3 code critique: no runtime blockers; straight long chords and unstratified roots risk fans/gaps/end-on collapse. Follow-up stays in the same instanced wisp path: stratify8roots across tail05–07 after55% tail length; use current and downstream posed bone directions as a quadratic centerline, with moderate terminal lift. Width remains soft and tapered, side axis follows the curve tangent. No new particle system. Primary source audit confirms7dominant vertices per ear_04, upper-neck90up-facing candidates, model→worldscale~0.354; expect all15sources to resolve.
+
+## Next isolated pass — planted limb mass (not enabled in7555611)
+
+Opus design critique supports a small rest-surface correction but requires its own0/1A/B after the current brush capture. Target+15–20% cannon radius,~15% paw mass, with no bone/clip/controller changes. Measure mid-bone radial sections first; AABB extents of angled limbs are not radii. Candidate offsets in asset units: haunch0.014, upperforeleg0.010, cannon0.016, paw0.020 with strong paw-weight gate so wrists/hocks stay lean. Bias medial displacement down to45%; suppress body-joint creases and preserve the CPU-sampled sole band. Smooth scalar weights over neighbouring vertices before building one rest-offset attribute.
+
+If adopted, one shared displacement function must run before skinning in coat, fringe and custom shadow depth. GUI amount0/1 supports same-pose A/B. CPUgetVertexPosition and IK remain raw; therefore sampled soles must have exactly zero offset. Verify low side/front/chase images, thicker matching shadow, no inner-leg clipping or sole lip, unchanged plant/slide metrics. This is mass only; it cannot shorten the long-leg proportions. Do not include it in the pending brush request.
+
+Mass prototype refinement: prefer a CPU rest-geometry sculpt from a fixed baseline, updated only when GUI amount changes. This gives coat, shared fringe, depth and CPU skinning the same positions, avoiding a second shadow shader. Freeze the entire1.5cm world sole sample band (about0.043asset), not just its lowest edge; no changes to ear-height scale or root bounds. Offline prototype will measure offsets and exact protected-band invariance before any game integration. Pending brush candidate remains unchanged.
+
+Offline prototype result:890sole-band vertices have exactly zero offset; maximum world displacement7.08mm; actor height delta0. Whole-fox bounding center shifts2.38mm in X because the curved tail sets one side of the original box. Therefore any eventual CPU sculpt must apply after initial actor sizing/centering and pad setup, while preserving those sampled vertices; geometry may then update only on amount changes. No mass code enabled yet.
+
+## Next identity layer — quiet spine heat
+
+Driver23:05 note explicitly asks spine licks and inner ember warmth. Keep this separate from the pending brush capture. Upgrade the existing zero-wisp back emitter to two low trailing furls, stratified on spine02/03, not upright candles. Add a broad, continuous under-coat warmth driven by spine/neck skin weights and upward rest normals; low linear intensity~0.08, slow breathing, no fine noise or symbols. Exclude head/ears/legs and do not repeat emission on fringe layers. Keep the existing restrained grazing rim. This is a warm living-coal body with a stronger tail/crest silhouette, not a body covered in flames. Expected17wisps after this layer (15existing+2spine),170sources,2fur layers. Capture A/B against held brush candidate after its result arrives.
+
+Opus spine-heat review refinement: append a dedicated independently seeded spine row with zero mote anchors, preserving all pending tail/ear anchors, seeds and mote patterns. Two0.14×0.06m strokes, lean0.4;~37°up at rest,≥28°at run, alternating lateral tilt; mild slow spine-only height flicker. Deep-orange under-rim starts0.06linear (GUIcap0.10), broad facing falloff1.3, normal and saturation feather in fragment, shared flame clock≤20%breath. Mask uses only spine/neck weight; no head/legs/pelvis and no repeated fringe glow. GUIspineHeat and innerHeat support an exact0/1identity A/B without changing the brush. Expected17wisps/170mote sources.
+
+## Eye paint, auxiliary depth and HDR correction
+
+Primary texture audit:85% of sampled coat pixels immediately outside the iris aperture are dark (meanRGB61/34/17). Cropping the separate iris cannot remove this baked socket ring. Share the eye rest centres/radius with the coat shader; feather a local socket mask, recover only low-luminance paint toward dark rust before normal coat/PBR grading, preserve cream and highlights and the actual thin lid. Provide an eyeSocketLift A/B control. Eye cap stops casting an oversized full-disc shadow; head volume remains shadowed normally.
+
+Scope extends to src/render/postStack.ts for a proven auxiliary-pass mismatch: GTAOPass overrides mesh materials and ignores custom eye/tail cuts and wisp transforms. Mark shader-shaped character meshes (eye, tail, fur fringe, wisps) with a targeted AO opt-out, hide them only during public AO rendering, and restore visibility in finally. Underlying opaque head/body/legs retain AO and physical shadow grounding. Verify restoration on normal and throwing paths with CPU scene objects; GPU beauty still required.
+
+Current warm wisp output is mostly below0.9luminance bloom threshold. Add a narrow HDR hot core inside the existing tapered soft shape, leaving rust edges restrained. Existing post highlight compression keeps hue (knee1.4/cap2.4). Local fireRadiance controls core and drifting mote radiance; do not alter global post bloom. Spine cores remain quieter than ear/nape/tail. Raise iris-only emission slightly for soft amber, no white ring. Latest-only GPU request per driver23:40; no held stale baseline.
+
+## Blocking tail topology replacement — d4ef285 visual review
+
+Personally inspected23PNGs+12decodedframes and full side/back/run/face atd4ef285. Tail attaches and chaseframes work; no errors,17wisps/170anchors/698heatvertices/2fringe. Sol+Opus NEEDS REVISION: rear tail is a hollow cupped/petalled shell. Primary topology audit finds10components inFoxTailFur (one1138tri component plusnine124tri locks),20boundary edges, front-sided. This is blocking geometry, not a lighting polish. cfdHDR/socket work remains queued but cannot fix this silhouette.
+
+Replace only the tail render geometry, retaining original8bones, skeleton indices, bind matrices, poses andclips. Closed, outward-normal, single-sided spindle tube:~0.07m root, peak0.15m aroundhalf-length, taper to0.02–0.03m tip; ellipticalheight:width1:0.85. About4rings per segment,12sides; linearly blend adjacentbone weights. Sinkroot insidebody. V1root→0tip. Two alpha-tested strand fringe shells at1.08/1.16radius; remove all old shell meshes, no dual path.
+
+Critical closure detail: do not fragment-cut a thick tube at81% (that would recreate a visible open cup). Keep a capped, thin incandescent core through the tip; dissolve only fringe into wisps. Its actual closed geometry supplies shadows and GTAO, removing the earlier opaque-tail AO trade-off and oldcustom-depth cutoff. Preserve authored pre-look bounds for actor scale/centering so restyling the tail cannot move the body/collider contract.
+
+Validate closed/manifold outward topology, finite attributes, normalizedweights/tail-only joint indices, source actorbounds/footpad invariants with CPU math; remote back3/4, side, idle/run andturntable plus__game/Opus visual gate. Bodyfur/legs are polish perOpus; no leg-length change.

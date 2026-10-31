@@ -28,6 +28,8 @@ import {
   createEmberMotes,
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
+import { createHubDusk, hubDuskWeight, HUB_DUSK } from './hubDusk';
+import { createReachMood } from './reachMood';
 import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
@@ -49,13 +51,13 @@ import type { ColorStroke } from '../../../src/render/colorField';
  * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
  * `fallGravity` gives weight on the way down; `apexHang` floats the top of a held jump.
  */
-/** `groundEase` (rad/s) is the critically damped ground-velocity response and `turnEase` the yaw-rate response:
- * the body path accelerates and turns in smooth curves instead of first-order snaps. */
-type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number; groundEase: number; turnEase: number };
+type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number; groundAccel: number; groundTurnRate: number };
 const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
   spring: {
     ...PRESET_SPRING,
     moveSpeed: 8.4,
+    groundAccel: 5.5,
+    groundTurnRate: 6,
     jumpVelocity: 9.6,
     gravity: 21,
     fallGravity: 1.35,
@@ -67,12 +69,12 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     glideSink: 2.5,
     glideForward: 7.9,
     glideDelay: 0.1,
-    groundEase: 10,
-    turnEase: 7,
   },
   brisk: {
     ...PRESET_BRISK,
     moveSpeed: 9,
+    groundAccel: 6,
+    groundTurnRate: 6,
     jumpVelocity: 10.2,
     gravity: 27,
     fallGravity: 1.5,
@@ -86,8 +88,6 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     glideSink: 2.7,
     glideForward: 8.4,
     glideDelay: 0.08,
-    groundEase: 11,
-    turnEase: 7,
   },
 };
 const presetParam = new URLSearchParams(location.search).get('feel');
@@ -149,6 +149,8 @@ async function boot() {
     cloudAmount: 0.6,
   });
   matchFogToSky(scene, fog, sky.params.mist);
+  const hubDusk = createHubDusk(scene, lights, sky, fog);
+  const reachMood = createReachMood(scene, lights, sky, fog);
   const distant = createDistantLand(scene, {
     silhouette: new THREE.Color(0x4a3a3c),
     haze: sky.params.mist,
@@ -264,12 +266,6 @@ async function boot() {
   });
   // spark bursts only (Seedwell, Wellspring, hearth flares) — no pickups
   const emberMotes = createEmberMotes(scene, { maxMotes: 0 });
-  const occlusion = createOcclusionFader(scene, {
-    blocked: cam.debug.blocked,
-    solidAt: (x, z) => col.highestAt(x, z),
-    exclude: foxActor.group,
-  });
-
   const restore = createRestoreCinematic({
     colorField,
     shrinePos: world.wellspringPos,
@@ -307,9 +303,9 @@ async function boot() {
   gui.add({ spring: () => usePreset('spring') }, 'spring');
   gui.add({ brisk: () => usePreset('brisk') }, 'brisk');
   const fFeel = gui.addFolder('Fox');
+  fFeel.add(feel, 'groundAccel', 3, 16, .25);
+  fFeel.add(feel, 'groundTurnRate', 2, 12, .25);
   fFeel.add(feel, 'moveSpeed', 4, 14, 0.1).listen();
-  fFeel.add(feel, 'groundEase', 4, 30, 0.5).listen();
-  fFeel.add(feel, 'turnEase', 2, 20, 0.5).listen();
   fFeel.add(feel, 'jumpVelocity', 6, 16, 0.1).listen();
   fFeel.add(feel, 'gravity', 10, 40, 0.5).listen();
   fFeel.add(feel, 'fallGravity', 1, 2.2, 0.05).listen();
@@ -341,7 +337,10 @@ async function boot() {
     folder.add(params, 'minStanceRatio', .2, 1, .01);
     folder.add(params, 'bodyBob', 0, 1, .01);
     folder.add(params, 'swingEase', 0, 1, .05);
+    folder.add(params, 'headBob', 0, 1, .05);
     folder.add(params, 'swingTuck', 0, .8, .01);
+    folder.add(params, 'releaseSwing', .12, .4, .01);
+    folder.add(params, 'carpalCurl', 0, .7, .01);
     folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
@@ -357,6 +356,8 @@ async function boot() {
     folder.add(params, 'maxCorrection', 0, .3, .01);
     folder.add(params, 'turnLean', 0, .1, .001);
     folder.add(params, 'tailLag', 0, .3, .01);
+    folder.add(params, 'pelvisBank', 0, 1, .05);
+    folder.add(params, 'headRollStabilize', 0, 1, .05);
     folder.add(params, 'springFrequency', 1, 6, .1);
     folder.add(params, 'springDamping', .4, 1.5, .05);
     folder.add(params, 'debug');
@@ -365,15 +366,21 @@ async function boot() {
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
   fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
-  const actionFeel = { jumpWindup: .05 };
+  const actionFeel = { jumpWindup: .05, jumpGatherBlend: .12 };
   fFeel.add(actionFeel,'jumpWindup',0,.066,.001);
+  fFeel.add(actionFeel,'jumpGatherBlend',.04,.2,.01);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
   fAudio.close();
+  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height };
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
-  fCam.add(cam.params, 'height', 0.5, 4, 0.05);
+  fCam.add(cam.params, 'runDistance', 2.6, 5, 0.1);
+  fCam.add(cam.params, 'framingHeight', 0, 1, 0.05);
+  fCam.add(cam.params, 'minDistance', 1.8, 3.2, 0.1).name('minimum terrain boom');
+  fCam.add(baseCam, 'height', 0.5, 4, 0.05);
+  fCam.add(cam.params, 'groundLift', 0, 0.6, 0.01);
   fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
   fCam.add(cam.params, 'glideDistance', 3, 12, 0.1);
   fCam.add(cam.params, 'fov', 35, 80, 0.5);
@@ -381,7 +388,7 @@ async function boot() {
   fCam.add(cam.params, 'lookAhead', 0, 4, 0.05);
   fCam.add(cam.params, 'recenterRate', 0, 4, 0.05);
   fCam.add(cam.params, 'sideBias', -0.6, 0.6, 0.01);
-  fCam.add(cam.params, 'jumpTrack', 0, 1, 0.01);
+  fCam.add(baseCam, 'jumpTrack', 0, 1, 0.01);
   fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
   fCam.add(cam.params, 'shake', 0, 2, 0.05);
   fCam.close();
@@ -403,7 +410,7 @@ async function boot() {
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
   const summitHearth = updrafts.hearths.find((h) => h.spot.id === SUMMIT_REPAIR.hearthId);
   let summitSeal = 0;
-  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
+  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui, (x, z, y) => col.blocked(x, z, y));
   // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
   let frontFxT = 0;
   const growth = createGrowth(scene, world.rootSpots, world.padSpots, world.collision, {
@@ -450,6 +457,13 @@ async function boot() {
   world.waterWashedAt = water.washedAt;
   world.waterInkAt = water.inkAt;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
+  // Patch only after every world builder has added its materials and shader
+  // hooks. In particular the grotto roof is built by water outside world.group.
+  const occlusion = createOcclusionFader(scene, {
+    blocked: () => !photo && cam.debug.blocked(),
+    solidAt: (x, z) => col.highestAt(x, z),
+    exclude: foxActor.group,
+  });
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;
@@ -492,7 +506,6 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
   let inColumn = false;
-  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
   let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
   const dashStruck = new Set<Hearth>();
@@ -513,16 +526,32 @@ async function boot() {
   fFox.add(FOX_LOOK, 'furValue', 0.5, 1.5, 0.01);
   fFox.add(FOX_LOOK, 'strokeStrength', 0, 0.5, 0.01);
   fFox.add(FOX_LOOK, 'strokeScale', 0.25, 4, 0.01);
+  fFox.add(FOX_LOOK, 'furFringe', 0, 1.5, 0.01);
   fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
   fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'eyeSocketLift', 0, 1, 0.01);
+  fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
+  fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickStream', 0, 1, 0.01);
+  fFox.add(FOX_LOOK, 'coreRadiance', 0, 8, 0.1);
+  fFox.add(FOX_LOOK, 'tailRadiance', 0, 8, 0.1);
+  fFox.add(FOX_LOOK, 'emberRadiance', 0, 6, 0.1);
   fFox.add(FOX_LOOK, 'emberRate', 0, 60, 1);
   fFox.add(FOX_LOOK, 'emberSize', 0.005, 0.08, 0.001);
   fFox.close();
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
+  const fDusk = fLook.addFolder('Lanternhollow dusk');
+  fDusk.add(HUB_DUSK, 'kOverride', -1, 1, .01).name('override (-1 auto)');
+  fDusk.add(HUB_DUSK, 'key', .8, 2.5, .01);
+  fDusk.add(HUB_DUSK, 'hemi', .2, .8, .01);
+  fDusk.add(HUB_DUSK, 'rim', .4, 1.6, .01);
+  fDusk.add(HUB_DUSK, 'skyScale', .5, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunBloom', 0, .3, .01);
+  fDusk.add(HUB_DUSK, 'godRays', 0, .5, .01);
+  fDusk.close();
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
   fLook.add(post.params, 'bloomStrength', 0, 1, 0.01);
   fLook.add(post.params, 'bloomThreshold', 0, 2, 0.01);
@@ -563,13 +592,11 @@ async function boot() {
   });
 
   const vel = new THREE.Vector3();
-  // Ground body-path state: acceleration of the horizontal velocity, the velocity it last produced
-  // (anything else wrote vel since — wall, teleport, knockback — so the spring restarts), and yaw rate.
-  const groundAccel = new THREE.Vector3();
-  const groundVelOut = new THREE.Vector3();
-  let yawRate = 0;
+  const maxGroundYawRate = 3.2;
+  let groundYawRate = 0;
   let grounded = false;
   let dashT = 0;
+  let dashContactActive = false;
   let gliding = false;
   let glideHoldT = 0;
   let airT = 0;
@@ -666,7 +693,7 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
+    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
@@ -747,6 +774,7 @@ async function boot() {
       foxActor.group.position.set(x, y + foxActor.feetOffset + 0.05, z);
       foxActor.group.rotation.y = yaw;
       windupT=-1;
+      groundYawRate=0;
       foxActor.locomotion?.reset();
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
@@ -849,6 +877,8 @@ async function boot() {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        dusk: { ...hubDusk.state(), practical: world.hubState() },
+        reachMood: reachMood.state(),
         crown: crown.state(),
         reach: reach.state(),
         albumPages: world.reedRegion.pageFound ? ['reed-ruin'] : [],
@@ -876,6 +906,7 @@ async function boot() {
         anim: foxActor.getAnim(),
         grounded,
         gliding,
+        dash: { remaining: Number(Math.max(0,dashT).toFixed(4)), readyIn: Number(Math.max(0,dashT+.2).toFixed(4)), collisionActiveLastStep: dashContactActive, used: feelMetrics.dashesUsed },
         preset: feelPreset,
         feel: { ...jumpStats, apex: feelMetrics.lastJumpApex, air: feelMetrics.lastAirTime },
         camera: {
@@ -883,6 +914,7 @@ async function boot() {
           fov: cam.camera.fov,
           yaw: cam.getYaw(),
           occlusion: occlusion.strength,
+          sightBlocked: occlusion.detected,
           photo: !!photo,
           foxNdc: cam.debug.fox,
           landingNdc: cam.debug.landing,
@@ -954,7 +986,7 @@ async function boot() {
   function respawn() {
     shades.resetSweep();
     shadeContact.respawn();
-    const p = world.respawnPos();
+    const p = reach.recoveryAt(foxActor.group.position) ?? world.respawnPos();
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
     prevFeet = p.y + 0.1;
     vel.set(0, 0, 0);
@@ -1081,7 +1113,20 @@ async function boot() {
     const waitWind = !!prevLabel?.startsWith('wind-ready:') && (wind.state().find(w => w.id === prevLabel.slice(11))?.heat ?? 0) < 0.98;
     const waitBridge = waitWind || waitLift || waitWash || waitFinale || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
-    else auto.wish.set(dx / d, 0, dz / d);
+    else {
+      // Full-stick steering orbits tight targets with the fox's smooth turn arc.
+      // Use ordinary analog braking; keep action takeoffs and airborne control full.
+      let approach = 1;
+      if (onGround && auto.phase === 'run' && !auto.dashQueued && !wp.act) {
+        const bearing = Math.atan2(dx, dz) - foxActor.group.rotation.y;
+        const error = Math.atan2(Math.sin(bearing), Math.cos(bearing));
+        const turnRate = maxGroundYawRate * Math.tanh(Math.abs(error) * feel.groundTurnRate / maxGroundYawRate);
+        const turnSpeed = 0.75 * turnRate * d / (2 * Math.max(0.05, Math.abs(Math.sin(error))));
+        const turnBrake = THREE.MathUtils.smoothstep(Math.abs(error), 0.12, 0.5);
+        approach = THREE.MathUtils.lerp(1, Math.min(1, turnSpeed / feel.moveSpeed), turnBrake);
+      }
+      auto.wish.set(dx / Math.max(d, 0.001) * approach, 0, dz / Math.max(d, 0.001) * approach);
+    }
     if (auto.phase === 'run') auto.space = false;
     if (auto.dashQueued) {
       auto.dash = true;
@@ -1243,6 +1288,10 @@ async function boot() {
       dashT = feel.dashDuration;
       vel.x = wish.x * feel.dashSpeed;
       vel.z = wish.z * feel.dashSpeed;
+      if(grounded) {
+        fox.rotation.y=Math.atan2(wish.x,wish.z); groundYawRate=0;
+        foxActor.locomotion?.syncYaw(fox.rotation.y);
+      }
       if (!grounded) {
         airDashUsed = true;
         vel.y = Math.max(vel.y, 0);
@@ -1259,6 +1308,7 @@ async function boot() {
       keys.delete('ShiftRight');
     }
     const wasDashing = dashT > 0;
+    dashContactActive = wasDashing;
     dashT -= dt;
     const dashing = dashT > 0;
     if (wasDashing && !dashing) jumpStats.lastDashDist = Number(Math.hypot(fox.position.x - dashFrom.x, fox.position.z - dashFrom.z).toFixed(2));
@@ -1272,9 +1322,8 @@ async function boot() {
     // ride framing: the lens follows the full rise in a column (normal jumps keep the partial track)
     const riding = inColumn || (gliding && lift.k > 0);
     cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, riding ? 1 : baseCam.jumpTrack, 3, dt);
-    // and rides above the fox, pulled in, looking down the column (the source stays in frame, the sun leaves it)
-    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 2.4 : baseCam.height, 2.2, dt);
-    cam.params.glideDistance = THREE.MathUtils.damp(cam.params.glideDistance, riding ? baseCam.glideDistance - 0.9 : baseCam.glideDistance, 2.2, dt);
+    // A small rise preserves the chase silhouette instead of craning over the column.
+    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 0.15 : baseCam.height, 2.2, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
     glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
@@ -1338,25 +1387,27 @@ async function boot() {
       if(grounded && wish.lengthSq()>.001) {
         const targetYaw=Math.atan2(wish.x,wish.z);
         const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
-        // Yaw rate eases in and out (ζ≈.7 with turnRate) so the spine carves arcs, never snaps.
-        yawRate=THREE.MathUtils.damp(yawRate,THREE.MathUtils.clamp(error*feel.turnEase,-4.5,4.5),feel.turnRate,dt);
-        fox.rotation.y+=yawRate*dt;
+        const targetRate=maxGroundYawRate*Math.tanh(error*feel.groundTurnRate/maxGroundYawRate);
+        groundYawRate=THREE.MathUtils.damp(groundYawRate,targetRate,10,dt);
+        const turnStep=groundYawRate*dt;
+        const yawStep=Math.sign(turnStep)===Math.sign(error) && Math.abs(turnStep)>Math.abs(error) ? error : turnStep;
+        fox.rotation.y+=yawStep;
+        cur.applyAxisAngle(new THREE.Vector3(0,1,0),yawStep);
         // Brake through a reversal; forward drive returns as the body points into the input.
         const drive=Math.max(0,Math.cos(error));
         desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
-      } else yawRate=0;
-      if (grounded) {
-        // Critically damped: velocity changes with continuous acceleration (no first-frame jerk).
-        if (cur.distanceToSquared(groundVelOut) > 1e-4) groundAccel.set(0, 0, 0);
-        const w = feel.groundEase;
-        const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n;
-        for (let i = 0; i < n; i++) {
-          groundAccel.addScaledVector(desired.clone().sub(cur), w * w * h).addScaledVector(groundAccel, -2 * w * h);
-          cur.addScaledVector(groundAccel, h);
-        }
-        groundVelOut.copy(cur);
+      }
+      if(grounded) {
+        if(wish.lengthSq()<=.001)groundYawRate=THREE.MathUtils.damp(groundYawRate,0,10,dt);
+        // Ground turns transport existing momentum with the body. Incoming
+        // landing/drift momentum keeps its sign and sheds lateral load smoothly.
+        const forward=new THREE.Vector3(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y));
+        const along=cur.dot(forward);
+        const lateral=cur.clone().addScaledVector(forward,-along).multiplyScalar(Math.exp(-12*dt));
+        const groundSpeed=THREE.MathUtils.damp(along,desired.length(),feel.groundAccel,dt);
+        cur.copy(lateral).addScaledVector(forward,groundSpeed);
       } else {
-        groundAccel.set(0, 0, 0);
+        groundYawRate=0;
         cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
       }
       vel.x = cur.x;
@@ -1402,9 +1453,11 @@ async function boot() {
       if (safe(fox.position.x, fox.position.z + dz)) fox.position.z += dz;
       return Math.hypot(fox.position.x - beforeX, fox.position.z - beforeZ);
     });
-    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
+    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashContactActive)) {
       if (e.type === 'freed') {
         shadeContact.frees++;
+        const wash = e.pos.clone().setY(e.pos.y - 1.4);
+        colorField.stroke(wash, wash.clone(), { life: 6, strength: 1.2, radius: shades.tun.drainRadius });
         hitstop = 0.08;
         cam.shake(0.12);
         audio.play('bridge');
@@ -1426,6 +1479,8 @@ async function boot() {
 
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
     const speed = Math.hypot(vel.x, vel.z);
+    // Forward gait travel excludes the lateral/reverse load carried out of an air dash.
+    const gaitSpeed=grounded ? Math.max(0,vel.x*Math.sin(fox.rotation.y)+vel.z*Math.cos(fox.rotation.y)) : speed;
     landT -= dt;
     skidT -= dt;
     if (grounded && wish.lengthSq() < .01 && previousSpeed > 4 && speed < previousSpeed) skidT = Math.max(skidT, .3);
@@ -1441,7 +1496,8 @@ async function boot() {
       } else {
         const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
         if (windupT >= 0) {
-          anim='jump_up'; fade=.04;
+          anim='jump_up';
+          fade=THREE.MathUtils.lerp(actionFeel.jumpGatherBlend,.04,THREE.MathUtils.smoothstep(speed,1,3));
         } else if (dashing) {
           anim = 'dash';
           fade = 0.05;
@@ -1454,6 +1510,9 @@ async function boot() {
         } else if (landT > 0 && (speed < 1.5 || landT > .033)) {
           anim = 'land';
           fade = 0.05;
+        } else if (grounded && speed>1 && gaitSpeed<speed*.65) {
+          // Carry sideways/backward landing load in a brace, never a frozen forward walk.
+          anim='skid'; fade=.06;
         } else if (skidT > 0 && wish.lengthSq() < .01) {
           anim = 'skid'; fade = .06;
         } else if (speed < .6 && Math.abs(foxActor.locomotion?.metrics.turnRate ?? 0) > .8) {
@@ -1463,8 +1522,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent,
-        crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : gaitSpeed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
@@ -1554,7 +1612,6 @@ async function boot() {
       airTime: airT,
       landing: landingValid ? landing : null,
     });
-    occlusion.update(rawDt, cam.camera, renderer, feetPos, foxActor.height, fox.rotation.y);
     // Permanent wavefronts only: the fox's own saturated aura must not keep ambience warm.
     let audioRestore = colorField.globalColor;
     for (const region of colorField.restores) {
@@ -1606,6 +1663,9 @@ async function boot() {
     // Wisps / autumn
     autumnFX.update(dt, fox.position);
     emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
+    hubDusk.update(fox.position.x, fox.position.z);
+    reachMood.update(fox.position.x, fox.position.z);
+    world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
     sky.update(dt);
     distant.update(dt);
 
@@ -1632,6 +1692,11 @@ async function boot() {
         cam.camera.updateProjectionMatrix();
       }
     }
+    // Fit the cutout to the rendered lens, including review/photo overrides.
+    // Simulation can run several steps without drawing in the capture harness.
+    occlusion.update(dt, cam.camera, renderer,
+      feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
+      foxActor.height, fox.rotation.y);
     // grade follows the flood: faded sepia → rich autumn over the 6 s wave
     // exposure stays put; the grade only follows once the front has left the summit
     post.params.restore = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;
@@ -1673,6 +1738,8 @@ async function boot() {
         `dashes=${feelMetrics.dashesUsed}`,
         `preset=${feelPreset}`,
         `quality=${quality.tier}`,
+        `dusk=${JSON.stringify({ ...hubDusk.state(), practical: world.hubState() })}`,
+        `spirit=${JSON.stringify(foxActor.group.userData.spiritFx)}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',
       ],
@@ -1726,6 +1793,9 @@ async function boot() {
       contactShadow.position.set(tx, ty + 0.03, tz);
       contactShadow.scale.set(1, 1, 1);
       (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
+      hubDusk.update(fox.position.x, fox.position.z);
+      reachMood.update(fox.position.x, fox.position.z);
+      world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
       sky.update(rawDt);
       post.render();
       requestAnimationFrame(tick);
