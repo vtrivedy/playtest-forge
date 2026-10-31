@@ -528,6 +528,9 @@ export class ColorField {
    */
   patchMaterial(mat: THREE.MeshStandardMaterial): void {
     const field = this;
+    // painted plants perk up: clumps swell a little along their (clump-outward) normals.
+    // A material define (not a shader one) so it is part of the program cache key.
+    if ((mat.userData as { foliage?: boolean }).foliage) mat.defines = { ...mat.defines, CF_PERK: '' };
     const prev = mat.onBeforeCompile;
     mat.onBeforeCompile = (shader, renderer) => {
       prev.call(mat, shader, renderer); // keep material-specific patches (e.g. ground blend)
@@ -553,8 +556,6 @@ export class ColorField {
       };
       shader.uniforms.uRestoredChroma = { value: (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1 };
       Object.assign(shader.uniforms, field.paint?.uniforms ?? NO_PAINT);
-      // painted plants perk up: clumps swell a little along their (clump-outward) normals
-      if ((mat.userData as { foliage?: boolean }).foliage) shader.defines = { ...shader.defines, CF_PERK: '' };
 
       (mat.userData as { colorFieldShader?: typeof shader }).colorFieldShader = shader;
 
