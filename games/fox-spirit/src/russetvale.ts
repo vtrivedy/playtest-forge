@@ -1,4 +1,4 @@
-import { createLanternhollow, hubPathDistance, hubClearance, HUB_HOUSES } from './regionLanternhollow';
+import { createLanternhollow, hubPathDistance, hubClearance, hubHearthClearance, HUB_HOUSES } from './regionLanternhollow';
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { routeRemnant } from './routeRemnants';
@@ -2038,6 +2038,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       const z = house.z + sz * (house.d / 2 + .3 + plants() * .6);
       if (Math.abs(x) < 6 && z > 72) continue;
       if (hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4) continue;
+      if (hubHearthClearance(x,z)) continue;
       const kind = k % 2 ? 'fern' : 'grass_wispy';
       nature.place(kind, x, groundRaw(x, z) - .03, z, {
         yaw: plants() * Math.PI * 2, scale: (.18 + plants() * .06) / nature.height(kind),
@@ -2049,7 +2050,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // Coherent low autumn drifts, with the core trails and water kept clear.
   for (const [i, [x, z]] of [[-12.5, 84], [-13, 91], [-10, 93], [-5, 85.5], [-19, 95.5], [-28, 91.5]].entries()) {
     litterPatch(bk('litter', x!, z!, false), rng(9400 + i), x!, z!, .8, 18, (px, pz) => {
-      if (hubPathDistance(px, pz) <= 1.2 || Math.hypot(px + 8, pz - 85) < 1.9) return NaN;
+      if (hubHearthClearance(px,pz) || hubPathDistance(px, pz) <= 1.2 || Math.hypot(px + 8, pz - 85) < 1.9) return NaN;
       if (((px - POND.x) / POND.rx) ** 2 + ((pz - POND.z) / POND.rz) ** 2 < 1.2) return NaN;
       if (HUB_HOUSES.some(h => Math.abs(px - h.x) < h.w / 2 + .2 && Math.abs(pz - h.z) < h.d / 2 + .2)) return NaN;
       return groundRaw(px, pz);
@@ -2132,6 +2133,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   {
     const lr = rng(909);
     const groundAtCover = (x: number, z: number) => {
+      if (hubHearthClearance(x,z)) return NaN;
       const g = col.highestAt(x, z);
       return g < -50 ? NaN : g;
     };

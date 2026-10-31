@@ -15,6 +15,18 @@ SHOTS = set('probe perf route kilnroute hub orbit fox gait worldgait stills wate
 def cli(args, **kw):
     return subprocess.run(args, text=True, capture_output=True, timeout=60, **kw)
 
+def identity_failures(run, report, ref, shots):
+    failures = []
+    if run.get('commit') != ref:
+        failures.append('run.commit differs from requested ref or is absent')
+    if run.get('shots') != shots:
+        failures.append('run.shots differs from requested shots or is absent')
+    if not run.get('captureToolSha'):
+        failures.append('run.captureToolSha is absent')
+    elif run.get('captureToolSha') != report.get('captureToolSha'):
+        failures.append('report.captureToolSha differs from run or is absent')
+    return failures
+
 def capture_request(stream, request, folder):
     folder.mkdir(parents=True, exist_ok=True)
     (folder/'request.json').write_text(json.dumps(request, indent=2))
@@ -81,8 +93,12 @@ def capture_request(stream, request, folder):
                 result[name]={k:data[k] for k in ['status','commit','gpu','failures','errors','captureToolSha'] if k in data}
         run=json.loads((evidence/'run.json').read_text()) if (evidence/'run.json').exists() else {}
         report=json.loads((evidence/'report.json').read_text()) if (evidence/'report.json').exists() else {}
-        if run.get('commit')!=ref or run.get('shots')!=shots or not run.get('captureToolSha') or run.get('captureToolSha')!=report.get('captureToolSha'):
+        missing_reports=[name for name in ['run.json','report.json'] if not (evidence/name).exists()]
+        failed_identity=identity_failures(run,report,ref,shots)
+        if missing_reports or failed_identity:
             result.update(status='capture-failed',verificationError='Missing or mismatched commit, shot or tool identity')
+            result['missingCompletionReports']=missing_reports
+            result['identityFailures']=failed_identity
         elif run.get('status')=='failed' or report.get('failures') or report.get('errors'):
             result['status']='capture-failed'
         elif run.get('status')=='success':
