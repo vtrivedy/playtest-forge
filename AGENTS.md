@@ -23,3 +23,4 @@ Ship **beautiful, great-feeling** Spyro-inspired (original IP) three.js creature
 - Skills: `.claude/skills/playtest-feel-gate/`, `.claude/skills/scope-check-sprint/`
 - Checklists: `docs/process/game-feel-checklist.md`, `docs/process/level-design-template.md`
 - Credit: `docs/process/SOURCE-claude-code-game-studios.md` (MIT © Donchitos; adapted, not wholesale)
+- Prompt vocab: `docs/process/SOURCE-gamedev-cheatsheet.md` + § Prompt vocabulary in the feel checklist (Nicolas Zullo; cite, do not dump all 34)

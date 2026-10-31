@@ -56,3 +56,26 @@ Use this **before** shipping a locomotion or action change. Pair with
 - [ ] Jump has anticipation and land squash; dash has weight
 - [ ] Empty-island 60s loop stays fun (pillar 1 kill test in `docs/design/game-design.md`)
 - [ ] Retained capture exists (webm or mp4 + ≥2 stills) for this change
+
+## Prompt vocabulary (Game Dev Cheat Sheet — adopt these words in briefs)
+
+> Named terms from [gamedev-cheatsheet.com](https://gamedev-cheatsheet.com/) (Nicolas Zullo). Credit + keep/drop: `SOURCE-gamedev-cheatsheet.md`. Use the **bold** words in agent prompts so the model reaches for the right technique.
+
+### Locomotion (open: hovering paws, stiff spine, stick forelegs, tail flip)
+- **paw ground probe / foot gap** — per-paw downward **raycast**; measure gap to hit; IK to the point ([raycasting](https://gamedev-cheatsheet.com/concepts/raycasting/))
+- **stance vs swing** — lock probe/IK in stance only; swing lifts the paw
+- **ground-normal alignment** — paw pitch/roll follow hit **normal**; walkable iff `normal.y > 0.7` ([normals](https://gamedev-cheatsheet.com/concepts/normals/))
+- **pastern / carpal give** — stance compression angle driven by IK depth (kills stick legs)
+- **spine squash-and-stretch** — gallop gather/extension, volume on 2 axes, **pivot at contact paws** ([squash and stretch](https://gamedev-cheatsheet.com/concepts/squash-and-stretch/))
+- **anticipation → action → follow-through** — Disney principles (not on the cheat sheet); pair with **easing** ([easing](https://gamedev-cheatsheet.com/concepts/easing/))
+- **bounded overshoot / damped spring** — tail & ears: `1-exp(-k·dt)`, hard pitch cap (no vertical whip)
+- **contact shadow** — blob/decal at ray hit; **polygon offset** so it does not z-fight ([z-fighting](https://gamedev-cheatsheet.com/concepts/z-fighting/))
+
+### Paint (open: flat green carpet, props stay sepia, trail specks)
+- **pigment palette + hue jitter** — 3–5 hues per stroke, never one green ([fragment shader](https://gamedev-cheatsheet.com/concepts/fragment-shader/))
+- **granulation / edge darkening / bleed** — named watercolor uniforms on the paint composite
+- **world-space seeded fBm** — noise on world XZ, one seed, no `Math.random`, does not swim with camera ([seeded noise](https://gamedev-cheatsheet.com/concepts/seeded-noise/))
+- **climb mask** — normal + height spreads paint up trees/rocks/ruins over `climbTime` ([normals](https://gamedev-cheatsheet.com/concepts/normals/))
+
+### Already in DESIGN.md — keep saying these names
+**coyote time** · **input buffer** · **acceleration / friction** (reversal decel, air rates) · **screen shake** (trauma²·noise) · **quaternions** (slerp, short-way dot) · **state machine** sub-phases · **delta time** springs · **fixed timestep** (foot rays on interpolated pose) · **particle system** (embers/leaves only — not the paint look fix)
