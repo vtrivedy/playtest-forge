@@ -761,12 +761,14 @@ try {
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
         if(!actor)return {failure:`Missing ${id}`};
         const [x,y,z]=actor.pos,col=h.debug.world.collision;
+        const floorBand=id.startsWith('shade-hill-')?2.4:.6;
         for(const radius of [4.3,4.8,3.4,3.1,2.8])for(let k=0;k<64;k++){
           const a=k*Math.PI*2/64,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
           const floor=col.groundAt(px,pz,y+.6).y;
-          if(!Number.isFinite(floor)||Math.abs(floor-y)>.6||col.blocked(px,pz,floor))continue;
+          if(!Number.isFinite(floor)||Math.abs(floor-y)>floorBand||col.blocked(px,pz,floor))continue;
           // Reject unsupported edges across the fox's footprint.
           if([[.3,0],[-.3,0],[0,.3],[0,-.3]].some(([dx,dz])=>Math.abs(col.groundAt(px+dx,pz+dz,floor+.2).y-floor)>.3))continue;
+          if(!h.photoBlocker||h.photoBlocker([px,floor+.9,pz],[x,y+1.3,z]))continue;
           return {pos:[px,floor,pz],yaw:Math.atan2(x-px,z-pz),actor:actor.pos,label:'Staged nearby observer on actual actor floor; live behavior preserved'};
         }
         return {failure:`No nearby supported observer for ${id}`,actor:actor.pos};
