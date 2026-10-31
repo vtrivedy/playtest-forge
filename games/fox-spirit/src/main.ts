@@ -342,57 +342,27 @@ async function boot() {
   fFeel.add(feel, 'dashDuration', 0.08, 0.4, 0.01).listen();
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
-    const folder = gui.addFolder('Authored locomotion');
-    folder.add(params,'headLead',0,.5,.01);
-    folder.add(params,'headFrequency',1,6,.1);
-    folder.add(params,'headDamping',.4,1.5,.05);
-    folder.add(params,'headStabilize',0,1,.05);
-    folder.add(params,'tailLoad',0,.4,.01);
-    folder.add(params,'brakeSquat',0,.08,.002);
-    folder.add(params,'brakePitch',0,.2,.005);
-    folder.add(params,'landSquash',0,.8,.005);
-    folder.add(params,'landPitch',0,2,.05).name('land pitch rad/m');
-    folder.add(params,'stationarySupport',0,.08,.005).name('stationary support m');
-    folder.add(params,'landFrequency',2,6,.1);
-    folder.add(params,'landDamping',.4,1.2,.05);
-    folder.add(params, 'walkHz', 1, 3, .05);
-    folder.add(params, 'trotHz', 1.2, 4, .05);
-    folder.add(params, 'gallopHz', 1.5, 5, .05);
-    folder.add(params, 'cadenceExponent', 0, 1, .05);
-    folder.add(params, 'minStanceRatio', .2, 1, .01);
-    folder.add(params, 'bodyBob', 0, 1, .01);
-    folder.add(params, 'swingEase', 0, 1, .05);
-    folder.add(params, 'headBob', 0, 1, .05);
-    folder.add(params, 'releaseSwing', .12, .4, .01);
-    for (const key of ['liftForeWalk','liftForeTrot','liftHindWalk','liftHindTrot','strideBob','rideDrop'] as const) folder.add(params, key, 0, .25, .005);
-    for (const key of ['swingReach','swingReachHind','swingReachRun','carpalFlex','carpalFlexRun','hockFold','carpalGive','landCarpalGive','airTuck','airReach','airHindStream','airForeSwing','airHindSwing'] as const) folder.add(params, key, 0, 2, .01);
-    for (const key of ['weightRoll','spineSway','breath','airArch','runningGather','tailAir','idleSettle','idleHipShot','idleLook','idleRestLift','idleRestFold','idleForeUnder','trackNarrow','earTwitch','gallopFlex','gallopFlexPhase','gatherHindReach','gallopHeadPitch','jumpHeadPitch','earBank','airPushHind','airForeOpen','glideLegs'] as const) folder.add(params, key, 0, 1, .005);
-    folder.add(params, 'earlyContact', .5, 1, .01);
-    folder.add(params, 'spineFlex', 0, 1, .05);
-    folder.add(params, 'takeoffCrouch', 0, .2, .005);
-    folder.add(params, 'takeoffPitch', 0, .2, .005);
-    folder.add(params, 'headHold', 0, 1.5, .05);
-    folder.add(params, 'headLevel', 0, 1, .05);
-    folder.add(params, 'tailStream', 0, .03, .001);
-    folder.add(params, 'tailWave', 0, .15, .005);
-    folder.add(params, 'tailWaveLag', 0, 1.5, .05);
-    folder.add(params, 'trotSpeed', 2, 6, .1);
-    folder.add(params, 'gallopSpeed', 4, 10, .1);
-    folder.add(params, 'plantStrength', 0, 1, .01);
-    folder.add(params, 'maxCorrection', 0, .3, .01);
+    const folder = gui.addFolder('Clip locomotion');
+    folder.add(params, 'trotSpeed', .6, 3, .05);
+    folder.add(params, 'gallopSpeed', 2, 8, .1);
+    folder.add(params, 'gaitHysteresis', 0, .4, .01);
+    folder.add(params, 'gaitFade', .05, .4, .01);
+    folder.add(params, 'idleFade', .05, .5, .01);
+    folder.add(params, 'minRate', .2, 1, .05);
+    folder.add(params, 'maxRate', 1, 3, .05);
+    folder.add(params, 'footIK', 0, 1, 1);
+    folder.add(params, 'pelvisAdjust', 0, 1, .05);
+    folder.add(params, 'maxPelvisDrop', 0, .4, .01);
+    folder.add(params, 'footLock', 0, 1, .05);
+    folder.add(params, 'maxLock', 0, .2, .005);
+    folder.add(params, 'normalAlignDeg', 0, 20, 1);
+    folder.add(params, 'contactShadow', 0, 1, .01);
+    folder.add(params, 'slopeTilt', 0, 1, .05);
     folder.add(params, 'turnLean', 0, .1, .001);
     folder.add(params, 'bankMax', 0, .35, .005);
-    folder.add(params, 'rootBank', 0, 1, .05);
-    folder.add(params, 'turnPlant', 0, 1.5, .05);
-    folder.add(params, 'gallopHeadHold', 0, 1.5, .05);
-    folder.add(params, 'suspensionLift', 0, .12, .005);
-    folder.add(params, 'gatherLift', 0, .15, .005);
-    folder.add(params, 'tailLag', 0, .3, .01);
-    folder.add(params, 'pelvisBank', 0, 1, .05);
-    folder.add(params, 'headRollStabilize', 0, 1, .05);
-    folder.add(params, 'springFrequency', 1, 6, .1);
-    folder.add(params, 'springDamping', .4, 1.5, .05);
-    folder.add(params, 'debug');
+    folder.add(params, 'headLead', 0, .5, .01);
+    folder.add(params, 'headFrequency', 1, 6, .1);
+    folder.add(params, 'headDamping', .4, 1.5, .05);
   }
   const fFoxLook=gui.addFolder('Fox look');
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
@@ -1670,7 +1640,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : gaitSpeed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && windupDur > 0 ? Math.min(1, (windupT + dt) / windupDur) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? .8 : harnessAnimLock==='trot' ? 2.4 : gaitSpeed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && windupDur > 0 ? Math.min(1, (windupT + dt) / windupDur) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
@@ -1939,7 +1909,7 @@ async function boot() {
       fox.position.set(tx, ty + foxActor.feetOffset, tz);
       fox.rotation.y = turntableYaw; // model spins; camera fixed (classic turntable)
       vel.set(0, 0, 0);
-      foxActor.setMotion?.({speed: turntableAnim==='run' ? 9 : turntableAnim==='walk' ? 1.4 : turntableAnim==='trot' ? 3.8 : 0,
+      foxActor.setMotion?.({speed: turntableAnim==='run' ? 9 : turntableAnim==='walk' ? .8 : turntableAnim==='trot' ? 2.4 : 0,
         grounded: ['idle','run','walk','trot','skid','land'].includes(turntableAnim), yaw: turntableYaw, verticalSpeed: 0,
         groundAt: () => ty});
       foxActor.setAnim(turntableAnim);

@@ -1,3 +1,9 @@
+> **Superseded (sprint 5).** The current locomotion design is [`DESIGN-loco-clips.md`](DESIGN-loco-clips.md):
+> authored clips in a speed-driven blend tree with stride-matched playback, light foot IK and subtle additives.
+> The procedural layers described below (per-leg clip split + hermite swing warp, swing lift / carpal flick / hock fold,
+> body bob/roll/sway, gallop flex, air pose) were deleted from `locomotion.ts`. Only the runtime carpus
+> (`foxLimbRig.ts`) survives, as the fore IK chain joint. Kept for history only.
+
 # Natural fox gait — kill the stilts (sprint 4, loco-nat)
 
 Vivek (Oct 31): legs read "rigid and weird like on 4 stilts". The flowing cadence stays: walk/trot/run

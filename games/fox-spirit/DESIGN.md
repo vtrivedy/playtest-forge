@@ -77,6 +77,8 @@ into review WAVs, keyboard traversal, mute/unlock checks, staged restoration, sc
 `window.__game` and audio diagnostics. Do not change movement, camera or visual tuning.
 
 ## Sprint 2 authored locomotion (LOCO-SOL)
+
+> Current locomotion design: [`DESIGN-loco-clips.md`](DESIGN-loco-clips.md) (sprint 5 clip-driven blend tree + foot IK). Sections below are history.
 Existing hero geometry/materials remain the baseline. Blender-baked walk/trot/rotary gallop clips provide the primary pose; AnimationMixer blends by speed with stride-matched playback. Grounded contact correction and damped tail/torso overlays provide terrain and momentum response. Turn, skid, jump/air/land remain authored states. Expose blend speeds, stride scale, plant correction, turn lean and spring damping in the existing debug GUI and publish contact/state metrics through the game hooks. Verify on the remote GPU gait gym before comparison; this branch stays isolated pending driver selection.
 
 ## Sprint 2 gait review gym

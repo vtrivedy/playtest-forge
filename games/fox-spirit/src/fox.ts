@@ -35,7 +35,7 @@ export type FoxActor = {
   update: (dt: number, t: number, gliding: boolean) => void;
   /** Crossfade to a named clip (must exist on the GLB). Same clip = no restart. */
   setAnim: (name: FoxAnimState, fadeS?: number) => void;
-  /** Playback rate of the current clip (run cadence follows ground speed). */
+  /** Playback rate of the current non-gait clip (gait cadence follows ground speed in the blend tree). */
   setTimeScale: (s: number) => void;
   /** Clip length in seconds (0 when missing). */
   clipDuration: (name: FoxAnimState) => number;
@@ -153,7 +153,8 @@ export async function createFox(): Promise<FoxActor> {
       },
       setTimeScale(k) {
         const act = actions.get(current);
-        if (act && current !== 'run') act.setEffectiveTimeScale(Number.isFinite(k) ? Math.max(0, k) : 1);
+        // Gait clips are phase-driven by the blend tree (stride-matched); only one-shot / state clips take a rate.
+        if (act && !['walk', 'trot', 'run'].includes(current)) act.setEffectiveTimeScale(Number.isFinite(k) ? Math.max(0, k) : 1);
       },
       clipDuration(name) {
         return actions.get(name)?.getClip().duration ?? 0;
