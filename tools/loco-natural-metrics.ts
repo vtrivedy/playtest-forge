@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AuthoredLocomotion } from '../games/fox-spirit/src/locomotion';
+import { applyFoxLimbRig } from '../games/fox-spirit/src/foxLimbRig';
 Object.assign(globalThis, { self: globalThis, ProgressEvent: class extends Event { constructor(type: string, init: Record<string, unknown>) { super(type); Object.assign(this, init); } } });
 const bytes = fs.readFileSync('assets/hero/spirit_fox.glb');
 const jsonLength = bytes.readUInt32LE(12);
@@ -13,6 +14,7 @@ delete doc.images; delete doc.textures; delete doc.samplers; delete doc.material
 for (const mesh of doc.meshes) for (const primitive of mesh.primitives) delete primitive.material;
 const gltf = await new GLTFLoader().parseAsync(JSON.stringify(doc), '');
 const root = gltf.scene, group = new THREE.Group(); group.add(root);
+applyFoxLimbRig(root, gltf.animations);
 const box = new THREE.Box3().setFromObject(root); root.scale.setScalar(1.25 / (box.max.y - box.min.y));
 const scaled = new THREE.Box3().setFromObject(root); root.position.y -= scaled.min.y;
 const center = scaled.getCenter(new THREE.Vector3()); root.position.x -= center.x; root.position.z -= center.z;
@@ -50,7 +52,7 @@ for (const [gait, speed] of [['walk', 1.5], ['trot', 3.8], ['run', 9]] as const)
     slide = Math.max(slide, loco.metrics.maxSlideMS); hz.push(loco.metrics.cadenceHz);
     const L = (n: string) => w(bone(n));
     elbow.push(angle(L('upperarm_l'), L('forearm_l'), L('front_paw_l')));
-    carpal.push(angle(L('forearm_l'), L('front_paw_l'), pawTip('front_paw_l')));
+    carpal.push(angle(L('forearm_l'), L('carpus_l'), pawTip('front_paw_l')));
     stifle.push(angle(L('thigh_l'), L('shin_l'), L('hind_foot_l')));
     hock.push(angle(L('shin_l'), L('hind_foot_l'), L('hind_paw_l')));
     legs.forEach((l, j) => { lift[j] = Math.max(lift[j], w(bone(l[l.length - 1])).y - rest[j]); });

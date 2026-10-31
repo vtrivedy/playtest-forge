@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { applyFoxLook, createSpiritFx } from './foxLook';
+import { applyFoxLimbRig } from './foxLimbRig';
 import { AuthoredLocomotion, type MotionInput } from './locomotion';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
@@ -52,6 +53,7 @@ export async function createFox(): Promise<FoxActor> {
     const root = gltf.scene;
     const targetHeight = 1.25; // gameplay scale stays authored even when the tail surface is restyled
     const authoredBox = new THREE.Box3().setFromObject(root);
+    applyFoxLimbRig(root, gltf.animations);
     applyFoxLook(root, targetHeight);
 
     const spiritFxMeshes: THREE.Object3D[] = [];
