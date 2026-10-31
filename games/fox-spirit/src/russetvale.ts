@@ -800,6 +800,14 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // R5 lateral flight on k4b (14 → 18). Its s64.05 high edge overlaps the
   // s64 terrace support by 5cm; masonry and collider share the same flight.
   flightT(62.85, 0.4, 14, 62.85, 9.8, 18, 2.4, 6);
+  // A dressed-stone turn landing joins the last riser to the terrace and R6.
+  // Its cap preserves the visible footing over the foundation's eroded corners.
+  {
+    const p = sp(63.3, 10.375);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 18, bottom: 13, tag: 'r5-landing' }));
+    slab({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 17.8, bottom: 13, rough: 0.3, seed: 77, topColor: null });
+    stoneBlock(bk('stone', p.x, p.z), trs(p.x, 17.9, p.z, T_YAW), 1.25, 0.2, 3.3, 7701, 0);
+  }
   // R6 lateral flight on k5 (18 → 22)
   flightT(66, 9.8, 18, 66, 0.4, 22, 2.4, 7);
 
