@@ -35,7 +35,7 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45,
+    minStanceRatio: .35, bodyBob: .45, swingEase: .35,
     // Glide carriage: share of per-stride back rock / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     rockDamp: 1.3, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
@@ -236,7 +236,13 @@ export class AuthoredLocomotion {
         // sweeps at ground speed; the remaining time is a longer, slower swing.
         const duty=contact.duty, stance=duty*this.stanceRatio[gait];
         const u=(this.phase-contact.phase+1)%1;
-        const local=u<stance ? duty*u/stance : duty+(1-duty)*(u-stance)/(1-stance);
+        let local=duty*u/stance;
+        if(u>=stance) {
+          // Hermite swing: leave and re-enter stance at the stance clip rate (no paw-velocity kink at
+          // lift-off/touch-down), easing into the slower reach between. swingEase 0 = linear swing.
+          const sw=(u-stance)/(1-stance), m=Math.min(3,1+(stance<duty ? (duty/stance)*(1-stance)/(1-duty)-1 : 0)*this.params.swingEase);
+          local=duty+(1-duty)*(sw*sw*(3-2*sw)+m*(2*sw*sw*sw-3*sw*sw+sw));
+        }
         drive(parts.legs[i],weight,((contact.phase+local)%1)*duration);
       });
     }
