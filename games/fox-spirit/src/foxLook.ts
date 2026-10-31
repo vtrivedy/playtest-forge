@@ -339,6 +339,9 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(rnd() * sourcePts.length)]! });
   }
 
+  const diagnostics = { wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  group.userData.spiritFx = diagnostics;
+
   // flame licks: one instanced billboard per lick
   const quad = new THREE.PlaneGeometry(1, 1, 4, 10).translate(0.5, 0.5, 0);
   const lg = new THREE.InstancedBufferGeometry();
@@ -423,7 +426,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
 
   return {
     setVisible(on) {
-      visible = on;
+      visible = diagnostics.visible = on;
       lickMesh.visible = embers.visible = on;
     },
     update(dt, t, gliding) {
@@ -437,6 +440,8 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       const L = FOX_LOOK;
       time = t;
       speed = Math.hypot(vel.x, vel.z);
+      diagnostics.speed = Number(speed.toFixed(2));
+      diagnostics.liveEmbers = 0;
       lickMat.uniforms.uTime!.value = t;
       lickMat.uniforms.uIntensity!.value = L.lickIntensity * (gliding ? 1.25 : 1);
       emberMat.uniforms.uScale!.value = innerHeight * 1.1;
@@ -445,6 +450,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       spawnAcc -= Math.floor(spawnAcc);
       for (let i = 0; i < N; i++) {
         if (eAge[i]! >= eLife[i]!) { eHeat[i] = 0; continue; }
+        diagnostics.liveEmbers++;
         eAge[i] += dt;
         const u = eAge[i]! / eLife[i]!;
         const drag = Math.exp(-1.6 * dt);
