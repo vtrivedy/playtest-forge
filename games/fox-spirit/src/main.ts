@@ -549,6 +549,7 @@ async function boot() {
   fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
   fFox.add(FOX_LOOK, 'bodyEmber', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'brushRelief', 0, 1.5, 0.05);
+  fFox.add(FOX_LOOK, 'emberSeams', 0, 2, 0.05);
   fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
