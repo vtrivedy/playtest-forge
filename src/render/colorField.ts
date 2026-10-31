@@ -542,6 +542,7 @@ export class ColorField {
       shader.uniforms.uTrailLife = { value: field.trailLife };
       shader.uniforms.uGlobalColor = { value: field.globalColor };
       shader.uniforms.uGroundSurface = { value: mat.name === 'rv-terrain' || mat.name === 'rv-ground' ? 1 : 0 };
+      shader.uniforms.uPaintKind = { value: paintKindOf(mat) };
       shader.uniforms.uTrail = { value: new Float32Array(24 * 4) };
       shader.uniforms.uTrailCount = { value: 0 };
       // up to 4 restores
@@ -618,6 +619,8 @@ export class ColorField {
           float cfRim;
           float cfPermanent;
           uniform float uGroundSurface;
+          // what the fox's paint restores this surface to: 0 meadow, 1 cool stone, 2 own colour, 3 leaf litter
+          uniform float uPaintKind;
           uniform sampler2D uMaskMap;
           uniform float uUseMaskMap;
           uniform vec4 uBounds;
@@ -671,10 +674,22 @@ export class ColorField {
               );
               if (puv.x >= 0.0 && puv.x <= 1.0 && puv.y >= 0.0 && puv.y <= 1.0) {
                 // paint is the fox's: a Shade's drain blots it like the live aura
-                cfPaint = texture2D(uPaintMap, puv).r * temporaryVisibility;
+                cfPaint = texture2D(uPaintMap, puv).r;
+                if (uPaintKind > 0.5 && uPaintKind < 2.5) {
+                  // walls, pillars and posts beside the path soak paint up from a wider footprint
+                  vec2 texM = 1.0 / vec2(uPaintBounds.y - uPaintBounds.x, uPaintBounds.w - uPaintBounds.z);
+                  float reach = 0.0;
+                  for (int k = 0; k < 6; k++) {
+                    float a = float(k) * 1.0472 + 0.5;
+                    vec2 o = vec2(cos(a), sin(a)) * texM;
+                    reach = max(reach, texture2D(uPaintMap, puv + o * 2.4).r * 0.95);
+                    reach = max(reach, texture2D(uPaintMap, puv + o * 4.6).r * 0.8);
+                  }
+                  cfPaint = max(cfPaint, reach);
+                }
+                cfPaint *= temporaryVisibility;
                 cfWet = texture2D(uWetMap, puv).r * temporaryVisibility;
                 cfPaintLead = clamp((cfPaint - s) * 4.0 + 0.5, 0.0, 1.0);
-                s = max(s, cfPaint);
               }
             }
             // analytic restores with ink-bleed edge
@@ -769,41 +784,58 @@ export class ColorField {
           // (the sepia is warm, so true colour on stone is the cool) with moss tops and lichen.
           // Permanent paint path always shows pigment (cfPaintLead only modulates the drying rim).
           // Multiplying by lead previously collapsed the ribbon into the fox's aura disc.
-          float paintK = cfPaint;
-          if (paintK > 0.001) {
+          // Watercolour, not a decal: a body of pigment with a granulated wet fringe bleeding past
+          // it and a thin, broken tide mark where the wash dried. Paint restores each surface to
+          // its own life: ground → living meadow, stone → cool blue-grey with lichen and sparse moss,
+          // wood / plaster / water / foliage → their authored colour, litter → mostly meadow.
+          float pk = 0.0;
+          if (cfPaint > 0.002) {
             vec3 wp = vWorldPosCF;
+            vec2 gp = wp.xz + wp.y * vec2(0.63, 1.21);
+            float gran = noise21(gp * 4.7 + 1.3) * 0.6 + noise21(gp * 12.9) * 0.4;
+            float body = smoothstep(0.5, 0.78, cfPaint + (gran - 0.5) * 0.16);
+            float fringe = smoothstep(0.04, 0.4, cfPaint) * smoothstep(0.28, 0.72, gran) * 0.72;
+            pk = max(body, fringe);
+            float rimBreak = smoothstep(0.32, 0.62, noise21(gp * 0.9 + 4.0));
+            float tide = smoothstep(0.46, 0.58, cfPaint + (gran - 0.5) * 0.08) * (1.0 - smoothstep(0.6, 0.76, cfPaint)) * mix(0.35, 1.0, rimBreak);
             float hueA = noise21(wp.xz * 0.16 + 31.0) * 0.75 + noise21(wp.xz * 0.6 + 9.0) * 0.25;
             float hueB = noise21(wp.xz * 0.45 + 5.0);
+            float hueC = noise21(wp.xz * 0.23 + 47.0);
             float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
-            // pigment density: settled pools and thin, paper-lit passages (not a flat carpet)
-            float dens = mix(0.9, 1.22, noise21(wp.xz * 0.7 + 11.0) * 0.6 + noise21(wp.xz * 2.3 + 2.0) * 0.4);
-            // unit-luma hues — push green saturation so thumbnail reads two-tone vs sepia
-            vec3 meadow = mix(vec3(0.55, 1.28, 0.28), vec3(0.48, 1.22, 0.5), smoothstep(0.35, 0.6, hueA));
-            meadow = mix(meadow, vec3(0.4, 1.3, 0.38), smoothstep(0.62, 0.82, hueA));
-            meadow = mix(meadow, vec3(1.15, 1.05, 0.35), smoothstep(0.75, 0.92, hueB) * 0.35);
-            meadow = mix(meadow, vec3(1.25, 0.75, 0.55), smoothstep(0.85, 0.97, 1.0 - hueB) * 0.25);
-            vec3 own = max(mix(vec3(chromaLuma), chroma, 1.05), 0.0);
-            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.28, 0.92) * dens;
+            // pigment density: settled pools and thin paper-lit passages at two scales
+            float dens = mix(0.8, 1.24, noise21(wp.xz * 0.38 + 11.0) * 0.55 + noise21(wp.xz * 1.9 + 2.0) * 0.45);
+            // fresh (still wet) paint sits lighter on the paper; it darkens as it dries
+            dens *= 1.0 + cfWet * 0.12;
+            // unit-luma hues: yellow-green / sage / moss wet-in-wet, gold-ochre and madder accents
+            vec3 meadow = mix(vec3(0.62, 1.26, 0.26), vec3(0.46, 1.2, 0.52), smoothstep(0.35, 0.62, hueA));
+            meadow = mix(meadow, vec3(0.38, 1.28, 0.42), smoothstep(0.64, 0.84, hueA));
+            meadow = mix(meadow, vec3(1.18, 1.04, 0.38), smoothstep(0.6, 0.86, hueB) * 0.55);
+            meadow = mix(meadow, vec3(1.3, 0.78, 0.5), smoothstep(0.8, 0.95, hueC) * 0.3);
+            // cauliflower back-runs: faint darker lines where one wash crept into another
+            float backrun = 1.0 - smoothstep(0.0, 0.035, abs(noise21(wp.xz * 0.42 + 23.0) - 0.5));
+            vec3 own = max(mix(vec3(chromaLuma), chroma, 1.1), 0.0);
+            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.26, 0.9) * dens * (1.0 - backrun * 0.1);
             float up = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
-            float lichenN = noise21(wp.xz * 1.3 + wp.y * vec2(1.1, 0.7) + 3.0);
-            float lichen = smoothstep(0.45, 0.68, lichenN);
-            // cool blue-grey stone (sepia is warm — restored is the cool opposite)
-            vec3 stone = chromaLuma * mix(vec3(0.78, 0.92, 1.22), vec3(0.9, 0.96, 1.08), noise21(wp.xz * 0.5 + wp.y * 0.4)) * 1.15;
-            // ochre-gold lichen on faces, green moss on tops
-            vec3 lichenC = chromaLuma * vec3(1.25, 1.08, 0.4) * 1.15;
-            vec3 moss = chromaLuma * vec3(0.55, 1.22, 0.4) * 1.2;
-            vec3 face = mix(stone, lichenC, lichen * 0.85);
-            // Ignore authored warm brick chroma — force cool restore on props
-            vec3 propPaint = mix(face, moss, smoothstep(0.45, 0.85, up)) * dens;
-            chroma = mix(chroma, mix(propPaint, groundPaint, uGroundSurface), paintK * 0.95);
+            float lichen = smoothstep(0.5, 0.7, noise21(wp.xz * 1.3 + wp.y * vec2(1.1, 0.7) + 3.0));
+            vec3 stone = chromaLuma * mix(vec3(0.8, 0.93, 1.2), vec3(0.92, 0.97, 1.07), noise21(wp.xz * 0.5 + wp.y * 0.4)) * 1.12;
+            vec3 lichenC = chromaLuma * vec3(1.22, 1.08, 0.45) * 1.1;
+            vec3 moss = chromaLuma * vec3(0.6, 1.2, 0.42) * 1.15;
+            float mossK = smoothstep(0.55, 0.9, up) * smoothstep(0.45, 0.7, noise21(wp.xz * 0.8 + 6.0));
+            vec3 stonePaint = mix(mix(stone, lichenC, lichen * 0.7), moss, mossK);
+            // natural colour comes back richer than it was authored, never meadow-green
+            vec3 ownPaint = own * mix(0.95, 1.08, dens - 0.8);
+            // litter: mostly blends into the meadow, a few warm leaf clusters stay as accents
+            vec3 litterPaint = mix(groundPaint * 0.92, ownPaint, smoothstep(0.72, 0.84, noise21(wp.xz * 0.7 + 13.0)) * 0.8);
+            vec3 paintC = uPaintKind < 0.5 ? groundPaint : uPaintKind < 1.5 ? stonePaint : uPaintKind < 2.5 ? ownPaint : litterPaint;
+            // the dried tide mark is the pigment itself, pooled darker — never a brown outline
+            paintC *= 1.0 - tide * 0.24;
+            paintC = mix(vec3(dot(paintC, vec3(0.2126, 0.7152, 0.0722))), paintC, 1.0 + tide * 0.2);
+            // the fringe is a thin dilute bleed: paper shows through
+            paintC = mix(chroma, paintC, mix(0.55, 1.0, body));
+            chroma = mix(chroma, paintC, pk);
           }
-          outgoingLight = mix(washed, chroma, brushed);
-          // watercolour drying rim: darker pigment pool at the edge (not an orange glow)
-          float pigmentRim = smoothstep(0.08, 0.38, cfPaint) * (1.0 - smoothstep(0.42, 0.88, cfPaint));
-          outgoingLight *= mix(vec3(1.0), vec3(0.55, 0.48, 0.36), pigmentRim * 0.7);
-          // subtle cool granulation lift inside the wash (no warm aura bloom)
-          outgoingLight *= 1.0 + cfPaint * (1.0 - cfWet) * vec3(0.04, 0.06, 0.02);
-          // wet front: soft cool sheen, not #FFC98A orange ring
+          outgoingLight = mix(washed, chroma, max(brushed, pk));
+          // wet front: soft cool sheen while a bloom is still spreading
           float wetLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
           outgoingLight += cfWet * 0.35 * (outgoingLight * vec3(0.15, 0.18, 0.12) + vec3(0.02, 0.025, 0.02) * (0.35 + wetLuma));
           // restore-wave rim stays warm but quieter (Shade/shrine only, not fox paint)
@@ -873,7 +905,7 @@ export class ColorField {
   }
 }
 
-type Bloom = { x: number; z: number; radius: number; strength: number; age: number; life: number; seed: number };
+type Bloom = { x: number; z: number; radius: number; strength: number; age: number; life: number; seed: number; start: number };
 
 export type PaintTuning = {
   /** Path ribbon bloom radius (m) at a run; walk scales it down a little */
@@ -899,11 +931,11 @@ export type PaintTuning = {
 export class PaintLayer {
   readonly bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   readonly tun: PaintTuning = {
-    ribbonRadius: 2.6,
-    ribbonSpacing: 0.38,
+    ribbonRadius: 2.2,
+    ribbonSpacing: 0.35,
     pawRadius: 0.95,
-    dripSpacing: 3.5,
-    dripRadius: 2.6,
+    dripSpacing: 6,
+    dripRadius: 1.5,
     bloomLife: 1.3,
     strength: 1,
   };
@@ -1041,10 +1073,13 @@ export class PaintLayer {
             gl_FragColor = vec4((front + pool * 0.3) * vWet * vStrength, 0.0, 0.0, 1.0);
             return;
           }
-          // watercolour: a fairly decided edge, not an airbrush falloff
-          float ink = 1.0 - smoothstep(0.68, 0.86, d);
+          // watercolour: a decided body edge, then a thin wet fringe creeping out in fingers
+          float core = 1.0 - smoothstep(0.62, 0.8, d);
+          float fingers = (noise(vWorld * 2.6 + 19.0) - 0.5) * 0.3;
+          float fringe = (1.0 - smoothstep(0.76, 1.08 + fingers, d)) * 0.42;
+          float ink = max(core, fringe);
           // paper granulation inside the wash
-          ink *= 0.88 + 0.12 * noise(vWorld * 9.0);
+          ink *= 0.9 + 0.1 * noise(vWorld * 9.0);
           gl_FragColor = vec4(ink * vStrength, 0.0, 0.0, 1.0);
         }`,
     });
@@ -1059,24 +1094,29 @@ export class PaintLayer {
   }
 
   /** Lay one wet bloom that spreads to `radius` over `life` seconds, then dries in place. */
-  bloom(x: number, z: number, radius: number, strength = this.tun.strength, life = this.tun.bloomLife): void {
+  bloom(x: number, z: number, radius: number, strength = this.tun.strength, life = this.tun.bloomLife, start = 0.35, delay = 0): void {
     const { minX, maxX, minZ, maxZ } = this.bounds;
     if (x < minX || x > maxX || z < minZ || z > maxZ || strength < 0.02) return;
     if (this.blooms.length >= PaintLayer.MAX) this.blooms.shift();
-    this.blooms.push({ x, z, radius, strength: Math.min(1, strength), age: 0, life, seed: Math.random() });
+    this.blooms.push({ x, z, radius, strength: Math.min(1, strength), age: -delay, life, seed: Math.random(), start });
     this.laid++;
     this.markGrid(x, z, radius * 0.8, Math.min(1, strength));
   }
 
-  /** A big wet splash: centre plus petal lobes, spreading slower than a pawfall. */
-  splash(x: number, z: number, radius: number, life = 2.2): void {
-    this.bloom(x, z, radius * 0.75, 1, life);
-    const lobes = 7;
+  /**
+   * A big radial burst (Shade freed, hearth lit, Seedwell latched): one wash spreads out of a
+   * point to `radius` over ~`life` s while petal lobes run ahead of it unevenly, then all of it dries for good.
+   */
+  splash(x: number, z: number, radius: number, life = 1.5): void {
+    this.bloom(x, z, radius * 0.8, 1, life, 0.06);
+    const lobes = 9;
     const a0 = Math.random() * Math.PI * 2;
     for (let i = 0; i < lobes; i++) {
-      const a = a0 + (i / lobes) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
-      const d = radius * (0.45 + Math.random() * 0.35);
-      this.bloom(x + Math.cos(a) * d, z + Math.sin(a) * d, radius * (0.32 + Math.random() * 0.2), 0.95, life * (0.8 + Math.random() * 0.5));
+      const a = a0 + (i / lobes) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const d = radius * (0.42 + Math.random() * 0.3);
+      // a lobe wells up once the central wash has reached it, then runs on past the rim
+      const delay = life * (0.18 + (d / radius) * 0.35);
+      this.bloom(x + Math.cos(a) * d, z + Math.sin(a) * d, radius * (0.3 + Math.random() * 0.16), 0.95, life * (0.7 + Math.random() * 0.35), 0.3, delay);
     }
   }
 
@@ -1134,13 +1174,14 @@ export class PaintLayer {
       return;
     }
     const mesh = this.mesh;
-    const n = this.blooms.length;
+    const live = this.blooms.filter((b) => b.age >= 0);
+    const n = live.length;
     for (let i = 0; i < n; i++) {
-      const b = this.blooms[i]!;
+      const b = live[i]!;
       const t = Math.min(1, b.age / b.life);
       // wet spread: quick bloom out of the pawfall, slowing as the pigment settles
-      const r = b.radius * (0.35 + 0.65 * (1 - Math.pow(1 - t, 3)));
-      const size = r * 2.9; // quad support for the noise-bent edge
+      const r = b.radius * (b.start + (1 - b.start) * (1 - Math.pow(1 - t, 3)));
+      const size = r * 3.4; // quad support for the noise-bent edge and wet fringe
       this._m.makeScale(size, 1, size).setPosition(b.x, 0, b.z);
       mesh.setMatrixAt(i, this._m);
       this.aRadius!.setX(i, r);
@@ -1176,6 +1217,17 @@ export class PaintLayer {
     this.mesh?.geometry.dispose();
     (this.mesh?.material as THREE.Material | undefined)?.dispose();
   }
+}
+
+/** What the fox's paint restores a material to (see the uPaintKind shader uniform). */
+function paintKindOf(mat: THREE.Material): number {
+  const kind = (mat.userData as { cfPaintKind?: number }).cfPaintKind;
+  if (kind !== undefined) return kind;
+  // grass blades on the path green up with the meadow under them
+  if (mat.name === 'rv-terrain' || mat.name === 'rv-ground' || /grass/i.test(mat.name)) return 0;
+  if (mat.name === 'rv-stone' || mat.name === 'rv-rock') return 1;
+  if (mat.name === 'rv-litter') return 3;
+  return 2;
 }
 
 /** Convenience factory */

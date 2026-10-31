@@ -64,7 +64,9 @@ const server = http.createServer((req, res) => {
   res.setHeader('Content-Type', types[path.extname(file)] || 'application/octet-stream');
   fs.createReadStream(file).pipe(res);
 });
-server.listen(5180, '127.0.0.1');
+/** CAPTURE_PORT lets two worktrees capture at once (default 5180). */
+const PORT = Number(process.env.CAPTURE_PORT) || 5180;
+server.listen(PORT, '127.0.0.1');
 await once(server, 'listening');
 const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
 report.captureHelperSha = Object.fromEntries(['water-wade-capture.mjs', 'projected-visibility-capture.mjs'].map(file =>
@@ -90,7 +92,7 @@ try {
   if (xvfb) browser.on('disconnected', () => xvfb.kill());
   const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
   const cube = await context.newPage();
-  await cube.goto('http://127.0.0.1:5180/gpu-cube.html');
+  await cube.goto(`http://127.0.0.1:${PORT}/gpu-cube.html`);
   await cube.waitForFunction(() => !!window.cubeProbe);
   const cubeSamples = [];
   for (let i = 0; i < 60; i++) cubeSamples.push(await cube.evaluate(() => window.cubeProbe()));
@@ -128,7 +130,7 @@ try {
     page.setDefaultTimeout(180000);
     page.on('pageerror', e => { errors.push(String(e)); console.error('PAGEERROR', String(e)); });
     page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error' || m.text().includes('Mismatch between texture format and sampler type')) { if (!errors.includes(m.text())) errors.push(m.text()); } if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
-    await page.goto(`http://127.0.0.1:5180/?q=${q}&fresh${query}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://127.0.0.1:${PORT}/?q=${q}&fresh${query}`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { polling: 100 });
     await H('setManual', true);
     if (fixedClock) await page.evaluate(() => {
@@ -958,35 +960,65 @@ try {
     save('feel-acceptance.json',{label:'60s scripted live-input movement loop, one staged start, no resets/forced poses; not human fun approval',seconds:60,initial,end,deaths:end.deaths-initial.deaths});
   }
   if(wants('paint')) {
-    // Paint trail (DESIGN-paint-trail.md): sepia meadow, 32 s live-input figure-eight walk (3 s) → trot → run;
-    // the same high lens before/after shows what the fox left behind.
+    // Paint trail r2 (DESIGN-paint-trail.md, driver note 10/31): a straight live-input walk → trot from sepia
+    // ground to the cold H-a hearth with one pause midway, then the fox stands at the bowl until it lights
+    // (radial burst). The same high 3/4 lens before/after shows the ribbon it left.
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
-    const c=[-2,77];
+    const hearthOf=st=>st.chem.hearths.find(h=>h.id==='H-a');
+    const [hx,hy,hz]=hearthOf(await H('state')).pos;
+    // most open straight approach over dry ground from the meadow side (+Z half)
+    const route=await page.evaluate(([hx,hz])=>{
+      const w=window.__gameHooks.debug.world,best={len:0,a:0};
+      for(let k=0;k<25;k++){
+        const a=Math.PI*(.05+.9*k/24),dx=Math.cos(a),dz=Math.sin(a);
+        let prev=w.collision.highestAt(hx+dx*3,hz+dz*3),len=3;
+        for(let r=4;r<=36;r++){
+          const x=hx+dx*r,z=hz+dz*r,y=w.collision.highestAt(x,z);
+          if(!Number.isFinite(y)||Math.abs(y-prev)>.45||w.waterSurfaceAt(x,z)>y-.05)break;
+          prev=y;len=r;
+        }
+        if(len>best.len)Object.assign(best,{len,a});
+      }
+      return {len:best.len,dir:[Math.cos(best.a),Math.sin(best.a)]};
+    },[hx,hz]);
+    const L=Math.min(34,route.len-1),[ux,uz]=route.dir;
     const yAt=(x,z)=>page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[x,z]);
-    const curve=u=>[c[0]+Math.sin(u)*6,c[1]+Math.sin(2*u)*4.5];
-    const [sx,sz]=curve(0),sy=await yAt(sx,sz),cy=await yAt(c[0],c[1]);
-    await H('teleport',sx,sy,sz,0);await H('photoOff');await advance(20);
-    const lens=[[c[0]+9,cy+15,c[1]+17],[c[0],cy,c[1]-1],52];
+    const S=[hx+ux*L,hz+uz*L],E=[hx+ux*2.2,hz+uz*2.2],M=[(S[0]+hx)/2,(S[1]+hz)/2];
+    console.log('PAINT ROUTE',JSON.stringify({hearth:[hx,hy,hz],route,L,S,E}));
+    await H('teleport',S[0],await yAt(...S),S[1],Math.atan2(-ux,-uz));await H('photoOff');await advance(20);
+    // high 3/4 lens beside the route (on the +Z side), looking at its midpoint
+    let [nx,nz]=[-uz,ux];if(nz<0){nx=-nx;nz=-nz;}
+    const my=await yAt(...M);
+    const lens=[[M[0]+nx*22-ux*3,my+21,M[1]+nz*22-uz*3],[M[0],my,M[1]],55];
     await H('photo',...lens);await advance(2);await shot('paint-before-overview');await H('photoOff');await advance(2);
     const initial={state:await H('state'),game:await page.evaluate(()=>window.__game)};
-    let u=0;
-    const gaitAt=t=>t<3?{v:1.4,cap:.32}:t<14?{v:3.6,cap:.55}:{v:7,cap:1};
-    await video('paint-walk',32*fps,async i=>{
-      const st=await H('state'),t=i/fps,g=gaitAt(t);
-      // the target leads along the curve at the gait's speed (arc length ≈ |curve'| du)
-      const [ax,az]=curve(u),[bx,bz]=curve(u+.01),du=g.v/fps/(Math.hypot(bx-ax,bz-az)/.01||1);
-      u+=du;
-      const [tx,tz]=curve(u+.25);
-      const dx=tx-st.pos[0],dz=tz-st.pos[2],d=Math.hypot(dx,dz)||1;
-      const k=Math.min(g.cap,Math.max(.15,d/2.5));
-      await H('setStick',dx/d*k,dz/d*k);
-    },undefined,{traceEveryFrame:false,keyFrames:[0,75,150,300,600,900,1200,1500,1800].map(f=>Math.round(f*fps/60))});
-    await H('setStick',null);await advance(30);
+    // progress u along S→E (m); pause 1.6 s at 45 %; walk the first 4 s, then trot
+    let phase='walk',pauseT=0,arriveI=-1,litI=-1,dashI=-1;
+    const total=Math.hypot(E[0]-S[0],E[1]-S[1]);
+    await video('paint-walk',34*fps,async i=>{
+      const st=await H('state'),t=i/fps;
+      const along=(st.pos[0]-S[0])*-ux+(st.pos[2]-S[1])*-uz;
+      if(litI<0&&hearthOf(st).heat>0)litI=i;
+      if(phase==='walk'&&along>total*.45){phase='pause';pauseT=t;}
+      if(phase==='pause'&&t-pauseT>1.6)phase='trot';
+      if((phase==='walk'||phase==='trot')&&along>=total-.4){phase='arrive';arriveI=i;}
+      if(phase==='pause'||phase==='arrive'){
+        // stand at the bowl; if the aura alone has not lit it after 2.5 s, dash through it
+        if(phase==='arrive'&&litI<0&&i-arriveI>2.5*fps&&dashI<0){dashI=i;await H('setStick',-ux,-uz);await H('setKeys',['ShiftLeft']);return;}
+        if(dashI>=0&&i-dashI<12){await H('setKeys',[]);return;}
+        await H('setKeys',[]);await H('setStick',null);return;
+      }
+      const lead=Math.min(total,along+2.5),tx=S[0]-ux*lead,tz=S[1]-uz*lead;
+      const dx=tx-st.pos[0],dz=tz-st.pos[2],d=Math.hypot(dx,dz)||1,cap=t<4?.32:.5;
+      await H('setStick',dx/d*cap,dz/d*cap);
+    },(st,i)=>litI>=0&&i-litI>4.5*fps,{traceEveryFrame:false,keyFrames:Array.from({length:17},(_,k)=>k*2*fps)});
+    await H('setStick',null);await H('setKeys',[]);await advance(30);
     await shot('paint-after-chase');
     await H('photo',...lens);await advance(2);await shot('paint-after-overview');
+    await H('photo',[hx+nx*13-ux*4,hy+11,hz+nz*13-uz*4],[hx+ux*2,hy,hz+uz*2],55);await advance(2);await shot('paint-burst-hearth');
     const end={state:await H('state'),game:await page.evaluate(()=>window.__game)};
-    save('paint-acceptance.json',{label:'Staged sepia-meadow start; live-input figure-eight walk/trot/run, no forced poses. Same high lens before/after.',initial,end,laid:end.game.paint?.laid,areaM2:end.game.paint?.areaM2,deaths:end.state.deaths-initial.state.deaths});
+    save('paint-acceptance.json',{label:'Staged sepia start; live-input straight walk→pause→trot to cold H-a hearth, stand until lit (dash fallback); same high lens before/after.',route:{S,E,L,dir:route.dir},arriveFrame:arriveI,litFrame:litI,dashFrame:dashI,initial,end,laid:end.game.paint?.laid,areaM2:end.game.paint?.areaM2,deaths:end.state.deaths-initial.state.deaths});
   }
   if (wants('showcase')) {
     if(fps!==60)throw Error('Showcase dense landing comparison requires60fps');
