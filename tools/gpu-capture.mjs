@@ -333,6 +333,7 @@ try {
       const failed=rows.filter(row=>!row.fox||!row.shade||row.fox.heightFraction<=.15||row.shade.heightFraction<=.15||!row.fox.inFrame||!row.shade.inFrame);
       save(`${name}-framing.json`,{passed:rows.length>0&&failed.length===0,minimumHeightFraction:.15,rows,failedFrames:failed.map(row=>row.frame)});
       if(!rows.length||failed.length)report.failures.push(`Shade pair framing below director bar in ${name}: ${JSON.stringify(failed.map(row=>({frame:row.frame,fox:row.fox,shade:row.shade})))}`);
+      return rows.length>0&&failed.length===0;
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(({start:[x,y,z],center:[cx,cz],actorId}) => {
@@ -682,7 +683,7 @@ try {
       await camera(id);
       const lensTrace=[];
       await video(id,frames,async frame=>{await camera(id);lensTrace.push({frame,...latestReviewLens.get(id)});},undefined,pairOptions('Regional',id,keyFrames));
-      validatePair(id);
+      const framingPassed=validatePair(id);
       const take=report.videos[id],rows=take.trace.map(row=>row.state);
       const support=await page.evaluate(positions=>positions.map(p=>{
         const floor=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;
@@ -690,7 +691,7 @@ try {
       }),rows.map(row=>row.pos));
       let airborne=0,longestAirborne=0;
       for(const row of rows){airborne=row.grounded?0:airborne+1;longestAirborne=Math.max(longestAirborne,airborne);}
-      const failures=[];
+      const failures=framingPassed?[]:['projected pair framing failed'];
       if(lensTrace.some(row=>!row.clear||row.noFit))failures.push('no unobstructed fitted pair lens');
       if(rows.some(row=>row.deaths>take.start.deaths))failures.push('observer died');
       if(support.some(row=>row.gap===null||row.gap>.55)||longestAirborne>Math.ceil(fps*.2)||!take.end.grounded)failures.push('observer lost supporting floor');
