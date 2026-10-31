@@ -206,3 +206,5 @@ Opus personally inspected the matched gait and landing PNGs: trot/run clearly im
 
 ### Driver02:40 walk body response
 Measure the existing `spineFlex` tunable at .6/.8/1 during straight walk before adding another procedural oscillator. Preserve current cadence, foot anchors and root bob; compare chest/pelvis/head path and contact residual/slide. The driver asks for slight shoulder/spine flow with quiet head, so prefer restoring a small amount of authored motion if the measured curves support it. Do not duplicate the parallel stream's gallop/turn/jump. Any chosen motion change still needs a dedicated side/three-quarter GPU comparison and Opus review.
+
+Root-cause decision: see WALK-FLOW-DESIGN.md. The quaternion accumulator has an unintended identity term because Vector4() defaults w=1. Fix only its initialization to zero before evaluating further body-flow tuning. The exploratory walk-specific parameter was removed before commit. Opus endorses the isolated mathematical repair; contact regressions and suspension limits are disclosed, GPU review still required before main.
