@@ -695,7 +695,9 @@ export class ColorField {
           // while retaining authored hue and the same soft permanent/temporary fronts.
           float washedValue = dot(washed, vec3(0.2126, 0.7152, 0.0722));
           float restoredValue = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
-          float aliveGain = clamp(washedValue * 1.18 / max(restoredValue, 0.002), 1.0, 1.65);
+          // Dark soil needs more headroom than stone to reach the same target;
+          // otherwise the lifted sepia floor turns a warm wake into a burn mark.
+          float aliveGain = clamp(washedValue * 1.18 / max(restoredValue, 0.002), 1.0, mix(1.65, 4.0, uGroundSurface));
           chroma *= aliveGain;
           outgoingLight = mix(washed, chroma, brushed);
           // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
