@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
+import { sceneWaterSampler, sceneWaterFragment } from './waterScene';
 
 export type StylizedWater = {
   mesh: THREE.Mesh;
@@ -10,11 +12,16 @@ export type StylizedWater = {
 /** Soft stylized water plane — reflections approximated via sky tint + fresnel. */
 export function createStylizedWater(
   scene: THREE.Scene,
-  opts: { size?: number; y?: number; colorDeep?: number; colorShallow?: number; shoreRadius?: number } = {},
+  opts: { size?: number; y?: number; colorDeep?: number; colorShallow?: number; shoreRadius?: number; reflection?: boolean } = {},
 ): StylizedWater {
   const size = opts.size ?? 80;
   const shoreRadius = opts.shoreRadius ?? 1;
+  const sceneSampler = sceneWaterSampler(scene);
   const uniforms = {
+    ...sceneSampler.uniforms,
+    uReflectionMap: { value: null as THREE.Texture | null },
+    uReflectionMatrix: { value: new THREE.Matrix4() },
+    uReflectionOn: { value: opts.reflection ? 1 : 0 },
     uTime: { value: 0 },
     uHalf: { value: size * 0.5 },
     uShoreRadius: { value: shoreRadius },
@@ -33,6 +40,8 @@ export function createStylizedWater(
       varying vec3 vWorld;
       varying vec3 vN;
       varying vec2 vLocal;
+      varying vec4 vReflection;
+      uniform mat4 uReflectionMatrix;
       void main() {
         vec3 p = position;
         vLocal = position.xy / uHalf;
@@ -42,44 +51,43 @@ export function createStylizedWater(
         p.z += w1 + w2;
         vec4 wpos = modelMatrix * vec4(p, 1.0);
         vWorld = wpos.xyz;
+        vReflection = uReflectionMatrix * vec4(p, 1.0);
         vN = normalize(mat3(modelMatrix) * normalize(vec3(-cos(p.x*0.55+uTime*0.65)*0.55*0.025, sin(p.y*0.43+uTime*0.48)*0.43*0.018, 1.0)));
         gl_Position = projectionMatrix * viewMatrix * wpos;
       }`,
-    fragmentShader: /* glsl */ `
+    fragmentShader: sceneWaterFragment + /* glsl */ `
       uniform vec3 uDeep, uShallow, uSky;
-      uniform float uShoreRadius;
-      uniform float uTime;
+      uniform float uShoreRadius, uTime, uReflectionOn;
+      uniform sampler2D uReflectionMap;
       varying vec3 vWorld;
       varying vec3 vN;
       varying vec2 vLocal;
+      varying vec4 vReflection;
       void main() {
         vec3 V = normalize(cameraPosition - vWorld);
-        // Broad crossed swells bend reflections without a noisy photographic normal map.
         vec2 q = vWorld.xz;
         float a = dot(q, vec2(0.72, 0.38)) - uTime * 0.55;
         float b = dot(q, vec2(-0.31, 0.64)) + uTime * 0.38;
         vec3 N = normalize(vN + vec3(cos(a) * 0.055, 0.0, cos(b) * 0.045));
-        float fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 4.0);
+        float fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 5.0);
         float r = length(vLocal);
-        // Authored elliptical basin: transparent shallows darken toward the centre.
-        // This is a depth suggestion, not a scene-depth/refraction buffer.
         float depth = 1.0 - smoothstep(0.15, 1.0, r);
+        vec3 viewNormal = mat3(viewMatrix) * N;
+        vec3 bed = sceneWaterColor(viewNormal.xy * 0.005);
+        vec3 tint = mix(vec3(0.94, 0.97, 0.91), vec3(0.66, 0.82, 0.73), depth);
+        vec3 absorption = mix(uShallow, uDeep * 0.85, depth);
+        vec3 refracted = mix(bed * tint, absorption, 0.025 + depth * 0.095);
         float bedLight = sin(a + sin(b) * 0.55) * sin(b * 1.3) * 0.5 + 0.5;
-        vec3 body = mix(uShallow * 0.66, uDeep * 0.7, depth);
-        body += uShallow * bedLight * (1.0 - depth) * 0.075;
-        vec3 R = reflect(-V, N);
-        float skyWash = smoothstep(-0.15, 0.65, R.y);
-        float reflectedGrove = sin(R.x * 8.0 + R.z * 5.0 + sin(a) * 0.16) * 0.5 + 0.5;
-        vec3 reflection = mix(uDeep * 0.55, uSky * 1.1, skyWash);
-        reflection *= 0.82 + reflectedGrove * 0.18;
-        vec3 col = mix(body, reflection, 0.08 + fres * 0.85);
-        // Narrow, broken amber glints, deliberately far below white/bloom.
-        float glint = pow(max(0.0, sin(a * 2.1 + sin(b) * 0.6)), 24.0);
-        glint *= smoothstep(0.25, 0.8, sin(b * 1.8) * 0.5 + 0.5);
-        col += uSky * glint * (0.025 + fres * 0.065);
+        refracted += bed * bedLight * (1.0 - depth) * 0.025;
+        vec3 reflection = uSky * (0.75 + 0.10 * sin(a * 0.3 + b * 0.2));
+        if (uReflectionOn > 0.5) {
+          vec2 mirrorUV = vReflection.xy / vReflection.w + N.xz * 0.007;
+          reflection = texture2D(uReflectionMap, clamp(mirrorUV, vec2(0.001), vec2(0.999))).rgb;
+        }
+        vec3 col = mix(refracted, reflection, 0.02 + fres * 0.94);
         float shore = 1.0 - smoothstep(uShoreRadius * 0.90, uShoreRadius, r);
-        float alpha = mix(0.72, 0.95, depth) + fres * 0.04;
-        gl_FragColor = vec4(col, alpha * shore);
+        // Scene colour already contains the bed: avoid blending it a second time.
+        gl_FragColor = vec4(col, shore);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -90,6 +98,28 @@ export function createStylizedWater(
   mesh.position.y = opts.y ?? -1.2;
   mesh.receiveShadow = true;
   scene.add(mesh);
+  const reflector = opts.reflection ? new Reflector(mesh.geometry, { textureWidth: 512, textureHeight: 512, multisample: 0, clipBias: 0.003 }) : null;
+  if (reflector) {
+    reflector.matrixAutoUpdate = false;
+    const mirrorMaterial = reflector.material as THREE.ShaderMaterial;
+    uniforms.uReflectionMap.value = reflector.getRenderTarget().texture;
+    uniforms.uReflectionMatrix.value = mirrorMaterial.uniforms.textureMatrix!.value as THREE.Matrix4;
+  }
+  sceneSampler.register(mesh, reflector ? (renderer, camera) => {
+    reflector.matrixWorld.copy(mesh.matrixWorld);
+    const planeNormal = new THREE.Vector3(0, 0, 1).transformDirection(mesh.matrixWorld);
+    const view = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld).sub(new THREE.Vector3().setFromMatrixPosition(mesh.matrixWorld));
+    uniforms.uReflectionOn.value = planeNormal.dot(view) > 0 ? 1 : 0;
+    if (!uniforms.uReflectionOn.value) return;
+    const target = renderer.getRenderTarget(), xr = renderer.xr.enabled, shadows = renderer.shadowMap.autoUpdate;
+    // Reflector's implementation consumes the first three standard hook arguments.
+    const renderMirror = reflector.onBeforeRender as (renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) => void;
+    sceneSampler.withoutSkins(() => {
+      try { renderMirror.call(reflector, renderer, scene, camera); }
+      finally { renderer.xr.enabled = xr; renderer.shadowMap.autoUpdate = shadows; renderer.setRenderTarget(target); }
+    });
+  } : undefined);
+  mesh.onBeforeRender = renderer => sceneSampler.capture(renderer);
 
   return {
     mesh,
@@ -98,6 +128,8 @@ export function createStylizedWater(
       uniforms.uTime.value = t;
     },
     dispose() {
+      sceneSampler.release(mesh);
+      reflector?.dispose();
       mesh.geometry.dispose();
       material.dispose();
       scene.remove(mesh);
