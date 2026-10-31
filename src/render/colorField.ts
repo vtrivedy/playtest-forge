@@ -5,6 +5,7 @@ const MAX_VISUAL_DRAINS = 16;
 /** Uniforms for a field with no paint layer (paint disabled in the shader). */
 const NO_PAINT = {
   uPaintMap: { value: null as THREE.Texture | null },
+  uWetMap: { value: null as THREE.Texture | null },
   uPaintBounds: { value: new THREE.Vector4(0, 1, 0, 1) },
   uPaintOn: { value: 0 },
 };
@@ -621,8 +622,11 @@ export class ColorField {
           uniform float uUseMaskMap;
           uniform vec4 uBounds;
           uniform sampler2D uPaintMap;
+          uniform sampler2D uWetMap;
           uniform vec4 uPaintBounds;
           uniform float uPaintOn;
+          // spreading wet front of fresh blooms
+          float cfWet;
           // fox paint coverage here, and how much of the visible colour is that paint
           float cfPaint;
           float cfPaintLead;
@@ -646,6 +650,7 @@ export class ColorField {
             cfRim = 0.0;
             cfPermanent = uGlobalColor;
             cfPaint = 0.0;
+            cfWet = 0.0;
             cfPaintLead = 0.0;
             cfFresh = 0.0;
             if (uUseMaskMap > 0.5) {
@@ -667,6 +672,7 @@ export class ColorField {
               if (puv.x >= 0.0 && puv.x <= 1.0 && puv.y >= 0.0 && puv.y <= 1.0) {
                 // paint is the fox's: a Shade's drain blots it like the live aura
                 cfPaint = texture2D(uPaintMap, puv).r * temporaryVisibility;
+                cfWet = texture2D(uWetMap, puv).r * temporaryVisibility;
                 cfPaintLead = clamp((cfPaint - s) * 4.0 + 0.5, 0.0, 1.0);
                 s = max(s, cfPaint);
               }
@@ -757,15 +763,22 @@ export class ColorField {
           chroma *= aliveGain;
           // the fox's paint is pigment, not just authored colour returning: richer, with a
           // low-frequency watercolour hue drift (ochre / olive / madder) across the wash
-          float paintK = cfPaint * cfPaintLead * mix(0.45, 1.0, uGroundSurface);
+          // props (stone, wood) take a thinner glaze than the ground, but never stay grey
+          float paintK = cfPaint * cfPaintLead * mix(0.7, 1.0, uGroundSurface);
           if (paintK > 0.001) {
-            float hueA = noise21(vWorldPosCF.xz * 0.11 + 31.0);
-            float hueB = noise21(vWorldPosCF.xz * 0.37 + 5.0);
-            vec3 tint = mix(vec3(1.25, 0.92, 0.45), vec3(0.95, 1.02, 0.52), smoothstep(0.35, 0.75, hueA));
-            tint = mix(tint, vec3(1.3, 0.72, 0.55), smoothstep(0.6, 0.9, hueB) * 0.6);
+            float hueA = noise21(vWorldPosCF.xz * 0.13 + 31.0);
+            float hueB = noise21(vWorldPosCF.xz * 0.41 + 5.0);
+            // ochre / olive-gold / madder, mixed wet-in-wet
+            vec3 tint = mix(vec3(1.16, 0.95, 0.56), vec3(0.97, 1.03, 0.6), smoothstep(0.3, 0.62, hueA));
+            tint = mix(tint, vec3(1.24, 0.8, 0.64), smoothstep(0.55, 0.85, hueB) * 0.7);
             float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
-            vec3 pigment = max(mix(vec3(chromaLuma), chroma, 1.35), 0.0) * tint * 1.1;
-            chroma = mix(chroma, pigment, paintK * 0.8);
+            vec3 pigment = max(mix(vec3(chromaLuma), chroma, 1.2), 0.0) * tint;
+            // pigment density: settled pools and thin, paper-lit passages (not a flat carpet)
+            float dens = noise21(vWorldPosCF.xz * 0.7 + 11.0) * 0.6 + noise21(vWorldPosCF.xz * 2.3 + 2.0) * 0.4;
+            pigment *= mix(0.86, 1.16, dens);
+            // stone/wood: a warm glaze over the authored grey so props read painted too
+            pigment = mix(pigment, pigment * vec3(1.12, 0.98, 0.8) + vec3(0.02, 0.012, 0.004), (1.0 - uGroundSurface) * (1.0 - uRestoredChroma) * 1.4);
+            chroma = mix(chroma, pigment, paintK * 0.85);
           }
           outgoingLight = mix(washed, chroma, brushed);
           // watercolour: pigment pools at the drying edge of the fox's paint (burnt-sienna line),
@@ -773,6 +786,9 @@ export class ColorField {
           float pigmentRim = smoothstep(0.1, 0.4, cfPaint) * (1.0 - smoothstep(0.45, 0.9, cfPaint)) * cfPaintLead;
           outgoingLight *= mix(vec3(1.0), vec3(0.7, 0.52, 0.38), pigmentRim * 0.85);
           outgoingLight *= 1.0 + cfPaint * cfFresh * vec3(0.14, 0.08, 0.02);
+          // the wet front of a spreading bloom catches the light (#FFC98A), like a restore rim
+          float wetLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
+          outgoingLight += cfWet * (outgoingLight * vec3(0.5, 0.3, 0.08) + vec3(0.08, 0.045, 0.012) * (0.35 + wetLuma));
           // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
           // without repainting it — stone stays stone, just sunlit
           float rimLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
@@ -884,6 +900,11 @@ export class PaintLayer {
   readonly gridH: number;
   private painted = 0;
   private rt: THREE.WebGLRenderTarget | null = null;
+  /** Live wet edges of spreading blooms; cleared every frame (half resolution) */
+  private wetRT: THREE.WebGLRenderTarget | null = null;
+  private wetDirty = false;
+  private mat: THREE.ShaderMaterial | null = null;
+  private aWet: THREE.InstancedBufferAttribute | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
   private scene = new THREE.Scene();
   private cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
@@ -895,6 +916,7 @@ export class PaintLayer {
   /** Uniform objects shared by every consumer material */
   readonly uniforms = {
     uPaintMap: { value: null as THREE.Texture | null },
+    uWetMap: { value: null as THREE.Texture | null },
     uPaintBounds: { value: new THREE.Vector4() },
     uPaintOn: { value: 0 },
   };
@@ -920,10 +942,19 @@ export class PaintLayer {
       minFilter: THREE.LinearFilter,
       depthBuffer: false,
     });
+    this.wetRT = new THREE.WebGLRenderTarget(Math.round(w / 2), Math.round(h / 2), {
+      type: THREE.UnsignedByteType,
+      format: THREE.RGBAFormat,
+      magFilter: THREE.LinearFilter,
+      minFilter: THREE.LinearFilter,
+      depthBuffer: false,
+    });
     const prev = renderer.getRenderTarget();
-    renderer.setRenderTarget(this.rt);
     renderer.setClearColor(0x000000, 1);
-    renderer.clear();
+    for (const t of [this.rt, this.wetRT]) {
+      renderer.setRenderTarget(t);
+      renderer.clear();
+    }
     renderer.setRenderTarget(prev);
     // look up from below with up=+Z: u→+X, v→+Z (same convention as the colour mask)
     Object.assign(this.cam, { left: minX, right: maxX, top: maxZ, bottom: minZ });
@@ -936,9 +967,12 @@ export class PaintLayer {
     geo.rotateX(-Math.PI / 2);
     this.aRadius = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
     this.aStrength = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
+    this.aWet = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aWet', this.aWet);
     geo.setAttribute('aRadius', this.aRadius);
     geo.setAttribute('aStrength', this.aStrength);
     const mat = new THREE.ShaderMaterial({
+      uniforms: { uWetPass: { value: 0 } },
       transparent: true,
       blending: THREE.CustomBlending,
       blendEquation: THREE.MaxEquation,
@@ -950,11 +984,14 @@ export class PaintLayer {
       vertexShader: /* glsl */ `
         attribute float aRadius;
         attribute float aStrength;
+        attribute float aWet;
         varying vec2 vWorld;
         varying vec2 vCenter;
         varying float vRadius;
         varying float vStrength;
+        varying float vWet;
         void main() {
+          vWet = aWet;
           vWorld = (instanceMatrix * vec4(position, 1.0)).xz;
           vCenter = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;
           vRadius = aRadius;
@@ -966,6 +1003,8 @@ export class PaintLayer {
         varying vec2 vCenter;
         varying float vRadius;
         varying float vStrength;
+        varying float vWet;
+        uniform float uWetPass;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
         float noise(vec2 p){
           vec2 i = floor(p); vec2 f = fract(p);
@@ -979,6 +1018,13 @@ export class PaintLayer {
                   + (noise(vWorld * 1.9 + 7.0) - 0.5) * 0.3
                   + (noise(vWorld * 6.5 + 3.0) - 0.5) * 0.12;
           float d = distance(vWorld, vCenter) / max(vRadius, 0.01) + n;
+          if (uWetPass > 0.5) {
+            // the spreading front of a wet bloom glistens; its interior a little
+            float front = smoothstep(0.5, 0.8, d) * (1.0 - smoothstep(0.82, 0.92, d));
+            float pool = 1.0 - smoothstep(0.55, 0.86, d);
+            gl_FragColor = vec4((front + pool * 0.3) * vWet * vStrength, 0.0, 0.0, 1.0);
+            return;
+          }
           // watercolour: a fairly decided edge, not an airbrush falloff
           float ink = 1.0 - smoothstep(0.68, 0.86, d);
           // paper granulation inside the wash
@@ -986,11 +1032,13 @@ export class PaintLayer {
           gl_FragColor = vec4(ink * vStrength, 0.0, 0.0, 1.0);
         }`,
     });
+    this.mat = mat;
     this.mesh = new THREE.InstancedMesh(geo, mat, PaintLayer.MAX);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.scene.add(this.mesh);
     this.uniforms.uPaintMap.value = this.rt.texture;
+    this.uniforms.uWetMap.value = this.wetRT.texture;
     this.uniforms.uPaintOn.value = 1;
   }
 
@@ -1057,8 +1105,16 @@ export class PaintLayer {
   /** Advance wet blooms and stamp them into the persistent target. */
   render(dt: number): void {
     for (const b of this.blooms) b.age += dt;
-    if (!this.rt || !this.renderer || !this.mesh || !this.blooms.length) {
-      this.blooms = this.blooms.filter((b) => b.age < b.life);
+    if (!this.rt || !this.wetRT || !this.renderer || !this.mesh || !this.mat) return;
+    if (!this.blooms.length) {
+      if (this.wetDirty) {
+        const prev = this.renderer.getRenderTarget();
+        this.renderer.setRenderTarget(this.wetRT);
+        this.renderer.setClearColor(0x000000, 1);
+        this.renderer.clear();
+        this.renderer.setRenderTarget(prev);
+        this.wetDirty = false;
+      }
       return;
     }
     const mesh = this.mesh;
@@ -1073,17 +1129,26 @@ export class PaintLayer {
       mesh.setMatrixAt(i, this._m);
       this.aRadius!.setX(i, r);
       this.aStrength!.setX(i, b.strength);
+      this.aWet!.setX(i, 1 - t * t);
     }
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
     this.aRadius!.needsUpdate = true;
     this.aStrength!.needsUpdate = true;
+    this.aWet!.needsUpdate = true;
     const renderer = this.renderer;
     const prev = renderer.getRenderTarget();
     const prevAuto = renderer.autoClear;
     renderer.autoClear = false;
+    this.mat.uniforms.uWetPass!.value = 0;
     renderer.setRenderTarget(this.rt);
     renderer.render(this.scene, this.cam);
+    this.mat.uniforms.uWetPass!.value = 1;
+    renderer.setRenderTarget(this.wetRT);
+    renderer.setClearColor(0x000000, 1);
+    renderer.clear();
+    renderer.render(this.scene, this.cam);
+    this.wetDirty = true;
     renderer.setRenderTarget(prev);
     renderer.autoClear = prevAuto;
     this.blooms = this.blooms.filter((b) => b.age < b.life);
@@ -1091,6 +1156,7 @@ export class PaintLayer {
 
   dispose(): void {
     this.rt?.dispose();
+    this.wetRT?.dispose();
     this.mesh?.geometry.dispose();
     (this.mesh?.material as THREE.Material | undefined)?.dispose();
   }
