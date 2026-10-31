@@ -1,21 +1,27 @@
 import * as THREE from 'three';
 import { Bucket, rng } from './russetKit';
+import { weatheredSurface } from './worldSurfaces';
 
-/** Original Reach geometry, built in metres. No external asset or texture dependency. */
+/** Original Reach geometry, built in metres. No new asset downloads; bark reuses the existing CC0 surface library. */
 export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMaterial) => void) {
   const bark = new Bucket(), reeds = new Bucket(), leaves = new Bucket(), stone = new Bucket();
   const random = rng(73104);
+  const breeze = { value: 0 };
+  bark.aux=[];reeds.aux=[];leaves.aux=[];
   const barkColor = new THREE.Color(0x505754), reedColor = new THREE.Color(0x777c69);
   function branch(points: number[][], radius: number) {
     const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p as [number, number, number])));
     const geo = new THREE.TubeGeometry(curve, 8, radius, 6, false);
     // Taper the final half gently, including the end cap silhouette.
     const pos = geo.getAttribute('position');
+    const weights=new Float32Array(pos.count);
     for (let i = 0; i < pos.count; i++) {
       const t = Math.floor(i / 7) / 8, centre = curve.getPointAt(t);
       const p = new THREE.Vector3().fromBufferAttribute(pos, i).sub(centre).multiplyScalar(1 - t * .83).add(centre);
       pos.setXYZ(i, p.x, p.y, p.z);
+      weights[i]=radius<.12?t*t:0;
     }
+    geo.setAttribute('leafy',new THREE.BufferAttribute(weights,1));
     geo.computeVertexNormals(); bark.add(geo, undefined, barkColor); geo.dispose();
   }
   // Open crowns keep the ferry and bell readable; fine hanging twigs suggest willow/alder.
@@ -30,7 +36,7 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
         const t = k/7, ly = by+.2-t*1.7;
         const geo = new THREE.SphereGeometry(.12, 5, 3);
         const matrix = new THREE.Matrix4().compose(new THREE.Vector3(x+dx*(1+t*.15),ly,z+dz*(1+t*.15)),new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,a,.3)),new THREE.Vector3(.55,2.3,.35));
-        leaves.add(geo, matrix, new THREE.Color(k%3 ? 0x987346 : 0x8b583c)); geo.dispose();
+        leaves.auxDefault=1;leaves.add(geo, matrix, new THREE.Color(k%3 ? 0x987346 : 0x8b583c)); geo.dispose();
       }
     }
     // Exposed root knees around the flooded trunk, rather than lush ground-cover.
@@ -41,8 +47,10 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
     for (let i=0;i<16;i++) {
       const x=cx+(random()-.5)*2.8,z=cz+(random()-.5)*1.7,h=.6+random()*1.1;
       const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(x,30,z),new THREE.Vector3(x+.08,30+h*.6,z),new THREE.Vector3(x+.23,30+h,z+.1)]);
-      const stem=new THREE.TubeGeometry(curve,3,.018,3,false); reeds.add(stem,undefined,reedColor);stem.dispose();
-      const head=new THREE.CylinderGeometry(.045,.06,.27,5);head.translate(x+.23,30+h,z+.1);leaves.add(head,undefined,new THREE.Color(0x816448));head.dispose();
+      const stem=new THREE.TubeGeometry(curve,3,.018,3,false);
+      const weight=new Float32Array(stem.getAttribute('position').count);for(let j=0;j<weight.length;j++)weight[j]=Math.floor(j/4)/3;
+      stem.setAttribute('leafy',new THREE.BufferAttribute(weight,1)); reeds.add(stem,undefined,reedColor);stem.dispose();
+      const head=new THREE.CylinderGeometry(.045,.06,.27,5);head.translate(x+.23,30+h,z+.1);leaves.auxDefault=1;leaves.add(head,undefined,new THREE.Color(0x816448));head.dispose();
     }
   }
   // Pale mooring posts remain fixed; wet dark feet measure the water's rise.
@@ -53,9 +61,23 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
     }
   }
   for (const [bucket,color,name] of [[bark,0xffffff,'reach-willow'],[reeds,0xffffff,'reach-reeds'],[leaves,0xffffff,'reach-copper-leaves'],[stone,0xffffff,'reach-watermarks']] as const) {
-    const mat=new THREE.MeshStandardMaterial({color,vertexColors:true,roughness:.88});mat.name=name;patch(mat);
+    const mat=new THREE.MeshStandardMaterial({color,vertexColors:true,roughness:.88});mat.name=name;
+    if(bucket===bark)weatheredSurface(mat,true);
+    if(bucket.aux){
+      const prev=mat.onBeforeCompile,key=mat.customProgramCacheKey();
+      mat.onBeforeCompile=(shader,renderer)=>{
+        prev.call(mat,shader,renderer);shader.uniforms.uReachBreeze=breeze;
+        shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nuniform float uReachBreeze; attribute float leafy;')
+          .replace('#include <begin_vertex>',`#include <begin_vertex>
+            transformed.x += sin(uReachBreeze*.65 + position.x*.27 + position.z*.2)*.035*leafy;
+            transformed.z += cos(uReachBreeze*.51 + position.z*.31)*.025*leafy;`);
+      };
+      mat.customProgramCacheKey=()=>`${key}|reach-breeze-v1`;
+    }
+    patch(mat);
     const mesh=bucket.toMesh(mat,{cast:true,receive:true});if(mesh)group.add(mesh);
   }
+  return {update(time:number){breeze.value=time;}};
 }
 
 /** Local basin surface: quiet teal depth with restrained moving reflection, no pale foam disc. */

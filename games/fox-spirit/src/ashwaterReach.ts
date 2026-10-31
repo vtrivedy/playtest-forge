@@ -75,7 +75,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   // and the LOW lane; the high-water surface no longer floats above an empty floor.
   for (let i=0;i<24;i++) {
     const a=i/24*Math.PI*2;
-    if (Math.cos(a)<-.9 || (Math.sin(a)<-.86 && Math.cos(a)<.55)) continue;
+    if (Math.cos(a)<-.9 || (Math.sin(a)<-.45 && Math.cos(a)<.55)) continue;
     const x=187+Math.cos(a)*11.35,z=-118+Math.sin(a)*12.35;
     const yaw=-a;
     stoneBlock(stone,trs(x,33.1,z,yaw),.85,6.6,3.25,1300+i,.12);
@@ -106,7 +106,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     weatheredSurface(mat,name==='rv-bark'); mat.userData.cfRestoredChroma=name==='rv-bark'?.45:.3; field.patchMaterial(mat); mats.push(mat);
     const mesh=bucket.toMesh(mat,{cast:true,receive:true,boxUV:name==='rv-rock'?4:1.6}); if(mesh)group.add(mesh);
   }
-  dressReach(group, mat => { field.patchMaterial(mat); mats.push(mat); });
+  const scenery=dressReach(group, mat => { field.patchMaterial(mat); mats.push(mat); });
   const bellMat=new THREE.MeshStandardMaterial({color:0x8b5832,metalness:.6,roughness:.5,emissive:0xc17530,emissiveIntensity:.02});
   const bell=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(.9,0),new THREE.Vector2(.65,.25),new THREE.Vector2(.55,1.05),new THREE.Vector2(.2,1.35),new THREE.Vector2(0,1.45)],20),bellMat);
   bell.position.set(207,40.5,-119);group.add(bell);field.patchMaterial(bellMat);mats.push(bellMat);
@@ -193,7 +193,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
         const hull=f.mesh.children[0]!;hull.position.y=motion.offset;
         hull.rotation.z=Math.sin(field.time*.9+i)*.004*buoyant;
       }
-      lake.update(field.time,fill);
+      lake.update(field.time,fill);scenery.update(field.time);
       for(const [i,mist] of mistBanks.entries()){mist.position.y=pool.position.y+.15;mist.position.x+=(Math.sin(field.time*.2+i)*.015)*dt;}
     },
     submergedAt(p:THREE.Vector3,feet:number){return fill>.2&&((p.x-117)/11)**2+((p.z+118)/12)**2<.9&&feet<pool.position.y-.8;},
