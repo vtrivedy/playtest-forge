@@ -61,14 +61,12 @@ def capture_request(stream, request, folder):
         wrapper=source_root/'tools/modal/gpu_capture.py'
         requested_wrapper=wrapper.read_text()
         canonical=(ROOT/'tools/modal/gpu_capture.py').read_text()
-        ca=canonical.index('\nif modal.is_local():\n');cb=canonical.index('\n@app.function',ca)
-        wa=requested_wrapper.index('\nif modal.is_local():\n');wb=requested_wrapper.index('\n@app.function',wa)
         (folder/'requested-gpu_capture.py').write_text(requested_wrapper)
-        applied_wrapper=requested_wrapper[:wa]+canonical[ca:cb]+requested_wrapper[wb:]
+        applied_wrapper=canonical
         wrapper.write_text(applied_wrapper)
         (folder/'applied-gpu_capture.py').write_text(applied_wrapper)
         mounts=sorted(p.name for p in (source_root/'tools').glob('*.mjs'))
-        (folder/'packaging.json').write_text(json.dumps({'patch':'automatic capture module mounts','modules':mounts,'gameSha':ref},indent=2))
+        (folder/'packaging.json').write_text(json.dumps({'patch':'canonical transport wrapper; requested game and JS modules unchanged','modules':mounts,'gameSha':ref},indent=2))
         if shots == 'gait' and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
             (source_root/'tools/gpu-capture.mjs').write_bytes(Path(os.environ['FOX_GAIT_CAPTURE_SCRIPT']).read_bytes())
         command=['modal','run','--detach',str(source_root/'tools/modal/gpu_capture.py'),'--ref',ref,'--shots',shots,'--out',str(folder/'evidence')]
@@ -83,7 +81,7 @@ def capture_request(stream, request, folder):
         capture_env.pop('FOX_CAPTURE_SCRIPT',None)
         capture_env['FOX_CAPTURE_APP']=f'fox-relay-{stream}-{folder.name}'
         with (folder/'modal.log').open('w') as log:
-            proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env)
+            proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env,start_new_session=True)
         source.cleanup()
         evidence=folder/'evidence'
         result={'status':'captured' if proc.returncode==0 else 'capture-failed','exit':proc.returncode,'ref':ref,'shots':shots,'path':str(evidence),'moduleMounts':mounts}
@@ -104,9 +102,10 @@ def capture_request(stream, request, folder):
             result.update(status='capture-failed',verificationError='Commit, shot or tool identity disagreement',identity={'requestedRef':ref,'actualCommit':run.get('commit'),'requestedShots':shots,'actualShots':run.get('shots'),'runTool':run.get('captureToolSha'),'reportTool':report.get('captureToolSha')})
         elif run.get('status')=='failed' or report.get('failures') or report.get('errors'):
             result['status']='capture-failed'
+        elif proc.returncode or not (evidence/'.download-complete').exists():
+            result.update(status='capture-incomplete',verificationError='Client exit or absent atomic download completion marker')
         elif run.get('status')=='success':
             result['status']='captured'
-            if proc.returncode:result['transportWarning']=f'Client exit {proc.returncode}; verified durable capture succeeded'
         archive=folder/'evidence.tar'
         with tarfile.open(archive,'w') as tar:
             if evidence.exists():tar.add(evidence,arcname='evidence')

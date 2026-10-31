@@ -18,3 +18,6 @@ Packaging repair01:42: a new static import (water-wade-capture.mjs) was absent f
 
 ### 02:45 transport diagnosis
 Rendered frames without run.json/report.json are incomplete captures, not identity mismatches. Modal logs show cancellation signals across concurrent jobs sharing one app name. Give every request a distinct Modal app name; distinguish missing completion metadata, malformed/truncated downloads, and actual identity disagreement. Never bless partial frames as successful provenance. Preserve requested tool bytes and rerun current requests.
+
+### Reviewed transport completion protocol
+Opus review identified incomplete-download acceptance and cancellation cleanup blockers. Use canonical Python transport wrapper for every pinned game (archive requested/applied wrappers); pinned game SHA and JS modules remain unchanged. Children start in a separate process session. Remote cancellation kills the node process before archiving, and archives publish by rename. Local download validates the full tar and extracts to a temporary directory before publishing evidence with `.download-complete`. Nonzero client exit or missing marker cannot be `captured`. App-name causality remains unproven.
