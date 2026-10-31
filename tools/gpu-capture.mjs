@@ -354,6 +354,7 @@ try {
     const stageSupportedKilnDash=async(label,startDistance=2.7)=>{
       const trace=[];
       let movedFoxAway=false;
+      try {
       for(let waitFrames=0;waitFrames<=1200;waitFrames+=15){
         const sample=await page.evaluate(({id,startDistance})=>{
           const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
@@ -372,7 +373,7 @@ try {
         trace.push({waitFrames,...sample});
         if(sample.failure)throw Error(sample.failure);
         if(sample.setup){
-          save(`${label}-runway-wait.json`,{label:'Staged fox moved to world spawn only if needed; live animal returns/patrols until full supported runway exists',movedFoxAway,waitFrames,trace});
+          save(`${label}-runway-wait.json`,{passed:true,label:'Staged fox moved to world spawn only if needed; live animal returns/patrols until full supported runway exists',movedFoxAway,waitFrames,trace});
           return sample.setup;
         }
         if(waitFrames===1200)break;
@@ -383,8 +384,11 @@ try {
         }
         await advance(15,false);
       }
-      save(`${label}-runway-wait.json`,{passed:false,movedFoxAway,trace});
       throw Error(`No supported Kiln dash runway after20s of live patrol: ${label}`);
+      } catch(error) {
+        save(`${label}-runway-wait.json`,{passed:false,movedFoxAway,trace,error:String(error)});
+        throw error;
+      }
     };
     const validatePair=name=>{
       const rows=report.videos[name].trace.filter(row=>row.state.capture?.shadePresent).map(row=>({frame:row.frame,...row.state.capture}));
