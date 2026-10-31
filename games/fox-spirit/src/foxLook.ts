@@ -19,6 +19,9 @@ export const FOX_LOOK = {
   rimPower: 2.5,
   rimColor: [1.0, 0.72, 0.42] as [number, number, number], // pale gold: separates the fox from orange ground
   eyeGlow: 0.025,
+  /** Deep warmth just inside the coat silhouette; stays below bloom. */
+  innerHeat: 0.06,
+  spineHeat: 1.0,
   /** spirit wisps (thin curling flame off the back and tail): height multiplier, brightness, stream-back with speed */
   lickScale: 1.0,
   lickIntensity: 1.0,
@@ -30,6 +33,7 @@ export const FOX_LOOK = {
 };
 
 type FurUniforms = {
+  uTime: { value: number };
   uFringe: { value: number };
   uTint: { value: THREE.Vector3 };
   uSatVal: { value: THREE.Vector2 };
@@ -38,6 +42,7 @@ type FurUniforms = {
   uRimColor: { value: THREE.Color };
 };
 const furUniforms: FurUniforms = {
+  uTime: { value: 0 },
   uFringe: { value: 1 },
   uTint: { value: new THREE.Vector3() },
   uSatVal: { value: new THREE.Vector2() },
@@ -54,7 +59,7 @@ function syncLook() {
   furUniforms.uTint.value.set(...L.furTint);
   furUniforms.uSatVal.value.set(L.furSaturation, L.furValue);
   furUniforms.uStroke.value.set(L.strokeStrength, L.strokeScale);
-  furUniforms.uRim.value.set(L.rimStrength, L.rimPower, 0, 0);
+  furUniforms.uRim.value.set(L.rimStrength, L.rimPower, L.innerHeat, 0);
   furUniforms.uRimColor.value.setRGB(...L.rimColor);
   for (const m of eyeMats) m.emissiveIntensity = L.eyeGlow;
 }
@@ -72,14 +77,17 @@ float fxNoise(vec3 x) {
 function patchFur(mat: THREE.MeshStandardMaterial, fringeLength = 0, fringeAlpha = 0.22) {
   const shell = mat.name.toLowerCase().includes("shell");
   const tail = mat.name.toLowerCase().startsWith('foxtailfur');
+  const innerHeat = !shell && !tail;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, furUniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
 varying vec3 vRest;
+${innerHeat ? 'attribute vec2 aInnerHeat; varying vec2 vInnerHeat;' : ''}
 ${fringeLength ? `uniform float uFringe; attribute float aFurMask; varying float vFurMask;` : ''}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vRest = position;
+${innerHeat ? 'vInnerHeat = aInnerHeat;' : ''}
 ${fringeLength ? `
   // Offset in bind space before skinning, so fringe follows the exact authored pose.
   vFurMask = aFurMask;
@@ -90,6 +98,7 @@ ${fringeLength ? `
         '#include <common>',
         `#include <common>
 varying vec3 vRest;
+${innerHeat ? 'uniform float uTime; varying vec2 vInnerHeat;' : ''}
 ${fringeLength ? 'uniform float uFringe; varying float vFurMask;' : ''}
 uniform vec3 uTint; uniform vec2 uSatVal; uniform vec2 uStroke; uniform vec4 uRim; uniform vec3 uRimColor;
 ${NOISE_GLSL}`,
@@ -125,6 +134,13 @@ ${NOISE_GLSL}`,
   float facing = saturate(dot(${fringeLength ? 'normalize(vNormal)' : 'normal'}, normalize(vViewPosition)));
   ${shell ? `diffuseColor.a *= (1.0 - smoothstep(0.05, 0.45, facing)) * ${tail ? "0.075" : fringeAlpha.toFixed(3)}; if (diffuseColor.a < 0.01) discard;` : ""}
   ${fringeLength ? `float tuft = fxNoise(vRest * vec3(10.0, 10.0, 3.0)); diffuseColor.a *= smoothstep(${fringeLength > 0.04 ? "0.4, 0.8" : "0.1, 0.5"}, tuft) * vFurMask * uFringe; if (diffuseColor.a < 0.001) discard;` : ''}
+  ${innerHeat ? `
+  float chroma = (max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b))) / max(0.0001, max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)));
+  float warmth = vInnerHeat.x * smoothstep(0.2, 0.7, vInnerHeat.y) * smoothstep(0.25, 0.55, chroma);
+  warmth *= mix(0.35, 1.0, pow(1.0 - facing, 1.3));
+  float heatBreath = 0.85 + 0.15 * sin(uTime * 1.1);
+  outgoingLight += vec3(1.0, 0.30, 0.06) * uRim.z * warmth * heatBreath;
+  ` : ''}
   float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
   outgoingLight += uRimColor * ${fringeLength ? "0.0" : "1.0"} * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
@@ -142,7 +158,7 @@ ${NOISE_GLSL}`,
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeAlpha}`;
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeAlpha}-${innerHeat ? 'warm' : 'plain'}`;
   mat.needsUpdate = true;
 }
 
@@ -266,23 +282,30 @@ if (1.0 - smoothstep(0.70, 0.90, 1.0 - vUv.y) < 0.45) discard;`);
     }
   });
   // Append after traversal: each surface shares the source skeleton and bind matrices, never new bones.
+  let coatHeatVertices = 0;
   for (const { mesh, mat } of coats) {
     const R = FOX_RIG;
+    const heatBones = new Set<string>([...R.spine, ...R.neck]);
     const full = new Set<string>([R.pelvis, ...R.spine, ...R.neck]);
     const short = new Set<string>(['l', 'r'].flatMap((side) => {
       const s = side as 'l' | 'r', f = R.foreleg(s), h = R.hindleg(s);
       return [f.scapula, f.upper, h.hip, h.thigh];
     }));
     const g = mesh.geometry, si = g.getAttribute('skinIndex'), sw = g.getAttribute('skinWeight'), p = g.getAttribute('position');
-    const mask = new Float32Array(si.count);
+    const mask = new Float32Array(si.count), heat = new Float32Array(si.count * 2);
+    const restNormals = g.getAttribute('normal');
     for (let i = 0; i < si.count; i++) {
       for (let k = 0; k < 4; k++) {
         const name = mesh.skeleton.bones[si.getComponent(i, k)]?.name ?? '';
+        if (heatBones.has(name)) heat[i * 2] += sw.getComponent(i, k);
         let amount = full.has(name) ? 1 : short.has(name) ? 0.5 : 0;
         if (name === R.head) amount = 0.5 * (1 - THREE.MathUtils.smoothstep(p.getZ(i), 0.85, 1.28)) * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.6, 2.85));
         mask[i] += sw.getComponent(i, k) * amount;
       }
+      heat[i * 2 + 1] = restNormals.getY(i);
+      if (heat[i * 2]! > 0.05 && restNormals.getY(i) > 0.2) coatHeatVertices++;
     }
+    g.setAttribute('aInnerHeat', new THREE.BufferAttribute(heat, 2));
     g.setAttribute('aFurMask', new THREE.BufferAttribute(mask, 1));
     for (const [i, [length, alpha]] of [[0.03, 0.35], [0.06, 0.25]].entries()) {
       const fringe = mesh.clone(false);
@@ -303,13 +326,14 @@ if (1.0 - smoothstep(0.70, 0.90, 1.0 - vUv.y) < 0.45) discard;`);
     }
   }
   root.userData.coatFringeLayers = coats.length * 2;
+  root.userData.coatHeatVertices = coatHeatVertices;
   syncLook();
 }
 
 // ------------------------------------------------------------------------------------------- spirit fire
 
 type Anchor = { mesh: THREE.SkinnedMesh; index: number };
-type Lick = { a: Anchor; h: number; w: number; seed: number; lean: number; tailFlow: boolean; flow?: { from: THREE.Bone; to: THREE.Bone; after?: THREE.Bone } };
+type Lick = { a: Anchor; h: number; w: number; seed: number; lean: number; tailFlow: boolean; spineFlow: boolean; flow?: { from: THREE.Bone; to: THREE.Bone; after?: THREE.Bone } };
 
 /** Surface points whose dominant bone is in `bones` and whose rest normal points up enough. */
 function surfacePoints(mesh: THREE.SkinnedMesh, bones: readonly string[], minUp: number): number[] {
@@ -406,24 +430,29 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const tail = skinned.find((m) => matName(m) === 'foxtailfur');
   const R = FOX_RIG;
   // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — small ear smoulders, tapered tail brush
-  const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
+  const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number, boolean?, number?][] = [
     [body, [R.neck[1], R.neck[2]], 0.45, 3, 0.22, 0.10, 0.7],
     [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 0, 0.18, 0.06, 0.8],
     [tail, R.tail.slice(4, 7), 0.15, 8, 0.58, 0.13, 0.8],
     [body, R.ear("l").slice(3), -1.0, 2, 0.14, 0.035, 0.8],
     [body, R.ear("r").slice(3), -1.0, 2, 0.14, 0.035, 0.8],
+    // Appended, independently seeded and without motes: existing brush/crest randomness stays identical.
+    [body, [R.spine[1], R.spine[2]], 0.75, 2, 0.14, 0.06, 0.4, true, 0],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
   let seed = 1;
   const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
-  for (const [mesh, bones, minUp, n, h, w, lean] of spec) {
+  let spineSeed = 2017;
+  const spineRnd = () => ((spineSeed = (Math.imul(spineSeed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  for (const [mesh, bones, minUp, n, h, w, lean, spineFlow = false, sparks] of spec) {
+    const random = spineFlow ? spineRnd : rnd;
     if (!mesh) continue;
     const surface = surfacePoints(mesh, bones, minUp);
     const uv = mesh.geometry.getAttribute('uv');
     const pts = mesh === tail ? surface.filter((i) => 1 - uv.getY(i) >= 0.55) : surface;
     if (!pts.length) continue;
-    const crest = mesh !== tail && n > 0;
+    const crest = mesh !== tail && n > 0 && !spineFlow;
     const ear = bones.some((b) => b.startsWith('ear_'));
     const positions = mesh.geometry.getAttribute('position');
     const highest = crest ? Math.max(...pts.map((i) => positions.getY(i))) : 0;
@@ -434,11 +463,12 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       for (let k = 1; k < 4; k++) if (weights.getComponent(index, k) > weights.getComponent(index, slot)) slot = k;
       return mesh.skeleton.bones[joints.getComponent(index, slot)]!;
     };
-    const tailBuckets = mesh === tail ? bones.map((name) => pts.filter((index) => pointBone(index).name === name)) : [];
+    const stratified = mesh === tail || spineFlow;
+    const sourceBuckets = stratified ? bones.map((name) => pts.filter((index) => pointBone(index).name === name)) : [];
     for (let i = 0; i < n; i++) {
-      const bucket = mesh === tail ? tailBuckets[i % tailBuckets.length]! : wickPts;
+      const bucket = stratified ? sourceBuckets[i % sourceBuckets.length]! : wickPts;
       const candidates = bucket.length ? bucket : pts;
-      const index = candidates[Math.floor(rnd() * candidates.length)]!;
+      const index = candidates[Math.floor(random() * candidates.length)]!;
       let flow: Lick['flow'];
       if (mesh === tail) {
         const from = pointBone(index);
@@ -447,15 +477,15 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
         const after = mesh.skeleton.bones.find((bone) => bone.name === R.tail[segment + 2]);
         if (to) flow = { from, to, after };
       }
-      licks.push({ a: { mesh, index }, h: h * (0.7 + 0.6 * rnd()), w: w * (0.8 + 0.4 * rnd()), seed: rnd() * 10, lean, tailFlow: mesh === tail, flow });
+      licks.push({ a: { mesh, index }, h: h * (0.7 + 0.6 * random()), w: w * (0.8 + 0.4 * random()), seed: random() * 10, lean, tailFlow: mesh === tail, spineFlow, flow });
     }
     const sparkPts = mesh === tail ? surfacePoints(mesh, R.tail.slice(2, 6), -1) : pts;
     const sourcePts = sparkPts.length ? sparkPts : pts;
-    const count = mesh === tail ? 90 : 20;
-    for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(rnd() * sourcePts.length)]! });
+    const count = sparks ?? (mesh === tail ? 90 : 20);
+    for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(random() * sourcePts.length)]! });
   }
 
-  const diagnostics = { coatFringeLayers: root.userData.coatFringeLayers as number, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  const diagnostics = { spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
   group.userData.spiritFx = diagnostics;
 
   // flame licks: one instanced billboard per lick
@@ -476,7 +506,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   lg.instanceCount = licks.length;
   const lickMat = new THREE.ShaderMaterial({
     vertexShader: LICK_VERT, fragmentShader: LICK_FRAG,
-    uniforms: { uTime: { value: 0 }, uIntensity: { value: 1 } },
+    uniforms: { uTime: furUniforms.uTime, uIntensity: { value: 1 } },
     transparent: true, depthWrite: false, blending: THREE.CustomBlending,
     blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, side: THREE.DoubleSide,
   });
@@ -507,7 +537,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   embers.renderOrder = 3;
 
   const tmp = new THREE.Vector3(), prev = new THREE.Vector3(), vel = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  const dir = new THREE.Vector3(), backward = new THREE.Vector3(), curve = new THREE.Vector3();
+  const dir = new THREE.Vector3(), backward = new THREE.Vector3(), curve = new THREE.Vector3(), lateral = new THREE.Vector3();
   let hasPrev = false, visible = true, spawnAcc = 0, pending = 0, next = 0, time = 0, speed = 0;
   const anchorPos = (a: Anchor, out: THREE.Vector3) => a.mesh.getVertexPosition(a.index, out).applyMatrix4(a.mesh.matrixWorld);
   const anchorMeshes = [...new Set([...licks.map((l) => l.a.mesh), ...emberPool.map((a) => a.mesh)])];
@@ -532,7 +562,10 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
         curve.addScaledVector(up, 0.5).normalize();
       } else {
         backward.set(0, 0, -1).transformDirection(group.matrixWorld);
-        dir.copy(up).multiplyScalar(0.8).addScaledVector(backward, 0.65);
+        if (lk.spineFlow) {
+          lateral.set(1, 0, 0).transformDirection(group.matrixWorld);
+          dir.copy(up).multiplyScalar(0.65).addScaledVector(backward, 0.85).addScaledVector(lateral, i % 2 ? -0.3 : 0.3);
+        } else dir.copy(up).multiplyScalar(0.8).addScaledVector(backward, 0.65);
       }
       dir.addScaledVector(vel, -L.lickStream * lk.lean * (lk.tailFlow ? 0.04 : 0.25)).normalize();
       if (lk.flow) curve.sub(dir).multiplyScalar(0.5);
@@ -541,11 +574,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       tmp.addScaledVector(dir, 0.015);
       aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
       aDir.setXYZ(i, dir.x, dir.y, dir.z);
-      const flick = 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
+      const flick = lk.spineFlow ? 0.925 + 0.075 * Math.sin(time * 1.1 + lk.seed * 3) : 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
       const restScale = lk.tailFlow ? 0.65 : 0.95;
       const stretch = THREE.MathUtils.lerp(restScale, 1, THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (1 + Math.min(1, speed * 0.12) * lk.lean);
       aShape.setXYZW(i, lk.w * L.lickScale, lk.h * L.lickScale * flick * stretch, lk.seed, lk.tailFlow ? 0 : 1);
-      aAlpha.setX(i, 0.45 + 0.35 * flick);
+      aAlpha.setX(i, (0.45 + 0.35 * flick) * (lk.spineFlow ? L.spineHeat : 1));
     });
     aPos.needsUpdate = aDir.needsUpdate = aBend.needsUpdate = aShape.needsUpdate = aAlpha.needsUpdate = true;
     for (; pending > 0 && emberPool.length; pending--) {
@@ -570,6 +603,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     },
     update(dt, t, gliding) {
       syncLook();
+      furUniforms.uTime.value = t;
       if (!lickMesh.parent && group.parent) group.parent.add(lickMesh, embers);
       group.getWorldPosition(tmp);
       if (hasPrev && dt > 0) vel.copy(tmp).sub(prev).divideScalar(dt);
@@ -581,7 +615,6 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       speed = Math.hypot(vel.x, vel.z);
       diagnostics.speed = Number(speed.toFixed(2));
       diagnostics.liveEmbers = 0;
-      lickMat.uniforms.uTime!.value = t;
       lickMat.uniforms.uIntensity!.value = L.lickIntensity * (0.8 + 0.4 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (gliding ? 1.25 : 1);
       spawnAcc += dt * (L.emberRate + L.emberRateSpeed * speed) * (gliding ? 1.6 : 1);
       pending = Math.min(N, pending + Math.floor(spawnAcc));

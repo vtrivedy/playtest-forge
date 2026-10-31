@@ -447,8 +447,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(1.5, 0, 2);
   WS(6, 6, 2);
   WS(10.5, 12.8, 2);
-  // Begin the scripted upper turn on the ramp, before its t2.0 end/drop.
-  WS(10.5, 3.0, 6, { pace: 0.4 });
+  // Reach the authored R2 landing before turning; gentle real stick input on the climb/exit.
+  WS(10.5, 0.5, 6, { pace: 0.4 });
   WS(14.5, 2.4, 6, { pace: 0.4 });
   WS(17.2, 6.5, 6, { label: 'cp-mills' });
   WS(24.2, 9.7, 6, { act: 'dash', label: 'hearth-brush' });
@@ -760,6 +760,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // R2 lateral flight on k1 (2 → 6). Its s12.05 high edge overlaps the
   // s12 terrace support by 5cm; masonry and collider share the same flight.
   flightT(10.75, 11.2, 2, 10.75, 2.0, 6, 2.6, 2);
+  // The top landing meets the last riser at t2 and upper terrace at s12.
+  {
+    const p = sp(10.6, 0.4);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 3.2, d: 2.8, yaw: T_YAW, top: 6, bottom: 1.5, tag: 'r2-landing' }));
+    slab({ x: p.x, z: p.z, w: 3.2, d: 2.8, yaw: T_YAW, top: 6, bottom: 1.5, rough: 0.3, seed: 74,
+      topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
+  }
   // R3 jump chain on k2: broken pillar stumps (6 → 7.5 → 9 → 10)
   for (const [s, top, variant] of [[23, 7.5, 0], [25.5, 9.0, 1]] as const) {
     const p = sp(s, -1);

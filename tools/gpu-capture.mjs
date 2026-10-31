@@ -366,7 +366,10 @@ try {
     }, (state,i)=>contactFrame!==null&&i>=contactFrame+61, { traceEveryFrame: true, keyFrames: [0, 6, 12, 18, 36, 60] });
     await H('setStick', null);
     const contact = await page.evaluate(() => window.__gameHooks.shades.state());
-    if (contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1) throw Error(`Shade contact failed: ${JSON.stringify(contact)}`);
+    const shadeContactFailures=[];
+    const contactFailure=contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1 ? `Shade contact failed: ${JSON.stringify(contact)}` : null;
+    if(contactFailure){shadeContactFailures.push(contactFailure);report.failures.push(contactFailure);}
+    save('shade-contact-acceptance.json',{passed:!contactFailure,failure:contactFailure,contact,label:'Strict contact gate retained; release diagnostics continue before final failure'});
     p = contact.actors[0].pos;
     const dashSetup = await page.evaluate(([x,y,z]) => {
       const col=window.__gameHooks.debug.world.collision;
@@ -378,14 +381,17 @@ try {
     },p);
     save('shade-dash-setup.json',dashSetup);
     await H('teleport', ...dashSetup.pos, dashSetup.yaw);
+    const dashControllerBefore=await H('state');
     await H('setStick', ...dashSetup.direction);
     await H('setKeys', ['ShiftLeft']);
     lens=null;
     await camera();
-    await video('shade-free', 120, async i => {
+    const dashControllerAfter=await video('shade-free', 120, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
       await camera();
     }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 119] });
+    save('shade-dash-controller.json',{before:dashControllerBefore.dash,after:dashControllerAfter.dash,label:'Actual controller activation; collisionActiveLastStep is the preceding simulated movement tick'});
+    if(dashControllerBefore.dash&&dashControllerAfter.dash.used<=dashControllerBefore.dash.used)throw Error(`Shade dash input never activated controller ${JSON.stringify(dashControllerAfter.dash)}`);
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
     if (freed.frees !== 1 || !freed.actors[0].freed || freed.hits !== contact.hits || freed.wisps < contact.wisps) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
     // The original baseline predates the release wash; only the new attraction-enabled candidate owes this assertion.
@@ -398,6 +404,40 @@ try {
       save('shade-release-wash.json',wash);
       if(!wash||wash.life<3.8||wash.strength<1)throw Error(`Missing six-second shade release wash ${JSON.stringify(wash)}`);
     }
+    await shot('shade-wash-normal');
+    const occlusionSaved=await page.evaluate(()=>{
+      const h=window.__gameHooks,saved=[],seen=new Set();
+      h.debug.scene.traverse(o=>{
+        if(!o.isMesh)return;
+        for(const material of Array.isArray(o.material)?o.material:[o.material]){
+          const uniform=h.debug.renderer.properties.get(material).uniforms?.uOccStrength;
+          if(uniform&&!seen.has(uniform)){seen.add(uniform);saved.push({material:material.uuid,value:uniform.value});}
+        }
+      });
+      return saved;
+    });
+    const applyOcclusion=async saved=>page.evaluate(saved=>{
+      const h=window.__gameHooks,values=new Map(saved.map(s=>[s.material,s.value])),actual=[];
+      h.debug.scene.traverse(o=>{
+        if(!o.isMesh)return;
+        for(const material of Array.isArray(o.material)?o.material:[o.material])if(values.has(material.uuid)){
+          const uniform=h.debug.renderer.properties.get(material).uniforms?.uOccStrength;
+          if(uniform){uniform.value=values.get(material.uuid);actual.push({material:material.uuid,uniform});}
+        }
+      });
+      h.debug.post.render();
+      return actual.map(s=>({material:s.material,value:s.uniform.value}));
+    },saved);
+    try {
+      await applyOcclusion(occlusionSaved.map(s=>({...s,value:0})));
+      await shot('shade-wash-occlusion-disabled-diagnostic');
+      save('shade-occlusion-isolation.json',{label:'Same simulation time, temporary renderer-uniform diagnostic only; zero touched or already-inactive uniforms is inconclusive',touched:occlusionSaved.length,inconclusive:!occlusionSaved.some(s=>s.value>.001),saved:occlusionSaved});
+    } finally {
+      const restored=await applyOcclusion(occlusionSaved);
+      const matched=restored.length===occlusionSaved.length&&occlusionSaved.every(s=>restored.some(r=>r.material===s.material&&r.value===s.value));
+      save('shade-occlusion-restore.json',{matched,restored});
+      if(!matched)throw Error('Shade occlusion diagnostic did not restore exact uniform values');
+    }
     await advance(180);
     await shot('shade-leaf-litter');
     await advance(600, false);
@@ -405,7 +445,7 @@ try {
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
     await advance(0);
     await shot('shade-after-free');
-    save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    save('shade-acceptance.json', { passed:!contactFailure, releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
     let edge = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
     if(!edge || edge.freed)throw Error('No live high-hill Shade for clear encounter evidence');
     if(edge && !edge.freed){
@@ -428,8 +468,9 @@ try {
       },(_,i)=>touch!==null&&i>=touch+61,{traceEveryFrame:true,keyFrames:[0,6,12,18,36,60]});
       await H('setStick',null);
       const contactAfter=await page.evaluate(()=>window.__gameHooks.shades.state());
-      if(contactAfter.hits!==contactBefore.hits+1||contactAfter.knockbackTravel<2.9)throw Error(`Edge contact failed ${JSON.stringify(contactAfter)}`);
-      save('shade-clear-contact-acceptance.json',{approach,before:contactBefore,after:contactAfter});
+      const edgeFailure=contactAfter.hits!==contactBefore.hits+1||contactAfter.knockbackTravel<2.9?`Edge contact failed ${JSON.stringify(contactAfter)}`:null;
+      if(edgeFailure){shadeContactFailures.push(edgeFailure);report.failures.push(edgeFailure);}
+      save('shade-clear-contact-acceptance.json',{passed:!edgeFailure,failure:edgeFailure,approach,before:contactBefore,after:contactAfter});
       edge=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
       const setup=await page.evaluate(([x,y,z])=>{
         const col=window.__gameHooks.debug.world.collision;
@@ -443,15 +484,22 @@ try {
       await H('teleport',...setup.pos,setup.yaw);
       const [x,y,z]=edge.pos;
       await H('photo',[x+5.5,y+3.8,z+5.5],[x,y+1.6,z],48);
+      const edgeControllerBefore=await H('state');
       await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
-      await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,{traceEveryFrame:true,keyFrames:[0,5,12,24,36,48,75,119]});
+      const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,{traceEveryFrame:true,keyFrames:[0,5,12,24,36,48,75,119]});
+      save('shade-edge-dash-controller.json',{before:edgeControllerBefore.dash,after:edgeControllerAfter.dash});
+      if(edgeControllerBefore.dash&&edgeControllerAfter.dash.used<=edgeControllerBefore.dash.used)throw Error(`Second Shade dash input never activated controller ${JSON.stringify(edgeControllerAfter.dash)}`);
       const after=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(after.frees!==before.frees+1||after.hits!==before.hits||!after.actors.find(a=>a.id==='shade-hill-high')?.freed)throw Error(`Restored-edge dash failed ${JSON.stringify(after)}`);
+      const releasedIds=after.actors.filter(a=>a.freed).map(a=>a.id);
+      if(after.frees<2||releasedIds.length<2)throw Error(`Two distinct dash releases missing ${JSON.stringify(after)}`);
+      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0,releasePassed:true,contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
+      await shot('shade-two-freed');
       await advance(180,false);await advance(0);await shot('shade-clear-litter');
       await advance(600,false);await advance(0);await shot('shade-clear-empty');
       const end=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(end.actors.find(a=>a.id==='shade-hill-high').leaves!==0)throw Error('Edge dissolve did not end empty');
-      save('shade-clear-acceptance.json',{label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
+      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0,releasePassed:true,contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
     }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
@@ -496,6 +544,7 @@ try {
     }
 
 
+    // Stored contact failures survive later exceptions and keep the final process result failed.
   }
   if(wants('feel')) {
     await boot(quality,true);
@@ -691,17 +740,18 @@ try {
     save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
     // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
     const orbitCameras = [];
-    const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-7, 90));
-    const orbitTarget = [-7, targetGround + 1.2, 90];
+    const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-10, 88));
+    const orbitTarget = [-10, targetGround + 2, 88];
     const orbitLens = (angle, height) => [-9 + Math.sin(angle) * 30, height, 88 + Math.cos(angle) * 24];
     // One fixed clearance height avoids frame-to-frame camera pops. The ellipse
     // stays >2m outside every cottage roof footprint; low close/chase shots above
     // retain the player-scale views. Every captured pose is checked and logged.
-    let orbitHeight = targetGround + 14;
-    for (const height of [6, 8, 10, 12, 14].map(h => targetGround + h)) {
+    let orbitHeight = targetGround + 26;
+    let orbitHeightSearchClear = false;
+    for (const height of [6, 8, 10, 12, 14, 18, 22, 26].map(h => targetGround + h)) {
       let clear = true;
       for (let j = 0; j < 36 && clear; j++) clear = !(await H('photoBlocker', orbitLens(j / 36 * Math.PI * 2, height), orbitTarget));
-      if (clear) { orbitHeight = height; break; }
+      if (clear) { orbitHeight = height; orbitHeightSearchClear = true; break; }
     }
     let orbitBlocked = 0;
     await video('hub-orbit', 18 * fps, async i => {
@@ -711,7 +761,7 @@ try {
       orbitCameras.push({ frame: i, lens, target: orbitTarget, blocker });
       await H('photo', lens, orbitTarget, 58);
     }, undefined, {keyFrames: [0, 3*fps, 6*fps, 9*fps, 12*fps, 15*fps, 18*fps-1]});
-    save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, blockedFrames: orbitBlocked, cameras: orbitCameras });
+    save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, heightSearchClear: orbitHeightSearchClear, probeAngles: 36, blockedFrames: orbitBlocked, cameras: orbitCameras });
     if (orbitBlocked) report.failures.push(`Hub context orbit has ${orbitBlocked} blocked review frames`);
     await H('photoOff');
 

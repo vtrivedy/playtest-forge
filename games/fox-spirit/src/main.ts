@@ -369,6 +369,8 @@ async function boot() {
   fAudio.close();
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
+  fCam.add(cam.params, 'runDistance', 2.6, 5, 0.1);
+  fCam.add(cam.params, 'framingHeight', 0, 1, 0.05);
   fCam.add(cam.params, 'minDistance', 1.8, 3.2, 0.1).name('minimum terrain boom');
   fCam.add(cam.params, 'height', 0.5, 4, 0.05);
   fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
@@ -521,6 +523,8 @@ async function boot() {
   fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
   fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
+  fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickStream', 0, 1, 0.01);
@@ -584,6 +588,7 @@ async function boot() {
   let yawRate = 0;
   let grounded = false;
   let dashT = 0;
+  let dashContactActive = false;
   let gliding = false;
   let glideHoldT = 0;
   let airT = 0;
@@ -891,6 +896,7 @@ async function boot() {
         anim: foxActor.getAnim(),
         grounded,
         gliding,
+        dash: { remaining: Number(Math.max(0,dashT).toFixed(4)), readyIn: Number(Math.max(0,dashT+.2).toFixed(4)), collisionActiveLastStep: dashContactActive, used: feelMetrics.dashesUsed },
         preset: feelPreset,
         feel: { ...jumpStats, apex: feelMetrics.lastJumpApex, air: feelMetrics.lastAirTime },
         camera: {
@@ -1280,6 +1286,7 @@ async function boot() {
       keys.delete('ShiftRight');
     }
     const wasDashing = dashT > 0;
+    dashContactActive = wasDashing;
     dashT -= dt;
     const dashing = dashT > 0;
     if (wasDashing && !dashing) jumpStats.lastDashDist = Number(Math.hypot(fox.position.x - dashFrom.x, fox.position.z - dashFrom.z).toFixed(2));
@@ -1423,7 +1430,7 @@ async function boot() {
       if (safe(fox.position.x, fox.position.z + dz)) fox.position.z += dz;
       return Math.hypot(fox.position.x - beforeX, fox.position.z - beforeZ);
     });
-    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
+    for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashContactActive)) {
       if (e.type === 'freed') {
         shadeContact.frees++;
         const wash = e.pos.clone().setY(e.pos.y - 1.4);

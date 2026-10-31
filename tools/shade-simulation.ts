@@ -157,6 +157,18 @@ try {
   const patrolDetour=await createShades(new THREE.Scene(),[{id:'patrol-detour',patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0,undefined,(x,z)=>Math.hypot(x-1,z+.35)<.4);
   for(let k=0;k<180;k++)patrolDetour.update(1/60,k/60,new THREE.Vector3(30,0,30),false);
   assert.ok(patrolDetour.state()[0]!.pos[0]!>1.5,'patrol must move beyond a post instead of freezing off-route');
+  const sweepFixture=async(id:string,from:THREE.Vector3,to:THREE.Vector3)=>{
+    const system=await createShades(new THREE.Scene(),[{id,patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0);
+    system.tun.speed=0;
+    system.update(1/60,0,from,false);
+    return system.update(1/60,1/60,to,true);
+  };
+  const grazing=await sweepFixture('air-graze',new THREE.Vector3(-.2,3,1.59),new THREE.Vector3(.1,3.15,1.59));
+  assert.equal(grazing.filter(e=>e.type==='freed').length,1,'rising grazing dash must enter the cylindrical animal volume');
+  const rising=await sweepFixture('air-rise',new THREE.Vector3(-3,0,0),new THREE.Vector3(3,6,0));
+  assert.equal(rising.filter(e=>e.type==='freed').length,1,'crossing the volume counts even when final feet rise above its cap');
+  const above=await sweepFixture('air-above',new THREE.Vector3(-3,4,0),new THREE.Vector3(3,4,0));
+  assert.equal(above.length,0,'a dash entirely above the animal must not release it');
   // Mirror the capture's ten-second observer schedule on a controlled loop.
   // Actual authored terrain still belongs to the remote GPU playtest.
   const behavior=await createShades(new THREE.Scene(),[{id:'behavior',patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0);
@@ -175,5 +187,5 @@ try {
   let observedModes=0;
   for(const mode of modes)if(mode===expectedModes[observedModes])observedModes++;
   assert.equal(observedModes,expectedModes.length,`capture observer schedule must show complete cycle: ${modes}`);
-  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery', 'latch activation', 'dash during chase', 'blocked chase retreats', 'return stall recovery', 'quiet patrol after return', 'return detours around obstruction', 'patrol detours around obstruction', 'ten-second ordered observer cycle'], final: state() }, null, 2));
+  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery', 'latch activation', 'dash during chase', 'blocked chase retreats', 'return stall recovery', 'quiet patrol after return', 'return detours around obstruction', 'patrol detours around obstruction', 'rising grazing dash cylinder hit', 'sweep crosses vertical slab', 'dash above animal misses', 'ten-second ordered observer cycle'], final: state() }, null, 2));
 } finally { globalThis.fetch = originalFetch; THREE.DefaultLoadingManager.setURLModifier(url => url); }
