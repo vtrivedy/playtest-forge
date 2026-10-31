@@ -24,7 +24,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   let wasDash=false, toggleCooldown=0, drinks=false, refillDelay=0;
   let fill = 0, warning = 0, seal = 0, retained = false, arrived = false, open = false;
   const saveKey = 'fox-spirit:ashwater:bell';
-  let restored = false;
+  let restored = false, recoveryVisited = false;
   try { if (new URLSearchParams(location.search).has('fresh')) localStorage.removeItem(saveKey); restored = localStorage.getItem(saveKey) === '1'; } catch { /* unsaved play */ }
   if (restored) fill = seal = 1;
   function shelf(x: number, y: number, z: number, w: number, d: number, seed: number) {
@@ -84,6 +84,10 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   const raft = new THREE.Group(); raft.name='reach-ferry'; group.add(raft);
   for (const x of [-2.35,2.35]) stoneBlock(wood,trs(x,-.52,0),.7,.65,6.6,1001+x,.08);
   for(let i=0;i<9;i++) stoneBlock(wood,trs(-2.8+i*.7,-.2,0),.65,.4,7,1010+i,.05);
+  for (const z of [-3.42,3.42]) {
+    const trim=new THREE.BoxGeometry(6.2,.06,.12);trim.translate(0,-.01,z);
+    wood.add(trim,undefined,new THREE.Color(0xa99f87));trim.dispose();
+  }
   const timber = new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9}); weatheredSurface(timber,true); field.patchMaterial(timber); mats.push(timber);
   const ferry = wood.toMesh(timber,{cast:true,receive:true,boxUV:1.4}); if(ferry) raft.add(ferry);
   raft.position.set(187,30,-118);
@@ -126,7 +130,8 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   const lowMesh=low.toMesh(mats[2]!,{cast:true,receive:true,boxUV:1.6});if(lowMesh)group.add(lowMesh);
   world.hearthSpots.push({id:'reach-steam',x:183,y:30,z:-128,height:13});
   world.shadeSpots.push({id:'reach-drinker',speed:1.6,patrol:[[183,30,-120],[186,30,-122],[190,30,-120],[186,30,-116]]});
-  world.checkpoints.push({pos:new THREE.Vector3(171,30,-130),lit:false});
+  const bankCheckpoint={pos:new THREE.Vector3(171,30,-130),lit:false};
+  world.checkpoints.push(bankCheckpoint);
   const handles=[[173,30,-124],[201,36,-121]];
   const handleMeshes:THREE.Mesh[]=[];
   for(const [x,y,z] of handles){const m=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,2.2,8),timber);m.position.set(x,y+1,z);m.rotation.z=.5;group.add(m);handleMeshes.push(m);}
@@ -134,8 +139,8 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   const mistCtx=mistCanvas.getContext('2d')!;const mistGradient=mistCtx.createRadialGradient(32,32,5,32,32,32);mistGradient.addColorStop(0,'rgba(255,255,255,.55)');mistGradient.addColorStop(.6,'rgba(255,255,255,.3)');mistGradient.addColorStop(1,'rgba(255,255,255,0)');mistCtx.fillStyle=mistGradient;mistCtx.fillRect(0,0,64,64);
   const mistMat=new THREE.MeshBasicMaterial({color:0x9daea5,map:new THREE.CanvasTexture(mistCanvas),transparent:true,opacity:.08,depthWrite:false,side:THREE.DoubleSide});
   const mistBanks: THREE.Mesh[]=[];
-  for (const [x,z] of [[179,-110],[196,-113],[197,-126],[181,-130]]) {
-    const mist=new THREE.Mesh(new THREE.PlaneGeometry(5,2),mistMat);mist.rotation.x=-Math.PI/2;mist.position.set(x,30.1,z);group.add(mist);mistBanks.push(mist);
+  for (const [x,z] of [[183,-111],[191,-114],[191,-126],[180,-120]]) {
+    const mist=new THREE.Mesh(new THREE.PlaneGeometry(5,2),mistMat);mist.rotation.x=-Math.PI/2;mist.position.set(x,30.1,z);mist.renderOrder=2;group.add(mist);mistBanks.push(mist);
   }
   const house=new Bucket();for(const x of[179.5,183.5])for(const z of[-126.5,-122.5])stoneBlock(house,trs(x,31.5,z),.25,3,.25,1250+x,.04);
   stoneBlock(house,trs(180.4,33,-124.5,0,1,1,1,0,-.4),2.5,.2,5.2,1260,.06);stoneBlock(house,trs(182.6,33,-124.5,0,1,1,1,0,.4),2.5,.2,5.2,1261,.06);
@@ -144,14 +149,15 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   for(const w of waterSpots.filter(w=>w.realm==='ashwater')){w.lip.x+=offsetX;w.foot.x+=offsetX;for(const p of w.path)p.x+=offsetX;for(const p of w.probes??[])p.x+=offsetX;}
   for(const h of world.hearthSpots.filter(h=>h.id==='reach-steam'))h.x+=offsetX;
   for(const sh of world.shadeSpots.filter(sh=>sh.id==='reach-drinker'))for(const p of sh.patrol)p[0]+=offsetX;
-  world.checkpoints.at(-1)!.pos.x+=offsetX;
-  let supportedBy: number | null = null, actualFillRate=0;
-  const floatMotion=floats.map(()=>({occupied:false,dip:0,offset:0}));
+  bankCheckpoint.pos.x+=offsetX;
+  let supportedBy: number | null = null, retentionSupport: number | null = null, actualFillRate=0;
+  const floatMotion=floats.map(()=>({offset:0}));
   let inlet: ReturnType<typeof createInlets>;
   let water: ReturnType<typeof createWater>;
   function restoreSource(duration=3){const w=water.waters.find(w=>w.spot.id===source);if(w)w.reactor.restored=true;if(!field.restores.length)field.restore(new THREE.Vector3(120,30,-118),55,duration);}
   return {
     contains:(p:THREE.Vector3)=>p.x>68&&p.z<-80,
+    recoveryAt:(p:THREE.Vector3)=>recoveryVisited&&p.x>68&&p.z<-80?bankCheckpoint.pos.clone():null,
     supplyAt:(p:THREE.Vector3)=>Math.hypot(p.x-113,p.z+128)<1.5&&p.y<32?(fill>.2?0:field.strokeAt(p)):field.sample(p),
     init(renderer:THREE.WebGLRenderer){field.initMask(renderer);},
     attach(w:typeof water,gui:GUI){water=w;
@@ -161,6 +167,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     sync(dt:number,base:ReturnType<typeof createColorField>){field.trail=[];field.strokes=[];field.update(dt);field.setFox(base.fox);field.trail=base.trail.map(t=>({...t}));field.strokes=base.strokes.map(t=>({...t}));field.renderMask(dt);for(const m of mats)field.syncMaterial(m);},
     update(dt:number,fox:THREE.Vector3,feetY:number,grounded:boolean,flood:boolean,dashing:boolean,drained:boolean){
       const localFox=fox.clone();localFox.x-=offsetX;
+      if(Math.hypot(fox.x-bankCheckpoint.pos.x,fox.z-bankCheckpoint.pos.z)<4.5&&Math.abs(feetY-bankCheckpoint.pos.y)<3)recoveryVisited=true;
       open=flood;gate.enabled=!open;gateMesh.visible=!open;
       toggleCooldown=Math.max(0,toggleCooldown-dt);drinks=drained&&!restored;
       if(dashing&&!wasDash&&toggleCooldown===0&&handles.some(([x,y,z])=>Math.hypot(localFox.x-x,localFox.z-z)<3&&Math.abs(feetY-y)<2)){level=level==='high'?'low':'high';toggleCooldown=.6;warning=tun.warningTime;refillDelay=level==='high'?1.8:0;}
@@ -168,35 +175,34 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       for(const h of handleMeshes)h.rotation.z=level==='high'?.5:-.5;
       refillDelay=Math.max(0,refillDelay-dt);
       arrived=level==='high'&&refillDelay<=0&&water.arriving(source);
-      const occupied=grounded&&floats.some(f=>Math.abs(localFox.x-f.x)<f.c.hx+.1&&Math.abs(localFox.z-f.z)<f.c.hz+.1&&Math.abs(feetY-f.c.top0)<.7);
       supportedBy=grounded?floats.findIndex(f=>Math.abs(localFox.x-f.x)<f.c.hx+.1&&Math.abs(localFox.z-f.z)<f.c.hz+.1&&Math.abs(feetY-f.c.top0)<.7):null;
       if(supportedBy===-1)supportedBy=null;
+      if(supportedBy!==null)retentionSupport=supportedBy;
+      else if(grounded)retentionSupport=null;
       const oldFill=fill;
       retained=false;
       if(level==='high'&&arrived){warning=tun.warningTime;fill=Math.min(1,fill+dt*tun.fillRate);}
       else if(warning>0)warning=Math.max(0,warning-dt);
-      else if(occupied&&fill>0)retained=true;
+      else if(retentionSupport!==null&&fill>0)retained=true;
       else fill=Math.max(0,fill-dt*tun.drainRate);
-      if(drinks&&!occupied)fill=Math.max(0,fill-dt*tun.drainRate*.5);
+      if(drinks&&retentionSupport===null)fill=Math.max(0,fill-dt*tun.drainRate*.5);
       const latched=inlet.update(dt,()=>level==='high'&&arrived&&fill>=.98&&!retained);seal=inlet.inlets[0]!.seal;if(!restored&&latched.length){restored=true;restoreSource();try{localStorage.setItem(saveKey,'1');}catch{}}
       bellMat.emissiveIntensity=.02+seal*.7;bell.rotation.z=restored?Math.sin(field.time*1.7)*.07:0;
       actualFillRate=dt>0?(fill-oldFill)/dt:0;
       for(const [i,f] of floats.entries()){
         const motion=floatMotion[i]!,on=supportedBy===i;
-        if(on&&!motion.occupied)motion.dip=-.045;
-        motion.occupied=on;motion.dip=THREE.MathUtils.damp(motion.dip,0,6,dt);
         const buoyant=THREE.MathUtils.smoothstep(fill,0,.12)*(retained?.2:1);
-        motion.offset=(Math.sin(field.time*1.3+i*2.1)*.018+motion.dip)*buoyant;
+        motion.offset=on?0:Math.sin(field.time*1.3+i*2.1)*.018*buoyant;
         f.mesh.position.y=f.base+tun.rise*fill;
         f.c.top0=f.c.top1=f.mesh.position.y;f.c.bottom=f.mesh.position.y-.5;
         // Only the render child heaves. The planted deck/collider stays deterministic.
         const hull=f.mesh.children[0]!;hull.position.y=motion.offset;
-        hull.rotation.z=Math.sin(field.time*.9+i)*.004*buoyant;
+        hull.rotation.z=on?0:Math.sin(field.time*.9+i)*.004*buoyant;
       }
-      lake.update(field.time,fill);scenery.update(field.time);
+      lake.update(field.time,fill,tun.rise,actualFillRate);scenery.update(field.time);
       for(const [i,mist] of mistBanks.entries()){mist.position.y=pool.position.y+.15;mist.position.x+=(Math.sin(field.time*.2+i)*.015)*dt;}
     },
-    submergedAt(p:THREE.Vector3,feet:number){return fill>.2&&((p.x-117)/11)**2+((p.z+118)/12)**2<.9&&feet<pool.position.y-.8;},
-    state(){return {offsetX,waterSurface:Number(pool.position.y.toFixed(3)),buoyantRise:tun.rise*fill,supportedBy,actualFillRate:Number(actualFillRate.toFixed(3)),level,refillDelay:Number(refillDelay.toFixed(2)),drinks,floats:floats.map(f=>({x:f.x+offsetX,z:f.z,height:Number(f.mesh.position.y.toFixed(2)),freeboard:Number((f.mesh.position.y-pool.position.y).toFixed(3)),visualOffset:Number(floatMotion[floats.indexOf(f)]!.offset.toFixed(3))})),open,arrived,fill:Number(fill.toFixed(3)),raftHeight:Number(raft.position.y.toFixed(3)),warning:Number(warning.toFixed(2)),retained,seal:Number(seal.toFixed(3)),restored,source};},
+    submergedAt(p:THREE.Vector3,feet:number){return fill>.2&&((p.x-117)/12)**2+((p.z+118)/13)**2<.9&&feet<pool.position.y-.8;},
+    state(){return {offsetX,recoveryVisited,recoveryPoint:bankCheckpoint.pos.toArray(),waterSurface:Number(pool.position.y.toFixed(3)),buoyantRise:tun.rise*fill,supportedBy,retentionSupport,actualFillRate:Number(actualFillRate.toFixed(3)),level,refillDelay:Number(refillDelay.toFixed(2)),drinks,floats:floats.map(f=>({x:f.x+offsetX,z:f.z,height:Number(f.mesh.position.y.toFixed(2)),freeboard:Number((f.mesh.position.y-pool.position.y).toFixed(3)),visualOffset:Number(floatMotion[floats.indexOf(f)]!.offset.toFixed(3))})),open,arrived,fill:Number(fill.toFixed(3)),raftHeight:Number(raft.position.y.toFixed(3)),warning:Number(warning.toFixed(2)),retained,seal:Number(seal.toFixed(3)),restored,source};},
   };
 }

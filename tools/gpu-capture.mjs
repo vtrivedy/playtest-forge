@@ -981,6 +981,7 @@ try {
     await boot(quality,true);await RH('forceRestore');await advance(660,false);
     // Explicit staged setup for a supply-loss stress test; basin/float/seal states stay simulated.
     await RH('teleport',171,30,-130,Math.PI/2);await advance(20,false);
+    const bank=await RH('state');save('reach-bank-checkpoint.json',bank);if(!bank.reach.recoveryVisited)report.failures.push('Reach bank recovery did not activate');
     await RH('teleport',173,30,-116,Math.PI/2);await advance(60,false);
     await RH('teleport',188,30,-129,Math.PI/2);await RH('photo',[170,44,-103],[188,33,-123],52);
     await video('reach-retained-supply-loss',8*fps,async i=>{
@@ -988,7 +989,12 @@ try {
     },undefined,{keyFrames:[0,2*fps,4*fps,6*fps]});
     const held=await RH('state');save('reach-retention-acceptance.json',held);
     if(!held.reach.retained||held.reach.restored||held.reach.seal>0||!held.grounded)report.failures.push('Occupied float retention or no-false-latch test failed');
-    const t0=held.t;
+    // Keep the already-used support until a stable landing, including a brief hop.
+    await RH('setKeys',['Space']);await advance(12);await shot('reach-retained-airborne');
+    const airborne=await RH('state');save('reach-airborne-retention-acceptance.json',airborne);
+    if(airborne.grounded||!airborne.reach.retained||airborne.reach.restored||airborne.reach.seal>0||Math.abs(airborne.reach.fill-held.reach.fill)>.001)report.failures.push('Reach support drained during airborne retained hop');
+    await RH('setKeys',[]);await advance(90,false);
+    const t0=(await RH('state')).t;
     await RH('photoOff');await RH('setStick',-1,0);
     await video('reach-boarding-recovery',8*fps,async()=>{},st=>st.deaths>held.deaths&&Math.hypot(st.pos[0]-101,st.pos[2]+130)<3);
     await RH('setStick',null);await shot('reach-recovered-bank');
@@ -1002,7 +1008,7 @@ try {
     await RH('teleport',173,30,-116,Math.PI/2);await advance(900,false);
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
     await RH('teleport',214,31,-137,Math.PI/2);
-    await RH('photo',[204,35.5,-144],[216,35,-137],48);await advance(2);await shot('reachview-payoff-vista');
+    await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-payoff-vista');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
