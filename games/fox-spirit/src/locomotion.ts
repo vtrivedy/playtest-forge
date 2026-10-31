@@ -39,8 +39,8 @@ export class AuthoredLocomotion {
     minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, swingTuck: .35, releaseSwing: .25, carpalCurl: .25, earlyContact: .85, headBob: .35,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
-    headHold: 1.2, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landPitch: 0, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headHold: 1.2, gallopHeadHold: .8, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .20, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -403,7 +403,9 @@ export class AuthoredLocomotion {
     const heightSmooth=this.headHeightSpring.step(height,dt,1.2,1);
     const reach=Math.max(.05,base.getWorldPosition(v()).distanceTo(this.head.getWorldPosition(v())));
     // Positive rotation about the actor's right axis lowers a forward-pointing neck.
-    worldOverlay(base,right.clone(),THREE.MathUtils.clamp((height-heightSmooth)/reach,-.35,.35)*this.params.headHold);
+    // The gallop head rides its gather rather than kinking the neck base to hold height.
+    const hold=THREE.MathUtils.lerp(this.params.headHold,this.params.gallopHeadHold,this.metrics.clipWeights.run ?? 0);
+    worldOverlay(base,right.clone(),THREE.MathUtils.clamp((height-heightSmooth)/reach,-.35,.35)*hold);
     this.root.updateWorldMatrix(true,true);
     const head=AuthoredLocomotion.pitchOf(this.head);
     const headSmooth=this.headPitchSpring.step(head,dt,1.2,1);
@@ -429,7 +431,7 @@ export class AuthoredLocomotion {
     this.yaw=this.input.yaw;
     this.turn=THREE.MathUtils.damp(this.turn,dy/step,12,dt);
     this.metrics.turnRate=this.turn;
-    this.lean=this.leanSpring.step(THREE.MathUtils.clamp(-this.turn*this.input.speed*this.params.turnLean,-.16,.16),dt,this.params.springFrequency,this.params.springDamping);
+    this.lean=this.leanSpring.step(THREE.MathUtils.clamp(-this.turn*this.input.speed*this.params.turnLean,-this.params.bankMax,this.params.bankMax),dt,this.params.springFrequency,this.params.springDamping);
     this.metrics.bankCommand=this.lean;
     this.pelvisShare=THREE.MathUtils.damp(this.pelvisShare,this.input.grounded ? this.params.pelvisBank : 0,12,dt);
     this.tail=THREE.MathUtils.damp(this.tail,-this.turn*this.params.tailLag,7,dt);
@@ -472,6 +474,12 @@ export class AuthoredLocomotion {
       this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
       this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(landingPitch,0,0)));
     }
+    // Whole-body lean about the ground line: legs tilt with the body, so the outer hip stays over its plant.
+    const rootLean=this.lean*this.params.rootBank*this.pelvisShare/Math.max(.001,this.params.pelvisBank);
+    if(Math.abs(rootLean)>1e-5){
+      this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
+      this.root.quaternion.premultiply(q().setFromAxisAngle(new THREE.Vector3(0,0,1),rootLean));
+    }
     if(crouch>0){
       this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
       this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(-crouch*this.params.takeoffPitch,0,0)));
@@ -487,8 +495,9 @@ export class AuthoredLocomotion {
     };
     const bankAxis=new THREE.Vector3(Math.sin(this.input.yaw),0,Math.cos(this.input.yaw));
     // Load the hips as well as the shoulders; total chest bank stays bounded by the same lean.
-    worldOverlay(this.spine,bankAxis.clone(),this.lean*this.pelvisShare);
-    for(const spine of this.spines)worldOverlay(spine,bankAxis.clone(),this.lean*(1-this.pelvisShare)/this.spines.length);
+    const bodyLean=this.lean-rootLean;
+    worldOverlay(this.spine,bankAxis.clone(),bodyLean*this.pelvisShare);
+    for(const spine of this.spines)worldOverlay(spine,bankAxis.clone(),bodyLean*(1-this.pelvisShare)/this.spines.length);
     const headBank=-this.lean*this.params.headRollStabilize;
     for(const neck of this.necks)worldOverlay(neck,bankAxis.clone(),headBank*.5/this.necks.length);
     worldOverlay(this.head,bankAxis.clone(),headBank*.5);
@@ -574,13 +583,25 @@ export class AuthoredLocomotion {
       }
       if (stance) {
         foot.phaseRelease=false;foot.releaseCorrection.set(0,0,0);foot.releaseProgress=0;
-        if (!foot.planted) {
+        const touchdown=!foot.planted;
+        if (touchdown) {
           // Re-enter at the current solved pad, including any fading correction.
           foot.strength=this.params.plantStrength;
           if(earlyTouch)this.metrics.earlyTouches++;
           if(locomoting && this.input.speed>1) this.footfalls.push(paw.clone().setY(ground));
         }
         foot.anchor.copy(this.contactAnchor(foot,paw,ground,active,dt));
+        if(touchdown && locomoting && this.metrics.cadenceHz>1e-4) {
+          // Carved turn: the hips yaw over a planted pad. Plant where the pad will be at mid-stance so the
+          // stance drift runs -d/2..+d/2 instead of 0..d (outer feet otherwise hit the re-step cap every stride).
+          const stanceSeconds=GAIT_NAMES.reduce((sum,g)=>sum+(this.metrics.clipWeights[g] ?? 0)*GAITS[g].contacts[i].duty*this.stanceRatio[g],0)/Math.max(.001,gaitWeight)/this.metrics.cadenceHz;
+          // Slow walk pivots keep the authored plant (long stance over-rotates the prediction).
+          const striding=1-(this.metrics.clipWeights.walk ?? 0)/Math.max(.001,gaitWeight);
+          const angle=THREE.MathUtils.clamp(this.turn*stanceSeconds*.5*this.params.turnPlant*striding,-.35,.35);
+          const pivot=this.group.position;
+          foot.anchor.sub(pivot).applyAxisAngle(new THREE.Vector3(0,1,0),angle).add(pivot);
+          foot.anchor.y=ground+foot.clearance;
+        }
         const delta=foot.anchor.clone().sub(paw);
         this.metrics.maxPlantError=Math.max(this.metrics.maxPlantError,Math.hypot(delta.x,delta.z));
         // Latch strength at touchdown: another pose fading in cannot move an anchor.
