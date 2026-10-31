@@ -13,3 +13,9 @@ This closes a verification gap: labelled sheets must describe the state shown, r
 ## Current checks
 
 Fresh TypeScript and fox Vite build pass. Actual coupled CPU diagnostic passes: arrival2.23s, aura latch6.67s, occupied and airborne retained fill1 with seal0, stable ground drains0. Scripted coordinates and dummy rendering assets mean this is not playing. No new assets/licenses.
+
+## Actual29b85d1 GPU findings — 04:43 UTC
+
+Personally inspected HIGH/LOW/hero PNGs and real crossing contact sheet from relay753c9cd29d61/b2f4ffe7a555; safety1767ded77094 reports pass. Stone is missing across frames, with floating native trees/bell: capture.log contains repeated GL_INVALID_OPERATION texture/sampler mismatch. Do not judge bank/palette composition from these broken renders. Integrated main9773d70 initializes PCF shadow type before water reflection compilation; request its GPU retest.
+
+Real route now boards the ferry with zero deaths but source never flows: heat peaks.889 then holds/gutters. Source staging waypoint advances while moving north; dash2 starts after overshooting towardz−114, outside the source probe's1.6m stroke radius. Source gate accepts heat>.01 and advances before water is emitted. Correct the harness with a grounded settled west staging waypoint and a source gate requiring actual flowing water. Hold near source probe at local(173,30,−115), then board. Re-arm a failed source dash against observed flowing state, rather than mere nonzero heat. This uses real stick/dash/aura and does not assign puzzle state or change game timing. Record sourceActivatedAt on actual flow emission, so event order means source→front→latch. Build/syntax and new GPU controller evidence required.

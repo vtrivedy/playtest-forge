@@ -1475,7 +1475,7 @@ try {
   if (wants('reach')) {
     await boot(quality,true); await RH('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
-    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115},{x:175,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
+    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
     await video('reach-first-crossing',65*fps,async()=>{
@@ -1483,15 +1483,15 @@ try {
       const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
       const sourceWater=st.chem.water.find(w=>w.id==='reach-spout');
       if(drinker?.freed&&events.shadeFreedAt===null)events.shadeFreedAt=st.t;
-      if(sourceWater?.heat>.01&&events.sourceActivatedAt===null)events.sourceActivatedAt=st.t;
+      if(sourceWater?.flowing&&events.sourceActivatedAt===null)events.sourceActivatedAt=st.t;
       if(st.reach.arrived&&events.firstArrivalAt===null)events.firstArrivalAt=st.t;
       if(st.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=st.t;
       if(p.shade){if(!drinker)throw Error('Reach drinker missing');p.x=drinker.pos[0];p.z=drinker.pos[2];}
       const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
-      const ready=p.shade?drinker.freed:p.source?st.pos[0]>=103&&Math.abs(st.pos[2]+115)<1.2&&events.sourceActivatedAt!==null:d<.8&&st.pos[1]>=p.y-.4;
+      const ready=p.shade?drinker.freed:p.source?sourceWater?.flowing:p.settle?d<.3&&st.grounded&&Math.abs(st.pos[1]-p.y)<.6&&Math.hypot(st.vel[0],st.vel[2])<.7:d<.8&&st.pos[1]>=p.y-.4;
       if(p.shade&&drinker.freed&&!shadeShot){await shot('reach-drinker-released');shadeShot=true;}
       if(ready&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
-      const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&events.sourceActivatedAt===null)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
+      const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&!sourceWater?.flowing)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
       const vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
       let sx=len>.2?vx/len*Math.min(1,len):0,sz=len>.2?vz/len*Math.min(1,len):0;
       const keys=q.jump?['Space']:[];
