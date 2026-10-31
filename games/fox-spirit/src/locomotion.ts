@@ -42,11 +42,11 @@ export class AuthoredLocomotion {
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .09, liftHindTrot: .12, carpalFlex: .95, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
     carpalGive: .14, landCarpalGive: .5, strideBob: .012, weightRoll: .05, spineSway: .045, breath: .022,
-    airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
+    runningGather: .45, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     headHold: 1.2, gallopHeadHold: .8, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .28, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .16, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     earlyTouches: 0, maxSwingLift: 0, airPose: 0, pelvisRoll: 0, spineSway: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -478,8 +478,8 @@ export class AuthoredLocomotion {
     const terrainTarget=this.input.grounded && Number.isFinite(rigGround) && Number.isFinite(actorGround)
       ? THREE.MathUtils.clamp(rigGround-actorGround,-.3,.3) : 0;
     this.terrainOffset=THREE.MathUtils.damp(this.terrainOffset,terrainTarget,25,dt);
-    // Standing jumps load the haunches; a gallop carries its momentum straight into the leap.
-    const crouch=THREE.MathUtils.smoothstep(this.input.crouch ?? 0,0,1)*(1-THREE.MathUtils.smoothstep(this.input.speed,1,3));
+    // Standing jumps load the haunches fully; a running leap keeps a shallower gather so the take-off still reads.
+    const crouch=THREE.MathUtils.smoothstep(this.input.crouch ?? 0,0,1)*THREE.MathUtils.lerp(1,this.params.runningGather,THREE.MathUtils.smoothstep(this.input.speed,1,3));
     this.metrics.windupLoad=crouch;
     this.metrics.windupActive=this.input.grounded && active==='jump_up' && (this.input.crouch ?? 0)>0;
     const suspension=this.suspension();
@@ -504,7 +504,7 @@ export class AuthoredLocomotion {
     }
     overlay(this.spine,new THREE.Vector3(1,0,0),-this.brake*this.params.brakePitch);
     const lookDelta=this.input.lookYaw===undefined ? 0 : Math.atan2(Math.sin(this.input.lookYaw-this.input.yaw),Math.cos(this.input.lookYaw-this.input.yaw));
-    const look=this.lookSpring.step(THREE.MathUtils.clamp(lookDelta*this.params.headLead+this.turn*.04,-.32,.32),dt,this.params.headFrequency,this.params.headDamping);
+    const look=this.lookSpring.step(THREE.MathUtils.clamp(lookDelta*this.params.headLead+this.turn*.06,-.32,.32),dt,this.params.headFrequency,this.params.headDamping);
     const worldOverlay=(bone:THREE.Object3D|undefined,worldAxis:THREE.Vector3,angle:number)=>{
       if(!bone)return;
       bone.updateWorldMatrix(true,false);
@@ -519,7 +519,7 @@ export class AuthoredLocomotion {
     const headBank=-this.lean*this.params.headRollStabilize;
     for(const neck of this.necks)worldOverlay(neck,bankAxis.clone(),headBank*.5/this.necks.length);
     worldOverlay(this.head,bankAxis.clone(),headBank*.5);
-    const bend=THREE.MathUtils.clamp(this.turn*.035,-.14,.14);
+    const bend=THREE.MathUtils.clamp(this.turn*.05,-.2,.2);
     for(let i=0;i<this.spines.length;i++)worldOverlay(this.spines[i],new THREE.Vector3(0,1,0),bend/this.spines.length);
     for(const neck of this.necks)worldOverlay(neck,new THREE.Vector3(0,1,0),look*.22);
     worldOverlay(this.head,new THREE.Vector3(0,1,0),look*.34);
