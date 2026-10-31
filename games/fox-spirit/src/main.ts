@@ -1084,7 +1084,12 @@ async function boot() {
     const waitWind = !!prevLabel?.startsWith('wind-ready:') && (wind.state().find(w => w.id === prevLabel.slice(11))?.heat ?? 0) < 0.98;
     const waitBridge = waitWind || waitLift || waitWash || waitFinale || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
-    else auto.wish.set(dx / d, 0, dz / d);
+    else {
+      // Authored analog input for tight ground turns; keep real controller/air physics.
+      const pace = onGround && auto.phase === 'run' ? THREE.MathUtils.clamp(wp.pace ?? 1, 0.1, 1) : 1;
+      const scale = d > 1e-6 ? pace / d : 0;
+      auto.wish.set(dx * scale, 0, dz * scale);
+    }
     if (auto.phase === 'run') auto.space = false;
     if (auto.dashQueued) {
       auto.dash = true;

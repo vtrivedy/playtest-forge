@@ -62,6 +62,8 @@ export type Waypoint = {
   x: number; y: number; z: number; act?: RouteAct; ground?: boolean; label?: string;
   /** lift waypoints: metres to rise above the lift before steering off (default: 0.5 m above the next waypoint) */
   rise?: number;
+  /** Scripted ground-stick magnitude (0..1); manual controls and physics are unchanged. */
+  pace?: number;
 };
 
 export type SeedwellState = {
@@ -443,8 +445,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(1.5, 0, 2);
   WS(6, 6, 2);
   WS(10.5, 12.8, 2);
-  WS(10.5, 2.6, 6);
-  WS(14.5, 2.4, 6);
+  // Begin the scripted upper turn on the ramp, before its t2.0 end/drop.
+  WS(10.5, 3.0, 6, { pace: 0.4 });
+  WS(14.5, 2.4, 6, { pace: 0.4 });
   WS(17.2, 6.5, 6, { label: 'cp-mills' });
   WS(24.2, 9.7, 6, { act: 'dash', label: 'hearth-brush' });
   WS(27.2, 9.7, 6, { act: 'glide', label: 'lift:H0' });
