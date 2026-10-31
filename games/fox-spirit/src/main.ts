@@ -343,26 +343,20 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Clip locomotion');
-    folder.add(params, 'trotSpeed', .6, 3, .05);
-    folder.add(params, 'gallopSpeed', 2, 8, .1);
-    folder.add(params, 'gaitHysteresis', 0, .4, .01);
-    folder.add(params, 'gaitFade', .05, .4, .01);
-    folder.add(params, 'idleFade', .05, .5, .01);
-    folder.add(params, 'minRate', .2, 1, .05);
-    folder.add(params, 'maxRate', 1, 3, .05);
-    folder.add(params, 'footIK', 0, 1, 1);
-    folder.add(params, 'pelvisAdjust', 0, 1, .05);
-    folder.add(params, 'maxPelvisDrop', 0, .4, .01);
-    folder.add(params, 'footLock', 0, 1, .05);
-    folder.add(params, 'maxLock', 0, .2, .005);
-    folder.add(params, 'normalAlignDeg', 0, 20, 1);
-    folder.add(params, 'contactShadow', 0, 1, .01);
-    folder.add(params, 'slopeTilt', 0, 1, .05);
-    folder.add(params, 'turnLean', 0, .1, .001);
-    folder.add(params, 'bankMax', 0, .35, .005);
-    folder.add(params, 'headLead', 0, .5, .01);
-    folder.add(params, 'headFrequency', 1, 6, .1);
-    folder.add(params, 'headDamping', .4, 1.5, .05);
+    const ranges: Record<string, [number, number, number]> = {
+      trotSpeed: [.6, 3, .05], gallopSpeed: [2, 8, .1], gaitHysteresis: [0, .4, .01], gaitSpeedHalfLife: [0, .6, .01],
+      gaitHalfLife: [.02, .4, .01], idleHalfLife: [.02, .4, .01], landHalfLife: [.02, .4, .01],
+      minRate: [.2, 1, .05], maxRate: [1, 3, .05], walkMaxRate: [.6, 2, .05], stopHold: [0, .6, .01], stopMatch: [1, 4, .1], entryLook: [0, .2, .01],
+      footIK: [0, 1, 1], pelvisAdjust: [0, 1, .05], maxPelvisDrop: [0, .4, .01], footLock: [0, 1, .05], maxLock: [0, .2, .005],
+      normalAlignDeg: [0, 20, 1], padJerk: [.005, .2, .005], contactShadow: [0, 1, .01],
+      slopeTilt: [0, 1, .05], turnLean: [0, .15, .005], bankMax: [0, .35, .005], headLead: [0, .8, .01], headTurn: [0, .4, .01],
+      headFrequency: [1, 6, .1], headDamping: [.4, 1.5, .05],
+      spineGallop: [0, 12, .5], spineGallopPhase: [-.5, .5, .01], spineAir: [0, 15, .5], spineLand: [0, 15, .5], spineBendGain: [0, 4, .1], spineMaxDeg: [0, 20, .5],
+      spineFrequency: [1, 6, .1], spineDamping: [.3, 1.5, .05],
+      tailAccel: [0, 6, .1], tailVertical: [0, 8, .1], tailTurn: [0, 6, .1], tailMaxUpDeg: [0, 35, 1], tailMaxElevDeg: [30, 90, 1],
+      tailFrequency: [1, 6, .1], tailDamping: [.3, 1.5, .05], carpalGive: [0, 20, .5], maxGiveDeg: [0, 20, .5],
+    };
+    for (const [key, [lo, hi, stepSize]] of Object.entries(ranges)) folder.add(params, key as keyof typeof params, lo, hi, stepSize);
   }
   const fFoxLook=gui.addFolder('Fox look');
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
@@ -784,6 +778,8 @@ async function boot() {
       if (harnessStick.length() > 1) harnessStick.normalize();
     },
     locomotion: foxActor.locomotion,
+    /** Loco flow metrics (DESIGN-loco-flow.md): spineFlexDeg, tailPitchDeg, carpalGiveDeg, inertiaDeg/Cm, footGap, maxSlideMS, padJerkCm. */
+    get loco() { return foxActor.locomotion?.metrics; },
     /** Debug handles for lookdev probes (read-only use from the harness) */
     debug: { scene, renderer, post, colorField, camera: cam.camera,
       // Explicit capture-only mutable tuning handle; other debug handles remain read-only.
