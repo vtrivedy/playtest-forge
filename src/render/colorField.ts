@@ -148,7 +148,7 @@ export class ColorField {
 
   /** Soft-edge half-width of a restore front at its current radius (m). */
   static edgeOf(r: RestoreRegion): number {
-    return Math.min(r.radius * 0.18, r.edgeMax);
+    return Math.min(r.radius * 0.22, r.edgeMax * (1 + 0.6 * THREE.MathUtils.smoothstep(r.t, 0.8, 1)));
   }
 
   update(dt: number): void {
@@ -289,9 +289,12 @@ export class ColorField {
           vec2 p = vUv * 2.0 - 1.0;
           // world-space brush noise (two octaves, slow drift): neighbouring stamps share one ragged,
           // organic edge instead of each repeating the same disc outline
-          float n = ((noise(vWorld * 0.55 + uTime * 0.07) - 0.5) * 1.6 + (noise(vWorld * 2.1 - uTime * 0.05) - 0.5) * 0.7) * (vNoise + 0.12);
+          float n = ((noise(vWorld * 0.55) - 0.5) * 1.6 + (noise(vWorld * 2.1) - 0.5) * 0.7) * vNoise;
+          // Reserve an unpainted border for outward brush variation. Without it,
+          // negative noise leaves nonzero ink at the quad edge: visible rectangles.
           float d = length(p) + n;
-          float soft = 1.0 - smoothstep(vInner * 0.8, 1.0, d);
+          float soft = 1.0 - smoothstep(vInner, 0.88, d);
+          soft *= 1.0 - smoothstep(0.82, 1.0, length(p));
           float ink = soft * soft * (3.0 - 2.0 * soft) * vStrength;
           gl_FragColor = vec4(ink, ink, ink, 1.0);
         }`,
@@ -353,7 +356,7 @@ export class ColorField {
       if (r.radius > 0.01) {
         // full strength inside radius - edge, fading to 0 by radius + edge (matches the analytic front)
         const edge = Math.max(0.3, ColorField.edgeOf(r));
-        const outer = r.radius + edge;
+        const outer = (r.radius + edge * 1.8) / 0.88;
         stamps.push({
           x: r.center.x,
           z: r.center.z,
@@ -542,9 +545,9 @@ export class ColorField {
               if (rad < 0.001) continue;
               vec3 c = uRestorePos[i];
               float d = distance(p.xz, c.xz);
-              float edge = min(rad * 0.18, uRestoreEdge[i]);
+              float edge = max(0.001, uRestoreEdge[i]);
               // painterly ragged front: two octaves so a crisp front still reads as brushwork
-              float n = ((noise21(p.xz * 0.35 + uTime * 0.15) - 0.5) * 0.8 + (noise21(p.xz * 1.7 - uTime * 0.1) - 0.5) * 0.35) * edge * 1.6;
+              float n = ((noise21(p.xz * 0.35) - 0.5) * 0.8 + (noise21(p.xz * 1.7) - 0.5) * 0.35) * edge * 1.6;
               float local = 1.0 - smoothstep(rad - edge + n, rad + edge * 0.5 + n, d);
               s = max(s, local);
               cfPermanent = max(cfPermanent, local);
@@ -553,7 +556,7 @@ export class ColorField {
               cfRim = max(cfRim, uRestoreRim[i] * smoothstep(-edge * 0.4, edge * 0.3, behind) * (1.0 - smoothstep(edge * 0.4, edge * 2.6, behind)));
             }
             // aura: feathered and brush-broken, not a clean sphere
-            float an = (noise21(p.xz * 0.6 + uTime * 0.08) - 0.5) * 0.35 + (noise21(p.xz * 2.3) - 0.5) * 0.15;
+            float an = (noise21(p.xz * 0.6) - 0.5) * 0.35 + (noise21(p.xz * 2.3) - 0.5) * 0.15;
             float ad = distance(p, uFox) / uAura + an;
             float af = 1.0 - smoothstep(0.15, 1.0, ad);
             s = max(s, af * af);
@@ -666,7 +669,7 @@ export class ColorField {
       const r = this.restores[i]!;
       posArr[i]!.copy(r.center);
       radArr[i] = r.radius;
-      edgeArr[i] = Number.isFinite(r.edgeMax) ? r.edgeMax : 1e6;
+      edgeArr[i] = ColorField.edgeOf(r);
       rimArr[i] = r.rim;
     }
   }
