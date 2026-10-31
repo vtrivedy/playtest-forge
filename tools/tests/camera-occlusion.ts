@@ -2,21 +2,8 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createFollowCamera } from '../../games/fox-spirit/src/camera';
 import { createOcclusionFader } from '../../games/fox-spirit/src/occlusion';
-import { createStylizedWater } from '../../src/render/water';
 
 // CPU geometry probes only; this never creates a renderer or browser.
-const waterScene = new THREE.Scene();
-const focusedWater = createStylizedWater(waterScene);
-const untouchedWater = createStylizedWater(waterScene);
-const feetFocus = new THREE.Vector3(2, -0.75, 3);
-for (let i = 0; i < 60; i++) { focusedWater.update(i / 60, feetFocus); untouchedWater.update(i / 60); }
-assert.ok(focusedWater.material.uniforms.uFocus!.value.w > 0.99, 'wading visibility focus eases in');
-assert.equal(untouchedWater.material.uniforms.uFocus!.value.w, 0, 'other water instances remain opted out');
-assert.equal(focusedWater.material.uniforms.uFocus!.value.y, -0.75, 'water mask receives feet, not torso height');
-for (let i = 60; i < 120; i++) focusedWater.update(i / 60);
-assert.ok(focusedWater.material.uniforms.uFocus!.value.w < 0.001, 'omitting focus releases the wading mask');
-focusedWater.dispose(); untouchedWater.dispose();
-assert.equal(waterScene.children.length, 0, 'water visibility uniforms do not retain scene meshes after disposal');
 const scenery = new THREE.Group();
 const material = new THREE.MeshStandardMaterial();
 const wall = new THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]>(new THREE.PlaneGeometry(20, 20), material);

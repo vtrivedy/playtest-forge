@@ -6,12 +6,12 @@ export async function captureWadeVisibility({ H, boot, video, shot, save, getPag
     { name: 'low', offset: [-3, 0.75, 3] },
   ];
   const summary = [];
-  for (const view of views) for (const enabled of [false, true]) {
+  for (const view of views) {
     await boot(quality, true);
     await H('teleport', -22, -0.75, 70, Math.PI / 2);
     await H('setStick', 0, 0); await H('setKeys', []); await H('advance', 30, 1 / 60, false);
     const start = await H('state');
-    const name = `pond-wade-${view.name}-${enabled ? 'focus' : 'authored'}`;
+    const name = `pond-wade-${view.name}`;
     const end = await video(name, 3 * fps, async () => {
       await H('setStick', 0.18, 0);
     }, undefined, {
@@ -20,28 +20,17 @@ export async function captureWadeVisibility({ H, boot, video, shot, save, getPag
       afterStep: async (_, state) => {
         const [x, y, z] = state.pos, [dx, dy, dz] = view.offset;
         await H('photo', [x + dx, y + dy, z + dz], [x, y + 0.4, z], 46);
-        if (!enabled) await getPage().evaluate(() => {
-          window.__gameHooks.debug.scene.traverse(o => {
-            const focus = o.material?.uniforms?.uFocus;
-            if (focus) focus.value.w = 0;
-          });
-        });
       },
       sample: async () => getPage().evaluate(() => {
-        const focus = [];
-        window.__gameHooks.debug.scene.traverse(o => {
-          const uniform = o.material?.uniforms?.uFocus;
-          if (uniform) focus.push({ water: o.position.toArray(), feet: uniform.value.toArray() });
-        });
-        return { waterVisibilityFocus: focus };
+        return { waterScene: window.__gameHooks.debug.scene.userData.waterCapture ?? null };
       }),
     });
     await H('setStick', null); await shot(`${name}-end`);
     if (end.deaths !== start.deaths) throw Error(`Wading visibility comparison died: ${name}`);
-    summary.push({ name, enabled, view: view.offset, start: start.pos, end: end.pos, deaths: end.deaths - start.deaths });
+    summary.push({ name, view: view.offset, start: start.pos, end: end.pos, deaths: end.deaths - start.deaths });
   }
   save('pond-wade-visibility.json', {
     label: 'Staged fresh starts; identical live inputs; fixed world-offset tracking photo lenses. Not gameplay-camera route proof.',
-    secondsPerVariant: 3, focusOffMethod: 'Only uFocus.w zeroed after simulation before draw', variants: summary,
+    secondsPerView: 3, water: 'Current scene refraction; no opacity override', views: summary,
   });
 }

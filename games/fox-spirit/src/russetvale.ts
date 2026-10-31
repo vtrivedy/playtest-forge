@@ -271,7 +271,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   scene.add(group);
   const r = rng(20261030);
   const waterVisuals: ReturnType<typeof createStylizedWater>[] = [];
-  const wadingFeet = new THREE.Vector3();
 
   const terrainY = (x: number, z: number) => (insideIsland(x, z) ? groundRaw(x, z) : -1000);
   const col = new CollisionWorld(terrainY);
@@ -607,6 +606,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const bank = Math.max(smooth01(1.25, 0.85, me), smooth01(1.5, 0.95, pe));
         c.lerp(PAL.bankDamp, bank * 0.9);
         leafy *= 1 - bank * 0.85;
+        // Reed's restored reward needs authored autumn colour beneath the mask.
+        // Keep submerged peat dark; collect leaves in irregular landward drifts.
+        const reedLand = (1 - smooth01(1.0, 1.4, me)) * smooth01(-1.1, -0.4, y);
+        const reedDrift = smooth01(0.42, 0.65, n1) * reedLand * (1 - pathK * 0.9) * (1 - hubWear);
+        c.lerp(PAL.grassGold, reedDrift * 0.25);
+        leafy = Math.max(leafy, reedDrift * 0.58);
         c.lerp(PAL.rockGrey, rimK * 0.7);
         // creek bed: damp dark pebbles, few leaves
         const ck = creekK(x, z);
@@ -1075,7 +1080,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const cb = new THREE.Color();
     const ct = new THREE.Color();
     const nrm = new THREE.Vector3();
-    const reedTones = [new THREE.Color(0x8a6a42), new THREE.Color(0x9a7a4a), PAL.copper, PAL.russet, new THREE.Color(0x6e5a3a)];
+    const reedTones = [PAL.grassGold, PAL.grassGold, PAL.amber, PAL.copper, PAL.russet, PAL.russet, new THREE.Color(0x8a6a42), new THREE.Color(0x47624a)];
     let placed = 0;
     for (let i = 0; i < 6000 && placed < 190; i++) {
       const x = MARSH.x + (rr() * 2 - 1) * MARSH.rx * 1.08;
@@ -2016,7 +2021,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     archAt(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
   }
   // Wen's pond
-  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x293730, colorShallow: 0x5b604b, shoreRadius: 1.18 });
+  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x293730, colorShallow: 0x5b604b, shoreRadius: 1.18, reflection: true });
   waterVisuals.push(pond);
   pond.mesh.position.set(POND.x, POND.water, POND.z);
   pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
@@ -2519,8 +2524,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
-      wadingFeet.set(fox.x, feetY, fox.z);
-      for (const water of waterVisuals) water.update(t, water === pond ? wadingFeet : undefined);
+      for (const water of waterVisuals) water.update(t);
       inkTime.value = t;
       const ev: RealmEvent[] = [];
       if (reedRegion.visit(fox, feetY)) ev.push({ type: 'page', id: 'reed-ruin' });
@@ -2650,6 +2654,7 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
   mat.onBeforeCompile = (shader, renderer) => {
     prev.call(mat, shader, renderer);
     shader.uniforms.uSoil = { value: tex.soil };
+    shader.uniforms.uReedBank = { value: new THREE.Vector4(MARSH.x, MARSH.z, MARSH.rx, MARSH.rz) };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
         attribute float leafy;
@@ -2661,6 +2666,7 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform sampler2D uSoil;
+        uniform vec4 uReedBank;
         varying float vLeafy;
         varying vec3 vGPos;
         float gHash(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
@@ -2690,6 +2696,13 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
         float gTake = step(fract(gLeaf.a * 5.37), 0.72);
         gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.70, 0.20, 0.12) : vec3(0.66, 0.27, 0.12), smoothstep(0.58, 0.74, gReg) * gTake);
         gHue = mix(gHue, fract(gLeaf.a * 3.7) < 0.5 ? vec3(0.76, 0.60, 0.29) : vec3(0.82, 0.50, 0.17), (1.0 - smoothstep(0.28, 0.42, gReg)) * gTake);
+        vec2 gReedP = (vGPos.xz - uReedBank.xy) / uReedBank.zw;
+        float gReedLand = (1.0 - smoothstep(1.0, 1.4, dot(gReedP, gReedP))) * smoothstep(-1.1, -0.4, vGPos.y);
+        float gBankRank = fract(gLeaf.a * 9.3);
+        vec3 gBankHue = gBankRank < 0.50 ? vec3(0.78, 0.60, 0.22)
+          : gBankRank < 0.80 ? vec3(0.57, 0.21, 0.08)
+          : gBankRank < 0.94 ? vec3(0.42, 0.30, 0.17) : vec3(0.09, 0.19, 0.105);
+        gHue = mix(gHue, gBankHue, gReedLand * 0.85);
         vec3 gLeafCol = gLeaf.rgb * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
         diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);
         // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of

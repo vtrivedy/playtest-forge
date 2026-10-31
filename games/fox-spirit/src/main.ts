@@ -29,6 +29,7 @@ import {
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createHubDusk, hubDuskWeight, HUB_DUSK } from './hubDusk';
+import { createReachMood } from './reachMood';
 import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
@@ -116,7 +117,6 @@ async function boot() {
     exposure: 1.18,
     shadows: quality.shadows,
     pixelRatio: quality.pixelRatio,
-    softShadows: quality.softShadows,
   });
   const { renderer, backend } = forge;
 
@@ -149,6 +149,7 @@ async function boot() {
   });
   matchFogToSky(scene, fog, sky.params.mist);
   const hubDusk = createHubDusk(scene, lights, sky, fog);
+  const reachMood = createReachMood(scene, lights, sky, fog);
   const distant = createDistantLand(scene, {
     silhouette: new THREE.Color(0x4a3a3c),
     haze: sky.params.mist,
@@ -337,6 +338,8 @@ async function boot() {
     folder.add(params, 'swingEase', 0, 1, .05);
     folder.add(params, 'headBob', 0, 1, .05);
     folder.add(params, 'swingTuck', 0, .8, .01);
+    folder.add(params, 'releaseSwing', .12, .4, .01);
+    folder.add(params, 'carpalCurl', 0, .7, .01);
     folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
@@ -526,11 +529,15 @@ async function boot() {
   fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
   fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'eyeSocketLift', 0, 1, 0.01);
   fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
   fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickStream', 0, 1, 0.01);
+  fFox.add(FOX_LOOK, 'coreRadiance', 0, 8, 0.1);
+  fFox.add(FOX_LOOK, 'tailRadiance', 0, 8, 0.1);
+  fFox.add(FOX_LOOK, 'emberRadiance', 0, 6, 0.1);
   fFox.add(FOX_LOOK, 'emberRate', 0, 60, 1);
   fFox.add(FOX_LOOK, 'emberSize', 0.005, 0.08, 0.001);
   fFox.close();
@@ -685,7 +692,7 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, world },
+    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
@@ -870,6 +877,7 @@ async function boot() {
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         dusk: { ...hubDusk.state(), practical: world.hubState() },
+        reachMood: reachMood.state(),
         crown: crown.state(),
         reach: reach.state(),
         albumPages: world.reedRegion.pageFound ? ['reed-ruin'] : [],
@@ -1655,6 +1663,7 @@ async function boot() {
     autumnFX.update(dt, fox.position);
     emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
     hubDusk.update(fox.position.x, fox.position.z);
+    reachMood.update(fox.position.x, fox.position.z);
     world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
     sky.update(dt);
     distant.update(dt);
@@ -1784,6 +1793,7 @@ async function boot() {
       contactShadow.scale.set(1, 1, 1);
       (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
       hubDusk.update(fox.position.x, fox.position.z);
+      reachMood.update(fox.position.x, fox.position.z);
       world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
       sky.update(rawDt);
       post.render();

@@ -1,5 +1,6 @@
 import { weatheredSurface } from '../worldSurfaces';
 import * as THREE from 'three';
+import { sceneWaterSampler, sceneWaterFragment } from '../../../../src/render/waterScene';
 import type GUI from 'lil-gui';
 import { Reactor, type SupplyFn } from './reactor';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
@@ -60,6 +61,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   block(-30, 3.05, 60.4, 4.1, 0.6, 4.8, 0, true);
   block(-30, 1.35, 58.1, 4.1, 3.3, 0.75, 0, true);
   block(-30, -0.2, 60.5, 3.2, 0.45, 4.8, 0, true);
+  const sceneSampler = sceneWaterSampler(scene);
   const foamColor = new THREE.Color();
   const warningColor = new THREE.Color(0xb09b67);
   const waters = waterSpots.map(spot => {
@@ -109,19 +111,22 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     for (let i = 0; i < waterColors.count; i++) waterColors.setXYZ(i, dryWater.r, dryWater.g, dryWater.b);
     surfaceGeometry.setAttribute('aWet', wetState); surfaceGeometry.setAttribute('color', waterColors);
     const surface = new THREE.Mesh(surfaceGeometry, surfaceMat);
+    sceneSampler.register(surface);
+    surface.onBeforeRender = renderer => sceneSampler.capture(renderer);
     surfaceMat.onBeforeCompile = shader => {
+      Object.assign(shader.uniforms, sceneSampler.uniforms);
       shader.uniforms.uWaterTime = animation.uWaterTime;
       shader.uniforms.uWaterWash = { value: spot.wash ? 1 : 0 };
       shader.vertexShader = 'attribute float aFlowD; attribute float aWet; varying float vFlowD; varying float vWet; varying vec2 vWaterUV; uniform float uWaterTime;\n' + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>\nvFlowD = aFlowD; vWet = aWet; vWaterUV = uv; transformed.y += sin(aFlowD * 3.0 - uWaterTime * 7.0) * 0.018;`);
-      shader.fragmentShader = 'uniform float uWaterTime; uniform float uWaterWash; varying float vFlowD; varying float vWet; varying vec2 vWaterUV;\n' + shader.fragmentShader;
+      shader.fragmentShader = sceneWaterFragment + 'uniform float uWaterTime; uniform float uWaterWash; varying float vFlowD; varying float vWet; varying vec2 vWaterUV;\n' + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
         if (uWaterWash < 0.5 && vWet < 0.5) discard;
         float drift = vFlowD - uWaterTime * 8.0;
         float foam = pow(max(0.0, sin(drift * 2.2 + sin(vWaterUV.x * 11.0) * 0.6)), 14.0);
         float edgeFoam = pow(abs(vWaterUV.x - 0.5) * 2.0, 10.0) * (0.5 + 0.5 * sin(drift * 3.0));
         diffuseColor.rgb += vec3(0.12, 0.105, 0.075) * (foam * 0.65 + edgeFoam * 0.35) * vWet;
-        diffuseColor.a *= 1.0 - smoothstep(0.5, 1.0, abs(vWaterUV.x - 0.5) * 2.0);
+        diffuseColor.a = mix(diffuseColor.a, 1.0, vWet) * (1.0 - smoothstep(0.5, 1.0, abs(vWaterUV.x - 0.5) * 2.0));
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float waterFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
@@ -134,7 +139,12 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         float kneeLuma = min(waterLuma, 0.12) + excess / (1.0 + excess / 0.18);
         outgoingLight -= waterDiffuse * (1.0 - kneeLuma / max(waterLuma, 0.0001)) * vWet;
         outgoingLight = mix(outgoingLight, waterSky, (0.06 + waterFresnel * 0.35) * vWet);
-        outgoingLight += vec3(0.08, 0.06, 0.03) * foam * vWet;
+        vec3 rippleView = (viewMatrix * vec4(ripple, 0.0)).xyz;
+        float channelDepth = 1.0 - abs(vWaterUV.x - 0.5) * 2.0;
+        vec3 bed = sceneWaterColor(rippleView.xy * 0.055 * vWet * smoothstep(0.0, 0.35, channelDepth));
+        vec3 clearBody = bed * mix(vec3(0.95, 0.97, 0.91), vec3(0.67, 0.83, 0.73), channelDepth);
+        outgoingLight = mix(outgoingLight, clearBody, (0.84 - waterFresnel * 0.40) * vWet);
+        outgoingLight += vec3(0.025, 0.02, 0.012) * foam * vWet;
         #include <opaque_fragment>`);
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         vec3 ripple = vec3(sin(vFlowD * 3.4 - uWaterTime * 8.0) * 0.08, 0.0, sin(vWaterUV.x * 16.0 + vFlowD * 2.1 - uWaterTime * 6.0) * 0.03);
