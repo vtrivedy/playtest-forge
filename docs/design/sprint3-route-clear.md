@@ -25,3 +25,11 @@ Hub is now in origin/main and preserves spawn and route coordinates, requiring n
 ## Validation
 
 Node/Python syntax checks for capture tooling; TypeScript and fox Vite build for game integration. Push immutable SHAs, request remote GPU captures, personally inspect PNGs and window.__game, obtain cross-model critique and retest fixes. No local browser/render. Missing external sprint3 style/COMMON and sprint2 lessons are recorded as unavailable; supplied soft gentle animated realism brief and art lock govern.
+
+## R2 observed failure: R2 stair turn (23:08 ET)
+
+GPU archive880ccfc7a24f on9641e2e/fd26877 fails at27.67s,0deaths/assists, waypoint12. Personally inspected all four route PNGs and window.__game trace: fox climbs to4.68m then drops to2m at(-54.834,41.957), against the6m terrace face, and cannot progress. Current main retains that capture's ground steering code. The R2 ramp is only2.6m wide; the bot uses full9m/s input through a near-reversal and consumes the nominal upper waypoint while still below the ramp top.
+
+Options: (A) author moderate analog pacing and align the upper waypoint with the true ramp exit (chosen); (B) widen/add a masonry landing apron, which changes manual level geometry before proving it is necessary; (C) sharpen the controller turn/acceleration, which conflicts with the gliding movement brief and another stream's ownership.
+
+Add optional route `pace` metadata, interpreted only by the existing bot as ground-stick magnitude, never as a physics override, teleport or assist. Keep full input in air and for required dash/glide approaches. Apply0.4 to the R2 approach/ramp/exit waypoints only, with upper target shifted from terrace(s10.5,t2.6) to(s10.5,t1.8). At0.9m waypoint reach, that target is first consumed around t2.7, where ramp height≈5.70m, within the existing0.6m step-up to the6m terrace. At3.6m/s the turning radius at4.5rad/s is≈0.8m, fitting a1.3m half-width; this is a design hypothesis requiring live recapture. No geometry, manual controls or feel tunables change. If later identical narrow-turn failures appear, extend measured pacing deliberately rather than applying a broad speed override. Require tsc/fox build, Opus critique and a fresh whole-route remote GPU retest with all existing acceptance gates.
