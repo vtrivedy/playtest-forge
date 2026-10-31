@@ -323,6 +323,23 @@ assert.ok(highestEars < .9, 'nose protection retains the ears');
 assert.ok(steepestView < 40, `nose protection avoids top-down framing: ${steepestView}`);
 console.log('Downhill front proxy:', JSON.stringify({ lowestNose, highestEars, steepestView }));
 
+const turnGuard = createFollowCamera({ params: { minDistance: 3.2, framingHeight: 1 }, surfaceAt: (x, z) => Math.hypot(x, z) > 1 ? 2 : 0 });
+turnGuard.resize(1280, 720);
+const perpendicular = turnGuard.params.sideBias + Math.PI / 2;
+for (let i = 0; i < 180; i++) turnGuard.update(1 / 60, { ...idleFrame, facing: perpendicular + .3 });
+const initialTurnView = turnGuard.camera.getWorldDirection(new THREE.Vector3());
+const previousTurnView = initialTurnView.clone();
+let turnPitchStep = 0;
+for (let i = 0; i <= 240; i++) {
+  turnGuard.update(1 / 60, { ...idleFrame, facing: perpendicular + .3 - i * .6 / 240 });
+  const view = turnGuard.camera.getWorldDirection(new THREE.Vector3());
+  turnPitchStep = Math.max(turnPitchStep, THREE.MathUtils.radToDeg(Math.acos(THREE.MathUtils.clamp(view.dot(previousTurnView), -1, 1))));
+  previousTurnView.copy(view);
+}
+assert.ok(turnPitchStep < .1, `snout protection blends through perpendicular turns: ${turnPitchStep}`);
+assert.ok(initialTurnView.angleTo(previousTurnView) > .005, 'turn probe actually exercises the framing correction');
+console.log('Perpendicular facing guard max step degrees:', turnPitchStep);
+
 // Isolate authored-volume clearance from the earlier mesh-ray solver. A clear
 // spring endpoint crosses this solid; the final lens must slide continuously.
 const volumeWorld = new CollisionWorld(() => 0);
