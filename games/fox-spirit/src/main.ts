@@ -336,6 +336,7 @@ async function boot() {
     folder.add(params,'brakePitch',0,.2,.005);
     folder.add(params,'landSquash',0,.25,.005);
     folder.add(params,'landPitch',0,2,.05).name('land pitch rad/m');
+    folder.add(params,'stationarySupport',0,.08,.005).name('stationary support m');
     folder.add(params,'landFrequency',2,6,.1);
     folder.add(params, 'walkHz', 1, 3, .05);
     folder.add(params, 'trotHz', 1.2, 4, .05);
@@ -540,6 +541,7 @@ async function boot() {
   fFox.add(FOX_LOOK, 'eyeSocketLift', 0, 1, 0.01);
   fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
   fFox.add(FOX_LOOK, 'bodyEmber', 0, 1.5, 0.05);
+  fFox.add(FOX_LOOK, 'brushRelief', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);

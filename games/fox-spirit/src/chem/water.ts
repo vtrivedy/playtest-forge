@@ -67,12 +67,12 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   const waters = waterSpots.map(spot => {
     const reactor = new Reactor(spot.id, 'water', spot.probes ?? [spot.lip.clone(), spot.foot.clone().setY(0.6)], tun);
     const glass = new THREE.MeshPhysicalMaterial({ color: 0x6b7566, roughness: 0.25, metalness: 0, transmission: 0, thickness: 0.3, transparent: true, opacity: 0.64, depthWrite: false, emissive: 0x302a1c, emissiveIntensity: 0.04, side: THREE.DoubleSide });
-    const animation = { uWaterTime: { value: 0 }, uWaterFlow: { value: 0 }, uWaterHalfWidth: { value: spot.width * 0.4 } };
+    const animation = { uWaterTime: { value: 0 }, uWaterFlow: { value: 0 }, uWaterWarning: { value: 0 }, uWaterHalfWidth: { value: spot.width * 0.4 } };
     glass.onBeforeCompile = shader => {
-      Object.assign(shader.uniforms, animation);
+      Object.assign(shader.uniforms, animation, sceneSampler.uniforms);
       shader.vertexShader = 'uniform float uWaterTime; uniform float uWaterFlow; varying vec2 vWaterP;\n' + shader.vertexShader;
       shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterP = position.xy; transformed.z += sin(position.y * 2.4 - uWaterTime * 3.5) * 0.025 * uWaterFlow;');
-      shader.fragmentShader = 'uniform float uWaterTime; uniform float uWaterFlow; uniform float uWaterHalfWidth; varying vec2 vWaterP;\n' + shader.fragmentShader;
+      shader.fragmentShader = sceneWaterFragment + 'uniform float uWaterTime; uniform float uWaterFlow; uniform float uWaterHalfWidth; uniform float uWaterWarning; varying vec2 vWaterP;\n' + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
         float ribbon = sin(vWaterP.x * 13.0 + sin(vWaterP.y * 1.1 - uWaterTime * 3.2) * 0.45) * 0.5 + 0.5;
         float streak = pow(ribbon, 12.0);
@@ -80,11 +80,14 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         diffuseColor.rgb += vec3(0.16, 0.14, 0.10) * streak * uWaterFlow;
         // Dark gaps and soft margins let the bank show through the moving sheet.
         float margin = 1.0 - smoothstep(0.66, 1.0, abs(vWaterP.x) / uWaterHalfWidth);
-        diffuseColor.a *= margin * mix(1.0, 0.55 + ribbon * 0.25 + streak * travelling * 0.20, uWaterFlow);
+        diffuseColor.a = mix(diffuseColor.a, 1.0, uWaterFlow) * margin;
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float fallFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
-        outgoingLight = mix(outgoingLight, vec3(0.38, 0.33, 0.24), fallFresnel * 0.55 * uWaterFlow);
+        vec2 fallDistortion = vec2(sin(vWaterP.x * 9.0 + vWaterP.y * 2.4 - uWaterTime * 3.5), cos(vWaterP.y * 3.0 + uWaterTime * 4.0)) * 0.003 * margin;
+        vec3 fallBed = sceneWaterColor(fallDistortion) * vec3(0.87, 0.96, 0.91);
+        outgoingLight = mix(outgoingLight, fallBed, (0.82 - fallFresnel * 0.40) * uWaterFlow * (1.0 - uWaterWarning));
+        outgoingLight += vec3(0.018, 0.025, 0.021) * streak * travelling * uWaterFlow;
         #include <opaque_fragment>`);
     };
     const gate = spot.gate ? collision.add(boxCollider({ x: spot.lip.x, z: spot.lip.z, w: spot.width, d: 0.2, top: spot.lip.y, bottom: spot.foot.y, tag: 'frozen-water' })) : null;
@@ -98,6 +101,8 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     fallGeo.computeVertexNormals();
     const fall = new THREE.Mesh(fallGeo, glass);
     fall.position.copy(spot.lip).lerp(spot.foot, 0.5); fall.castShadow = !!spot.gate; scene.add(fall);
+    sceneSampler.register(fall);
+    fall.onBeforeRender = renderer => sceneSampler.capture(renderer);
     const light = new THREE.PointLight(0xffb55e, 0.8, 7, 2); light.position.copy(fall.position); scene.add(light);
     const curve = new THREE.CatmullRomCurve3(spot.path, false, 'centripetal');
     const length = curve.getLength();
@@ -122,10 +127,6 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
       shader.fragmentShader = sceneWaterFragment + 'uniform float uWaterTime; uniform float uWaterWash; varying float vFlowD; varying float vWet; varying vec2 vWaterUV;\n' + shader.fragmentShader;
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
         if (uWaterWash < 0.5 && vWet < 0.5) discard;
-        float drift = vFlowD - uWaterTime * 8.0;
-        float foam = pow(max(0.0, sin(drift * 2.2 + sin(vWaterUV.x * 11.0) * 0.6)), 14.0);
-        float edgeFoam = pow(abs(vWaterUV.x - 0.5) * 2.0, 10.0) * (0.5 + 0.5 * sin(drift * 3.0));
-        diffuseColor.rgb += vec3(0.12, 0.105, 0.075) * (foam * 0.65 + edgeFoam * 0.35) * vWet;
         diffuseColor.a = mix(diffuseColor.a, 1.0, vWet) * (1.0 - smoothstep(0.5, 1.0, abs(vWaterUV.x - 0.5) * 2.0));
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
@@ -144,7 +145,6 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         vec3 bed = sceneWaterColor(rippleView.xy * 0.055 * vWet * smoothstep(0.0, 0.35, channelDepth));
         vec3 clearBody = bed * mix(vec3(0.95, 0.97, 0.91), vec3(0.67, 0.83, 0.73), channelDepth);
         outgoingLight = mix(outgoingLight, clearBody, (0.84 - waterFresnel * 0.40) * vWet);
-        outgoingLight += vec3(0.025, 0.02, 0.012) * foam * vWet;
         #include <opaque_fragment>`);
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         vec3 ripple = vec3(sin(vFlowD * 3.4 - uWaterTime * 8.0) * 0.08, 0.0, sin(vWaterUV.x * 16.0 + vFlowD * 2.1 - uWaterTime * 6.0) * 0.03);
@@ -284,7 +284,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         w.wetState.needsUpdate = true;
         w.waterColors.needsUpdate = true;
         w.arriving = w.parcels.some(p => p.head >= w.length && p.tail < w.length);
-        w.animation.uWaterTime.value = time; w.animation.uWaterFlow.value = flowing ? 1 : 0;
+        w.animation.uWaterTime.value = time; w.animation.uWaterFlow.value = flowing ? 1 : 0; w.animation.uWaterWarning.value = warning;
         w.glass.color.set(0x6b7566).lerp(foamColor.set(w.reactor.restored ? 0x6b735b : 0x53695e), w.reactor.heat);
         w.fall.castShadow = !!w.gate && !flowing;
         w.glass.roughness = flowing ? 0.18 : 0.25;
