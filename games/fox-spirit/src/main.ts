@@ -34,6 +34,7 @@ import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
+import { createCameraVisibilityProbe } from './cameraVisibility';
 import type { FoxAnimState } from './fox';
 import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
@@ -692,7 +693,8 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world },
+    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world,
+      cameraVisibility: createCameraVisibilityProbe(scene, renderer, cam.camera, foxActor.group) },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
