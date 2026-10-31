@@ -128,7 +128,7 @@ export function createOcclusionFader(
     const steps = Math.ceil(dist / 0.35);
     for (let i = 1; i < steps; i++) {
       const t = i / steps;
-      if (dist * (1 - t) < 0.7) break; // ignore the fox's own footing
+      if (dist * (1 - t) < 0.1) break; // floor fragments are protected in the shader
       pt.lerpVectors(cam, target, t);
       if (opts.solidAt(pt.x, pt.z) > pt.y + 0.05) return true;
     }
@@ -136,7 +136,7 @@ export function createOcclusionFader(
     dir.multiplyScalar(1 / dist);
     ray.set(cam, dir);
     ray.near = 0.05;
-    ray.far = dist - 0.6;
+    ray.far = dist - 0.1;
     for (const canopy of visibleCanopies) {
       canopyHits.length = 0;
       // Stop on the first mesh hit; sorting every intersection in every crown
