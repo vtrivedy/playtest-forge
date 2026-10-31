@@ -15,7 +15,7 @@ const CARRIAGE_SIGN = -1;
 const GAIT_NAMES = Object.keys(GAITS) as Gait[];
 /** Speed each gait's designed cadence is quoted at (gait-gym bands). */
 const CADENCE_REF: Record<Gait, number> = { walk: 1.5, trot: 3.8, run: 9 };
-type GaitParts = { body: THREE.AnimationAction; legs: THREE.AnimationAction[]; bobMean: THREE.Vector3[] };
+type GaitParts = { body: THREE.AnimationAction; legs: THREE.AnimationAction[]; bobMean: THREE.Vector3[]; flexMean: THREE.Quaternion[] };
 const v = () => new THREE.Vector3();
 const q = () => new THREE.Quaternion();
 class Spring {
@@ -35,7 +35,7 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45, trotLift: .01, gallopLift: .02, swingEase: 1, headBob: .35,
+    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, headBob: .35,
     // Glide carriage: share of per-stride back rock / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     rockDamp: 1.3, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
@@ -95,6 +95,7 @@ export class AuthoredLocomotion {
   /** Each gait clip split into body + four legs so every leg can run its own warped clip time. */
   private parts = new Map<Gait, GaitParts>();
   private bobBones: THREE.Object3D[] = [];
+  private flexBones: THREE.Object3D[] = [];
   /** Stance time / authored stance time per gait: < 1 compresses stance and lengthens the swing. */
   private stanceRatio: Record<Gait, number> = { walk: 1, trot: 1, run: 1 };
   constructor(private root: THREE.Object3D, private group: THREE.Group,
@@ -157,6 +158,7 @@ export class AuthoredLocomotion {
     const legBones=new Set(legs.flat());
     const bobNames=[FOX_RIG.root,FOX_RIG.pelvis];
     this.bobBones=bobNames.map(n=>root.getObjectByName(n)!);
+    this.flexBones=[FOX_RIG.pelvis,...FOX_RIG.spine].map(n=>root.getObjectByName(n)!);
     const boneOf=(t:THREE.KeyframeTrack)=>t.name.slice(0,t.name.lastIndexOf('.'));
     for(const gait of GAIT_NAMES) {
       const source=this.actions.get(gait);
@@ -179,6 +181,7 @@ export class AuthoredLocomotion {
         body: mixer.clipAction(new THREE.AnimationClip(`${gait}_body`,clip.duration,clip.tracks.filter(t=>!legBones.has(boneOf(t))))),
         legs: legs.map((names,i)=>mixer.clipAction(new THREE.AnimationClip(`${gait}_leg${i}`,clip.duration,clip.tracks.filter(t=>names.includes(boneOf(t)))))),
         bobMean: bobNames.map(n=>new THREE.Vector3().fromArray(sample(n,'position'))),
+        flexMean: this.flexBones.map(b=>new THREE.Quaternion().fromArray(sample(b.name,'quaternion')).normalize()),
       });
     }
   }
@@ -271,17 +274,21 @@ export class AuthoredLocomotion {
     for(const g of GAIT_NAMES) total+=this.weights.get(g) ?? 0;
     if(total<1e-3)return;
     const keep=1-(1-this.params.bodyBob)*Math.min(1,total);
-    // Carry the body higher at speed: legs extend, stance pads stay down through IK.
-    const lift=((this.weights.get('trot') ?? 0)*this.params.trotLift+(this.weights.get('run') ?? 0)*this.params.gallopLift);
+    // Long back line: pull the clip's per-stride pelvis/spine flexion toward its cycle mean.
+    const flex=(1-this.params.spineFlex)*Math.min(1,total), mean=q();
+    this.flexBones.forEach((bone,i)=>{
+      const sum=new THREE.Vector4();
+      for(const g of GAIT_NAMES){const w=this.weights.get(g) ?? 0, m=this.parts.get(g)!.flexMean[i];
+        const sign=sum.x*m.x+sum.y*m.y+sum.z*m.z+sum.w*m.w<0 ? -1 : 1;
+        sum.x+=sign*w*m.x;sum.y+=sign*w*m.y;sum.z+=sign*w*m.z;sum.w+=sign*w*m.w;}
+      mean.set(sum.x,sum.y,sum.z,sum.w).normalize();
+      this.overlays.push({bone,rotation:bone.quaternion.clone()});
+      bone.quaternion.slerp(mean,flex);
+    });
     this.bobBones.forEach((bone,i)=>{
       const m=v();
       for(const g of GAIT_NAMES) m.addScaledVector(this.parts.get(g)!.bobMean[i],(this.weights.get(g) ?? 0)/total);
       bone.position.sub(m).multiplyScalar(keep).add(m);
-      if(i===0 && lift>0 && bone.parent) {
-        // World-up metres into the parent's space (its matrixWorld from last frame: scale/axes are constant).
-        const base=bone.parent.getWorldPosition(v()), parent=bone.parent;
-        bone.position.add(parent.worldToLocal(base.clone().setY(base.y+lift)).sub(parent.worldToLocal(base)));
-      }
     });
   }
   private backPitchSpring=new Spring();
