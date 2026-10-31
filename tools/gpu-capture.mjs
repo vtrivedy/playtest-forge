@@ -1,3 +1,4 @@
+import { captureReportSummary } from './capture-report-summary.mjs';
 import { blackFrameIntervals } from './hub-black-frames.mjs';
 import { captureFinale } from './finale-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
@@ -201,6 +202,54 @@ try {
     attempt.invariantsMatch=attempt.before.digest===attempt.after.digest;
     save('hub-still-attempts.json',report.hubStillAttempts);
     if(!attempt.recovered || !attempt.invariantsMatch) report.failures.push(name+': black still recovery failed or changed pose/camera/state');
+  }
+  async function capturePlasterComparison(label) {
+    await H('advance',0,1/60,true);
+    const entry=await page.evaluate(()=>{
+      const material=window.__gameHooks.debug.world.materials.find(m=>m.name==='rv-hub-plaster');
+      if(!material) throw Error('Plaster comparison material missing');
+      return {uuid:material.uuid,color:material.color.toArray()};
+    });
+    const invariant=async()=>{
+      const fixed=await hubStillInvariant();
+      const other=await page.evaluate(()=>window.__gameHooks.debug.world.materials
+        .filter(m=>m.name!=='rv-hub-plaster').map(m=>({name:m.name,color:m.color?.toArray(),
+          emissive:m.emissive?.toArray(),emissiveIntensity:m.emissiveIntensity})));
+      return {...fixed,otherMaterials:other,fullDigest:createHash('sha256')
+        .update(fixed.digest+JSON.stringify(other)).digest('hex')};
+    };
+    const before=await invariant(), variants=[];
+    try {
+      for(const variant of ['old','new']) {
+        const paint=await page.evaluate(async ({variant,entry})=>{
+          const {Color}=await import('/gpu-three.js');
+          const material=window.__gameHooks.debug.world.materials.find(m=>m.uuid===entry.uuid);
+          if(!material) throw Error('Plaster material identity changed');
+          const oldPaint=new Color(0xc0ac86),newPaint=new Color(0xd5c7ad);
+          const ratio=variant==='old'?[oldPaint.r/newPaint.r,oldPaint.g/newPaint.g,oldPaint.b/newPaint.b]:[1,1,1];
+          material.color.fromArray(entry.color.map((value,i)=>value*ratio[i]));
+          return {uuid:material.uuid,color:material.color.toArray(),ratio};
+        },{variant,entry});
+        await H('advance',0,1/60,true);
+        const filename='hub-plaster-'+label+'-'+variant;
+        await captureStill(filename);
+        const proof=await invariant();
+        variants.push({variant,filename,paint,proof,game:await page.evaluate(()=>window.__game)});
+        if(proof.fullDigest!==before.fullDigest) report.failures.push(filename+': plaster comparison changed pose/camera/state/other materials');
+      }
+    } finally {
+      await page.evaluate(entry=>{
+        const material=window.__gameHooks.debug.world.materials.find(m=>m.uuid===entry.uuid);
+        if(!material) throw Error('Cannot restore plaster material');
+        material.color.fromArray(entry.color);
+      },entry);
+      await H('advance',0,1/60,true);
+      const restored=await invariant();
+      const restoredColor=await page.evaluate(uuid=>window.__gameHooks.debug.world.materials.find(m=>m.uuid===uuid)?.color.toArray(),entry.uuid);
+      save('hub-plaster-'+label+'-comparison.json',{label:'Staged old/new plaster proof; fixed light, pose, camera and game state',entry,before,variants,restored,restoredColor});
+      if(restored.fullDigest!==before.fullDigest || JSON.stringify(restoredColor)!==JSON.stringify(entry.color))
+        report.failures.push('Plaster comparison failed exact restoration at '+label);
+    }
   }
   async function shot(name) {
     await captureStill(name);
@@ -1258,6 +1307,7 @@ try {
     // Natural spawn, gravity warm-up and untouched chase before any staging.
     await advance(60); await shot('hub-spawn-chase');
     save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
+    await capturePlasterComparison('spawn');
     // Live player view from natural spawn, before any teleport or photo camera.
     const naturalInitial = await H('state');
     await video('hub-natural-arrive-chase', 15 * fps, async i => {
@@ -1305,6 +1355,7 @@ try {
 
     save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
     if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
+    await capturePlasterComparison('hero');
     const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
     save('hub-festoon-clearance.json', festoon);
     if (festoon?.pendants.length !== 12 || festoon?.cords?.length !== 3) report.failures.push('Hub must expose twelve pendants on three supported cords');
@@ -1315,6 +1366,7 @@ try {
       ['arrival', [16, 10, 108], [-5, 2, 81], 52],
       ['arrival-close', [8, 3.8, 98], [-10, 2, 85], 55],
       ['well', [-2, 4, 91], [-9, 2, 82], 52],
+      ['hearth-lane', [-5.5, 3.4, 98], [-13.5, 1.4, 91], 52],
       ['west-exit', [-7, 7, 96], [-23, 2, 71], 56],
       ['east-exit', [2, 6, 99], [18, 2, 80], 56],
       ['north-exit', [0, 5, 97], [0, 2, 65], 55],
@@ -1967,6 +2019,9 @@ try {
     await RH('photo',[220,44,-122],[190,34,-119],52);await advance(2);await shot('reachview-payoff-vista');
     // A closer comparison avoids the east-bank trunk without moving the scene.
     await RH('photo',[213,39,-121],[192,34,-120],52);await advance(2);await shot('reachview-hero-orchard');
+    // Verified old hero crosses bell pillars; compare from their north side.
+    await RH('teleport',204,36,-118,-Math.PI/2);
+    await RH('photo',[210,40,-110],[198,35,-118],52);await advance(60,false);await shot('reachview-hero-clear');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
@@ -2420,7 +2475,10 @@ try {
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
 finally {
   report.errors = errors; report.qualityLog = log;
-  save('report.json', report); save('perf.json', report.perf);
+  // Write completion atomically: the relay must never parse a partial report.
+  save('report.json.tmp', captureReportSummary(report));
+  fs.renameSync(path.join(out, 'report.json.tmp'), path.join(out, 'report.json'));
+  save('perf.json', report.perf);
   if (browser) await browser.close();
   server.close();
 }

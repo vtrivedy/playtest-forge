@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { captureReportSummary } from '../capture-report-summary.mjs';
+const trace = Array.from({ length: 2250 }, (_, frame) => ({ frame, state: { pos: [1, 2, 3] } }));
+const report = { captureToolSha: 'immutable', failures: ['honest-failure'], errors: [], videos: { route: { frames: 2250, trace, end: { deaths: 0 } } } };
+const compact = captureReportSummary(report);
+assert.equal(report.videos.route.trace, trace);
+assert.equal(trace.length, 2250);
+assert.equal(compact.videos.route.trace, undefined);
+assert.equal(compact.videos.route.traceFile, 'route.json');
+assert.equal(compact.videos.route.traceSamples, 2250);
+assert.deepEqual(compact.failures, report.failures);
+assert.deepEqual(compact.videos.route.end, report.videos.route.end);
+assert.ok(JSON.stringify(compact).length < JSON.stringify(report).length / 100);
+console.log('Capture report summary preserves verdicts and full source trace; compact relay payload passed');
