@@ -331,6 +331,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     group.name=s.id;
     const body = new THREE.Mesh(geo, mat);
     body.name='shade-density-core';
+    body.userData.forgeSkipAO = true;
     body.castShadow = false;
     body.renderOrder = 2;
     group.add(body);
@@ -340,6 +341,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       material.uniforms.uLayer!.value = layer;
       material.side = layer % 2 ? THREE.BackSide : THREE.FrontSide;
       const wash = new THREE.Mesh(geo, material);
+      wash.userData.forgeSkipAO = true;
       wash.renderOrder = layer % 2 ? 1 : 3;
       group.add(wash);
       layers.push(material);
