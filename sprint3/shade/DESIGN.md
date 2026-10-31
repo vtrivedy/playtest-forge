@@ -7,3 +7,5 @@ Patrol becomes a slow drift; nearby warmth attracts a bounded, softly turning pu
 Validation: tsc and fox Vite build, immutable branch push, request remote shade capture with before baseline 2e0e614. Inspect PNGs and window.__game reports before visual claims or main landing. Ask the driver for Opus critique of side/chase depth and release. Follow-up fix and remote retest required. No local browser/render.
 
 Assets: existing /assets/library/animals/quaternius_stag.glb (Quaternius CC0); all smoke/noise/motes are original procedural code, no new downloaded assets.
+
+Code critique follow-up: pause patrol phase while pursuing/returning so the return point is reachable; damp visual yaw independently from displacement. Check world walls as well as terrain. Render back shells before core/front shells, anchor wrap lighting in world space, and preserve every mote's drift at release. Remove eye sprites and retain only 20 settling leaves. Pursuit attracts the shade's existing drain zone toward warmth; player contact/invulnerability rules stay in the existing contact system.
