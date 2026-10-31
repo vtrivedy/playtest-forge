@@ -9,3 +9,7 @@ Restoration should feather over several metres with stationary world-space water
 Validation: TypeScript and fox Vite build. Request matching GPU water and restore stills at baseline 2e0e614 and candidate pushed immutable SHA, plus water gameplay reports from window.__game. Inspect returned PNGs personally, document concrete defects, revise and request a second capture. Seek Opus critique of source and captured images; if unavailable, record limitation. No visual pass or main merge before evidence review.
 
 Missing checkout references: sprint3/briefs/_style-update-1105.md, COMMON.md, sprint2/critic/STATUS.md, external sprint2 lessons. Supplied combined brief and local locked design docs are the available direction.
+
+## R2 evidence coverage
+
+The baseline water/stills suite lacks close mask-front evidence. Add a remote-only `restoration` capture group: fixed oblique meadow camera, idle aura, actual dash input with wake decay, then staged existing `lightSeedwells` event at expanding and settled times. Record window.__game and public state beside each PNG. The harness must label staged latches, retain the same lens, and never mutate read-only debug handles. This changes review coverage only, not gameplay.
