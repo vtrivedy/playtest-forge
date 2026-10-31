@@ -103,14 +103,14 @@ export class AuthoredLocomotion {
     stopHold: .3, stopMatch: 1.25,
     /** Entry pose search look-ahead (s): matches where the legs are heading, not only where they are. */
     entryLook: .08,
-    footIK: 1, pelvisAdjust: 1, maxPelvisDrop: .2, footLock: 1, maxLock: .08, normalAlignDeg: 10, clearance: .004,
+    footIK: 1, pelvisAdjust: 1, maxPelvisDrop: .2, footLock: 1, maxLock: .1, normalAlignDeg: 10, clearance: .004,
     /** Max change of a paw's IK correction per 60 Hz frame (m). */
     padJerk: .04,
     contactShadow: .45,
     slopeTilt: 1, turnLean: .07, bankMax: .22, headLead: .38, headTurn: .12, headFrequency: 3, headDamping: .85,
     springFrequency: 3, springDamping: .8,
     /** Spine gather (+) / extend (−) degrees: gallop stride, air arc, land absorb; lateral bend deg per (rad/s · m/s). */
-    spineGallop: 5, spineGallopPhase: .04, spineAir: 9, spineLand: 7, spineBendGain: 1.4, spineMaxDeg: 13, spineFrequency: 3.2, spineDamping: .8,
+    spineGallop: 4, spineGallopPhase: .04, spineAir: 9, spineLand: 7, spineBendGain: 1.4, spineMaxDeg: 13, spineFrequency: 3.2, spineDamping: .8,
     /** Tail spring chain: deg per m/s² of forward accel (− = drops when accelerating), deg per m/s vertical (rising drags it
      * down), yaw deg per (rad/s · m/s). Root pitch ≤ tailMaxUpDeg above the clip, chain never past tailMaxElevDeg. */
     tailAccel: 2.2, tailVertical: 3, tailTurn: 2.2, tailMaxUpDeg: 35, tailMaxElevDeg: 80, tailFrequency: 3.2, tailDamping: .72,

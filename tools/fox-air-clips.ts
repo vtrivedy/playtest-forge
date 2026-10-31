@@ -128,7 +128,7 @@ for (const edit of EDITS) {
   // Sample tracks directly: the mixer skips re-writing constant tracks, which would compound the edits.
   const tracks = clip.tracks.map((t) => {
     const [node, prop] = t.name.split('.');
-    return { target: (bone(node) as unknown as Record<string, { fromArray(a: ArrayLike<number>): void }>)[prop], interpolant: t.createInterpolant() };
+    return { target: (bone(node) as unknown as Record<string, { fromArray(a: ArrayLike<number>): void }>)[prop], interpolant: (t as THREE.KeyframeTrack & { createInterpolant(): THREE.Interpolant }).createInterpolant() };
   });
   const n = Math.round(edit.duration * FPS) + 1;
   const times = new Float32Array(n);
