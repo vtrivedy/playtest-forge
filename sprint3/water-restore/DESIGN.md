@@ -13,3 +13,5 @@ Missing checkout references: sprint3/briefs/_style-update-1105.md, COMMON.md, sp
 ## R2 evidence coverage
 
 The baseline water/stills suite lacks close mask-front evidence. Add a remote-only `restoration` capture group: fixed oblique meadow camera, idle aura, actual dash input with wake decay, then staged existing `lightSeedwells` event at expanding and settled times. Record window.__game and public state beside each PNG. The harness must label staged latches, retain the same lens, and never mutate read-only debug handles. This changes review coverage only, not gameplay.
+
+Relay compatibility: run the restoration coverage as part of the already supported `water` shot group as well as the explicit `restoration` group, so the running relay requires no restart or whitelist change.

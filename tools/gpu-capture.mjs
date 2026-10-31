@@ -651,7 +651,7 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
-  if (wants('restoration')) {
+  if (wants('restoration') || wants('water')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
