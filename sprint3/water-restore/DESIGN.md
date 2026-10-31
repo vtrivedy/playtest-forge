@@ -94,7 +94,7 @@ Remove the authored sine-foam chevrons from channel shading; physical specular, 
 
 For permanent restoration, preserve authored hue while compensating the sepia wash's lifted black floor: make restored midtone luminance about18% above its washed equivalent, bounded to1.65x gain; deep shadow stays deep. No new radial overlay, saturation wall or change to CPU mask probes. This supports gold/green/russet returning instead of a darker rust stain. The same already-soft mask controls its transition. Review before/mid/settled at the same unobstructed lens, and retain dark wet gaps/fox saturation priority.
 
-The scanned litter texture already carries orange/brown chroma; multiplying it by clean authored hues doubles that bias. In Reed land only, neutralize85% of the source texture chroma before applying the existing gold/russet/pine palette. Keep its value/detail, alpha, leaf placement and other regions unchanged.
+Source correction after direct inspection: active ground litter comes from procedural groundTextures(1024), with near-white warm RGB and per-leaf rank alpha; it does not use the scannedLeaf001 asset. In Reed land only, the implemented85% source-chroma neutralization removes a small warm bias before applying gold/russet/pine. It preserves value/detail, alpha, leaf placement and other regions; it is not a demonstrated fix for distant stipple. The shader also maps mipmapped rank alpha into nonlinear hue bins, a plausible minification-noise cause requiring captured near/far assessment.
 
 ## Transient dash wake follow-up
 
