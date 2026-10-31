@@ -237,9 +237,9 @@ async function boot() {
   cam.resize(innerWidth, innerHeight);
 
   const colorField = createColorField({
-    auraRadius: 3.4,
-    trailLife: 3.0,
-    trailRadius: 2.6,
+    auraRadius: 1.8,
+    trailLife: 2.2,
+    trailRadius: 1.8,
     trailDepositInterval: 0.035,
     bounds: world.bounds,
     maskSize: 512,

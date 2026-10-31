@@ -767,45 +767,48 @@ export class ColorField {
           // ground a wet-in-wet living meadow (yellow-green / sage / moss, ochre and madder only as
           // accents) replaces the hue at the surface's own value; stone comes back cool blue-grey
           // (the sepia is warm, so true colour on stone is the cool) with moss tops and lichen.
-          float paintK = cfPaint * cfPaintLead;
+          // Permanent paint path always shows pigment (cfPaintLead only modulates the drying rim).
+          // Multiplying by lead previously collapsed the ribbon into the fox's aura disc.
+          float paintK = cfPaint;
           if (paintK > 0.001) {
             vec3 wp = vWorldPosCF;
             float hueA = noise21(wp.xz * 0.16 + 31.0) * 0.75 + noise21(wp.xz * 0.6 + 9.0) * 0.25;
             float hueB = noise21(wp.xz * 0.45 + 5.0);
             float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
             // pigment density: settled pools and thin, paper-lit passages (not a flat carpet)
-            float dens = mix(0.86, 1.16, noise21(wp.xz * 0.7 + 11.0) * 0.6 + noise21(wp.xz * 2.3 + 2.0) * 0.4);
-            // unit-luma hues
-            vec3 meadow = mix(vec3(0.92, 1.08, 0.3), vec3(0.76, 1.1, 0.55), smoothstep(0.35, 0.6, hueA));
-            meadow = mix(meadow, vec3(0.62, 1.14, 0.42), smoothstep(0.62, 0.82, hueA));
-            meadow = mix(meadow, vec3(1.3, 0.95, 0.42), smoothstep(0.7, 0.9, hueB) * 0.55);
-            meadow = mix(meadow, vec3(1.5, 0.8, 0.62), smoothstep(0.82, 0.95, 1.0 - hueB) * 0.4);
-            vec3 own = max(mix(vec3(chromaLuma), chroma, 1.2), 0.0);
-            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.15, 0.85) * dens;
+            float dens = mix(0.9, 1.22, noise21(wp.xz * 0.7 + 11.0) * 0.6 + noise21(wp.xz * 2.3 + 2.0) * 0.4);
+            // unit-luma hues — push green saturation so thumbnail reads two-tone vs sepia
+            vec3 meadow = mix(vec3(0.55, 1.28, 0.28), vec3(0.48, 1.22, 0.5), smoothstep(0.35, 0.6, hueA));
+            meadow = mix(meadow, vec3(0.4, 1.3, 0.38), smoothstep(0.62, 0.82, hueA));
+            meadow = mix(meadow, vec3(1.15, 1.05, 0.35), smoothstep(0.75, 0.92, hueB) * 0.35);
+            meadow = mix(meadow, vec3(1.25, 0.75, 0.55), smoothstep(0.85, 0.97, 1.0 - hueB) * 0.25);
+            vec3 own = max(mix(vec3(chromaLuma), chroma, 1.05), 0.0);
+            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.28, 0.92) * dens;
             float up = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
             float lichenN = noise21(wp.xz * 1.3 + wp.y * vec2(1.1, 0.7) + 3.0);
-            float lichen = smoothstep(0.5, 0.7, lichenN);
-            vec3 stone = chromaLuma * mix(vec3(0.86, 0.97, 1.16), vec3(1.02, 0.98, 0.98), noise21(wp.xz * 0.5 + wp.y * 0.4)) * 1.1;
+            float lichen = smoothstep(0.45, 0.68, lichenN);
+            // cool blue-grey stone (sepia is warm — restored is the cool opposite)
+            vec3 stone = chromaLuma * mix(vec3(0.78, 0.92, 1.22), vec3(0.9, 0.96, 1.08), noise21(wp.xz * 0.5 + wp.y * 0.4)) * 1.15;
             // ochre-gold lichen on faces, green moss on tops
-            vec3 lichenC = chromaLuma * vec3(1.2, 1.05, 0.45) * 1.1;
-            vec3 moss = chromaLuma * vec3(0.66, 1.14, 0.42) * 1.15;
-            vec3 face = mix(stone, lichenC, lichen * 0.8);
-            vec3 propPaint = mix(own, mix(face, moss, smoothstep(0.45, 0.85, up)), 1.0 - uRestoredChroma * 0.5) * dens;
-            chroma = mix(chroma, mix(propPaint, groundPaint, uGroundSurface), paintK * 0.92);
+            vec3 lichenC = chromaLuma * vec3(1.25, 1.08, 0.4) * 1.15;
+            vec3 moss = chromaLuma * vec3(0.55, 1.22, 0.4) * 1.2;
+            vec3 face = mix(stone, lichenC, lichen * 0.85);
+            // Ignore authored warm brick chroma — force cool restore on props
+            vec3 propPaint = mix(face, moss, smoothstep(0.45, 0.85, up)) * dens;
+            chroma = mix(chroma, mix(propPaint, groundPaint, uGroundSurface), paintK * 0.95);
           }
           outgoingLight = mix(washed, chroma, brushed);
-          // watercolour: pigment pools at the drying edge of the fox's paint (burnt-sienna line),
-          // and paint the brush is still passing over glistens warm
-          float pigmentRim = smoothstep(0.1, 0.4, cfPaint) * (1.0 - smoothstep(0.45, 0.9, cfPaint)) * cfPaintLead;
-          outgoingLight *= mix(vec3(1.0), vec3(0.7, 0.52, 0.38), pigmentRim * 0.85);
-          outgoingLight *= 1.0 + cfPaint * cfFresh * vec3(0.14, 0.08, 0.02);
-          // the wet front of a spreading bloom catches the light (#FFC98A), like a restore rim
+          // watercolour drying rim: darker pigment pool at the edge (not an orange glow)
+          float pigmentRim = smoothstep(0.08, 0.38, cfPaint) * (1.0 - smoothstep(0.42, 0.88, cfPaint));
+          outgoingLight *= mix(vec3(1.0), vec3(0.55, 0.48, 0.36), pigmentRim * 0.7);
+          // subtle cool granulation lift inside the wash (no warm aura bloom)
+          outgoingLight *= 1.0 + cfPaint * (1.0 - cfWet) * vec3(0.04, 0.06, 0.02);
+          // wet front: soft cool sheen, not #FFC98A orange ring
           float wetLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
-          outgoingLight += cfWet * (outgoingLight * vec3(0.5, 0.3, 0.08) + vec3(0.08, 0.045, 0.012) * (0.35 + wetLuma));
-          // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
-          // without repainting it — stone stays stone, just sunlit
+          outgoingLight += cfWet * 0.35 * (outgoingLight * vec3(0.15, 0.18, 0.12) + vec3(0.02, 0.025, 0.02) * (0.35 + wetLuma));
+          // restore-wave rim stays warm but quieter (Shade/shrine only, not fox paint)
           float rimLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
-          outgoingLight += cfRim * (outgoingLight * vec3(0.55, 0.32, 0.08) + vec3(0.11, 0.06, 0.018) * (0.35 + rimLuma));
+          outgoingLight += cfRim * 0.55 * (outgoingLight * vec3(0.45, 0.28, 0.08) + vec3(0.08, 0.045, 0.014) * (0.35 + rimLuma));
           #include <opaque_fragment>
           `,
         );
@@ -896,9 +899,9 @@ export type PaintTuning = {
 export class PaintLayer {
   readonly bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   readonly tun: PaintTuning = {
-    ribbonRadius: 2.2,
-    ribbonSpacing: 0.45,
-    pawRadius: 0.8,
+    ribbonRadius: 2.6,
+    ribbonSpacing: 0.38,
+    pawRadius: 0.95,
     dripSpacing: 3.5,
     dripRadius: 2.6,
     bloomLife: 1.3,
