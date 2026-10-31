@@ -12,7 +12,7 @@ export type StylizedWater = {
 /** Gentle scene-refracted water with an optional planar scenery reflection. */
 export function createStylizedWater(
   scene: THREE.Scene,
-  opts: { size?: number; y?: number; colorDeep?: number; colorShallow?: number; shoreRadius?: number; reflection?: boolean } = {},
+  opts: { size?: number; y?: number; colorDeep?: number; colorShallow?: number; shoreRadius?: number; reflection?: boolean; reflectionDistance?: number; depthTint?: number } = {},
 ): StylizedWater {
   const size = opts.size ?? 80;
   const shoreRadius = opts.shoreRadius ?? 1;
@@ -22,6 +22,7 @@ export function createStylizedWater(
     uReflectionMap: { value: null as THREE.Texture | null },
     uReflectionMatrix: { value: new THREE.Matrix4() },
     uReflectionOn: { value: 0 },
+    uDepthTint: { value: THREE.MathUtils.clamp(opts.depthTint ?? 0.12, 0.025, 0.4) },
     uTime: { value: 0 },
     uHalf: { value: size * 0.5 },
     uShoreRadius: { value: shoreRadius },
@@ -57,7 +58,7 @@ export function createStylizedWater(
       }`,
     fragmentShader: sceneWaterFragment + /* glsl */ `
       uniform vec3 uDeep, uShallow, uSky;
-      uniform float uShoreRadius, uTime, uReflectionOn;
+      uniform float uShoreRadius, uTime, uReflectionOn, uDepthTint;
       uniform sampler2D uReflectionMap;
       varying vec3 vWorld;
       varying vec3 vN;
@@ -77,7 +78,7 @@ export function createStylizedWater(
         vec3 bed = sceneWaterColor(rippleView.xy * 0.06 * shore);
         vec3 tint = mix(vec3(0.94, 0.97, 0.91), vec3(0.66, 0.82, 0.73), depth);
         vec3 absorption = mix(uShallow, uDeep * 0.85, depth);
-        vec3 refracted = mix(bed * tint, absorption, 0.025 + depth * 0.095);
+        vec3 refracted = mix(bed * tint, absorption, 0.025 + depth * (uDepthTint - 0.025));
         float bedLight = sin(a + sin(b) * 0.55) * sin(b * 1.3) * 0.5 + 0.5;
         refracted += bed * bedLight * (1.0 - depth) * 0.025;
         vec3 reflection = uSky * (0.75 + 0.10 * sin(a * 0.3 + b * 0.2));
@@ -109,7 +110,7 @@ export function createStylizedWater(
     reflector.matrixWorld.copy(mesh.matrixWorld);
     const planeNormal = new THREE.Vector3(0, 0, 1).transformDirection(mesh.matrixWorld);
     const view = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld).sub(new THREE.Vector3().setFromMatrixPosition(mesh.matrixWorld));
-    uniforms.uReflectionOn.value = planeNormal.dot(view) > 0 ? 1 : 0;
+    uniforms.uReflectionOn.value = planeNormal.dot(view) > 0 && view.lengthSq() <= (opts.reflectionDistance ?? 100) ** 2 ? 1 : 0;
     if (!uniforms.uReflectionOn.value) return false;
     const target = renderer.getRenderTarget(), xr = renderer.xr.enabled, shadows = renderer.shadowMap.autoUpdate, shadowRequested = renderer.shadowMap.needsUpdate;
     reflector.getReflectionCamera(camera).layers.mask = camera.layers.mask;

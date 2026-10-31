@@ -968,6 +968,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   ink.receiveShadow = true;
   group.add(ink);
   let inkActive = true;
+  // Restoring Reed clears the ink into ankle-deep water, with the same safe floor.
+  const reedWater = createStylizedWater(scene, { size: 60, y: MARSH.floor + 0.18, colorDeep: 0x247b74, colorShallow: 0x668779, reflection: true, reflectionDistance: 70, depthTint: 0.22 });
+  reedWater.mesh.position.set(MARSH.x, MARSH.floor + 0.18, MARSH.z);
+  reedWater.mesh.scale.set(MARSH.rx / 30, MARSH.rz / 30, 1);
+  reedWater.mesh.visible = false;
+  waterVisuals.push(reedWater);
 
   // boardwalk on stilts (56,37)→(65,31)
   const plankWalk = (a: { x: number; z: number }, b: { x: number; z: number }, top: number, w: number) => {
@@ -2560,7 +2566,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         if (bridgeT >= 1) bridgeC.enabled = true;
       }
 
-      // ink pools dry after SW2
+      reedWater.mesh.visible = !inkActive;
+      // Ink sinks after SW2, revealing the shallow clear water and original floor.
       if (!inkActive && ink.position.y > MARSH.floor - 1.2) {
         ink.position.y -= dt * 0.35;
         inkMat.roughness = Math.min(0.9, inkMat.roughness + dt * 0.2);
@@ -2703,7 +2710,8 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
           : gBankRank < 0.80 ? vec3(0.57, 0.21, 0.08)
           : gBankRank < 0.94 ? vec3(0.42, 0.30, 0.17) : vec3(0.09, 0.19, 0.105);
         gHue = mix(gHue, gBankHue, gReedLand * 0.85);
-        vec3 gLeafCol = gLeaf.rgb * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
+        vec3 gLeafBase = mix(gLeaf.rgb, vec3(dot(gLeaf.rgb, vec3(0.2126, 0.7152, 0.0722))), gReedLand * 0.85);
+        vec3 gLeafCol = gLeafBase * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
         diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);
         // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of
         // dry olive-gold grass where the litter thins, so open ground never reads as one plane

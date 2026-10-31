@@ -85,3 +85,13 @@ GPU b807005/5d403d3 show lost opaque geometry plus repeated shadow sampler/type 
 Boot reflection starts disabled until its first valid render; readiness ignores hidden/out-of-layer shadow lights. Capture treats sampler/type mismatch warnings as errors and records/requires shadowMap.type=PCF(1), making the formerly silent dropped-draw failure explicit.
 
 Opus confirms PCF/startup repair but tightens proof: record shadow type at the first prepare (before any mirror/main draw can normalize it) and require1; also fail on preserved bootPriorGlError so the original1282 cannot be hidden by pond-scope reset. End-of-sequence shadow type alone is insufficient.
+
+## After valid d99 GPU: Reed payoff and clean restored value
+
+Fresh d99/0e8333ed passes renderer/runtime gates and personal inspection proves the pond now reflects scenery and reveals shallows. Remaining concrete defects: flat channel chevrons, cleared Reed basin is bare dark mud, restored colour still muddy. Opus quota resets06:40UTC; Sol CLI image attachments were unavailable, so its provisional output is not counted as visual approval.
+
+Remove the authored sine-foam chevrons from channel shading; physical specular, refracted bed and ripple normals supply flow cues. Put a shallow clear Reed water skin at floor+0.18 under the existing sinking ink. It is hidden while inkActive, appears after the existing latch/flood clears the hazard, and does not alter ink state, sink timing, collisions, pads or route. Reuse the tested scene-water shader/reflection path; use a restrained dark teal depth tint. Limit mirror distance per surface to avoid distant duplicate scene renders. Add a dedicated restored-Reed water vista and record warm-render performance.
+
+For permanent restoration, preserve authored hue while compensating the sepia wash's lifted black floor: make restored midtone luminance about18% above its washed equivalent, bounded to1.65x gain; deep shadow stays deep. No new radial overlay, saturation wall or change to CPU mask probes. This supports gold/green/russet returning instead of a darker rust stain. The same already-soft mask controls its transition. Review before/mid/settled at the same unobstructed lens, and retain dark wet gaps/fox saturation priority.
+
+The scanned litter texture already carries orange/brown chroma; multiplying it by clean authored hues doubles that bias. In Reed land only, neutralize85% of the source texture chroma before applying the existing gold/russet/pine palette. Keep its value/detail, alpha, leaf placement and other regions unchanged.

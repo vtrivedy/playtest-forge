@@ -872,6 +872,8 @@ try {
     for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['settled', 240]]) {
       await advance(frames); await shot(`restoration-${name}`);
     }
+    await H('photo', [64, 3, 43], [82, -1.7, 20], 52); await advance(2); await shot('restoration-water-vista');
+    save('restoration-water-perf.json', await H('perf', 6));
     save('restoration-provenance.json', {
       label: 'STAGED fixed-lens visual review: real dash input, then staged public Seedwell latches',
       note: 'All three staged latches activate their normal Shade encounters; actors may enter the Reed frame.',
