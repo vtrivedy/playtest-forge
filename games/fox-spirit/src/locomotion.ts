@@ -37,11 +37,11 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45, spineFlex: 1, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .8,
+    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .8,
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .8, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .025, gallopFlex: .2, gallopFlexPhase: .8, strideFlex: .025, weightRoll: .05, spineSway: .045, breath: .022,
+    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .025, gallopFlex: .3, gallopFlexPhase: .8, weightRoll: .05, spineSway: .045, breath: .022,
     runningGather: .45, tailAir: .05, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
@@ -784,7 +784,8 @@ export class AuthoredLocomotion {
     // Positive about the actor right axis lowers a forward-pointing bone: spines curl the chest down, pelvis tucks.
     const run=locomoting ? this.weights.get('run') ?? 0 : 0;
     const flexPhase=Math.cos(2*Math.PI*(this.phase-this.params.gallopFlexPhase));
-    const flex=run*this.params.gallopFlex*flexPhase+(walk+trot)*this.params.strideFlex*Math.cos(4*Math.PI*(this.phase-.15));
+    // Rounding only: an extension past the authored line lifts the withers beyond the planted forelegs' reach.
+    const flex=run*this.params.gallopFlex*(.5+.5*flexPhase);
     if(Math.abs(flex)>1e-4) {
       worldOverlay(this.spine,right.clone(),-flex*.5);
       for(const spine of this.spines)worldOverlay(spine,right.clone(),flex/this.spines.length*1.5);
