@@ -13,7 +13,7 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 
 export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number; inkDensity: number; noticeDistance: number; noticeTime: number; leafSize: number; chaseDistance: number; chaseDelay: number; chaseLeash: number; chaseRest: number };
-export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 1.25, hitRadius: 1.1, knockback: 3, bob: 0.12, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.17, inkSize: 0.55, inkDensity: 3, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14, chaseDistance: 3.8, chaseDelay: 1.2, chaseLeash: 4, chaseRest: 3 };
+export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 1.25, hitRadius: 1.1, knockback: 3, bob: 0.12, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.17, inkSize: 0.55, inkDensity: 4, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14, chaseDistance: 3.8, chaseDelay: 1.2, chaseLeash: 4, chaseRest: 3 };
 
 type ShadeActor = {
   active: boolean;
@@ -297,6 +297,8 @@ export type ShadeSystem = {
   update: (dt: number, t: number, fox: THREE.Vector3, dashing: boolean) => Array<{ type: 'freed' | 'hit'; id: string; pos: THREE.Vector3 }>;
   resetSweep: () => void;
   activateAfterLatch: (id: string) => void;
+  /** Reuse renderer volumes while preserving live actor precision; excludes inactive/freed actors. */
+  writeDrainVolumes: (volumes: Array<{ center: THREE.Vector3; radius: number }>) => void;
   state: () => ShadeState[];
 };
 
@@ -535,6 +537,17 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       }
       previousFox = fox.clone();
       return ev;
+    },
+    writeDrainVolumes(volumes) {
+      let count = 0;
+      for (const s of shades) {
+        if (!s.active || s.freed) continue;
+        const volume = volumes[count] ?? (volumes[count] = { center: new THREE.Vector3(), radius: tun.drainRadius });
+        volume.center.copy(s.pos);
+        volume.radius = tun.drainRadius;
+        count++;
+      }
+      volumes.length = count;
     },
     state() {
       return shades.filter(s => s.active).map((s) => ({ id: s.id, height: Number(animalHeight.toFixed(3)), pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, mode: s.mode, presence: Number(s.presence.toFixed(3)), smokeParticles: s.group.visible ? s.smoke.geometry.attributes.position!.count : 0, notice: Number(s.notice.toFixed(3)), noticeYaw: Number(s.noticeYaw.toFixed(3)), heading: Number(s.heading.toFixed(4)), attractionRest: Number(s.attractionRest.toFixed(3)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.leaves.visible ? s.leaves.count : 0 }));

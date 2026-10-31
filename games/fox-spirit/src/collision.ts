@@ -146,6 +146,17 @@ export class CollisionWorld {
     return false;
   }
 
+  /** Lens diagnostic: solid overlap without the creature's one-way/step-up exceptions. */
+  cameraOccupied(x: number, y: number, z: number, radius = 0.2): boolean {
+    if (this.terrain(x, z) > y - radius) return true;
+    for (const c of this.colliders) {
+      if (!c.enabled || c.bottom >= y + radius) continue;
+      const top = colliderTopAt(c, x, z, radius);
+      if (top !== null && top > y - radius) return true;
+    }
+    return false;
+  }
+
   /** Highest surface of any kind at (x,z) — camera floor / dressing. */
   highestAt(x: number, z: number): number {
     let best = this.terrain(x, z);
