@@ -350,6 +350,41 @@ try {
       for(const reason of reasons){const failure=`${name} staging: ${reason}`;releaseStagingFailures.push(failure);report.failures.push(failure);}
       return result;
     };
+    const stageSupportedKilnDash=async(label,startDistance=2.7)=>{
+      const trace=[];
+      let movedFoxAway=false;
+      for(let waitFrames=0;waitFrames<=1200;waitFrames+=15){
+        const sample=await page.evaluate(({id,startDistance})=>{
+          const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
+          if(!actor||actor.freed)return {failure:'No live Kiln Shade'};
+          const [x,y,z]=actor.pos,col=h.debug.world.collision;
+          for(let k=0;k<128;k++){
+            const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
+            for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){
+              const px=x+dx*r-dz*width,pz=z+dz*r+dx*width,floor=col.groundAt(px,pz,y+.1).y;
+              if(!Number.isFinite(floor)||col.blocked(px,pz,y)||Math.abs(floor-y)>.2){safe=false;break;}
+            }
+            if(safe)return {actor:actor.pos,mode:actor.mode,setup:{pos:[x+dx*startDistance,y,z+dz*startDistance],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)}};
+          }
+          return {actor:actor.pos,mode:actor.mode,setup:null};
+        },{id:actors[0].id,startDistance});
+        trace.push({waitFrames,...sample});
+        if(sample.failure)throw Error(sample.failure);
+        if(sample.setup){
+          save(`${label}-runway-wait.json`,{label:'Staged fox moved to world spawn only if needed; live animal returns/patrols until full supported runway exists',movedFoxAway,waitFrames,trace});
+          return sample.setup;
+        }
+        if(waitFrames===1200)break;
+        if(!movedFoxAway){
+          await H('setKeys',[]);await H('setStick',null);
+          const spawn=await page.evaluate(()=>window.__gameHooks.debug.world.spawnPos.toArray());
+          await H('teleport',...spawn);movedFoxAway=true;
+        }
+        await advance(15,false);
+      }
+      save(`${label}-runway-wait.json`,{passed:false,movedFoxAway,trace});
+      throw Error(`No supported Kiln dash runway after20s of live patrol: ${label}`);
+    };
     const validatePair=name=>{
       const rows=report.videos[name].trace.filter(row=>row.state.capture?.shadePresent).map(row=>({frame:row.frame,...row.state.capture}));
       const failed=rows.filter(row=>!row.fox||!row.shade||row.fox.heightFraction<=.15||row.shade.heightFraction<=.15||!row.fox.inFrame||!row.shade.inFrame);
@@ -555,15 +590,7 @@ try {
     const contactFailure=contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1 ? `Shade contact failed: ${JSON.stringify(contact)}` : null;
     if(contactFailure){shadeContactFailures.push(contactFailure);report.failures.push(contactFailure);}
     save('shade-contact-acceptance.json',{passed:!contactFailure,failure:contactFailure,contact,label:'Strict contact gate retained; release diagnostics continue before final failure'});
-    p = contact.actors[0].pos;
-    const dashSetup = await page.evaluate(([x,y,z]) => {
-      const col=window.__gameHooks.debug.world.collision;
-      for(let k=0;k<128;k++){
-        const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2){safe=false;break;}}
-        if(safe)return {pos:[x+dx*2.7,y,z+dz*2.7], direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
-      }throw Error('No clear dash approach');
-    },p);
+    const dashSetup = await stageSupportedKilnDash('shade-free');
     save('shade-dash-setup.json',dashSetup);
     await H('teleport', ...dashSetup.pos, dashSetup.yaw);
     const dashControllerBefore=await H('state');
@@ -692,15 +719,7 @@ try {
     }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
-    const live = await page.evaluate(() => {
-      const actor=window.__gameHooks.shades.state().actors[0];
-      const [x,y,z]=actor.pos,col=window.__gameHooks.debug.world.collision;
-      for(let k=0;k<128;k++){
-        const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2){safe=false;break;}}
-        if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
-      }throw Error('No clear live dash approach');
-    });
+    const live = await stageSupportedKilnDash('shade-play',2.6);
     await H('teleport', ...live.pos, live.yaw);
     await H('advance', 1, 0, true);
     await page.keyboard.down('w');
