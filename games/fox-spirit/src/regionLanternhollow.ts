@@ -191,7 +191,11 @@ export function createLanternhollow(
   const chimneyY = ground(chimney.x, chimney.z) + 5.7;
   const smoke = Array.from({ length: 8 }, () => {
     const mat = new THREE.SpriteMaterial({ map: smokeTexture, color: 0x6e5a44, transparent: true, opacity: 0, depthWrite: false });
-    const puff = new THREE.Sprite(mat); parent.add(puff); return puff;
+    const puff = new THREE.Sprite(mat);
+    // Decorative smoke must not enter world/photography collision probes. Sprite
+    // raycasts require a camera, while the photo-blocker ray intentionally has none.
+    puff.raycast = () => {};
+    parent.add(puff); return puff;
   });
 
   // Three modest hand-lettered fingerposts; letters are generated locally, never downloaded.
