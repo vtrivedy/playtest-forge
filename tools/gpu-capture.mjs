@@ -899,6 +899,22 @@ try {
     // Natural spawn, gravity warm-up and untouched chase before any staging.
     await advance(60); await shot('hub-spawn-chase');
     save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
+    // Live player view from natural spawn, before any teleport or photo camera.
+    const naturalInitial = await H('state');
+    await video('hub-natural-arrive-chase', 15 * fps, async i => {
+      await H('setStick', i < 3 * fps ? 0 : null, -.2);
+    }, undefined, {keyFrames: [0, 2*fps, 4*fps, 7*fps, 10*fps, 14*fps]});
+    await H('setStick', null);
+    const naturalEnd = await H('state');
+    const naturalDeaths = naturalEnd.deaths - naturalInitial.deaths;
+    const naturalAssists = naturalEnd.auto.assists - naturalInitial.auto.assists;
+    save('hub-natural-arrive-chase-acceptance.json', { staged: false,
+      label: 'Natural spawn; live analog input for 3s then 12s idle; untouched chase camera; no teleport, photo or pose override',
+      initial: naturalInitial, end: naturalEnd, deaths: naturalDeaths, assists: naturalAssists,
+      game: await page.evaluate(() => window.__game) });
+    if (naturalDeaths || naturalAssists || naturalEnd.auto.active || !naturalEnd.grounded || naturalEnd.anim !== 'idle') {
+      report.failures.push('Hub natural chase arrival did not finish grounded idle without deaths or assists');
+    }
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
     // Portrait staging only; natural spawn above is untouched. Real idle rig, no bone override.
     const heroYaw = Math.atan2(3.1, .8) - Math.PI / 4;
