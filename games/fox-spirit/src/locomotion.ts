@@ -41,7 +41,7 @@ export class AuthoredLocomotion {
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .8, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .025, gallopFlex: .3, gallopFlexPhase: .8, weightRoll: .05, spineSway: .045, breath: .022,
+    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .025, idleLook: .16, gallopFlex: .3, gallopFlexPhase: .8, weightRoll: .05, spineSway: .045, breath: .022,
     runningGather: .45, tailAir: .05, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
@@ -796,6 +796,10 @@ export class AuthoredLocomotion {
     worldOverlay(withers,right.clone(),idle*this.params.breath*.6*breath);
     // Standing soft, not locked: hips and shoulders settle a little so elbows and hocks keep a bend.
     this.root.position.y+=idle*(.004*breath-this.params.idleSettle);
+    // Idle attention: an unhurried look around, carried mostly by the neck.
+    const gaze=idle*this.params.idleLook*(Math.sin(2*Math.PI*.09*this.time)+.5*Math.sin(2*Math.PI*.23*this.time+2));
+    if(this.necks[1])worldOverlay(this.necks[1],up.clone(),gaze*.6);
+    worldOverlay(this.head,up.clone(),gaze*.4);
     // Air pose: forelegs tuck on the rise and reach on the fall, hind legs stream back off the push, body arcs.
     const airborne=!this.input.grounded && /^jump_/.test(active);
     const a=this.air.step(airborne ? THREE.MathUtils.clamp(this.input.verticalSpeed/6,-1,1) : 0,dt,3.2,.9);
