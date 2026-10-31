@@ -390,9 +390,17 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
           mesh.userData.forgeSkipAO = true;
           mesh.castShadow = false;
           mesh.renderOrder = 2;
-          mat.transparent = !n.startsWith('foxtailfur');
-          mat.depthWrite = n.startsWith('foxtailfur');
-          if (!n.startsWith('foxtailfur')) mat.alphaTest = 0;
+          // Body shells must stay opaque+depthWrite: transparent shells let dock/hearth
+          // show through the fox in chase/hero shots (sprint4 paint critic FAIL). Tail
+          // fringe keeps alpha-tested cutout; body shells match the coat-fringe cutout path.
+          if (n.startsWith('foxtailfur')) {
+            mat.transparent = false;
+            mat.depthWrite = true;
+          } else {
+            mat.transparent = false;
+            mat.depthWrite = true;
+            mat.alphaTest = 0.28;
+          }
         }
         if (n.startsWith('foxtailfur')) {
           // The new core is a capped physical volume; only its alpha-tested fringe dissolves.
