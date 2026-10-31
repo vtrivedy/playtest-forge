@@ -759,9 +759,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // The stair top is at s10.5; the upper terrace begins at s12. Join them
   // beyond the last riser so a turn cannot drop the fox back to the y2 floor.
   {
-    const p = sp(11, 0.4);
-    col.add(boxCollider({ x: p.x, z: p.z, w: 3.2, d: 3.6, yaw: T_YAW, top: 6, bottom: 1.5, tag: 'r2-landing' }));
-    slab({ x: p.x, z: p.z, w: 3.2, d: 3.6, yaw: T_YAW, top: 6, bottom: 1.5, rough: 0.65, seed: 74,
+    const p = sp(10.6, 0.4);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 3.2, d: 2.8, yaw: T_YAW, top: 6, bottom: 1.5, tag: 'r2-landing' }));
+    slab({ x: p.x, z: p.z, w: 3.2, d: 2.8, yaw: T_YAW, top: 6, bottom: 1.5, rough: 0.3, seed: 74,
       topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
   }
   // R3 jump chain on k2: broken pillar stumps (6 → 7.5 → 9 → 10)
