@@ -202,16 +202,20 @@ export class AuthoredLocomotion {
     // Designed cadence, bounded so stance is never slower than the ground (no skating) and never
     // compressed below minStanceRatio. Lower cadence than the clip's natural one buys suspension.
     const reach=(g:Gait)=>GAITS[g].stride*this.armScale;
+    // Cadence follows the weights the pose actually blends (smoothed), not the instantaneous targets.
+    const alpha=this.fadeSeconds<=0 ? 1 : 1-Math.exp(-4*dt/this.fadeSeconds);
+    const blended={} as Record<Gait,number>; let blendTotal=0;
+    for(const g of GAIT_NAMES){blended[g]=THREE.MathUtils.lerp(this.weights.get(g) ?? 0,locomoting ? weights[g] : 0,alpha);blendTotal+=blended[g];}
+    for(const g of GAIT_NAMES)blended[g]=blendTotal>1e-3 ? blended[g]/blendTotal : weights[g];
     let cadence=0;
     for(const g of GAIT_NAMES) {
       const natural=speed/reach(g);
       const designed=this.hz(g)*Math.pow(Math.max(speed,.05)/CADENCE_REF[g],this.params.cadenceExponent);
-      cadence+=weights[g]*THREE.MathUtils.clamp(designed,natural*this.params.minStanceRatio,natural);
+      cadence+=blended[g]*THREE.MathUtils.clamp(designed,natural*this.params.minStanceRatio,natural);
     }
     for(const g of GAIT_NAMES) this.stanceRatio[g]=speed>.01 ? THREE.MathUtils.clamp(reach(g)*cadence/speed,this.params.minStanceRatio,1) : 1;
     if(locomoting) this.phase=(this.phase+dt*cadence)%1;
     this.metrics.cadenceHz=cadence; this.metrics.playback=cadence; this.metrics.stanceRatio=this.stanceRatio[dominant];
-    const alpha=this.fadeSeconds<=0 ? 1 : 1-Math.exp(-4*dt/this.fadeSeconds);
     const drive=(action:THREE.AnimationAction,weight:number,time?:number)=>{
       if(weight>1e-5 && !action.isScheduled()) action.play();
       action.enabled=true;
@@ -418,13 +422,13 @@ export class AuthoredLocomotion {
         foot.anchor.y=ground+foot.clearance;
         // A tight turn can pull a stance outside its reach. Transfer support and take a new step;
         // don't solve an impossible fixed anchor or hide the event in the residual metric.
-        if(foot.planted && Math.abs(this.turn)>1 && Math.hypot(foot.anchor.x-paw.x,foot.anchor.z-paw.z)>.20) {
+        if(foot.planted && Math.hypot(foot.anchor.x-paw.x,foot.anchor.z-paw.z)>(Math.abs(this.turn)>1 ? .20 : .25)) {
           foot.planted=false;foot.anchor.copy(paw).setY(ground+foot.clearance);this.metrics.earlySteps++;
         }
         const delta=foot.anchor.clone().sub(paw);
         this.metrics.maxPlantError=Math.max(this.metrics.maxPlantError,Math.hypot(delta.x,delta.z));
-        const gaitWeight=this.metrics.clipWeights[gait] ?? 1;
-        const plantBlend=locomoting ? THREE.MathUtils.smoothstep(gaitWeight,.55,.9) : 1;
+        // IK confidence follows blended contact agreement, so a 50/50 gait handoff keeps its plants.
+        const plantBlend=locomoting ? THREE.MathUtils.smoothstep(support,.55,.9) : 1;
         delta.clampLength(0,this.params.maxCorrection).multiplyScalar(this.params.plantStrength*plantBlend);
         this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,delta.length());
         // Save both joints so correction cannot accumulate when a clip doesn't key that bone.
