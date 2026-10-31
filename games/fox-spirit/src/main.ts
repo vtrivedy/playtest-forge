@@ -571,7 +571,7 @@ async function boot() {
     dripDist += step;
     if (paintDist >= T.ribbonSpacing) {
       paintDist = 0;
-      const r = T.ribbonRadius * THREE.MathUtils.lerp(0.75, 1, Math.min(1, speed / 8)) * (dashing ? 1.3 : 1);
+      const r = T.ribbonRadius * THREE.MathUtils.lerp(0.85, 1, Math.min(1, speed / 8)) * (dashing ? 1.3 : 1);
       if (nearK > 0.02) paint.bloom(fox.position.x + (Math.random() - 0.5) * 0.5, fox.position.z + (Math.random() - 0.5) * 0.5, r, T.strength * nearK);
     }
     if (dripDist >= T.dripSpacing) {
