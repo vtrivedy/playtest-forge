@@ -50,13 +50,13 @@ import type { ColorStroke } from '../../../src/render/colorField';
  * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
  * `fallGravity` gives weight on the way down; `apexHang` floats the top of a held jump.
  */
-/** `groundEase` (rad/s) is the critically damped ground-velocity response and `turnEase` the yaw-rate response:
- * the body path accelerates and turns in smooth curves instead of first-order snaps. */
-type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number; groundEase: number; turnEase: number };
+type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number; groundAccel: number; groundTurnRate: number };
 const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
   spring: {
     ...PRESET_SPRING,
     moveSpeed: 8.4,
+    groundAccel: 5.5,
+    groundTurnRate: 6,
     jumpVelocity: 9.6,
     gravity: 21,
     fallGravity: 1.35,
@@ -68,12 +68,12 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     glideSink: 2.5,
     glideForward: 7.9,
     glideDelay: 0.1,
-    groundEase: 10,
-    turnEase: 7,
   },
   brisk: {
     ...PRESET_BRISK,
     moveSpeed: 9,
+    groundAccel: 6,
+    groundTurnRate: 6,
     jumpVelocity: 10.2,
     gravity: 27,
     fallGravity: 1.5,
@@ -87,8 +87,6 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     glideSink: 2.7,
     glideForward: 8.4,
     glideDelay: 0.08,
-    groundEase: 11,
-    turnEase: 7,
   },
 };
 const presetParam = new URLSearchParams(location.search).get('feel');
@@ -303,9 +301,9 @@ async function boot() {
   gui.add({ spring: () => usePreset('spring') }, 'spring');
   gui.add({ brisk: () => usePreset('brisk') }, 'brisk');
   const fFeel = gui.addFolder('Fox');
+  fFeel.add(feel, 'groundAccel', 3, 16, .25);
+  fFeel.add(feel, 'groundTurnRate', 2, 12, .25);
   fFeel.add(feel, 'moveSpeed', 4, 14, 0.1).listen();
-  fFeel.add(feel, 'groundEase', 4, 30, 0.5).listen();
-  fFeel.add(feel, 'turnEase', 2, 20, 0.5).listen();
   fFeel.add(feel, 'jumpVelocity', 6, 16, 0.1).listen();
   fFeel.add(feel, 'gravity', 10, 40, 0.5).listen();
   fFeel.add(feel, 'fallGravity', 1, 2.2, 0.05).listen();
@@ -337,6 +335,7 @@ async function boot() {
     folder.add(params, 'minStanceRatio', .2, 1, .01);
     folder.add(params, 'bodyBob', 0, 1, .01);
     folder.add(params, 'swingEase', 0, 1, .05);
+    folder.add(params, 'headBob', 0, 1, .05);
     folder.add(params, 'swingTuck', 0, .8, .01);
     folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
@@ -353,6 +352,8 @@ async function boot() {
     folder.add(params, 'maxCorrection', 0, .3, .01);
     folder.add(params, 'turnLean', 0, .1, .001);
     folder.add(params, 'tailLag', 0, .3, .01);
+    folder.add(params, 'pelvisBank', 0, 1, .05);
+    folder.add(params, 'headRollStabilize', 0, 1, .05);
     folder.add(params, 'springFrequency', 1, 6, .1);
     folder.add(params, 'springDamping', .4, 1.5, .05);
     folder.add(params, 'debug');
@@ -361,8 +362,9 @@ async function boot() {
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
   fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
-  const actionFeel = { jumpWindup: .05 };
+  const actionFeel = { jumpWindup: .05, jumpGatherBlend: .12 };
   fFeel.add(actionFeel,'jumpWindup',0,.066,.001);
+  fFeel.add(actionFeel,'jumpGatherBlend',.04,.2,.01);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
@@ -581,11 +583,7 @@ async function boot() {
   });
 
   const vel = new THREE.Vector3();
-  // Ground body-path state: acceleration of the horizontal velocity, the velocity it last produced
-  // (anything else wrote vel since — wall, teleport, knockback — so the spring restarts), and yaw rate.
-  const groundAccel = new THREE.Vector3();
-  const groundVelOut = new THREE.Vector3();
-  let yawRate = 0;
+  let groundYawRate = 0;
   let grounded = false;
   let dashT = 0;
   let dashContactActive = false;
@@ -766,6 +764,7 @@ async function boot() {
       foxActor.group.position.set(x, y + foxActor.feetOffset + 0.05, z);
       foxActor.group.rotation.y = yaw;
       windupT=-1;
+      groundYawRate=0;
       foxActor.locomotion?.reset();
       prevFeet = y + 0.05;
       vel.set(0, 0, 0);
@@ -1265,6 +1264,10 @@ async function boot() {
       dashT = feel.dashDuration;
       vel.x = wish.x * feel.dashSpeed;
       vel.z = wish.z * feel.dashSpeed;
+      if(grounded) {
+        fox.rotation.y=Math.atan2(wish.x,wish.z); groundYawRate=0;
+        foxActor.locomotion?.syncYaw(fox.rotation.y);
+      }
       if (!grounded) {
         airDashUsed = true;
         vel.y = Math.max(vel.y, 0);
@@ -1361,25 +1364,27 @@ async function boot() {
       if(grounded && wish.lengthSq()>.001) {
         const targetYaw=Math.atan2(wish.x,wish.z);
         const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
-        // Yaw rate eases in and out (ζ≈.7 with turnRate) so the spine carves arcs, never snaps.
-        yawRate=THREE.MathUtils.damp(yawRate,THREE.MathUtils.clamp(error*feel.turnEase,-4.5,4.5),feel.turnRate,dt);
-        fox.rotation.y+=yawRate*dt;
+        const targetRate=3.2*Math.tanh(error*feel.groundTurnRate/3.2);
+        groundYawRate=THREE.MathUtils.damp(groundYawRate,targetRate,10,dt);
+        const turnStep=groundYawRate*dt;
+        const yawStep=Math.sign(turnStep)===Math.sign(error) && Math.abs(turnStep)>Math.abs(error) ? error : turnStep;
+        fox.rotation.y+=yawStep;
+        cur.applyAxisAngle(new THREE.Vector3(0,1,0),yawStep);
         // Brake through a reversal; forward drive returns as the body points into the input.
         const drive=Math.max(0,Math.cos(error));
         desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
-      } else yawRate=0;
-      if (grounded) {
-        // Critically damped: velocity changes with continuous acceleration (no first-frame jerk).
-        if (cur.distanceToSquared(groundVelOut) > 1e-4) groundAccel.set(0, 0, 0);
-        const w = feel.groundEase;
-        const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n;
-        for (let i = 0; i < n; i++) {
-          groundAccel.addScaledVector(desired.clone().sub(cur), w * w * h).addScaledVector(groundAccel, -2 * w * h);
-          cur.addScaledVector(groundAccel, h);
-        }
-        groundVelOut.copy(cur);
+      }
+      if(grounded) {
+        if(wish.lengthSq()<=.001)groundYawRate=THREE.MathUtils.damp(groundYawRate,0,10,dt);
+        // Ground turns transport existing momentum with the body. Incoming
+        // landing/drift momentum keeps its sign and sheds lateral load smoothly.
+        const forward=new THREE.Vector3(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y));
+        const along=cur.dot(forward);
+        const lateral=cur.clone().addScaledVector(forward,-along).multiplyScalar(Math.exp(-12*dt));
+        const groundSpeed=THREE.MathUtils.damp(along,desired.length(),feel.groundAccel,dt);
+        cur.copy(lateral).addScaledVector(forward,groundSpeed);
       } else {
-        groundAccel.set(0, 0, 0);
+        groundYawRate=0;
         cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
       }
       vel.x = cur.x;
@@ -1451,6 +1456,8 @@ async function boot() {
 
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
     const speed = Math.hypot(vel.x, vel.z);
+    // Forward gait travel excludes the lateral/reverse load carried out of an air dash.
+    const gaitSpeed=grounded ? Math.max(0,vel.x*Math.sin(fox.rotation.y)+vel.z*Math.cos(fox.rotation.y)) : speed;
     landT -= dt;
     skidT -= dt;
     if (grounded && wish.lengthSq() < .01 && previousSpeed > 4 && speed < previousSpeed) skidT = Math.max(skidT, .3);
@@ -1466,7 +1473,8 @@ async function boot() {
       } else {
         const offLedge = !grounded && !jumpedThisAir && airT < 0.14; // coyote window: keep stride
         if (windupT >= 0) {
-          anim='jump_up'; fade=.04;
+          anim='jump_up';
+          fade=THREE.MathUtils.lerp(actionFeel.jumpGatherBlend,.04,THREE.MathUtils.smoothstep(speed,1,3));
         } else if (dashing) {
           anim = 'dash';
           fade = 0.05;
@@ -1479,6 +1487,9 @@ async function boot() {
         } else if (landT > 0 && (speed < 1.5 || landT > .033)) {
           anim = 'land';
           fade = 0.05;
+        } else if (grounded && speed>1 && gaitSpeed<speed*.65) {
+          // Carry sideways/backward landing load in a brace, never a frozen forward walk.
+          anim='skid'; fade=.06;
         } else if (skidT > 0 && wish.lengthSq() < .01) {
           anim = 'skid'; fade = .06;
         } else if (speed < .6 && Math.abs(foxActor.locomotion?.metrics.turnRate ?? 0) > .8) {
@@ -1488,8 +1499,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent,
-        crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : gaitSpeed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);

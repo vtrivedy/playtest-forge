@@ -582,16 +582,18 @@ try {
       {name:'Windmill slope jump and land',seconds:3,stick:td.map(v=>v*.18),jump:true,reset:sp(-4,0,.1+1.9*2.5/6.9)},
       {name:'Meadow dash',seconds:1,stick:[0,-1],dash:true,reset:[0,null,86]},
       {name:'Windmill brake and settle',seconds:2,stick:[0,0]},
+      {name:'Meadow long drop and landing',seconds:2,stick:[0,0],reset:[0,null,80],drop:8,settle:0},
+      {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true},
     ];
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
-    const keyFrames=segments.flatMap(segment=>[segment.start+Math.round(fps*.25),segment.end-1]);
-    save('showcase-script.json',{label:'20 seconds in real World1, live controller, staged segment cuts, standard gameplay camera, no forced poses or grade',segments});
+    const keyFrames=segments.flatMap(segment=>segment.standing ? [0,1,2,3,5,8,15,30,45,65].map(f=>segment.start+f).concat(segment.end-1) : segment.drop ? [.08,.25,.4,.55,.7,1,1.5].map(t=>segment.start+Math.round(fps*t)).concat(segment.end-1) : [segment.start+Math.round(fps*.25),segment.end-1]);
+    save('showcase-script.json',{label:'World1 live controller, staged segment cuts, tracked three-quarter review camera, no forced poses or grade',segments});
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
       if(segment.turn){const angle=local/fps*2;stick=[Math.sin(angle)*.45,-Math.cos(angle)*.45];}
-      if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
+      if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);reset[1]+=segment.drop??0;const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(segment.settle??18);}
       await H('setStick',...stick);
       await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
     },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);}});
@@ -603,9 +605,19 @@ try {
     const landed=air>=0?rows.slice(air+1).find(row=>row.state.grounded):null;
     const pos=landed?.state.pos;
     const terraceS=pos ? (pos[0]+48)*td[0]+(pos[2]-52)*td[1] : null;
-    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'standard gameplay',slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
+    const drop=segments.find(segment=>segment.drop);
+    const dropRows=result.trace.filter(row=>row.frame>=drop.start && row.frame<drop.end);
+    const longDropFallSeconds=dropRows.filter(row=>row.state.anim==='jump_fall').reduce((sum,row)=>sum+row.dt,0);
+    const longDropLanded=dropRows.some(row=>row.state.grounded);
+    const longDropHeldFrames=dropRows.filter(row=>row.state.anim==='jump_fall' && row.state.locomotion?.fallPoseHeld).length;
+    const standing=segments.find(segment=>segment.standing);
+    const standingRows=result.trace.filter(row=>row.frame>=standing.start && row.frame<standing.end);
+    const standingWindupFrames=standingRows.filter(row=>row.state.locomotion?.windupActive).length;
+    const standingJumpAirborne=standingRows.some(row=>!row.state.grounded);
+    const standingJumpLanded=standingRows.at(-1)?.state.grounded ?? false;
+    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'tracked three-quarter review lens',longDropHeight:drop.drop,longDropFallSeconds,longDropLanded,longDropHeldFrames,standingWindupFrames,standingJumpAirborne,standingJumpLanded,slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
-    if(!acceptance.landedOnIncline || acceptance.deaths)throw Error('World showcase did not complete safely with an incline landing');
+    if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
