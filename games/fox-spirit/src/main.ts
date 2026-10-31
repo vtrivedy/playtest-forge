@@ -359,7 +359,7 @@ async function boot() {
     folder.add(params, 'releaseSwing', .12, .4, .01);
     for (const key of ['liftForeWalk','liftForeTrot','liftHindWalk','liftHindTrot','strideBob','rideDrop'] as const) folder.add(params, key, 0, .25, .005);
     for (const key of ['swingReach','swingReachHind','swingReachRun','carpalFlex','carpalFlexRun','hockFold','carpalGive','landCarpalGive','airTuck','airReach','airHindStream','airForeSwing','airHindSwing'] as const) folder.add(params, key, 0, 2, .01);
-    for (const key of ['weightRoll','spineSway','breath','airArch','runningGather','tailAir','idleSettle','idleHipShot','idleLook','gallopFlex','gallopFlexPhase'] as const) folder.add(params, key, 0, 1, .005);
+    for (const key of ['weightRoll','spineSway','breath','airArch','runningGather','tailAir','idleSettle','idleHipShot','idleLook','idleRestLift','idleRestFold','gallopFlex','gallopFlexPhase'] as const) folder.add(params, key, 0, 1, .005);
     folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);

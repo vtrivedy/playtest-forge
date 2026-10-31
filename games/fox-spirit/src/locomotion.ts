@@ -40,8 +40,8 @@ export class AuthoredLocomotion {
     minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .8,
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
-    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .65, carpalFlexRun: .4, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .045, idleHipShot: .07, idleLook: .16, gallopFlex: .22, gallopFlexPhase: .8, weightRoll: .04, spineSway: .08, breath: .022,
+    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .65, carpalFlexRun: .25, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
+    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .02, idleRestLift: .018, idleRestFold: .35, idleHipShot: .07, idleLook: .16, gallopFlex: .2, gallopFlexPhase: .8, weightRoll: .04, spineSway: .08, breath: .022,
     runningGather: .45, tailAir: .05, airTuck: 1.25, airForeSwing: .55, airHindSwing: .45, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
@@ -676,8 +676,15 @@ export class AuthoredLocomotion {
       // Coming out of a landing the forelegs plant and reach; folding them then reads as hooks.
       const landed=1-THREE.MathUtils.clamp(-this.landSpring.value/.04,0,1);
       const lift=this.swingLift[i]/Math.max(.001,gaitWeight), fold=landed*this.swingFold[i]/Math.max(.001,gaitWeight);
+      // Idle rests the right hind: hock softly flexed, toe tipped, weight on the other three.
+      const resting=active==='idle' && i===3 && this.input.grounded && Number.isFinite(ground);
+      if(resting && stance){stance=false;foot.correction.set(0,0,0);}
       const swinging=!stance && locomoting && this.input.grounded;
-      if(swinging) {
+      if(resting) {
+        const w=this.weights.get('idle') ?? 0;
+        this.swingPose(foot,i,this.params.idleRestLift*w,this.params.idleRestFold*w,ground);
+        foot.previousSolved.copy(foot.paw.localToWorld(foot.padLocal.clone()));
+      } else if(swinging) {
         this.swingPose(foot,i,lift,fold,swingFloor);
         foot.previousSolved.copy(foot.paw.localToWorld(foot.padLocal.clone()));
       } else if(stance || foot.correction.lengthSq()>0) {
@@ -742,6 +749,11 @@ export class AuthoredLocomotion {
     foot.hock.updateWorldMatrix(false,true);
     const target=foot.paw.getWorldPosition(v()).add(foot.correction).add(new THREE.Vector3(0,lift,0));
     this.placePaw(foot,target);
+    if(i<2) {
+      // A forepaw folded up past its own elbow reads as a hook jabbing the chest: keep it below.
+      const over=foot.paw.getWorldPosition(v()).y-(foot.lower.getWorldPosition(v()).y-.05);
+      if(over>0){target.y-=over;this.placePaw(foot,target);}
+    }
     if(floor!==null) {
       const under=floor+foot.clearance+.01-foot.paw.localToWorld(foot.padLocal.clone()).y;
       if(under>0){target.y+=under;this.placePaw(foot,target);}
@@ -788,10 +800,12 @@ export class AuthoredLocomotion {
     const run=locomoting ? this.weights.get('run') ?? 0 : 0;
     const flexPhase=Math.cos(2*Math.PI*(this.phase-this.params.gallopFlexPhase));
     // Rounding only: an extension past the authored line lifts the withers beyond the planted forelegs' reach.
-    const flex=run*this.params.gallopFlex*(.5+.5*flexPhase);
+    const flex=run*this.params.gallopFlex*(flexPhase>0 ? flexPhase : .4*flexPhase);
     if(Math.abs(flex)>1e-4) {
       // The pelvis stays put: tucking it opens a seam at the haunch.
       for(const spine of this.spines)worldOverlay(spine,right.clone(),flex/this.spines.length*1.5);
+      // Level eyeline: the head counter-pitches what the back does.
+      worldOverlay(this.head,right.clone(),-flex*1.2);
     }
     this.metrics.spineFlexCommand=flex;
     // Breath: ribcage lifts, withers ease, root rises a few mm.
@@ -809,23 +823,28 @@ export class AuthoredLocomotion {
     const airW=airborne ? 1 : Math.max(0,1-Math.abs(a)*4) < 1 ? Math.abs(a) : 0;
     this.metrics.airPose=a;
     if(Math.abs(a)>1e-3 || airborne) {
-      const tuck=THREE.MathUtils.lerp(this.params.airReach,this.params.airTuck,THREE.MathUtils.smoothstep(a,-.6,.4));
+      // Paws curl only while rising; from the apex on the forelegs open and reach so nothing hangs limp.
+      const tuck=THREE.MathUtils.lerp(this.params.airReach,this.params.airTuck,THREE.MathUtils.smoothstep(a,.1,.7));
+      const reach=1-THREE.MathUtils.smoothstep(a,0,.6);
       const hind=this.params.airHindStream*(a>0 ? a : .6*a);
       const k=airborne ? 1 : airW;
       // Upper limb (measured: +local X swings the limb back): forelegs fold back under the chest on the rise and
       // reach forward-down on the fall; hind legs stream back off the push, then gather under for the landing.
-      const rise=Math.max(0,a), fall=Math.max(0,-a);
+      const rise=Math.max(0,a);
       for(let i=0;i<4;i++){
         const foot=this.feet[i];
         this.overlays.push({bone:foot.hock,rotation:foot.hock.quaternion.clone()},{bone:foot.upper,rotation:foot.upper.quaternion.clone()},{bone:foot.lower,rotation:foot.lower.quaternion.clone()});
         foot.hock.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),k*(i<2 ? tuck : hind)));
-        const upper=i<2 ? this.params.airForeSwing*(rise*.4-fall) : this.params.airHindSwing*(rise-fall*.8);
-        const lower=i<2 ? this.params.airForeSwing*rise*1.2 : -this.params.airHindSwing*fall*.6;
+        const upper=i<2 ? this.params.airForeSwing*(rise*.4-reach) : this.params.airHindSwing*(rise-reach*.5);
+        const lower=i<2 ? this.params.airForeSwing*(rise*1.2-reach*.25) : -this.params.airHindSwing*reach*.4;
         foot.upper.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),k*upper));
         foot.lower.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),k*lower));
       }
       this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
       this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(-k*a*this.params.airArch,0,0)));
+      // Apex arch: the back rounds over the top of the arc.
+      const arch=k*this.params.airArch*1.5*(1-Math.min(1,Math.abs(a)*1.6));
+      for(const spine of this.spines)worldOverlay(spine,right.clone(),arch/this.spines.length);
     }
     this.metrics.pelvisRoll=pelvisRoll;this.metrics.spineSway=sway;
   }

@@ -128,9 +128,9 @@ export function applyFoxLimbRig(root: THREE.Object3D, clips: THREE.AnimationClip
         const moved = local.clone();
         if (seg.widthOnly) moved.x *= seg.k;
         else {
-          // Taper toward the joints so elbows/hocks stay defined.
-          const along = seg.length > 0 ? THREE.MathUtils.clamp(local.y / seg.length, 0, 1) : 0.5;
-          const k = 1 + (seg.k - 1) * (0.55 + 0.45 * Math.sin(Math.PI * along));
+                    const along = seg.length > 0 ? THREE.MathUtils.clamp(local.y / seg.length, 0, 1) : 0.5;
+          // Full mass mid-bone, none at the proximal joint (keeps the haunch / shoulder seam closed).
+          const k = 1 + (seg.k - 1) * THREE.MathUtils.smoothstep(along, 0, 0.35) * (0.55 + 0.45 * Math.sin(Math.PI * along));
           moved.x *= k; moved.z *= k;
         }
         disp.add(moved.applyMatrix4(seg.fromLocal).sub(p).multiplyScalar(w));
