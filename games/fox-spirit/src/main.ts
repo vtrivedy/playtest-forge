@@ -363,6 +363,11 @@ async function boot() {
     folder.add(params, 'plantStrength', 0, 1, .01);
     folder.add(params, 'maxCorrection', 0, .3, .01);
     folder.add(params, 'turnLean', 0, .1, .001);
+    folder.add(params, 'bankMax', 0, .35, .005);
+    folder.add(params, 'rootBank', 0, 1, .05);
+    folder.add(params, 'turnPlant', 0, 1.5, .05);
+    folder.add(params, 'gallopHeadHold', 0, 1.5, .05);
+    folder.add(params, 'suspensionLift', 0, .12, .005);
     folder.add(params, 'tailLag', 0, .3, .01);
     folder.add(params, 'pelvisBank', 0, 1, .05);
     folder.add(params, 'headRollStabilize', 0, 1, .05);
@@ -374,8 +379,10 @@ async function boot() {
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
   fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
-  const actionFeel = { jumpWindup: .05, jumpGatherBlend: .12 };
+  // Standing jumps load the haunches for ~8 frames; at speed the windup shrinks back to 3 so running jumps stay immediate.
+  const actionFeel = { jumpWindup: .05, standingWindup: .13, jumpGatherBlend: .12 };
   fFeel.add(actionFeel,'jumpWindup',0,.066,.001);
+  fFeel.add(actionFeel,'standingWindup',0,.2,.005);
   fFeel.add(actionFeel,'jumpGatherBlend',.04,.2,.01);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
@@ -617,7 +624,7 @@ async function boot() {
   let airT = 0;
   let jumpedThisAir = false;
   let landT = 0;
-  let windupT = -1;
+  let windupT = -1, windupDur = .05;
   let skidT = 0;
   let previousSpeed = 0;
   let hitstop = 0;
@@ -1285,15 +1292,22 @@ async function boot() {
       airT += dt;
     }
 
-    // Three 60Hz frames of visible load; coyote jumps keep immediate launch.
+    // Standing jumps load for ~8 frames, running jumps for 3; coyote jumps keep immediate launch.
     let jv: number | null = null;
     if (windupT >= 0) {
       windupT += dt;
-      if (windupT >= actionFeel.jumpWindup || !grounded) {
+      // Accelerating out of a standing gather shortens it; a committed windup never lengthens.
+      windupDur=Math.min(windupDur,THREE.MathUtils.lerp(Math.max(actionFeel.standingWindup,actionFeel.jumpWindup),actionFeel.jumpWindup,THREE.MathUtils.smoothstep(Math.hypot(vel.x,vel.z),1,3)));
+      if (windupT >= windupDur || !grounded) {
         windupT=-1;
+        // The press was committed when the windup began; a long standing gather must not outlive the buffer.
+        jumpFeel.buffer=Math.max(jumpFeel.buffer,1e-3);
         jv=jumpFeel.tryJump(feel.jumpVelocity * groundBounce,fox.position.y);
       }
-    } else if (grounded && jumpFeel.buffer>0 && actionFeel.jumpWindup>0) windupT=0;
+    } else if (grounded && jumpFeel.buffer>0 && actionFeel.jumpWindup>0) {
+      windupT=0;
+      windupDur=THREE.MathUtils.lerp(Math.max(actionFeel.standingWindup,actionFeel.jumpWindup),actionFeel.jumpWindup,THREE.MathUtils.smoothstep(Math.hypot(vel.x,vel.z),1,3));
+    }
     else jv=jumpFeel.tryJump(feel.jumpVelocity * groundBounce,fox.position.y);
     if (jv !== null) {
       vel.y = jv;
@@ -1552,7 +1566,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : gaitSpeed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : gaitSpeed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && windupDur > 0 ? Math.min(1, (windupT + dt) / windupDur) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
