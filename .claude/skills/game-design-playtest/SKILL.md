@@ -36,7 +36,7 @@ Use `games/shared/`:
 
 ## 2. Character feel (mandatory)
 
-Expose tunables via **lil-gui** (`createFeelPanel` in `games/shared/character-feel.ts`):
+Expose tunables via **lil-gui** (fox: the `Fox` folder in `games/fox-spirit/src/main.ts`; presets/`JumpFeel` in `games/shared/character-feel.ts`):
 
 - moveSpeed, accel, turnRate
 - jumpVelocity, gravity, airControl
@@ -83,4 +83,4 @@ Later only. See `docs/unreal/SCOPING.md`. Do not install UE.
 
 Hero = tiny wispy **multicolored fox spirit** (always saturated).
 World starts **monochrome**; fox leaves temporary color aura/trail; **shrines** permanently restore region color.
-Use `games/shared/color-mask.ts`. Capture shrine payoff on playtest video.
+Use the ColorField paint layer (`src/render/colorField.ts`). Capture shrine payoff on playtest video.

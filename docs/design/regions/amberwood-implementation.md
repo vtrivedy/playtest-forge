@@ -1,5 +1,7 @@
 # Amberwood heartwood stair — implementation contract
 
+> **Status (2026-10-31):** not integrated. The unwired layout helper `games/fox-spirit/src/regionAmberwood.ts` was removed from main (restore from `b0dd988^` when an integrating stream picks this up).
+
 The split maple at (−10,−36) becomes an enterable, hollow tree. A 2.4 m southern doorway reveals a curled root at floor y0; light reaches a second root on a ring at y10 and a carved socket beneath the y17.5 crown. Use the shipped dash, glide, Reactor and Root systems. No new input or quest key.
 
 K1 grows a 1.6 m wide helix at radius 2.5, through 2.4 turns and 17.5 m of rise: horizontal length ≈37.7 m, slope ≈24.9°, four 1.5 s growth segments. Shade drain opposes ordinary aura. A fresh dash stroke sustains growth through completion and the two-second socket feed. Alternatively free the Shade, then stay by K1. A central 12 m hearth lifts to the y10 ring, where K2 grows a separate 1.1-turn counter-spiral into the same socket in two segments (≈23.5°). Distinct curves avoid coincident root surfaces when restored. The socket accepts either root's physical completion with heat ≥0.5; fox proximity and HK heat never count.
