@@ -2158,7 +2158,20 @@ try {
       if(d<.55 && q.pos[1]>=p[1]-.5 && q.grounded && walkIdx<walk.length-1) {walkIdx++; walkAge=0; console.log('CROWN WALK',walkIdx,JSON.stringify(q.pos));}
       const target=walk[walkIdx], vx=target[0]-q.pos[0], vz=target[2]-q.pos[2], len=Math.hypot(vx,vz);
       await H('setKeys',[]); await H('setStick',len>.2?vx/len*Math.min(.65,len):0,len>.2?vz/len*Math.min(.65,len):0);
-    }, q => q.deaths>0 || walkAge>9 || walkIdx===walk.length-1 && q.grounded && Math.hypot(q.pos[0]+12,q.pos[2]+93)<.7, {keyFrames:[0,5*fps,10*fps,15*fps]});
+    }, q => q.deaths>0 || walkAge>9 || walkIdx===walk.length-1 && q.grounded && Math.hypot(q.pos[0]+12,q.pos[2]+93)<.7, { traceEveryFrame: true, keyFrames: [0,5*fps,10*fps,15*fps, ...[744,745,746].map(frame => Math.round(frame / 30 * fps))],
+      sample: async frame => {
+        if (frame < Math.floor(24.5 * fps) || frame > Math.ceil(25.1 * fps)) return {};
+        const rendererState = await page.evaluate(() => {
+          const r = window.__gameHooks.debug.renderer, target = r.getRenderTarget();
+          // Minimal Vector4-compatible output avoids importing or modifying the renderer.
+          const read = method => { const v = { x:0,y:0,z:0,w:0,copy(o){this.x=o.x;this.y=o.y;this.z=o.z;this.w=o.w;return this;} }; r[method](v); return [v.x,v.y,v.z,v.w]; };
+          return { target: target ? {width:target.width,height:target.height} : null,
+            viewport: read('getViewport'), scissor: read('getScissor'), scissorTest:r.getScissorTest(),
+            glError:r.getContext().getError(), contextLost:r.getContext().isContextLost() };
+        });
+        if (rendererState.glError || rendererState.contextLost) report.failures.push(`Crown renderer error frame${frame}: ${JSON.stringify(rendererState)}`);
+        return { rendererState };
+      } });
     await H('setStick',null); await advance(30); await shot('crown-walk-end');
     const walkEnd=await H('state'); save('crown-walk-acceptance.json',{walkIdx,of:walk.length,grounded:walkEnd.grounded,deaths:walkEnd.deaths,end:walkEnd.pos});
     if(walkIdx!==walk.length-1 || walkEnd.deaths) report.failures.push('Crown permanent walking fallback incomplete');
