@@ -2465,6 +2465,27 @@ try {
         const cameraFloor = await page.evaluate(([x, z]) => window.__gameHooks.debug.world.collision.highestAt(x, z), [p.x + dx, p.z + dz]);
         await H('photo', [p.x + dx, Math.max(p.y + dy, cameraFloor + 0.3), p.z + dz], look, fov);
         await advance(3); await shot(`fox-${state}-${name}`);
+        // Adjacent idle frames at one fixed lens isolate material causes of the jaw/coat defects.
+        if (state === 'restored' && (name === 'face' || name === 'three_q')) {
+          const comparisons = name === 'face'
+            ? [['furFringe', 0, 'fringe-off'], ['eyeSocketLift', 0, 'socket-recovery-off']]
+            : [['bodyEmber', 0, 'body-heat-off'], ['brushRelief', 0, 'relief-off']];
+          for (const [key, value, label] of comparisons) {
+            const before = await page.evaluate(({ key, value }) => {
+              const look = window.__gameHooks.foxLook;
+              if (!look || typeof look[key] !== 'number') throw Error(`Missing numeric fox look control ${key}`);
+              const original = look[key]; look[key] = value; return original;
+            }, { key, value });
+            try {
+              await advance(2); await shot(`fox-${state}-${name}-${label}`);
+              save(`fox-${state}-${name}-${label}-comparison.json`, { control: key, original: before, override: value,
+                method: 'Adjacent idle frames at the normal staged lens; not exact same-frame or gameplay proof' });
+            } finally {
+              await page.evaluate(({ key, value }) => { window.__gameHooks.foxLook[key] = value; }, { key, value: before });
+              await advance(2);
+            }
+          }
+        }
 
       }
       await H('photoOff'); await advance(30); await shot(`fox-${state}-chase-idle`);

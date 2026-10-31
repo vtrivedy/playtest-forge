@@ -171,17 +171,14 @@ ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
   ${coat ? `{
     vec3 center = vRest.x > 0.0 ? uEyeL : uEyeR;
     float aperture = foxSocketExtent(foxSocketCoordinates(vRest, center, uEyeR0));
-    float region = 1.0 - smoothstep(2.0, 3.2, aperture);
+    float region = 1.0 - smoothstep(2.4, 3.2, aperture);
     region *= 1.0 - smoothstep(0.10, 0.22, abs(vRest.x - center.x));
     float pigment = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    float darkPaint = 1.0 - smoothstep(0.035, 0.12, pigment);
-    float bakedAmber = smoothstep(0.10, 0.18, pigment)
-      * (1.0 - smoothstep(0.15, 0.35, diffuseColor.b / max(0.001, diffuseColor.g)));
-    float oldIris = 1.0 - smoothstep(0.9, 1.4, aperture);
-    float recoverPaint = max(darkPaint, bakedAmber * oldIris);
-    // Recover rust pigment while retaining the source texel's broad value variation.
-    vec3 rust = vec3(0.30, 0.085, 0.020) * clamp(pigment / 0.022, 0.85, 1.6);
-    diffuseColor.rgb = mix(diffuseColor.rgb, rust, uSocketLift * region * recoverPaint);
+    float rustSource = smoothstep(1.6, 2.2, diffuseColor.r / max(0.001, diffuseColor.g))
+      * (1.0 - smoothstep(0.40, 0.55, diffuseColor.b / max(0.001, diffuseColor.g)));
+    float paintedFootprint = max(rustSource, 1.0 - smoothstep(0.02, 0.05, pigment));
+    // Match measured unpainted boundary pigment; never carry the old ring's luminance into the fill.
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.384, 0.127, 0.031), uSocketLift * region * paintedFootprint);
   }` : ''}
 #endif
 {
@@ -285,7 +282,7 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeCutoff}-${mat.alphaTest}-${innerHeat ? 'warm-relief-furls-v3' : heatedCoat ? 'warm-cutout-furls-v3' : 'plain'}`;
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeCutoff}-${mat.alphaTest}-${innerHeat ? 'warm-relief-furls-v4' : heatedCoat ? 'warm-cutout-furls-v4' : 'plain'}`;
   mat.needsUpdate = true;
 }
 
@@ -690,7 +687,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   }
 
   const lookState = { emberSeams: FOX_LOOK.emberSeams, bodyEmber: FOX_LOOK.bodyEmber, brushRelief: FOX_LOOK.brushRelief, furFringe: FOX_LOOK.furFringe, tailRadiance: FOX_LOOK.tailRadiance, eyeSocketLift: FOX_LOOK.eyeSocketLift };
-  const diagnostics = { look: lookState, tailBrush: root.userData.tailBrush, spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, coatFringeMode: root.userData.coatFringeMode, coatRuffVertices: root.userData.coatRuffVertices as number, coatSpiritRegions: root.userData.coatSpiritRegions, limbHeatPlacement: 'outer-back-above-stocking', limbHeatAbovePadMetres: { front: (LIMB_HEAT_BAND.inEnd + LIMB_HEAT_BAND.outStart) * 0.5 - LIMB_HEAT_BAND.frontOffset, hind: (LIMB_HEAT_BAND.inEnd + LIMB_HEAT_BAND.outStart) * 0.5 }, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  const diagnostics = { look: lookState, eyePigmentRecovery: 'boundary-rust', tailBrush: root.userData.tailBrush, spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, coatFringeMode: root.userData.coatFringeMode, coatRuffVertices: root.userData.coatRuffVertices as number, coatSpiritRegions: root.userData.coatSpiritRegions, limbHeatPlacement: 'outer-back-above-stocking', limbHeatAbovePadMetres: { front: (LIMB_HEAT_BAND.inEnd + LIMB_HEAT_BAND.outStart) * 0.5 - LIMB_HEAT_BAND.frontOffset, hind: (LIMB_HEAT_BAND.inEnd + LIMB_HEAT_BAND.outStart) * 0.5 }, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
   group.userData.spiritFx = diagnostics;
 
   // flame licks: one instanced billboard per lick
