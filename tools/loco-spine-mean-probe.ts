@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AuthoredLocomotion } from '../games/fox-spirit/src/locomotion';
+import { applyFoxLimbRig } from '../games/fox-spirit/src/foxLimbRig';
 Object.assign(globalThis, { self: globalThis, ProgressEvent: class extends Event {
         constructor(type: string, init: Record<string, unknown>) { super(type); Object.assign(this, init); }
     } });
@@ -35,6 +36,7 @@ const make = async (spineFlex: number) => {
     root.position.z -= center.z;
     const mixer = new THREE.AnimationMixer(root);
     const actions = new Map(gltf.animations.map(c => [c.name, mixer.clipAction(c)]));
+    applyFoxLimbRig(root, gltf.animations);
     const loco = new AuthoredLocomotion(root, group, actions);
     loco.params.spineFlex = spineFlex;
     return { root, group, mixer, loco };

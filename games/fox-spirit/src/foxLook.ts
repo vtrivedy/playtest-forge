@@ -265,6 +265,9 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
   float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
   float rimPigment = smoothstep(1.6, 2.2, diffuseColor.r / max(0.001, diffuseColor.g));
   outgoingLight += uRimColor * ${shell || tail ? "0.0" : "1.0"} * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a * rimPigment;
+  // Dark stockings get a soft russet sheen on their silhouette so legs read as furred volume, not flat sticks.
+  float sockPigment = 1.0 - smoothstep(0.10, 0.22, max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)));
+  outgoingLight += vec3(0.55, 0.27, 0.12) * ${shell || tail ? "0.0" : "1.0"} * uRim.x * 1.6 * fres * (0.45 + 0.55 * strands) * diffuseColor.a * sockPigment;
   ${tail ? `
   #ifdef USE_MAP
     // Brush UV: V=1 at the buried root, V=0 at the capped terminal extension.
@@ -282,7 +285,7 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeCutoff}-${mat.alphaTest}-${innerHeat ? 'warm-relief-furls-v4' : heatedCoat ? 'warm-cutout-furls-v4' : 'plain'}`;
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeCutoff}-${mat.alphaTest}-sock-sheen-${innerHeat ? 'warm-relief-furls-v4' : heatedCoat ? 'warm-cutout-furls-v4' : 'plain'}`;
   mat.needsUpdate = true;
 }
 
