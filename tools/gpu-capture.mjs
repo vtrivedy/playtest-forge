@@ -1454,26 +1454,60 @@ try {
     // The meadow lens cannot see it, so use a separate fixed lens for the matched front pair.
     const framing = await page.evaluate(() => {
       const h = window.__gameHooks, attempts = [];
-      for (const [x,z] of [[95,13],[93,10],[97,10],[95,7],[90,15]]) {
+      for (const [x,z] of [[69,28.2],[84,36]]) {
         const y = h.debug.world.collision.highestAt(x,z);
         if (!Number.isFinite(y) || y < -.5 || y > 4) continue;
+        const closeLook = [x+9,y-1.2,z-8.2];
+        const poolProbes = [[78,-1.2,26],[81,-1.2,27],[77,-1.2,28]];
+        const closeLens = [[x-5,y+2.1,z+3.8],[x-6.5,y+3,z+4],[x-5,y+4,z+5],[x-4,y+2.7,z+5]].find(lens => {
+          const foxBlockers = [.1,.5,.9].map(k => h.photoBlocker(lens,[x,y+h.debug.foxHeight*k,z]));
+          const poolBlockers = poolProbes.map(point => h.photoBlocker(lens,point));
+          attempts.push({kind:'close',fox:[x,y,z],lens,foxBlockers,poolBlockers});
+          return foxBlockers.filter(b => !b).length >= 2 && poolBlockers.filter(b => !b).length >= 2;
+        });
+        if (!closeLens) continue;
         for (const lens of [[68,34,44],[65,34,18],[112,35,0],[78,40,-6],[95,45,30]]) {
-          const blocker = h.photoBlocker(lens,[x,y+.6,z]);
-          attempts.push({fox:[x,y,z],lens,blocker});
-          if (!blocker) return {fox:[x,y,z],lens,look:[(x+95)/2,y+.6,(z+10)/2],attempts};
+          const foxBlockers = [.1,.5,.9].map(k => h.photoBlocker(lens,[x,y+h.debug.foxHeight*k,z]));
+          const poolBlockers = poolProbes.map(point => h.photoBlocker(lens,point));
+          attempts.push({kind:'overview',fox:[x,y,z],lens,foxBlockers,poolBlockers});
+          if (foxBlockers.filter(b=>!b).length>=2 && poolBlockers.filter(b=>!b).length>=2) return {fox:[x,y,z],lens,look:[(x+95)/2,y+.6,(z+10)/2],closeLens,closeLook,poolProbes,attempts};
         }
       }
       return {attempts};
     });
     save('restoration-framing.json', framing);
-    if (!framing.fox) throw Error('No unobstructed safe Reed restoration review lens');
+    if (!framing.fox || !framing.closeLens) throw Error('No unobstructed safe Reed restoration review lens pair');
     await H('teleport', ...framing.fox, Math.PI);
-    await H('photo', framing.lens, framing.look, 60);
-    await advance(1); await shot('restoration-front-before');
+    await advance(30, false);
+    const restoreBaseline = await H('state');
+    const restoreFrame = async name => {
+      const phase = await H('state');
+      const drift = Math.hypot(...phase.pos.map((value,i) => value-restoreBaseline.pos[i]));
+      if (phase.deaths !== restoreBaseline.deaths || drift > .15) report.failures.push(`Restore fox moved or died at ${name}: drift=${drift}, deaths=${phase.deaths-restoreBaseline.deaths}`);
+      const saveComposition = async (view,minimumHeight) => {
+        const composition = await page.evaluate(pool => {
+        const h=window.__gameHooks, fox=h.debug.fox, camera=h.debug.camera;
+        const feet=fox.position.clone(); feet.y-=h.debug.foxFeetOffset;
+        const head=feet.clone(); head.y+=h.debug.foxHeight;
+        const bottom=feet.clone().project(camera), top=head.clone().project(camera);
+        const inside = p => Math.abs(p.x)<.95 && Math.abs(p.y)<.95 && p.z>-1 && p.z<1;
+        const foxBlockers=[.1,.5,.9].map(k => h.photoBlocker(camera.position.toArray(),feet.clone().lerp(head,k).toArray()));
+        const poolVisible=pool.map(point => ({point,inside:inside(feet.clone().set(...point).project(camera)),blocker:h.photoBlocker(camera.position.toArray(),point)}));
+        return {proxyHeightPx:Math.abs(top.y-bottom.y)*innerHeight/2,inside:inside(bottom)&&inside(top),foxBlockers,poolVisible};
+        },framing.poolProbes);
+        save(`restoration-${view}-${name}-composition.json`,{...composition,drift,deaths:phase.deaths-restoreBaseline.deaths,state:await H('state'),label:'CPU composition proxies, not pixel-visibility or visual acceptance'});
+        if (!composition.inside || composition.proxyHeightPx<minimumHeight || composition.foxBlockers.filter(b=>!b).length<2 || composition.poolVisible.filter(p=>p.inside&&!p.blocker).length<2) report.failures.push(`Restore ${view} composition gate failed at ${name}`);
+      };
+      await H('photo', framing.lens, framing.look, 60); await advance(0); await shot(`restoration-${name}`);
+      await saveComposition('overview',0);
+      await H('photo', framing.closeLens, framing.closeLook, 48); await advance(0); await shot(`restoration-close-${name}`);
+      await saveComposition('close',48);
+    };
+    await restoreFrame('front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
     for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['water-reveal', 39], ['settled', 201]]) {
-      await advance(frames); await shot(`restoration-${name}`);
+      await advance(frames, false); await restoreFrame(name);
     }
     await H('photo', [64, 3, 43], [82, -1.7, 20], 52); await advance(2); await shot('restoration-water-vista');
     await H('perf', 6);
