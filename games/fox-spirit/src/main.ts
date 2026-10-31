@@ -1349,7 +1349,7 @@ async function boot() {
         const w = feel.groundEase;
         const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n;
         for (let i = 0; i < n; i++) {
-          groundAccel.addScaledVector(desired.clone().sub(cur), w * w * h).multiplyScalar(1 - 2 * w * h);
+          groundAccel.addScaledVector(desired.clone().sub(cur), w * w * h).addScaledVector(groundAccel, -2 * w * h);
           cur.addScaledVector(groundAccel, h);
         }
         groundVelOut.copy(cur);
