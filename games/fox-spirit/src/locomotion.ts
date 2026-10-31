@@ -42,7 +42,7 @@ export class AuthoredLocomotion {
     headHold: 1.2, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
     headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
-    earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
+    earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
     padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; correction: THREE.Vector3; strength: number; replantTime: number; dot: THREE.Mesh }[] = [];
@@ -275,7 +275,7 @@ export class AuthoredLocomotion {
           const sw=(u-stance)/(1-stance), m=Math.min(3,1+(stance<duty ? (duty/stance)*(1-stance)/(1-duty)-1 : 0)*this.params.swingEase);
           local=duty+(1-duty)*(sw*sw*(3-2*sw)+m*(2*sw*sw*sw-3*sw*sw+sw));
           // Tuck grows with the suspension the warp added (none at the authored cadence).
-          if(locomoting)this.tuck[i]+=weight*Math.sin(Math.PI*sw)*(1-this.stanceRatio[gait]);
+          this.tuck[i]+=weight*Math.sin(Math.PI*sw)*(1-this.stanceRatio[gait]);
           this.swingProgress[i]+=weight*sw;
         }
         drive(parts.legs[i],weight,((contact.phase+local)%1)*duration);
@@ -465,7 +465,7 @@ export class AuthoredLocomotion {
     this.metrics.fallPoseTime=active==='jump_fall' ? fallAction?.time ?? 0 : 0;
     this.metrics.fallPoseHeld=active==='jump_fall' && !!fallAction?.paused && !!fallAction?.clampWhenFinished;
     this.footfalls.length=0;
-    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;this.metrics.groundClampFeet=0;this.metrics.maxSwingPenetration=0;
+    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;this.metrics.groundClampFeet=0;this.metrics.maxSwingPenetration=0;this.metrics.maxSwingResidual=0;
     const locomoting=['run','walk','trot'].includes(active);
     this.debugGroup.visible=this.params.debug;
     let authoredSupportFeet=0;
@@ -483,9 +483,10 @@ export class AuthoredLocomotion {
       const windup=active==='jump_up' && (this.input.crouch ?? 0)>0 && this.input.speed<3;
       let stance=this.input.grounded && (locomoting ? normalizedSupport>(foot.planted ? .45 : .55) : (active==='idle' || active==='land' || windup));
       let earlyTouch=false;
-      if(!stance && locomoting && this.input.grounded && this.swingProgress[i]>this.params.earlyContact) {
+      const swingProgress=this.swingProgress[i]/Math.max(.001,gaitWeight);
+      if(!stance && locomoting && this.input.grounded && swingProgress>this.params.earlyContact) {
         const floor=this.input.groundAt(paw.x,paw.z,this.group.position.y+.6);
-        if(Number.isFinite(floor) && paw.y<floor+foot.clearance+.01) {stance=true;earlyTouch=true;}
+        if(foot.planted || (Number.isFinite(floor) && paw.y<floor+foot.clearance+.01)) {stance=true;earlyTouch=true;}
       }
       const sample=foot.planted ? foot.anchor : paw;
       const ground=this.input.groundAt(sample.x,sample.z,this.group.position.y+.6);
@@ -515,9 +516,11 @@ export class AuthoredLocomotion {
         foot.correction.multiplyScalar(Math.exp(-dt/.04));
         if(foot.correction.lengthSq()<1e-8)foot.correction.set(0,0,0);
       }
+      let swingFloor:number|null=null;
       if(!stance && locomoting && this.input.grounded) {
         const floor=this.input.groundAt(paw.x,paw.z,this.group.position.y+.6);
         if(Number.isFinite(floor)) {
+          swingFloor=floor;
           const penetration=floor+foot.clearance-paw.y-foot.correction.y;
           this.metrics.maxSwingPenetration=Math.max(this.metrics.maxSwingPenetration,penetration);
           if(penetration>0) {
@@ -537,6 +540,10 @@ export class AuthoredLocomotion {
           this.metrics.maxResidual=Math.max(this.metrics.maxResidual,corrected.distanceTo(foot.anchor));
           this.metrics.stanceFeet++;
         }
+      }
+      if(swingFloor!==null) {
+        const solvedPad=foot.paw.localToWorld(foot.padLocal.clone());
+        this.metrics.maxSwingResidual=Math.max(this.metrics.maxSwingResidual,swingFloor+foot.clearance-solvedPad.y);
       }
       foot.planted=stance;
       foot.dot.position.copy(this.group.worldToLocal(foot.anchor.clone()));
