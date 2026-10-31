@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
@@ -12,7 +13,7 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
 export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 
 export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number; noticeDistance: number; noticeTime: number; leafSize: number; chaseDistance: number; chaseDelay: number; chaseLeash: number; chaseRest: number };
-export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 1.25, hitRadius: 1.1, knockback: 3, bob: 0.12, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.26, inkSize: 0.8, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14, chaseDistance: 3.8, chaseDelay: 1.2, chaseLeash: 4, chaseRest: 3 };
+export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 1.25, hitRadius: 1.1, knockback: 3, bob: 0.12, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.17, inkSize: 0.55, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14, chaseDistance: 3.8, chaseDelay: 1.2, chaseLeash: 4, chaseRest: 3 };
 
 type ShadeActor = {
   active: boolean;
@@ -147,13 +148,13 @@ function inkMaterial(): THREE.ShaderMaterial {
         float rim = pow(1.0 - abs(dot(vN, vV)), 2.2);
         // Density varies through separate shells: broad translucent wash, never a black plate.
         float legFade = smoothstep(0.02, 0.45, vY);
-        float density = smoothstep(0.12, 0.76, n * 0.75 + billow * 0.25);
+        float density = mix(0.2, 1.0, smoothstep(0.12, 0.76, n * 0.75 + billow * 0.25));
         float dissolve = smoothstep(1.0 - uPresence - 0.12, 1.0 - uPresence + 0.24, n);
-        vec3 core = vec3(0.065, 0.052, 0.046);
-        vec3 light = vec3(0.24, 0.205, 0.17);
+        vec3 core = vec3(0.035, 0.024, 0.016);
+        vec3 light = vec3(0.15, 0.10, 0.065);
         float wrap = dot(normalize(vWorldN), normalize(vec3(-0.4, 0.8, 0.5))) * 0.5 + 0.5;
         vec3 col = mix(core, light, wrap * 0.45 + n * 0.25 + rim * 0.18);
-        float alpha = (uLayer < 0.5 ? 0.55 : 0.13) * density * legFade;
+        float alpha = (uLayer < 0.5 ? 0.7 : 0.11) * density * legFade;
         alpha *= (1.0 - smoothstep(0.42, 1.0, rim)) * dissolve * uPresence;
         gl_FragColor = vec4(col, alpha);
         #include <colorspace_fragment>
@@ -172,8 +173,16 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
   const count = 144;
   const points = new Float32Array(count * 3);
   const vertex = new THREE.Vector3();
+  let randomState=31+seed*167;
+  // Runtime Three includes the seeded RNG setter; the installed declaration predates it.
+  const sampler=new MeshSurfaceSampler(new THREE.Mesh(source)) as MeshSurfaceSampler & {setRandomGenerator(random:()=>number):MeshSurfaceSampler};
+  sampler.setRandomGenerator(()=>{
+    randomState=(Math.imul(randomState,1664525)+1013904223)>>>0;
+    return randomState/4294967296;
+  });
+  sampler.build();
   for (let k = 0; k < count; k++) {
-    vertex.fromBufferAttribute(source.attributes.position!, (k * 167 + seed * 31) % source.attributes.position!.count);
+    sampler.sample(vertex);
     vertex.x *= 0.65 + (k % 7) * 0.05;
     vertex.z *= 0.8;
     vertex.toArray(points, k * 3);
@@ -186,8 +195,8 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
       void main(){
         float clock=uReleased>.5?uReleaseStart:uTime;
         float age=fract(aPhase+clock*.22);vAge=age;vPhase=aPhase;
-        vec3 p=position; p.y+=age*1.3;
-        p.x+=sin(age*4.+aPhase*19.)*.22*age;
+        vec3 p=position; p.y+=age*.55;
+        p.x+=sin(age*4.+aPhase*19.)*.12*age;
         p.z-=age*.25;
         if(uReleased>.5){
           p.y+=uReleaseAge*(.9+aPhase*.8);
@@ -208,7 +217,7 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
         if(uReleased>.5) life=mix(life,.8,smoothstep(0.,.25,uReleaseAge))*(1.-smoothstep(.6+vPhase*.4,2.+vPhase*.4,uReleaseAge));
         float presence=uReleased>.5?1.:uPresence;
         float a=edge*edge*(.35+grain*.65)*life*uOpacity*presence;
-        vec3 color=mix(vec3(.09,.075,.065),vec3(.42,.23,.095),uReleased*smoothstep(.15,1.8,uReleaseAge));
+        vec3 color=mix(vec3(.16,.12,.09),vec3(.42,.23,.095),uReleased*smoothstep(.15,1.8,uReleaseAge));
         gl_FragColor=vec4(color,a);
         #include <colorspace_fragment>
       }`,
