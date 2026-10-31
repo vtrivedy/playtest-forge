@@ -654,27 +654,36 @@ try {
     const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
     if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
     save('shade-live-acceptance.json',{passed:liveRunout.passed,runout:liveRunout,label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
-    const flume = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
-    if(flume){
-      await H('teleport',95,6,18,0);
-      await H('photo',[103,10,31],[99,5,23],48);
-      await video('shade-flume',120,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,90,119]});
-      const result=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
-      if(result.pos[1]<3.5||result.pos[1]>7)throw Error('Flume Shade left elevated channel');
-      save('shade-flume-acceptance.json',{actor:result,game:await page.evaluate(()=>window.__game)});
-      for(const [id,observer,lens,target] of [
-        ['shade-hill-low',[8,12,-67],[11,20,-60],[0,15,-68.7]],
-        ['shade-hill-high',[8,32.8,-79.5],[12,41,-73],[0,35,-80.5]],
-      ]){
-        await H('teleport',...observer,0);await H('photo',lens,target,48);
-        await video(id,90,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,89]});
-        const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
-        if(!actor)throw Error(`Missing ${id}`);
-        save(`${id}-acceptance.json`,actor);
-      }
-
+    // Regional review uses the same close actor-aware lens as patrol, not distant fixed vistas.
+    for(const [id,frames,keyFrames] of [
+      ['shade-flume',120,[0,30,60,90,119]],
+      ['shade-hill-low',90,[0,30,60,89]],
+      ['shade-hill-high',90,[0,30,60,89]],
+    ]){
+      const setup=await page.evaluate(id=>{
+        const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
+        if(!actor)return {failure:`Missing ${id}`};
+        const [x,y,z]=actor.pos,col=h.debug.world.collision;
+        for(const radius of [3.1,2.8,3.4])for(let k=0;k<64;k++){
+          const a=k*Math.PI*2/64,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
+          const floor=col.groundAt(px,pz,y+.6).y;
+          if(!Number.isFinite(floor)||Math.abs(floor-y)>.6||col.blocked(px,pz,floor))continue;
+          // Reject unsupported edges across the fox's footprint.
+          if([[.3,0],[-.3,0],[0,.3],[0,-.3]].some(([dx,dz])=>Math.abs(col.groundAt(px+dx,pz+dz,floor+.2).y-floor)>.3))continue;
+          return {pos:[px,floor,pz],yaw:Math.atan2(x-px,z-pz),actor:actor.pos,label:'Staged nearby observer on actual actor floor; live behavior preserved'};
+        }
+        return {failure:`No nearby supported observer for ${id}`,actor:actor.pos};
+      },id);
+      save(`${id}-observer-setup.json`,setup);
+      if(setup.failure){report.failures.push(setup.failure);continue;}
+      await H('teleport',...setup.pos,setup.yaw);lens=null;
+      await camera(id);
+      await video(id,frames,async()=>camera(id),undefined,pairOptions('Regional',id,keyFrames));
+      validatePair(id);
+      const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
+      if(id==='shade-flume'&&(actor.pos[1]<3.5||actor.pos[1]>7))report.failures.push('Flume Shade left elevated channel');
+      save(`${id}-acceptance.json`,{actor,setup,game:await page.evaluate(()=>window.__game)});
     }
-
 
     // Stored contact failures survive later exceptions and keep the final process result failed.
   }
