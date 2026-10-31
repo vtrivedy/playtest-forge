@@ -39,6 +39,17 @@ export function hubPathDistance(x: number, z: number): number {
   return d;
 }
 
+/** Worn plaza albedo only; compact support leaves the realm's trails untouched. */
+export const HUB_PLAZA_LIFT = .18;
+export function hubPlazaWeight(x: number, z: number): number {
+  if (x <= -17 || x >= 0 || z <= 78 || z >= 97) return 0;
+  const west = THREE.MathUtils.smoothstep(x, -17, -12.5);
+  const east = 1 - THREE.MathUtils.smoothstep(x, -5, 0);
+  const north = THREE.MathUtils.smoothstep(z, 78, 83);
+  const south = 1 - THREE.MathUtils.smoothstep(z, 92, 97);
+  return west * east * north * south;
+}
+
 /** Exclude random vegetation/rocks from doorsteps, the well and new paths. */
 export function hubClearance(x: number, z: number): boolean {
   return hubHearthClearance(x,z) || Math.hypot(x + 23.6, z - 85.2) < 1.2 || Math.hypot(x + 22.4, z - 85.1) < 1 || HUB_FESTOON_POSTS.some(([px, pz]) => Math.hypot(x - px, z - pz) < .9) || Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||

@@ -1,4 +1,4 @@
-import { createLanternhollow, hubPathDistance, hubClearance, hubHearthClearance, HUB_HOUSES } from './regionLanternhollow';
+import { createLanternhollow, hubPathDistance, hubPlazaWeight, HUB_PLAZA_LIFT, hubClearance, hubHearthClearance, HUB_HOUSES } from './regionLanternhollow';
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { routeRemnant } from './routeRemnants';
@@ -605,9 +605,12 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const pathK = smooth01(2.6, 0.9, pd);
         c.lerp(PAL.pathEarth, pathK * 0.85);
         // Hub trails need a value cue even while all world colour is pressed.
-        const hubWear = smooth01(2.1, .7, hubPathDistance(x, z)) * smooth01(72, 80, z);
+        const plaza = hubPlazaWeight(x, z);
+        const hubWear = smooth01(2.1, .7, hubPathDistance(x, z)) * smooth01(72, 80, z) * (1 - plaza);
         c.lerp(PAL.soilUmber, hubWear * .65);
         c.multiplyScalar(1 - hubWear * .2);
+        // A flat, soft-edged packed-earth square; no grade or restoration exemption.
+        if (plaza > 0) c.multiplyScalar(1 + HUB_PLAZA_LIFT * plaza);
         leafy = THREE.MathUtils.lerp(leafy, 0.06, pathK * 0.9) + smooth01(1.6, 3.2, pd) * smooth01(4.5, 3.0, pd) * 0.35; // leaves banked at the verge
         // damp dark banks at the pond and marsh
         const bank = Math.max(smooth01(1.25, 0.85, me), smooth01(1.5, 0.95, pe));
