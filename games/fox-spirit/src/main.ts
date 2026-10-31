@@ -354,7 +354,7 @@ async function boot() {
     folder.add(params,'tailLoad',0,.4,.01);
     folder.add(params,'brakeSquat',0,.08,.002);
     folder.add(params,'brakePitch',0,.2,.005);
-    folder.add(params,'landSquash',0,.4,.005);
+    folder.add(params,'landSquash',0,.8,.005);
     folder.add(params,'landPitch',0,2,.05).name('land pitch rad/m');
     folder.add(params,'stationarySupport',0,.08,.005).name('stationary support m');
     folder.add(params,'landFrequency',2,6,.1);
@@ -370,7 +370,7 @@ async function boot() {
     folder.add(params, 'releaseSwing', .12, .4, .01);
     for (const key of ['liftForeWalk','liftForeTrot','liftHindWalk','liftHindTrot','strideBob','rideDrop'] as const) folder.add(params, key, 0, .25, .005);
     for (const key of ['swingReach','swingReachHind','swingReachRun','carpalFlex','carpalFlexRun','hockFold','carpalGive','landCarpalGive','airTuck','airReach','airHindStream','airForeSwing','airHindSwing'] as const) folder.add(params, key, 0, 2, .01);
-    for (const key of ['weightRoll','spineSway','breath','airArch','runningGather','tailAir','idleSettle','idleHipShot','idleLook','idleRestLift','idleRestFold','idleForeUnder','trackNarrow','earTwitch','gallopFlex','gallopFlexPhase'] as const) folder.add(params, key, 0, 1, .005);
+    for (const key of ['weightRoll','spineSway','breath','airArch','runningGather','tailAir','idleSettle','idleHipShot','idleLook','idleRestLift','idleRestFold','idleForeUnder','trackNarrow','earTwitch','gallopFlex','gallopFlexPhase','gatherHindReach','gallopHeadPitch','jumpHeadPitch','earBank','airPushHind','airForeOpen','glideLegs'] as const) folder.add(params, key, 0, 1, .005);
     folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);

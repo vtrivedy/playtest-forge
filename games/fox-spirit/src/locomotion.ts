@@ -41,12 +41,14 @@ export class AuthoredLocomotion {
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .65, carpalFlexRun: .6, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .02, idleRestLift: .04, idleRestFold: .6, idleForeUnder: .5, trackNarrow: .03, earTwitch: .5, idleHipShot: .07, idleLook: .16, gallopFlex: .2, gallopFlexPhase: .8, weightRoll: .04, spineSway: .08, breath: .04,
-    runningGather: .6, tailAir: .05, airTuck: 1.25, airForeSwing: .55, airHindSwing: .45, airReach: .25, airHindStream: .45, airArch: .12,
+    carpalGive: .2, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .02, idleRestLift: .04, idleRestFold: .6, idleForeUnder: .75, trackNarrow: .03, earTwitch: .5, idleHipShot: .07, idleLook: .16, gallopFlex: .32, gallopFlexPhase: .85, gatherHindReach: .4, gallopHeadPitch: .1, jumpHeadPitch: .14, earBank: .6, weightRoll: .04, spineSway: .08, breath: .04,
+    runningGather: .9, tailAir: .05, airTuck: 1.25, airForeSwing: .55, airHindSwing: .45, airReach: 0, airHindStream: .45, airArch: .12,
+    // World-space limb aims: hinds drive back off the push, fores open and reach from the apex, glide hangs the legs loose.
+    airPushHind: .75, airForeOpen: .65, glideLegs: .7,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
-    takeoffCrouch: .12, takeoffPitch: .07,
+    takeoffCrouch: .15, takeoffPitch: .07,
     headHold: .8, gallopHeadHold: 1.5, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .24, landPitch: 1, landFrequency: 3, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .08, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .45, landPitch: 1, landFrequency: 2.6, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .08, bankMax: .18, rootBank: 1, pelvisBank: .45, headRollStabilize: .2, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     earlyTouches: 0, spineFlexCommand: 0, maxSwingLift: 0, airPose: 0, pelvisRoll: 0, spineSway: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -123,6 +125,7 @@ export class AuthoredLocomotion {
   private swingLift = [0, 0, 0, 0];
   private time = 0;
   private air = new Spring();
+  private airTime = 0;
   constructor(private root: THREE.Object3D, private group: THREE.Group,
     private actions: Map<string, THREE.AnimationAction>) {
     this.rootPosition=root.position.clone();
@@ -346,7 +349,7 @@ export class AuthoredLocomotion {
       // Standing square: forepaws settle under the shoulders instead of propping out in an A-frame.
       const target=pad.clone();
       if(foot.pole<0){const shoulder=foot.upper.getWorldPosition(v());target.x=THREE.MathUtils.lerp(target.x,shoulder.x,this.params.idleForeUnder);target.z=THREE.MathUtils.lerp(target.z,shoulder.z,this.params.idleForeUnder);}
-      anchor.lerp(target,1-Math.exp(-5*dt));
+      anchor.lerp(target,1-Math.exp(-8*dt));
     }
     anchor.y=ground+foot.clearance;
     return anchor;
@@ -450,8 +453,8 @@ export class AuthoredLocomotion {
     const step=Math.max(dt,.00001);
     this.glideLayer();
     if(this.input.grounded && !this.wasGrounded) {
-      const impact=THREE.MathUtils.clamp(-this.previousVerticalSpeed/14,0,1);
-      this.landSpring.velocity-=this.params.landSquash*Math.max(.15,impact)*16;
+      const impact=THREE.MathUtils.clamp(-this.previousVerticalSpeed/10,0,1);
+      this.landSpring.velocity-=this.params.landSquash*Math.max(.35,impact)*16;
       this.metrics.lastLandingImpact=impact;
     }
     this.wasGrounded=this.input.grounded;this.previousVerticalSpeed=this.input.verticalSpeed;
@@ -534,6 +537,8 @@ export class AuthoredLocomotion {
     const headBank=-this.lean*this.params.headRollStabilize;
     for(const neck of this.necks)worldOverlay(neck,bankAxis.clone(),headBank*.5/this.necks.length);
     worldOverlay(this.head,bankAxis.clone(),headBank*.5);
+    // Ears tip into the turn on top of the body roll, so the bank reads as an ear-tip line tilt head-on.
+    for(const ear of this.ears)worldOverlay(ear,bankAxis.clone(),this.lean*this.params.earBank);
     const bend=THREE.MathUtils.clamp(this.turn*.05,-.2,.2);
     for(let i=0;i<this.spines.length;i++)worldOverlay(this.spines[i],new THREE.Vector3(0,1,0),bend/this.spines.length);
     for(const neck of this.necks)worldOverlay(neck,new THREE.Vector3(0,1,0),look*.22);
@@ -576,6 +581,18 @@ export class AuthoredLocomotion {
       if(lift>0) {overlay(this.tailBone,new THREE.Vector3(1,0,0),Math.min(.65,lift));this.root.updateWorldMatrix(true,true);}
     }
     this.carriage(dt,worldOverlay,right);
+    // Head counter-pitch accents ride on top of the low-passed carriage (which would otherwise flatten them):
+    // gallop nose down through the gather, up/forward through the extension; jump nose down in the crouch,
+    // up off the push, down again to spot the landing.
+    const gallopPitch=(this.input.grounded ? this.metrics.clipWeights.run ?? 0 : 0)*this.params.gallopHeadPitch*Math.cos(2*Math.PI*(this.phase-this.params.gallopFlexPhase));
+    const jumpPitch=this.params.jumpHeadPitch*(crouch-(this.input.grounded ? 0 : THREE.MathUtils.clamp(this.metrics.airPose*1.4,-1,1)));
+    const accent=gallopPitch+jumpPitch;
+    if(Math.abs(accent)>1e-4){
+      const neck=this.necks[this.necks.length-1];
+      worldOverlay(neck,right.clone(),accent*.35);
+      worldOverlay(this.head,right.clone(),accent*.65);
+      this.root.updateWorldMatrix(true,true);
+    }
     if(this.input.grounded && Math.abs(slope)<.1 && Math.abs(this.turn)>.5 && this.spine) {
       const pelvis=this.spine.getWorldPosition(v());
       const floorY=this.input.groundAt(pelvis.x,pelvis.z,this.group.position.y+.8);
@@ -604,7 +621,9 @@ export class AuthoredLocomotion {
       },0);
       const normalizedSupport=support/Math.max(.001,gaitWeight);
       if(normalizedSupport>.5)authoredSupportFeet++;
-      const windup=active==='jump_up' && (this.input.crouch ?? 0)>0 && this.input.speed<3;
+      // Every windup loads the legs; a moving one plants vertically only (the pad keeps travelling), so hocks and
+      // elbows flex under the dropped body instead of the clip's straight legs sinking through the floor.
+      const windup=this.input.grounded && active==='jump_up' && (this.input.crouch ?? 0)>0;
       let stance=this.input.grounded && (locomoting ? normalizedSupport>(foot.planted ? .45 : .55) : (active==='idle' || active==='land' || windup));
       let earlyTouch=false;
       const swingProgress=this.swingProgress[i]/Math.max(.001,gaitWeight);
@@ -632,6 +651,7 @@ export class AuthoredLocomotion {
           if(locomoting && this.input.speed>1) this.footfalls.push(paw.clone().setY(ground));
         }
         foot.anchor.copy(this.contactAnchor(foot,paw,ground,active,dt));
+        if(windup && this.input.speed>=1){foot.anchor.x=paw.x;foot.anchor.z=paw.z;}
         if(touchdown && locomoting && this.input.grounded) {
           const plant=this.turnPlant(i,paw,gaitWeight);
           if(plant.lengthSq()>0){
@@ -764,6 +784,18 @@ export class AuthoredLocomotion {
     this.placePaw(foot,target);
     if(i<2) {
       // A forepaw folded up past its own elbow reads as a hook jabbing the chest: keep it below.
+      // Open the wrist first: dropping the target with the fold kept swings the forearm up into line with the folded
+      // metacarpus (the boneless J-hook). Only what the unfold can't clear moves the target.
+      let unfold=fold;
+      for(let pass=0;pass<3 && unfold>1e-3;pass++) {
+        const over=foot.paw.getWorldPosition(v()).y-(foot.lower.getWorldPosition(v()).y-.05);
+        if(over<=0)break;
+        const ease=Math.min(unfold,.2);unfold-=ease;
+        foot.hock.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),-ease));
+        foot.hock.updateWorldMatrix(false,true);
+        target.copy(foot.paw.getWorldPosition(v()));
+        this.placePaw(foot,target);
+      }
       const over=foot.paw.getWorldPosition(v()).y-(foot.lower.getWorldPosition(v()).y-.05);
       if(over>0){target.y-=over;this.placePaw(foot,target);}
     } else for(let pass=0;pass<2;pass++) {
@@ -822,10 +854,18 @@ export class AuthoredLocomotion {
     if(Math.abs(flex)>1e-4) {
       // The pelvis stays put: tucking it opens a seam at the haunch.
       for(const spine of this.spines)worldOverlay(spine,right.clone(),flex/this.spines.length*1.5);
-      // Level eyeline: the head counter-pitches what the back does.
-      worldOverlay(this.head,right.clone(),-flex*2);
+      // The head pitch accent is layered after carriage (afterMixer), which would low-pass it away here.
     }
     this.metrics.spineFlexCommand=flex;
+    // Gathered flight: the hinds swing through under the belly before they land (+local X swings the thigh back).
+    // Zero at the hind touchdown (phase 1) so a latched pad is never thrown forward of the authored plant.
+    const gatherWindow=(this.phase+1-.7)%1;
+    const gather=run*(gatherWindow<.3 ? Math.sin(Math.PI*gatherWindow/.3) : 0);
+    if(gather>1e-4)for(let i=2;i<4;i++){
+      const thigh=this.feet[i].upper;
+      this.overlays.push({bone:thigh,rotation:thigh.quaternion.clone()});
+      thigh.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),-gather*this.params.gatherHindReach));
+    }
     // Breath: ribcage lifts, withers ease, root rises a few mm.
     worldOverlay(chest,right.clone(),-idle*this.params.breath*breath);
     worldOverlay(withers,right.clone(),idle*this.params.breath*.6*breath);
@@ -836,19 +876,33 @@ export class AuthoredLocomotion {
     const cycle=this.time/3.1, flick=Math.max(0,Math.sin(Math.PI*Math.min(1,(cycle%1)/.06)))*(cycle%1<.06 ? 1 : 0);
     const ear=this.ears[Math.floor(cycle)%2];
     if(ear && flick>0)worldOverlay(ear,forward.clone(),(Math.floor(cycle)%2 ? -1 : 1)*this.params.earTwitch*flick*Math.max(idle,.3));
+    if(idle>1e-3) {
+      // Standing life between twitches: each ear swivels on its own slow beat, the brush sweeps lazily.
+      this.ears.forEach((e,k)=>worldOverlay(e,up.clone(),idle*.14*Math.sin(2*Math.PI*(.13+.05*k)*this.time+k*2.1)));
+      for(let i=1;i<Math.min(5,this.tails.length);i++){
+        const bone=this.tails[i];
+        this.overlays.push({bone,rotation:bone.quaternion.clone()});
+        bone.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(0,0,1),idle*.05*Math.sin(2*Math.PI*.16*this.time-i*.6)));
+      }
+    }
     // Idle attention: an unhurried look around, carried mostly by the neck.
     const gaze=idle*this.params.idleLook*(Math.sin(2*Math.PI*.09*this.time)+.5*Math.sin(2*Math.PI*.23*this.time+2));
     if(this.necks[1])worldOverlay(this.necks[1],up.clone(),gaze*.6);
     worldOverlay(this.head,up.clone(),gaze*.4);
     // Air pose: forelegs tuck on the rise and reach on the fall, hind legs stream back off the push, body arcs.
     const airborne=!this.input.grounded && /^jump_/.test(active);
-    const a=this.air.step(airborne ? THREE.MathUtils.clamp(this.input.verticalSpeed/6,-1,1) : 0,dt,3.2,.9);
+    const airTarget=airborne ? THREE.MathUtils.clamp(this.input.verticalSpeed/6,-1,1) : 0;
+    // Take-off snaps straight into the push pose: a spring lagging here leaves the hinds dangling on the first frames.
+    if(airborne && this.airTime===0 && airTarget>this.air.value){this.air.value=airTarget;this.air.velocity=0;}
+    this.airTime=airborne ? this.airTime+dt : 0;
+    const a=this.air.step(airTarget,dt,3.2,.9);
     const airW=airborne ? 1 : Math.max(0,1-Math.abs(a)*4) < 1 ? Math.abs(a) : 0;
     this.metrics.airPose=a;
     if(Math.abs(a)>1e-3 || airborne) {
       // Paws curl only while rising; from the apex on the forelegs open and reach so nothing hangs limp.
-      const tuck=THREE.MathUtils.lerp(this.params.airReach,this.params.airTuck,THREE.MathUtils.smoothstep(a,.1,.7));
-      const reach=1-THREE.MathUtils.smoothstep(a,0,.6);
+      const tuck=THREE.MathUtils.lerp(this.params.airReach,this.params.airTuck,THREE.MathUtils.smoothstep(a,.3,.8));
+      // Reach opens before the true apex (the spring lags the arc), so the fores are never caught hanging.
+      const reach=1-THREE.MathUtils.smoothstep(a,.1,.5);
       const hind=this.params.airHindStream*(a>0 ? a : .6*a);
       const k=airborne ? 1 : airW;
       // Upper limb (measured: +local X swings the limb back): forelegs fold back under the chest on the rise and
@@ -868,8 +922,58 @@ export class AuthoredLocomotion {
       // Apex arch: the back rounds over the top of the arc.
       const arch=k*this.params.airArch*1.5*(1-Math.min(1,Math.abs(a)*1.6));
       for(const spine of this.spines)worldOverlay(spine,right.clone(),arch/this.spines.length);
+      if(airborne) {
+        this.root.updateWorldMatrix(true,true);
+        // Push-off: hinds drive long and back (hock open) for the first part of the rise, then release.
+        const push=this.params.airPushHind*Math.max(0,a)*(1-THREE.MathUtils.smoothstep(this.airTime,.12,.35));
+        // Apex/fall: fores open forward-down, nearly straight, paws leading (no limp vertical hang).
+        // Driven by the live arc, not the lagging spring, so they are already open as the rise tops out.
+        const open=this.params.airForeOpen*(1-THREE.MathUtils.smoothstep(airTarget,.15,.55));
+        for(let i=0;i<4;i++){
+          const foot=this.feet[i];
+          if(i<2 && open>1e-3){this.aimLimb(foot,forward,50,45,open);}
+          if(i>=2 && push>1e-3){
+            this.aimLimb(foot,forward,-62,-28,push);
+            // Hock opens so the metatarsus carries the shin's line back (+X extends): a driving leg, not a dangling one.
+            this.overlays.push({bone:foot.hock,rotation:foot.hock.quaternion.clone()});
+            foot.hock.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),push*1.1));
+            foot.hock.updateWorldMatrix(false,true);
+          }
+        }
+      }
+    }
+    if(!this.input.grounded && active==='glide' && this.params.glideLegs>0) {
+      // Glide: legs hang loose under the body (fores slightly forward, hinds trailing), never a four-legs-flat superhero.
+      this.root.updateWorldMatrix(true,true);
+      const w=this.params.glideLegs;
+      for(let i=0;i<4;i++){
+        const foot=this.feet[i];
+        if(i<2)this.aimLimb(foot,forward,68,80,w); else this.aimLimb(foot,forward,-72,-50,w);
+        this.overlays.push({bone:foot.hock,rotation:foot.hock.quaternion.clone()});
+        // Soft wrist curl fore (+X flexes the metacarpus back), relaxed hock fold hind (-X folds).
+        foot.hock.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),i<2 ? .45*w : -.25*w));
+        foot.hock.updateWorldMatrix(false,true);
+      }
     }
     this.metrics.pelvisRoll=pelvisRoll;this.metrics.spineSway=sway;
+  }
+  /** Swing the upper and lower limb bones toward world directions given as degrees below the horizontal, signed by
+   * heading (positive = toward the actor's forward, negative = backward), blended by weight. */
+  private aimLimb(foot:{upper:THREE.Object3D;lower:THREE.Object3D;hock:THREE.Object3D},forward:THREE.Vector3,upperDeg:number,lowerDeg:number,weight:number) {
+    const dir=(deg:number)=>{
+      const r=THREE.MathUtils.degToRad(Math.abs(deg)), s=Math.sign(deg) || 1;
+      return forward.clone().setY(0).normalize().multiplyScalar(Math.cos(r)*s).add(new THREE.Vector3(0,-Math.sin(r),0));
+    };
+    const aim=(bone:THREE.Object3D,child:THREE.Object3D,to:THREE.Vector3)=>{
+      this.overlays.push({bone,rotation:bone.quaternion.clone()});
+      const from=child.getWorldPosition(v()).sub(bone.getWorldPosition(v())).normalize();
+      const turn=q().slerp(q().setFromUnitVectors(from,to),THREE.MathUtils.clamp(weight,0,1));
+      const parent=bone.parent?.getWorldQuaternion(q()) ?? q();
+      bone.quaternion.copy(parent.invert().multiply(turn.multiply(bone.getWorldQuaternion(q()))));
+      bone.updateWorldMatrix(false,true);
+    };
+    aim(foot.upper,foot.lower,dir(upperDeg));
+    aim(foot.lower,foot.hock,dir(lowerDeg));
   }
   /** Three-joint leg: solve shoulder/hip -> elbow/stifle so the carpus/hock carries its metacarpus/metatarsus
    * (world orientation kept) onto the target; the pad keeps its own orientation. */
