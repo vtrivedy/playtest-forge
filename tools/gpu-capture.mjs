@@ -923,7 +923,7 @@ try {
       };
       await frameLens(initial);
       await video(name,seconds*fps,async i=>{
-        const angle=gait==='turn' ? Math.max(0,i/fps-.5)*.6 : 0;
+        const angle=gait==='turn' ? -Math.max(0,i/fps-.5)*.6 : 0;
         await H('setStick',Math.sin(angle)*stick,-Math.cos(angle)*stick);
         await H('setKeys',gait==='jump' && i>=48 && i<63 ? ['Space'] : []);
       },undefined,{
