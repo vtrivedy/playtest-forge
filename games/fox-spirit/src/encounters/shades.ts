@@ -111,7 +111,7 @@ const NOISE = /* glsl */ `
 
 function inkMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 }, uDensity: { value: 3 } },
+    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 }, uDensity: { value: 3 }, uReleaseAge: { value: -1 } },
     vertexShader: /* glsl */ `
       uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer;
       varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
@@ -138,7 +138,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer, uDensity;
+      uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer, uDensity, uReleaseAge;
       varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
       ${NOISE}
       void main() {
@@ -153,6 +153,10 @@ function inkMaterial(): THREE.ShaderMaterial {
         vec3 light = vec3(0.15, 0.10, 0.065);
         float wrap = dot(normalize(vWorldN), normalize(vec3(-0.4, 0.8, 0.5))) * 0.5 + 0.5;
         vec3 col = mix(core, light, wrap * 0.45 + n * 0.25 + rim * 0.18);
+        // The remaining animal warms briefly before its ink unspools into motes.
+        float releaseWarmth = smoothstep(0.08, 0.32, uReleaseAge);
+        vec3 amber = mix(vec3(0.25, 0.09, 0.025), vec3(0.65, 0.30, 0.075), wrap * 0.6 + n * 0.25);
+        col = mix(col, amber, releaseWarmth);
         float alpha = (uLayer < 0.5 ? 1.0-exp(-uDensity*density) : 0.11*density) * legFade;
         alpha *= (1.0 - smoothstep(0.42, 1.0, rim)) * dissolve * uPresence;
         gl_FragColor = vec4(col, alpha);
@@ -496,10 +500,12 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         s.mat.uniforms.uTime!.value = t;
         s.mat.uniforms.uPresence!.value = s.presence;
         s.mat.uniforms.uDensity!.value = tun.inkDensity;
+        s.mat.uniforms.uReleaseAge!.value = s.freed ? s.releaseAge : -1;
         for (const material of s.layers) {
           material.uniforms.uTime!.value=t;
           material.uniforms.uPresence!.value=s.presence;
           material.uniforms.uDensity!.value=tun.inkDensity;
+          material.uniforms.uReleaseAge!.value=s.freed?s.releaseAge:-1;
           material.uniforms.uNoticeYaw!.value=s.noticeYaw;
         }
         if (!s.freed && (s.poolSampleAt.distanceToSquared(s.pos) > 0.0144 || s.poolRadius !== tun.drainRadius)) {
