@@ -96,7 +96,8 @@ export function createStylizedWater(
             + texture2D(uReflectionMap, mirrorCentre + vec2(0.0, mirrorStep.y)).rgb * 0.15
             + texture2D(uReflectionMap, mirrorCentre - vec2(0.0, mirrorStep.y)).rgb * 0.15;
         }
-        vec3 col = mix(refracted, reflection, 0.02 + fres * 0.94);
+        // Leave transmitted bed/limbs legible even in low wading views.
+        vec3 col = mix(refracted, reflection, 0.02 + fres * 0.70);
         // Scene colour already contains the bed: avoid blending it a second time.
         gl_FragColor = vec4(col, shore);
         #include <tonemapping_fragment>

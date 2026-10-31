@@ -157,3 +157,7 @@ Merged main's automatic *.mjs mount loop. Its new capture-module test still reco
 ## Capture the continuous reveal itself
 
 Current fixed-camera stages are0,.3,1,5seconds and skip the new fade at1.2..2.06seconds. Add restoration-water-reveal at1.65seconds (39frames after mid), then201frames to retain the unchanged5second settled state. Same lens, real existing latch event and identical total simulation time. This is next-candidate evidence only; keep already pendingb389 request immutable.
+
+## ebffd87 water-lens critique: submerged detail
+
+Independent Sol actually inspected side/low wade, pond vista, restored Reed vista and thin washbridge. Meaningful baseline improvement, finalFAIL: at grazing views the near-full scenery/fox reflection obscures underwater legs/bed, and restored basin broad patches feel planar. Preserve real mirror and existing five-tap softness; lower only pond/creek/Reed skin reflection ceiling from0.96 to0.72 (base0.02 + Fresnel*0.70). This leaves at least28% scene-transmitted colour at maximum grazing reflection, avoiding a moving local clarity disc or extra effects. Existing depth tint, ripples, shoreline, geometry and collision remain. The physical ribbon washbridge is unaffected. No new pass/assets/cost. Prepare separate candidate while current3b request stays immutable. GPU compare low/side wade and pond/Reed vista: limbs/bed clearer, recognizable scenery reflection retained, no flat putty regression. No quality approval from source.
