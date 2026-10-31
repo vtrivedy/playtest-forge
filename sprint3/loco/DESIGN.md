@@ -47,3 +47,5 @@ Ratio instrumentation after main merge: worst ramp slide 3.20m/s occurs at ratio
 
 ## Follow-up blockers
 Opus follow-up confirms six fixes but finds two new edge failures: a continuous re-anchor can repeat at the correction cap, and forward-only cadence can freeze a walk pose during sideways/backward landing travel. Release an overextended contact before the cap for a short recovery interval (80ms) before normal replanting; count the release once. Select existing skid pose when non-forward ground travel dominates, keeping actual momentum. Clarify Hermite endpoint match is bounded by the monotonicity cap. No extra gameplay verb or parallel animation path.
+
+Ratio-response-8 trial rejected: ramp residual .064m vs .057m and slide 3.37 vs 3.20m/s. No runtime change retained. Fixed-mesh probe source retained as tools/loco-mesh-contact.ts; it tracks consistent vertex IDs and reports near-floor motion plus a low-vertical-speed subset. The full-tangent choice reduced flat near-floor trot p95 from 5.58 to .43m/s in CPU trials but gallop recovery still needs visual assessment. No metric-only pass.
