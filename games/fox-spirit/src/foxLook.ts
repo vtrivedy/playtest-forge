@@ -12,6 +12,8 @@ export const FOX_LOOK = {
   /** painterly value strokes (object-space clumps laid along the body) */
   strokeStrength: 0.18,
   strokeScale: 1.0,
+  /** Amount of the two thin skinned coat fringe layers; 0 returns to the original surface. */
+  furFringe: 1.0,
   /** broken amber rim at grazing angles = the spirit glow at the silhouette */
   rimStrength: 0.22,
   rimPower: 2.5,
@@ -28,6 +30,7 @@ export const FOX_LOOK = {
 };
 
 type FurUniforms = {
+  uFringe: { value: number };
   uTint: { value: THREE.Vector3 };
   uSatVal: { value: THREE.Vector2 };
   uStroke: { value: THREE.Vector2 };
@@ -35,6 +38,7 @@ type FurUniforms = {
   uRimColor: { value: THREE.Color };
 };
 const furUniforms: FurUniforms = {
+  uFringe: { value: 1 },
   uTint: { value: new THREE.Vector3() },
   uSatVal: { value: new THREE.Vector2() },
   uStroke: { value: new THREE.Vector2() },
@@ -46,6 +50,7 @@ const eyeMats: THREE.MeshStandardMaterial[] = [];
 /** Push FOX_LOOK into the shared uniforms (cheap; call per frame). */
 function syncLook() {
   const L = FOX_LOOK;
+  furUniforms.uFringe.value = L.furFringe;
   furUniforms.uTint.value.set(...L.furTint);
   furUniforms.uSatVal.value.set(L.furSaturation, L.furValue);
   furUniforms.uStroke.value.set(L.strokeStrength, L.strokeScale);
@@ -64,14 +69,25 @@ float fxNoise(vec3 x) {
                  mix(fxHash(i + vec3(0, 1, 1)), fxHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }`;
 
-function patchFur(mat: THREE.MeshStandardMaterial) {
+function patchFur(mat: THREE.MeshStandardMaterial, fringeLength = 0, fringeAlpha = 0.22) {
   const shell = mat.name.toLowerCase().includes("shell");
   const tail = mat.name.toLowerCase().startsWith('foxtailfur');
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, furUniforms);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vRest;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
+      .replace('#include <common>', `#include <common>
+varying vec3 vRest;
+${fringeLength ? `uniform float uFringe;
+${NOISE_GLSL}` : ''}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vRest = position;
+${fringeLength ? `
+  // Offset in bind space before skinning, so fringe follows the exact authored pose.
+  float furMask = smoothstep(0.30, 0.85, position.y) * (1.0 - smoothstep(1.35, 1.9, position.z));
+  furMask *= 1.0 - smoothstep(2.9, 3.4, position.y) * 0.65;
+  float furClump = 0.45 + 0.55 * fxNoise(position * vec3(7.0, 9.0, 3.0));
+  transformed += normalize(normal + vec3(0.0, -0.2, -0.2)) * ${fringeLength.toFixed(3)} * uFringe * furMask * furClump;
+` : ''}`);
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
@@ -103,7 +119,8 @@ ${NOISE_GLSL}`,
         '#include <opaque_fragment>',
         `{
   float facing = saturate(dot(normal, normalize(vViewPosition)));
-  ${shell ? `diffuseColor.a *= (1.0 - smoothstep(0.12, 0.7, facing)) * ${tail ? "0.075" : "0.22"}; if (diffuseColor.a < 0.01) discard;` : ""}
+  ${shell ? `diffuseColor.a *= (1.0 - smoothstep(0.12, 0.7, facing)) * ${tail ? "0.075" : fringeAlpha.toFixed(3)}; if (diffuseColor.a < 0.01) discard;` : ""}
+  ${fringeLength ? `diffuseColor.a *= 0.35 + 0.65 * fxNoise(vRest * vec3(35.0, 20.0, 3.0));` : ''}
   float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
   outgoingLight += uRimColor * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
@@ -121,7 +138,7 @@ ${NOISE_GLSL}`,
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}`;
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeAlpha}`;
   mat.needsUpdate = true;
 }
 
@@ -188,6 +205,7 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
 
 /** Material pass over the loaded GLB (spirit FX cards, eyes, nose, fur). */
 export function applyFoxLook(root: THREE.Object3D) {
+  const coats: { mesh: THREE.SkinnedMesh; mat: THREE.MeshStandardMaterial }[] = [];
   root.traverse((c) => {
     if (!(c as THREE.Mesh).isMesh) return;
     const mesh = c as THREE.Mesh;
@@ -208,6 +226,7 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       } else if (n.includes('fur')) {
+        if (n === 'foxfur' && (mesh as THREE.SkinnedMesh).isSkinnedMesh) coats.push({ mesh: mesh as THREE.SkinnedMesh, mat });
         // The opaque coat supplies the soft shadow; shell shadow maps ignore our grazing-angle fade.
         if (n.includes('shell')) {
           mesh.castShadow = false;
@@ -243,6 +262,26 @@ export function applyFoxLook(root: THREE.Object3D) {
       }
     }
   });
+  // Append after traversal: each surface shares the source skeleton and bind matrices, never new bones.
+  for (const { mesh, mat } of coats) {
+    for (const [i, [length, alpha]] of [[0.025, 0.22], [0.045, 0.14]].entries()) {
+      const fringe = mesh.clone(false);
+      const material = mat.clone();
+      material.name = `FoxFurShellCoat${i + 1}`;
+      material.transparent = true;
+      material.depthWrite = false;
+      material.alphaTest = 0;
+      patchFur(material, length, alpha);
+      fringe.name = `FoxCoatFringe${i + 1}`;
+      fringe.material = material;
+      fringe.castShadow = false;
+      fringe.receiveShadow = true;
+      fringe.renderOrder = 2;
+      fringe.frustumCulled = false;
+      mesh.parent!.add(fringe);
+    }
+  }
+  root.userData.coatFringeLayers = coats.length * 2;
   syncLook();
 }
 
@@ -367,7 +406,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(rnd() * sourcePts.length)]! });
   }
 
-  const diagnostics = { wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  const diagnostics = { coatFringeLayers: root.userData.coatFringeLayers as number, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
   group.userData.spiritFx = diagnostics;
 
   // flame licks: one instanced billboard per lick
