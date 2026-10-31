@@ -1839,6 +1839,7 @@ try {
     const encounter = { initialHits: start.shades.hits, minWisps: start.shades.wisps, knockbackTravelMeters: 0 };
     let previousPos = start.pos, previousKnockback = start.shades.knockbackTravel ?? 0, previousHits = start.shades.hits;
     const framing = { samples: 0, outside: 0, maxAbsX: 0, maxAbsY: 0, firstFailure: null, failures: [] };
+    const lensSafety = { samples: 0, occupied: 0, missing: 0, firstFailure: null };
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const budgetFrames = Number(arg('route-seconds', kilnRoute ? '60' : '360')) * fps;
     const minimumIdleFrames = 10 * fps;
@@ -1870,6 +1871,13 @@ try {
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     }, { traceEveryFrame: kilnRoute || budgetFrames <= 60 * fps, sample: async (i, st) => {
       const audit = {};
+      if (typeof st.camera.lensTouchesCollider === 'boolean') {
+        lensSafety.samples++;
+        if (st.camera.lensTouchesCollider) {
+          lensSafety.occupied++;
+          lensSafety.firstFailure ??= { frame: i, pos: st.camera.pos };
+        }
+      } else lensSafety.missing++;
       const visibility = await visibilityReview.sample(i);
       if (visibility) audit.projectedVisibility = visibility;
       if (kilnRoute) {
@@ -1968,6 +1976,8 @@ try {
       return { ...audit, cameraDiagnostic: `${name}-camera-frame-${i}.json` };
     } });
     const projectedVisibility = await visibilityReview.finish();
+    save('route-lens-safety.json', { ...lensSafety, passed: lensSafety.samples > 0 && lensSafety.occupied === 0 && lensSafety.missing === 0,
+      scope: 'Every encoded frame, conservative .2m authored box/cylinder/terrain proximity; not exact visual mesh containment' });
     if (projectedVisibility.invalid || projectedVisibility.errors) report.failures.push(`Invalid GPU visibility masks: ${JSON.stringify(projectedVisibility)}`);
     if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
     await H('autopilot', false, state.auto.idx, { assist: false });
