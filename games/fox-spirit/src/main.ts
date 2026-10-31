@@ -542,6 +542,8 @@ async function boot() {
   fDusk.add(HUB_DUSK, 'skyScale', .5, 1, .01);
   fDusk.add(HUB_DUSK, 'sunBloom', 0, .3, .01);
   fDusk.add(HUB_DUSK, 'godRays', 0, .5, .01);
+  fDusk.add(HUB_DUSK, 'horizonGlow', 0, .6, .01);
+  fDusk.add(HUB_DUSK, 'cloudAmount', 0, 1, .01);
   fDusk.close();
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
   fLook.add(post.params, 'bloomStrength', 0, 1, 0.01);

@@ -161,9 +161,9 @@ export function createLanternhollow(
       b.plaster.add(g, trs(h.x + sx * h.w / 2 + (sx < 0 ? .12 : 0), 0, h.z, -Math.PI / 2), plaster); g.dispose();
     }
     if (h.chimney) {
-      box(b.stone, h.x - 1.6, y + 3.8, h.z - .4, .75, 3.6, .75, PAL.stoneDark);
-      box(b.stone, h.x - 1.6, y + 5.55, h.z - .4, 1, .2, 1, PAL.stone);
-      col.add(boxCollider({ x: h.x - 1.6, z: h.z - .4, w: 1, d: 1, top: y + 5.65, bottom: y + 2, tag: 'hub-chimney' }));
+      box(b.stone, h.x - 1.6, y + 3.35, h.z - .4, .75, 2.1, .75, PAL.stoneDark);
+      box(b.stone, h.x - 1.6, y + 4.45, h.z - .4, 1, .2, 1, PAL.stone);
+      col.add(boxCollider({ x: h.x - 1.6, z: h.z - .4, w: 1, d: 1, top: y + 4.55, bottom: y + 2.3, tag: 'hub-chimney' }));
     }
   }
 
@@ -261,9 +261,9 @@ export function createLanternhollow(
   smokeCtx.fillStyle = gradient; smokeCtx.fillRect(0, 0, 32, 32);
   const smokeTexture = new THREE.CanvasTexture(smokeCanvas);
   const chimney = HUB_HOUSES.find(h => h.chimney)!;
-  const chimneyY = ground(chimney.x, chimney.z) + 5.7;
+  const chimneyY = ground(chimney.x, chimney.z) + 4.6;
   const smoke = Array.from({ length: 8 }, () => {
-    const mat = new THREE.SpriteMaterial({ map: smokeTexture, color: 0x6e5a44, transparent: true, opacity: 0, depthWrite: false });
+    const mat = new THREE.SpriteMaterial({ map: smokeTexture, color: 0xa99b86, transparent: true, opacity: 0, depthWrite: false });
     const puff = new THREE.Sprite(mat);
     // Decorative smoke must not enter world/photography collision probes. Sprite
     // raycasts require a camera, while the photo-blocker ray intentionally has none.
@@ -304,11 +304,11 @@ export function createLanternhollow(
     plazaLight.intensity = 3 * dusk * flicker;
     for (const [i, puff] of smoke.entries()) {
       const age = (time / 4.5 + i / smoke.length) % 1;
-      puff.position.set(chimney.x - 1.6 + age * .7 + Math.sin(age * 5 + i) * .08,
-        chimneyY + age * 2.7, chimney.z - .4 + age * .2);
-      const size = .3 + age * 1.1;
+      puff.position.set(chimney.x - 1.6 + age * 1.15 + Math.sin(age * 5 + i) * .08,
+        chimneyY + age * 1.4, chimney.z - .4 + age * .2);
+      const size = .25 + age * .65;
       puff.scale.set(size, size * 1.15, 1);
-      puff.material.opacity = Math.sin(age * Math.PI) * .16;
+      puff.material.opacity = Math.sin(age * Math.PI) * .075;
       puff.material.rotation = i * 1.7 + age * .3;
     }
     },

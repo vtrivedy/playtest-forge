@@ -786,7 +786,8 @@ try {
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
     }
     save('hub-view-cameras.json', hubViewCameras);
-    await H('photo', [8, 4.5, 101], [-8, 2, 86], 55); await advance(30);
+    const arrivalCamera = { lens: [8, 4.5, 101], target: [-8, 2, 86], fov: 55, blocker: await H('photoBlocker', [8, 4.5, 101], [-8, 2, 86]) };
+    await H('photo', arrivalCamera.lens, arrivalCamera.target, arrivalCamera.fov); await advance(30);
     const initial = await H('state');
     await video('hub-arrive-idle', 15 * fps, async i => {
       // One staged starting point, then the live controller. Arrival pauses at the well lane.
@@ -795,7 +796,7 @@ try {
     await H('setStick', null);
     const end = await H('state');
     await H('photoOff'); await advance(30); await shot('hub-chase-arrived');
-    save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
+    save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', arrivalCamera, initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
     // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
     const orbitCameras = [];
     const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-10, 88));

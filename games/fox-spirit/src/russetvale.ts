@@ -2007,15 +2007,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   }
 
   // ==================================================================== MEADOW + PORTAL
-  // portal ring of standing stones (0,92) and the first arch framing the Wellspring
-  for (let k = 0; k < 7; k++) {
-    const a = (k / 7) * Math.PI * 2 - Math.PI / 2 + 0.45;
-    const px = Math.cos(a) * 5.4;
-    const pz = 92 + Math.sin(a) * 5.4;
-    if (pz > 94) continue; // keep the camera side open
-    const h = 1.6 + ((k * 53) % 7) * 0.25;
-    bk('stone', px, pz).add(lanternColumn, trs(px, groundRaw(px, pz) - 0.1, pz, -a, 0.55 / 0.61, h / 1.9, 0.55 / 0.61, 0.06, 0.05), PAL.stone);
-  }
+  // The village arch remains; decorative arrival-ring columns obscured the chase view.
   {
     const y = groundRaw(0, 85);
     archAt(bk('stone', 0, 85), 0, y - 0.1, 85, 0.06, { span: 3.6, pillarH: 4.2, seed: 250, pointed: true });
