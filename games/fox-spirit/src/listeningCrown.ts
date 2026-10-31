@@ -117,6 +117,7 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
       field.setFox(source.fox);
       field.trail = source.trail.map(t => ({ ...t }));
       field.strokes = source.strokes.map(t => ({ ...t }));
+      field.visualDrains = source.visualDrains;
       field.renderMask(dt);
       for (const m of materials) field.syncMaterial(m);
     },
