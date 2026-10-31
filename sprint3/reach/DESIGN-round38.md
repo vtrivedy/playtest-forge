@@ -24,3 +24,16 @@ the void and horizon only, pending a separately reviewed bank replacement.
 Root tsc and fox Vite required. Remote reachview HIGH/LOW/hero plus actual reach
 ride and window.__game; inspect PNGs and shader errors before any main merge.
 No new asset/license dependency. Other-model critique required.
+
+Implementation also feathers out from local z-96 to-78, matching the Reach
+mood's northern realm boundary so the sheet does not extend under the W1 south.
+
+Opus critique (artifacts/opus-round38.txt): far fog is too weak to hide a sheet
+edge; W1 can see east despite object clipping; straight feather and distant
+ripples risk seams/shimmer. Follow-up: camera-region visibility gate in world
+coordinates, noisy local west boundary, explicit450–720m distance alpha fade
+inside geometry extent, ripple/normal detail fading80–240m. Forced renderOrder-2
+precedes basin/curtain/wakes. Accepted risks pending GPU: perched cistern and
+unshadowed distant water, fall-through scenery outside the safe route. No claim
+that this fixes the bank wall or hero framing. z-boundary was added before
+critique returned. Local coordinates are explicitly passed by the baked plane.
