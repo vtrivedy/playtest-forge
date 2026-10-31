@@ -31,10 +31,33 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
   for (const [index,[x, y, z, h]] of trees.entries()) {
     const variant: NatureVariant=index%2?'dead_1':'dead_2';
     nature.place(variant,x,y,z,{scale:h/nature.height(variant),yaw:x*.31,hue:barkColor,bark:barkColor});
+  }
+  const treeStart=group.children.length;
+  for(const mat of nature.build(group))patch(mat);
+  const treeMeshes=group.children.slice(treeStart) as THREE.Mesh[];
+  const triangle=new THREE.Triangle(),near=new THREE.Vector3();
+  // Geometry is baked in the group's local frame by NatureKit. Find a real bark
+  // attachment rather than assuming that a crooked trunk follows its root axis.
+  function barkAnchor(point:THREE.Vector3){
+    let best=Infinity;const result=new THREE.Vector3();
+    for(const mesh of treeMeshes){
+      const geo=mesh.geometry,p=geo.getAttribute('position'),index=geo.index,n=index?.count??p.count;
+      for(let i=0;i<n;i+=3){
+        triangle.a.fromBufferAttribute(p,index?index.getX(i):i);
+        triangle.b.fromBufferAttribute(p,index?index.getX(i+1):i+1);
+        triangle.c.fromBufferAttribute(p,index?index.getX(i+2):i+2);
+        triangle.closestPointToPoint(point,near);const d=point.distanceToSquared(near);
+        if(d<best){best=d;result.copy(near);}
+      }
+    }
+    return result;
+  }
+  for(const [x,y,z,h] of trees){
     for (let j = 0; j < 5; j++) {
       const a = j * 2.4 + x, reach = 1.5 + random() * 1.7;
       const dx = Math.cos(a) * reach, dz = Math.sin(a) * reach, by = y+h*(.52+j*.065);
-      branch([[x,by,z],[x+dx*.5,by+.9,z+dz*.5],[x+dx,by+.3,z+dz],[x+dx*1.15,by-1.4,z+dz*1.15]], .09);
+      const root=barkAnchor(new THREE.Vector3(x,by,z));
+      branch([[root.x,root.y,root.z],[x+dx*.5,by+.9,z+dz*.5],[x+dx,by+.3,z+dz],[x+dx*1.15,by-1.4,z+dz*1.15]], .09);
       // Sparse, slender copper leaves, never a maple canopy mass.
       for (let k = 0; k < 7; k++) {
         const t = k/7, ly = by+.2-t*1.7;
@@ -44,7 +67,6 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
       }
     }
   }
-  for(const mat of nature.build(group))patch(mat);
   // Bank clusters stay clear of the source, handles, ferry and low-lane line.
   for (const [cx,cz] of [[176,-106.5],[183,-104.5],[193,-104],[198,-132],[189,-132],[174,-133]]) {
     for (let i=0;i<16;i++) {
