@@ -36,7 +36,8 @@ loco.reset(); for (let i = 0; i < 30; i++) step(0, 0, 'idle');
 const rest = paws.map(p => w(p).y);
 const median = (a: number[]) => a.length ? [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)] : 0;
 const rows: Record<string, unknown>[] = [];
-for (const rate of [0, 2.5]) for (const speed of [1.62, 4.05, 9]) {
+const speeds = (process.env.SPEEDS ?? "1.62,4.05,9").split(",").map(Number), rates = (process.env.RATES ?? "0,2.5").split(",").map(Number);
+for (const rate of rates) for (const speed of speeds) {
   loco.reset(); group.position.set(0, 0, 0); group.rotation.y = 0;
   let yaw = 0, residual = 0, lastPhase = 0; const hz: number[] = [], events: number[] = [], heads: number[] = [], pitches: number[] = [];
   const prev = paws.map(() => new THREE.Vector3()), contact = paws.map(() => ({ on: false, max: 0 }));
@@ -66,3 +67,16 @@ for (const rate of [0, 2.5]) for (const speed of [1.62, 4.05, 9]) {
     footfallNearGroundMS: +median(events).toFixed(2), headBobCm: +(range(heads) * 100).toFixed(1), torsoPitchDeg: +(range(pitches) * 180 / Math.PI).toFixed(1) });
 }
 console.table(rows);
+// Gait handoffs: critically damped speed steps 3.8 <-> 9 m/s (the controller's groundEase shape).
+{
+  loco.reset(); group.position.set(0, 0, 0); group.rotation.y = 0;
+  let v = 3.8, a = 0, slide = 0, residual = 0, pops = 0;
+  const replantsBefore = loco.metrics.earlySteps;
+  for (let i = 0; i < 360; i++) {
+    const t = i / 60, target = t < 1 ? 3.8 : t < 3 ? 9 : t < 4.5 ? 3.8 : 9;
+    for (let k = 0; k < 2; k++) { a += (121 * (target - v) - 22 * a) / 120; v += a / 120; }
+    group.position.z += v / 60; group.updateMatrixWorld(true); step(v, 0, 'run');
+    if (i > 60) { slide = Math.max(slide, loco.metrics.maxSlideMS); residual = Math.max(residual, loco.metrics.maxResidual); if (loco.metrics.maxSlideMS > 2) pops++; }
+  }
+  console.table([{ scenario: 'handoff 3.8<->9', maxPlantSlideMS: +slide.toFixed(2), plantResidual: +residual.toFixed(3), framesSlide2ms: pops, replants: loco.metrics.earlySteps - replantsBefore }]);
+}

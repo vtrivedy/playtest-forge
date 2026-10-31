@@ -45,7 +45,7 @@ export class AuthoredLocomotion {
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
-    padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; dot: THREE.Mesh }[] = [];
+    padLocal: THREE.Vector3; planted: boolean; early: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; dot: THREE.Mesh }[] = [];
   private debugGroup = new THREE.Group();
   private phase = 0;
   private lastActive = '';
@@ -147,7 +147,7 @@ export class AuthoredLocomotion {
       padHeights.push(padWorld.y-floor);
       const dot = new THREE.Mesh(new THREE.SphereGeometry(.025,6,4), new THREE.MeshBasicMaterial({color:0xffcc44, depthTest:false}));
       this.debugGroup.add(dot);
-      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:upper.startsWith('thigh') ? root.getObjectByName(upper.replace('thigh','hind_foot')) : undefined,planted:false,anchor:v(),previousSolved:v(),clearance:.005,dot});
+      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:upper.startsWith('thigh') ? root.getObjectByName(upper.replace('thigh','hind_foot')) : undefined,planted:false,early:false,anchor:v(),previousSolved:v(),clearance:.005,dot});
     }
     root.position.y-=padHeights.reduce((a,b)=>a+b,0)/padHeights.length;
     this.rootPosition.copy(root.position);
@@ -452,6 +452,9 @@ export class AuthoredLocomotion {
         const ground=this.input.groundAt(paw.x,paw.z,this.group.position.y+.6);
         if(Number.isFinite(ground) && paw.y<ground+foot.clearance+.01) stance=early=true;
       }
+      // Latched: an early plant holds until its nominal stance window takes over.
+      if(!stance && foot.early && foot.planted && locomoting && this.input.grounded) stance=early=true;
+      foot.early=early;
       if (stance) {
         const sample=foot.planted ? foot.anchor : paw;
         const ground=this.input.groundAt(sample.x,sample.z,this.group.position.y+.6);
@@ -467,7 +470,8 @@ export class AuthoredLocomotion {
         const delta=foot.anchor.clone().sub(paw);
         this.metrics.maxPlantError=Math.max(this.metrics.maxPlantError,Math.hypot(delta.x,delta.z));
         // IK confidence follows blended contact agreement, so a 50/50 gait handoff keeps its plants.
-        const plantBlend=locomoting && !early ? THREE.MathUtils.smoothstep(support,.55,.9) : 1;
+        // An established plant keeps full correction; only a fresh contact during a gait handoff eases in.
+        const plantBlend=!locomoting || early || foot.planted ? 1 : THREE.MathUtils.smoothstep(support,.55,.9);
         delta.clampLength(0,this.params.maxCorrection).multiplyScalar(this.params.plantStrength*plantBlend);
         this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,delta.length());
         this.placePaw(foot,paw.add(delta).sub(padOffset));
