@@ -57,7 +57,7 @@ for(const [ax,az,bx,bz] of HUB_PATHS) {
   const steps=Math.ceil(Math.hypot(bx-ax,bz-az)*10);
   for(let i=0;i<=steps;i++){
     const x=ax+(bx-ax)*i/steps,z=az+(bz-az)*i/steps;
-    for(const c of col.colliders)if(['hub-cottage','hub-bench','hub-well','hub-pulley-post'].includes(c.tag ?? '') && colliderTopAt(c,x,z,.4)!==null)throw Error(`Path clips hub collider at ${x},${z}`);
+    for(const c of col.colliders)if(['hub-cottage','hub-bench','hub-well','hub-pulley-post','hub-woodpile'].includes(c.tag ?? '') && colliderTopAt(c,x,z,.4)!==null)throw Error(`Path clips hub collider at ${x},${z}`);
   }
 }
 console.log(JSON.stringify({arrivalRouteSweepSamples:routeSweeps,smokeCameraFreeProbes:smokeProbes,pathSegmentsClear:HUB_PATHS.length,roofStrips:36,maxMeshColliderError:maxError,routePointsClear:8,colliders:col.colliders.length,vertices:Object.values(b).reduce((n,k)=>n+k.vertexCount,0)},null,2));
