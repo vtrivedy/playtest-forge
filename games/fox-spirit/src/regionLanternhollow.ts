@@ -3,8 +3,8 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { Bucket, PAL, trs } from './russetKit';
 import { boxCollider, cylCollider, type CollisionWorld } from './collision';
 
-/** Development comparison control; default preserves authored practical intensities. */
-export const HUB_PRACTICAL = { strength: 1 };
+/** Development comparison control; default selected from the captured 1x/2.5x/4x comparison. */
+export const HUB_PRACTICAL = { strength: 2.5 };
 
 /** Domestic scale, kept outside the existing arrival/hearth route. Original geometry. */
 export const HUB_FESTOON_POSTS = [[-12, 86.4], [6.6, 89.4]] as const;

@@ -70,12 +70,12 @@ assert.equal(hub.state().hearth, 0);
 for (const [x,z] of HUB_FESTOON_POSTS) assert.ok(hubPathDistance(x,z) >= 2.3, `Festoon post crowds path: ${x},${z}`);
 for (const p of hub.festoon.pendants) assert.ok(p.bottom >= p.ground + 3, 'Pendant must clear jumping fox');
 hub.update(1,1);
-const originalIntensities = practicals.map(p => p.intensity);
+const originalIntensities = practicals.map(p => p.intensity), originalStrength = HUB_PRACTICAL.strength;
 try {
-  HUB_PRACTICAL.strength = 2.5;
+  HUB_PRACTICAL.strength = originalStrength * 2.5;
   for (let i=0;i<1000;i++) hub.update(1,1);
   for (const [i,p] of practicals.entries()) assert.ok(Math.abs(p.intensity-originalIntensities[i]*2.5)<1e-12, 'Practical strength must not accumulate');
-} finally { HUB_PRACTICAL.strength = 1; hub.update(1,1); }
+} finally { HUB_PRACTICAL.strength = originalStrength; hub.update(1,1); }
 assert.deepEqual(practicals.map(p => p.intensity), originalIntensities, 'Comparison must restore exact authored lights');
 assert.ok(practicals.every(light => light.visible), 'fading must not change shader light count');
 const spriteHits: THREE.Intersection[] = [];

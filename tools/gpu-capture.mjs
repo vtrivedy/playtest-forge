@@ -1170,7 +1170,7 @@ try {
             game:await page.evaluate(() => window.__game)};
         };
         const entry = await snapshot(), variants = [];
-        if (entry.pose.strength !== 1) report.failures.push('Hub practical comparison default must remain one');
+        if (entry.pose.strength !== 2.5) report.failures.push('Hub practical comparison default must match reviewed 2.5x candidate');
         try {
           for (const strength of [1,2.5,4]) {
             await page.evaluate(value => { window.__gameHooks.debug.hubPractical.strength=value; }, strength);
