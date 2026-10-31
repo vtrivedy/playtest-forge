@@ -753,6 +753,9 @@ try {
   if (wants('hub')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '.lil-gui,#hud{visibility:hidden!important}' });
+    // Natural spawn, gravity warm-up and untouched chase before any staging.
+    await advance(60); await shot('hub-spawn-chase');
+    save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
     await H('teleport', 0, y, 94, Math.PI);
     const hubViews = [
