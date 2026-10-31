@@ -131,6 +131,32 @@ try {
   }
   assert.equal(recovery.state()[0]!.mode,'chase','attraction resumes after rest plus notice delay');
 
+  // A real local obstruction on the way home must produce a detour, not a mode-only reset.
+  let detourWall:THREE.Vector3|null=null;
+  const detour=await createShades(new THREE.Scene(),[{id:'detour',patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0,undefined,(x,z)=>detourWall!==null&&Math.hypot(x-detourWall.x,z-detourWall.z)<.16);
+  let departure:THREE.Vector3|null=null;
+  const lure=new THREE.Vector3(0,0,2.8);
+  for(let k=0;k<240;k++){
+    detour.update(1/60,k/60,lure,false);
+    if(detour.state()[0]!.mode==='chase'){departure=new THREE.Vector3().fromArray(detour.state()[0]!.pos);break;}
+  }
+  assert.ok(departure,'detour fixture must enter pursuit');
+  for(let k=0;k<50;k++)detour.update(1/60,4+k/60,lure,false);
+  const away=new THREE.Vector3().fromArray(detour.state()[0]!.pos);
+  assert.ok(away.distanceTo(departure!)>.4,'detour fixture needs a real off-route excursion');
+  detourWall=away.clone().lerp(departure!,.5);
+  let arrived=false;
+  for(let k=0;k<600;k++){
+    detour.update(1/60,5+k/60,new THREE.Vector3(30,0,30),false);
+    if(detour.state()[0]!.mode==='patrol'){
+      arrived=new THREE.Vector3().fromArray(detour.state()[0]!.pos).distanceTo(departure!)<.45;
+      break;
+    }
+  }
+  assert.equal(arrived,true,'detour must reach the route, not just time out into patrol');
+  const patrolDetour=await createShades(new THREE.Scene(),[{id:'patrol-detour',patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0,undefined,(x,z)=>Math.hypot(x-1,z+.35)<.4);
+  for(let k=0;k<180;k++)patrolDetour.update(1/60,k/60,new THREE.Vector3(30,0,30),false);
+  assert.ok(patrolDetour.state()[0]!.pos[0]!>1.5,'patrol must move beyond a post instead of freezing off-route');
   // Mirror the capture's ten-second observer schedule on a controlled loop.
   // Actual authored terrain still belongs to the remote GPU playtest.
   const behavior=await createShades(new THREE.Scene(),[{id:'behavior',patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0);
@@ -149,5 +175,5 @@ try {
   let observedModes=0;
   for(const mode of modes)if(mode===expectedModes[observedModes])observedModes++;
   assert.equal(observedModes,expectedModes.length,`capture observer schedule must show complete cycle: ${modes}`);
-  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery', 'latch activation', 'dash during chase', 'blocked chase retreats', 'return stall recovery', 'quiet patrol after return', 'ten-second ordered observer cycle'], final: state() }, null, 2));
+  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery', 'latch activation', 'dash during chase', 'blocked chase retreats', 'return stall recovery', 'quiet patrol after return', 'return detours around obstruction', 'patrol detours around obstruction', 'ten-second ordered observer cycle'], final: state() }, null, 2));
 } finally { globalThis.fetch = originalFetch; THREE.DefaultLoadingManager.setURLModifier(url => url); }
