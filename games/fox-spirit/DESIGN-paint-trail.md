@@ -77,3 +77,25 @@ S-curve walk/trot, before/after stills from a high lens. Judge PNGs personally.
 
 ## Out of scope
 Locomotion (other stream). Gameplay supply / Shade drain logic.
+
+## v9 (Sprint 5 paint2 — watercolor Keeping, 2026-10-31)
+
+Research: `playtest-forge-artifacts/sprint5/research/painting-the-world.md` · brain `knowledge/painting-the-world.md`.
+
+### Fantasy fix
+The valley must **start colorless** (pressed gray-sepia paper). The fox is the wet brush that restores **authored life** on ground *and* props. Autumn palette soft realism — never a neon green carpet.
+
+### Mechanism changes (one path; delete replaced look)
+1. **Harder unpainted grade** — `inkWash` drops the authored-hue leak (~10% → ~2%); unpainted albedo stays gray-sepia. Aura visual strength for *color* is quieter so the trail/paint does the storytelling (gameplay aura radius unchanged).
+2. **Coverage drives ALL patched materials** — `coverage = max(paint, mask, restore, quiet aura)`. `mix(washed, chroma, coverage)` on terrain, stone, wood, plaster, roofs, foliage, litter. Fox/spirit materials stay unpatched.
+3. **Restore own colour first** — ground: soft autumn meadow (ochre / sage / moss / burnt sienna, madder accents) at surface value, not lime. Stone/wood/plaster/foliage/roofs: authored hue enriched. Bursts restore props in-radius to own colour; soil gets autumn wash.
+4. **Climb** — for props (`uPaintKind` stone/own) and foliage: sample paint at XZ, then `climb = smoothstep(0, climbH, paint * climbTimeFactor - (worldY - groundY))` with wet delay so colour creeps up trunks/faces (~0.8–1.2 s, climbH ~2.5–4 m). Tunables: `uClimbH`, `uClimbRate`.
+5. **Watercolor cues (visible at 720p chase)** — stronger granulation, darker broken tide at coverage≈0.5–0.7, wet-edge sat boost from `uWetMap`, paper grain from world-XZ seeded fBm (single seed). lil-gui: palette, hueJitter, granulation, bleed, edgeDarken, climbH/rate, speckDebug.
+6. **Speck root cause (v8 honest fail)** — leftover leaf instances + litter accents + sprout z-fight. Fix: ≥95% leaf shrink over paint; `polygonOffset` on paint sprouts; no brown outline. Record in this section after verify.
+7. **Bursts** — keep Shade/hearth/Seedwell radii; burst meadow only on soil; props in splash get own-colour climb; lean on existing ember/leaf particles.
+
+### Metrics
+`window.__game.paint`: laid, areaM2, localFraction, hueStdDev (overview), propClimbSat by class, paintPassMs. Perf: paint pass ≤ v8 baseline + 1.5 ms on capture box.
+
+### Non-scope
+Locomotion / foxLook / fox animation. No Modal/Codex. No dual legacy paint path.
