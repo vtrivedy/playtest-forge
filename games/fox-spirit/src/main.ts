@@ -259,7 +259,7 @@ async function boot() {
   // spark bursts only (Seedwell, Wellspring, hearth flares) — no pickups
   const emberMotes = createEmberMotes(scene, { maxMotes: 0 });
   const occlusion = createOcclusionFader(scene, {
-    blocked: cam.debug.blocked,
+    blocked: () => !photo && cam.debug.blocked(),
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
@@ -1511,7 +1511,6 @@ async function boot() {
       airTime: airT,
       landing: landingValid ? landing : null,
     });
-    occlusion.update(rawDt, cam.camera, renderer, feetPos, foxActor.height, fox.rotation.y);
     // Permanent wavefronts only: the fox's own saturated aura must not keep ambience warm.
     let audioRestore = colorField.globalColor;
     for (const region of colorField.restores) {
@@ -1589,6 +1588,11 @@ async function boot() {
         cam.camera.updateProjectionMatrix();
       }
     }
+    // Fit the cutout to the rendered lens, including review/photo overrides.
+    // Simulation can run several steps without drawing in the capture harness.
+    occlusion.update(dt, cam.camera, renderer,
+      feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
+      foxActor.height, fox.rotation.y);
     // grade follows the flood: faded sepia → rich autumn over the 6 s wave
     // exposure stays put; the grade only follows once the front has left the summit
     post.params.restore = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;

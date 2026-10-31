@@ -7,3 +7,5 @@ This pass makes query geometry double-sided without modifying rendered material 
 Validation: CPU regression probes for a single-sided wall and a hidden parent; TypeScript and fox Vite build. Request immutable-SHA remote route/orbit captures, 30-second continuous hub-to-Windmill segment, matched baseline 2e0e614. Inspect PNGs and window.__game reports before claiming readability or landing. Measure visible fox frames / total sampled route frames; target >=95%, with detection telemetry reported separately rather than called visual proof. No local browser or render.
 
 No new art assets or license dependencies. Locomotion, gameplay input, and authored cinematic paths remain owned by their existing systems.
+
+Code review follow-up: photo framing is applied in draw(), after the old simulation-time cutout update. Move cutout projection/detection into draw after the photo override, so the shader uses the actual rendered lens and updates once per rendered frame. Photo views bypass the traversal boom blocked flag.
