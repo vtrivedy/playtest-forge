@@ -9,3 +9,5 @@ Validation: CPU regression probes for a single-sided wall and a hidden parent; T
 No new art assets or license dependencies. Locomotion, gameplay input, and authored cinematic paths remain owned by their existing systems.
 
 Code review follow-up: photo framing is applied in draw(), after the old simulation-time cutout update. Move cutout projection/detection into draw after the photo override, so the shader uses the actual rendered lens and updates once per rendered frame. Photo views bypass the traversal boom blocked flag.
+
+Opus code critique follow-up: use live small/instanced meshes with a synchronous try/finally query-material swap; synchronize chunk transforms on query. Limit canopy work to chest plus one cycling silhouette sample, and return on the first intersecting mesh. Add moving-prop regression coverage. Double-sided interior hits and cutout onset remain remote-review questions.

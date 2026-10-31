@@ -99,6 +99,8 @@ export function createOcclusionFader(
   const head = new THREE.Vector3();
   const flank = new THREE.Vector3();
   const visibleCanopies: THREE.Object3D[] = [];
+  const canopyHits: THREE.Intersection[] = [];
+  let silhouetteSample = 0;
   const dir = new THREE.Vector3();
   const pt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
@@ -124,7 +126,14 @@ export function createOcclusionFader(
     ray.set(cam, dir);
     ray.near = 0.05;
     ray.far = dist - 0.6;
-    return ray.intersectObjects(visibleCanopies, false).length > 0;
+    for (const canopy of visibleCanopies) {
+      canopyHits.length = 0;
+      // Stop on the first mesh hit; sorting every intersection in every crown
+      // provides no additional information for this boolean visibility query.
+      (canopy as THREE.Mesh).raycast(ray, canopyHits);
+      if (canopyHits.length) return true;
+    }
+    return false;
   }
 
   return {
@@ -153,15 +162,17 @@ export function createOcclusionFader(
           while (ancestor?.visible) ancestor = ancestor.parent;
           if (!ancestor) visibleCanopies.push(canopy);
         }
-        lastBlocked = sightBlocked(camera.position, chest) || sightBlocked(camera.position, head);
-        // Catch a crown edge across the torso while the centre line is clear.
-        for (const side of [-1, 1]) {
-          if (lastBlocked) break;
-          flank.copy(chest);
+        lastBlocked = sightBlocked(camera.position, chest);
+        // Keep at most two sight lines per tested frame. Cycle the second
+        // sample through ears and torso sides instead of doubling clear-view cost.
+        const sample = silhouetteSample++ % 3;
+        flank.copy(sample === 0 ? head : chest);
+        if (sample !== 0) {
+          const side = sample === 1 ? -1 : 1;
           flank.x += Math.cos(foxYaw) * foxHeight * 0.35 * side;
           flank.z -= Math.sin(foxYaw) * foxHeight * 0.35 * side;
-          lastBlocked = sightBlocked(camera.position, flank);
         }
+        if (!lastBlocked) lastBlocked = sightBlocked(camera.position, flank);
       }
       if (lastBlocked || opts.blocked?.()) blockedHold = 0.35;
       else blockedHold -= dt;
