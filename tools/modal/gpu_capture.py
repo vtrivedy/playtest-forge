@@ -24,6 +24,7 @@ if modal.is_local():
         selected_module = Path(os.environ.get('FOX_CAPTURE_SCRIPT', str(capture_module))) if capture_module.name == 'gpu-capture.mjs' else capture_module
         image = image.add_local_file(selected_module, f'/opt/browser/{capture_module.name}')
 
+
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)
 def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds: int, backend: str, size: str, quality: str, fps: int, cube_only: bool, verbose: bool, route_from: int = 0, route_to: int = -1) -> dict:

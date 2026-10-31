@@ -1728,13 +1728,14 @@ try {
     const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
-    const phaseTrace=[];
+    const phaseTrace=[],supplyTrace=[];let nextSupplySample=0;
     const crossingSample=(st,p,phase,age)=>{
       const water=st.chem.water.find(w=>w.id==='reach-spout');
       return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
     };
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
+      if(st.t>=nextSupplySample){supplyTrace.push(crossingSample(st,p,phase,age));nextSupplySample=st.t+.5;}
       const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
       const sourceWater=st.chem.water.find(w=>w.id==='reach-spout');
       if(drinker?.freed&&events.shadeFreedAt===null)events.shadeFreedAt=st.t;
@@ -1756,19 +1757,23 @@ try {
     await RH('setKeys',[]);await RH('setStick',null);await advance(30);await shot('reach-end');
     const end=await RH('state');if(end.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=end.t;
     const eventOrder=Object.values(events).every(t=>t!==null)&&events.shadeFreedAt<events.sourceActivatedAt&&events.sourceActivatedAt<events.firstArrivalAt&&events.firstArrivalAt<events.bellLatchedAt;
-    save('reach-acceptance.json',{phase,reached,phaseTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
+    supplyTrace.push(crossingSample(end,points[phase],phase,age));
+    save('reach-acceptance.json',{phase,reached,phaseTrace,supplyTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(!eventOrder)report.failures.push('Reach release/source/arrival/latch event order not observed');
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
       let cycle=0,cycleAge=0,cyclePaint=false,ventHopIssued=false;
       const lowSeen={value:false};let lowLaneVisited=false,steamRise=false;
+      const cycleTrace=[];let nextCycleSample=0;
+      const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
+      const sampleCycle=(st,reason)=>({reason,t:st.t,cycle,age:cycleAge,waypoint:targets[cycle],distance:Math.hypot(targets[cycle][0]-st.pos[0],targets[cycle][2]-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,dashIssued:cyclePaint,ventHopIssued,steam:st.chem.hearths.find(h=>h.id==='reach-steam')??null,reach:st.reach});
       await video('reach-level-cycle',30*fps,async()=>{
         const st=await RH('state');cycleAge+=1/fps;
-        const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
+        if(st.t>=nextCycleSample){cycleTrace.push(sampleCycle(st,'interval'));nextCycleSample=st.t+.5;}
         const p=targets[cycle],dx=p[0]-st.pos[0],dz=p[2]-st.pos[2],d=Math.hypot(dx,dz);
         const atFooting=d<.8&&st.grounded&&Math.abs(st.pos[1]-p[1])<.6;
         const ready=cycle===0?st.reach.level==='low':cycle===1?st.reach.fill<.02:cycle===2?atFooting:cycle===3?cycleAge>1.2&&st.pos[1]>34:cycle===4?st.reach.level==='high':st.reach.fill>.99;
-        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
+        if(ready&&cycleAge>.2&&cycle<5){cycleTrace.push(sampleCycle(st,'transition'));if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
         const t=targets[cycle],vx=t[0]-st.pos[0],vz=t[2]-st.pos[2],len=Math.hypot(vx,vz);
         let sx=len>.25?vx/len*Math.min(.8,len):0,sz=len>.25?vz/len*Math.min(.8,len):0;
         const steamHot=st.chem.hearths.some(h=>h.id==='reach-steam'&&h.heat>=.5);
@@ -1783,7 +1788,7 @@ try {
         await RH('setKeys',keys);
       },st=>cycle===5&&st.reach.level==='high'&&st.reach.fill>.99||st.deaths>end.deaths||cycleAge>10,{keyFrames:[0,4*fps,8*fps,12*fps,16*fps]});
       await RH('setKeys',[]);await RH('setStick',null);await shot('reach-cycle-end');
-      const cy=await RH('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
+      const cy=await RH('state');cycleTrace.push(sampleCycle(cy,'final'));save('reach-cycle-acceptance.json',{cycle,cycleTrace,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
       if(cycle!==5||!lowSeen.value||!lowLaneVisited||!steamRise||cy.reach.level!=='high'||!cy.reach.restored||cy.reach.fill<.99)report.failures.push('Reach reversible water cycle incomplete');
     }
     // Staged architecture views are separate from the real summit-to-basin traversal above.
