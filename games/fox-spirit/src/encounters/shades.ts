@@ -346,7 +346,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           const age = s.releaseAge;
           s.leaves.visible = age < 10;
           const base = s.group.position;
-          for (let k = 0; k < s.leafSeeds.length; k++) {
+          for (let k = 0; s.leaves.visible && k < s.leafSeeds.length; k++) {
             const seed = s.leafSeeds[k]!;
             const p = seed.p.clone().applyAxisAngle(THREE.Object3D.DEFAULT_UP, s.heading);
             p.add(base).addScaledVector(seed.velocity.clone().applyAxisAngle(THREE.Object3D.DEFAULT_UP,s.heading), age);
@@ -366,8 +366,10 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
             leafColor.copy(inkColor).lerp(autumnColors[k % 4]!, 0.3 + 0.7 * THREE.MathUtils.smoothstep(age, 0.05 + (k % 4) * 0.025, 0.5));
             s.leaves.setColorAt(k, leafColor);
           }
-          s.leaves.instanceMatrix.needsUpdate = true;
-          if (s.leaves.instanceColor) s.leaves.instanceColor.needsUpdate = true;
+          if (s.leaves.visible) {
+            s.leaves.instanceMatrix.needsUpdate = true;
+            if (s.leaves.instanceColor) s.leaves.instanceColor.needsUpdate = true;
+          }
           s.presence = Math.max(0, s.presence - dt / tun.releaseTime);
           s.group.visible = s.presence > 0 || (s.freed && s.releaseAge < 2.4);
           s.pool.visible = s.freed ? s.releaseAge < 1.5 : true;

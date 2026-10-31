@@ -48,6 +48,10 @@ try {
   step(10, new THREE.Vector3(30,0,30));
   assert.equal(state().smokeParticles, 0);
   assert.equal(state().leaves, 0);
+  const leaves = scene.children.find(o => (o as THREE.InstancedMesh).isInstancedMesh) as THREE.InstancedMesh;
+  const completedVersion = leaves.instanceMatrix.version;
+  step(2, new THREE.Vector3(30,0,30));
+  assert.equal(leaves.instanceMatrix.version, completedVersion, 'completed leaves must stop uploading transforms');
   // Authored route heights can differ from sampled terrain; return arrival is horizontal.
   const sloped = await createShades(new THREE.Scene(), [{ id:'slope', patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]] }], () => .5);
   for(let k=0;k<180;k++) sloped.update(1/60,k/60,new THREE.Vector3(30,0,30),false);
@@ -64,5 +68,5 @@ try {
   wall=false;
   for(let k=0;k<180;k++) obstructed.update(1/60,3+k/60,new THREE.Vector3(30,0,30),false);
   assert.ok(new THREE.Vector3().fromArray(obstructed.state()[0]!.pos).length()>1,'patrol must recover when obstacle clears');
-  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'terrain-height mismatch return', 'blocked patrol recovery'], final: state() }, null, 2));
+  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery'], final: state() }, null, 2));
 } finally { globalThis.fetch = originalFetch; THREE.DefaultLoadingManager.setURLModifier(url => url); }
