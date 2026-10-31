@@ -223,12 +223,16 @@ try {
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
     if (!actors.length) throw Error('No Shade encounter authored');
     save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
+    const reviewCenter=await page.evaluate(()=>{
+      const points=window.__gameHooks.debug.world.shadeSpots[0].patrol;
+      return points.reduce((sum,p)=>[sum[0]+p[0]/points.length,sum[1]+p[2]/points.length],[0,0]);
+    });
     let lens = null;
     const camera = async () => {
       const actor = await page.evaluate(() => window.__gameHooks.shades.state().actors[0]);
       const [x,y,z] = actor.pos;
       // Staged review lens stays outside the Kiln ring so masonry sits behind the animal.
-      const dx=x+112,dz=z+24,d=Math.hypot(dx,dz)||1;
+      const dx=x-reviewCenter[0],dz=z-reviewCenter[1],d=Math.hypot(dx,dz)||1;
       const desired=[x+dx/d*6.5,y+2.8,z+dz/d*6.5];
       lens=lens?lens.map((value,i)=>value+(desired[i]-value)*.12):desired;
       const sight=await page.evaluate(({preferred,desired,look})=>{

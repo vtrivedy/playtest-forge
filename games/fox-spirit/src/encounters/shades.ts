@@ -31,7 +31,9 @@ type ShadeActor = {
   mode: 'patrol' | 'chase' | 'return' | 'released';
   nearTime: number;
   returnStall: number;
+  returnBest: number;
   attractionRest: number;
+  detourSide: number;
   smoke: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
   pool: THREE.Mesh;
   /** 1 = present, falls to 0 while freed */
@@ -324,7 +326,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { layers, mode: 'patrol', nearTime: 0, returnStall: 0, attractionRest: 0, notice: 0, noticeYaw: 0, active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, releaseStart: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, smoke, pool, presence: 1, freed: false };
+    return { layers, mode: 'patrol', nearTime: 0, returnStall: 0, returnBest: Infinity, attractionRest: 0, detourSide: i%2?1:-1, notice: 0, noticeYaw: 0, active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, releaseStart: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, smoke, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
@@ -387,7 +389,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           const onLevel = Math.abs(fox.y-s.pos.y)<2;
           s.attractionRest = Math.max(0, s.attractionRest-dt);
           s.nearTime = s.attractionRest===0 && distance < tun.chaseDistance && onLevel ? s.nearTime + dt : 0;
-          if (s.mode === 'chase' && (distance > 7 || !onLevel || Math.hypot(s.pos.x-patrol.x,s.pos.z-patrol.z)>tun.chaseLeash)) s.mode='return';
+          if (s.mode === 'chase' && (distance > 7 || !onLevel || Math.hypot(s.pos.x-patrol.x,s.pos.z-patrol.z)>tun.chaseLeash)) { s.mode='return'; s.returnBest=Infinity; s.returnStall=0; }
           if (s.mode === 'patrol' && s.nearTime > tun.chaseDelay) s.mode='chase';
           if (s.mode === 'return' && Math.hypot(s.pos.x-patrol.x,s.pos.z-patrol.z)<.4) { s.mode='patrol'; s.nearTime=0; s.attractionRest=tun.chaseRest; }
           const target = s.mode === 'chase' ? fox : patrol;
@@ -395,26 +397,45 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           const remaining=tmp.length();
           if (remaining>.02) {
             const desired=Math.atan2(tmp.x,tmp.z);
-            const delta=Math.atan2(Math.sin(desired-s.heading),Math.cos(desired-s.heading));
-            s.heading+=delta*(1-Math.exp(-dt*2.4));
             // Attraction draws near; the player chooses contact rather than being hunted into repeated hits.
             const travel = s.mode==='chase' ? Math.max(0, remaining-tun.hitRadius-.65) : remaining;
             const step=Math.min(travel,dt*(s.speed??tun.speed)*(s.mode==='chase'?1.25:1));
-            // Flow directly toward the target; visual yaw damps independently so a turn cannot orbit it.
-            const nx=s.pos.x+tmp.x/remaining*step,nz=s.pos.z+tmp.z/remaining*step;
-            const floor=groundAt(nx,nz,s.pos.y+1);
-            if(Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<.6&&!blocked(nx,nz,floor)) {
-              s.pos.set(nx,floor,nz);
-              s.returnStall=0;
-            } else if(s.mode==='chase') {
-              s.mode='return';
-              s.returnStall=0;
-            } else if(s.mode==='return') {
-              // A prop can invalidate the straight route home. Resume the moving patrol target
-              // after a short pause rather than freezing forever or teleporting through scenery.
-              s.returnStall+=dt;
-              if(s.returnStall>1.5) { s.mode='patrol'; s.nearTime=0; s.returnStall=0; s.attractionRest=tun.chaseRest; }
+            // Motion follows a validated step; visual yaw damps independently of travel.
+            const canStep=(angle:number)=>{
+              const dx=tmp.x/remaining,dz=tmp.z/remaining,c=Math.cos(angle),sn=Math.sin(angle);
+              const nx=s.pos.x+(dx*c-dz*sn)*step,nz=s.pos.z+(dx*sn+dz*c)*step;
+              const floor=groundAt(nx,nz,s.pos.y+1);
+              return Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<.6&&!blocked(nx,nz,floor)?new THREE.Vector3(nx,floor,nz):null;
+            };
+            let destination=canStep(0);
+            if(!destination&&s.mode!=='chase'){
+              for(const side of [s.detourSide,-s.detourSide]){
+                for(const angle of [.6,1.2,1.66]){
+                  destination=canStep(angle*side);
+                  if(destination){s.detourSide=side;break;}
+                }
+                if(destination)break;
+              }
             }
+            if(destination) {
+              const movementYaw=step>1e-6?Math.atan2(destination.x-s.pos.x,destination.z-s.pos.z):desired;
+              s.heading+=Math.atan2(Math.sin(movementYaw-s.heading),Math.cos(movementYaw-s.heading))*(1-Math.exp(-dt*2.4));
+              s.pos.copy(destination);
+            } else {
+              s.heading+=Math.atan2(Math.sin(desired-s.heading),Math.cos(desired-s.heading))*(1-Math.exp(-dt*2.4));
+              if(s.mode==='chase'){
+                s.mode='return';
+                s.returnStall=0;
+                s.returnBest=Infinity;
+              }
+            }
+          }
+          if(s.mode==='return'){
+            const gap=Math.hypot(s.pos.x-patrol.x,s.pos.z-patrol.z);
+            if(gap<s.returnBest-.04){s.returnBest=gap;s.returnStall=0;}
+            else s.returnStall+=dt;
+            // An unreachable route point must not trap a shade in an endless lateral orbit.
+            if(s.returnStall>1.5){s.mode='patrol';s.nearTime=0;s.returnStall=0;s.attractionRest=tun.chaseRest;}
           }
           const near = Math.hypot(fox.x-s.pos.x,fox.z-s.pos.z)<tun.noticeDistance && Math.abs(fox.y-s.pos.y)<3;
           s.notice=THREE.MathUtils.damp(s.notice,near?1:0,3/tun.noticeTime,dt);
