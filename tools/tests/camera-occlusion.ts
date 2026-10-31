@@ -166,3 +166,25 @@ for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
   ascentViews.push({ verticalSpeed, extraHeight: +extraHeight.toFixed(3), extraCrane: +extraCrane.toFixed(3) });
 }
 console.log('Landing-preview lift CPU probe:', JSON.stringify(ascentViews));
+
+// Geometry proxies for the image-driven composition pass. The .95m running
+// silhouette is an estimate, not an image measurement or substitute for GPU review.
+const composition = [];
+for (const runDistance of [3.0, 3.3]) for (const speed of [0, 3.8, 9]) {
+  const follow = createFollowCamera({ params: { runDistance } });
+  follow.resize(1280, 720);
+  const target = new THREE.Vector3();
+  for (let i = 0; i < 180; i++) {
+    target.z = -speed * i / 60;
+    follow.update(1 / 60, { ...idleFrame, target, vel: new THREE.Vector3(0, 0, -speed) });
+  }
+  const foot = target.clone().project(follow.camera);
+  const head = target.clone().add(new THREE.Vector3(0, speed ? 0.95 : 1.25, 0)).project(follow.camera);
+  const centre = target.clone().add(new THREE.Vector3(0, 0.6, 0)).project(follow.camera);
+  const angle = THREE.MathUtils.radToDeg(Math.atan2(Math.abs(follow.camera.position.x - target.x), Math.abs(follow.camera.position.z - target.z)));
+  assert.ok(centre.y < -0.2 && centre.y > -0.55, 'grounded chest sits below centre inside lower-third band');
+  assert.ok(foot.y > -0.95 && head.y < 0.85, 'proxy ears and feet remain inside frame');
+  assert.ok(angle > 20, 'quartering lens preserves a side component at run speed');
+  composition.push({ runDistance, speed, chestNdcY: +centre.y.toFixed(3), proxyHeightPx: +((head.y-foot.y)*360).toFixed(1), rearAngleDeg: +angle.toFixed(1) });
+}
+console.log('Chase composition CPU proxies:', JSON.stringify(composition));

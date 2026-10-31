@@ -41,10 +41,13 @@ export type CameraPath = {
 
 export type CameraTunables = {
   distance: number;
+  runDistance: number;
   /** Terrain compression hands off to the cutout before the lens enters the animal. */
   minDistance: number;
   height: number;
   lookHeight: number;
+  /** Composition offset above the chest; kept separate from collision focus. */
+  framingHeight: number;
   airDistance: number;
   glideDistance: number;
   fov: number;
@@ -109,19 +112,21 @@ export function createFollowCamera(opts: {
 } = {}): FollowCamera {
   const params: CameraTunables = {
     distance: 3.8,
+    runDistance: 3.0,
     minDistance: 2.6,
     height: 1.25,
     lookHeight: 0.62,
+    framingHeight: 0.65,
     airDistance: 4.8,
     glideDistance: 6.4,
     fov: 54,
-    runFov: 3,
+    runFov: 0,
     glideFov: 7,
     lag: 0.14,
     lookAhead: 1.6,
     recenterRate: 1.25,
     recenterDelay: 1.2,
-    sideBias: 0.34,
+    sideBias: 0.55,
     jumpTrack: 0.8,
     landingBias: 0.24,
     clearance: 0.55,
@@ -554,16 +559,18 @@ export function createFollowCamera(opts: {
 
       // ---- boom length: ground → (sustained) air → glide. Short chained hops keep the ground boom.
       const airW = f.grounded ? 0 : THREE.MathUtils.smoothstep(f.airTime, 0.35, 0.9);
+      const groundDist = THREE.MathUtils.lerp(params.distance, params.runDistance,
+        THREE.MathUtils.smoothstep(speed, 1.5, 7.5));
       let goalDist = f.gliding
         ? params.glideDistance
-        : THREE.MathUtils.lerp(params.distance, params.airDistance, airW);
+        : THREE.MathUtils.lerp(groundDist, params.airDistance, airW);
       let dropLift = 0;
       // ---- look target: fox + look-ahead; airborne, slide toward the predicted landing so it stays in frame
       const hasLanding = !!f.landing && !f.grounded;
       if (hasLanding) landAt.copy(f.landing!);
       landW = THREE.MathUtils.damp(landW, hasLanding ? 1 : 0, hasLanding ? 6 : 4, dt);
       const baseY = f.grounded ? Math.max(focusY, p.y - 0.3) : focusY;
-      aim.set(p.x + lead.x * (1 - landW * 0.6), baseY + params.lookHeight, p.z + lead.z * (1 - landW * 0.6));
+      aim.set(p.x + lead.x * (1 - landW * 0.6), baseY + params.lookHeight + params.framingHeight * (1 - landW * 0.65), p.z + lead.z * (1 - landW * 0.6));
       if (landW > 0.001) {
         const spread = Math.hypot(landAt.x - p.x, landAt.z - p.z);
         const drop = Math.max(0, p.y - landAt.y);
