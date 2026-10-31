@@ -42,7 +42,7 @@ export class AuthoredLocomotion {
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .8, carpalFlexRun: .4, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
     carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .025, idleLook: .16, gallopFlex: .22, gallopFlexPhase: .8, weightRoll: .05, spineSway: .045, breath: .022,
-    runningGather: .45, tailAir: .05, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
+    runningGather: .45, tailAir: .05, airTuck: 1.25, airForeSwing: .55, airHindSwing: .45, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     headHold: .8, gallopHeadHold: 1.5, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
@@ -809,10 +809,17 @@ export class AuthoredLocomotion {
       const tuck=THREE.MathUtils.lerp(this.params.airReach,this.params.airTuck,THREE.MathUtils.smoothstep(a,-.6,.4));
       const hind=this.params.airHindStream*(a>0 ? a : .6*a);
       const k=airborne ? 1 : airW;
+      // Upper limb (measured: +local X swings the limb back): forelegs fold back under the chest on the rise and
+      // reach forward-down on the fall; hind legs stream back off the push, then gather under for the landing.
+      const rise=Math.max(0,a), fall=Math.max(0,-a);
       for(let i=0;i<4;i++){
         const foot=this.feet[i];
-        this.overlays.push({bone:foot.hock,rotation:foot.hock.quaternion.clone()});
+        this.overlays.push({bone:foot.hock,rotation:foot.hock.quaternion.clone()},{bone:foot.upper,rotation:foot.upper.quaternion.clone()},{bone:foot.lower,rotation:foot.lower.quaternion.clone()});
         foot.hock.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),k*(i<2 ? tuck : hind)));
+        const upper=i<2 ? this.params.airForeSwing*(rise*.4-fall) : this.params.airHindSwing*(rise-fall*.8);
+        const lower=i<2 ? this.params.airForeSwing*rise*1.2 : -this.params.airHindSwing*fall*.6;
+        foot.upper.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),k*upper));
+        foot.lower.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),k*lower));
       }
       this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
       this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(-k*a*this.params.airArch,0,0)));
