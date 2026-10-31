@@ -323,9 +323,6 @@ async function boot() {
   if (foxActor.locomotion) {
     const params = foxActor.locomotion.params;
     const folder = gui.addFolder('Authored locomotion');
-    folder.add(params,'strideScale',1,1.16,.01);
-    folder.add(params,'gaitBlendSeconds',.12,.6,.01);
-    folder.add(params,'headBob',0,1,.05);
     folder.add(params,'headLead',0,.5,.01);
     folder.add(params,'headFrequency',1,6,.1);
     folder.add(params,'headDamping',.4,1.5,.05);
@@ -335,6 +332,20 @@ async function boot() {
     folder.add(params,'brakePitch',0,.2,.005);
     folder.add(params,'landSquash',0,.2,.005);
     folder.add(params,'landFrequency',2,6,.1);
+    folder.add(params, 'walkHz', 1, 3, .05);
+    folder.add(params, 'trotHz', 1.2, 4, .05);
+    folder.add(params, 'gallopHz', 1.5, 5, .05);
+    folder.add(params, 'cadenceExponent', 0, 1, .05);
+    folder.add(params, 'minStanceRatio', .2, 1, .01);
+    folder.add(params, 'bodyBob', 0, 1, .01);
+    folder.add(params, 'swingEase', 0, 1, .05);
+    folder.add(params, 'takeoffCrouch', 0, .2, .005);
+    folder.add(params, 'takeoffPitch', 0, .2, .005);
+    folder.add(params, 'rockDamp', 0, 2, .05);
+    folder.add(params, 'headLevel', 0, 1, .05);
+    folder.add(params, 'tailStream', 0, .03, .001);
+    folder.add(params, 'tailWave', 0, .15, .005);
+    folder.add(params, 'tailWaveLag', 0, 1.5, .05);
     folder.add(params, 'trotSpeed', 2, 6, .1);
     folder.add(params, 'gallopSpeed', 4, 10, .1);
     folder.add(params, 'plantStrength', 0, 1, .01);
@@ -1450,7 +1461,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
