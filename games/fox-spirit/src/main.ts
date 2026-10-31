@@ -936,6 +936,7 @@ async function boot() {
           yaw: cam.getYaw(),
           occlusion: occlusion.strength,
           sightBlocked: occlusion.detected,
+          softOccluders: occlusion.softBindings(),
           photo: !!photo,
           lensTouchesCollider: col.cameraOccupied(cam.camera.position.x, cam.camera.position.y, cam.camera.position.z),
           foxNdc: cam.debug.fox,
