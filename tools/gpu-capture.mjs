@@ -1,5 +1,4 @@
 import { captureFinale } from './finale-capture.mjs';
-import { captureWadeVisibility } from './water-wade-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
@@ -1277,6 +1276,7 @@ try {
       report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
     }
 
+    const { captureWadeVisibility } = await import(path.resolve(repo, 'tools/water-wade-capture.mjs'));
     await captureWadeVisibility({ H, boot, video, shot, save, getPage: () => page, fps, quality });
   }
   if (wants('updraft')) {

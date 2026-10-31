@@ -115,3 +115,7 @@ Sol actually inspected d99 via view_image (not unavailable attachments): pond PA
 ## Dash evidence lens cleanup
 
 The d99 dash/wake frames contain a large white H-a shelf arc at the right/bottom edge. Keep the meadow stage and real input sequence, shift only the fixed review lens from(5,y+6,79) to(-6,y+6,79), on the clear west side. Match every dash/wake frame at that lens; this changes capture composition only.
+
+## Remote harness import repair (391499c GPU startup failure)
+
+The integrated capture script statically imports new water-wade-capture.mjs, but the existing Modal image does not package that file. GPU68fa397eaf49 fails at Node module resolution before any render/report, so it is not game/exposure evidence. Load the optional wade helper from the immutable fetched repo tools directory inside its existing water-coverage branch. This avoids a stale image dependency and binds the helper to the requested commit. No browser run locally; node syntax check only, then fresh remote request.
