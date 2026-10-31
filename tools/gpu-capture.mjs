@@ -296,11 +296,11 @@ try {
         return vertices?{heightFraction:(maxY-minY)/2,inFrame:minX>=-1&&maxX<=1&&minY>=-1&&maxY<=1&&minZ>=-1&&maxZ<=1,vertices,bounds:[minX,maxX,minY,maxY]}:null;
       };
       const core=h.debug.scene.getObjectByName(id)?.getObjectByName('shade-density-core');
-      return {method:'posed mesh vertices, shader displacement/alpha excluded',fox:bounds(h.debug.fox,true),shade:bounds(core,false),shadePresent:!actor.freed||actor.presence>.5,presence:actor.presence};
+      return {actorId:id,freed:actor.freed,method:'posed mesh vertices, shader displacement/alpha excluded',fox:bounds(h.debug.fox,true),shade:bounds(core,false),shadePresent:!actor.freed||actor.presence>.5,presence:actor.presence};
     },actorId);
     const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,sample:frame=>keyFrames.includes(frame)?measurePair(id):undefined,label:(frame,state)=>{
       const p=state?.capture;
-      return `${name} ${frame} fox ${p?.fox?(p.fox.heightFraction*100).toFixed(0):'?'}% shade ${p?.shade?(p.shade.heightFraction*100).toFixed(0):'?'}%`;
+      return `${name} ${frame} ${id} p${p?.presence??'?'} fox ${p?.fox?(p.fox.heightFraction*100).toFixed(0):'?'}% shade ${p?.shade?(p.shade.heightFraction*100).toFixed(0):'?'}%`;
     }});
     const validatePair=name=>{
       const rows=report.videos[name].trace.filter(row=>row.state.capture?.shadePresent).map(row=>({frame:row.frame,...row.state.capture}));
