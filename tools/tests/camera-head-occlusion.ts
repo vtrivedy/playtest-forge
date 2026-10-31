@@ -1,0 +1,48 @@
+/** Exact sight segments and animated head projection. CPU only, no GL context. */
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { createFollowCamera } from '../../games/fox-spirit/src/camera';
+import { createOcclusionFader } from '../../games/fox-spirit/src/occlusion';
+const scene = new THREE.Scene();
+const material = new THREE.MeshStandardMaterial();
+const blocker = new THREE.Mesh(new THREE.PlaneGeometry(.22, .35), material);
+blocker.position.set(.694, .945, .3); scene.add(blocker); scene.updateMatrixWorld(true);
+const follow = createFollowCamera({ scenery: scene });
+const lens = new THREE.Vector3(0, 1.5, 4), chest = new THREE.Vector3(0, .5625, 0), head = new THREE.Vector3(.75, .9, 0);
+assert.equal(follow.sightBlocked(lens, chest, 0), false, 'chest can be clear while the head is hidden');
+const diagnostics = follow.debug.internals();
+assert.equal(follow.sightBlocked(lens, head, 0), true, 'head-only side obstruction must be found');
+assert.equal(follow.debug.internals(), diagnostics, 'sight query preserves boom diagnostics');
+assert.equal(blocker.material, material); assert.equal(material.side, THREE.FrontSide);
+blocker.position.set(.8, .86, -.3); scene.updateMatrixWorld(true);
+assert.equal(follow.sightBlocked(lens, head, 0), false, 'geometry behind the head does not trigger');
+blocker.position.set(0, 1.5, 4.1); scene.updateMatrixWorld(true);
+assert.equal(follow.sightBlocked(lens, head, 0), false, 'geometry behind the lens does not trigger');
+blocker.position.set(.694, .945, .3); scene.updateMatrixWorld(true);
+const camera = new THREE.PerspectiveCamera(54, 1280 / 720, .1, 100);
+camera.position.copy(lens); camera.lookAt(chest); camera.updateMatrixWorld(true);
+const renderer = { getDrawingBufferSize: (v: THREE.Vector2) => v.set(1280, 720) } as unknown as THREE.WebGLRenderer;
+const fader = createOcclusionFader(scene, { solidAt: () => -Infinity, sight: follow.sightBlocked });
+const shader = { uniforms: {}, fragmentShader: '#include <common>\n#include <normal_fragment_begin>' } as any;
+material.onBeforeCompile(shader, renderer);
+const step = () => fader.update(1 / 60, camera, renderer, new THREE.Vector3(), 1.25, 0, head);
+step(); assert.equal(fader.detected, true, 'head geometry participates in every sight-test frame');
+const projected = head.clone().project(camera), uniform = shader.uniforms.uOccHead.value as THREE.Vector4;
+assert.ok(Math.abs(uniform.x - (projected.x * .5 + .5) * 1280) < 1e-8);
+assert.ok(Math.abs(uniform.y - (projected.y * .5 + .5) * 720) < 1e-8);
+assert.ok(uniform.w > 1, 'head has its own bounded screen radius');
+head.set(-.75, .9, 0);
+for (let i = 0; i < 180; i++) step();
+assert.equal(fader.detected, false); assert.ok(fader.strength < .01, 'moving animated head clears the obstruction');
+// A wall between the chest and a forward-facing head is a head-only depth case.
+head.set(0, .9, -.6); step();
+assert.ok(shader.uniforms.uOccHead.value.z > shader.uniforms.uOccFox.value.z + .3,
+  'head depth must extend independently of the chest, only inside its local circle');
+const floorScene = new THREE.Group();
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshStandardMaterial());
+floor.rotation.x = -Math.PI / 2; floor.position.set(0, .25, 1); floorScene.add(floor); floorScene.updateMatrixWorld(true);
+const floorFollow = createFollowCamera({ scenery: floorScene });
+assert.equal(floorFollow.sightBlocked(lens, new THREE.Vector3(0, .1, 0), 0), false, 'supporting tread does not open a window');
+floor.position.y = 1; floorScene.updateMatrixWorld(true);
+assert.equal(floorFollow.sightBlocked(lens, new THREE.Vector3(0, .1, 0), 0), true, 'a high overhang remains an obstruction');
+console.log('PASS: exact head-only sight, bounded depth/projection, off-segment rejection, floor preservation and state isolation (CPU only)');

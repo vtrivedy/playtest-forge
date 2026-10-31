@@ -40,11 +40,11 @@ assert.match(follow.debug.internals(), /blocker=$/, 'moved wall must not leave a
 const ordinaryDiagnostics = follow.debug.internals();
 wall.position.set(4, .7, 0);
 scenery.updateWorldMatrix(true, true);
-assert.equal(follow.debug.viewBlocked(new THREE.Vector3(0, .62, 0), new THREE.Vector3(0, .62, 4)), false, 'follow view remains clear');
+assert.equal(follow.sightBlocked(new THREE.Vector3(0, .62, 4), new THREE.Vector3(0, .62, 0), 0), false, 'follow view remains clear');
 // Turn the decorative plane toward the photo lens; the gameplay lens is elsewhere.
 wall.rotation.y = Math.PI / 2;
 scenery.updateWorldMatrix(true, true);
-assert.equal(follow.debug.viewBlocked(new THREE.Vector3(0, .62, 0), new THREE.Vector3(8, .62, 0)), true, 'actual photo view catches decorative wall');
+assert.equal(follow.sightBlocked(new THREE.Vector3(8, .62, 0), new THREE.Vector3(0, .62, 0), 0), true, 'actual photo view catches decorative wall');
 assert.equal(follow.debug.internals(), ordinaryDiagnostics, 'photo query preserves gameplay diagnostics');
 assert.equal(wall.material, material, 'photo query preserves render material identity');
 wall.rotation.y = 0;
@@ -92,7 +92,7 @@ assert.ok(shader.uniforms.uOccFox, 'built material receives live cutout uniforms
 const camera = new THREE.PerspectiveCamera(54, 16 / 9, 0.1, 100);
 camera.position.set(0, 0.6, 4); camera.lookAt(0, 0.3, 0);
 const renderer = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(1280, 720) } as THREE.WebGLRenderer;
-const step = () => fader.update(1 / 60, camera, renderer, new THREE.Vector3(), 0.55, 0);
+const step = () => fader.update(1 / 60, camera, renderer, new THREE.Vector3(), 0.55, 0, new THREE.Vector3(0, .5, .3));
 step();
 // The shader's floor protection uses column 1 of the *view* rotation, not
 // camera-up or the transposed column. Exercise pitched/rolled camera transforms.
@@ -111,7 +111,7 @@ for (const eye of [new THREE.Vector3(4, 2, 3), new THREE.Vector3(-3, 8, 1)]) {
       'floor normal reconstruction must distinguish treads, slopes and walls under pitch/roll');
   }
 }
-fader.update(1 / 60, camera, renderer, new THREE.Vector3(0, 7.25, 0), 0.55, 0);
+fader.update(1 / 60, camera, renderer, new THREE.Vector3(0, 7.25, 0), 0.55, 0, new THREE.Vector3(0, .5, .3));
 assert.equal(shader.uniforms.uOccFox.value.w, 7.25, 'floor protection follows current feet height');
 camera.up.set(0, 1, 0); camera.position.set(0, 0.6, 4); camera.lookAt(0, 0.3, 0);
 step(); step();
@@ -133,7 +133,7 @@ const post = new THREE.Mesh(new THREE.CylinderGeometry(.09, .099, 1.59, 8), post
 post.position.set(0, .645, 2); post.userData.isOccluder = true; signScene.add(post);
 signScene.updateMatrixWorld(true);
 const signFader = createOcclusionFader(signScene, { solidAt: () => -Infinity });
-const signStep = () => signFader.update(1 / 60, camera, renderer, new THREE.Vector3(), .55, 0);
+const signStep = () => signFader.update(1 / 60, camera, renderer, new THREE.Vector3(), .55, 0, new THREE.Vector3(0, .5, .3));
 signStep();
 assert.equal(signFader.detected, true, 'query-only post must trigger fade without gameplay-boom signal');
 assert.equal(post.material, postMaterial); assert.equal(postMaterial.visible, false, 'sight query must not reveal its proxy');
@@ -143,7 +143,7 @@ signFace.position.set(0, .45, 2); signFace.userData.isOccluder = true; signScene
 // Fader snapshots world builders once; construct the sign-face-only case after its builder.
 signScene.updateMatrixWorld(true);
 const faceFader = createOcclusionFader(signScene, { solidAt: () => -Infinity });
-faceFader.update(1 / 60, camera, renderer, new THREE.Vector3(), .55, 0);
+faceFader.update(1 / 60, camera, renderer, new THREE.Vector3(), .55, 0, new THREE.Vector3(0, .5, .3));
 assert.equal(faceFader.detected, true, 'tagged sign face must independently trigger cutout');
 
 parent.visible = true;

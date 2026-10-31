@@ -19,10 +19,13 @@ export function createOcclusionFader(
     exclude?: THREE.Object3D;
     /** Geometry-aware follow boom: close props and in-flight compression need a cutout. */
     blocked?: (camera: THREE.Camera, focus: THREE.Vector3) => boolean;
+    /** Exact geometry segment; sampled with the animated head, not the boom focus. */
+    sight?: (lens: THREE.Vector3, target: THREE.Vector3, feetY: number) => boolean;
   },
 ) {
   // xy = projected bounds centre (px), z = view depth (m), w = feet world height.
   const uOccFox = { value: new THREE.Vector4(0, 0, 0, 1) };
+  const uOccHead = { value: new THREE.Vector4(-10000, -10000, -10000, 1) };
   const uOccRad = { value: new THREE.Vector2(1, 1) };
   const uOccStrength = { value: 0 };
   const patched = new WeakSet<THREE.Material>();
@@ -39,6 +42,7 @@ export function createOcclusionFader(
     mat.onBeforeCompile = (shader, renderer) => {
       prev.call(mat, shader, renderer);
       shader.uniforms.uOccFox = uOccFox;
+      shader.uniforms.uOccHead = uOccHead;
       shader.uniforms.uOccStrength = uOccStrength;
       shader.uniforms.uOccRad = uOccRad;
       shader.fragmentShader = shader.fragmentShader
@@ -46,6 +50,7 @@ export function createOcclusionFader(
           '#include <common>',
           `#include <common>
           uniform vec4 uOccFox;
+          uniform vec4 uOccHead;
           uniform vec2 uOccRad;
           uniform float uOccStrength;`,
         )
@@ -65,7 +70,10 @@ export function createOcclusionFader(
             float occUp = smoothstep(0.65, 0.80, dot(viewMatrix[1].xyz, normal));
             float occStepFloor = 1.0 - smoothstep(uOccFox.w + 0.45, uOccFox.w + 0.65, occWorldY);
             occAboveFeet *= 1.0 - occUp * occStepFloor;
-            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear) * occAboveFeet;
+            float occBody = (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear);
+            float occHeadR = length(gl_FragCoord.xy - uOccHead.xy) / max(1.0, uOccHead.w);
+            float occHead = (1.0 - smoothstep(0.65, 1.0, occHeadR)) * smoothstep(-0.03, 0.15, uOccHead.z - vViewPosition.z);
+            float occCut = uOccStrength * max(occBody, occHead) * occAboveFeet;
             // Stable one-pixel threshold; no coarse repeating checker or
             // temporal jitter in the SMAA pipeline (which has no TAA history).
             float occB = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
@@ -73,7 +81,7 @@ export function createOcclusionFader(
           }`,
         );
     };
-    mat.customProgramCacheKey = () => `${prevKey}|occ-cutout`;
+    mat.customProgramCacheKey = () => `${prevKey}|occ-cutout-head`;
     mat.needsUpdate = true;
   }
 
@@ -86,7 +94,7 @@ export function createOcclusionFader(
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       let soft = false;
       for (const m of mats) {
-        if (bindHeroSoftOccluder(m, uOccFox, uOccRad)) {
+        if (bindHeroSoftOccluder(m, uOccFox, uOccRad, uOccHead)) {
           soft = true; softMaterials.add(m as THREE.ShaderMaterial);
         }
         if (mesh.isMesh && (m as THREE.MeshStandardMaterial)?.isMeshStandardMaterial) patch(m as THREE.MeshStandardMaterial);
@@ -195,7 +203,8 @@ export function createOcclusionFader(
     softBindings() {
       let bound = 0, enabled = 0, meshes = 0, aoExcluded = 0;
       for (const material of softMaterials) {
-        if (material.uniforms.uCameraHero === uOccFox && material.uniforms.uCameraHeroRadius === uOccRad) bound++;
+        if (material.uniforms.uCameraHero === uOccFox && material.uniforms.uCameraHeroRadius === uOccRad
+          && material.uniforms.uCameraHeroHead === uOccHead) bound++;
         if (material.uniforms.uCameraHeroEnabled?.value === 1) enabled++;
       }
       for (const object of softObjects) if ((object as THREE.Mesh).isMesh) {
@@ -215,11 +224,12 @@ export function createOcclusionFader(
       foxPos: THREE.Vector3,
       foxHeight: number,
       foxYaw: number,
+      foxHead: THREE.Vector3,
     ) {
       renderedCamera = camera;
       camera.updateMatrixWorld();
       chest.copy(foxPos).y += foxHeight * 0.45;
-      head.copy(foxPos).y += foxHeight * 1.05;
+      head.copy(foxHead);
       // sight test every other frame (canopy raycast is the expensive part)
       if ((frame++ & 1) === 0) {
         visibleCanopies.length = 0;
@@ -228,16 +238,15 @@ export function createOcclusionFader(
           while (ancestor?.visible) ancestor = ancestor.parent;
           if (!ancestor) visibleCanopies.push(canopy);
         }
-        lastBlocked = sightBlocked(camera.position, chest);
-        // Keep at most two sight lines per tested frame. Cycle the second
-        // sample through ears and torso sides instead of doubling clear-view cost.
+        lastBlocked = sightBlocked(camera.position, head)
+          || !!opts.sight?.(camera.position, head, foxPos.y);
+        // Always protect the animated head. Cycle the second canopy/height
+        // sample through chest and flanks, retaining the two-line budget.
         const sample = silhouetteSample++ % 3;
-        flank.copy(sample === 0 ? head : chest);
-        if (sample !== 0) {
-          const side = sample === 1 ? -1 : 1;
-          flank.x += Math.cos(foxYaw) * foxHeight * 0.35 * side;
-          flank.z -= Math.sin(foxYaw) * foxHeight * 0.35 * side;
-        }
+        const side = sample === 0 ? 0 : sample === 1 ? -1 : 1;
+        flank.copy(chest);
+        flank.x += Math.cos(foxYaw) * foxHeight * 0.35 * side;
+        flank.z -= Math.sin(foxYaw) * foxHeight * 0.35 * side;
         if (!lastBlocked) lastBlocked = sightBlocked(camera.position, flank);
       }
       if (lastBlocked || opts.blocked?.(camera, chest)) blockedHold = 0.35;
@@ -258,6 +267,13 @@ export function createOcclusionFader(
         y0 = Math.min(y0, py); y1 = Math.max(y1, py);
       }
       const pad = size.y * 0.03;
+      ndc.copy(head).project(camera);
+      const headX = (ndc.x * .5 + .5) * size.x, headY = (ndc.y * .5 + .5) * size.y;
+      const headDepth = -pt.copy(head).applyMatrix4(camera.matrixWorldInverse).z;
+      const headRadius = Math.max(1, size.y * foxHeight * .36 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov * .5)) * Math.max(camera.near, headDepth)));
+      uOccHead.value.set(headX, headY, headDepth, headRadius);
+      x0 = Math.min(x0, headX); x1 = Math.max(x1, headX);
+      y0 = Math.min(y0, headY); y1 = Math.max(y1, headY);
       uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 1.05 + pad), Math.max(size.y * 0.05, (y1 - y0) * 1.05 + pad));
       const depth = chest.applyMatrix4(camera.matrixWorldInverse).z * -1;
       uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, foxPos.y);
