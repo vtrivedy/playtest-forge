@@ -22,6 +22,8 @@ const backend = arg('backend', 'egl'), quality = arg('quality', 'high'), fps = N
 const [width, height] = arg('size', '1920x1080').split('x').map(Number);
 if (![30, 60].includes(fps) || ![width, height].every(n => Number.isInteger(n) && n > 0)) throw Error('Invalid size/fps');
 if (!['vulkan', 'egl', 'gl', 'swiftshader'].includes(backend)) throw Error('Unknown backend');
+// Compound hip diagnostics deliberately omit the long standard galleries.
+const hipDiagnostic = selected !== 'all' && selected.split(',').length === 2 && selected.split(',').includes('worldgait') && selected.split(',').includes('fox');
 const wants = k => selected === 'all' || selected.split(',').includes(k);
 fs.mkdirSync(out, { recursive: true });
 const save = (name, data) => fs.writeFileSync(path.join(out, name), JSON.stringify(data, null, 2));
@@ -1019,7 +1021,7 @@ try {
     if(!landingTakes.every(landingPass))throw Error('Landing A/B must land with four compression contacts and submillimeter compression residual; visual review still required');
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
-  if (wants('worldgait')) {
+  if (wants('worldgait') && !hipDiagnostic) {
     if(fps!==60)throw Error('World gait comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
@@ -2299,7 +2301,7 @@ try {
     });
     await shot('orbit-end');
   }
-  if (wants('fox')) {
+  if (wants('fox') && !hipDiagnostic) {
     // Character review: staged stills around the fox (concept turnaround angles + face), then the real chase cam.
     for (const state of ['sepia', 'restored']) {
       await boot(quality, true);
@@ -2342,6 +2344,10 @@ try {
       });
       await H('setKeys', []); await H('photoOff');
     }
+  }
+  if(hipDiagnostic) {
+    const {captureHipWeightAB}=await import(pathToFileURL(path.resolve(repo,'tools/hip-weight-capture.mjs')).href);
+    await captureHipWeightAB({repo,H,boot,video,save,getPage:()=>page,fps,quality});
   }
   if (wants('turntable')) {
     // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
