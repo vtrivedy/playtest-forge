@@ -188,3 +188,55 @@ solidPostCamera.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vec
   gliding: false, dashing: false, airTime: 0, landing: null });
 assert.match(solidPostCamera.debug.internals(), /blocker=decorative-string-test/, 'solid scenery must still block');
 console.log('Decorative string / solid post camera distinction PASS');
+// Geometry proxies for the image-driven composition pass. The .95m running
+// silhouette is an estimate, not an image measurement or substitute for GPU review.
+const composition = [];
+for (const runDistance of [3.0, 3.3]) for (const speed of [0, 3.8, 9]) {
+  const follow = createFollowCamera({ params: { runDistance } });
+  follow.resize(1280, 720);
+  const target = new THREE.Vector3();
+  for (let i = 0; i < 180; i++) {
+    target.z = -speed * i / 60;
+    follow.update(1 / 60, { ...idleFrame, target, vel: new THREE.Vector3(0, 0, -speed) });
+  }
+  const foot = target.clone().project(follow.camera);
+  const head = target.clone().add(new THREE.Vector3(0, speed ? 0.95 : 1.25, 0)).project(follow.camera);
+  const centre = target.clone().add(new THREE.Vector3(0, 0.6, 0)).project(follow.camera);
+  const angle = THREE.MathUtils.radToDeg(Math.atan2(Math.abs(follow.camera.position.x - target.x), Math.abs(follow.camera.position.z - target.z)));
+  assert.ok(centre.y <= -0.3 && centre.y > -0.55, 'grounded chest sits in lower-third band');
+  assert.ok(foot.y > -0.95 && head.y < 0.85, 'proxy ears and feet remain inside frame');
+  assert.ok(angle > 20, 'quartering lens preserves a side component at run speed');
+  composition.push({ runDistance, speed, chestNdcY: +centre.y.toFixed(3), proxyHeightPx: +((head.y-foot.y)*360).toFixed(1), rearAngleDeg: +angle.toFixed(1) });
+}
+console.log('Chase composition CPU proxies:', JSON.stringify(composition));
+
+for (const velocity of [new THREE.Vector3(0, 0, 9), new THREE.Vector3(4.5, 0, -7.8)]) {
+  const follow = createFollowCamera();
+  const reference = createFollowCamera({ params: { minDistance: 0 } });
+  follow.resize(1280, 720);
+  reference.resize(1280, 720);
+  const target = new THREE.Vector3();
+  let minimumRange = Infinity;
+  let referenceRange = Infinity;
+  for (let i = 0; i < 180; i++) {
+    target.addScaledVector(velocity, 1 / 60);
+    follow.update(1 / 60, { ...idleFrame, target, vel: velocity });
+    reference.update(1 / 60, { ...idleFrame, target, vel: velocity });
+    minimumRange = Math.min(minimumRange, follow.camera.position.distanceTo(target.clone().setY(target.y + follow.params.lookHeight)));
+    referenceRange = Math.min(referenceRange, reference.camera.position.distanceTo(target.clone().setY(target.y + reference.params.lookHeight)));
+  }
+  assert.ok(minimumRange >= follow.params.minDistance - 1e-6, 'toward-lens and off-axis motion retain actual body room');
+  if (velocity.z > 0) assert.ok(referenceRange < follow.params.minDistance, 'backpedal probe must actually need the body-room correction');
+}
+
+// Solid compression has final authority after the open-ground lag correction.
+// The minimum must not push a wall-compressed lens through the wall again.
+const wallScene = new THREE.Group();
+const closeWall = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial());
+closeWall.position.z = 2.1; wallScene.add(closeWall);
+const wallCamera = createFollowCamera({ scenery: wallScene });
+wallCamera.resize(1280, 720);
+for (let i = 0; i < 120; i++) wallCamera.update(1 / 60, { ...idleFrame, target: new THREE.Vector3() });
+assert.ok(wallCamera.camera.position.z < 2, 'compressed lens stays on the hero side of the wall');
+assert.ok(wallCamera.camera.position.distanceTo(new THREE.Vector3(0, wallCamera.params.lookHeight, 0)) < wallCamera.params.minDistance,
+  'safe wall compression may take precedence over the open-ground minimum');

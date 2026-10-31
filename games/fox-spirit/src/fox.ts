@@ -102,7 +102,7 @@ export async function createFox(): Promise<FoxActor> {
       const act = mixer.clipAction(clip);
       act.enabled = true;
       // Loop continuous states; one-shots clamp
-      const once = /^(jump_up|land|burst|skid)$/.test(clip.name);
+      const once = /^(jump_up|jump_fall|land|burst|skid)$/.test(clip.name);
       act.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, once ? 1 : Infinity);
       if (once) act.clampWhenFinished = true;
       actions.set(clip.name, act);
