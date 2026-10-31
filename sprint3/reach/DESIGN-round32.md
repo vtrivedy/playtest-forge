@@ -7,3 +7,5 @@ Change capture controller only: preserve real source dash, walk to ferry centre 
 Verify Node syntax and packaging; remote immutable pushed SHA crossing run must show no death, arrival then latch and stable ferry support. Game TypeScript/Vite rechecked after main integration. No local browser/render.
 
 Timing review: source→arrival takes1.63s in failed trace. A walking approach can meet an already rising deck. Permit the existing jump/hold combo during boarding if deck is above feet and no ferry support is present, so the capture exercises an actual boarding jump rather than walking into a raised collider. No automatic game assistance.
+
+Opus critique of191416b confirms support gate but rejects0.6 input cap: arrival outruns walking. Follow-up uses full input until within~1.54m, then proportional braking0.65×distance. Existing added jump handles raised edge. This remains a GPU-tested hypothesis, not an acceptance claim. Saved critique in persistent artifacts/opus-round32.txt.
