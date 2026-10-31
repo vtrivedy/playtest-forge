@@ -61,11 +61,9 @@ export function createOcclusionFader(
             float occStepFloor = 1.0 - smoothstep(uOccFox.w + 0.45, uOccFox.w + 0.65, occWorldY);
             occAboveFeet *= 1.0 - occUp * occStepFloor;
             float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear) * occAboveFeet;
-            // 4x4 Bayer stipple — no sorting, no blending, keeps a ghost of the occluder
-            vec2 occP = mod(floor(gl_FragCoord.xy), 4.0);
-            vec2 occLo = mod(occP, 2.0);
-            vec2 occHi = floor(occP * 0.5);
-            float occB = (4.0 * mod(2.0 * occLo.x + 3.0 * occLo.y, 4.0) + mod(2.0 * occHi.x + 3.0 * occHi.y, 4.0) + 0.5) / 16.0;
+            // Stable one-pixel threshold; no coarse repeating checker or
+            // temporal jitter in the SMAA pipeline (which has no TAA history).
+            float occB = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
             if (occB < occCut) discard; // clear the hero completely; keep a dithered outer edge
           }`,
         );
