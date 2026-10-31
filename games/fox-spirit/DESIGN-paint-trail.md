@@ -57,5 +57,23 @@ ribbon radius/spacing, paw radius, drip chance, bloom life, strength, grade coup
 `tsc`, fox vite build. GPU capture: new `paint` shot — sepia meadow start, 30 s scripted
 S-curve walk/trot, before/after stills from a high lens. Judge PNGs personally.
 
+## v8 (driver note 2026-10-31 11:24)
+- **Watercolour edge**: each bloom stamps a decided body (d<0.62–0.8) plus a 0.42-density wet fringe
+  creeping out in noise fingers to d≈1.1. Consumer: granulated fringe (paper shows through, 55 % pigment),
+  body, and a thin *broken* tide mark (pigment ×0.76, a touch more saturated) at coverage ≈0.5–0.7.
+  No brown multiply on the sepia side.
+- **Restore to own colour** (`uPaintKind`, `paintKindOf`): terrain/ground/grass → meadow; rv-stone/rv-rock →
+  cool blue-grey + gold lichen + moss only on noisy top patches; litter → meadow with sparse warm clusters;
+  everything else (wood/dock, plaster, roofs, water, canopy) → its authored colour, richer. Never meadow-green.
+- **Path, not blob**: ribbon bloom r 2.2 (≈3–4 m wide incl. fringe), drips r 1.5 at 0.9–1.7 m off-path every 6 m.
+  Idle pools at pauses. Props (kinds stone/own) soak paint from 2.4 m / 4.6 m tap rings → pillars/houses
+  beside the path restore.
+- **Bursts**: `splash` = central wash from 6 % → r·0.8 over 1.5 s plus 9 lobes that well up once the wash
+  reaches them (delayed blooms). Shade 12 m, hearth 11/13 (dash), root 9/10, Seedwell 15.
+- **Pigment variation**: two-scale density, lighter while wet, gold-ochre and madder accents, faint back-run lines.
+- **Leaves**: ~82 % of leaf slots shrink away over paint (per-instance hash, no flicker).
+- Capture `paint`: straight walk→pause→trot to cold H-a hearth, stand until lit (dash fallback), same lens
+  before/after + `paint-burst-hearth`.
+
 ## Out of scope
 Locomotion (other stream). Gameplay supply / Shade drain logic.

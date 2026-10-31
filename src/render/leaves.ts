@@ -174,7 +174,10 @@ function makeLeafMaterial(atlas: THREE.Texture, field?: ColorField) {
         '#include <common>',
         `#include <common>
         attribute vec2 aCell;
-        varying vec3 vLeafWorld;`,
+        varying vec3 vLeafWorld;
+        uniform sampler2D uPaintMap;
+        uniform vec4 uPaintBounds;
+        uniform float uPaintOn;`,
       )
       .replace(
         '#include <uv_vertex>',
@@ -186,6 +189,14 @@ function makeLeafMaterial(atlas: THREE.Texture, field?: ColorField) {
         `#include <begin_vertex>
         vec3 leafCenter = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
         vLeafWorld = leafCenter;
+        if (uPaintOn > 0.5) {
+          // the paint path is meadow, not a leaf carpet: only a few leaves (per slot, so no flicker) stay on it
+          vec2 lpuv = vec2((leafCenter.x - uPaintBounds.x) / (uPaintBounds.y - uPaintBounds.x),
+                           (leafCenter.z - uPaintBounds.z) / (uPaintBounds.w - uPaintBounds.z));
+          float lp = textureLod(uPaintMap, clamp(lpuv, 0.0, 1.0), 0.0).r;
+          float keep = step(fract(sin(float(gl_InstanceID) * 12.9898) * 43758.5453), 0.1);
+          transformed *= mix(1.0, keep, smoothstep(0.3, 0.7, lp));
+        }
         // keep leaves from filling the lens: shrink inside ~1.6 m of the camera
         transformed *= smoothstep(0.5, 1.6, distance(leafCenter, cameraPosition));`,
       );
