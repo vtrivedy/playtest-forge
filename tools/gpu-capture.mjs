@@ -366,7 +366,10 @@ try {
     }, (state,i)=>contactFrame!==null&&i>=contactFrame+61, { traceEveryFrame: true, keyFrames: [0, 6, 12, 18, 36, 60] });
     await H('setStick', null);
     const contact = await page.evaluate(() => window.__gameHooks.shades.state());
-    if (contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1) throw Error(`Shade contact failed: ${JSON.stringify(contact)}`);
+    const shadeContactFailures=[];
+    const contactFailure=contact.hits !== 1 || contact.wisps !== 2 || contact.knockbackTravel < 2.9 || contact.knockbackTravel > 3.1 ? `Shade contact failed: ${JSON.stringify(contact)}` : null;
+    if(contactFailure){shadeContactFailures.push(contactFailure);report.failures.push(contactFailure);}
+    save('shade-contact-acceptance.json',{passed:!contactFailure,failure:contactFailure,contact,label:'Strict contact gate retained; release diagnostics continue before final failure'});
     p = contact.actors[0].pos;
     const dashSetup = await page.evaluate(([x,y,z]) => {
       const col=window.__gameHooks.debug.world.collision;
@@ -378,14 +381,17 @@ try {
     },p);
     save('shade-dash-setup.json',dashSetup);
     await H('teleport', ...dashSetup.pos, dashSetup.yaw);
+    const dashControllerBefore=await H('state');
     await H('setStick', ...dashSetup.direction);
     await H('setKeys', ['ShiftLeft']);
     lens=null;
     await camera();
-    await video('shade-free', 120, async i => {
+    const dashControllerAfter=await video('shade-free', 120, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
       await camera();
     }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 119] });
+    save('shade-dash-controller.json',{before:dashControllerBefore.dash,after:dashControllerAfter.dash,label:'Actual controller activation; collisionActiveLastStep is the preceding simulated movement tick'});
+    if(dashControllerBefore.dash&&dashControllerAfter.dash.used<=dashControllerBefore.dash.used)throw Error(`Shade dash input never activated controller ${JSON.stringify(dashControllerAfter.dash)}`);
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
     if (freed.frees !== 1 || !freed.actors[0].freed || freed.hits !== contact.hits || freed.wisps < contact.wisps) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
     // The original baseline predates the release wash; only the new attraction-enabled candidate owes this assertion.
@@ -398,6 +404,36 @@ try {
       save('shade-release-wash.json',wash);
       if(!wash||wash.life<3.8||wash.strength<1)throw Error(`Missing six-second shade release wash ${JSON.stringify(wash)}`);
     }
+    await shot('shade-wash-normal');
+    const occlusionSaved=await page.evaluate(()=>{
+      const h=window.__gameHooks,saved=[],seen=new Set();
+      h.debug.scene.traverse(o=>{
+        if(!o.isMesh)return;
+        for(const material of Array.isArray(o.material)?o.material:[o.material]){
+          const uniform=h.debug.renderer.properties.get(material).uniforms?.uOccStrength;
+          if(uniform&&!seen.has(uniform)){seen.add(uniform);saved.push({material:material.uuid,value:uniform.value});}
+        }
+      });
+      return saved;
+    });
+    const applyOcclusion=async saved=>page.evaluate(saved=>{
+      const h=window.__gameHooks,values=new Map(saved.map(s=>[s.material,s.value]));
+      h.debug.scene.traverse(o=>{
+        if(!o.isMesh)return;
+        for(const material of Array.isArray(o.material)?o.material:[o.material])if(values.has(material.uuid)){
+          const uniform=h.debug.renderer.properties.get(material).uniforms?.uOccStrength;
+          if(uniform)uniform.value=values.get(material.uuid);
+        }
+      });
+      h.debug.post.render();
+    },saved);
+    try {
+      await applyOcclusion(occlusionSaved.map(s=>({...s,value:0})));
+      await shot('shade-wash-occlusion-disabled-diagnostic');
+      save('shade-occlusion-isolation.json',{label:'Same simulation time, temporary renderer-uniform diagnostic only; zero touched uniforms is inconclusive',touched:occlusionSaved.length,saved:occlusionSaved});
+    } finally {
+      await applyOcclusion(occlusionSaved);
+    }
     await advance(180);
     await shot('shade-leaf-litter');
     await advance(600, false);
@@ -405,7 +441,7 @@ try {
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
     await advance(0);
     await shot('shade-after-free');
-    save('shade-acceptance.json', { contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    save('shade-acceptance.json', { passed:!contactFailure, releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
     let edge = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
     if(!edge || edge.freed)throw Error('No live high-hill Shade for clear encounter evidence');
     if(edge && !edge.freed){
@@ -428,8 +464,9 @@ try {
       },(_,i)=>touch!==null&&i>=touch+61,{traceEveryFrame:true,keyFrames:[0,6,12,18,36,60]});
       await H('setStick',null);
       const contactAfter=await page.evaluate(()=>window.__gameHooks.shades.state());
-      if(contactAfter.hits!==contactBefore.hits+1||contactAfter.knockbackTravel<2.9)throw Error(`Edge contact failed ${JSON.stringify(contactAfter)}`);
-      save('shade-clear-contact-acceptance.json',{approach,before:contactBefore,after:contactAfter});
+      const edgeFailure=contactAfter.hits!==contactBefore.hits+1||contactAfter.knockbackTravel<2.9?`Edge contact failed ${JSON.stringify(contactAfter)}`:null;
+      if(edgeFailure){shadeContactFailures.push(edgeFailure);report.failures.push(edgeFailure);}
+      save('shade-clear-contact-acceptance.json',{passed:!edgeFailure,failure:edgeFailure,approach,before:contactBefore,after:contactAfter});
       edge=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
       const setup=await page.evaluate(([x,y,z])=>{
         const col=window.__gameHooks.debug.world.collision;
@@ -443,10 +480,17 @@ try {
       await H('teleport',...setup.pos,setup.yaw);
       const [x,y,z]=edge.pos;
       await H('photo',[x+5.5,y+3.8,z+5.5],[x,y+1.6,z],48);
+      const edgeControllerBefore=await H('state');
       await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
-      await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,{traceEveryFrame:true,keyFrames:[0,5,12,24,36,48,75,119]});
+      const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,{traceEveryFrame:true,keyFrames:[0,5,12,24,36,48,75,119]});
+      save('shade-edge-dash-controller.json',{before:edgeControllerBefore.dash,after:edgeControllerAfter.dash});
+      if(edgeControllerBefore.dash&&edgeControllerAfter.dash.used<=edgeControllerBefore.dash.used)throw Error(`Second Shade dash input never activated controller ${JSON.stringify(edgeControllerAfter.dash)}`);
       const after=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(after.frees!==before.frees+1||after.hits!==before.hits||!after.actors.find(a=>a.id==='shade-hill-high')?.freed)throw Error(`Restored-edge dash failed ${JSON.stringify(after)}`);
+      const releasedIds=after.actors.filter(a=>a.freed).map(a=>a.id);
+      if(after.frees<2||releasedIds.length<2)throw Error(`Two distinct dash releases missing ${JSON.stringify(after)}`);
+      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0,releasePassed:true,contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
+      await shot('shade-two-freed');
       await advance(180,false);await advance(0);await shot('shade-clear-litter');
       await advance(600,false);await advance(0);await shot('shade-clear-empty');
       const end=await page.evaluate(()=>window.__gameHooks.shades.state());
@@ -496,6 +540,7 @@ try {
     }
 
 
+    // Stored contact failures survive later exceptions and keep the final process result failed.
   }
   if(wants('feel')) {
     await boot(quality,true);
