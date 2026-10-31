@@ -78,7 +78,15 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     if (Math.cos(a)<-.9 || (Math.sin(a)<-.45 && Math.cos(a)<.55)) continue;
     const x=187+Math.cos(a)*11.35,z=-118+Math.sin(a)*12.35;
     const yaw=-a;
+    const start=rock.pos.length;
     rockSlab(rock,{x,z,top:36.4,bottom:29.4,w:2.2,d:3.25,seed:1300+i,rough:.24,topColor:PAL.stone,overhang:.25});
+    // rockSlab bakes world vertices; rotate the new bank to its collider frame.
+    const c=Math.cos(yaw),sn=Math.sin(yaw);
+    for(let j=start;j<rock.pos.length;j+=3){
+      const dx=rock.pos[j]!-x,dz=rock.pos[j+2]!-z,nx=rock.nor[j]!,nz=rock.nor[j+2]!;
+      rock.pos[j]=x+dx*c+dz*sn;rock.pos[j+2]=z-dx*sn+dz*c;
+      rock.nor[j]=nx*c+nz*sn;rock.nor[j+2]=-nx*sn+nz*c;
+    }
     col.add(boxCollider({x,z,w:2.2,d:3.25,yaw,top:36.4,bottom:29.8,tag:'reach-bank'}));
   }
   const raft = new THREE.Group(); raft.name='reach-ferry'; group.add(raft);
@@ -111,6 +119,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     const mesh=bucket.toMesh(mat,{cast:true,receive:true,boxUV:name==='rv-rock'?4:1.6}); if(mesh)group.add(mesh);
   }
   const scenery=await dressReach(group, mat => { field.patchMaterial(mat); mats.push(mat); });
+  for(const trunk of scenery.trunks)col.add(trunk);
   const bellMat=new THREE.MeshStandardMaterial({color:0x8b5832,metalness:.6,roughness:.5,emissive:0xc17530,emissiveIntensity:.02});
   const bell=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(.9,0),new THREE.Vector2(.65,.25),new THREE.Vector2(.55,1.05),new THREE.Vector2(.2,1.35),new THREE.Vector2(0,1.45)],20),bellMat);
   bell.position.set(207,40.5,-119);group.add(bell);field.patchMaterial(bellMat);mats.push(bellMat);
@@ -129,7 +138,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   stoneBlock(low,trs(179.5,30.4,-130),2.5,.5,1,1221,.08);
   const lowMesh=low.toMesh(mats[2]!,{cast:true,receive:true,boxUV:1.6});if(lowMesh)group.add(lowMesh);
   world.hearthSpots.push({id:'reach-steam',x:183,y:30,z:-128,height:13});
-  world.shadeSpots.push({id:'reach-drinker',speed:1.6,patrol:[[184.5,30,-118],[188.5,30,-118],[187,30,-118.8],[185,30,-117.3]]});
+  world.shadeSpots.push({id:'reach-drinker',speed:1.6,patrol:[[179,30,-118],[179,30,-109],[195.5,30,-109],[195.5,30,-118],[195.5,30,-109],[179,30,-109]]});
   const bankCheckpoint={pos:new THREE.Vector3(171,30,-130),lit:false};
   world.checkpoints.push(bankCheckpoint);
   const handles=[[173,30,-124],[201,36,-121]];

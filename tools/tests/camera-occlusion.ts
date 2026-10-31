@@ -68,6 +68,27 @@ camera.position.set(0, 0.6, 4); camera.lookAt(0, 0.3, 0);
 const renderer = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(1280, 720) } as THREE.WebGLRenderer;
 const step = () => fader.update(1 / 60, camera, renderer, new THREE.Vector3(), 0.55, 0);
 step();
+// The shader's floor protection uses column 1 of the *view* rotation, not
+// camera-up or the transposed column. Exercise pitched/rolled camera transforms.
+for (const eye of [new THREE.Vector3(4, 2, 3), new THREE.Vector3(-3, 8, 1)]) {
+  camera.position.copy(eye); camera.up.set(0.2, 1, 0.1); camera.lookAt(0, 0.6, 0);
+  camera.updateMatrixWorld(true);
+  const column = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorldInverse, 1);
+  for (const world of [new THREE.Vector3(1, -2, 3), new THREE.Vector3(-4, 6, -1)]) {
+    const viewPosition = world.clone().applyMatrix4(camera.matrixWorldInverse).negate();
+    assert.ok(Math.abs(camera.position.y - column.dot(viewPosition) - world.y) < 1e-9,
+      'fragment height reconstruction must preserve floor height under pitch/roll');
+  }
+  for (const worldNormal of [new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 2, 0).normalize(), new THREE.Vector3(0, 0, 1)]) {
+    const viewNormal = worldNormal.clone().transformDirection(camera.matrixWorldInverse);
+    assert.ok(Math.abs(column.dot(viewNormal) - worldNormal.y) < 1e-9,
+      'floor normal reconstruction must distinguish treads, slopes and walls under pitch/roll');
+  }
+}
+fader.update(1 / 60, camera, renderer, new THREE.Vector3(0, 7.25, 0), 0.55, 0);
+assert.equal(shader.uniforms.uOccFox.value.w, 7.25, 'floor protection follows current feet height');
+camera.up.set(0, 1, 0); camera.position.set(0, 0.6, 4); camera.lookAt(0, 0.3, 0);
+step(); step();
 assert.equal(fader.detected, true, 'unproxied leaf material must block sight');
 assert.equal(crown.material, crownMat, 'canopy query must restore the rendered material');
 assert.equal(crownMat.side, THREE.FrontSide, 'canopy query must preserve render sidedness');
@@ -77,6 +98,27 @@ step(); step();
 assert.equal(fader.detected, false, 'hidden ancestor must not trigger canopy ray');
 for (let i = 0; i < 120; i++) step();
 assert.ok(fader.strength < 0.01, 'cutout must restore after obstruction clears');
+
+// Photo/review cameras do not use the gameplay-boom blocked signal. Signs need
+// their own precise sight coverage, including a post whose render material is hidden.
+const signScene = new THREE.Scene();
+const postMaterial = new THREE.MeshBasicMaterial({ visible: false });
+const post = new THREE.Mesh(new THREE.CylinderGeometry(.09, .099, 1.59, 8), postMaterial);
+post.position.set(0, .645, 2); post.userData.isOccluder = true; signScene.add(post);
+signScene.updateMatrixWorld(true);
+const signFader = createOcclusionFader(signScene, { solidAt: () => -Infinity });
+const signStep = () => signFader.update(1 / 60, camera, renderer, new THREE.Vector3(), .55, 0);
+signStep();
+assert.equal(signFader.detected, true, 'query-only post must trigger fade without gameplay-boom signal');
+assert.equal(post.material, postMaterial); assert.equal(postMaterial.visible, false, 'sight query must not reveal its proxy');
+post.visible = false;
+const signFace = new THREE.Mesh(new THREE.PlaneGeometry(2.2, .38), new THREE.MeshStandardMaterial());
+signFace.position.set(0, .45, 2); signFace.userData.isOccluder = true; signScene.add(signFace);
+// Fader snapshots world builders once; construct the sign-face-only case after its builder.
+signScene.updateMatrixWorld(true);
+const faceFader = createOcclusionFader(signScene, { solidAt: () => -Infinity });
+faceFader.update(1 / 60, camera, renderer, new THREE.Vector3(), .55, 0);
+assert.equal(faceFader.detected, true, 'tagged sign face must independently trigger cutout');
 
 parent.visible = true;
 const crownMaterials = [crownMat];
@@ -142,7 +184,7 @@ for (const minDistance of [0, 2.2, 2.6, 3.0]) {
 console.log('Terrain boom CPU variations:', JSON.stringify(terrainVariations));
 
 // Predicting a lower landing should not crane above a fox that is still rising.
-// Descending keeps the same landing-preview lift and its damped transition.
+// Descending retains a restrained landing-preview lift and its damped transition.
 const ascentViews = [];
 for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
   const noLanding = createFollowCamera();
@@ -161,8 +203,85 @@ for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
     - Math.hypot(noLanding.camera.position.x, noLanding.camera.position.z);
   const extraCrane = extraHeight - rangeDifference * lowLanding.params.height / lowLanding.params.distance;
   if (verticalSpeed > 0) assert.ok(Math.abs(extraCrane) < 0.05, 'rising fox gets no descent-only crane lift');
-  else if (verticalSpeed <= -4) assert.ok(extraCrane > 2, 'fast descent retains the landing-preview lift');
+  else if (verticalSpeed <= -4) assert.ok(extraCrane > 0.5 && extraCrane <= 0.85, 'fast descent keeps a restrained landing-preview lift');
   else assert.ok(extraCrane > 0, 'partial descent retains a weighted landing-preview lift');
   ascentViews.push({ verticalSpeed, extraHeight: +extraHeight.toFixed(3), extraCrane: +extraCrane.toFixed(3) });
 }
 console.log('Landing-preview lift CPU probe:', JSON.stringify(ascentViews));
+
+// Ground-only elevation must not leak into sustained flight. Compare two live
+// rigs with deliberately different ground tuning, not a copied height formula.
+for (const gliding of [false, true]) {
+  const groundLow = createFollowCamera({ params: { groundLift: 0 } });
+  const groundHigh = createFollowCamera({ params: { groundLift: 0.6 } });
+  const flight = { ...idleFrame, target: new THREE.Vector3(0, 10, 0), grounded: false,
+    gliding, airTime: 2, vel: new THREE.Vector3(0, -2.7, -8), landing: new THREE.Vector3(0, 0, -8) };
+  for (let i = 0; i < 180; i++) { groundLow.update(1 / 60, flight); groundHigh.update(1 / 60, flight); }
+  assert.ok(groundLow.camera.position.distanceTo(groundHigh.camera.position) < 1e-8,
+    'sustained air/glide camera must ignore ground-only elevation');
+  assert.ok(groundLow.camera.quaternion.angleTo(groundHigh.camera.quaternion) < 1e-7);
+}
+const rideViews = [];
+for (const [label, height, glideDistance] of [['previous ride proportions', 1.65, 5.5], ['restrained ride proportions', 1.4, 4.8]] as const) {
+  const follow = createFollowCamera({ params: { height, glideDistance } });
+  const frame = { ...idleFrame, target: new THREE.Vector3(0, 10, 0), grounded: false,
+    gliding: true, airTime: 2, vel: new THREE.Vector3(0, -2.7, -8), landing: new THREE.Vector3(0, 0, -8) };
+  for (let i = 0; i < 180; i++) follow.update(1 / 60, frame);
+  const direction = follow.camera.getWorldDirection(new THREE.Vector3());
+  rideViews.push({ label, viewPitchDeg: THREE.MathUtils.radToDeg(Math.asin(-direction.y)), range: follow.camera.position.distanceTo(frame.target) });
+}
+assert.ok(rideViews[1]!.viewPitchDeg <= rideViews[0]!.viewPitchDeg, 'closer ride must not also steepen the view');
+console.log('Flight tuning CPU poses (not image proof):', JSON.stringify(rideViews));
+
+// Geometry proxies for the image-driven composition pass. The .95m running
+// silhouette is an estimate, not an image measurement or substitute for GPU review.
+const composition = [];
+for (const runDistance of [3.0, 3.3]) for (const speed of [0, 3.8, 9]) {
+  const follow = createFollowCamera({ params: { runDistance } });
+  follow.resize(1280, 720);
+  const target = new THREE.Vector3();
+  for (let i = 0; i < 180; i++) {
+    target.z = -speed * i / 60;
+    follow.update(1 / 60, { ...idleFrame, target, vel: new THREE.Vector3(0, 0, -speed) });
+  }
+  const foot = target.clone().project(follow.camera);
+  const head = target.clone().add(new THREE.Vector3(0, speed ? 0.95 : 1.25, 0)).project(follow.camera);
+  const centre = target.clone().add(new THREE.Vector3(0, 0.6, 0)).project(follow.camera);
+  const angle = THREE.MathUtils.radToDeg(Math.atan2(Math.abs(follow.camera.position.x - target.x), Math.abs(follow.camera.position.z - target.z)));
+  assert.ok(centre.y <= -0.3 && centre.y > -0.55, 'grounded chest sits in lower-third band');
+  assert.ok(foot.y > -0.95 && head.y < 0.85, 'proxy ears and feet remain inside frame');
+  assert.ok(angle > 20, 'quartering lens preserves a side component at run speed');
+  composition.push({ runDistance, speed, chestNdcY: +centre.y.toFixed(3), proxyHeightPx: +((head.y-foot.y)*360).toFixed(1), rearAngleDeg: +angle.toFixed(1) });
+}
+console.log('Chase composition CPU proxies:', JSON.stringify(composition));
+
+for (const velocity of [new THREE.Vector3(0, 0, 9), new THREE.Vector3(4.5, 0, -7.8)]) {
+  const follow = createFollowCamera();
+  const reference = createFollowCamera({ params: { minDistance: 0 } });
+  follow.resize(1280, 720);
+  reference.resize(1280, 720);
+  const target = new THREE.Vector3();
+  let minimumRange = Infinity;
+  let referenceRange = Infinity;
+  for (let i = 0; i < 180; i++) {
+    target.addScaledVector(velocity, 1 / 60);
+    follow.update(1 / 60, { ...idleFrame, target, vel: velocity });
+    reference.update(1 / 60, { ...idleFrame, target, vel: velocity });
+    minimumRange = Math.min(minimumRange, follow.camera.position.distanceTo(target.clone().setY(target.y + follow.params.lookHeight)));
+    referenceRange = Math.min(referenceRange, reference.camera.position.distanceTo(target.clone().setY(target.y + reference.params.lookHeight)));
+  }
+  assert.ok(minimumRange >= follow.params.minDistance - 1e-6, 'toward-lens and off-axis motion retain actual body room');
+  if (velocity.z > 0) assert.ok(referenceRange < follow.params.minDistance, 'backpedal probe must actually need the body-room correction');
+}
+
+// Solid compression has final authority after the open-ground lag correction.
+// The minimum must not push a wall-compressed lens through the wall again.
+const wallScene = new THREE.Group();
+const closeWall = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial());
+closeWall.position.z = 2.1; wallScene.add(closeWall);
+const wallCamera = createFollowCamera({ scenery: wallScene });
+wallCamera.resize(1280, 720);
+for (let i = 0; i < 120; i++) wallCamera.update(1 / 60, { ...idleFrame, target: new THREE.Vector3() });
+assert.ok(wallCamera.camera.position.z < 2, 'compressed lens stays on the hero side of the wall');
+assert.ok(wallCamera.camera.position.distanceTo(new THREE.Vector3(0, wallCamera.params.lookHeight, 0)) < wallCamera.params.minDistance,
+  'safe wall compression may take precedence over the open-ground minimum');

@@ -39,3 +39,49 @@ Integrated GPU restoration frames expose an opaque-looking cream basin before an
 Opus image review passes soft mask edges but rejects readability/framing. Move the staged fox to the safe Reed Seedwell island and use a southwest lens that includes origin and south front; tighten aura lens. Keep the same lens before/early/mid/settled. Do not adopt suggested green restore hues (ART LOCK forbids spring-green W1); judge the existing rust/gold wash after fog clears.
 
 Opus follow-up finds a concrete mist clipping bug: tilt0.06 drops large planes through opaque ink, cutting horizontal stripes. Flatten mist to -PI/2; existing y=-1.32..-1.12 remains above ink=-1.45. Save photoBlocker sightline evidence for the staged restore lens to distinguish occlusion from weak colour progression in the next capture.
+
+## R2 continuous transparent ribbon
+
+Driver23:05 again rejects older integrated frames as opaque putty. Higher opacity only hides transparent-cell overlaps; it conflicts with translucent water. Replace the instanced overlapping cell planes with one non-overlapping ribbon mesh whose adjacent quads share exact boundary positions/tangents. Keep simulation samples/cell wet flags, path length, timing, beds and colliders. Duplicate vertices per cell only for binary wet/colour attributes; coincident boundaries do not overlap. A per-vertex arc-distance attribute drives continuous ripple displacement in the vertex shader, eliminating per-cell bob steps. Grotto visual bank grade is interpolated at common boundaries; no separate tilt/length compensation remains. Restore channel opacity~0.64, retain restrained PBR highlights and local wet-diffuse knee. One current rendering path only. Remote water crossing/reed reports must match baseline; GPU must show clear body without a ruled grid.
+
+Continuous ribbon geometry gate caught a real inverted triangle at Reed's tight bend. Bound the inside-edge offset to45% of local curvature radius (sampled yaw change per arc distance), leaving the outside edge and simulation width unchanged. Test exact boundary continuity/normals, upward triangle winding, and the existing water timings before requesting GPU review. This prevents folded inner transparent geometry from recreating the overlap artifact.
+
+Opus source review finds no blocking ribbon regression; preserve simulation path despite suggested rounding. Reduce over-conservative inner pinch by allowing65% of measured curvature radius, still below the fold radius and gated by actual upward-triangle checks. Initialize dry vertex colours before first update. Keep GPU attention on the tight Reed bend's slope/width; do not smooth the authored path and alter parcel length.
+
+The85% candidate failed the upward-triangle gate on Reed;65% passes while exposing less bed than45%. Keep65% for remote judgment.
+
+## Driver23:40: clean autumn restoration colour
+
+Newest driver note explicitly passes front shape but rejects muddy rust, requesting gold/russet/green. This supersedes the earlier no-new-green interpretation: use restrained pine/olive accents, never lime/spring green. Author visible autumn colour on Reed land rather than increasing mask brightness. Raise existing leaf coverage in deterministic bank drifts (exclude submerged floor), blend some muted gold into the bank vertex colour, and give Reed-local leaf hue a gold/russet/tan mix with sparse pine. Reed blade palette becomes gold/copper/russet with one pine accent among eight tones. Preserve most damp umber gaps, global palette elsewhere, terrain/collision, RNG draw count and mask/front semantics. Existing mask reveals authored colours outward. Capture the same source-centred before/mid/settled lens; no new discs or fake wave overlay.
+
+Opus bank-source follow-up: preserve worn approaches by multiplying new CPU drift weight by(1-pathK*0.9)*(1-hubWear). Existing Reed peat crowns intentionally share local leaf hues (land includes these playable tussocks); raised stone platforms do not use groundBlend. Sparse pine appears in both local leaf mix and reed clumps as requested by newest driver; dark/tan gaps remain for restraint. No blanket recolouring of paths.
+
+## GPU abe0f35: scene-based water, not more tint tuning
+
+Personal PNG review: grid removed and outlet connected, but pond remains flat green putty; channel has stylized chevrons. Crossing still passes0 deaths/no GPU errors. Restore sightline is concretely blocked by Reed recovery geometry. Scalar colour/alpha changes alone do not supply water's missing visual cue.
+
+Add one shared scene-colour sampler per scene: copy the active opaque framebuffer once per renderer render-frame before transparent water, matching target dimensions/type; sample it with small animated normal distortion for refraction-like bed visibility. No extra scene render for this sampler. Correct direct-canvas sRGB decoding; composer targets remain linear. Register all water skins with this helper.
+
+Wen pond additionally uses the existing three.js Reflector helper at512px/no MSAA, hidden from scene and with all water skins temporarily hidden during its one reflection render to prevent recursion/feedback. Restore visibility in finally. Genuine tower/tree/sky reflections are Fresnel-weighted, gently distorted, with restrained depth tint and shoreline. Creek uses screen refraction without a reflection pass. Channel PBR retains small real highlights and lighter foam, but now shows sampled/distorted bed instead of a uniformly tinted plank. Deterministic manual-clock ripple motion only; no assets/API keys. Preserve simulation/collision and scene lights.
+
+This is a renderer-material pass requiring GPU shader/error/performance checks; source/build success cannot validate framebuffer format/copy or reflected-camera behavior.
+
+Opus scene-water design corrections applied: use an explicit shared postStack pre-pass, not renderer.info.frame. Prepare updates matrices, renders the visible pond reflection with skins hidden, then arms exactly one copy in RenderPass; GTAO scene renders cannot capture or render a second reflection. Only the forge single-sample HDR composer path is supported (no direct-canvas decoding/double tone mapping). Capture texture matches target format/type/size. Fade distortion at screen edges. Save capture diagnostics (copy count, target type/size, first GL error) and fail remote evidence if the copy has a GL error.
+
+Restoration framing now tests safe Reed island/tussock positions against candidate lenses with photoBlocker; uses the first clear sightline, saves all attempts, and keeps that same lens across before/front/settled. A frame cannot silently claim an unobstructed fox if every candidate is blocked.
+
+Creek evidence correction: the abe low lens looked through the south bank into its root knot rather than the water. Raise that lens to y12 above the bank, preserving the creek target. Remove unused direct-canvas sizing fallback from the composer-only sampler.
+
+Scene-water source critique fixes: distort by normal perturbation only, not the whole upward view normal; wet channel alpha becomes1 apart from shore feather because the background is already embedded. Hide screen-sized Points from the512 mirror to avoid oversized reflected sprites. Preserve shadow needsUpdate as well as autoUpdate across reflection; sync reflection-camera layers. Unsupported targets record diagnostics and return, never throw inside a renderer callback. Remote pond-specific counter snapshots require actual copies/reflection attempts, half-float matching buffer dimensions, and isolated GL error checks. Clear stale comments about tint-only reflection.
+
+Final source follow-up: perturbation-only refraction needs a larger scale to remain visible; use0.06 pond/0.055 channel with both screen-edge and shoreline-margin fade, and mildly stronger mirror distortion. Pond validation resets current error fields while preserving boot-copy diagnostics, and gates on completed reflection renders rather than attempts alone. This is still a GPU-tuned visual parameter, not accepted by source review.
+
+Main4e6290c supplies forgeSkipAO exclusions for shader-shaped meshes. Mark registered water skins to skip GTAO's override-material geometry pass so the opaque bed supplies AO instead of a false solid water sheet. Keep color-pass visibility and PBR shadows. Driver00:10 reports an identity-invalid capture; issue the next request at a fresh pushed immutable ref after this main merge.
+
+## GPU GL1282 root cause and repair
+
+GPU b807005/5d403d3 show lost opaque geometry plus repeated shadow sampler/type mismatch warnings. Copy itself is valid; Opus traces this to r186's removed PCFSoftShadowMap: the first mirror renders with shadow updates disabled before three's PCFSoft→PCF conversion, caching BASIC/plain-sampler programs that later receive PCF compare textures. Use supported PCF from renderer construction and remove the obsolete softShadows setting from renderer options/quality presets/caller. Defer mirror renders until visible shadow-casting lights have allocated maps through a main render, avoiding r186's uninitialized shadow-array placeholder. Keep the single-copy path; no extra scene-color render pass is needed. GPU must restore opaque geometry and have zero sampler mismatch/GL errors before art judgment.
+
+Boot reflection starts disabled until its first valid render; readiness ignores hidden/out-of-layer shadow lights. Capture treats sampler/type mismatch warnings as errors and records/requires shadowMap.type=PCF(1), making the formerly silent dropped-draw failure explicit.
+
+Opus confirms PCF/startup repair but tightens proof: record shadow type at the first prepare (before any mirror/main draw can normalize it) and require1; also fail on preserved bootPriorGlError so the original1282 cannot be hidden by pond-scope reset. End-of-sequence shadow type alone is insufficient.

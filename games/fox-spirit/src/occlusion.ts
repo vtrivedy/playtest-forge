@@ -20,7 +20,7 @@ export function createOcclusionFader(
     blocked?: () => boolean;
   },
 ) {
-  // x,y = centre of the fox's projected bounds (framebuffer px), z = fox view depth (m); radii in px
+  // xy = projected bounds centre (px), z = view depth (m), w = feet world height.
   const uOccFox = { value: new THREE.Vector4(0, 0, 0, 1) };
   const uOccRad = { value: new THREE.Vector2(1, 1) };
   const uOccStrength = { value: 0 };
@@ -45,18 +45,25 @@ export function createOcclusionFader(
           uniform float uOccStrength;`,
         )
         .replace(
-          '#include <clipping_planes_fragment>',
-          `#include <clipping_planes_fragment>
+          '#include <normal_fragment_begin>',
+          `#include <normal_fragment_begin>
           if (uOccStrength > 0.001) {
             float occR = length((gl_FragCoord.xy - uOccFox.xy) / uOccRad);
             float occNear = uOccFox.z - vViewPosition.z; // vViewPosition = -mvPosition → +depth
             // soft-edged ellipse fitted to the fox; nearby geometry counts from 0.45 m in front
-            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear);
-            // 4x4 Bayer stipple — no sorting, no blending, keeps a ghost of the occluder
-            vec2 occP = mod(floor(gl_FragCoord.xy), 4.0);
-            vec2 occLo = mod(occP, 2.0);
-            vec2 occHi = floor(occP * 0.5);
-            float occB = (4.0 * mod(2.0 * occLo.x + 3.0 * occLo.y, 4.0) + mod(2.0 * occHi.x + 3.0 * occHi.y, 4.0) + 0.5) / 16.0;
+            // Preserve the supporting floor, including instanced/skinned geometry:
+            // vViewPosition is minus view-space position, so inverse-rotate its Y.
+            float occWorldY = cameraPosition.y - dot(viewMatrix[1].xyz, vViewPosition);
+            float occAboveFeet = smoothstep(uOccFox.w + 0.02, uOccFox.w + 0.20, occWorldY);
+            // Keep nearby uphill ground/stair treads as well as a flat floor.
+            // Use the standard unperturbed normal (flat and smooth materials).
+            float occUp = smoothstep(0.65, 0.80, dot(viewMatrix[1].xyz, normal));
+            float occStepFloor = 1.0 - smoothstep(uOccFox.w + 0.45, uOccFox.w + 0.65, occWorldY);
+            occAboveFeet *= 1.0 - occUp * occStepFloor;
+            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear) * occAboveFeet;
+            // Stable one-pixel threshold; no coarse repeating checker or
+            // temporal jitter in the SMAA pipeline (which has no TAA history).
+            float occB = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
             if (occB < occCut) discard; // clear the hero completely; keep a dithered outer edge
           }`,
         );
@@ -212,7 +219,7 @@ export function createOcclusionFader(
       const pad = size.y * 0.03;
       uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 1.05 + pad), Math.max(size.y * 0.05, (y1 - y0) * 1.05 + pad));
       const depth = chest.applyMatrix4(camera.matrixWorldInverse).z * -1;
-      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, 1);
+      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, foxPos.y);
     },
   };
 }

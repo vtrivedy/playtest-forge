@@ -17,8 +17,6 @@ export type RendererOptions = {
   shadowMapSize?: number;
   /** Backbuffer pixel-ratio cap (quality tier); default 2 */
   pixelRatio?: number;
-  /** PCFSoft vs PCF shadow filtering */
-  softShadows?: boolean;
 };
 
 /**
@@ -65,7 +63,7 @@ export async function createForgeRenderer(opts: RendererOptions = {}): Promise<F
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = opts.exposure ?? 1.05;
   renderer.shadowMap.enabled = opts.shadows !== false;
-  renderer.shadowMap.type = opts.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   container.appendChild(renderer.domElement);
 
   return {
