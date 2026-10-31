@@ -13,6 +13,7 @@ type Gait = keyof typeof GAITS;
 const CARRIAGE_SIGN = -1;
 
 
+const BRACE_CLIPS = ['skid'];
 const GAIT_NAMES = Object.keys(GAITS) as Gait[];
 /** Speed each gait's designed cadence is quoted at (gait-gym bands). */
 const CADENCE_REF: Record<Gait, number> = { walk: 1.5, trot: 3.8, run: 9 };
@@ -95,6 +96,9 @@ export class AuthoredLocomotion {
   /** Each gait clip split into body + four legs so every leg can run its own warped clip time. */
   private parts = new Map<Gait, GaitParts>();
   private bobBones: THREE.Object3D[] = [];
+  /** Braced clips split body/legs: legs cross in ~2 frames (blending a folded gallop leg toward a brace flings it up), body eases. */
+  private brace = new Map<string, { body: THREE.AnimationAction; legs: THREE.AnimationAction[] }>();
+  private legWeights = new Map<string, number>();
   private flexBones: THREE.Object3D[] = [];
   /** Stance time / authored stance time per gait: < 1 compresses stance and lengthens the swing. */
   private stanceRatio: Record<Gait, number> = { walk: 1, trot: 1, run: 1 };
@@ -188,6 +192,15 @@ export class AuthoredLocomotion {
         flexMean: this.flexBones.map(b=>new THREE.Quaternion().fromArray(sample(b.name,'quaternion')).normalize()),
       });
     }
+    for(const name of BRACE_CLIPS) {
+      const source=this.actions.get(name);
+      if(!source)continue;
+      const clip=source.getClip(), mixer=source.getMixer();
+      this.brace.set(name,{
+        body: mixer.clipAction(new THREE.AnimationClip(`${name}_body`,clip.duration,clip.tracks.filter(t=>!legBones.has(boneOf(t))))),
+        legs: legs.map((names,i)=>mixer.clipAction(new THREE.AnimationClip(`${name}_leg${i}`,clip.duration,clip.tracks.filter(t=>names.includes(boneOf(t)))))),
+      });
+    }
   }
   private hz(gait: Gait) { return gait==='walk' ? this.params.walkHz : gait==='trot' ? this.params.trotHz : this.params.gallopHz; }
   /** Undo last frame's additive layer before the mixer supplies the next authored pose. */
@@ -234,10 +247,22 @@ export class AuthoredLocomotion {
       action.setEffectiveTimeScale(0);
     };
     this.tuck.fill(0); this.swingProgress.fill(0);
+    const bracing=this.brace.has(active) || [...this.brace.keys()].some(n=>(this.legWeights.get(n) ?? 0)>.01);
+    const legAlpha=bracing ? 1-Math.exp(-4*dt/.02) : alpha;
     for(const [name,action] of this.actions) {
       const target=locomoting ? (weights[name as Gait] ?? 0) : name===active ? 1 : 0;
       const weight=THREE.MathUtils.lerp(this.weights.get(name) ?? 0,target,alpha);
       this.weights.set(name,weight);
+      const legWeight=THREE.MathUtils.lerp(this.legWeights.get(name) ?? 0,target,legAlpha);
+      this.legWeights.set(name,legWeight);
+      const brace=this.brace.get(name);
+      if(brace) {
+        // The source keeps its clock (one-shot clamp) at zero weight; its splits play at that time.
+        drive(action,0);
+        drive(brace.body,weight,action.time);
+        for(const leg of brace.legs)drive(leg,legWeight,action.time);
+        continue;
+      }
       const parts=this.parts.get(name as Gait);
       if(!parts) { drive(action,weight); continue; }
       // The whole clip never plays; its body and per-leg splits do.
@@ -259,7 +284,7 @@ export class AuthoredLocomotion {
           if(locomoting)this.tuck[i]+=weight*Math.sin(Math.PI*sw)*(1-this.stanceRatio[gait]);
           this.swingProgress[i]+=weight*sw;
         }
-        drive(parts.legs[i],weight,((contact.phase+local)%1)*duration);
+        drive(parts.legs[i],legWeight,((contact.phase+local)%1)*duration);
       });
     }
     if (this.lastGait!==dominant) { for(const foot of this.feet)foot.planted=false; this.lastGait=dominant; }
