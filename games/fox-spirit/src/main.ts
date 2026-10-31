@@ -367,6 +367,7 @@ async function boot() {
     folder.add(params, 'rootBank', 0, 1, .05);
     folder.add(params, 'turnPlant', 0, 1.5, .05);
     folder.add(params, 'gallopHeadHold', 0, 1.5, .05);
+    folder.add(params, 'suspensionLift', 0, .12, .005);
     folder.add(params, 'tailLag', 0, .3, .01);
     folder.add(params, 'pelvisBank', 0, 1, .05);
     folder.add(params, 'headRollStabilize', 0, 1, .05);

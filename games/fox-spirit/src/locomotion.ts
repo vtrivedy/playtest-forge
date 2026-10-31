@@ -40,9 +40,9 @@ export class AuthoredLocomotion {
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     headHold: 1.2, gallopHeadHold: .8, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .20, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, brakeSquat: .04, brakePitch: .09, landSquash: .20, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
-    earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
+    earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
     padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; correction: THREE.Vector3; strength: number; replantTime: number; releaseCorrection: THREE.Vector3; releaseProgress: number; phaseRelease: boolean; dot: THREE.Mesh }[] = [];
@@ -386,6 +386,22 @@ export class AuthoredLocomotion {
       this.root.updateWorldMatrix(true,true);
     }
   }
+  /** Gallop flight: carry the body up through each authored zero-support window (gathered and extended), so the
+   * legs fold under a rising body instead of crowding a level one. Zero at every touchdown and lift-off. */
+  private suspension() {
+    const run=this.weights.get('run') ?? 0;
+    if(!this.input.grounded || run<1e-3 || this.params.suspensionLift<=0)return 0;
+    const intervals=GAITS.run.contacts.map(c=>[c.phase,c.phase+c.duty*this.stanceRatio.run] as [number,number]).sort((a,b)=>a[0]-b[0]);
+    let lift=0;
+    intervals.forEach(([,end],k)=>{
+      const covered=intervals.reduce((e,[s0,e0])=>s0<=e+1e-6 && e0>e ? e0 : e,end);
+      const next=k+1<intervals.length ? intervals[k+1][0] : intervals[0][0]+1;
+      if(next<=covered)return;
+      const t=((this.phase-covered)%1+1)%1/(next-covered);
+      if(t<1)lift=Math.max(lift,Math.sin(Math.PI*t));
+    });
+    return lift*this.params.suspensionLift*run;
+  }
   /** Pitch of a bone's +Y in the world (chain bones point toward their child along +Y). */
   private static pitchOf(bone:THREE.Object3D) {
     const d=new THREE.Vector3(0,1,0).applyQuaternion(bone.getWorldQuaternion(q()));
@@ -466,7 +482,9 @@ export class AuthoredLocomotion {
     const crouch=THREE.MathUtils.smoothstep(this.input.crouch ?? 0,0,1)*(1-THREE.MathUtils.smoothstep(this.input.speed,1,3));
     this.metrics.windupLoad=crouch;
     this.metrics.windupActive=this.input.grounded && active==='jump_up' && (this.input.crouch ?? 0)>0;
-    this.root.position.y+=this.terrainOffset+landOffset-this.brake*this.params.brakeSquat-crouch*this.params.takeoffCrouch;
+    const suspension=this.suspension();
+    this.metrics.suspension=suspension;
+    this.root.position.y+=this.terrainOffset+landOffset+suspension-this.brake*this.params.brakeSquat-crouch*this.params.takeoffCrouch;
     // Radians per meter of compression: shoulders lead the landing load.
     const landingPitch=Math.max(0,-landOffset)*this.params.landPitch;
     this.metrics.landPitch=landingPitch;

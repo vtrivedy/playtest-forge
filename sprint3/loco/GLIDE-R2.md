@@ -42,3 +42,8 @@ Walk pivot (1.62 m/s) and every straight gait unchanged (cadence 1.85/2.15/2.40,
   stance metrics identical to the snap version (residual p95 0/3/0 mm). New metric `maxTouchdownShift`.
 - Windup accelerating out of a standing gather now shortens (never lengthens).
 - Rejected: buffer-latch concern (latch only runs at windup completion; reset clears windupT). Ground sample at the shifted anchor: ≤.16 m XZ, accepted.
+
+## Gallop suspension (suspensionLift .04)
+Root lift = sin envelope over each authored zero-support window of the run gait (gathered .72–1.0 and extended .27–.46 at 9 m/s),
+× run weight, grounded only. CPU (tools/loco-suspension-probe.ts): 9 m/s pelvis no longer sinks to its 59 cm low through the gather
+(peaks ~65 cm mid-flight), stance residual 12.9 mm and slide .78 m/s unchanged; zero at every touchdown/lift-off.
