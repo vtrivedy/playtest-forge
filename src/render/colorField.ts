@@ -507,6 +507,7 @@ export class ColorField {
     }
   }
 
+  /** RG provenance mask: red = all sources, green = permanent/glow or strong-stroke protected color. */
   getMaskTexture(): THREE.Texture | null {
     return this.maskRT?.texture ?? null;
   }
@@ -598,6 +599,7 @@ export class ColorField {
           }
 
           float colorMaskAt(vec3 p) {
+            float temporaryVisibility = temporaryVisibilityAt(p);
             float s = uGlobalColor;
             cfRim = 0.0;
             cfPermanent = uGlobalColor;
@@ -608,7 +610,7 @@ export class ColorField {
               );
               if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
                 vec2 sources = texture2D(uMaskMap, uv).rg;
-                s = max(s, max(sources.r * temporaryVisibilityAt(p), sources.g));
+                s = max(s, max(sources.r * temporaryVisibility, sources.g));
               }
             }
             // analytic restores with ink-bleed edge
@@ -632,7 +634,7 @@ export class ColorField {
             float an = (noise21(p.xz * 0.6) - 0.5) * 0.35 + (noise21(p.xz * 2.3) - 0.5) * 0.15;
             float ad = distance(p, uFox) / uAura + an;
             float af = 1.0 - smoothstep(0.15, 1.0, ad);
-            s = max(s, af * af * temporaryVisibilityAt(p));
+            s = max(s, af * af * temporaryVisibility);
             // the mask RT already carries the trail; the analytic loop is the no-RT fallback
             for (int i = 0; i < 24; i++) {
               if (i >= uTrailCount || uUseMaskMap > 0.5) break;
@@ -640,7 +642,7 @@ export class ColorField {
               float life = uTrail[i*4+3];
               float td = distance(p, tp);
               float fall = 1.0 - clamp(td / uTrailRadius, 0.0, 1.0);
-              s = max(s, fall * fall * (life / uTrailLife) * temporaryVisibilityAt(p));
+              s = max(s, fall * fall * (life / uTrailLife) * temporaryVisibility);
             }
             return clamp(s, 0.0, 1.0);
           }
