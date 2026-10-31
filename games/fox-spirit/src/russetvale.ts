@@ -271,6 +271,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   scene.add(group);
   const r = rng(20261030);
   const waterVisuals: ReturnType<typeof createStylizedWater>[] = [];
+  const wadingFeet = new THREE.Vector3();
 
   const terrainY = (x: number, z: number) => (insideIsland(x, z) ? groundRaw(x, z) : -1000);
   const col = new CollisionWorld(terrainY);
@@ -2518,7 +2519,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
-      for (const water of waterVisuals) water.update(t);
+      wadingFeet.set(fox.x, feetY, fox.z);
+      for (const water of waterVisuals) water.update(t, water === pond ? wadingFeet : undefined);
       inkTime.value = t;
       const ev: RealmEvent[] = [];
       if (reedRegion.visit(fox, feetY)) ev.push({ type: 'page', id: 'reed-ruin' });
