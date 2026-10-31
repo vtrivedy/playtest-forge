@@ -118,7 +118,7 @@ console.log('PASS: remote celebration rejected, local idle shot retained, runnin
 // filling the image with the fox's torso. Compare minimum-distance variations
 // on identical CPU geometry; these metrics are not visual acceptance.
 const terrainVariations = [];
-for (const minDistance of [2.2, 2.6, 3.0]) {
+for (const minDistance of [0, 2.2, 2.6, 3.0]) {
   const stair = createFollowCamera({ params: { minDistance }, surfaceAt: (_x, z) => z > 0.5 ? 2 : 0 });
   stair.resize(1280, 720);
   for (let i = 0; i < 120; i++) stair.update(1 / 60, { ...idleFrame, target: new THREE.Vector3() });
@@ -126,8 +126,17 @@ for (const minDistance of [2.2, 2.6, 3.0]) {
   const horizontal = Math.hypot(pos.x, pos.z);
   assert.ok(horizontal > minDistance * 0.8, 'terrain fallback preserves horizontal body room');
   assert.ok(pos.y >= 2, 'readability floor retains the final ground clearance');
-  assert.equal(stair.debug.blocked(), true, 'unresolved terrain requests a cutout');
+  if (minDistance > 0) assert.equal(stair.debug.blocked(), true, 'unresolved terrain requests a cutout');
   assert.ok(stair.camera.projectionMatrix.elements.every(Number.isFinite));
-  terrainVariations.push({ minDistance, horizontal: +horizontal.toFixed(3), height: +pos.y.toFixed(3), cutout: stair.debug.blocked() });
+  const feetNdc = new THREE.Vector3().project(stair.camera).y;
+  const earsNdc = new THREE.Vector3(0, 1.25, 0).project(stair.camera).y;
+  const direction = stair.camera.getWorldDirection(new THREE.Vector3());
+  const pitch = THREE.MathUtils.radToDeg(Math.atan2(-direction.y, Math.hypot(direction.x, direction.z)));
+  if (minDistance >= 2.6) {
+    assert.ok(pitch < 40, 'selected terrain fallback avoids a steep overhead view');
+    assert.ok(Math.abs(feetNdc) < 0.92 && Math.abs(earsNdc) < 0.92, 'ears and feet remain inside the safe vertical frame');
+  }
+  terrainVariations.push({ minDistance, horizontal: +horizontal.toFixed(3), height: +pos.y.toFixed(3), pitch: +pitch.toFixed(2),
+    feetNdc: +feetNdc.toFixed(3), earsNdc: +earsNdc.toFixed(3), cutout: stair.debug.blocked() });
 }
 console.log('Terrain boom CPU variations:', JSON.stringify(terrainVariations));
