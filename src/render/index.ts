@@ -9,35 +9,26 @@ export { createForgeRenderer } from './forgeRenderer';
 export type { ForgeRenderer, RendererOptions } from './forgeRenderer';
 
 export { ColorField, PaintLayer, createColorField } from './colorField';
-export type { ColorFieldOptions, RestoreOptions, RestoreRegion, TrailSample, PaintTuning } from './colorField';
+export type { RestoreRegion } from './colorField';
 
 export { createPostStack } from './postStack';
-export type { PostStack, PostStackOptions, GradeParams } from './postStack';
+export type { PostStack } from './postStack';
 
-export { detectQuality, probeGpu } from './quality';
-export type { QualityTier, QualitySettings } from './quality';
+export { detectQuality } from './quality';
 
 export { createPaintedSky, applyLookdevLights } from './sky';
-export type { PaintedSky, SkyParams } from './sky';
+export type { PaintedSky } from './sky';
 
 export { applyHeightFog, syncFog, matchFogToSky } from './atmosphere';
 export type { HeightFogParams } from './atmosphere';
 
 export { createDistantLand } from './distantLand';
-export type { DistantLand, DistantLandOptions } from './distantLand';
 
 export { createStylizedWater } from './water';
-export type { StylizedWater } from './water';
-
-export { createWindGrass, createStylizedTree, createMapleTree } from './foliage';
-export type { WindFoliage } from './foliage';
-
-export { createFoxWisps } from './wisps';
-export type { FoxWisps } from './wisps';
 
 export { createAutumnParticles } from './leaves';
-export type { AutumnParticles, AutumnParticleOptions } from './leaves';
+export type { AutumnParticles } from './leaves';
 
 export { createEmberMotes } from './emberMotes';
 export { createPaintSprouts } from './paintSprouts';
-export type { EmberMotes, EmberBurstOptions } from './emberMotes';
+export type { EmberMotes } from './emberMotes';

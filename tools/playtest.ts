@@ -20,12 +20,12 @@ function arg(name: string, fallback?: string): string | undefined {
   return fallback;
 }
 
-const game = arg('game', 'creature-island')!;
+const game = arg('game', 'fox-spirit')!;
 const seconds = Number(arg('seconds', '25'));
 const outDir = path.resolve(arg('out', path.join(root, 'playtest-output', game))!);
-const port = Number(arg('port', '5173'));
+const port = Number(arg('port', '5180'));
 const urlOverride = arg('url');
-const scriptName = arg('script', game.includes('fox') ? 'shrine' : 'wander')!;
+const scriptName = arg('script', 'shrine')!;
 fs.mkdirSync(outDir, { recursive: true });
 
 type Step = { down: string[]; ms: number; tap?: boolean };

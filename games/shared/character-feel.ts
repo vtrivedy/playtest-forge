@@ -1,5 +1,3 @@
-import GUI from 'lil-gui';
-
 export type FeelParams = {
   moveSpeed: number;
   accel: number;
@@ -49,8 +47,6 @@ export const PRESET_BRISK: FeelParams = {
   coyoteTime: 0.08,
   jumpBuffer: 0.1,
 };
-
-export const DEFAULT_FEEL: FeelParams = { ...PRESET_SPRING };
 
 export type FeelMetrics = {
   lastJumpApex: number;
@@ -154,28 +150,4 @@ export class JumpFeel {
     }
     return velY;
   }
-}
-
-export function createFeelPanel(params: FeelParams, onChange?: () => void): GUI {
-  const gui = new GUI({ title: 'Character Feel' });
-  const apply = (p: FeelParams) => {
-    Object.assign(params, p);
-    onChange?.();
-  };
-  gui.add({ spring: () => apply(PRESET_SPRING) }, 'spring');
-  gui.add({ brisk: () => apply(PRESET_BRISK) }, 'brisk');
-  gui.add(params, 'moveSpeed', 2, 20, 0.1).onChange(() => onChange?.()).listen();
-  gui.add(params, 'accel', 5, 60, 0.5).onChange(() => onChange?.()).listen();
-  gui.add(params, 'turnRate', 1, 20, 0.1).onChange(() => onChange?.()).listen();
-  gui.add(params, 'jumpVelocity', 4, 18, 0.1).onChange(() => onChange?.()).listen();
-  gui.add(params, 'jumpCut', 0.1, 1, 0.01).onChange(() => onChange?.()).listen();
-  gui.add(params, 'gravity', 8, 40, 0.5).onChange(() => onChange?.()).listen();
-  gui.add(params, 'airControl', 0, 1, 0.01).onChange(() => onChange?.()).listen();
-  gui.add(params, 'glideGravityScale', 0.05, 1, 0.01).onChange(() => onChange?.()).listen();
-  gui.add(params, 'glideDrag', 0, 6, 0.05).onChange(() => onChange?.()).listen();
-  gui.add(params, 'dashSpeed', 8, 40, 0.5).onChange(() => onChange?.()).listen();
-  gui.add(params, 'dashDuration', 0.05, 0.6, 0.01).onChange(() => onChange?.()).listen();
-  gui.add(params, 'coyoteTime', 0, 0.25, 0.01).onChange(() => onChange?.()).listen();
-  gui.add(params, 'jumpBuffer', 0, 0.25, 0.01).onChange(() => onChange?.()).listen();
-  return gui;
 }

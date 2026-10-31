@@ -60,7 +60,7 @@ Activate the shrine. Gems optional path juice.
 ## Verify
 - `node tools/feel-capture.mjs --mode framing|presets|honest|moments|shots|video` → playtest-output/fox-spirit/feel/
   (manual 60 Hz clock; every output labelled UNASSISTED or STAGED)
-- `npm run playtest:fox` → playtest-output/fox-spirit/ (`metrics.json` splits unassisted vs staged)
+- `npm run playtest` → playtest-output/fox-spirit/ (`metrics.json` splits unassisted vs staged)
 
 ## Audio — procedural autumn pass
 One WebAudio graph in `src/audio/`: lazy user-gesture unlock, smoothed master volume,

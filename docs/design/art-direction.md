@@ -14,7 +14,7 @@
 
 Source copies: `assets/concept/world-keyart.jpg`, `assets/concept/fox-turnaround.jpg`, `assets/concept/ART_LOCK.md`.
 Companion docs: [`game-design.md`](game-design.md) (rules, numbers), [`world-1.md`](world-1.md) (Russetvale layout), [`story.md`](story.md) (The Keeping).
-Lookdev code: `src/render/` (ColorField, sky, post stack, wisps). Showcase: `games/lookdev/`.
+Lookdev code: `src/render/` (ColorField, sky, post stack, ember motes). Showcase: `games/fox-spirit/`.
 
 ### Open questions (Vivek)
 
