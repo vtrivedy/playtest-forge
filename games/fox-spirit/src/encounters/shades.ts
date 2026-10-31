@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { touchShade } from './contact';
 import { heroSoftUniforms, HERO_SOFT_VERTEX, HERO_SOFT_FRAGMENT } from '../cameraSoftOcclusion';
 import type GUI from 'lil-gui';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -351,31 +352,6 @@ function poolMaterial(): THREE.ShaderMaterial {
   });
 }
 
-/** Intersect the swept feet segment with the authored vertical animal hit cylinder. */
-function crossesShade(from:THREE.Vector3,to:THREE.Vector3,origin:THREE.Vector3,radius:number):boolean {
-  const x=from.x-origin.x,z=from.z-origin.z,dx=to.x-from.x,dz=to.z-from.z;
-  const a=dx*dx+dz*dz,c=x*x+z*z-radius*radius;
-  let enter=0,exit=1;
-  if(a<1e-12){
-    if(c>=0)return false;
-  }else{
-    const b=2*(x*dx+z*dz),discriminant=b*b-4*a*c;
-    if(discriminant<=0)return false;
-    const root=Math.sqrt(discriminant);
-    enter=Math.max(enter,(-b-root)/(2*a));
-    exit=Math.min(exit,(-b+root)/(2*a));
-  }
-  const y=from.y-origin.y,dy=to.y-from.y;
-  if(Math.abs(dy)<1e-12){
-    if(y<=-.5||y>=3.2)return false;
-  }else{
-    const bottom=(-.5-y)/dy,top=(3.2-y)/dy;
-    enter=Math.max(enter,Math.min(bottom,top));
-    exit=Math.min(exit,Math.max(bottom,top));
-  }
-  return enter<exit;
-}
-
 export type ShadeState = { id: string; pos: number[]; freed: boolean; mode: ShadeActor['mode']; presence: number; smokeParticles: number; notice: number; noticeYaw: number; heading: number; releaseAge: number; leaves: number; attractionRest: number; height: number };
 
 export type ShadeSystem = {
@@ -574,15 +550,13 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           if (Number.isFinite(gy) && Math.abs(gy - s.pos.y) < 1) s.pos.y = gy;
           // Sweep the fox segment so a fast dash cannot skip a narrow animal between frames.
           // Teleport/reset hooks explicitly clear the previous endpoint.
-          if (crossesShade(previousFox??fox,fox,s.pos,tun.hitRadius+(dashing ? 0.5 : 0))) {
-            if (dashing) {
-              s.freed = true;
-              s.mode = 'released';
-              s.releaseAge = 0;
-              s.releaseStart = t;
-              ev.push({ type: 'freed', id: s.id, pos: s.pos.clone().setY(s.pos.y + 1.5) });
-            } else ev.push({ type: 'hit', id: s.id, pos: s.pos.clone() });
-          }
+          const touch = touchShade(s, previousFox??fox, fox, s.pos, tun.hitRadius, dashing);
+          if (touch === 'freed') {
+            s.mode = 'released';
+            s.releaseAge = 0;
+            s.releaseStart = t;
+            ev.push({ type: 'freed', id: s.id, pos: s.pos.clone().setY(s.pos.y + 1.5) });
+          } else if (touch === 'hit') ev.push({ type: 'hit', id: s.id, pos: s.pos.clone() });
         }
         s.debug.visible = tun.debug && !s.freed;
         const ring = s.debug.children[1]!;

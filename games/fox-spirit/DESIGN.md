@@ -98,7 +98,10 @@ weak temporary supply; fresh dash strokes and permanent restoration still win.
 Contact costs one of three wisps, grants one second of grace and pushes the fox
 3 m over a short eased impulse, through the existing wall checks. Dash through
 the silhouette to free it permanently: ink breaks into falling leaves whose
-sepia warms to copper and russet. No explosion, score pickup or respawn.
+sepia warms to copper and russet. No explosion, score pickup or respawn. The dash
+passes through with no knockback; its post-dash skid (≤ 0.2 s, still > 1.25× run
+speed) also counts, and a dash cancels any knockback still in flight. Each Shade
+frees exactly once (`tools/tests/shade-dash.ts`).
 
 Expose patrol speed (2.2 m/s), bob (0.3 m), hit/drain radii, release timing,
 knockback distance and invulnerability in lil-gui. Debug spline and drain off by

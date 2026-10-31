@@ -1,5 +1,49 @@
 import * as THREE from 'three';
 
+/** Extra sweep reach while a dash is live, so a fast pass cannot graze past the animal. */
+export const DASH_REACH = 0.5;
+/** After the dash timer runs out its momentum still carries the fox ~3 m; that skid keeps dash contact. */
+export const DASH_CARRY = 0.2;
+const DASH_CARRY_SPEED = 1.25;
+
+/** Dash contact: the dash tick itself, or its post-dash skid while still faster than a run. */
+export function dashContact(wasDashing: boolean, dashT: number, speed: number, cruise: number): boolean {
+  return wasDashing || (dashT > -DASH_CARRY && speed > cruise * DASH_CARRY_SPEED);
+}
+
+/** Intersect the swept feet segment with the authored vertical animal hit cylinder. */
+export function crossesShade(from: THREE.Vector3, to: THREE.Vector3, origin: THREE.Vector3, radius: number): boolean {
+  const x = from.x - origin.x, z = from.z - origin.z, dx = to.x - from.x, dz = to.z - from.z;
+  const a = dx * dx + dz * dz, c = x * x + z * z - radius * radius;
+  let enter = 0, exit = 1;
+  if (a < 1e-12) {
+    if (c >= 0) return false;
+  } else {
+    const b = 2 * (x * dx + z * dz), discriminant = b * b - 4 * a * c;
+    if (discriminant <= 0) return false;
+    const root = Math.sqrt(discriminant);
+    enter = Math.max(enter, (-b - root) / (2 * a));
+    exit = Math.min(exit, (-b + root) / (2 * a));
+  }
+  const y = from.y - origin.y, dy = to.y - from.y;
+  if (Math.abs(dy) < 1e-12) {
+    if (y <= -.5 || y >= 3.2) return false;
+  } else {
+    const bottom = (-.5 - y) / dy, top = (3.2 - y) / dy;
+    enter = Math.max(enter, Math.min(bottom, top));
+    exit = Math.min(exit, Math.max(bottom, top));
+  }
+  return enter < exit;
+}
+
+/** One fox sweep against one Shade: a dash crossing frees it exactly once; plain contact hits. */
+export function touchShade(shade: { freed: boolean }, from: THREE.Vector3, to: THREE.Vector3, origin: THREE.Vector3, hitRadius: number, dashing: boolean): 'freed' | 'hit' | null {
+  if (shade.freed || !crossesShade(from, to, origin, hitRadius + (dashing ? DASH_REACH : 0))) return null;
+  if (!dashing) return 'hit';
+  shade.freed = true;
+  return 'freed';
+}
+
 /** Encounter-owned displacement: wall checked by the caller; never changes movement tuning. */
 export class ShadeContact {
   wisps = 3;
@@ -41,6 +85,9 @@ export class ShadeContact {
     this.left = Math.max(0, this.left - distance);
     if (next >= 1) this.left = 0;
   }
+
+  /** A dash overrides any knockback still in flight: nothing pushes the fox while it dashes. */
+  cancelKnockback() { this.left = 0; }
 
   respawn() { this.wisps = 3; this.left = 0; this.invulnerable = 1; }
   state() {

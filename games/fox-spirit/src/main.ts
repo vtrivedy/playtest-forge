@@ -1,7 +1,7 @@
 import { HUB_PRACTICAL } from './regionLanternhollow';
 import { createWind, type WindForce } from './chem/wind';
 import { createShades } from './encounters/shades';
-import { ShadeContact } from './encounters/contact';
+import { ShadeContact, dashContact } from './encounters/contact';
 import { createWater } from './chem/water';
 import * as THREE from 'three';
 import GUI from 'lil-gui';
@@ -1441,6 +1441,7 @@ async function boot() {
         vel.y = Math.max(vel.y, 0);
       }
       dashFrom.copy(fox.position);
+      shadeContact.cancelKnockback();
       // the dash is the brush: a 6 s strong colour stroke along its path (world-1.md §1.1)
       dashStroke = colorField.stroke(fox.position.clone().setY(fox.position.y + 0.25), fox.position.clone().setY(fox.position.y + 0.25), { life: DASH_STROKE.life, strength: DASH_STROKE.strength, radius: DASH_STROKE.radius });
       feelMetrics.dashesUsed += 1;
@@ -1452,7 +1453,6 @@ async function boot() {
       keys.delete('ShiftRight');
     }
     const wasDashing = dashT > 0;
-    dashContactActive = wasDashing;
     dashT -= dt;
     const dashing = dashT > 0;
     if (wasDashing && !dashing) jumpStats.lastDashDist = Number(Math.hypot(fox.position.x - dashFrom.x, fox.position.z - dashFrom.z).toFixed(2));
@@ -1597,6 +1597,8 @@ async function boot() {
       if (safe(fox.position.x, fox.position.z + dz)) fox.position.z += dz;
       return Math.hypot(fox.position.x - beforeX, fox.position.z - beforeZ);
     });
+    // The dash and its skid pass through a Shade and free it; only plain contact knocks back.
+    dashContactActive = dashContact(wasDashing, dashT, Math.hypot(vel.x, vel.z), feel.moveSpeed);
     for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashContactActive)) {
       if (e.type === 'freed') {
         shadeContact.frees++;
