@@ -86,7 +86,7 @@ export type RealmEvent =
 export type Realm = {
   group: THREE.Group;
   updateHubVisuals: (time: number, dusk: number) => void;
-  hubState: () => { well: number; porch: number; plaza: number };
+  hubState: () => { well: number; porch: number; plaza: number; hearth: number };
   materials: THREE.MeshStandardMaterial[];
   collision: CollisionWorld;
   terrainY: (x: number, z: number) => number;

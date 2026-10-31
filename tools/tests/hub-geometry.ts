@@ -23,16 +23,18 @@ try {
 }
 // Practical lights stay allocated while the spatial mood fades their intensity.
 const practicals = group.children.filter((o): o is THREE.PointLight => (o as THREE.PointLight).isPointLight);
-assert.equal(practicals.length, 3);
+assert.equal(practicals.length, 4);
 hub.update(1, 1);
 assert.ok(hub.state().well > 0 && hub.state().porch > 0);
 assert.equal(hub.state().well, practicals[0].intensity);
 assert.equal(hub.state().porch, practicals[1].intensity);
 assert.equal(hub.state().plaza, practicals[2].intensity);
+assert.equal(hub.state().hearth, practicals[3].intensity);
 hub.update(2, 0);
 assert.equal(hub.state().well, 0);
 assert.equal(hub.state().porch, 0);
 assert.equal(hub.state().plaza, 0);
+assert.equal(hub.state().hearth, 0);
 for (const [x,z] of HUB_FESTOON_POSTS) assert.ok(hubPathDistance(x,z) >= 2.3, `Festoon post crowds path: ${x},${z}`);
 for (const p of hub.festoon.pendants) assert.ok(p.bottom >= p.ground + 3, 'Pendant must clear jumping fox');
 assert.ok(practicals.every(light => light.visible), 'fading must not change shader light count');
@@ -98,7 +100,25 @@ for(const [ax,az,bx,bz] of HUB_PATHS) {
   const steps=Math.ceil(Math.hypot(bx-ax,bz-az)*10);
   for(let i=0;i<=steps;i++){
     const x=ax+(bx-ax)*i/steps,z=az+(bz-az)*i/steps;
-    for(const c of col.colliders)if(['hub-cottage','hub-bench','hub-well','hub-pulley-post','hub-woodpile','hub-festoon-post','hub-market'].includes(c.tag ?? '') && colliderTopAt(c,x,z,.4)!==null)throw Error(`Path clips ${c.tag} at ${x},${z}`);
+    for(const c of col.colliders)if(['hub-cottage','hub-bench','hub-well','hub-pulley-post','hub-woodpile','hub-festoon-post','hub-market','hub-cooking-ring','hub-cooking-pot'].includes(c.tag ?? '') && colliderTopAt(c,x,z,.4)!==null)throw Error(`Path clips ${c.tag} at ${x},${z}`);
   }
 }
 console.log(JSON.stringify({arrivalRouteSweepSamples:routeSweeps,smokeCameraFreeProbes:smokeProbes,pathSegmentsClear:HUB_PATHS.length,roofStrips:HUB_HOUSES.length*12,maxMeshColliderError:maxError,routePointsClear:8,colliders:col.colliders.length,vertices:Object.values(b).reduce((n,k)=>n+k.vertexCount,0)},null,2));
+
+// The live arrival clip follows this diagonal through the real controller.
+for (let i = 0; i <= 100; i++) {
+  const x = -5.15*i/100, z = 94-5.44*i/100;
+  for (const c of col.colliders) assert.equal(colliderTopAt(c,x,z,.55), null, `Live arrival clips ${c.tag}`);
+}
+assert.equal(group.children.filter(o => o.name.startsWith('hub-cooking-flame-') && o.userData.forgeSkipAO).length, 3);
+
+const cookingFlames = group.children.filter(o => o.name.startsWith('hub-cooking-flame-'));
+for (let i = 0; i < 180; i++) {
+  hub.update(i / 17, 1);
+  for (const flame of cookingFlames) {
+    const bounds = new THREE.Box3().setFromObject(flame);
+    assert.ok(bounds.max.y < .38, `Cooking flame intersects pot: ${bounds.max.y}`);
+    assert.ok(bounds.min.y >= .06, 'Cooking flame sinks below ash bed');
+  }
+}
+console.log('Cooking fire animated bounds PASS: 540 mesh poses stay below pot and above ash bed.');

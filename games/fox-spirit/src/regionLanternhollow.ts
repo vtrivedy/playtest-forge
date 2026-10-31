@@ -34,7 +34,7 @@ export function hubPathDistance(x: number, z: number): number {
 
 /** Exclude random vegetation/rocks from doorsteps, the well and new paths. */
 export function hubClearance(x: number, z: number): boolean {
-  return Math.hypot(x + 23.6, z - 85.2) < 1.2 || Math.hypot(x + 22.4, z - 85.1) < 1 || HUB_FESTOON_POSTS.some(([px, pz]) => Math.hypot(x - px, z - pz) < .9) || Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
+  return Math.hypot(x + 5, z - 92) < 1.7 || Math.hypot(x + 23.6, z - 85.2) < 1.2 || Math.hypot(x + 22.4, z - 85.1) < 1 || HUB_FESTOON_POSTS.some(([px, pz]) => Math.hypot(x - px, z - pz) < .9) || Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
     HUB_HOUSES.some(h => Math.abs(x - h.x) < h.w / 2 + 1.2 && Math.abs(z - h.z) < h.d / 2 + 1.2);
 }
 
@@ -280,6 +280,49 @@ export function createLanternhollow(
   const plazaLight = new THREE.PointLight(0xffb665, 3, 6, 2);
   plazaLight.position.set(bounce.x, ground(bounce.x, bounce.z) + 2.5, bounce.z); parent.add(plazaLight);
 
+  // A communal cooking pot, distinct from the realm's tall traversal braziers.
+  const hx = -5, hz = 92, hy = ground(hx, hz);
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const g = new RoundedBoxGeometry(.32, .25, .24, 2, .035);
+    b.stone.add(g, trs(hx + Math.cos(a) * .5, hy + .125, hz + Math.sin(a) * .5, -a), PAL.stoneDark); g.dispose();
+  }
+  const ash = new THREE.CylinderGeometry(.4, .4, .06, 12);
+  b.dark.add(ash, trs(hx, hy + .05, hz), dark); ash.dispose();
+  const pot = new THREE.SphereGeometry(.3, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+  b.dark.add(pot, trs(hx, hy + .68, hz), dark); pot.dispose();
+  const lid = new THREE.CylinderGeometry(.31, .31, .04, 16);
+  b.dark.add(lid, trs(hx, hy + .7, hz), dark); lid.dispose();
+  box(b.dark, hx, hy + .745, hz, .13, .05, .07, dark);
+  for (const side of [-1, 1]) {
+    const handle = new THREE.TorusGeometry(.1, .025, 5, 12);
+    const m = new THREE.Matrix4().makeRotationY(Math.PI / 2); m.setPosition(hx + side * .32, hy + .63, hz);
+    b.dark.add(handle, m, dark); handle.dispose();
+  }
+  for (let i = 0; i < 3; i++) {
+    const a = i / 3 * Math.PI * 2;
+    const g = new THREE.CylinderGeometry(.025, .035, .58, 6);
+    b.dark.add(g, trs(hx + Math.cos(a) * .25, hy + .36, hz + Math.sin(a) * .25), dark); g.dispose();
+  }
+  col.add(cylCollider({ x: hx, z: hz, r: .67, top: hy + .25, bottom: hy - .1, tag: 'hub-cooking-ring' }));
+  col.add(cylCollider({ x: hx, z: hz, r: .45, top: hy + .77, bottom: hy + .25, tag: 'hub-cooking-pot' }));
+  const fireLight = new THREE.PointLight(0xffa653, 4, 5, 2);
+  fireLight.position.set(hx, hy + .7, hz); parent.add(fireLight);
+  const flameGeometry = new THREE.SphereGeometry(1, 10, 8);
+  const flamePos = flameGeometry.getAttribute('position');
+  for (let v = 0; v < flamePos.count; v++) {
+    const t = (flamePos.getY(v) + 1) * .5, taper = 1 - t * .75;
+    flamePos.setXYZ(v, flamePos.getX(v) * taper, t, flamePos.getZ(v) * taper);
+  }
+  const flameMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(2, .48, .06),
+    transparent: true, opacity: .28, depthWrite: false, blending: THREE.AdditiveBlending });
+  const flames = Array.from({ length: 3 }, (_, i) => {
+    const mesh = new THREE.Mesh(flameGeometry, flameMaterial);
+    mesh.name = `hub-cooking-flame-${i}`; mesh.userData.forgeSkipAO = true;
+    mesh.userData.cameraDecoration = true; mesh.raycast = () => {};
+    parent.add(mesh); return mesh;
+  });
+
   const by = ground(-10, 91);
   box(b.wood, -10, by + .72, 91, 2.2, .16, .7, PAL.wood);
   for (const dx of [-.85, .85]) box(b.wood, -10 + dx, by + .275, 91, .16, .85, .58, PAL.wood);
@@ -341,12 +384,19 @@ export function createLanternhollow(
   }
   return {
     festoon: { posts: endpoints, pendants },
-    state: () => ({ well: wellLight.intensity, porch: porchLight.intensity, plaza: plazaLight.intensity }),
+    state: () => ({ well: wellLight.intensity, porch: porchLight.intensity, plaza: plazaLight.intensity, hearth: fireLight.intensity }),
     update(time: number, dusk: number) {
     const flicker = 1 + Math.sin(time * 1.3) * .04;
     wellLight.intensity = 4 * dusk * flicker;
     porchLight.intensity = 3 * dusk * flicker;
     plazaLight.intensity = 3 * dusk * flicker;
+    fireLight.intensity = 4 * dusk * flicker;
+    for (const [i, flame] of flames.entries()) {
+      const phase = time * 2.2 + i * 2.1;
+      flame.position.set(hx + Math.cos(i * 2.1) * .16 + Math.sin(phase) * .018, hy + .12, hz + Math.sin(i * 2.1) * .16);
+      flame.scale.set(.14, .22 + Math.sin(phase * 1.3) * .025, .14);
+      flame.rotation.z = Math.sin(phase) * .09;
+    }
     for (const [i, puff] of smoke.entries()) {
       const age = (time / 4.5 + i / smoke.length) % 1;
       puff.position.set(chimney.x - 1.6 + age * 1.15 + Math.sin(age * 5 + i) * .08,
