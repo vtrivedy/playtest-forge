@@ -24,6 +24,7 @@ if modal.is_local():
         selected_module = Path(os.environ.get('FOX_CAPTURE_SCRIPT', str(capture_module))) if capture_module.name == 'gpu-capture.mjs' else capture_module
         image = image.add_local_file(selected_module, f'/opt/browser/{capture_module.name}')
 
+
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)
 def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds: int, backend: str, size: str, quality: str, fps: int, cube_only: bool, verbose: bool, route_from: int = 0, route_to: int = -1) -> dict:
@@ -34,6 +35,7 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
     def run(args, **kw):
         return subprocess.run(args, check=True, text=True, **kw)
     repo = None
+    proc = None
     try:
         # Modal can redeliver an input after an interrupted result acknowledgement.
         completed = out / 'run.json'
@@ -94,11 +96,11 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
                     'totalSeconds': round(time.monotonic()-started, 2)}
         (out / 'run.json').write_text(json.dumps(metadata, indent=2))
         return metadata
-    except Exception as exc:
+    except BaseException as exc:
         failure = {'error': str(exc), 'ref': ref, 'elapsedSeconds': round(time.monotonic() - started, 2)}
         (out / 'failure.json').write_text(json.dumps(failure, indent=2))
         if 'sha' in locals():
-            metadata = {**failure, 'status': 'failed', 'commit': sha, 'shots': shots, 'runId': run_id,
+            metadata = {**failure, 'status': 'failed' if isinstance(exc, Exception) else 'cancelled', 'commit': sha, 'shots': shots, 'runId': run_id,
                         'backend': backend, 'size': size, 'quality': quality, 'fps': fps,
                         'gpu': locals().get('gpu'), 'routeFrom': route_from, 'routeTo': route_to}
             report_file = out / 'report.json'
@@ -107,11 +109,16 @@ def capture(ref: str, shots: str, run_id: str, route_seconds: int, orbit_seconds
             (out / 'run.json').write_text(json.dumps(metadata, indent=2))
         raise
     finally:
+        if proc is not None and proc.poll() is None:
+            proc.kill()
+            proc.wait()
         if repo is not None:
             shutil.rmtree(repo, ignore_errors=True)
         archive = Path('/captures') / f'{run_id}.tar'
-        with tarfile.open(archive, 'w') as tar:
+        temporary_archive = archive.with_suffix('.tar.tmp')
+        with tarfile.open(temporary_archive, 'w') as tar:
             tar.add(out, arcname='.')
+        os.replace(temporary_archive, archive)
         results.commit()
 
 @app.local_entrypoint()
@@ -143,16 +150,26 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
             print(json.dumps(meta, indent=2))
         except Exception as exc:
             error = exc
-    target = destination / f'{run_id}.tar'
+    import tempfile, shutil
+    target = destination / f'{run_id}.tar.part'
     try:
         with target.open('wb') as f:
             for chunk in results.read_file(f'{run_id}.tar'):
                 f.write(chunk)
-        with tarfile.open(target) as tar:
-            tar.extractall(destination, filter='data')
+        with tempfile.TemporaryDirectory(prefix='fox-download-', dir=destination.parent) as temporary:
+            staging = Path(temporary)
+            with tarfile.open(target) as tar:
+                tar.getmembers()  # Validate the complete archive before publishing any evidence.
+                tar.extractall(staging, filter='data')
+            for item in staging.iterdir():
+                existing=destination/item.name
+                if existing.is_dir(): shutil.rmtree(existing)
+                elif existing.exists(): existing.unlink()
+                item.rename(existing)
         target.unlink()
+        (destination / '.download-complete').write_text(run_id + '\n')
         print(f'Downloaded results to {destination}', flush=True)
-    except Exception:
+    except BaseException:
         print(f'Recover with --fetch-only {run_id}', flush=True)
         raise
     if error:

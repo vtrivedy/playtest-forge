@@ -1,7 +1,7 @@
 import { createShadeLensReview } from './shade-lens-capture.mjs';
+import { captureReportSummary } from './capture-report-summary.mjs';
+import { blackFrameIntervals } from './hub-black-frames.mjs';
 import { captureFinale } from './finale-capture.mjs';
-import { captureWadeVisibility } from './water-wade-capture.mjs';
-import { projectedVisibilityReview } from './projected-visibility-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
@@ -14,8 +14,9 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
+import { pathToFileURL } from 'node:url';
 const arg = (k, d) => process.argv.includes(`--${k}`) ? process.argv[process.argv.indexOf(`--${k}`) + 1] : d;
 const repo = arg('repo', process.cwd()), out = arg('out', '/tmp/gpu-capture');
 const selected = arg('shots', 'all');
@@ -23,6 +24,8 @@ const backend = arg('backend', 'egl'), quality = arg('quality', 'high'), fps = N
 const [width, height] = arg('size', '1920x1080').split('x').map(Number);
 if (![30, 60].includes(fps) || ![width, height].every(n => Number.isInteger(n) && n > 0)) throw Error('Invalid size/fps');
 if (!['vulkan', 'egl', 'gl', 'swiftshader'].includes(backend)) throw Error('Unknown backend');
+// Compound hip diagnostics deliberately omit the long standard galleries.
+const hipDiagnostic = selected !== 'all' && selected.split(',').length === 2 && selected.split(',').includes('worldgait') && selected.split(',').includes('fox');
 const wants = k => selected === 'all' || selected.split(',').includes(k);
 fs.mkdirSync(out, { recursive: true });
 const save = (name, data) => fs.writeFileSync(path.join(out, name), JSON.stringify(data, null, 2));
@@ -59,6 +62,8 @@ const server = http.createServer((req, res) => {
 server.listen(5180, '127.0.0.1');
 await once(server, 'listening');
 const errors = [], log = [], report = { viewport: [width, height], fps, backend, quality, seed: 42, captureToolSha: createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'), perf: {}, shots: {}, videos: {}, failures: [] };
+report.captureHelperSha = Object.fromEntries(['water-wade-capture.mjs', 'projected-visibility-capture.mjs'].map(file =>
+  [file, createHash('sha256').update(fs.readFileSync(path.join(repo, 'tools', file))).digest('hex')]));
 let browser;
 try {
   const headed = backend === 'gl';
@@ -92,13 +97,21 @@ try {
   await context.addInitScript(() => {
     let seed = 42;
     Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-    document.addEventListener('webglcontextlost', e => console.warn('CONTEXT LOSS EVENT', e.target.width, e.target.height, e.target.isConnected, e.statusMessage), true);
+    window.__gpuContextLost = false;
+    document.addEventListener('webglcontextlost', e => { window.__gpuContextLost = true; console.warn('CONTEXT LOSS EVENT', e.target.width, e.target.height, e.target.isConnected, e.statusMessage); }, true);
+    window.__gpuNativeRaf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = () => 0;
     window.cancelAnimationFrame = () => {};
   });
   let page;
   const H = (fn, ...args) => page.evaluate(([f, a]) => {
     if (f === 'advance' && window.__gpuFixedClock) window.__gpuTime += a[0] * a[1] * 1000;
+    if (f === 'perf' && window.__gpuFixedClock) {
+      const fixedNow = performance.now;
+      Object.defineProperty(performance, 'now', { value: window.__gpuNativeNow, configurable: true });
+      try { return window.__gameHooks[f](...a); }
+      finally { Object.defineProperty(performance, 'now', { value: fixedNow, configurable: true }); }
+    }
     return window.__gameHooks[f](...a);
   }, [fn, args]);
   const advance = (n, render = true) => H('advance', n, 1 / 60, render);
@@ -114,7 +127,8 @@ try {
     if (fixedClock) await page.evaluate(() => {
       window.__gpuFixedClock = true;
       window.__gpuTime = window.__gameHooks.state().t * 1000;
-      Object.defineProperty(performance, 'now', { value: () => window.__gpuTime });
+      window.__gpuNativeNow = performance.now.bind(performance);
+      Object.defineProperty(performance, 'now', { value: () => window.__gpuTime, configurable: true });
     });
     const gl = await page.evaluate(() => {
       const gl = window.__gameHooks.debug.renderer.getContext();
@@ -132,8 +146,116 @@ try {
     if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error('WebGL context lost after warmup');
     return H('state');
   }
+  async function screenshotPixels(buffer) {
+    return page.evaluate(async encoded => {
+      const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      const bitmap=await createImageBitmap(new Blob([bytes],{type:'image/png'}));
+      const canvas=new OffscreenCanvas(128,72), ctx=canvas.getContext('2d',{willReadFrequently:true});
+      ctx.drawImage(bitmap,0,0,128,72); bitmap.close();
+      const data=ctx.getImageData(0,0,128,72).data;
+      let maxChannel=0;
+      for(let i=0;i<data.length;i+=4) maxChannel=Math.max(maxChannel,data[i],data[i+1],data[i+2]);
+      return {width:128,height:72,maxChannel,black:maxChannel<=3};
+    },buffer.toString('base64'));
+  }
+  async function hubStillInvariant() {
+    const state=await H('state');
+    const pose=await page.evaluate(()=>{
+      const {camera,fox}=window.__gameHooks.debug;
+      camera.updateMatrixWorld(true); fox.updateWorldMatrix(true,true);
+      const bones=[]; fox.traverse(o=>{if(o.isBone)bones.push([o.name,o.matrixWorld.toArray()]);});
+      return {camera:{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),
+        projection:camera.projectionMatrix.toArray()},fox:{position:fox.position.toArray(),
+        quaternion:fox.quaternion.toArray(),scale:fox.scale.toArray()},bones};
+    });
+    const fixed={pose,t:state.t,anim:state.anim,grounded:state.grounded,deaths:state.deaths,
+      assists:state.auto.assists,restored:state.restored,seedwells:state.seedwells,restore:state.restore,
+      grade:state.look.grade,dusk:state.dusk};
+    return {state,pose,digest:createHash('sha256').update(JSON.stringify(fixed)).digest('hex')};
+  }
+  async function captureStill(name) {
+    const assertHealthy=async()=>{
+      if(!name.startsWith('hub-')) return;
+      const healthy=await page.evaluate(()=>!window.__gpuContextLost &&
+        !window.__gameHooks.debug.renderer.getContext().isContextLost());
+      if(!healthy) throw Error(name+': WebGL context loss invalidates still evidence');
+    };
+    await assertHealthy();
+    const filename=path.join(out,name+'.png');
+    const first=await page.screenshot({path:filename,animations:'disabled'});
+    if(!name.startsWith('hub-')) return;
+    await assertHealthy();
+    const pixels=await screenshotPixels(first);
+    if(!pixels.black) return;
+    const attemptName=name+'-attempt-1-black.png', before=await hubStillInvariant(), started=Date.now();
+    fs.renameSync(filename,path.join(out,attemptName));
+    report.hubStillAttempts??={};
+    const attempt=report.hubStillAttempts[name]={preserved:attemptName,first:pixels,before};
+    save('hub-still-attempts.json',report.hubStillAttempts);
+    await H('advance',0,1/60,true);
+    await page.evaluate(()=>new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(Error('Native compositor barrier timed out')),5000);
+      window.__gpuNativeRaf(()=>window.__gpuNativeRaf(()=>{clearTimeout(timer);resolve();}));
+    }));
+    const retry=await page.screenshot({path:filename,animations:'disabled'});
+    await assertHealthy();
+    attempt.retry=await screenshotPixels(retry); attempt.after=await hubStillInvariant();
+    attempt.hostElapsedMs=Date.now()-started;
+    attempt.recovered=!attempt.retry.black;
+    attempt.invariantsMatch=attempt.before.digest===attempt.after.digest;
+    save('hub-still-attempts.json',report.hubStillAttempts);
+    if(!attempt.recovered || !attempt.invariantsMatch) report.failures.push(name+': black still recovery failed or changed pose/camera/state');
+  }
+  async function capturePlasterComparison(label) {
+    await H('advance',0,1/60,true);
+    const entry=await page.evaluate(()=>{
+      const material=window.__gameHooks.debug.world.materials.find(m=>m.name==='rv-hub-plaster');
+      if(!material) throw Error('Plaster comparison material missing');
+      return {uuid:material.uuid,color:material.color.toArray()};
+    });
+    const invariant=async()=>{
+      const fixed=await hubStillInvariant();
+      const other=await page.evaluate(()=>window.__gameHooks.debug.world.materials
+        .filter(m=>m.name!=='rv-hub-plaster').map(m=>({name:m.name,color:m.color?.toArray(),
+          emissive:m.emissive?.toArray(),emissiveIntensity:m.emissiveIntensity})));
+      return {...fixed,otherMaterials:other,fullDigest:createHash('sha256')
+        .update(fixed.digest+JSON.stringify(other)).digest('hex')};
+    };
+    const before=await invariant(), variants=[];
+    try {
+      for(const variant of ['old','new']) {
+        const paint=await page.evaluate(async ({variant,entry})=>{
+          const {Color}=await import('/gpu-three.js');
+          const material=window.__gameHooks.debug.world.materials.find(m=>m.uuid===entry.uuid);
+          if(!material) throw Error('Plaster material identity changed');
+          const oldPaint=new Color(0xc0ac86),newPaint=new Color(0xd5c7ad);
+          const ratio=variant==='old'?[oldPaint.r/newPaint.r,oldPaint.g/newPaint.g,oldPaint.b/newPaint.b]:[1,1,1];
+          material.color.fromArray(entry.color.map((value,i)=>value*ratio[i]));
+          return {uuid:material.uuid,color:material.color.toArray(),ratio};
+        },{variant,entry});
+        await H('advance',0,1/60,true);
+        const filename='hub-plaster-'+label+'-'+variant;
+        await captureStill(filename);
+        const proof=await invariant();
+        variants.push({variant,filename,paint,proof,game:await page.evaluate(()=>window.__game)});
+        if(proof.fullDigest!==before.fullDigest) report.failures.push(filename+': plaster comparison changed pose/camera/state/other materials');
+      }
+    } finally {
+      await page.evaluate(entry=>{
+        const material=window.__gameHooks.debug.world.materials.find(m=>m.uuid===entry.uuid);
+        if(!material) throw Error('Cannot restore plaster material');
+        material.color.fromArray(entry.color);
+      },entry);
+      await H('advance',0,1/60,true);
+      const restored=await invariant();
+      const restoredColor=await page.evaluate(uuid=>window.__gameHooks.debug.world.materials.find(m=>m.uuid===uuid)?.color.toArray(),entry.uuid);
+      save('hub-plaster-'+label+'-comparison.json',{label:'Staged old/new plaster proof; fixed light, pose, camera and game state',entry,before,variants,restored,restoredColor});
+      if(restored.fullDigest!==before.fullDigest || JSON.stringify(restoredColor)!==JSON.stringify(entry.color))
+        report.failures.push('Plaster comparison failed exact restoration at '+label);
+    }
+  }
   async function shot(name) {
-    await page.screenshot({ path: path.join(out, `${name}.png`), animations: 'disabled' });
+    await captureStill(name);
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
     if (name.startsWith('reachview-')) {
       // Validate the snapshot belonging to this PNG, after its staged teleport/lens.
@@ -212,7 +334,7 @@ try {
           if (!options.traceEveryFrame) trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
           console.log('FRAME', name, i, 'sim', state.t.toFixed(2), 'wp', state.auto.idx, 'restored', state.restored);
         }
-        if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
+        if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; if(name.startsWith('hub-')) await captureStill(filename.replace(/\.png$/,'')); else await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
         if (stop?.(state, i)) break;
       }
     } finally { encoder.stdin.end(); }
@@ -221,7 +343,22 @@ try {
     const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
     const stream = probe.streams[0];
     if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
-    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
+    let blackDetect;
+    if(name.startsWith('hub-')) {
+      const scan=spawnSync('ffmpeg',['-hide_banner','-nostats','-threads','1','-i',output,
+        '-vf','blackdetect=d=0.02:pix_th=0.02:pic_th=0.999,blackframe=amount=99:threshold=20','-an','-f','null','-'],
+        {encoding:'utf8',maxBuffer:4*1024*1024,timeout:60000,killSignal:'SIGKILL'});
+      const log=scan.stderr??String(scan.error??'');
+      fs.writeFileSync(path.join(out,name+'-blackdetect.log'),log);
+      const intervals=[...log.matchAll(/black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/g)]
+        .map(m=>({start:Number(m[1]),end:Number(m[2]),duration:Number(m[3])}));
+      const frameIntervals=blackFrameIntervals(log,fps);
+      blackDetect={status:scan.status,error:scan.error?.message??null,signal:scan.signal,
+        thresholds:{duration:.02,pixel:.02,frame:.999,frameAuditPercent:99,frameAuditY:20},
+        intervals,frameIntervals};
+      if(scan.status!==0 || scan.error || intervals.length || frameIntervals.some(run=>run.duration>=.02)) report.failures.push(name+': black video frame detected or detector failed');
+    }
+    report.videos[name] = { blackDetect, frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
     if (options.keyFrames) {
       const sheetPage = await context.newPage();
@@ -230,7 +367,9 @@ try {
         const cards = (options.sheetFrames ?? options.keyFrames).filter(frame => frame < count).map(frame => {
           const filename = `${name}-${String(frame).padStart(5, '0')}.png`;
           const label = options.label?.(frame, trace.find(sample => sample.frame === frame)?.state) ?? `${name} frame ${frame}`;
-          return `<figure><figcaption>${label}</figcaption><img src="data:image/png;base64,${fs.readFileSync(path.join(out, filename)).toString('base64')}"></figure>`;
+          // Native PNGs remain archived; do not send hundreds of MB through the sheet page.
+          const thumbnail=execFileSync('ffmpeg',['-v','error','-i',path.join(out,filename),'-vf','scale=480:-2','-frames:v','1','-f','image2pipe','-vcodec','mjpeg','-q:v','3','-threads','1','pipe:1'],{maxBuffer:4*1024*1024});
+          return `<figure><figcaption>${label}</figcaption><img src="data:image/jpeg;base64,${thumbnail.toString('base64')}"></figure>`;
         }).join('');
         await sheetPage.setContent(`<style>*{box-sizing:border-box}body{margin:0;background:#211b16;color:#eadfc8;font:16px sans-serif;display:grid;grid-template-columns:repeat(4,1fr)}figure{margin:0}figcaption{height:30px;padding:6px}img{display:block;width:100%}</style>${cards}`);
         await sheetPage.evaluate(() => Promise.all([...document.images].map(image => image.decode())));
@@ -754,6 +893,29 @@ try {
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
     await H('photoOff');
+    const soleProbe=await page.evaluate(async()=>{
+      const {Vector3}=await import('/gpu-three.js'),h=window.__gameHooks,root=h.debug.fox,meshes=[];
+      root.traverse(object=>{if(object.isSkinnedMesh&&!/fur|fringe|coat|heat|shell|glow|flame|spiritfx/i.test(object.name))meshes.push(object);});
+      const sets=['front_paw_l','front_paw_r','hind_paw_l','hind_paw_r'].map(name=>{
+        const vertices=[];
+        for(const mesh of meshes){const bone=mesh.skeleton.bones.findIndex(b=>b.name===name);if(bone<0)continue;const ix=mesh.geometry.getAttribute('skinIndex'),weights=mesh.geometry.getAttribute('skinWeight');
+          for(let i=0;i<ix.count;i++){let weight=0;for(let j=0;j<4;j++)if(ix.getComponent(i,j)===bone)weight+=weights.getComponent(i,j);if(weight>.2)vertices.push({mesh,index:i});}}
+        return {name,vertices,bone:root.getObjectByName(name)};
+      });
+      window.__captureLandingSoles=()=>{
+        root.updateWorldMatrix(true,true);for(const mesh of meshes)mesh.skeleton.update();
+        const p=new Vector3(),ceiling=root.getWorldPosition(new Vector3()).y+.6,col=h.debug.world.collision,terrain=h.debug.world.terrainY;
+        return {label:'Weighted core-paw vertex minima against terrain, not full silhouette or shadow proof',paws:sets.map(set=>{
+          const origin=set.bone?.getWorldPosition(new Vector3()),floor=origin?col.groundAt(origin.x,origin.z,ceiling).y:NaN;
+          const terrainOnly=!!origin&&Number.isFinite(floor)&&Math.abs(floor-terrain(origin.x,origin.z))<.02;
+          let minimum=Infinity;
+          if(terrainOnly)for(const vertex of set.vertices){vertex.mesh.localToWorld(vertex.mesh.getVertexPosition(vertex.index,p));minimum=Math.min(minimum,p.y-terrain(p.x,p.z));}
+          return {name:set.name,vertices:set.vertices.length,terrainOnly,minClearance:Number.isFinite(minimum)?minimum:null};
+        })};
+      };
+      return {label:'Core vertices with >20% corresponding paw weight; helpers excluded',meshes:meshes.map(mesh=>mesh.name),paws:sets.map(set=>({name:set.name,vertices:set.vertices.length}))};
+    });
+    save('landing-sole-probe.json',soleProbe);
     const n=Math.hypot(.684,.729),td=[-.684/n,-.729/n],tn=[.729/n,-.684/n];
     const sp=(s,t,y)=>[-48+td[0]*s+tn[0]*t,y,52+td[1]*s+tn[1]*t];
     const board=[.868243,-.496139];
@@ -770,10 +932,13 @@ try {
       {name:'Meadow long drop and landing',seconds:2,stick:[0,0],reset:[0,null,80],drop:8,settle:0},
       {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6},
     ];
-    const landingDefaults=await page.evaluate(()=>{const p=window.__gameHooks.locomotion.params;return {landSquash:p.landSquash,landPitch:p.landPitch}});
-    for(const [label,landSquash,landPitch] of [['baseline',.11,0],['squash',.20,0],['squash-pitch',.20,1]]) {
-      segments.push({name:`Landing A/B long drop ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],drop:8,settle:0,landingAB:{label,landSquash,landPitch}});
-      segments.push({name:`Landing A/B standing jump ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6,landingAB:{label,landSquash,landPitch}});
+    const landingDefaults=await page.evaluate(()=>{const h=window.__gameHooks.locomotion,p=h.params;
+      if(!Number.isFinite(p.stationarySupport)||typeof h.metrics.supportEvaluated!=='boolean'||!Number.isFinite(h.metrics.supportDrop))throw Error('Supported landing capture requires the support-capable game runtime');
+      return {landSquash:p.landSquash,landPitch:p.landPitch,stationarySupport:p.stationarySupport};});
+    save('landing-support-source.json',{gameCommit:execFileSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),landingDefaults,label:'Game runtime capability checked before changing parameters; compare commit against run.json and request ref'});
+    for(const [label,landSquash,landPitch,stationarySupport] of [['baseline',.11,0,0],['squash',.20,0,0],['squash-pitch',.20,1,0],['supported',.20,1,.06]]) {
+      segments.push({name:`Landing A/B long drop ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],drop:8,settle:0,landingAB:{label,landSquash,landPitch,stationarySupport}});
+      segments.push({name:`Landing A/B standing jump ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6,landingAB:{label,landSquash,landPitch,stationarySupport}});
     }
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
@@ -784,13 +949,13 @@ try {
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
       if(segment.turn){const angle=local/fps*2;stick=[Math.sin(angle)*.45,-Math.cos(angle)*.45];}
-      if(local===0 && segment.landingAB)await page.evaluate(({landSquash,landPitch})=>Object.assign(window.__gameHooks.locomotion.params,{landSquash,landPitch}),segment.landingAB);
+      if(local===0 && segment.landingAB)await page.evaluate(({landSquash,landPitch,stationarySupport})=>Object.assign(window.__gameHooks.locomotion.params,{landSquash,landPitch,stationarySupport}),segment.landingAB);
       if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);reset[1]+=segment.drop??0;const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(segment.settle??18);}
       await H('setStick',...stick);
       await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local>=(segment.leadIn??0) && local<(segment.leadIn??0)+Math.round(.25*fps)?['Space']:[]);
     },undefined,{traceEveryFrame:true,keyFrames,sheetFrames,afterStep:async(i,state)=>{
       const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);
-    },sample:async()=>({label:'Evaluated world-space bone landmarks; mesh shape judged from retained PNGs',bones:await page.evaluate(()=>{const fox=window.__gameHooks.debug.fox;return Object.fromEntries(['pelvis','spine_04','head'].map(name=>{const b=fox.getObjectByName(name);return [name,b?.getWorldPosition(b.position.clone()).toArray()??null]}))})})});
+    },sample:async i=>await page.evaluate(probe=>{const fox=window.__gameHooks.debug.fox;return {label:'Evaluated bone landmarks and separately labeled weighted sole probe; retained PNG review required',bones:Object.fromEntries(['pelvis','spine_04','head'].map(name=>{const b=fox.getObjectByName(name);return [name,b?.getWorldPosition(b.position.clone()).toArray()??null]})),soles:probe?window.__captureLandingSoles():null};},!!at(i).landingAB)});
     await H('setKeys',[]);await H('setStick',null);
     await page.evaluate(config=>Object.assign(window.__gameHooks.locomotion.params,config),landingDefaults);
     const result=report.videos.showcase;
@@ -816,6 +981,7 @@ try {
       const firstAir=rows.findIndex(row=>!row.state.grounded);
       const landedIndex=firstAir>=0?rows.findIndex((row,index)=>index>firstAir && row.state.grounded):-1;
       const recovery=landedIndex>=0?rows.slice(landedIndex,landedIndex+12):[];
+      const lateRecovery=landedIndex>=0?rows.slice(landedIndex,landedIndex+60):[];
       const relative=(row,bone)=>row.state.capture?.bones?.[bone]?.[1]-row.state.pos[1];
       const before=landedIndex>0?rows[landedIndex-1]:null;
       return {name:segment.name,config:segment.landingAB,firstAir,landedIndex,frames:rows.length,
@@ -824,19 +990,29 @@ try {
         peakHeadDrop:before?relative(before,'head')-Math.min(...recovery.map(row=>relative(row,'head'))):null,
         compressionMaxResidual:Math.max(...recovery.map(row=>row.state.locomotion.maxResidual)),
         minCompressionContacts:Math.min(...recovery.map(row=>row.state.locomotion.stanceFeet)),
+        recoveryFrames:lateRecovery.length,
+        recoveryGrounded:lateRecovery.length===60&&lateRecovery.every(row=>row.state.grounded),
+        recoveryMaxResidual:Math.max(...lateRecovery.map(row=>row.state.locomotion.maxResidual)),
+        recoveryMinContacts:Math.min(...lateRecovery.map(row=>row.state.locomotion.stanceFeet)),
+        supportDropMax:Math.max(...lateRecovery.map(row=>row.state.locomotion.supportDrop??0)),
+        supportTelemetryComplete:lateRecovery.length===60&&lateRecovery.every(row=>row.state.locomotion.supportEvaluated===true&&Number.isFinite(row.state.locomotion.supportDrop)&&Number.isFinite(row.state.locomotion.supportRequested)&&row.state.locomotion.supportConflict===false&&row.state.locomotion.supportUnreachableFeet===0),
+        soleSamplesComplete:lateRecovery.length===60&&lateRecovery.every(row=>row.state.capture?.soles?.paws?.length===4&&row.state.capture.soles.paws.every(paw=>paw.terrainOnly&&paw.vertices>0&&Number.isFinite(paw.minClearance))),
+        soleMinClearance:Math.min(...lateRecovery.flatMap(row=>(row.state.capture?.soles?.paws??[]).map(paw=>paw.minClearance??Infinity))),
+        soleMaxClearance:Math.max(...lateRecovery.flatMap(row=>(row.state.capture?.soles?.paws??[]).map(paw=>paw.minClearance??-Infinity))),
         landed:firstAir>=0 && landedIndex>firstAir && rows.at(-1).state.grounded};
     });
-    const landingPass=take=>take.landed && take.frames===2*fps && take.minCompressionContacts===4 && take.compressionMaxResidual<.001 && [take.firstChestStep,take.peakChestDrop,take.peakHeadDrop].every(Number.isFinite);
-    save('landing-ab-acceptance.json',{label:'Same build/lens/live physics, three tunable sets; pose heights relative actor pivot and last airborne frame, not idle; no visual approval',takes:landingTakes,passed:landingTakes.every(landingPass)});
+    const landingPass=take=>take.landed && take.frames===2*fps && take.minCompressionContacts===4 && take.compressionMaxResidual<.001 && [take.firstChestStep,take.peakChestDrop,take.peakHeadDrop].every(Number.isFinite) && (!(take.config.stationarySupport>0)||take.recoveryFrames===60&&take.recoveryGrounded&&take.recoveryMinContacts===4&&take.recoveryMaxResidual<.001&&take.supportTelemetryComplete&&Number.isFinite(take.supportDropMax)&&take.supportDropMax>.005&&take.supportDropMax<=take.config.stationarySupport+.000001&&take.soleSamplesComplete&&take.soleMinClearance>-.01&&take.soleMaxClearance<.01);
+    save('landing-ab-acceptance.json',{label:'Same build/lens/live physics, four tunable sets; supported option checks60 recovery frames and weighted sole minima; pose heights relative actor pivot and last airborne frame, not idle; no visual approval',takes:landingTakes,passed:landingTakes.every(landingPass)});
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
     if(!landingTakes.every(landingPass))throw Error('Landing A/B must land with four compression contacts and submillimeter compression residual; visual review still required');
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
-  if (wants('worldgait')) {
+  if (wants('worldgait') && !hipDiagnostic) {
     if(fps!==60)throw Error('World gait comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
     await H('setFeelPreset','brisk');
+    const lensOffsets={side:[-4.7,1.2,.25],'three-quarter':[-3.3,1.15,2.1]};
     // Freeze the same physical sight query for old and new game SHAs.
     await page.evaluate(async()=>{
       const {Vector3,Raycaster}=await import('/gpu-three.js');
@@ -854,7 +1030,7 @@ try {
         });
       };
     });
-    const preflight=await page.evaluate(()=>{
+    const preflight=await page.evaluate(lenses=>{
       const h=window.__gameHooks,col=h.debug.world.collision,attempts=[];
       for(const x of [40]) {
         const failures=[];
@@ -863,8 +1039,8 @@ try {
           const floor=col.highestAt(x,z),terrain=h.debug.world.terrainY(x,z),y=floor+.02;
           if(!Number.isFinite(floor) || Math.abs(floor-terrain)>.2 || (previousY!==null && Math.abs(floor-previousY)>.4))failures.push({z,footing:[floor,terrain,previousY]});
           previousY=floor;
-          for(const lens of ['side','three-quarter']) {
-            const camera=[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+          for(const [lens,offset] of Object.entries(lenses)) {
+            const camera=[x+offset[0],y+offset[1],z+offset[2]];
             const targets=[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]];
             const blockers=window.__captureWorldSight(camera,targets);
             if(blockers.some(Boolean))failures.push({z,lens,blockers});
@@ -874,7 +1050,8 @@ try {
         if(!failures.length)return {x,z:88,attempts};
       }
       return {x:null,z:88,attempts};
-    });
+    },lensOffsets);
+    preflight.lensOffsets=lensOffsets;
     save('worldgait-preflight.json',preflight);
     if(preflight.x===null)throw Error('No clear terrain-only meadow review corridor');
     const segments=[];
@@ -891,9 +1068,10 @@ try {
       await H('teleport',preflight.x,y,preflight.z,Math.PI);await advance(30);
       const name=`worldgait-${lens}-${gait}`, initial=await H('state');
       const visibility={sampledFrames:0,blocked:[]};
+      const offset=lensOffsets[lens];
       const frameLens=async st=>{
         const [x,y,z]=st.pos;
-        await H('photo',[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
+        await H('photo',[x+offset[0],y+offset[1],z+offset[2]],[x,y+.6,z],38);
       };
       await frameLens(initial);
       await video(name,seconds*fps,async i=>{
@@ -906,12 +1084,19 @@ try {
           if(st.deaths!==initial.deaths)throw Error(`${name}: death`);
           await frameLens(st);
           {
-            const [x,y,z]=st.pos, camera=[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const [x,y,z]=st.pos, camera=[x+offset[0],y+offset[1],z+offset[2]];
             const blockers=await page.evaluate(([camera,targets])=>window.__captureWorldSight(camera,targets),[camera,[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]]]);
             visibility.sampledFrames++;
             if(blockers.some(Boolean))visibility.blocked.push({frame:i,blockers});
           }
-        }
+        },
+        sample:async()=>({framing:await page.evaluate(()=>{
+          const h=window.__gameHooks,root=h.debug.fox,camera=h.debug.camera;
+          const names=['head','pelvis','spine_04','front_paw_l','front_paw_r','hind_paw_l','hind_paw_r','tail_08','ear_04_l','ear_04_r'];
+          const points=names.map(name=>{const bone=root.getObjectByName(name);return bone?{name,ndc:bone.getWorldPosition(bone.position.clone()).project(camera).toArray()}:null;}).filter(Boolean);
+          const bounds=selected=>selected.length ? {widthFraction:(Math.max(...selected.map(p=>p.ndc[0]))-Math.min(...selected.map(p=>p.ndc[0])))/2,heightFraction:(Math.max(...selected.map(p=>p.ndc[1]))-Math.min(...selected.map(p=>p.ndc[1])))/2,inFrame:selected.every(p=>Math.abs(p.ndc[0])<1 && Math.abs(p.ndc[1])<1 && p.ndc[2]>-1 && p.ndc[2]<1)} : null;
+          return {label:'Projected skeleton proxies, not a full rendered silhouette',sampledBones:points.map(p=>p.name),body:bounds(points.filter(p=>!p.name.startsWith('tail_')&&!p.name.startsWith('ear_'))),headToTail:bounds(points)};
+        })})
       });
       await H('setStick',0,0);await H('setKeys',[]);await shot(`${name}-end`);
       const end=await H('state');
@@ -934,6 +1119,8 @@ try {
       measured.bankTelemetryAvailable=measured.maxBankCommand!==null && measured.maxPelvisBank!==null;
       measured.bankObserved=measured.bankTelemetryAvailable ? measured.maxBankCommand>.04 && measured.maxPelvisBank>.01 : null;
       measured.headingChange=Math.abs(Math.atan2(Math.sin(end.foxYaw-initial.foxYaw),Math.cos(end.foxYaw-initial.foxYaw)));
+      const widths=rows.map(row=>row.state.capture?.framing?.headToTail?.widthFraction).filter(Number.isFinite).sort((a,b)=>a-b);
+      measured.medianHeadToTailWidthFraction=widths.length ? widths[Math.floor(widths.length/2)] : null;
       const motionPassed=gait==='jump' ? measured.groundedAtJumpInput && measured.firstAirFrame<=64 && measured.airFrames>=6 && measured.groundedRecoveryFrames>=6 && measured.landedAfterAir : measured.groundedFraction>.95 && measured.expectedGaitFraction>.9 && (gait!=='turn'||measured.headingChange>.6 && measured.bankObserved!==false);
       const passed=end.deaths===initial.deaths && !visibility.blocked.length && motionPassed && measured.speedFraction>.9 && measured.speedFraction<1.1;
       segments.push({name,gait,stick,seconds,initial,end,measured,visibility,passed,camera:`staged west-side ${lens} world-offset tracking photo lens, relative angle changes during turn; live controller`,reset:[preflight.x,y,preflight.z]});
@@ -1052,6 +1239,7 @@ try {
     // Natural spawn, gravity warm-up and untouched chase before any staging.
     await advance(60); await shot('hub-spawn-chase');
     save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
+    await capturePlasterComparison('spawn');
     // Live player view from natural spawn, before any teleport or photo camera.
     const naturalInitial = await H('state');
     await video('hub-natural-arrive-chase', 15 * fps, async i => {
@@ -1070,16 +1258,36 @@ try {
     }
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
     // Portrait staging only; natural spawn above is untouched. Real idle rig, no bone override.
-    const heroYaw = Math.atan2(3.1, .8) - Math.PI / 4;
+    const heroYaw = Math.atan2(4.2, 1.1) - Math.PI / 4;
     await H('teleport', 0, y, 94, heroYaw); await advance(30);
-    const heroLens = [3.1, y + 1.3, 94.8], heroLook = [-6.5, y + .9, 89.5];
+    const heroLens = [4.2, y + 1.5, 95.1], heroLook = [-6.5, y + .6, 89.5];
     const compositionBlocker = await H('photoBlocker', heroLens, heroLook);
     const foxSightBlocker = await H('photoBlocker', heroLens, [0, y + .35, 94]);
     await H('photo', heroLens, heroLook, 46); await advance(2);
     await shot('hub-hero-three-q');
     const heroState = await H('state');
+    const heroFraming = await page.evaluate(async () => {
+      const {Box3, Vector3} = await import('/gpu-three.js');
+      const {fox, camera} = window.__gameHooks.debug;
+      fox.updateWorldMatrix(true, true); camera.updateMatrixWorld(true);
+      const bounds = new Box3();
+      fox.traverse(o => { if (o.isSkinnedMesh && o.visible) {
+        o.computeBoundingBox(); bounds.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld));
+      } });
+      if (bounds.isEmpty()) return null;
+      const projected = [];
+      for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y])
+        for (const z of [bounds.min.z, bounds.max.z]) projected.push(new Vector3(x,y,z).project(camera).toArray());
+      return { label: 'Conservative posed skinned-mesh world bounds; all eight corners projected',
+        worldMin: bounds.min.toArray(), worldMax: bounds.max.toArray(), projected,
+        inFrame: projected.every(p => Math.abs(p[0]) < 1 && Math.abs(p[1]) < 1 && p[2] > -1 && p[2] < 1) };
+    });
+    save('hub-hero-framing.json', heroFraming);
+    if (!heroFraming?.inFrame) report.failures.push('Hub hero posed body bounds are cropped');
+
     save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
     if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
+    await capturePlasterComparison('hero');
     const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
     save('hub-festoon-clearance.json', festoon);
     if (festoon?.pendants.length !== 12 || festoon?.cords?.length !== 3) report.failures.push('Hub must expose twelve pendants on three supported cords');
@@ -1090,6 +1298,7 @@ try {
       ['arrival', [16, 10, 108], [-5, 2, 81], 52],
       ['arrival-close', [8, 3.8, 98], [-10, 2, 85], 55],
       ['well', [-2, 4, 91], [-9, 2, 82], 52],
+      ['hearth-lane', [-5.5, 3.4, 98], [-13.5, 1.4, 91], 52],
       ['west-exit', [-7, 7, 96], [-23, 2, 71], 56],
       ['east-exit', [2, 6, 99], [18, 2, 80], 56],
       ['north-exit', [0, 5, 97], [0, 2, 65], 55],
@@ -1098,6 +1307,51 @@ try {
     for (const [name, lens, target, fov] of hubViews) {
       hubViewCameras.push({ name, lens, target, fov, blocker: await H('photoBlocker', lens, target) });
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
+      if (name === 'well') {
+        // Same camera and posed skeleton; zero simulation steps between variants.
+        await H('advance', 0, 1/60, true);
+        const snapshot = async () => {
+          const state = await H('state');
+          const pose = await page.evaluate(() => {
+            const {camera, fox, hubPractical} = window.__gameHooks.debug;
+            camera.updateMatrixWorld(true); fox.updateWorldMatrix(true,true);
+            const bones = [];
+            fox.traverse(o => { if (o.isBone) bones.push({name:o.name,matrix:o.matrixWorld.toArray()}); });
+            return {strength:hubPractical.strength, camera:{position:camera.position.toArray(),
+              quaternion:camera.quaternion.toArray(), projection:camera.projectionMatrix.toArray()},
+              fox:{position:fox.position.toArray(),quaternion:fox.quaternion.toArray(),scale:fox.scale.toArray()},bones};
+          });
+          const fixed = {camera:pose.camera,fox:pose.fox,bones:pose.bones,t:state.t,
+            anim:state.anim,grounded:state.grounded,deaths:state.deaths,assists:state.auto.assists,
+            restored:state.restored,seedwells:state.seedwells,restore:state.restore,grade:state.look.grade};
+          return {pose,state,fixedDigest:createHash('sha256').update(JSON.stringify(fixed)).digest('hex'),
+            game:await page.evaluate(() => window.__game)};
+        };
+        const entry = await snapshot(), variants = [];
+        if (entry.pose.strength !== 2.5) report.failures.push('Hub practical comparison default must match reviewed 2.5x candidate');
+        try {
+          for (const strength of [1,2.5,4]) {
+            await page.evaluate(value => { window.__gameHooks.debug.hubPractical.strength=value; }, strength);
+            await H('advance',0,1/60,true);
+            const sample = await snapshot();
+            const filename = `hub-practical-${String(strength).replace('.','p')}`;
+            await shot(filename);
+            variants.push({filename,strength,...sample});
+            if (sample.fixedDigest !== entry.fixedDigest) report.failures.push(`Hub practical ${strength} comparison camera/pose/state changed`);
+          }
+        } finally {
+          await page.evaluate(value => { window.__gameHooks.debug.hubPractical.strength=value; }, entry.pose.strength);
+          await H('advance',0,1/60,true);
+          const restored = await snapshot();
+          save('hub-practical-comparison.json',{label:'Staged well-camera light-strength comparison; zero simulation steps; shipped default unchanged',
+            requestedCamera:{lens,target,fov},entry,variants,restored});
+          if (restored.pose.strength !== entry.pose.strength || restored.fixedDigest !== entry.fixedDigest ||
+            JSON.stringify(restored.state.dusk.practical) !== JSON.stringify(entry.state.dusk.practical)) {
+            report.failures.push('Hub practical comparison failed exact strength/state/light restoration');
+          }
+        }
+      }
+
     }
     save('hub-view-cameras.json', hubViewCameras);
     const arrivalCamera = { lens: [8, 4.5, 101], target: [-8, 2, 86], fov: 55, blocker: await H('photoBlocker', [8, 4.5, 101], [-8, 2, 86]) };
@@ -1114,7 +1368,7 @@ try {
     // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
     const orbitCameras = [];
     const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-10, 88));
-    const orbitTarget = [-10, targetGround + 2, 88];
+    const orbitTarget = [-10, targetGround + 4.8, 88];
     const orbitLens = (angle, height) => [-9 + Math.sin(angle) * 30, height, 88 + Math.cos(angle) * 24];
     // One fixed clearance height avoids frame-to-frame camera pops. The ellipse
     // stays >2m outside every cottage roof footprint; low close/chase shots above
@@ -1135,6 +1389,7 @@ try {
       await H('photo', lens, orbitTarget, 58);
     }, undefined, {keyFrames: [0, 3*fps, 6*fps, 9*fps, 12*fps, 15*fps, 18*fps-1]});
     save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, heightSearchClear: orbitHeightSearchClear, probeAngles: 36, blockedFrames: orbitBlocked, cameras: orbitCameras });
+    if (!orbitHeightSearchClear) report.failures.push('Hub context orbit found no clear fixed review height');
     if (orbitBlocked) report.failures.push(`Hub context orbit has ${orbitBlocked} blocked review frames`);
     await H('photoOff');
 
@@ -1165,13 +1420,13 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
-  if (wants('restoration') || wants('water')) {
+  if (wants('restoration') || wants('water') || wants('stills')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
     if (!Number.isFinite(y) || y < -24) throw Error('Restoration review has no safe meadow surface');
     await H('teleport', 0, y, 70, Math.PI);
-    await H('photo', [5, y + 6, 79], [-1, y, 70], 48);
+    await H('photo', [-6, y + 6, 79], [-1, y, 70], 48);
     await advance(60); await shot('restoration-aura');
     await H('setStick', -1, 0); await H('setKeys', ['ShiftLeft']);
     await advance(6); await shot('restoration-dash');
@@ -1183,26 +1438,80 @@ try {
     // The meadow lens cannot see it, so use a separate fixed lens for the matched front pair.
     const framing = await page.evaluate(() => {
       const h = window.__gameHooks, attempts = [];
-      for (const [x,z] of [[95,13],[93,10],[97,10],[95,7],[90,15]]) {
+      for (const [x,z] of [[69,28.2],[84,36]]) {
         const y = h.debug.world.collision.highestAt(x,z);
         if (!Number.isFinite(y) || y < -.5 || y > 4) continue;
+        const closeLook = [x+9,y-1.2,z-8.2];
+        const poolProbes = [[78,-1.2,26],[81,-1.2,27],[77,-1.2,28]];
+        const closeLens = [[x-5,y+2.1,z+3.8],[x-6.5,y+3,z+4],[x-5,y+4,z+5],[x-4,y+2.7,z+5]].find(lens => {
+          const foxBlockers = [.1,.5,.9].map(k => h.photoBlocker(lens,[x,y+h.debug.foxHeight*k,z]));
+          const poolBlockers = poolProbes.map(point => h.photoBlocker(lens,point));
+          attempts.push({kind:'close',fox:[x,y,z],lens,foxBlockers,poolBlockers});
+          return foxBlockers.filter(b => !b).length >= 2 && poolBlockers.filter(b => !b).length >= 2;
+        });
+        if (!closeLens) continue;
         for (const lens of [[68,34,44],[65,34,18],[112,35,0],[78,40,-6],[95,45,30]]) {
-          const blocker = h.photoBlocker(lens,[x,y+.6,z]);
-          attempts.push({fox:[x,y,z],lens,blocker});
-          if (!blocker) return {fox:[x,y,z],lens,look:[(x+95)/2,y+.6,(z+10)/2],attempts};
+          const foxBlockers = [.1,.5,.9].map(k => h.photoBlocker(lens,[x,y+h.debug.foxHeight*k,z]));
+          const poolBlockers = poolProbes.map(point => h.photoBlocker(lens,point));
+          attempts.push({kind:'overview',fox:[x,y,z],lens,foxBlockers,poolBlockers});
+          if (foxBlockers.filter(b=>!b).length>=2 && poolBlockers.filter(b=>!b).length>=2) return {fox:[x,y,z],lens,look:[(x+95)/2,y+.6,(z+10)/2],closeLens,closeLook,poolProbes,attempts};
         }
       }
       return {attempts};
     });
     save('restoration-framing.json', framing);
-    if (!framing.fox) throw Error('No unobstructed safe Reed restoration review lens');
+    if (!framing.fox || !framing.closeLens) throw Error('No unobstructed safe Reed restoration review lens pair');
     await H('teleport', ...framing.fox, Math.PI);
-    await H('photo', framing.lens, framing.look, 60);
-    await advance(1); await shot('restoration-front-before');
+    await advance(30, false);
+    const restoreBaseline = await H('state');
+    const restoreFrame = async name => {
+      const phase = await H('state');
+      const drift = Math.hypot(...phase.pos.map((value,i) => value-restoreBaseline.pos[i]));
+      if (phase.deaths !== restoreBaseline.deaths || drift > .15) report.failures.push(`Restore fox moved or died at ${name}: drift=${drift}, deaths=${phase.deaths-restoreBaseline.deaths}`);
+      const saveComposition = async (view,minimumHeight) => {
+        const composition = await page.evaluate(pool => {
+        const h=window.__gameHooks, fox=h.debug.fox, camera=h.debug.camera;
+        const feet=fox.position.clone(); feet.y-=h.debug.foxFeetOffset;
+        const head=feet.clone(); head.y+=h.debug.foxHeight;
+        const bottom=feet.clone().project(camera), top=head.clone().project(camera);
+        const inside = p => Math.abs(p.x)<.95 && Math.abs(p.y)<.95 && p.z>-1 && p.z<1;
+        const foxBlockers=[.1,.5,.9].map(k => h.photoBlocker(camera.position.toArray(),feet.clone().lerp(head,k).toArray()));
+        const poolVisible=pool.map(point => ({point,inside:inside(feet.clone().set(...point).project(camera)),blocker:h.photoBlocker(camera.position.toArray(),point)}));
+        return {proxyHeightPx:Math.abs(top.y-bottom.y)*innerHeight/2,inside:inside(bottom)&&inside(top),foxBlockers,poolVisible};
+        },framing.poolProbes);
+        save(`restoration-${view}-${name}-composition.json`,{...composition,drift,deaths:phase.deaths-restoreBaseline.deaths,state:await H('state'),label:'CPU composition proxies, not pixel-visibility or visual acceptance'});
+        if (!composition.inside || composition.proxyHeightPx<minimumHeight || composition.foxBlockers.filter(b=>!b).length<2 || composition.poolVisible.filter(p=>p.inside&&!p.blocker).length<2) report.failures.push(`Restore ${view} composition gate failed at ${name}`);
+      };
+      await H('photo', framing.lens, framing.look, 60); await advance(0); await shot(`restoration-${name}`);
+      await saveComposition('overview',0);
+      await H('photo', framing.closeLens, framing.closeLook, 48); await advance(0); await shot(`restoration-close-${name}`);
+      await saveComposition('close',48);
+    };
+    await restoreFrame('front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
-    for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['settled', 240]]) {
-      await advance(frames); await shot(`restoration-${name}`);
+    for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['water-reveal', 39], ['settled', 201]]) {
+      await advance(frames, false); await restoreFrame(name);
+    }
+    await H('photo', [64, 3, 43], [82, -1.7, 20], 52); await advance(2); await shot('restoration-water-vista');
+    await H('perf', 6);
+    const reedPerf = [];
+    for (let i = 0; i < 5; i++) reedPerf.push(await H('perf', 6));
+    const reedMedian = [...reedPerf].sort((a, b) => a.msPerFrame - b.msPerFrame)[2];
+    save('restoration-water-perf.json', { ...reedMedian, samples: reedPerf, method: 'Warm median of five GPU-synchronized render-only perf(6) batches with native wall clock; simulation paused' });
+    if (!reedPerf.every(sample => sample.msPerFrame > 0 && Number.isFinite(sample.fps))) throw Error('Invalid restored Reed performance timing');
+    const restoreRenderer = await page.evaluate(() => {
+      const h = window.__gameHooks, d = h.debug.scene.userData.waterCapture;
+      const target = h.debug.post.composer.readBuffer;
+      return { waterScene: d ? { ...d } : null, width: target.width, height: target.height, type: target.texture.type, shadowType: h.debug.renderer.shadowMap.type, finalGlError: h.debug.renderer.getContext().getError() };
+    });
+    save('restoration-water-renderer.json', restoreRenderer);
+    const rd = restoreRenderer.waterScene;
+    if (!rd || rd.shadowTypeAtFirstPrepare !== 1 || restoreRenderer.shadowType !== 1
+      || rd.copies < 1 || rd.reflections < 1 || rd.checkedCopies < 1 || rd.invalidTargets
+      || rd.type !== 1016 || rd.type !== restoreRenderer.type || rd.width !== restoreRenderer.width || rd.height !== restoreRenderer.height
+      || rd.glError || rd.priorGlError || rd.bootGlError || rd.bootPriorGlError || restoreRenderer.finalGlError) {
+      report.failures.push(`Restoration water renderer gate failed: ${JSON.stringify(restoreRenderer)}`);
     }
     save('restoration-provenance.json', {
       label: 'STAGED fixed-lens visual review: real dash input, then staged public Seedwell latches',
@@ -1276,6 +1585,7 @@ try {
       report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
     }
 
+    const {captureWadeVisibility}=await import(pathToFileURL(path.resolve(repo,'tools/water-wade-capture.mjs')).href);
     await captureWadeVisibility({ H, boot, video, shot, save, getPage: () => page, fps, quality });
   }
   if (wants('updraft')) {
@@ -1641,6 +1951,9 @@ try {
     await RH('photo',[220,44,-122],[190,34,-119],52);await advance(2);await shot('reachview-payoff-vista');
     // A closer comparison avoids the east-bank trunk without moving the scene.
     await RH('photo',[213,39,-121],[192,34,-120],52);await advance(2);await shot('reachview-hero-orchard');
+    // Verified old hero crosses bell pillars; compare from their north side.
+    await RH('teleport',204,36,-118,-Math.PI/2);
+    await RH('photo',[210,40,-110],[198,35,-118],52);await advance(60,false);await shot('reachview-hero-clear');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
@@ -1650,16 +1963,26 @@ try {
   if (wants('reach')) {
     await boot(quality,true); await RH('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
-    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
+    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,board:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
-    const phaseTrace=[];
+    const phaseTrace=[],supplyTrace=[],boardingTrace=[];let nextSupplySample=0;
+    const ferryWait={frames:0,supportedFrames:0,longestUnsupportedSeconds:0,entryHeight:null,exitHeight:null};let unsupportedWaitFrames=0;
     const crossingSample=(st,p,phase,age)=>{
       const water=st.chem.water.find(w=>w.id==='reach-spout');
-      return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
+      return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,raftHeight:st.reach.raftHeight,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
     };
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
+      if(p.board||p.wait)boardingTrace.push(crossingSample(st,p,phase,age));
+      if(p.wait){
+        ferryWait.frames++;
+        if(ferryWait.entryHeight===null)ferryWait.entryHeight=st.reach.raftHeight;
+        ferryWait.exitHeight=st.reach.raftHeight;
+        if(st.grounded&&st.reach.supportedBy===0){ferryWait.supportedFrames++;unsupportedWaitFrames=0;}else unsupportedWaitFrames++;
+        ferryWait.longestUnsupportedSeconds=Math.max(ferryWait.longestUnsupportedSeconds,unsupportedWaitFrames/fps);
+      }
+      if(st.t>=nextSupplySample){supplyTrace.push(crossingSample(st,p,phase,age));nextSupplySample=st.t+.5;}
       const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
       const sourceWater=st.chem.water.find(w=>w.id==='reach-spout');
       if(drinker?.freed&&events.shadeFreedAt===null)events.shadeFreedAt=st.t;
@@ -1668,32 +1991,39 @@ try {
       if(st.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=st.t;
       if(p.shade){if(!drinker)throw Error('Reach drinker missing');p.x=drinker.pos[0];p.z=drinker.pos[2];}
       const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
-      const ready=p.shade?drinker.freed:p.source?sourceWater?.flowing:p.settle?d<.3&&st.grounded&&Math.abs(st.pos[1]-p.y)<.6&&Math.hypot(st.vel[0],st.vel[2])<.7:d<.8&&st.pos[1]>=p.y-.4;
+      const ready=p.shade?drinker.freed:p.source?sourceWater?.flowing:p.board?d<.3&&st.grounded&&st.reach.supportedBy===0&&Math.hypot(st.vel[0],st.vel[2])<.7:p.settle?d<.3&&st.grounded&&Math.abs(st.pos[1]-p.y)<.6&&Math.hypot(st.vel[0],st.vel[2])<.7:d<.8&&st.pos[1]>=p.y-.4;
       if(p.shade&&drinker.freed&&!shadeShot){await shot('reach-drinker-released');shadeShot=true;}
       if(ready&&age>.15){phaseTrace.push(crossingSample(st,p,phase,age));if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
       const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&!sourceWater?.flowing)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
       const vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
       let sx=len>.2?vx/len*Math.min(1,len):0,sz=len>.2?vz/len*Math.min(1,len):0;
-      const keys=q.jump?['Space']:[];
+      // Board with a walking approach; a dash carries momentum past the rising ferry.
+      if(q.board){const speed=Math.min(1,len*.65);sx=len>.12?vx/len*speed:0;sz=len>.12?vz/len*speed:0;}
+      const boardingJump=q.board&&st.reach.supportedBy!==0&&st.reach.raftHeight>st.pos[1]+.25;
+      const keys=q.jump||boardingJump?['Space']:[];
       if((q.dash||q.shade)&&len<3&&!painted&&(!q.shade||st.grounded)){if(Math.hypot(sx,sz)<.1){sx=1;sz=0;}keys.push('ShiftLeft');painted=true;dashAttempt=age;}
       await RH('setStick',sx,sz);await RH('setKeys',keys);
     },st=>reached&&st.reach.restored||st.deaths>0||age>12,{keyFrames:[0,10*fps,20*fps,25*fps]});
     await RH('setKeys',[]);await RH('setStick',null);await advance(30);await shot('reach-end');
     const end=await RH('state');if(end.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=end.t;
     const eventOrder=Object.values(events).every(t=>t!==null)&&events.shadeFreedAt<events.sourceActivatedAt&&events.sourceActivatedAt<events.firstArrivalAt&&events.firstArrivalAt<events.bellLatchedAt;
-    save('reach-acceptance.json',{phase,reached,phaseTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
+    supplyTrace.push(crossingSample(end,points[phase],phase,age));
+    save('reach-acceptance.json',{phase,reached,phaseTrace,supplyTrace,boardingTrace,ferryWait,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(!eventOrder)report.failures.push('Reach release/source/arrival/latch event order not observed');
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
       let cycle=0,cycleAge=0,cyclePaint=false,ventHopIssued=false;
       const lowSeen={value:false};let lowLaneVisited=false,steamRise=false;
+      const cycleTrace=[];let nextCycleSample=0;
+      const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
+      const sampleCycle=(st,reason)=>({reason,t:st.t,cycle,age:cycleAge,waypoint:targets[cycle],distance:Math.hypot(targets[cycle][0]-st.pos[0],targets[cycle][2]-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,dashIssued:cyclePaint,ventHopIssued,steam:st.chem.hearths.find(h=>h.id==='reach-steam')??null,reach:st.reach});
       await video('reach-level-cycle',30*fps,async()=>{
         const st=await RH('state');cycleAge+=1/fps;
-        const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
+        if(st.t>=nextCycleSample){cycleTrace.push(sampleCycle(st,'interval'));nextCycleSample=st.t+.5;}
         const p=targets[cycle],dx=p[0]-st.pos[0],dz=p[2]-st.pos[2],d=Math.hypot(dx,dz);
         const atFooting=d<.8&&st.grounded&&Math.abs(st.pos[1]-p[1])<.6;
         const ready=cycle===0?st.reach.level==='low':cycle===1?st.reach.fill<.02:cycle===2?atFooting:cycle===3?cycleAge>1.2&&st.pos[1]>34:cycle===4?st.reach.level==='high':st.reach.fill>.99;
-        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
+        if(ready&&cycleAge>.2&&cycle<5){cycleTrace.push(sampleCycle(st,'transition'));if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
         const t=targets[cycle],vx=t[0]-st.pos[0],vz=t[2]-st.pos[2],len=Math.hypot(vx,vz);
         let sx=len>.25?vx/len*Math.min(.8,len):0,sz=len>.25?vz/len*Math.min(.8,len):0;
         const steamHot=st.chem.hearths.some(h=>h.id==='reach-steam'&&h.heat>=.5);
@@ -1708,7 +2038,7 @@ try {
         await RH('setKeys',keys);
       },st=>cycle===5&&st.reach.level==='high'&&st.reach.fill>.99||st.deaths>end.deaths||cycleAge>10,{keyFrames:[0,4*fps,8*fps,12*fps,16*fps]});
       await RH('setKeys',[]);await RH('setStick',null);await shot('reach-cycle-end');
-      const cy=await RH('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
+      const cy=await RH('state');cycleTrace.push(sampleCycle(cy,'final'));save('reach-cycle-acceptance.json',{cycle,cycleTrace,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
       if(cycle!==5||!lowSeen.value||!lowLaneVisited||!steamRise||cy.reach.level!=='high'||!cy.reach.restored||cy.reach.fill<.99)report.failures.push('Reach reversible water cycle incomplete');
     }
     // Staged architecture views are separate from the real summit-to-basin traversal above.
@@ -1788,6 +2118,22 @@ try {
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
+    const rendererSnapshot = () => page.evaluate(() => {
+      const { renderer, scene, post } = window.__gameHooks.debug;
+      const rt = renderer.getRenderTarget();
+      const output = post.composer.passes.find(p => p.isOutputPass);
+      if (!output || !Number.isFinite(output.uniforms?.toneMappingExposure?.value)) throw Error('Route renderer snapshot requires OutputPass exposure');
+      return {
+        exposure: renderer.toneMappingExposure, toneMapping: renderer.toneMapping,
+        outputColorSpace: renderer.outputColorSpace,
+        renderTarget: rt ? { uuid: rt.uuid, width: rt.width, height: rt.height, samples: rt.samples, type: rt.texture.type, colorSpace: rt.texture.colorSpace } : null,
+        outputExposure: output.uniforms.toneMappingExposure.value,
+        post: { ...post.params },
+        fog: scene.fog ? { color: scene.fog.color.toArray(), density: scene.fog.density ?? null, near: scene.fog.near ?? null, far: scene.fog.far ?? null } : null,
+        water: scene.userData.waterCapture ? { ...scene.userData.waterCapture } : null,
+      };
+    });
+    const rendererBefore = kilnRoute ? await rendererSnapshot() : null;
     const start = await H('state');
     const spawnDistanceToFirst = Math.hypot(start.pos[0] - route[0].x, start.pos[1] - route[0].y, start.pos[2] - route[0].z);
     if (kilnRoute && (!Number.isFinite(spawnDistanceToFirst) || spawnDistanceToFirst > 1)) throw Error('Kiln proof must begin within one metre of the authored plaza spawn');
@@ -1798,13 +2144,17 @@ try {
     await H('autopilot', true, from, { assist: false });
     let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt;
     let kilnStopped = false;
+    const pawSupport = [];
     const continuity = { maxStepMeters: 0, maxStepFrame: null, jumpLimitMeters: Math.max(3, 90 / fps), firstLargeStep: null };
     const encounter = { initialHits: start.shades.hits, minWisps: start.shades.wisps, knockbackTravelMeters: 0 };
     let previousPos = start.pos, previousKnockback = start.shades.knockbackTravel ?? 0, previousHits = start.shades.hits;
     const framing = { samples: 0, outside: 0, maxAbsX: 0, maxAbsY: 0, firstFailure: null, failures: [] };
+    const lensSafety = { samples: 0, occupied: 0, missing: 0, firstFailure: null };
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const budgetFrames = Number(arg('route-seconds', kilnRoute ? '60' : '360')) * fps;
     const minimumIdleFrames = 10 * fps;
+    // Unselected feature helpers must not prevent frozen gait tools reviewing historical refs.
+    const {projectedVisibilityReview}=await import(pathToFileURL(path.resolve(repo,'tools/projected-visibility-capture.mjs')).href);
     const visibilityReview = projectedVisibilityReview({ getPage: () => page, fs, path, out, name, save, fps });
     if (kilnRoute && budgetFrames < 60 * fps) throw Error('Kiln proof requires a capture budget of at least 60 seconds');
     const state = await video(name, budgetFrames, async () => {
@@ -1833,8 +2183,53 @@ try {
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     }, { traceEveryFrame: kilnRoute || budgetFrames <= 60 * fps, sample: async (i, st) => {
       const audit = {};
+      if (typeof st.camera.lensTouchesCollider === 'boolean') {
+        lensSafety.samples++;
+        if (st.camera.lensTouchesCollider) {
+          lensSafety.occupied++;
+          lensSafety.firstFailure ??= { frame: i, pos: st.camera.pos };
+        }
+      } else lensSafety.missing++;
       const visibility = await visibilityReview.sample(i);
       if (visibility) audit.projectedVisibility = visibility;
+      const [px, py, pz] = st.pos, axisLength = Math.hypot(.684, .729);
+      const terraceS = ((px + 48) * -.684 + (pz - 52) * -.729) / axisLength;
+      const terraceT = ((px + 48) * .729 + (pz - 52) * -.684) / axisLength;
+      if (kilnRoute && st.grounded && py >= 17.9 && py <= 18.1 && terraceS >= 61 && terraceS <= 66.5 && terraceT >= 8.8 && terraceT <= 10.8) {
+        const contacts = await page.evaluate(async () => {
+          const { Vector3, Matrix3, Raycaster } = await import('/gpu-three.js');
+          const hooks = window.__gameHooks, { world, fox } = hooks.debug;
+          const feet = hooks.locomotion?.feet;
+          if (!Array.isArray(feet) || feet.length !== 4) throw Error('Paw audit requires four solved locomotion feet');
+          const before = { t: hooks.state().t, pos: fox.position.toArray(), quaternion: fox.quaternion.toArray() };
+          const native = [];
+          const isNative = m => m?.isMeshStandardMaterial && m.visible && m.depthWrite && !m.transparent && /stone|rock|ground|terrain/i.test(m.name);
+          world.group.traverse(o => {
+            if (!o.isMesh || o.isInstancedMesh) return;
+            for (let p = o; p; p = p.parent) if (!p.visible) return;
+            const materials = Array.isArray(o.material) ? o.material : [o.material];
+            if (materials.some(isNative)) native.push(o);
+          });
+          const ray = new Raycaster(), normalMatrix = new Matrix3();
+          ray.near = 0; ray.far = 2.5;
+          const result = feet.map(foot => {
+            const pad = foot.paw.localToWorld(foot.padLocal.clone());
+            if (![pad.x, pad.y, pad.z].every(Number.isFinite)) throw Error('Nonfinite solved paw pad');
+            ray.set(pad.clone().add(new Vector3(0, .5, 0)), new Vector3(0, -1, 0));
+            const hit = ray.intersectObjects(native, false).find(h => {
+              const material = Array.isArray(h.object.material) ? h.object.material[h.face?.materialIndex ?? 0] : h.object.material;
+              return isNative(material) && h.face && h.face.normal.clone().applyNormalMatrix(normalMatrix.getNormalMatrix(h.object.matrixWorld)).y > .25;
+            });
+            return { id: foot.paw.name, stance: foot.planted, pad: pad.toArray(), anchor: foot.anchor.toArray(),
+              surface: hit ? { y: hit.point.y, gap: pad.y - hit.point.y, object: hit.object.name } : null };
+          });
+          const after = { t: hooks.state().t, pos: fox.position.toArray(), quaternion: fox.quaternion.toArray() };
+          if (JSON.stringify(before) !== JSON.stringify(after)) throw Error('Paw audit changed simulation time or root pose');
+          return result;
+        });
+        const sample = { frame: i, time: st.t, terraceS, terraceT, contacts };
+        pawSupport.push(sample); audit.pawSupport = sample;
+      }
       if (kilnRoute) {
         const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
         if (step > continuity.maxStepMeters) { continuity.maxStepMeters = step; continuity.maxStepFrame = i; }
@@ -1931,8 +2326,14 @@ try {
       return { ...audit, cameraDiagnostic: `${name}-camera-frame-${i}.json` };
     } });
     const projectedVisibility = await visibilityReview.finish();
+    save('route-lens-safety.json', { ...lensSafety, passed: lensSafety.samples > 0 && lensSafety.occupied === 0 && lensSafety.missing === 0,
+      scope: 'Every encoded frame, conservative .2m authored box/cylinder/terrain proximity; not exact visual mesh containment' });
     if (projectedVisibility.invalid || projectedVisibility.errors) report.failures.push(`Invalid GPU visibility masks: ${JSON.stringify(projectedVisibility)}`);
-    if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+    if (kilnRoute) {
+      save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+      save('route-renderer-state.json', { scope: 'Read-only snapshots bracketing the route across many reflection passes; not an atomic reflection-state leak test', before: rendererBefore, after: await rendererSnapshot() });
+      save('route-paw-support.json', { available: pawSupport.length > 0, scope: 'Bounded R5 turn: actual solved pad centres and stance flags vs upward opaque native stone/rock/ground triangles. Excludes full pad footprints, shader discard/displacement, instanced props, foliage, transparency and other support materials; no artistic contact or gameplay acceptance verdict', samples: pawSupport });
+    }
     await H('autopilot', false, state.auto.idx, { assist: false });
     await H('setKeys', []); await H('setStick', null); await shot('route-end');
 
@@ -1958,7 +2359,7 @@ try {
     });
     await shot('orbit-end');
   }
-  if (wants('fox')) {
+  if (wants('fox') && !hipDiagnostic) {
     // Character review: staged stills around the fox (concept turnaround angles + face), then the real chase cam.
     for (const state of ['sepia', 'restored']) {
       await boot(quality, true);
@@ -2002,6 +2403,11 @@ try {
       await H('setKeys', []); await H('photoOff');
     }
   }
+  if(hipDiagnostic) {
+    const {captureHipWeightAB}=await import(pathToFileURL(path.resolve(repo,'tools/hip-weight-capture.mjs')).href);
+    report.captureHelperSha['hip-weight-capture.mjs']=createHash('sha256').update(fs.readFileSync(path.join(repo,'tools/hip-weight-capture.mjs'))).digest('hex');
+    await captureHipWeightAB({repo,H,boot,video,save,getPage:()=>page,fps,quality,out});
+  }
   if (wants('turntable')) {
     // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
     await boot(quality, true); await H('forceRestore'); await advance(660, false);
@@ -2018,7 +2424,10 @@ try {
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
 finally {
   report.errors = errors; report.qualityLog = log;
-  save('report.json', report); save('perf.json', report.perf);
+  // Write completion atomically: the relay must never parse a partial report.
+  save('report.json.tmp', captureReportSummary(report));
+  fs.renameSync(path.join(out, 'report.json.tmp'), path.join(out, 'report.json'));
+  save('perf.json', report.perf);
   if (browser) await browser.close();
   server.close();
 }

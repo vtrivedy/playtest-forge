@@ -41,3 +41,43 @@ Before code, 2026-10-31. The current candidate remains pending remote GPU review
 Personally inspected the prior HIGH-arrival PNG again: stone is absent, basin appears suspended and fox is clipped at the lower image edge. Do not accept the frame. Sampler-error evidence means the pending PCF initialization retest is essential before further bank shading changes. Source waypoint inspection confirms the latest harness now observes actual source flow before advancing; phaseTrace/finalWaypoint will expose whether the pending run stalls at source, boarding or rise.
 
 GPU review order: (1) requested SHA/tool identity and no sampler warnings, (2) bank geometry visible in HIGH and LOW, with cool sky / mid-grey ground / dark teal water separated, (3) no continuous vertical glass wall, (4) hero-orchard comparison fox/basin framing, (5) real crossing event order plus completed reversible cycle and recovery. Complete reports remain required; the CPU summary does not satisfy these gates. Leave the existing immutable request stable rather than resetting an in-flight capture merely for this documentation audit.
+
+## Round16 — capture supply continuity
+
+Before code, 2026-10-31 05:43 UTC. Driver enabled reach-r2 polling at01:35ET; explicitly reissued current pushed tip. Feedback remains absent. Existing waypoint samples omit water loss between source departure and ferry arrival. Add half-second state samples to the real-input crossing acceptance report, using the existing crossingSample shape; include final sample. Keep transitions separately, retain all source/controls/timing/pass predicates. This provides supply continuity evidence without a local renderer or speculative game change. Node syntax and diff checks validate this capture-only edit; remote PNGs/window.__game remain required.
+
+## Round17: observed GPU image packaging failure
+
+The ac86a80 relay archive contains no PNGs or game report. Its capture.log identifies ERR_MODULE_NOT_FOUND for /opt/browser/projected-visibility-capture.mjs, statically imported by gpu-capture.mjs but absent from the Modal image. Repair: include the existing helper beside the runner, with no game or capture behavior changes. All nine relative runner imports must have image destinations; Python and helper syntax must pass. Remote recapture remains mandatory before visual/controller acceptance.
+
+Process correction: the intended pre-edit scoped design write used a nonexistent sprint3/reach directory and failed; that failure was missed before the one-line packaging commit. This records the rationale after that commit without rewriting branch history.
+
+## Round23 — driver-requested main integration
+
+Before conflict resolution: merge origin/main4bacc15 on s3-reach. The only conflict is the capture packaging regression checker. Keep main's inert RecordingImage execution of the local mount block: it follows actual computed mounts and the new modal.is_local guard, replacing our earlier AST shape matcher. Preserve Reach supply/cycle traces from the automatic merge. No new game art or tuning. Run packaging check, TypeScript and fox Vite before pushing branch and integrating main as explicitly requested by driver02:07. Re-request immutable landed SHA; relay failures are not visual evidence.
+
+## Round24 — break the spillway veil and regional sun wash
+
+Before code, 06:14 UTC. Main conflict already resolved at9c97912; feedback still only an older identity failure. Driver02:07 explicitly prioritizes glass-tank water and sepia sky. Existing rejected PNGs establish those failures; new candidate remains unreviewed. Code audit identifies a nonzero alpha floor plus continuous lip/foot on the165-degree spillway, and Reach gradients leaving the warm global sunColor untouched (also used by mist/cloud lighting).
+
+Scoped candidate: discard empty falling-water fragments, restrict strands into separated irregular spill clusters, and apply lip/foot only inside those clusters. Keep the surface footprint and all collisions/state/timing unchanged. Blend sky sunColor from a captured authored baseline toward pale daylight with the existing regional weight; restore baseline outside Reach each frame. Retain warm key/fox/copper accents. Report sun tint for per-shot inspection. No new assets/licenses. TypeScript and fox Vite required; push only s3-reach, request immutable remote comparison. No main merge or visual acceptance until personally inspecting valid PNGs/window.__game. Cross-model code critique requested; GPU review still decides whether holes look natural or merely patterned.
+
+
+## Round 26 — recovered relay frames, identity still rejected
+Personally inspected HIGH-basin, LOW-matched and hero-orchard PNGs from
+reach-r2 archive ea5fc32b8441. Relay identity verification failed; these frames
+must not establish current-commit acceptance. Unlike earlier missing-module
+archives, this archive contains rendered game evidence. Banks are present and
+dark; HIGH still reads as a round elevated reservoir with broad transparent
+water at the rim. LOW exposes the lane but repeated tall bank columns dominate.
+Hero-orchard places two huge masonry pillars ahead of the fox; sparse dead
+branches and pale mist lack a convincing drowned-orchard payoff.
+
+Report evidence: staged source arrival2.3s, latch6.7s, LOW fill0 and moodk1;
+report has no mood.sun field (the later candidate adds it). Therefore neither
+the latest daylight nor latest spillway discard changes can be assessed here.
+Do not tune the shared sky or change bank collision against unidentified frames.
+Next verified HIGH/LOW/hero capture must identify current pushed ref, tool and
+shot, include mood.sun and show whether broken spills eliminate the glass rim.
+If the ring still dominates, redesign only exposed spillway water silhouette
+first; preserve source timing, buoyancy, boarding gaps and low lane collision.

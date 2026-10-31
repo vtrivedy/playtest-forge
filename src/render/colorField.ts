@@ -332,7 +332,8 @@ export class ColorField {
             // Same metres, stationary noise and feather as the analytic material front.
             // Leaves sampling this RT must not see a larger circular restore halo.
             float edge = vRestore.y;
-            float brush = ((noise(vWorld * 0.35) - 0.5) * 0.8 + (noise(vWorld * 1.7) - 0.5) * 0.35) * edge * 1.6;
+            float brush = ((noise(vWorld * 0.35) - 0.5) * 0.8 + (noise(vWorld * 1.7) - 0.5) * 0.35) * edge * 1.6
+              + (noise(vWorld * 0.075 + 17.0) - 0.5) * edge * 3.0;
             ink = 1.0 - smoothstep(vRestore.x - edge + brush, vRestore.x + edge * 0.5 + brush, distance(vWorld, vCenter));
           } else {
             // Stationary world-space brush noise makes neighbouring stains coherent.
@@ -414,8 +415,8 @@ export class ColorField {
       if (r.radius > 0.01) {
         // Extra support around the analytic front keeps brush bleed inside the stamp quad.
         const edge = Math.max(0.001, ColorField.edgeOf(r));
-        // Noise can extend the analytic feather to R + 1.42e; keep it inside the quad.
-        const outer = r.radius + edge * 1.5;
+        // Fine + broad noise can extend the feather to R + 2.92e.
+        const outer = r.radius + edge * 3.1;
         stamps.push({
           x: r.center.x,
           z: r.center.z,
@@ -623,7 +624,8 @@ export class ColorField {
               float d = distance(p.xz, c.xz);
               float edge = max(0.001, uRestoreEdge[i]);
               // painterly ragged front: two octaves so a crisp front still reads as brushwork
-              float n = ((noise21(p.xz * 0.35) - 0.5) * 0.8 + (noise21(p.xz * 1.7) - 0.5) * 0.35) * edge * 1.6;
+              float n = ((noise21(p.xz * 0.35) - 0.5) * 0.8 + (noise21(p.xz * 1.7) - 0.5) * 0.35) * edge * 1.6
+                + (noise21(p.xz * 0.075 + 17.0) - 0.5) * edge * 3.0;
               float local = 1.0 - smoothstep(rad - edge + n, rad + edge * 0.5 + n, d);
               s = max(s, local);
               cfPermanent = max(cfPermanent, local);
@@ -689,6 +691,14 @@ export class ColorField {
           float brushEdge = (noise21(vWorldPosCF.xz * 0.85) - 0.5) * 0.5
             + (noise21(vWorldPosCF.xz * 2.7 + 8.0) - 0.5) * 0.2;
           float brushed = clamp(cm + brushEdge * sin(cm * 3.14159265), 0.0, 1.0);
+          // Sepia has a lifted dark floor. Restored colour should feel warmer/brighter,
+          // while retaining authored hue and the same soft permanent/temporary fronts.
+          float washedValue = dot(washed, vec3(0.2126, 0.7152, 0.0722));
+          float restoredValue = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
+          // Dark soil needs more headroom than stone to reach the same target;
+          // otherwise the lifted sepia floor turns a warm wake into a burn mark.
+          float aliveGain = clamp(washedValue * 1.18 / max(restoredValue, 0.002), 1.0, mix(1.65, 4.0, uGroundSurface));
+          chroma *= aliveGain;
           outgoingLight = mix(washed, chroma, brushed);
           // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
           // without repainting it — stone stays stone, just sunlit

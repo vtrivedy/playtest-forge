@@ -15,6 +15,18 @@ SHOTS = set('probe perf route kilnroute hub orbit fox gait worldgait stills wate
 def cli(args, **kw):
     return subprocess.run(args, text=True, capture_output=True, timeout=60, **kw)
 
+def identity_failures(run, report, ref, shots):
+    failures = []
+    if run.get('commit') != ref:
+        failures.append('run.commit differs from requested ref or is absent')
+    if run.get('shots') != shots:
+        failures.append('run.shots differs from requested shots or is absent')
+    if not run.get('captureToolSha'):
+        failures.append('run.captureToolSha is absent')
+    elif run.get('captureToolSha') != report.get('captureToolSha'):
+        failures.append('report.captureToolSha differs from run or is absent')
+    return failures
+
 def capture_request(stream, request, folder):
     folder.mkdir(parents=True, exist_ok=True)
     (folder/'request.json').write_text(json.dumps(request, indent=2))
@@ -49,14 +61,12 @@ def capture_request(stream, request, folder):
         wrapper=source_root/'tools/modal/gpu_capture.py'
         requested_wrapper=wrapper.read_text()
         canonical=(ROOT/'tools/modal/gpu_capture.py').read_text()
-        ca=canonical.index('\nif modal.is_local():\n');cb=canonical.index('\n@app.function',ca)
-        wa=requested_wrapper.index('\nif modal.is_local():\n');wb=requested_wrapper.index('\n@app.function',wa)
         (folder/'requested-gpu_capture.py').write_text(requested_wrapper)
-        applied_wrapper=requested_wrapper[:wa]+canonical[ca:cb]+requested_wrapper[wb:]
+        applied_wrapper=canonical
         wrapper.write_text(applied_wrapper)
         (folder/'applied-gpu_capture.py').write_text(applied_wrapper)
         mounts=sorted(p.name for p in (source_root/'tools').glob('*.mjs'))
-        (folder/'packaging.json').write_text(json.dumps({'patch':'automatic capture module mounts','modules':mounts,'gameSha':ref},indent=2))
+        (folder/'packaging.json').write_text(json.dumps({'patch':'canonical transport wrapper; requested game and JS modules unchanged','modules':mounts,'gameSha':ref},indent=2))
         if shots == 'gait' and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
             (source_root/'tools/gpu-capture.mjs').write_bytes(Path(os.environ['FOX_GAIT_CAPTURE_SCRIPT']).read_bytes())
         command=['modal','run','--detach',str(source_root/'tools/modal/gpu_capture.py'),'--ref',ref,'--shots',shots,'--out',str(folder/'evidence')]
@@ -69,25 +79,33 @@ def capture_request(stream, request, folder):
             if value is not None:command+=['--'+key,str(value)]
         capture_env=dict(os.environ)
         capture_env.pop('FOX_CAPTURE_SCRIPT',None)
+        capture_env['FOX_CAPTURE_APP']=f'fox-relay-{stream}-{folder.name}'
         with (folder/'modal.log').open('w') as log:
-            proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env)
+            proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env,start_new_session=True)
         source.cleanup()
         evidence=folder/'evidence'
         result={'status':'captured' if proc.returncode==0 else 'capture-failed','exit':proc.returncode,'ref':ref,'shots':shots,'path':str(evidence),'moduleMounts':mounts}
+        metadata={}
         for name in ['run.json','report.json']:
             p=evidence/name
-            if p.exists():
-                data=json.loads(p.read_text())
+            try:
+                data=json.loads(p.read_text()) if p.exists() else {}
+                metadata[name]=data
                 result[name]={k:data[k] for k in ['status','commit','gpu','failures','errors','captureToolSha'] if k in data}
-        run=json.loads((evidence/'run.json').read_text()) if (evidence/'run.json').exists() else {}
-        report=json.loads((evidence/'report.json').read_text()) if (evidence/'report.json').exists() else {}
-        if run.get('commit')!=ref or run.get('shots')!=shots or not run.get('captureToolSha') or run.get('captureToolSha')!=report.get('captureToolSha'):
-            result.update(status='capture-failed',verificationError='Missing or mismatched commit, shot or tool identity')
+            except (ValueError,OSError) as exc:
+                metadata[name]={}
+                result.setdefault('metadataErrors',{})[name]=str(exc)
+        run=metadata['run.json'];report=metadata['report.json']
+        if not run or not report:
+            result.update(status='capture-incomplete',verificationError='Completion metadata absent or unreadable; inspect cancellation/download log, not an identity verdict')
+        elif identity_failures(run,report,ref,shots):
+            result.update(status='capture-failed',verificationError='Commit, shot or tool identity disagreement',identity={'requestedRef':ref,'actualCommit':run.get('commit'),'requestedShots':shots,'actualShots':run.get('shots'),'runTool':run.get('captureToolSha'),'reportTool':report.get('captureToolSha')})
         elif run.get('status')=='failed' or report.get('failures') or report.get('errors'):
             result['status']='capture-failed'
+        elif proc.returncode or not (evidence/'.download-complete').exists():
+            result.update(status='capture-incomplete',verificationError='Client exit or absent atomic download completion marker')
         elif run.get('status')=='success':
             result['status']='captured'
-            if proc.returncode:result['transportWarning']=f'Client exit {proc.returncode}; verified durable capture succeeded'
         archive=folder/'evidence.tar'
         with tarfile.open(archive,'w') as tar:
             if evidence.exists():tar.add(evidence,arcname='evidence')

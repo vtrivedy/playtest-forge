@@ -37,6 +37,18 @@ scenery.updateMatrixWorld(true);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
   gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=$/, 'moved wall must not leave a phantom blocker');
+const ordinaryDiagnostics = follow.debug.internals();
+wall.position.set(4, .7, 0);
+scenery.updateWorldMatrix(true, true);
+assert.equal(follow.debug.viewBlocked(new THREE.Vector3(0, .62, 0), new THREE.Vector3(0, .62, 4)), false, 'follow view remains clear');
+// Turn the decorative plane toward the photo lens; the gameplay lens is elsewhere.
+wall.rotation.y = Math.PI / 2;
+scenery.updateWorldMatrix(true, true);
+assert.equal(follow.debug.viewBlocked(new THREE.Vector3(0, .62, 0), new THREE.Vector3(8, .62, 0)), true, 'actual photo view catches decorative wall');
+assert.equal(follow.debug.internals(), ordinaryDiagnostics, 'photo query preserves gameplay diagnostics');
+assert.equal(wall.material, material, 'photo query preserves render material identity');
+wall.rotation.y = 0;
+wall.position.set(0, 0, 2);
 wall.position.x = 0;
 scenery.updateMatrixWorld(true);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
@@ -310,6 +322,48 @@ assert.ok(lowestNose > -.9, `descending front silhouette stays above viewport ed
 assert.ok(highestEars < .9, 'nose protection retains the ears');
 assert.ok(steepestView < 40, `nose protection avoids top-down framing: ${steepestView}`);
 console.log('Downhill front proxy:', JSON.stringify({ lowestNose, highestEars, steepestView }));
+
+const turnGuard = createFollowCamera({ params: { minDistance: 3.2, framingHeight: 1 }, surfaceAt: (x, z) => Math.hypot(x, z) > 1 ? 2 : 0 });
+turnGuard.resize(1280, 720);
+const perpendicular = turnGuard.params.sideBias + Math.PI / 2;
+for (let i = 0; i < 180; i++) turnGuard.update(1 / 60, { ...idleFrame, facing: perpendicular + .3 });
+const initialTurnView = turnGuard.camera.getWorldDirection(new THREE.Vector3());
+const previousTurnView = initialTurnView.clone();
+let turnPitchStep = 0;
+for (let i = 0; i <= 240; i++) {
+  turnGuard.update(1 / 60, { ...idleFrame, facing: perpendicular + .3 - i * .6 / 240 });
+  const view = turnGuard.camera.getWorldDirection(new THREE.Vector3());
+  turnPitchStep = Math.max(turnPitchStep, THREE.MathUtils.radToDeg(Math.acos(THREE.MathUtils.clamp(view.dot(previousTurnView), -1, 1))));
+  previousTurnView.copy(view);
+}
+assert.ok(turnPitchStep < .1, `snout protection blends through perpendicular turns: ${turnPitchStep}`);
+assert.ok(initialTurnView.angleTo(previousTurnView) > .005, 'turn probe actually exercises the framing correction');
+console.log('Perpendicular facing guard max step degrees:', turnPitchStep);
+
+// Isolate authored-volume clearance from the earlier mesh-ray solver. A clear
+// spring endpoint crosses this solid; the final lens must slide continuously.
+const volumeWorld = new CollisionWorld(() => 0);
+volumeWorld.add(cylCollider({ x: 0, z: 3.2, r: .55, top: 3, bottom: 0 }));
+const volumeCamera = createFollowCamera({ surfaceAt: () => 0,
+  lensBlocked: (x, y, z, radius) => volumeWorld.cameraOccupied(x, y, z, radius) });
+volumeCamera.resize(1280, 720);
+const volumeTarget = new THREE.Vector3(-4, 0, 0);
+for (let i = 0; i < 120; i++) volumeCamera.update(1 / 60, { ...idleFrame, target: volumeTarget });
+const volumePrevious = volumeCamera.camera.position.clone();
+let volumeMaxStep = 0, volumeActiveFrames = 0;
+for (let i = 0; i < 240; i++) {
+  volumeTarget.x = -4 + i * 2 / 60;
+  volumeCamera.update(1 / 60, { ...idleFrame, target: volumeTarget, vel: new THREE.Vector3(2, 0, 0), facing: Math.PI / 2 });
+  const lens = volumeCamera.camera.position;
+  assert.equal(volumeWorld.cameraOccupied(lens.x, lens.y, lens.z, .2), false, 'rendered lens stays outside authored solid');
+  assert.match(volumeCamera.debug.internals(), /lensUnresolved=false/);
+  volumeMaxStep = Math.max(volumeMaxStep, lens.distanceTo(volumePrevious));
+  if (Math.abs(lens.z - 3.23918266122983) > .15) volumeActiveFrames++;
+  volumePrevious.copy(lens);
+}
+assert.ok(volumeMaxStep < .3, `volume clearance does not jump across a solid: ${volumeMaxStep}`);
+assert.ok(volumeActiveFrames > 10, 'volume test actually changes the lens path');
+console.log('Volume clearance CPU probe:', JSON.stringify({ volumeMaxStep, volumeActiveFrames }));
 
 for (const velocity of [new THREE.Vector3(0, 0, 9), new THREE.Vector3(4.5, 0, -7.8)]) {
   const follow = createFollowCamera();

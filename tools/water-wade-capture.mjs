@@ -12,7 +12,16 @@ export async function captureWadeVisibility({ H, boot, video, shot, save, getPag
     await H('setStick', 0, 0); await H('setKeys', []); await H('advance', 30, 1 / 60, false);
     const start = await H('state');
     const name = `pond-wade-${view.name}`;
+    const before = await getPage().evaluate(() => {
+      const h = window.__gameHooks, d = h.debug.scene.userData.waterCapture;
+      const buffer = h.debug.post.composer.readBuffer;
+      return { waterScene: d ? { ...d } : null, expected: { width: buffer.width, height: buffer.height, type: buffer.texture.type, shadowType: h.debug.renderer.shadowMap.type } };
+    });
     const end = await video(name, 3 * fps, async () => {
+      await getPage().evaluate(() => {
+        const d = window.__gameHooks.debug.scene.userData.waterCapture;
+        if (d) d.checkNextCopy = true;
+      });
       await H('setStick', 0.18, 0);
     }, undefined, {
       traceEveryFrame: true,
@@ -26,8 +35,20 @@ export async function captureWadeVisibility({ H, boot, video, shot, save, getPag
       }),
     });
     await H('setStick', null); await shot(`${name}-end`);
+    const after = await getPage().evaluate(() => {
+      const h = window.__gameHooks, d = h.debug.scene.userData.waterCapture;
+      const buffer = h.debug.post.composer.readBuffer;
+      return { waterScene: d ? { ...d } : null, expected: { width: buffer.width, height: buffer.height, type: buffer.texture.type, shadowType: h.debug.renderer.shadowMap.type }, finalGlError: h.debug.renderer.getContext().getError() };
+    });
+    const d = after.waterScene, initial = before.waterScene, expected = after.expected;
+    const rendererPassed = !!d && !!initial && d.copies > initial.copies && d.checkedCopies > initial.checkedCopies
+      && d.shadowTypeAtFirstPrepare === 1 && expected.shadowType === 1
+      && d.type === 1016 && d.type === expected.type && d.width === expected.width && d.height === expected.height
+      && !d.glError && !d.priorGlError && !d.invalidTargets && !after.finalGlError;
+    save(`${name}-renderer.json`, { before, after, rendererPassed });
+    if (!rendererPassed) throw Error(`Wading renderer gate failed: ${name}; see ${name}-renderer.json`);
     if (end.deaths !== start.deaths) throw Error(`Wading visibility comparison died: ${name}`);
-    summary.push({ name, view: view.offset, start: start.pos, end: end.pos, deaths: end.deaths - start.deaths });
+    summary.push({ name, view: view.offset, start: start.pos, end: end.pos, deaths: end.deaths - start.deaths, rendererPassed, renderer: `${name}-renderer.json` });
   }
   save('pond-wade-visibility.json', {
     label: 'Staged fresh starts; identical live inputs; fixed world-offset tracking photo lenses. Not gameplay-camera route proof.',

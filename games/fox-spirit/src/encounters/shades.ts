@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { heroSoftUniforms, HERO_SOFT_VERTEX, HERO_SOFT_FRAGMENT } from '../cameraSoftOcclusion';
 import type GUI from 'lil-gui';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js';
@@ -157,9 +158,10 @@ const NOISE = /* glsl */ `
   }`;
 
 function inkMaterial(): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 }, uDensity: { value: 3 }, uReleaseAge: { value: -1 } },
+  const material = new THREE.ShaderMaterial({
+    uniforms: { ...heroSoftUniforms(), uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 }, uDensity: { value: 3 }, uReleaseAge: { value: -1 } },
     vertexShader: /* glsl */ `
+      ${HERO_SOFT_VERTEX}
       uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer;
       attribute float aMass, aTip;
       varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying vec3 vRest; varying float vMass; varying float vTip;
@@ -181,12 +183,14 @@ function inkMaterial(): THREE.ShaderMaterial {
         p += normal * ((1.0 - uPresence) * 0.035 + uLayer * 0.025);
         vP = p;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        vCameraOccluderDepth = -mv.z;
         vN = normalize(normalMatrix * normal);
         vWorldN = normalize(mat3(modelMatrix) * normal);
         vV = normalize(-mv.xyz);
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
+      ${HERO_SOFT_FRAGMENT}
       uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer, uDensity, uReleaseAge;
       varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying vec3 vRest; varying float vMass; varying float vTip;
       ${NOISE}
@@ -213,7 +217,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         float shellEdge=.3+.7*smoothstep(.05,.55,rim);
         float alpha=(uLayer<.5?1.0-exp(-uDensity*density):.11*density*shellEdge)*(1.0-fray);
         alpha *= (1.0 - smoothstep(0.42, 1.0, rim)) * dissolve * uPresence;
-        gl_FragColor = vec4(col, alpha);
+        gl_FragColor = vec4(col, alpha * cameraHeroAlpha());
         #include <colorspace_fragment>
         #include <fog_fragment>
       }`,
@@ -221,6 +225,8 @@ function inkMaterial(): THREE.ShaderMaterial {
     transparent: true,
     depthWrite: false,
   });
+  material.userData.heroSoftOccluder = true;
+  return material;
 }
 
 /** Animal-volume ink wisps: original analytic sprites, no texture or external asset. */
@@ -256,8 +262,10 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
   g.userData.shadeInk={wisps:count,tipWisps:Array.from(tips).filter(v=>v>.25).length,meanWispMass:Number((masses.reduce((a,b)=>a+b,0)/count).toFixed(3)),meanWispTip:Number((tips.reduce((a,b)=>a+b,0)/count).toFixed(3))};
   g.setAttribute('aPhase', new THREE.BufferAttribute(Float32Array.from({length:count}, (_,k)=>(k*.618+seed*.13)%1),1));
   const mat=new THREE.ShaderMaterial({
-    uniforms:{uTime:{value:0},uPresence:{value:1},uOpacity:{value:.16},uSize:{value:.65},uPixelScale:{value:540},uReleased:{value:0},uReleaseAge:{value:0},uReleaseStart:{value:0}},
-    vertexShader:`attribute float aPhase,aMass,aTip; uniform float uTime,uPresence,uSize,uPixelScale,uReleased,uReleaseAge,uReleaseStart; varying float vAge; varying float vPhase; varying float vMass; varying float vTip;
+    uniforms:{...heroSoftUniforms(),uTime:{value:0},uPresence:{value:1},uOpacity:{value:.16},uSize:{value:.65},uPixelScale:{value:540},uReleased:{value:0},uReleaseAge:{value:0},uReleaseStart:{value:0}},
+    vertexShader:`${HERO_SOFT_VERTEX}
+      attribute float aPhase,aMass,aTip; uniform float uTime,uPresence,uSize,uPixelScale,uReleased,uReleaseAge,uReleaseStart; varying float vAge; varying float vPhase; varying float vMass; varying float vTip;
+
       void main(){
         vMass=aMass;vTip=aTip;
         float clock=uReleased>.5?uReleaseStart:uTime;
@@ -271,10 +279,13 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
           p.z+=cos(aPhase*23.+uReleaseAge*.7)*uReleaseAge*.35;
         }
         vec4 mv=modelViewMatrix*vec4(p,1.);
+        vCameraOccluderDepth=-mv.z;
         gl_Position=projectionMatrix*mv;
         gl_PointSize=clamp(uSize*mix(1.,.6,aTip*(1.-uReleased))*(.55+age)*projectionMatrix[1][1]*uPixelScale/max(.1,-mv.z),1.,180.);
       }`,
-    fragmentShader:`uniform float uTime,uPresence,uOpacity,uReleased,uReleaseAge; varying float vAge; varying float vPhase; varying float vMass; varying float vTip;
+    fragmentShader:`${HERO_SOFT_FRAGMENT}
+      uniform float uTime,uPresence,uOpacity,uReleased,uReleaseAge; varying float vAge; varying float vPhase; varying float vMass; varying float vTip;
+
       ${NOISE}
       void main(){
         vec2 q=(gl_PointCoord-.5)*2.;q.x+=sin(q.y*3.+vPhase*23.+uTime*.6)*.15;
@@ -286,11 +297,13 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
         float a=edge*edge*(.35+grain*.65)*life*uOpacity*presence*mix(1.,1.8,vTip*(1.-uReleased));
         vec3 base=mix(vec3(.16,.12,.09),vec3(.05,.036,.024),max(vTip,.6*vMass)*(1.-uReleased));
         vec3 color=mix(base,vec3(.42,.23,.095),uReleased*smoothstep(.15,1.8,uReleaseAge));
-        gl_FragColor=vec4(color,a);
+        gl_FragColor=vec4(color,a*cameraHeroAlpha());
+
         #include <colorspace_fragment>
       }`,
     transparent:true,depthWrite:false,depthTest:true,
   });
+  mat.userData.heroSoftOccluder = true;
   const smoke=new THREE.Points(g,mat);smoke.frustumCulled=false;
   const size=new THREE.Vector2();
   smoke.onBeforeRender=renderer=>{mat.uniforms.uPixelScale!.value=renderer.getDrawingBufferSize(size).y*.5;};
@@ -386,6 +399,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     group.name=s.id;
     const body = new THREE.Mesh(geo, mat);
     body.name='shade-density-core';
+    body.userData.forgeSkipAO = true;
     body.castShadow = false;
     body.renderOrder = 2;
     group.add(body);
@@ -395,6 +409,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       material.uniforms.uLayer!.value = layer;
       material.side = layer % 2 ? THREE.BackSide : THREE.FrontSide;
       const wash = new THREE.Mesh(geo, material);
+      wash.userData.forgeSkipAO = true;
       wash.renderOrder = layer % 2 ? 1 : 3;
       group.add(wash);
       layers.push(material);

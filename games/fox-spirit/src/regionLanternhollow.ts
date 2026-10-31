@@ -3,6 +3,13 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { Bucket, PAL, trs } from './russetKit';
 import { boxCollider, cylCollider, type CollisionWorld } from './collision';
 
+/** Development comparison control; default selected from the captured 1x/2.5x/4x comparison. */
+export const HUB_PRACTICAL = { strength: 2.5 };
+export const HUB_HEARTH = { x: -12, z: 93 } as const;
+export function hubHearthClearance(x: number, z: number): boolean {
+  return Math.hypot(x-HUB_HEARTH.x,z-HUB_HEARTH.z)<1.7;
+}
+
 /** Domestic scale, kept outside the existing arrival/hearth route. Original geometry. */
 export const HUB_FESTOON_POSTS = [[-12, 86.4], [6.6, 89.4]] as const;
 
@@ -34,7 +41,7 @@ export function hubPathDistance(x: number, z: number): number {
 
 /** Exclude random vegetation/rocks from doorsteps, the well and new paths. */
 export function hubClearance(x: number, z: number): boolean {
-  return Math.hypot(x + 5, z - 92) < 1.7 || Math.hypot(x + 23.6, z - 85.2) < 1.2 || Math.hypot(x + 22.4, z - 85.1) < 1 || HUB_FESTOON_POSTS.some(([px, pz]) => Math.hypot(x - px, z - pz) < .9) || Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
+  return hubHearthClearance(x,z) || Math.hypot(x + 23.6, z - 85.2) < 1.2 || Math.hypot(x + 22.4, z - 85.1) < 1 || HUB_FESTOON_POSTS.some(([px, pz]) => Math.hypot(x - px, z - pz) < .9) || Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
     HUB_HOUSES.some(h => Math.abs(x - h.x) < h.w / 2 + 1.2 && Math.abs(z - h.z) < h.d / 2 + 1.2);
 }
 
@@ -47,7 +54,7 @@ export function createLanternhollow(
   b: HubBuckets, labelMaterials: THREE.MeshStandardMaterial[], decorMaterials: DecorMaterials,
 ) {
   const windowAmber = new THREE.Color(0xe9a860);
-  const plaster = new THREE.Color(0xc0ac86), roof = new THREE.Color(0x80513b), dark = new THREE.Color(0x30261e);
+  const plaster = new THREE.Color(0xd5c7ad), roof = new THREE.Color(0x80513b), dark = new THREE.Color(0x30261e);
   const rounded = (bucket: Bucket, x: number, y: number, z: number, w: number, h: number, d: number, tint: THREE.Color, radius = .06) => {
     const g = new RoundedBoxGeometry(w, h, d, 2, Math.min(radius, w / 4, h / 4, d / 4));
     bucket.add(g, trs(x, y, z), tint); g.dispose();
@@ -321,7 +328,7 @@ export function createLanternhollow(
   plazaLight.position.set(bounce.x, ground(bounce.x, bounce.z) + 2.5, bounce.z); parent.add(plazaLight);
 
   // A communal cooking pot, distinct from the realm's tall traversal braziers.
-  const hx = -5, hz = 92, hy = ground(hx, hz);
+  const hx = HUB_HEARTH.x, hz = HUB_HEARTH.z, hy = ground(hx, hz);
   for (let i = 0; i < 8; i++) {
     const a = i / 8 * Math.PI * 2;
     const g = new RoundedBoxGeometry(.32, .25, .24, 2, .035);
@@ -427,10 +434,10 @@ export function createLanternhollow(
     state: () => ({ well: wellLight.intensity, porch: porchLight.intensity, plaza: plazaLight.intensity, hearth: fireLight.intensity }),
     update(time: number, dusk: number) {
     const flicker = 1 + Math.sin(time * 1.3) * .04;
-    wellLight.intensity = 4 * dusk * flicker;
-    porchLight.intensity = 3 * dusk * flicker;
-    plazaLight.intensity = 3 * dusk * flicker;
-    fireLight.intensity = 4 * dusk * flicker;
+    wellLight.intensity = 4 * dusk * flicker * HUB_PRACTICAL.strength;
+    porchLight.intensity = 3 * dusk * flicker * HUB_PRACTICAL.strength;
+    plazaLight.intensity = 3 * dusk * flicker * HUB_PRACTICAL.strength;
+    fireLight.intensity = 4 * dusk * flicker * HUB_PRACTICAL.strength;
     for (const [i, flame] of flames.entries()) {
       const phase = time * 2.2 + i * 2.1;
       flame.position.set(hx + Math.cos(i * 2.1) * .16 + Math.sin(phase) * .018, hy + .12, hz + Math.sin(i * 2.1) * .16);
