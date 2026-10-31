@@ -284,7 +284,14 @@ try {
           const overlap=shared/Math.max(1e-6,Math.min((a[1]-a[0])*(a[3]-a[2]),(b[1]-b[0])*(b[3]-b[2])));
           const fits=foxBounds.height>.19&&shadeBounds.height>.18&&foxBounds.inFrame&&shadeBounds.inFrame&&overlap<.3;
           if(!fits)continue;
-          clearance??=!h.photoBlocker||(!h.photoBlocker(pos,[x,y+1.3,z])&&!h.photoBlocker(pos,[fox.x,fy+.6,fox.z]));
+          clearance??=!!h.photoBlocker&&[
+            [x,y+1.3,z],
+            [x+right.x*.5,y+1.3,z+right.z*.5],
+            [x-right.x*.5,y+1.3,z-right.z*.5],
+            [x+Math.sin(actor.heading??0)*.6,y+2.4,z+Math.cos(actor.heading??0)*.6],
+            [fox.x,fy+.6,fox.z],
+            [fox.x+Math.sin(h.debug.fox.rotation.y)*.6,fy+.9,fox.z+Math.cos(h.debug.fox.rotation.y)*.6],
+          ].every(target=>!h.photoBlocker(pos,target));
           const clear=clearance;
           const result={pos,look,fov,clear,noFit:false,overlap,fox:foxBounds,shade:shadeBounds};
           fallback??=result;
