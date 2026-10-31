@@ -133,6 +133,24 @@ try {
   async function shot(name) {
     await page.screenshot({ path: path.join(out, `${name}.png`), animations: 'disabled' });
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
+    if (name.startsWith('reachview-')) {
+      // Validate the snapshot belonging to this PNG, after its staged teleport/lens.
+      // This observes the same simulated water; it never sets a puzzle state.
+      const { reach, reachMood } = report.shots[name].state;
+      const expectedLevel = name.startsWith('reachview-low-') ? 'low' : 'high';
+      const fillMatches = Number.isFinite(reach?.fill) && (expectedLevel === 'high' ? reach.fill >= .99 : reach.fill <= .02);
+      const checks = {
+        expectedLevel,
+        actualLevel: reach?.level,
+        fill: reach?.fill,
+        moodWeight: reachMood?.k,
+        waterMatches: reach?.level === expectedLevel && fillMatches,
+        moodMatches: reachMood?.k === 1,
+      };
+      save(`${name}-acceptance.json`, checks);
+      if (!checks.waterMatches) report.failures.push(`${name}: labelled ${expectedLevel.toUpperCase()} water state does not match PNG snapshot`);
+      if (!checks.moodMatches) report.failures.push(`${name}: Reach mood is not fully blended at photo position`);
+    }
   }
   await boot(quality);
   await shot('hardware-probe');
@@ -1538,6 +1556,8 @@ try {
     await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-lower-islet');
     await RH('teleport',207,36,-123,-Math.PI/2);
     await RH('photo',[220,44,-122],[190,34,-119],52);await advance(2);await shot('reachview-payoff-vista');
+    // A closer comparison avoids the east-bank trunk without moving the scene.
+    await RH('photo',[213,39,-121],[192,34,-120],52);await advance(2);await shot('reachview-hero-orchard');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
@@ -1547,23 +1567,28 @@ try {
   if (wants('reach')) {
     await boot(quality,true); await RH('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
-    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115},{x:175,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
+    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
+    const phaseTrace=[];
+    const crossingSample=(st,p,phase,age)=>{
+      const water=st.chem.water.find(w=>w.id==='reach-spout');
+      return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
+    };
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
       const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
       const sourceWater=st.chem.water.find(w=>w.id==='reach-spout');
       if(drinker?.freed&&events.shadeFreedAt===null)events.shadeFreedAt=st.t;
-      if(sourceWater?.heat>.01&&events.sourceActivatedAt===null)events.sourceActivatedAt=st.t;
+      if(sourceWater?.flowing&&events.sourceActivatedAt===null)events.sourceActivatedAt=st.t;
       if(st.reach.arrived&&events.firstArrivalAt===null)events.firstArrivalAt=st.t;
       if(st.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=st.t;
       if(p.shade){if(!drinker)throw Error('Reach drinker missing');p.x=drinker.pos[0];p.z=drinker.pos[2];}
       const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
-      const ready=p.shade?drinker.freed:p.source?st.pos[0]>=103&&Math.abs(st.pos[2]+115)<1.2&&events.sourceActivatedAt!==null:d<.8&&st.pos[1]>=p.y-.4;
+      const ready=p.shade?drinker.freed:p.source?sourceWater?.flowing:p.settle?d<.3&&st.grounded&&Math.abs(st.pos[1]-p.y)<.6&&Math.hypot(st.vel[0],st.vel[2])<.7:d<.8&&st.pos[1]>=p.y-.4;
       if(p.shade&&drinker.freed&&!shadeShot){await shot('reach-drinker-released');shadeShot=true;}
-      if(ready&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
-      const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&events.sourceActivatedAt===null)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
+      if(ready&&age>.15){phaseTrace.push(crossingSample(st,p,phase,age));if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
+      const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&!sourceWater?.flowing)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
       const vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
       let sx=len>.2?vx/len*Math.min(1,len):0,sz=len>.2?vz/len*Math.min(1,len):0;
       const keys=q.jump?['Space']:[];
@@ -1573,7 +1598,7 @@ try {
     await RH('setKeys',[]);await RH('setStick',null);await advance(30);await shot('reach-end');
     const end=await RH('state');if(end.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=end.t;
     const eventOrder=Object.values(events).every(t=>t!==null)&&events.shadeFreedAt<events.sourceActivatedAt&&events.sourceActivatedAt<events.firstArrivalAt&&events.firstArrivalAt<events.bellLatchedAt;
-    save('reach-acceptance.json',{phase,reached,strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
+    save('reach-acceptance.json',{phase,reached,phaseTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(!eventOrder)report.failures.push('Reach release/source/arrival/latch event order not observed');
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
