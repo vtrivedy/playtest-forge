@@ -740,7 +740,7 @@ export class ColorField {
           float edgeBoost = smoothstep(0.15, 0.55, cm) * (1.0 - smoothstep(0.55, 0.95, cm));
           vec3 washed = inkWash(outgoingLight, vWorldPosCF, vWorldNormalCF);
           // restored hue strength per material: stone/rock come back as warm-grey stone, not orange paint
-          vec3 chroma = mix(dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)) * vec3(1.04, 0.98, 0.88), outgoingLight, mix(uRestoredChroma, 1.0, cfPermanent * uGroundSurface)) * (1.0 + edgeBoost * 0.12);
+          vec3 chroma = mix(dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722)) * vec3(1.04, 0.98, 0.88), outgoingLight, mix(uRestoredChroma, 1.0, max(cfPermanent, cfPaint) * uGroundSurface)) * (1.0 + edgeBoost * 0.12);
           chroma *= mix(vec3(1.0), vec3(1.12, 1.04, 0.86), cfPermanent * uGroundSurface);
           // Keep the full feather instead of amplifying low mask values into a painted disc.
           // Modulation vanishes at 0/1, so untouched and fully restored regions remain exact.
@@ -755,11 +755,23 @@ export class ColorField {
           // otherwise the lifted sepia floor turns a warm wake into a burn mark.
           float aliveGain = clamp(washedValue * 1.18 / max(restoredValue, 0.002), 1.0, mix(1.65, 4.0, uGroundSurface));
           chroma *= aliveGain;
+          // the fox's paint is pigment, not just authored colour returning: richer, with a
+          // low-frequency watercolour hue drift (ochre / olive / madder) across the wash
+          float paintK = cfPaint * cfPaintLead * mix(0.45, 1.0, uGroundSurface);
+          if (paintK > 0.001) {
+            float hueA = noise21(vWorldPosCF.xz * 0.11 + 31.0);
+            float hueB = noise21(vWorldPosCF.xz * 0.37 + 5.0);
+            vec3 tint = mix(vec3(1.25, 0.92, 0.45), vec3(0.95, 1.02, 0.52), smoothstep(0.35, 0.75, hueA));
+            tint = mix(tint, vec3(1.3, 0.72, 0.55), smoothstep(0.6, 0.9, hueB) * 0.6);
+            float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
+            vec3 pigment = max(mix(vec3(chromaLuma), chroma, 1.35), 0.0) * tint * 1.1;
+            chroma = mix(chroma, pigment, paintK * 0.8);
+          }
           outgoingLight = mix(washed, chroma, brushed);
           // watercolour: pigment pools at the drying edge of the fox's paint (burnt-sienna line),
           // and paint the brush is still passing over glistens warm
           float pigmentRim = smoothstep(0.1, 0.4, cfPaint) * (1.0 - smoothstep(0.45, 0.9, cfPaint)) * cfPaintLead;
-          outgoingLight *= mix(vec3(1.0), vec3(0.8, 0.66, 0.52), pigmentRim * 0.6);
+          outgoingLight *= mix(vec3(1.0), vec3(0.7, 0.52, 0.38), pigmentRim * 0.85);
           outgoingLight *= 1.0 + cfPaint * cfFresh * vec3(0.14, 0.08, 0.02);
           // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
           // without repainting it — stone stays stone, just sunlit
@@ -855,10 +867,10 @@ export type PaintTuning = {
 export class PaintLayer {
   readonly bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
   readonly tun: PaintTuning = {
-    ribbonRadius: 1.55,
+    ribbonRadius: 1.9,
     ribbonSpacing: 0.45,
     pawRadius: 0.8,
-    dripSpacing: 5,
+    dripSpacing: 3.5,
     dripRadius: 2.6,
     bloomLife: 1.3,
     strength: 1,
@@ -968,7 +980,7 @@ export class PaintLayer {
                   + (noise(vWorld * 6.5 + 3.0) - 0.5) * 0.12;
           float d = distance(vWorld, vCenter) / max(vRadius, 0.01) + n;
           // watercolour: a fairly decided edge, not an airbrush falloff
-          float ink = 1.0 - smoothstep(0.72, 0.86, d);
+          float ink = 1.0 - smoothstep(0.68, 0.86, d);
           // paper granulation inside the wash
           ink *= 0.88 + 0.12 * noise(vWorld * 9.0);
           gl_FragColor = vec4(ink * vStrength, 0.0, 0.0, 1.0);
