@@ -421,7 +421,9 @@ void main() {
   float x = vUv.x - 0.5 + curl;
   float width = mix(0.36, 0.07, y);
   float shape = exp(-2.0 * x * x / (width * width));
-  shape *= smoothstep(0.0, 0.12, y) * (1.0 - smoothstep(0.6, 1.0, y));
+  float attachedCrest = step(0.5, vCrest) * (1.0 - step(1.5, vCrest));
+  float rootEnvelope = mix(smoothstep(0.0, 0.12, y), mix(0.55, 1.0, smoothstep(0.0, 0.12, y)), attachedCrest);
+  shape *= rootEnvelope * (1.0 - smoothstep(0.6, 1.0, y));
   float body = shape;
   // Broad, slow variation keeps the flame present between breaths, without glitter noise.
   float breathe = 0.72 + 0.28 * sin(uTime * 1.1 + vSeed * 3.0);
@@ -616,7 +618,8 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       if (lk.flow) curve.sub(dir).multiplyScalar(0.5);
       else curve.set(0, 0, 0);
       aBend.setXYZ(i, curve.x, curve.y, curve.z);
-      tmp.addScaledVector(dir, 0.015);
+      // Ear/nape fire begins inside fur; a lifted, zero-alpha root reads as a floating candle.
+      tmp.addScaledVector(dir, !lk.tailFlow && !lk.spineFlow ? -0.02 : 0.015);
       aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
       aDir.setXYZ(i, dir.x, dir.y, dir.z);
       const flick = lk.spineFlow ? 0.925 + 0.075 * Math.sin(time * 1.1 + lk.seed * 3) : 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
