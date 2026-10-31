@@ -21,11 +21,8 @@
     "vite": "^8.3.5"
   },
   "dependencies": {
-    "@dimforge/rapier3d-compat": "^0.21.0",
     "lil-gui": "^0.21.0",
-    "postprocessing": "^6.38.3",
-    "three": "^0.186.1",
-    "three-stdlib": "^2.36.1"
+    "three": "^0.186.1"
   },
   "allowScripts": {
     "esbuild@0.28.2": true
