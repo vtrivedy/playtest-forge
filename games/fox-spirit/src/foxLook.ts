@@ -132,7 +132,10 @@ ${NOISE_GLSL}`,
         `#ifdef USE_MAP
   // Prefer broad painted values over the baked fine fur speckle.
   diffuseColor = vec4(diffuse, opacity) * texture2D(map, vMapUv, 0.4);
-  ${tail ? "diffuseColor.a = opacity;" : ""}
+  ${tail ? `diffuseColor.a = opacity;
+  // This spindle has continuous UVs; the removed petal atlas would paint dark islands on it.
+  float brushAlong = 1.0 - vMapUv.y;
+  diffuseColor.rgb = mix(vec3(0.36, 0.095, 0.022), vec3(0.78, 0.29, 0.045), smoothstep(0.15, 1.0, brushAlong));` : ""}
   ${coat ? `{
     vec3 center = vRest.x > 0.0 ? uEyeL : uEyeR;
     float aperture = foxEyeAperture(foxEyeCoordinates(vRest, center, uEyeR0));
@@ -181,10 +184,10 @@ ${NOISE_GLSL}`,
   outgoingLight += uRimColor * ${fringeLength ? "0.0" : "1.0"} * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
   ${tail ? `
   #ifdef USE_MAP
-    // Authored tail UV: V=1 at the root, V=0 at tail_08.
+    // Brush UV: V=1 at the buried root, V=0 at the capped terminal extension.
     float tailAlong = 1.0 - vMapUv.y;
     float tipHeat = smoothstep(0.68, 0.88, tailAlong);
-    outgoingLight += vec3(1.0, 0.4, 0.075) * 0.4 * tipHeat;
+    ${!shell ? 'outgoingLight += vec3(1.0, 0.24, 0.025) * mix(0.07, 0.4, tipHeat);' : ''}
     ${shell ? `float tipCoverage = 1.0 - smoothstep(0.65, 1.0, tailAlong);
     float furTuft = smoothstep(0.20, 0.78, fxNoise(vRest * vec3(12.0, 12.0, 3.0)));
     float coverage = tipCoverage * furTuft * (1.0 - smoothstep(0.05, 0.60, facing));
@@ -435,9 +438,9 @@ void main() {
   float a = body * vAlpha * uIntensity * 0.70 * breathe;
   float radiance = mix(uRadiance.y, uRadiance.x, crest) * mix(1.0, 0.5, step(1.5, vCrest));
   // Keep the core luminous through quiet breaths; only the broad orange envelope breathes/noises.
-  float core = pow(shape, 2.5) * vAlpha * uIntensity * radiance;
+  float core = shape * vAlpha * uIntensity * radiance;
   if (a < 0.003 && core < 0.003) discard;
-  vec3 hot = mix(vec3(1.0, 0.52, 0.12), vec3(1.0, 0.45, 0.08), crest);
+  vec3 hot = mix(vec3(1.0, 0.32, 0.045), vec3(1.0, 0.28, 0.035), crest);
   gl_FragColor = vec4(col * a + hot * core, a * 0.85);
 }`;
 const EMBER_VERT = /* glsl */ `
