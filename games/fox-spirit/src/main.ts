@@ -549,13 +549,6 @@ async function boot() {
   fPaint.add(PAINT_FEEL, 'idlePool', 1, 5, 0.1).name('idle pool max r');
   fPaint.add(PAINT_FEEL, 'grade', 0, 1, 0.05).name('grade from paint');
   fPaint.close();
-  const pawBones = (['l', 'r'] as const).flatMap((s) => [FOX_RIG.foreleg(s).paw, FOX_RIG.hindleg(s).paw]).map((n) => {
-    const b = foxActor.group.getObjectByName(n);
-    if (!b) throw Error(`Authored fox paw bone ${n} missing`);
-    return b;
-  });
-  const pawLifted = pawBones.map(() => false);
-  const pawPos = new THREE.Vector3();
   const paintLast = new THREE.Vector3(NaN, 0, 0);
   let paintDist = 0;
   let dripDist = 0;
@@ -594,15 +587,9 @@ async function boot() {
     if (idleT > 0.5 && Math.floor((idleT - dt) / 0.7) !== Math.floor(idleT / 0.7))
       paint.bloom(fox.position.x, fox.position.z, Math.min(PAINT_FEEL.idlePool, 1.2 + idleT * 0.3), T.strength, 2);
     // pawfalls: each planted paw blooms where it lands
-    for (let i = 0; i < pawBones.length; i++) {
-      pawBones[i]!.getWorldPosition(pawPos);
-      const h = pawPos.y - col.groundAt(pawPos.x, pawPos.z, pawPos.y + 0.3).y;
-      if (h > 0.1) pawLifted[i] = true;
-      else if (pawLifted[i] && h < 0.07 && grounded) {
-        pawLifted[i] = false;
-        paint.bloom(pawPos.x, pawPos.z, T.pawRadius * (0.85 + Math.random() * 0.3), T.strength, T.bloomLife * 0.8);
-      }
-    }
+    if (grounded)
+      for (const paw of foxActor.locomotion?.footfalls ?? [])
+        paint.bloom(paw.x, paw.z, T.pawRadius * (0.85 + Math.random() * 0.3), T.strength, T.bloomLife * 0.8);
   }
   let inColumn = false;
   let hearthLeafT = 0;
