@@ -765,8 +765,8 @@ export class ColorField {
           // low-frequency watercolour hue drift (ochre / olive / madder) across the wash
           // The fox's paint brings the valley back alive, not the authored rust louder: on the
           // ground a wet-in-wet living meadow (yellow-green / sage / moss, ochre and madder only as
-          // accents) replaces the hue at the surface's own value; stone and wood come back as warm
-          // sandstone with moss on their tops and lichen patches on their faces.
+          // accents) replaces the hue at the surface's own value; stone comes back cool blue-grey
+          // (the sepia is warm, so true colour on stone is the cool) with moss tops and lichen.
           float paintK = cfPaint * cfPaintLead;
           if (paintK > 0.001) {
             vec3 wp = vWorldPosCF;
@@ -776,18 +776,21 @@ export class ColorField {
             // pigment density: settled pools and thin, paper-lit passages (not a flat carpet)
             float dens = mix(0.86, 1.16, noise21(wp.xz * 0.7 + 11.0) * 0.6 + noise21(wp.xz * 2.3 + 2.0) * 0.4);
             // unit-luma hues
-            vec3 meadow = mix(vec3(0.95, 1.06, 0.4), vec3(0.8, 1.08, 0.62), smoothstep(0.35, 0.6, hueA));
-            meadow = mix(meadow, vec3(0.7, 1.1, 0.5), smoothstep(0.62, 0.82, hueA));
+            vec3 meadow = mix(vec3(0.92, 1.08, 0.3), vec3(0.76, 1.1, 0.55), smoothstep(0.35, 0.6, hueA));
+            meadow = mix(meadow, vec3(0.62, 1.14, 0.42), smoothstep(0.62, 0.82, hueA));
             meadow = mix(meadow, vec3(1.3, 0.95, 0.42), smoothstep(0.7, 0.9, hueB) * 0.55);
             meadow = mix(meadow, vec3(1.5, 0.8, 0.62), smoothstep(0.82, 0.95, 1.0 - hueB) * 0.4);
             vec3 own = max(mix(vec3(chromaLuma), chroma, 1.2), 0.0);
-            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.12, 0.8) * dens;
+            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.15, 0.85) * dens;
             float up = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
-            float lichen = smoothstep(0.55, 0.75, noise21(wp.xz * 1.3 + wp.y * vec2(1.1, 0.7) + 3.0));
-            vec3 sandstone = chromaLuma * vec3(1.28, 0.93, 0.74) * 1.08;
-            vec3 moss = chromaLuma * vec3(0.78, 1.12, 0.48) * 1.1;
-            float mossK = max(smoothstep(0.45, 0.85, up), lichen * 0.75);
-            vec3 propPaint = mix(own, mix(sandstone, moss, mossK), 1.0 - uRestoredChroma * 0.5) * dens;
+            float lichenN = noise21(wp.xz * 1.3 + wp.y * vec2(1.1, 0.7) + 3.0);
+            float lichen = smoothstep(0.5, 0.7, lichenN);
+            vec3 stone = chromaLuma * mix(vec3(0.86, 0.97, 1.16), vec3(1.02, 0.98, 0.98), noise21(wp.xz * 0.5 + wp.y * 0.4)) * 1.1;
+            // ochre-gold lichen on faces, green moss on tops
+            vec3 lichenC = chromaLuma * vec3(1.2, 1.05, 0.45) * 1.1;
+            vec3 moss = chromaLuma * vec3(0.66, 1.14, 0.42) * 1.15;
+            vec3 face = mix(stone, lichenC, lichen * 0.8);
+            vec3 propPaint = mix(own, mix(face, moss, smoothstep(0.45, 0.85, up)), 1.0 - uRestoredChroma * 0.5) * dens;
             chroma = mix(chroma, mix(propPaint, groundPaint, uGroundSurface), paintK * 0.92);
           }
           outgoingLight = mix(washed, chroma, brushed);

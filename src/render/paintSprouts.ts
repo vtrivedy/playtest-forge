@@ -43,7 +43,7 @@ function bladeTexture(flowers: boolean): THREE.CanvasTexture {
     const w = N * (flowers ? 0.025 : 0.035 + r() * 0.03);
     // value ramp: dark base → light tip; hue comes from the instance colour
     const grad = g.createLinearGradient(0, N, 0, N - h);
-    grad.addColorStop(0, '#5a5a4a');
+    grad.addColorStop(0, '#8c876a');
     grad.addColorStop(1, '#f2ecd2');
     g.fillStyle = grad;
     g.beginPath();
@@ -139,7 +139,7 @@ export function createPaintSprouts(scene: THREE.Scene, opts: { maxGrass?: number
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-        totalEmissiveRadiance += diffuseColor.rgb * 0.18;`,
+        totalEmissiveRadiance += diffuseColor.rgb * 0.3;`,
       );
     };
     const mesh = new THREE.InstancedMesh(geo, mat, max);
