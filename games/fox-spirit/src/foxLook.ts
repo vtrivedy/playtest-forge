@@ -42,6 +42,8 @@ export const FOX_LOOK = {
   emberSize: 0.04,
 };
 
+const LIMB_HEAT_BAND = { inStart: 0.31, inEnd: 0.35, outStart: 0.39, outEnd: 0.45, frontOffset: 0.02 } as const;
+
 type FurUniforms = {
   uTime: { value: number };
   uFringe: { value: number };
@@ -201,7 +203,7 @@ ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
   vec3 charcoal = min(diffuseColor.rgb, vec3(0.055, 0.046, 0.040) + diffuseColor.rgb * 0.25);
   diffuseColor.rgb = mix(diffuseColor.rgb, charcoal, undercoat);
   float lowerLimb = 1.0 - smoothstep(1.20, 1.65, vRest.y);
-  float darkStocking = max(vSpiritCoat.y, lowerLimb) * (1.0 - smoothstep(0.035, 0.10, lum));
+  float darkStocking = lowerLimb * (1.0 - smoothstep(0.035, 0.10, lum));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.028, 0.018), darkStocking * 0.45 * coatAmount);
   float frontCoat = smoothstep(0.35, 1.25, vRest.z) * (1.0 - smoothstep(2.3, 2.6, vRest.y));
   float creamPigment = 1.0 - rustPigment;
@@ -247,10 +249,10 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
   warmth *= mix(0.35, 1.0, pow(1.0 - facing, 1.3));
   float heatBreath = 0.92 + 0.08 * sin(uTime * 1.1);
   ${innerHeat ? 'outgoingLight += vec3(1.0, 0.30, 0.06) * uRim.z * warmth * heatBreath;' : ''}
-  // Buried heat spreads through thin ear tissue and softly through the upper paw/back coat.
+  // Buried heat spreads through thin ear tissue and softly through the outer limb/back coat.
   // Broad skin weights provide the feather; only the opaque coat emits this layer.
   float throughCoat = ${fringeLength ? '1.0' : 'mix(0.60, 1.0, pow(1.0 - facing, 1.2))'};
-  float emberHeat = vSpiritCoat.x * 2.8 ${fringeLength ? '' : '+ vSpiritCoat.y * 0.22'} + vSpiritCoat.z * 0.40;
+  float emberHeat = vSpiritCoat.x * 2.8 ${fringeLength ? '' : '+ vSpiritCoat.y * 0.50 * foxRustPigment'} + vSpiritCoat.z * 0.40;
   outgoingLight += vec3(0.80, 0.23, 0.025) * emberHeat * throughCoat * heatBreath * clamp(uBodyEmber, 0.0, 1.5);
   float furlPulse = 0.94 + 0.06 * sin(uTime * 0.8 + vRest.z);
   vec3 furlColor = mix(vec3(0.85, 0.22, 0.03), vec3(1.0, 0.35, 0.06), foxFurls);
@@ -408,13 +410,17 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
   });
   // Append after traversal: each surface shares the source skeleton and bind matrices, never new bones.
   let coatHeatVertices = 0, coatRuffVertices = 0;
-  const coatSpiritRegions = { ear: 0, paw: 0, back: 0, undercoat: 0 };
-  const coatRegionNames = ['ear', 'paw', 'back', 'undercoat'] as const;
+  const coatSpiritRegions = { ear: 0, limb: 0, back: 0, undercoat: 0 };
+  const coatRegionNames = ['ear', 'limb', 'back', 'undercoat'] as const;
   for (const { mesh, mat } of coats) {
     const R = FOX_RIG;
     const heatBones = new Set<string>([...R.spine, ...R.neck]);
     const throatBones = new Set<string>(R.neck.slice(0, 2));
     const pawBones = new Set<string>(['l', 'r'].flatMap((s) => [R.foreleg(s as 'l' | 'r').paw, R.hindleg(s as 'l' | 'r').paw]));
+    const limbPaw = new Map<string, string>(['l', 'r'].flatMap((side) => {
+      const f = R.foreleg(side as 'l' | 'r'), h = R.hindleg(side as 'l' | 'r');
+      return [[f.lower, f.paw], [f.paw, f.paw], [h.shin, h.paw], [h.foot, h.paw], [h.paw, h.paw]];
+    }));
     const earHeat = new Map<string, number>(['l', 'r'].flatMap((s) => R.ear(s as 'l' | 'r').slice(2).map((name, index) => [name, index === 0 ? 0.45 : 1] as const)));
     const full = new Set<string>([R.pelvis, ...R.spine, ...R.neck]);
     const short = new Set<string>(['l', 'r'].flatMap((side) => {
@@ -432,13 +438,17 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
     const spirit = new Float32Array(si.count * 4);
     const restNormals = g.getAttribute('normal');
     for (let i = 0; i < si.count; i++) {
-      let pawFloorSum = 0;
+      let pawFloorSum = 0, frontLimbWeight = 0;
       for (let k = 0; k < 4; k++) {
         const name = mesh.skeleton.bones[si.getComponent(i, k)]?.name ?? '';
         if (heatBones.has(name)) heat[i * 2] += sw.getComponent(i, k);
         const weight = sw.getComponent(i, k);
         spirit[i * 4] += (earHeat.get(name) ?? 0) * weight;
-        if (pawBones.has(name)) { spirit[i * 4 + 1] += weight; pawFloorSum += weight * pawFloor.get(name)!; }
+        const limbFloor = limbPaw.get(name);
+        if (limbFloor) {
+          spirit[i * 4 + 1] += weight; pawFloorSum += weight * pawFloor.get(limbFloor)!;
+          if (limbFloor.startsWith('front_')) frontLimbWeight += weight;
+        }
         if (heatBones.has(name) || name === R.pelvis) spirit[i * 4 + 2] += weight;
         if (heatBones.has(name) || name === R.pelvis) spirit[i * 4 + 3] += weight;
         let ruffAmount = throatBones.has(name)
@@ -460,9 +470,12 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
         mask[i] += sw.getComponent(i, k) * amount;
       }
       heat[i * 2 + 1] = restNormals.getY(i);
-      const pawWeight = spirit[i * 4 + 1]!;
-      if (pawWeight > 0) spirit[i * 4 + 1] *= THREE.MathUtils.smoothstep(p.getY(i), pawFloorSum / pawWeight + 0.015 / metresPerUnit, pawFloorSum / pawWeight + 0.04 / metresPerUnit);
-      spirit[i * 4 + 1] *= THREE.MathUtils.smoothstep(restNormals.getY(i), -0.30, 0.25);
+      const limbWeight = spirit[i * 4 + 1]!;
+      if (limbWeight > 0) {
+        const abovePad = (p.getY(i) - pawFloorSum / limbWeight) * metresPerUnit + LIMB_HEAT_BAND.frontOffset * frontLimbWeight / limbWeight;
+        spirit[i * 4 + 1] *= THREE.MathUtils.smoothstep(abovePad, LIMB_HEAT_BAND.inStart, LIMB_HEAT_BAND.inEnd) * (1 - THREE.MathUtils.smoothstep(abovePad, LIMB_HEAT_BAND.outStart, LIMB_HEAT_BAND.outEnd));
+      }
+      spirit[i * 4 + 1] *= THREE.MathUtils.smoothstep(Math.max(restNormals.getX(i) * Math.sign(p.getX(i)), -restNormals.getZ(i) * 0.65), 0.05, 0.55);
       spirit[i * 4 + 2] *= THREE.MathUtils.smoothstep(restNormals.getY(i), 0.0, 0.60);
       spirit[i * 4 + 3] *= 1 - THREE.MathUtils.smoothstep(restNormals.getY(i), -0.45, 0.35);
       const eyeCenter = p.getX(i) > 0 ? eyeUniforms.uEyeL.value : eyeUniforms.uEyeR.value;
@@ -677,7 +690,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   }
 
   const lookState = { emberSeams: FOX_LOOK.emberSeams, bodyEmber: FOX_LOOK.bodyEmber, brushRelief: FOX_LOOK.brushRelief, furFringe: FOX_LOOK.furFringe, tailRadiance: FOX_LOOK.tailRadiance, eyeSocketLift: FOX_LOOK.eyeSocketLift };
-  const diagnostics = { look: lookState, tailBrush: root.userData.tailBrush, spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, coatFringeMode: root.userData.coatFringeMode, coatRuffVertices: root.userData.coatRuffVertices as number, coatSpiritRegions: root.userData.coatSpiritRegions, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  const diagnostics = { look: lookState, tailBrush: root.userData.tailBrush, spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, coatFringeMode: root.userData.coatFringeMode, coatRuffVertices: root.userData.coatRuffVertices as number, coatSpiritRegions: root.userData.coatSpiritRegions, limbHeatPlacement: 'outer-back-above-stocking', limbHeatAbovePadMetres: { front: (LIMB_HEAT_BAND.inEnd + LIMB_HEAT_BAND.outStart) * 0.5 - LIMB_HEAT_BAND.frontOffset, hind: (LIMB_HEAT_BAND.inEnd + LIMB_HEAT_BAND.outStart) * 0.5 }, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
   group.userData.spiritFx = diagnostics;
 
   // flame licks: one instanced billboard per lick
