@@ -72,7 +72,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   for (const z of [-123,-113]) stoneBlock(stone,trs(187,30.35,z),12,.7,.6,980+z,.08);
   for(let i=0;i<7;i++) stoneBlock(stone,trs(192.2,30.4+i*.9,-118),.4,.2,1.2,990+i,.04);
   // Cistern banks meet HIGH water. Two broken spillways preserve source boarding
-  // and the LOW lane; the high-water surface no longer floats above an empty floor.
+  // and the LOW lane. HIGH spillway edges remain above the dry-safe LOW floor.
   for (let i=0;i<24;i++) {
     const a=i/24*Math.PI*2;
     if (Math.cos(a)<-.9 || (Math.sin(a)<-.45 && Math.cos(a)<.55)) continue;

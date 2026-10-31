@@ -182,14 +182,15 @@ export function createReachWater(group: THREE.Group) {
     fragmentShader:`#include <fog_pars_fragment>
       uniform float uTime;uniform vec3 uDeep,uSky;varying vec2 vUv;varying vec3 vWorld;
       void main(){
-        vec2 p=(vUv-.5)*2.;float r=length(p);
+        vec2 p=(vUv-.5)*2.;
         float edge=length(vec2(p.x*12./11.55,p.y*13./12.55))+.008*sin(p.x*26.+sin(p.y*17.))+.006*sin(p.y*32.);
-        float alpha=1.-smoothstep(.98,1.015,edge);
         vec2 bankP=vec2(p.x*12./11.35,-p.y*13./12.35);
-        float bankAngle=atan(bankP.y,bankP.x);
-        bool spillway=cos(bankAngle)<-.9||(sin(bankAngle)<-.45&&cos(bankAngle)<.55);
-        if(spillway)alpha=1.-smoothstep(.95,1.,edge);
-        else alpha=1.-smoothstep(1.,1.025,length(bankP));
+        float bankAngle=mod(atan(bankP.y,bankP.x)+6.283185307,6.283185307);
+        // Continuous missing-bank arc; feather both ends beneath retained slabs.
+        float spillway=smoothstep(2.617993878,2.792526803,bankAngle)
+          *(1.-smoothstep(5.375614096,5.462880559,bankAngle));
+        float alpha=mix(1.-smoothstep(1.,1.025,length(bankP)),
+          1.-smoothstep(.95,1.,edge),spillway);
         if(alpha<.005)discard;
         float a=vWorld.x*.6+vWorld.z*.83-uTime*.36;
         float b=vWorld.x*1.9-vWorld.z*.74+uTime*.45;
@@ -202,7 +203,7 @@ export function createReachWater(group: THREE.Group) {
         // Broken, thin tide edge, rather than a white filled ellipse.
         float shore=smoothstep(.85,.93,edge)*(1.-smoothstep(.94,.99,edge));
         float shoreBreak=smoothstep(.2,.65,sin(vWorld.x*2.7+sin(vWorld.z*1.9))*.5+.5);
-        color=mix(color,vec3(.31,.36,.30),spillway?0.:shore*.2*shoreBreak);
+        color=mix(color,vec3(.31,.36,.30),(1.-spillway)*shore*.2*shoreBreak);
         gl_FragColor=vec4(color,alpha*(.95+fres*.04));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
