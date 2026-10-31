@@ -7,6 +7,9 @@ export type MotionInput = {
 };
 import GAITS from '../../../assets/hero/spirit_fox.loco.json';
 type Gait = keyof typeof GAITS;
+/** Measured: rotating the gaze about the actor right axis raises +Y pitch, so the correction flips. */
+const CARRIAGE_SIGN = -1;
+
 const GAIT_NAMES = Object.keys(GAITS) as Gait[];
 /** Speed each gait's designed cadence is quoted at (gait-gym bands). */
 const CADENCE_REF: Record<Gait, number> = { walk: 1.5, trot: 3.8, run: 9 };
@@ -31,6 +34,8 @@ export class AuthoredLocomotion {
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
     minStanceRatio: .35, bodyBob: .45,
+    // Glide carriage: share of per-stride back rock / head pitch removed, tail streaming and ribbon wave.
+    rockDamp: 1.3, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
     headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { cadenceHz: 0, stanceRatio: 1, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
@@ -48,7 +53,7 @@ export class AuthoredLocomotion {
     this.tailLoadSpring.value=0;this.tailLoadSpring.velocity=0;
     this.lookSpring.value=0;this.lookSpring.velocity=0;
     this.brake=0;
-    this.landSpring.value=0;this.landSpring.velocity=0;this.wasGrounded=true;this.previousVerticalSpeed=0;
+    this.landSpring.value=0;this.landSpring.velocity=0;this.carriageReady=false;this.wasGrounded=true;this.previousVerticalSpeed=0;
     this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
     this.leanSpring.value=0;this.leanSpring.velocity=0;
     this.pitchSpring.value=0;this.pitchSpring.velocity=0;
@@ -248,6 +253,34 @@ export class AuthoredLocomotion {
       bone.position.sub(m).multiplyScalar(keep).add(m);
     });
   }
+  private backPitchSpring=new Spring();
+  private headPitchSpring=new Spring();
+  private carriageReady=false;
+  /** Pitch of a bone's +Y in the world (chain bones point toward their child along +Y). */
+  private static pitchOf(bone:THREE.Object3D) {
+    const d=new THREE.Vector3(0,1,0).applyQuaternion(bone.getWorldQuaternion(q()));
+    return Math.atan2(d.y,Math.hypot(d.x,d.z));
+  }
+  /** Low-pass the back line and gaze: slope and turns still read, the per-stride rock and nod don't. */
+  private carriage(dt:number,worldOverlay:(bone:THREE.Object3D|undefined,axis:THREE.Vector3,angle:number)=>void,right:THREE.Vector3) {
+    if(!this.spine||!this.head||!this.spines.length)return;
+    const chest=this.spines[this.spines.length-1];
+    this.root.updateWorldMatrix(true,true);
+    const pelvis=this.spine.getWorldPosition(v()), withers=chest.getWorldPosition(v());
+    const back=Math.atan2(withers.y-pelvis.y,Math.hypot(withers.x-pelvis.x,withers.z-pelvis.z));
+    if(!this.carriageReady){this.backPitchSpring.value=back;this.headPitchSpring.value=AuthoredLocomotion.pitchOf(this.head);this.carriageReady=true;}
+    const backSmooth=this.backPitchSpring.step(back,dt,1.2,1);
+    // Positive rotation about the actor's right axis lowers a forward-pointing line.
+    const rock=(back-backSmooth)*this.params.rockDamp;
+    for(const spine of this.spines)worldOverlay(spine,right.clone(),rock/this.spines.length);
+    this.root.updateWorldMatrix(true,true);
+    const head=AuthoredLocomotion.pitchOf(this.head);
+    const headSmooth=this.headPitchSpring.step(head,dt,1.2,1);
+    const level=(headSmooth-head)*this.params.headLevel*CARRIAGE_SIGN;
+    for(const neck of this.necks)worldOverlay(neck,right.clone(),level*.5/this.necks.length);
+    worldOverlay(this.head,right.clone(),level*.5);
+    this.root.updateWorldMatrix(true,true);
+  }
   afterMixer(dt: number, active: string) {
     const step=Math.max(dt,.00001);
     this.glideLayer();
@@ -310,15 +343,18 @@ export class AuthoredLocomotion {
     const right=new THREE.Vector3(Math.cos(this.input.yaw),0,-Math.sin(this.input.yaw));
     for(const neck of this.necks)worldOverlay(neck,right.clone(),.10);
     worldOverlay(this.head,right.clone(),-.10*this.necks.length);
-    const nod=this.nodSpring.step(-landOffset*2-this.brake*.10+(this.input.grounded ? Math.sin(this.phase*Math.PI*(this.metrics.gait==='run' ? 2 : 4))*(this.metrics.gait==='run' ? .22 : .06) : THREE.MathUtils.clamp(-this.input.verticalSpeed*.012,-.1,.1)),dt,6,.7);
+    const nod=this.nodSpring.step(-landOffset*2-this.brake*.10+(this.input.grounded ? Math.sin(this.phase*Math.PI*(this.metrics.gait==='run' ? 2 : 4))*(this.metrics.gait==='run' ? .06 : .03) : THREE.MathUtils.clamp(-this.input.verticalSpeed*.012,-.1,.1)),dt,6,.7);
     worldOverlay(this.head,right,-this.pitch*this.params.headStabilize+nod);
-    const tailLoad=this.tailLoadSpring.step(this.params.tailLoad+this.input.speed*.005-landOffset*3+this.brake*.10+(this.input.grounded ? 0 : THREE.MathUtils.clamp(this.input.verticalSpeed*.015,-.1,.15)),dt,2.8,.8);
+    const tailLoad=this.tailLoadSpring.step(this.params.tailLoad-this.input.speed*this.params.tailStream-landOffset*3+this.brake*.10+(this.input.grounded ? 0 : THREE.MathUtils.clamp(this.input.verticalSpeed*.015,-.1,.15)),dt,2.8,.8);
     overlay(this.tailBone,new THREE.Vector3(1,0,0),tailLoad);
+    const locomotingNow=this.input.grounded && ['run','walk','trot'].includes(active);
     let tailTarget=THREE.MathUtils.clamp(-this.turn*this.params.tailLag,-.25,.25);
     for(let i=0;i<this.tails.length;i++) {
       const bone=this.tails[i]; const spring=this.tailSprings[i];
       const angle=spring.step(tailTarget,dt,Math.max(1.2,this.params.springFrequency-i*.16),this.params.springDamping);
       overlay(bone,new THREE.Vector3(0,0,1),angle*(i===0 ? 1 : .35));
+      // Ribbon: a pitch wave travelling down the tail, locked to the stride.
+      if(locomotingNow)overlay(bone,new THREE.Vector3(1,0,0),this.params.tailWave*Math.sin(2*Math.PI*this.phase-i*this.params.tailWaveLag));
       tailTarget=angle*.9;
     }
 
@@ -331,6 +367,7 @@ export class AuthoredLocomotion {
       }
       if(lift>0) {overlay(this.tailBone,new THREE.Vector3(1,0,0),Math.min(.65,lift));this.root.updateWorldMatrix(true,true);}
     }
+    this.carriage(dt,worldOverlay,right);
     if(this.input.grounded && Math.abs(slope)<.1 && Math.abs(this.turn)>.5 && this.spine) {
       const pelvis=this.spine.getWorldPosition(v());
       const floorY=this.input.groundAt(pelvis.x,pelvis.z,this.group.position.y+.8);

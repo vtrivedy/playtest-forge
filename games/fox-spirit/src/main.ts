@@ -340,6 +340,11 @@ async function boot() {
     folder.add(params, 'cadenceExponent', 0, 1, .05);
     folder.add(params, 'minStanceRatio', .2, 1, .01);
     folder.add(params, 'bodyBob', 0, 1, .01);
+    folder.add(params, 'rockDamp', 0, 2, .05);
+    folder.add(params, 'headLevel', 0, 1, .05);
+    folder.add(params, 'tailStream', 0, .03, .001);
+    folder.add(params, 'tailWave', 0, .15, .005);
+    folder.add(params, 'tailWaveLag', 0, 1.5, .05);
     folder.add(params, 'trotSpeed', 2, 6, .1);
     folder.add(params, 'gallopSpeed', 4, 10, .1);
     folder.add(params, 'plantStrength', 0, 1, .01);
