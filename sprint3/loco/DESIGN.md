@@ -103,3 +103,8 @@ Fore-only horizontal hold clears toes but zeroing Y increases worst lift step75.
 Long1500-frame jitter audit selects split XZ/vertical release: gallop fore lift min2.104mm unchanged; near-floor max4.511→.313m/s (17vs11 samples), worst vertical step82.3→95.4mm and median57.5→59.4mm. Fore trot near-floor p952.985→2.528m/s with .25curl, min unchanged; walk byte-identical. Hind samples, stance residual and no-support unchanged (gallop longrun residual .0349m inherited). This meets the narrow fore lift-off motion target, not global no-skating. GPU still required.
 
 Opus final split-release audit: no code blockers, safe to send for GPU. Offline near-floor sample counts are thin; evaluate actual side/chase toe-off for snap or lingering pad. Keep known inherited stance/hind motion and below-ground mesh minimum visible in report.
+
+## Next diagnostic: gallop gather hunch
+Keep b9bf716 gait capture immutable and unchanged while pending. Inspect current actual rig chest-to-pelvis pitch/height and mesh pads across steady gallop with spineFlex .6/.45/.3. Lower retained flex should reduce gather curvature, but reject variants that merely rigidify the back or increase contact residual. No runtime default change until returned side/chase motion establishes the defect on current main-derived rig. Probe metrics are diagnosis only; preserve lively stretch and suspension.
+
+Posture probe .6/.45/.3: chest-pelvis pitch range9.61°/7.21°/4.81°; lowest chest.505/.517/.528m, head range~22mm unchanged, maxplant residual7.5/2.3/<.001mm fixed60Hz. .45 is a possible conservative gather variant; .3 risks rigid back. These are not selected defaults. Await current gait side capture and cross-model design critique before change.
