@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bindHeroSoftOccluder } from './cameraSoftOcclusion';
 
 /**
  * Keeps the fox readable behind ruins, arches, rock and maple crowns.
@@ -25,6 +26,10 @@ export function createOcclusionFader(
   const uOccRad = { value: new THREE.Vector2(1, 1) };
   const uOccStrength = { value: 0 };
   const patched = new WeakSet<THREE.Material>();
+  const softMaterials = new Set<THREE.ShaderMaterial>();
+  const softObjects = new Set<THREE.Object3D>();
+  const renderViewport = new THREE.Vector4();
+  let renderedCamera: THREE.Camera | null = null;
 
   function patch(mat: THREE.MeshStandardMaterial) {
     if (patched.has(mat)) return;
@@ -77,9 +82,33 @@ export function createOcclusionFader(
     opts.exclude?.traverse((o) => skip.add(o));
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh || skip.has(o)) return;
+      if ((!mesh.isMesh && !(o as THREE.Points).isPoints) || !mesh.material || skip.has(o)) return;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const m of mats) if ((m as THREE.MeshStandardMaterial)?.isMeshStandardMaterial) patch(m as THREE.MeshStandardMaterial);
+      let soft = false;
+      for (const m of mats) {
+        if (bindHeroSoftOccluder(m, uOccFox, uOccRad)) {
+          soft = true; softMaterials.add(m as THREE.ShaderMaterial);
+        }
+        if (mesh.isMesh && (m as THREE.MeshStandardMaterial)?.isMeshStandardMaterial) patch(m as THREE.MeshStandardMaterial);
+      }
+      if (soft && !softObjects.has(o)) {
+        softObjects.add(o);
+        const before = o.onBeforeRender;
+        o.onBeforeRender = (renderer, s, camera, geometry, material, group) => {
+          before.call(o, renderer, s, camera, geometry, material, group);
+          const shader = material as THREE.ShaderMaterial;
+          if (!shader.isShaderMaterial || !shader.userData.heroSoftOccluder) return;
+          const target = renderer.getRenderTarget();
+          const width = target?.width ?? renderer.domElement.width;
+          const height = target?.height ?? renderer.domElement.height;
+          renderer.getCurrentViewport(renderViewport);
+          const nativeView = Math.floor(width) === size.x && Math.floor(height) === size.y
+            && Math.floor(renderViewport.x) === 0 && Math.floor(renderViewport.y) === 0
+            && Math.floor(renderViewport.z) === size.x && Math.floor(renderViewport.w) === size.y;
+          shader.uniforms.uCameraHeroEnabled!.value = camera === renderedCamera && nativeView ? 1 : 0;
+          shader.uniformsNeedUpdate = true;
+        };
+      }
     });
   }
   patchScene();
@@ -163,6 +192,17 @@ export function createOcclusionFader(
 
   return {
     patchScene,
+    softBindings() {
+      let bound = 0, enabled = 0, meshes = 0, aoExcluded = 0;
+      for (const material of softMaterials) {
+        if (material.uniforms.uCameraHero === uOccFox && material.uniforms.uCameraHeroRadius === uOccRad) bound++;
+        if (material.uniforms.uCameraHeroEnabled?.value === 1) enabled++;
+      }
+      for (const object of softObjects) if ((object as THREE.Mesh).isMesh) {
+        meshes++; if (object.userData.forgeSkipAO) aoExcluded++;
+      }
+      return { registered: softMaterials.size, bound, enabled, meshes, aoExcluded, cameraReady: renderedCamera !== null };
+    },
     get detected() { return lastBlocked; },
     /** Current cutout strength 0..1 (debug / metrics) */
     get strength() {
@@ -176,6 +216,7 @@ export function createOcclusionFader(
       foxHeight: number,
       foxYaw: number,
     ) {
+      renderedCamera = camera;
       camera.updateMatrixWorld();
       chest.copy(foxPos).y += foxHeight * 0.45;
       head.copy(foxPos).y += foxHeight * 1.05;

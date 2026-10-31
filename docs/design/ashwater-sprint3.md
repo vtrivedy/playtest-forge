@@ -96,3 +96,21 @@ at termination. Save these beside the existing cycle verdict; preserve all
 controls, timeout and acceptance predicates. This is diagnostic evidence only,
 not proof of traversal or appearance. Request the pushed immutable candidate
 through the GPU relay and personally review returned PNGs and game reports.
+
+## Round 27 — distinguish absent capture completion from identity mismatch
+Recovered rejected archive contains rendered PNGs but no run.json or report.json.
+The relay's single generic identity message hides whether a completed capture
+has wrong provenance or a capture stopped before writing its completion reports.
+Report missing completion filenames and individual failed identity checks in
+feedback, keeping every current acceptance requirement intact. Do not accept
+partial frames or infer a current visual verdict. This diagnostic-only change
+must pass Python syntax and synthetic missing/mismatched/matching identity cases;
+request existing immutable game candidate without replacing in-flight work.
+
+## Round 33 — rising-ferry support evidence
+Opus round32 identified missing support evidence during the height wait. Add
+raftHeight to each crossing sample and aggregate every captured wait frame:
+count, grounded-and-ferry-supported count, longest unsupported interval, entry
+and exit height. This diagnoses loss of support between half-second samples.
+Preserve controller inputs, timeouts and acceptance gates; pending GPU footage
+must decide whether boarding succeeds. No visual or gameplay approval from logs.

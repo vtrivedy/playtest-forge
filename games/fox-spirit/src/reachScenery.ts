@@ -192,8 +192,11 @@ export function createReachWater(group: THREE.Group) {
         vec3 color=mix(vec3(.035,.08,.075),vec3(.16,.24,.21),sheet*.5+flow*.12);
         color=mix(color,vec3(.32,.43,.38),lip*.4+foot*.5);
         float edge=smoothstep(0.,.025,vUv.x)*(1.-smoothstep(.975,1.,vUv.x));
-        // Opaque falling strands with open air between them, not an even glass wall.
-        gl_FragColor=vec4(color,edge*min(.92,.015+sheet*.76+lip*.18+foot*.2));
+        // Separated spill clusters: neither the lip nor the foot bridges dry gaps.
+        float clusters=smoothstep(.3,.65,sin(vUv.x*29.+sin(vUv.x*13.)*1.7));
+        float coverage=edge*clusters*sheet;
+        if(coverage<.12)discard;
+        gl_FragColor=vec4(color,min(.92,coverage*(.76+lip*.18+foot*.2)));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <fog_fragment>
