@@ -991,7 +991,10 @@ try {
     let [nx,nz]=[-uz,ux];if(nz<0){nx=-nx;nz=-nz;}
     const my=await yAt(...M);
     const lens=[[M[0]+nx*13-ux*3,my+25,M[1]+nz*13-uz*3],[M[0]-ux*2,my,M[1]-uz*2],58];
-    await H('photo',...lens);await advance(2);await shot('paint-before-overview');await H('photoOff');await advance(2);
+    // top-down overview over the route (tiny z offset keeps lookAt off the pole)
+    const top=[[M[0]-ux*2,my+44,M[1]-uz*2+.5],[M[0]-ux*2,my,M[1]-uz*2],50];
+    await H('photo',...lens);await advance(2);await shot('paint-before-overview');
+    await H('photo',...top);await advance(2);await shot('paint-before-top');await H('photoOff');await advance(2);
     const initial={state:await H('state'),game:await page.evaluate(()=>window.__game)};
     // progress u along S→E (m); pause 1.6 s at 45 %; walk the first 4 s, then trot
     let phase='walk',pauseT=0,arriveI=-1,litI=-1,dashI=-1;
@@ -1016,6 +1019,7 @@ try {
     await H('setStick',null);await H('setKeys',[]);await advance(30);
     await shot('paint-after-chase');
     await H('photo',...lens);await advance(2);await shot('paint-after-overview');
+    await H('photo',...top);await advance(2);await shot('paint-after-top');
     // from beyond the hearth looking back down the path: burst in front, ribbon receding
     await H('photo',[hx-ux*9+nx*4,hy+13,hz-uz*9+nz*4],[hx+ux*6,hy,hz+uz*6],55);await advance(2);await shot('paint-burst-hearth');
     const end={state:await H('state'),game:await page.evaluate(()=>window.__game)};

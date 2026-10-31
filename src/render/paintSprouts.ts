@@ -43,7 +43,8 @@ function bladeTexture(flowers: boolean): THREE.CanvasTexture {
     const w = N * (flowers ? 0.025 : 0.035 + r() * 0.03);
     // value ramp: dark base → light tip; hue comes from the instance colour
     const grad = g.createLinearGradient(0, N, 0, N - h);
-    grad.addColorStop(0, '#8c876a');
+    // a light base: seen from above a dark base read as a speck on the fresh wash
+    grad.addColorStop(0, '#c4bc98');
     grad.addColorStop(1, '#f2ecd2');
     g.fillStyle = grad;
     g.beginPath();
@@ -108,7 +109,8 @@ function tuftGeometry(): THREE.BufferGeometry {
   return g;
 }
 
-export function createPaintSprouts(scene: THREE.Scene, opts: { maxGrass?: number; maxFlowers?: number } = {}): PaintSprouts {
+export function createPaintSprouts(scene: THREE.Scene, opts: { maxGrass?: number; maxFlowers?: number; rand?: () => number } = {}): PaintSprouts {
+  const rand = opts.rand ?? Math.random;
   const group = new THREE.Group();
   group.name = 'paint-sprouts';
   scene.add(group);
@@ -119,6 +121,10 @@ export function createPaintSprouts(scene: THREE.Scene, opts: { maxGrass?: number
       map: bladeTexture(flowers),
       alphaTest: 0.5,
       side: THREE.DoubleSide,
+      // card bases sink 2 cm into the soil: pull them forward so the ground never z-fights through
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -2,
     });
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = time;
@@ -156,8 +162,8 @@ export function createPaintSprouts(scene: THREE.Scene, opts: { maxGrass?: number
   };
   const grass = make(false, opts.maxGrass ?? 4000);
   const flowers = make(true, opts.maxFlowers ?? 1200);
-  // olive-gold / sage / ochre grasses; cream, madder, gold and soft violet flowers
-  const grassHues = [0x9c9a4a, 0xb3a24e, 0x7f8f4e, 0xc49a52, 0x8f9a5c].map((c) => new THREE.Color(c));
+  // autumn grasses matching the wash (ochre / straw / sage / sienna); cream, madder, gold and soft violet flowers
+  const grassHues = [0xc9a456, 0xd6b870, 0xa3a46a, 0xc98a52, 0xb7a35e].map((c) => new THREE.Color(c));
   const flowerHues = [0xf2dcb8, 0xd8644a, 0xe8b440, 0xb98ac0, 0xf0a070].map((c) => new THREE.Color(c));
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -184,11 +190,11 @@ export function createPaintSprouts(scene: THREE.Scene, opts: { maxGrass?: number
     const i = k.next;
     k.next = (k.next + 1) % k.max;
     k.pos.set([x, y - 0.02, z], i * 3);
-    k.yaw[i] = Math.random() * Math.PI;
+    k.yaw[i] = rand() * Math.PI;
     k.size[i] = size;
     k.age[i] = 0;
     k.growing.add(i);
-    col.copy(hue).multiplyScalar(0.85 + Math.random() * 0.3);
+    col.copy(hue).multiplyScalar(0.85 + rand() * 0.3);
     k.mesh.setColorAt(i, col);
     k.mesh.instanceColor!.needsUpdate = true;
     k.mesh.count = Math.max(k.mesh.count, i + 1);
@@ -204,14 +210,14 @@ export function createPaintSprouts(scene: THREE.Scene, opts: { maxGrass?: number
     },
     sprout(x, z, radius, count, groundAt, flowerChance = 0.25) {
       for (let n = 0; n < count; n++) {
-        const a = Math.random() * Math.PI * 2;
-        const d = Math.sqrt(Math.random()) * radius;
+        const a = rand() * Math.PI * 2;
+        const d = Math.sqrt(rand()) * radius;
         const px = x + Math.cos(a) * d;
         const pz = z + Math.sin(a) * d;
         const py = groundAt(px, pz);
         if (!Number.isFinite(py)) continue;
-        if (Math.random() < flowerChance) plant(flowers, px, py, pz, 0.32 + Math.random() * 0.22, flowerHues[Math.floor(Math.random() * flowerHues.length)]!);
-        else plant(grass, px, py, pz, 0.28 + Math.random() * 0.3, grassHues[Math.floor(Math.random() * grassHues.length)]!);
+        if (rand() < flowerChance) plant(flowers, px, py, pz, 0.32 + rand() * 0.22, flowerHues[Math.floor(rand() * flowerHues.length)]!);
+        else plant(grass, px, py, pz, 0.28 + rand() * 0.3, grassHues[Math.floor(rand() * grassHues.length)]!);
       }
     },
     update(dt) {

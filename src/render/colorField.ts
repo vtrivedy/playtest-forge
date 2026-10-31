@@ -6,6 +6,8 @@ const MAX_VISUAL_DRAINS = 16;
 const NO_PAINT = {
   uPaintMap: { value: null as THREE.Texture | null },
   uWetMap: { value: null as THREE.Texture | null },
+  uClimbMap: { value: null as THREE.Texture | null },
+  uGroundMap: { value: null as THREE.Texture | null },
   uPaintBounds: { value: new THREE.Vector4(0, 1, 0, 1) },
   uPaintOn: { value: 0 },
 };
@@ -557,7 +559,8 @@ export class ColorField {
         value: new THREE.Vector4(field.bounds.minX, field.bounds.maxX, field.bounds.minZ, field.bounds.maxZ),
       };
       shader.uniforms.uRestoredChroma = { value: (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1 };
-      Object.assign(shader.uniforms, field.paint?.uniforms ?? NO_PAINT);
+      Object.assign(shader.uniforms, field.paint?.uniforms ?? { ...NO_PAINT, ...paintLookUniforms() });
+      shader.uniforms.uClimbTall = { value: climbTallOf(mat) };
 
       (mat.userData as { colorFieldShader?: typeof shader }).colorFieldShader = shader;
 
@@ -628,6 +631,23 @@ export class ColorField {
           uniform sampler2D uWetMap;
           uniform vec4 uPaintBounds;
           uniform float uPaintOn;
+          uniform sampler2D uClimbMap;
+          uniform sampler2D uGroundMap;
+          uniform float uClimbH;
+          uniform float uClimbFoliage;
+          uniform float uClimbTall;
+          uniform float uInkWash;
+          uniform float uHueLeak;
+          uniform float uAuraColor;
+          uniform float uPalette;
+          uniform float uHueJitter;
+          uniform float uGranulation;
+          uniform float uBleed;
+          uniform float uEdgeDarken;
+          uniform float uPaperGrain;
+          uniform vec2 uPaintSeed;
+          uniform float uSpeckDebug;
+          uniform vec3 uPal[5];
           // spreading wet front of fresh blooms
           float cfWet;
           // fox paint coverage here, and how much of the visible colour is that paint
@@ -648,6 +668,16 @@ export class ColorField {
             vec2 u = f*f*(3.-2.*f);
             return mix(a,b,u.x) + (c-a)*u.y*(1.-u.x) + (d-b)*u.x*u.y;
           }
+          // seeded world-space fBm (4 octaves, rotated) — paper and pigment never swim with the camera
+          float fbm4(vec2 p) {
+            float v = 0.0, a = 0.5;
+            for (int i = 0; i < 4; i++) {
+              v += a * noise21(p);
+              p = mat2(1.6, 1.2, -1.2, 1.6) * p + 7.3;
+              a *= 0.5;
+            }
+            return v / 0.9375;
+          }
 
           float colorMaskAt(vec3 p) {
             float temporaryVisibility = temporaryVisibilityAt(p);
@@ -666,7 +696,8 @@ export class ColorField {
               );
               if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
                 vec2 sources = texture2D(uMaskMap, uv).rg;
-                s = max(s, max(sources.r * temporaryVisibility, sources.g));
+                // the live aura / short trail only hints colour: the lasting paint tells the story
+                s = max(s, max(sources.r * temporaryVisibility * uAuraColor, sources.g));
                 cfFresh = sources.r;
               }
             }
@@ -681,16 +712,18 @@ export class ColorField {
                 cfPaint = paintRG.r;
                 cfWash = paintRG.g;
                 if (uPaintKind > 0.5 && uPaintKind < 2.5) {
-                  // walls, pillars and posts beside the path soak paint up from a wider footprint
-                  vec2 texM = 1.0 / vec2(uPaintBounds.y - uPaintBounds.x, uPaintBounds.w - uPaintBounds.z);
-                  float reach = 0.0;
-                  for (int k = 0; k < 6; k++) {
-                    float a = float(k) * 1.0472 + 0.5;
-                    vec2 o = vec2(cos(a), sin(a)) * texM;
-                    reach = max(reach, texture2D(uPaintMap, puv + o * 2.4).r * 0.95);
-                    reach = max(reach, texture2D(uPaintMap, puv + o * 4.6).r * 0.8);
-                  }
-                  cfPaint = max(cfPaint, reach);
+                  // props: colour climbs from the foot. The climb target (paint dilated over a
+                  // footprint, eased at climbRate) raises a ragged front up to climbH above the ground.
+                  float cover = texture2D(uClimbMap, puv).r;
+                  float gY = texture2D(uGroundMap, puv).r;
+                  float hA = gY < -500.0 ? 0.0 : max(0.0, p.y - gY);
+                  float upN = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
+                  float reachH = uClimbH * mix(1.0, uClimbFoliage, uClimbTall) * (1.0 + upN * 0.3);
+                  float front = reachH * smoothstep(0.02, 0.92, cover);
+                  float jag = (noise21(vec2(p.x + p.z, p.y) * 1.4 + uPaintSeed) - 0.5) * 0.8
+                            + (noise21(vec2(p.x - p.z, p.y) * 4.1 + uPaintSeed) - 0.5) * 0.25;
+                  float climbK = 1.0 - smoothstep(front - 0.6, front + 0.05, hA + jag);
+                  cfPaint = cover * climbK;
                 }
                 cfPaint *= temporaryVisibility;
                 cfWet = texture2D(uWetMap, puv).r * temporaryVisibility;
@@ -719,7 +752,7 @@ export class ColorField {
             float an = (noise21(p.xz * 0.6) - 0.5) * 0.35 + (noise21(p.xz * 2.3) - 0.5) * 0.15;
             float ad = distance(p, uFox) / uAura + an;
             float af = 1.0 - smoothstep(0.15, 1.0, ad);
-            s = max(s, af * af * temporaryVisibility);
+            s = max(s, af * af * temporaryVisibility * uAuraColor);
             // the mask RT already carries the trail; the analytic loop is the no-RT fallback
             for (int i = 0; i < 24; i++) {
               if (i >= uTrailCount || uUseMaskMap > 0.5) break;
@@ -733,28 +766,25 @@ export class ColorField {
           }
 
           vec3 inkWash(vec3 color, vec3 worldPos, vec3 worldN) {
-            // Faded sepia old photograph: luminance-preserving tone (darks stay dark — a lifted
-            // floor turned thin dark reeds into pale streaks), soft paper shoulder, a ghost of hue.
+            // Pressed gray-sepia paper: luminance only (a warm roof or a lit window must not read
+            // as colour before the fox arrives), darks stay dark, soft paper shoulder, a whisper of hue.
             float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-            vec3 ink = luma * vec3(1.12, 0.93, 0.66);
-            // faded blacks: a little warm lift, not a grey floor
-            ink = ink * 0.94 + vec3(0.016, 0.012, 0.008);
-            // paper shoulder so sunlit stone tops out cream, never white
+            vec3 ink = luma * vec3(1.05, 0.99, 0.87);
+            ink = ink * 0.95 + vec3(0.013, 0.012, 0.01);
+            // paper shoulder so sunlit stone tops out cream-grey, never white
             float sh = smoothstep(0.35, 1.6, luma);
-            ink = mix(ink, vec3(0.86, 0.74, 0.56) * (0.45 + luma * 0.4), sh * 0.6);
-            // ochre warmth in the mids (pressed-leaf) and a trace of the original hue
-            ink = mix(ink, ink * vec3(1.08, 0.97, 0.8), smoothstep(0.04, 0.3, luma) * (1.0 - sh));
-            ink = mix(ink, color * 0.92, 0.1);
+            ink = mix(ink, vec3(0.83, 0.79, 0.7) * (0.45 + luma * 0.4), sh * 0.6);
+            ink = mix(ink, color * 0.92, uHueLeak);
             // low-frequency foxing / water stains only — fine world noise aliased into stipple
-            vec2 gp = worldPos.xz + worldPos.y * vec2(0.71, 1.37);
-            float g = (noise21(gp * 0.9) - 0.5) * 0.12 + (noise21(gp * 3.1) - 0.5) * 0.06;
+            vec2 gp = worldPos.xz + worldPos.y * vec2(0.71, 1.37) + uPaintSeed;
+            float g = (noise21(gp * 0.9) - 0.5) * 0.1 + (noise21(gp * 3.1) - 0.5) * 0.05;
             float fox = smoothstep(0.62, 0.9, noise21(gp * 0.35 + 3.1));
             ink *= 1.0 + g;
-            ink = mix(ink, ink * vec3(0.9, 0.76, 0.56), fox * 0.25);
+            ink = mix(ink, ink * vec3(0.94, 0.88, 0.76), fox * 0.22);
             // top-lit surfaces catch a breath of paper (soft wash, not a rim halo)
             float up = clamp(dot(normalize(worldN), vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
-            ink += up * up * vec3(0.012, 0.009, 0.005);
-            return ink;
+            ink += up * up * vec3(0.01, 0.009, 0.007);
+            return mix(color, ink, uInkWash);
           }
           `,
         )
@@ -781,70 +811,78 @@ export class ColorField {
           // otherwise the lifted sepia floor turns a warm wake into a burn mark.
           float aliveGain = clamp(washedValue * 1.18 / max(restoredValue, 0.002), 1.0, mix(1.65, 4.0, uGroundSurface));
           chroma *= aliveGain;
-          // the fox's paint is pigment, not just authored colour returning: richer, with a
-          // low-frequency watercolour hue drift (ochre / olive / madder) across the wash
-          // The fox's paint brings the valley back alive, not the authored rust louder: on the
-          // ground a wet-in-wet living meadow (yellow-green / sage / moss, ochre and madder only as
-          // accents) replaces the hue at the surface's own value; stone comes back cool blue-grey
-          // (the sepia is warm, so true colour on stone is the cool) with moss tops and lichen.
-          // Permanent paint path always shows pigment (cfPaintLead only modulates the drying rim).
-          // Multiplying by lead previously collapsed the ribbon into the fox's aura disc.
-          // Watercolour, not a decal: a body of pigment with a granulated wet fringe bleeding past
-          // it and a thin, broken tide mark where the wash dried. Paint restores each surface to
-          // its own life: ground → living meadow, stone → cool blue-grey with lichen and sparse moss,
-          // wood / plaster / water / foliage → their authored colour, litter → mostly meadow.
+          // The fox's paint is a watercolour wash that brings each surface's own life back:
+          // soil → an autumn wash (ochre / sage / moss / burnt sienna, madder accents) blended with its
+          // own colour; stone → cool grey with lichen and moss tops; wood / plaster / roofs / foliage /
+          // water → their authored colour, enriched; litter melts into the wash bar a few warm piles.
+          // Watercolour cues: granulation in the paper's valleys, a dilute fringe where paper shows,
+          // a darker broken tide line where the wash dried, a wet glistening edge while it spreads.
           float pk = 0.0;
+          vec3 wpP = vWorldPosCF;
+          vec2 spP = wpP.xz + uPaintSeed;
+          vec2 gpP = spP + wpP.y * vec2(0.63, 1.21);
+          float paper = fbm4(gpP * 2.3);
           if (cfPaint > 0.002) {
-            vec3 wp = vWorldPosCF;
-            vec2 gp = wp.xz + wp.y * vec2(0.63, 1.21);
-            float gran = noise21(gp * 4.7 + 1.3) * 0.6 + noise21(gp * 12.9) * 0.4;
-            float body = smoothstep(0.5, 0.78, cfPaint + (gran - 0.5) * 0.16);
-            float fringe = smoothstep(0.04, 0.4, cfPaint) * smoothstep(0.28, 0.72, gran) * 0.72;
+            float gran = noise21(gpP * 4.7 + 1.3) * 0.5 + noise21(gpP * 12.9) * 0.25 + paper * 0.25;
+            float body = smoothstep(0.5, 0.78, cfPaint + (gran - 0.5) * (0.08 + 0.2 * uBleed));
+            float fringe = smoothstep(0.04, 0.4, cfPaint) * smoothstep(0.3, 0.7, gran) * mix(0.4, 0.85, uBleed);
             pk = max(body, fringe);
-            float rimBreak = smoothstep(0.32, 0.62, noise21(gp * 0.9 + 4.0));
-            float tide = smoothstep(0.46, 0.58, cfPaint + (gran - 0.5) * 0.08) * (1.0 - smoothstep(0.6, 0.76, cfPaint)) * mix(0.35, 1.0, rimBreak);
-            float hueA = noise21(wp.xz * 0.16 + 31.0) * 0.75 + noise21(wp.xz * 0.6 + 9.0) * 0.25;
-            float hueB = noise21(wp.xz * 0.45 + 5.0);
-            float hueC = noise21(wp.xz * 0.23 + 47.0);
-            float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
-            // pigment density: settled pools and thin paper-lit passages at two scales
-            float dens = mix(0.74, 1.28, noise21(wp.xz * 0.38 + 11.0) * 0.55 + noise21(wp.xz * 1.9 + 2.0) * 0.45);
-            // each wash dried at its own strength: overlapping blooms read as separate passes
+            float rimBreak = smoothstep(0.3, 0.62, noise21(gpP * 0.9 + 4.0));
+            float tide = smoothstep(0.44, 0.56, cfPaint + (gran - 0.5) * 0.08) * (1.0 - smoothstep(0.6, 0.78, cfPaint)) * mix(0.2, 1.0, rimBreak);
+            // each wash dried at its own strength / hue: overlapping blooms read as separate passes
             float wash = clamp((cfWash - 0.15) / 0.85, 0.0, 1.0);
-            dens *= mix(0.86, 1.14, wash);
-            hueA = clamp(hueA + (wash - 0.5) * 0.35, 0.0, 1.0);
-            // fresh (still wet) paint sits lighter on the paper; it darkens as it dries
-            dens *= 1.0 + cfWet * 0.12;
-            // unit-luma hues: yellow-green / sage / moss wet-in-wet, gold-ochre and madder accents
-            vec3 meadow = mix(vec3(0.62, 1.26, 0.26), vec3(0.46, 1.2, 0.52), smoothstep(0.35, 0.62, hueA));
-            meadow = mix(meadow, vec3(0.38, 1.28, 0.42), smoothstep(0.64, 0.84, hueA));
-            meadow = mix(meadow, vec3(1.18, 1.04, 0.38), smoothstep(0.6, 0.86, hueB) * 0.55);
-            meadow = mix(meadow, vec3(1.3, 0.78, 0.5), smoothstep(0.8, 0.95, hueC) * 0.3);
+            float h1 = clamp(fbm4(spP * 0.075) * 1.5 - 0.25 + ((wash - 0.5) * 0.5 + (noise21(spP * 0.55 + 9.0) - 0.5) * 0.4) * uHueJitter, 0.0, 1.0);
+            float h2 = noise21(spP * 0.21 + 5.0);
+            float h3 = noise21(spP * 0.33 + 47.0);
+            vec3 pO = uPal[0] / dot(uPal[0], vec3(0.2126, 0.7152, 0.0722));
+            vec3 pS = uPal[1] / dot(uPal[1], vec3(0.2126, 0.7152, 0.0722));
+            vec3 pM = uPal[2] / dot(uPal[2], vec3(0.2126, 0.7152, 0.0722));
+            vec3 pB = uPal[3] / dot(uPal[3], vec3(0.2126, 0.7152, 0.0722));
+            vec3 pR = uPal[4] / dot(uPal[4], vec3(0.2126, 0.7152, 0.0722));
+            vec3 pal = mix(pO, pS, smoothstep(0.32, 0.58, h1));
+            pal = mix(pal, pM, smoothstep(0.62, 0.86, h1));
+            pal = mix(pal, pB, smoothstep(0.58, 0.84, h2) * 0.75);
+            pal = mix(pal, pR, smoothstep(0.82, 0.95, h3) * 0.55);
+            float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
+            // pigment density: settled pools and thin passages; granulation settles in paper valleys
+            float dens = mix(0.8, 1.2, noise21(spP * 0.38 + 11.0) * 0.55 + noise21(spP * 1.9 + 2.0) * 0.45);
+            dens *= mix(0.88, 1.12, wash);
+            dens *= 1.0 + uGranulation * 0.5 * (0.5 - gran);
             // cauliflower back-runs: faint darker lines where one wash crept into another
-            float backrun = 1.0 - smoothstep(0.0, 0.035, abs(noise21(wp.xz * 0.42 + 23.0) - 0.5));
-            vec3 own = max(mix(vec3(chromaLuma), chroma, 1.1), 0.0);
-            vec3 groundPaint = mix(own, chromaLuma * meadow * 1.26, 0.9) * dens * (1.0 - backrun * 0.1);
+            float backrun = 1.0 - smoothstep(0.0, 0.035, abs(noise21(spP * 0.42 + 23.0) - 0.5));
+            vec3 own = max(mix(vec3(chromaLuma), chroma, 1.25), 0.0);
+            vec3 groundPaint = mix(own, chromaLuma * pal * 1.12, uPalette) * dens * (1.0 - backrun * 0.12);
             float up = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
             // lichen patches follow the surface (gp folds height in), not horizontal bands
-            float lichen = smoothstep(0.55, 0.75, noise21(gp * 0.9 + 3.0) * 0.7 + noise21(gp * 3.1) * 0.3);
-            vec3 stone = chromaLuma * mix(vec3(0.86, 0.95, 1.1), vec3(0.95, 0.98, 1.03), noise21(gp * 0.5)) * 1.1;
-            vec3 lichenC = chromaLuma * vec3(1.16, 1.06, 0.6) * 1.08;
-            vec3 moss = chromaLuma * vec3(0.6, 1.2, 0.42) * 1.15;
-            float mossK = smoothstep(0.55, 0.9, up) * smoothstep(0.45, 0.7, noise21(wp.xz * 0.8 + 6.0));
-            vec3 stonePaint = mix(mix(stone, lichenC, lichen * 0.55), moss, mossK);
-            // natural colour comes back richer than it was authored, never meadow-green
-            vec3 ownPaint = own * mix(0.95, 1.08, dens - 0.8);
-            // litter: mostly blends into the meadow, a few warm leaf clusters stay as accents
-            vec3 litterPaint = mix(groundPaint * 0.8, ownPaint, smoothstep(0.8, 0.9, noise21(wp.xz * 0.7 + 13.0)) * 0.45);
+            float lichen = smoothstep(0.55, 0.75, noise21(gpP * 0.9 + 3.0) * 0.7 + noise21(gpP * 3.1) * 0.3);
+            vec3 stone = chromaLuma * mix(vec3(0.92, 0.97, 1.06), vec3(1.03, 0.99, 0.94), noise21(gpP * 0.5)) * 1.1;
+            vec3 lichenC = chromaLuma * pO * 1.05;
+            vec3 moss = chromaLuma * pM * 1.08;
+            float mossK = smoothstep(0.55, 0.9, up) * smoothstep(0.45, 0.7, noise21(spP * 0.8 + 6.0));
+            vec3 ownPaint = own * mix(0.95, 1.1, dens - 0.8);
+            vec3 stonePaint = mix(mix(mix(stone, ownPaint, 0.35), lichenC, lichen * 0.5), moss, mossK);
+            // kept litter piles come back as warm leaves, lighter than their dead value
+            vec3 litterPaint = ownPaint * 1.2;
             vec3 paintC = uPaintKind < 0.5 ? groundPaint : uPaintKind < 1.5 ? stonePaint : uPaintKind < 2.5 ? ownPaint : litterPaint;
-            // the dried tide mark is the pigment itself, pooled darker — never a brown outline
-            paintC *= 1.0 - tide * 0.24;
-            paintC = mix(vec3(dot(paintC, vec3(0.2126, 0.7152, 0.0722))), paintC, 1.0 + tide * 0.2);
-            // the fringe is a thin dilute bleed: paper shows through
-            paintC = mix(chroma, paintC, mix(0.55, 1.0, body));
+            // the dried tide line is the pigment itself, pooled darker and richer — never a brown outline
+            paintC *= 1.0 - tide * uEdgeDarken;
+            paintC = mix(vec3(dot(paintC, vec3(0.2126, 0.7152, 0.0722))), paintC, 1.0 + tide * 0.25);
+            // wet edge: the spreading front glistens more saturated and a touch darker
+            paintC = mix(vec3(dot(paintC, vec3(0.2126, 0.7152, 0.0722))), paintC, 1.0 + cfWet * 0.3) * (1.0 - cfWet * 0.1);
+            // the fringe is dilute: lighter and thinner, the paper shows through
+            float pL = dot(paintC, vec3(0.2126, 0.7152, 0.0722));
+            paintC = mix(mix(vec3(pL), paintC, 0.6) * 1.08, paintC, body);
             chroma = mix(chroma, paintC, pk);
+            if (uPaintKind > 2.5) {
+              // litter melts into the wash: only sparse warm piles stay (whole patches, so no torn leaves)
+              if (pk > 0.3 && noise21(spP * 0.55 + 71.0) < 0.86) discard;
+              if (uSpeckDebug > 0.5) chroma = vec3(1.0, 0.0, 1.0);
+            }
           }
+          if (uSpeckDebug > 0.5 && uPaintKind > 2.5) { washed = vec3(1.0, 0.0, 1.0); }
           outgoingLight = mix(washed, chroma, max(brushed, pk));
+          // paper grain under everything patched: one seeded world fBm, so it never swims
+          outgoingLight *= 1.0 + (paper - 0.5) * 0.14 * uPaperGrain;
           // wet front: soft cool sheen while a bloom is still spreading
           float wetLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
           outgoingLight += cfWet * 0.35 * (outgoingLight * vec3(0.15, 0.18, 0.12) + vec3(0.02, 0.025, 0.02) * (0.35 + wetLuma));
@@ -930,12 +968,66 @@ export type PaintTuning = {
   /** Seconds a bloom keeps spreading before it dries in place */
   bloomLife: number;
   strength: number;
+  /** Climb coverage gained per second once paint reaches a prop's foot (1/s) */
+  climbRate: number;
 };
+
+/**
+ * Watercolour look uniforms shared by every patched material (lil-gui "Paint" folder).
+ * Autumn palette in unit luma (the shader renormalises): ochre, sage, moss, burnt sienna, madder accent.
+ */
+export function paintLookUniforms() {
+  return {
+    /** 0 = authored colour, 1 = full gray-sepia paper for unpainted surfaces */
+    uInkWash: { value: 1 },
+    /** Authored hue that leaks through the unpainted wash */
+    uHueLeak: { value: 0.02 },
+    /** How much the live aura / short trail colours on its own (the paint does the storytelling) */
+    uAuraColor: { value: 0.45 },
+    /** Palette weight vs the surface's own enriched colour on soil */
+    uPalette: { value: 0.62 },
+    uHueJitter: { value: 0.7 },
+    uGranulation: { value: 0.6 },
+    uBleed: { value: 0.6 },
+    uEdgeDarken: { value: 0.4 },
+    uPaperGrain: { value: 0.5 },
+    /** World-XZ offset derived from the single paint seed (fBm never swims; same seed = same paper) */
+    uPaintSeed: { value: new THREE.Vector2() },
+    /** Metres paint climbs up props at full coverage; foliage climbs uClimbFoliage× further */
+    uClimbH: { value: 4.2 },
+    uClimbFoliage: { value: 2.4 },
+    /** 1 = tint litter magenta / sprout-free debug for speck hunts */
+    uSpeckDebug: { value: 0 },
+    uPal: {
+      value: [
+        new THREE.Color(1.42, 1.0, 0.46), // ochre
+        new THREE.Color(0.94, 1.05, 0.8), // sage
+        new THREE.Color(0.86, 1.08, 0.56), // moss
+        new THREE.Color(1.6, 0.86, 0.52), // burnt sienna
+        new THREE.Color(1.55, 0.8, 0.82), // madder
+      ],
+    },
+  };
+}
+
+/** mulberry32: the paint's only randomness (bloom ids, splash lobes, ribbon jitter) */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 /**
  * Persistent watercolour paint laid by the fox. One render target over the whole valley,
  * never cleared: wet blooms spread (MAX-blended, ragged world-space edge) for ~1 s, then dry
  * in place forever. Visual only — gameplay probes (ColorField.sample) never read it.
+ * A 1 m climb target follows the paint (dilated to a prop footprint) at `climbRate`/s, so colour
+ * creeps up trunks, walls and rocks a beat after the wash reaches their foot.
  * A coarse CPU grid mirrors coverage for the grade coupling and capture metrics.
  */
 export class PaintLayer {
@@ -948,6 +1040,7 @@ export class PaintLayer {
     dripRadius: 1.5,
     bloomLife: 1.3,
     strength: 1,
+    climbRate: 0.8,
   };
   blooms: Bloom[] = [];
   /** Total blooms ever laid (metrics) */
@@ -956,11 +1049,22 @@ export class PaintLayer {
   readonly grid: Float32Array;
   readonly gridW: number;
   readonly gridH: number;
+  /** Seeded RNG: every random choice in paint goes through this */
+  readonly rand: () => number;
+  /** CPU ms of the last render() (stamp + climb submission) */
+  passMs = 0;
   private painted = 0;
   private rt: THREE.WebGLRenderTarget | null = null;
   /** Live wet edges of spreading blooms; cleared every frame (half resolution) */
   private wetRT: THREE.WebGLRenderTarget | null = null;
   private wetDirty = false;
+  /** 1 m climb coverage, ping-ponged while anything is still climbing */
+  private climbRT: [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] | null = null;
+  private climbMat: THREE.ShaderMaterial | null = null;
+  private climbScene = new THREE.Scene();
+  private climbCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  /** Seconds the climb pass keeps running after the last live bloom */
+  private climbSettle = 0;
   private mat: THREE.ShaderMaterial | null = null;
   private aWet: THREE.InstancedBufferAttribute | null = null;
   private aSeed: THREE.InstancedBufferAttribute | null = null;
@@ -976,12 +1080,19 @@ export class PaintLayer {
   readonly uniforms = {
     uPaintMap: { value: null as THREE.Texture | null },
     uWetMap: { value: null as THREE.Texture | null },
+    uClimbMap: { value: null as THREE.Texture | null },
+    /** Terrain height (m) at 1 m, for the climb height gate; -1000 off-island */
+    uGroundMap: { value: null as THREE.Texture | null },
     uPaintBounds: { value: new THREE.Vector4() },
     uPaintOn: { value: 0 },
+    ...paintLookUniforms(),
   };
 
-  constructor(bounds: { minX: number; maxX: number; minZ: number; maxZ: number }, private texelsPerMetre = 6.8) {
+  constructor(bounds: { minX: number; maxX: number; minZ: number; maxZ: number }, private texelsPerMetre = 6.8, readonly seed = 1337) {
     this.bounds = { ...bounds };
+    this.rand = mulberry32(seed);
+    const sr = mulberry32(seed ^ 0x9e3779b9);
+    this.uniforms.uPaintSeed.value.set(sr() * 512, sr() * 512);
     this.gridW = Math.ceil(bounds.maxX - bounds.minX);
     this.gridH = Math.ceil(bounds.maxZ - bounds.minZ);
     this.grid = new Float32Array(this.gridW * this.gridH);
@@ -1106,9 +1217,75 @@ export class PaintLayer {
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.scene.add(this.mesh);
+
+    // climb coverage: 1 m texels; each texel eases toward the paint dilated over a prop footprint
+    const cw = Math.ceil(maxX - minX);
+    const ch = Math.ceil(maxZ - minZ);
+    const climbOpts = { type: THREE.UnsignedByteType, format: THREE.RGBAFormat, magFilter: THREE.LinearFilter, minFilter: THREE.LinearFilter, depthBuffer: false };
+    this.climbRT = [new THREE.WebGLRenderTarget(cw, ch, climbOpts), new THREE.WebGLRenderTarget(cw, ch, climbOpts)];
+    for (const t of this.climbRT) {
+      renderer.setRenderTarget(t);
+      renderer.clear();
+    }
+    renderer.setRenderTarget(prev);
+    this.climbMat = new THREE.ShaderMaterial({
+      uniforms: {
+        tPaint: { value: this.rt.texture },
+        tPrev: { value: null as THREE.Texture | null },
+        uStep: { value: 0 },
+        uMetre: { value: new THREE.Vector2(1 / (maxX - minX), 1 / (maxZ - minZ)) },
+      },
+      depthTest: false,
+      depthWrite: false,
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tPaint;
+        uniform sampler2D tPrev;
+        uniform float uStep;
+        uniform vec2 uMetre;
+        varying vec2 vUv;
+        void main() {
+          // a wall or trunk 1–4 m from the wash still drinks it: dilate over the footprint
+          float target = texture2D(tPaint, vUv).r;
+          for (int k = 0; k < 8; k++) {
+            float a = float(k) * 0.785398 + 0.3;
+            vec2 o = vec2(cos(a), sin(a)) * uMetre;
+            target = max(target, texture2D(tPaint, vUv + o * 0.6).r);
+            target = max(target, texture2D(tPaint, vUv + o * 2.0).r * 0.95);
+            target = max(target, texture2D(tPaint, vUv + o * 3.8).r * 0.78);
+          }
+          float prevC = texture2D(tPrev, vUv).r;
+          gl_FragColor = vec4(prevC + clamp(target - prevC, 0.0, uStep), 0.0, 0.0, 1.0);
+        }`,
+    });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.climbMat);
+    quad.frustumCulled = false;
+    this.climbScene.add(quad);
+
     this.uniforms.uPaintMap.value = this.rt.texture;
     this.uniforms.uWetMap.value = this.wetRT.texture;
+    this.uniforms.uClimbMap.value = this.climbRT[0].texture;
     this.uniforms.uPaintOn.value = 1;
+  }
+
+  /** Bake terrain height (1 m) for the prop climb gate. `heightAt` returns < -500 where there is no ground. */
+  setGround(heightAt: (x: number, z: number) => number): void {
+    const { minX, minZ } = this.bounds;
+    const w = this.gridW;
+    const h = this.gridH;
+    const data = new Uint16Array(w * h * 4);
+    for (let j = 0; j < h; j++)
+      for (let i = 0; i < w; i++) {
+        const y = heightAt(minX + i + 0.5, minZ + j + 0.5);
+        data[(j * w + i) * 4] = THREE.DataUtils.toHalfFloat(Number.isFinite(y) ? Math.max(-1000, y) : -1000);
+      }
+    const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat, THREE.HalfFloatType);
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    this.uniforms.uGroundMap.value = tex;
   }
 
   /** Lay one wet bloom that spreads to `radius` over `life` seconds, then dries in place. */
@@ -1116,7 +1293,7 @@ export class PaintLayer {
     const { minX, maxX, minZ, maxZ } = this.bounds;
     if (x < minX || x > maxX || z < minZ || z > maxZ || strength < 0.02) return;
     if (this.blooms.length >= PaintLayer.MAX) this.blooms.shift();
-    this.blooms.push({ x, z, radius, strength: Math.min(1, strength), age: -delay, life, seed: Math.random(), start });
+    this.blooms.push({ x, z, radius, strength: Math.min(1, strength), age: -delay, life, seed: this.rand(), start });
     this.laid++;
     this.markGrid(x, z, radius * 0.8, Math.min(1, strength));
   }
@@ -1128,13 +1305,14 @@ export class PaintLayer {
   splash(x: number, z: number, radius: number, life = 1.5): void {
     this.bloom(x, z, radius * 0.8, 1, life, 0.06);
     const lobes = 9;
-    const a0 = Math.random() * Math.PI * 2;
+    const rnd = this.rand;
+    const a0 = rnd() * Math.PI * 2;
     for (let i = 0; i < lobes; i++) {
-      const a = a0 + (i / lobes) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-      const d = radius * (0.42 + Math.random() * 0.3);
+      const a = a0 + (i / lobes) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
+      const d = radius * (0.42 + rnd() * 0.3);
       // a lobe wells up once the central wash has reached it, then runs on past the rim
       const delay = life * (0.18 + (d / radius) * 0.35);
-      this.bloom(x + Math.cos(a) * d, z + Math.sin(a) * d, radius * (0.3 + Math.random() * 0.16), 0.95, life * (0.7 + Math.random() * 0.35), 0.3, delay);
+      this.bloom(x + Math.cos(a) * d, z + Math.sin(a) * d, radius * (0.3 + rnd() * 0.16), 0.95, life * (0.7 + rnd() * 0.35), 0.3, delay);
     }
   }
 
@@ -1178,6 +1356,31 @@ export class PaintLayer {
 
   /** Advance wet blooms and stamp them into the persistent target. */
   render(dt: number): void {
+    const t0 = performance.now();
+    this.stamp(dt);
+    this.climb(dt);
+    this.passMs = performance.now() - t0;
+  }
+
+  /** Ease the climb target toward the (dilated) paint; idles once everything has finished climbing. */
+  private climb(dt: number): void {
+    if (!this.climbRT || !this.climbMat || !this.renderer) return;
+    if (this.blooms.length) this.climbSettle = 1 / Math.max(0.05, this.tun.climbRate) + 0.3;
+    if (this.climbSettle <= 0) return;
+    this.climbSettle -= dt;
+    const [a, b] = this.climbRT;
+    this.climbMat.uniforms.tPrev!.value = a.texture;
+    this.climbMat.uniforms.uStep!.value = Math.max(1 / 255, this.tun.climbRate * dt);
+    const renderer = this.renderer;
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(b);
+    renderer.render(this.climbScene, this.climbCam);
+    renderer.setRenderTarget(prev);
+    this.climbRT = [b, a];
+    this.uniforms.uClimbMap.value = b.texture;
+  }
+
+  private stamp(dt: number): void {
     for (const b of this.blooms) b.age += dt;
     if (!this.rt || !this.wetRT || !this.renderer || !this.mesh || !this.mat) return;
     if (!this.blooms.length) {
@@ -1234,6 +1437,9 @@ export class PaintLayer {
   dispose(): void {
     this.rt?.dispose();
     this.wetRT?.dispose();
+    for (const t of this.climbRT ?? []) t.dispose();
+    this.climbMat?.dispose();
+    this.uniforms.uGroundMap.value?.dispose();
     this.mesh?.geometry.dispose();
     (this.mesh?.material as THREE.Material | undefined)?.dispose();
   }
@@ -1248,6 +1454,11 @@ function paintKindOf(mat: THREE.Material): number {
   if (mat.name === 'rv-stone' || mat.name === 'rv-rock') return 1;
   if (mat.name === 'rv-litter') return 3;
   return 2;
+}
+
+/** Trunks and canopies climb further than walls and rocks (uClimbFoliage). */
+function climbTallOf(mat: THREE.Material): number {
+  return (mat.userData as { foliage?: boolean }).foliage || /bark|canopy|leaf|trunk/i.test(mat.name) ? 1 : 0;
 }
 
 /** Convenience factory */

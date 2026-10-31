@@ -244,8 +244,10 @@ async function boot() {
   // the fox's persistent paint covers the valley plus the Crown and Reach (visual only)
   const paint = new PaintLayer({ minX: -140, maxX: 165, minZ: -165, maxZ: 115 });
   paint.init(renderer);
+  // terrain height for the prop climb gate (paint climbs from each prop's foot)
+  paint.setGround((x, z) => world.terrainY(x, z));
   colorField.paint = paint;
-  const sprouts = createPaintSprouts(scene);
+  const sprouts = createPaintSprouts(scene, { rand: paint.rand });
   /** A big wet splash of paint with a ring of new growth in it */
   const splash = (x: number, z: number, r: number) => {
     paint.splash(x, z, r);
@@ -528,6 +530,27 @@ async function boot() {
   fPaint.add(paint.tun, 'strength', 0.2, 1, 0.05);
   fPaint.add(PAINT_FEEL, 'idlePool', 1, 5, 0.1).name('idle pool max r');
   fPaint.add(PAINT_FEEL, 'grade', 0, 1, 0.05).name('grade from paint');
+  fPaint.add(paint.tun, 'climbRate', 0.1, 3, 0.05);
+  const PU = paint.uniforms;
+  fPaint.add(PU.uClimbH, 'value', 0.5, 10, 0.1).name('climbH (m)');
+  fPaint.add(PU.uClimbFoliage, 'value', 1, 4, 0.1).name('climb ×trees');
+  fPaint.add(PU.uInkWash, 'value', 0, 1, 0.01).name('inkWash');
+  fPaint.add(PU.uHueLeak, 'value', 0, 0.3, 0.005).name('unpainted hue leak');
+  fPaint.add(PU.uAuraColor, 'value', 0, 1, 0.05).name('aura colour');
+  fPaint.add(PU.uPalette, 'value', 0, 1, 0.01).name('palette vs own (soil)');
+  fPaint.add(PU.uHueJitter, 'value', 0, 1.5, 0.05).name('hueJitter');
+  fPaint.add(PU.uGranulation, 'value', 0, 1.5, 0.05).name('granulation');
+  fPaint.add(PU.uBleed, 'value', 0, 1, 0.05).name('bleed');
+  fPaint.add(PU.uEdgeDarken, 'value', 0, 0.8, 0.01).name('edgeDarken');
+  fPaint.add(PU.uPaperGrain, 'value', 0, 1.5, 0.05).name('paper grain');
+  const fPal = fPaint.addFolder('palette (unit luma)');
+  for (const [i, n] of ['ochre', 'sage', 'moss', 'sienna', 'madder'].entries()) fPal.addColor({ get c() { return PU.uPal.value[i]!.getHex(); }, set c(v: number) { PU.uPal.value[i]!.setHex(v); } }, 'c').name(n);
+  fPal.close();
+  const speck = { debug: false };
+  fPaint.add(speck, 'debug').name('speckDebug (litter magenta, no sprouts)').onChange((v: boolean) => {
+    PU.uSpeckDebug.value = v ? 1 : 0;
+    sprouts.group.visible = !v;
+  });
   fPaint.close();
   const paintLast = new THREE.Vector3(NaN, 0, 0);
   let paintDist = 0;
@@ -562,19 +585,19 @@ async function boot() {
       const lead = Math.min(0.9, speed * 0.18);
       const fx = fox.position.x + Math.sin(fox.rotation.y) * lead;
       const fz = fox.position.z + Math.cos(fox.rotation.y) * lead;
-      if (nearK > 0.02) paint.bloom(fx + (Math.random() - 0.5) * 0.5, fz + (Math.random() - 0.5) * 0.5, r, T.strength * nearK);
+      if (nearK > 0.02) paint.bloom(fx + (paint.rand() - 0.5) * 0.5, fz + (paint.rand() - 0.5) * 0.5, r, T.strength * nearK);
       // life springs up in the fresh wash
       if (nearK > 0.8 && grounded) sprouts.sprout(fox.position.x, fox.position.z, r * 0.85, 2, soilAt);
     }
     if (dripDist >= T.dripSpacing) {
-      dripDist = Math.random() * T.dripSpacing * 0.4;
+      dripDist = paint.rand() * T.dripSpacing * 0.4;
       if (nearK > 0.5) {
         // a drip runs off the brush to one side and spreads past the path
-        const side = (Math.random() < 0.5 ? -1 : 1) * (0.9 + Math.random() * 0.8);
+        const side = (paint.rand() < 0.5 ? -1 : 1) * (0.9 + paint.rand() * 0.8);
         const yaw = fox.rotation.y;
         const dx = fox.position.x + Math.cos(yaw) * side;
         const dz = fox.position.z - Math.sin(yaw) * side;
-        const dr = T.dripRadius * (0.7 + Math.random() * 0.5);
+        const dr = T.dripRadius * (0.7 + paint.rand() * 0.5);
         paint.bloom(dx, dz, dr, T.strength * 0.95, T.bloomLife * 1.6);
         sprouts.sprout(dx, dz, dr * 0.7, 5, soilAt, 0.4);
       }
@@ -589,7 +612,7 @@ async function boot() {
     // pawfalls: each planted paw blooms where it lands
     if (grounded)
       for (const paw of foxActor.locomotion?.footfalls ?? [])
-        paint.bloom(paw.x, paw.z, T.pawRadius * (0.85 + Math.random() * 0.3), T.strength, T.bloomLife * 0.8);
+        paint.bloom(paw.x, paw.z, T.pawRadius * (0.85 + paint.rand() * 0.3), T.strength, T.bloomLife * 0.8);
   }
   let inColumn = false;
   let hearthLeafT = 0;
@@ -1849,7 +1872,7 @@ async function boot() {
       backend,
       crown: crown.state(),
       reach: reach.state(),
-      paint: { laid: paint.laid, sprouts: sprouts.planted, areaM2: paint.paintedArea, local: Number(paintLocal.toFixed(3)), wet: paint.blooms.length, grade: Number(post.params.restore.toFixed(3)) },
+      paint: { laid: paint.laid, sprouts: sprouts.planted, areaM2: paint.paintedArea, paintedAreaM2: paint.paintedArea, local: Number(paintLocal.toFixed(3)), localFraction: Number(paintLocal.toFixed(3)), wet: paint.blooms.length, grade: Number(post.params.restore.toFixed(3)), paintPassMs: Number(paint.passMs.toFixed(3)), seed: paint.seed },
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
       chem: { water: water.state(), growth: growth.state().roots, updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [
