@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { FOX_RIG } from './foxRig';
 import { rebuildTailBrush } from './foxTailBrush';
 import { BROAD_FUR_RELIEF_GLSL } from './foxCoatRelief';
+import { EMBER_FURL_GLSL } from './foxCoatHeat';
 
 export const FOX_LOOK = {
   /** fur albedo multiplier (linear) — pulls the ACES-reddened vermilion back to burnt orange / ochre */
@@ -21,17 +22,18 @@ export const FOX_LOOK = {
   rimStrength: 0.22,
   rimPower: 2.5,
   rimColor: [1.0, 0.72, 0.42] as [number, number, number], // pale gold: separates the fox from orange ground
-  eyeGlow: 0.08,
+  eyeGlow: 0.04,
   eyeSocketLift: 1.0,
   /** Deep warmth just inside the coat silhouette; stays below bloom. */
   innerHeat: 0.06,
   bodyEmber: 1.0,
+  emberSeams: 1.0,
   spineHeat: 1.0,
   /** spirit wisps (thin curling flame off the back and tail): height multiplier, brightness, stream-back with speed */
   lickScale: 1.0,
   lickIntensity: 1.0,
   lickStream: 0.35,
-  coreRadiance: 4.0,
+  coreRadiance: 2.4,
   tailRadiance: 0.8,
   emberRadiance: 3.0,
   /** embers per second at rest / extra per m/s of speed; size in metres */
@@ -47,6 +49,7 @@ type FurUniforms = {
   uBodyEmber: { value: number };
   uBrushRelief: { value: number };
   uHeroMetres: { value: number };
+  uEmberSeams: { value: number };
   uTint: { value: THREE.Vector3 };
   uSatVal: { value: THREE.Vector2 };
   uStroke: { value: THREE.Vector2 };
@@ -60,6 +63,7 @@ const furUniforms: FurUniforms = {
   uBodyEmber: { value: 1 },
   uBrushRelief: { value: 0.75 },
   uHeroMetres: { value: 1 },
+  uEmberSeams: { value: 1 },
   uTint: { value: new THREE.Vector3() },
   uSatVal: { value: new THREE.Vector2() },
   uStroke: { value: new THREE.Vector2() },
@@ -73,12 +77,17 @@ const eyeUniforms = {
   uEyeR0: { value: 0.1 },
 };
 const EYE_APERTURE_GLSL = /* glsl */ `
-vec2 foxEyeCoordinates(vec3 p, vec3 center, float radius) {
+vec2 foxSocketCoordinates(vec3 p, vec3 center, float radius) {
   vec2 q = (p.zy - center.zy) / max(0.0001, radius);
   q.y += q.x * 0.10;
   return q;
 }
-float foxEyeAperture(vec2 q) { return length(q / vec2(0.9, 0.38)); }
+vec2 foxEyeCoordinates(vec3 p, vec3 center, float radius) {
+  vec2 q = foxSocketCoordinates(p, center, radius);
+  q.y += q.x * 0.08;
+  return q;
+}
+float foxEyeAperture(vec2 q) { return length(q / vec2(0.70, q.y < 0.0 ? 0.26 : 0.32)); }
 float foxSocketExtent(vec2 q) { return length(q / vec2(1.0, 0.5)); }
 `;
 
@@ -89,6 +98,7 @@ function syncLook() {
   furUniforms.uSocketLift.value = L.eyeSocketLift;
   furUniforms.uBodyEmber.value = L.bodyEmber;
   furUniforms.uBrushRelief.value = L.brushRelief;
+  furUniforms.uEmberSeams.value = L.emberSeams;
   furUniforms.uTint.value.set(...L.furTint);
   furUniforms.uSatVal.value.set(L.furSaturation, L.furValue);
   furUniforms.uStroke.value.set(L.strokeStrength, L.strokeScale);
@@ -136,7 +146,7 @@ ${fringeLength ? `
         '#include <common>',
         `#include <common>
 varying vec3 vRest;
-${heatedCoat ? 'uniform float uTime; uniform float uBodyEmber; uniform float uHeroMetres; varying vec2 vInnerHeat; varying vec4 vSpiritCoat;' : ''}
+${heatedCoat ? 'uniform float uTime; uniform float uBodyEmber; uniform float uHeroMetres; uniform float uEmberSeams; varying vec2 vInnerHeat; varying vec4 vSpiritCoat; float foxFurls; float foxFurlMask; float foxRustPigment;' : ''}
 ${innerHeat ? 'uniform float uBrushRelief;' : ''}
 ${coat ? `uniform vec3 uEyeL; uniform vec3 uEyeR; uniform float uEyeR0; uniform float uSocketLift;
 ${EYE_APERTURE_GLSL}` : ''}
@@ -144,6 +154,7 @@ ${fringeLength || innerHeat ? 'varying float vFurMask;' : ''}
 ${fringeLength ? 'uniform float uFringe; varying float vRuffMask;' : ''}
 uniform vec3 uTint; uniform vec2 uSatVal; uniform vec2 uStroke; uniform vec4 uRim; uniform vec3 uRimColor;
 ${NOISE_GLSL}
+${heatedCoat ? EMBER_FURL_GLSL : ''}
 ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
       )
       .replace(
@@ -157,7 +168,7 @@ ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
   diffuseColor.rgb = mix(vec3(0.36, 0.095, 0.022), vec3(0.78, 0.29, 0.045), smoothstep(0.15, 1.0, brushAlong));` : ""}
   ${coat ? `{
     vec3 center = vRest.x > 0.0 ? uEyeL : uEyeR;
-    float aperture = foxSocketExtent(foxEyeCoordinates(vRest, center, uEyeR0));
+    float aperture = foxSocketExtent(foxSocketCoordinates(vRest, center, uEyeR0));
     float region = 1.0 - smoothstep(2.0, 3.2, aperture);
     region *= 1.0 - smoothstep(0.10, 0.22, abs(vRest.x - center.x));
     float pigment = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
@@ -185,12 +196,20 @@ ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
   ${heatedCoat ? `
   float coatAmount = clamp(uBodyEmber, 0.0, 1.5);
   float rustPigment = smoothstep(1.6, 2.2, c.r / max(0.001, c.g));
+  foxRustPigment = rustPigment;
   float undercoat = vSpiritCoat.w * rustPigment * smoothstep(0.35, 0.60, sat) * 0.24 * coatAmount;
   vec3 charcoal = min(diffuseColor.rgb, vec3(0.055, 0.046, 0.040) + diffuseColor.rgb * 0.25);
   diffuseColor.rgb = mix(diffuseColor.rgb, charcoal, undercoat);
   float lowerLimb = 1.0 - smoothstep(1.20, 1.65, vRest.y);
   float darkStocking = max(vSpiritCoat.y, lowerLimb) * (1.0 - smoothstep(0.035, 0.10, lum));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.028, 0.018), darkStocking * 0.45 * coatAmount);
+  float frontCoat = smoothstep(0.35, 1.25, vRest.z) * (1.0 - smoothstep(2.3, 2.6, vRest.y));
+  float creamPigment = 1.0 - rustPigment;
+  float peachShift = min(0.1, 0.1 * frontCoat * vSpiritCoat.w * creamPigment * coatAmount);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.06, 0.97, 0.86), peachShift);
+  foxFurls = foxEmberFurls(vRest * uHeroMetres, smoothstep(0.6, 1.3, vRest.z), uTime);
+  float furlNapeClearance = 1.0 - smoothstep(0.55, 1.15, vRest.z);
+  foxFurlMask = clamp(vSpiritCoat.z * rustPigment * coatAmount * uEmberSeams * furlNapeClearance, 0.0, 1.0);
   ` : ''}
   ${tail ? `
   #ifdef USE_MAP
@@ -202,7 +221,7 @@ ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
 ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
   vec3 reliefCenter = vRest.x > 0.0 ? uEyeL : uEyeR;
-  float reliefEye = smoothstep(1.4, 3.2, foxSocketExtent(foxEyeCoordinates(vRest, reliefCenter, uEyeR0)));
+  float reliefEye = smoothstep(1.4, 3.2, foxSocketExtent(foxSocketCoordinates(vRest, reliefCenter, uEyeR0)));
   float reliefRust = smoothstep(1.6, 2.2, diffuseColor.r / max(0.001, diffuseColor.g));
   float reliefMask = vFurMask * reliefEye * reliefRust;
   float reliefThroat = smoothstep(0.6, 1.3, vRest.z)
@@ -226,13 +245,22 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
   float chroma = (max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b))) / max(0.0001, max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)));
   float warmth = vInnerHeat.x * smoothstep(0.2, 0.7, vInnerHeat.y) * smoothstep(0.25, 0.55, chroma);
   warmth *= mix(0.35, 1.0, pow(1.0 - facing, 1.3));
-  float heatBreath = 0.85 + 0.15 * sin(uTime * 1.1);
+  float heatBreath = 0.92 + 0.08 * sin(uTime * 1.1);
   ${innerHeat ? 'outgoingLight += vec3(1.0, 0.30, 0.06) * uRim.z * warmth * heatBreath;' : ''}
   // Buried heat spreads through thin ear tissue and softly through the upper paw/back coat.
   // Broad skin weights provide the feather; only the opaque coat emits this layer.
   float throughCoat = ${fringeLength ? '1.0' : 'mix(0.60, 1.0, pow(1.0 - facing, 1.2))'};
   float emberHeat = vSpiritCoat.x * 2.8 ${fringeLength ? '' : '+ vSpiritCoat.y * 0.22'} + vSpiritCoat.z * 0.40;
   outgoingLight += vec3(0.80, 0.23, 0.025) * emberHeat * throughCoat * heatBreath * clamp(uBodyEmber, 0.0, 1.5);
+  float furlPulse = 0.94 + 0.06 * sin(uTime * 0.8 + vRest.z);
+  vec3 furlColor = mix(vec3(0.85, 0.22, 0.03), vec3(1.0, 0.35, 0.06), foxFurls);
+  outgoingLight += furlColor * foxFurls * foxFurlMask * 0.90 * furlPulse * throughCoat;
+  ${innerHeat ? `float bibFront = smoothstep(0.35, 1.25, vRest.z) * (1.0 - smoothstep(2.3, 2.6, vRest.y));
+  float bibRust = foxRustPigment;
+  float bibBorder = 4.0 * bibRust * (1.0 - bibRust);
+  float bibHeat = bibFront * vSpiritCoat.w * clamp(uBodyEmber, 0.0, 1.5);
+  outgoingLight += vec3(0.85, 0.22, 0.03) * bibBorder * bibHeat * 0.35 * heatBreath;
+` : ''}
   ` : ''}
   float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
@@ -255,7 +283,7 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeCutoff}-${mat.alphaTest}-${innerHeat ? 'warm-relief-v1' : heatedCoat ? 'warm-cutout-v1' : 'plain'}`;
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeCutoff}-${mat.alphaTest}-${innerHeat ? 'warm-relief-furls-v3' : heatedCoat ? 'warm-cutout-furls-v3' : 'plain'}`;
   mat.needsUpdate = true;
 }
 
@@ -299,15 +327,15 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
   float d = length(q);
   float aperture = foxEyeAperture(q);
   if (aperture > 0.82) discard;
-  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.12, 0.30)));
-  vec3 iris = mix(vec3(0.48, 0.23, 0.055), vec3(0.22, 0.075, 0.018), smoothstep(0.15, 0.85, d));
+  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.07, 0.15)));
+  vec3 iris = mix(vec3(0.32, 0.13, 0.025), vec3(0.16, 0.045, 0.009), smoothstep(0.15, 0.85, d));
   iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.74, 0.78, aperture));   // fine umber iris boundary
   iris = mix(iris, vec3(0.02, 0.01, 0.008), pupil);
-  float glint = 1.0 - smoothstep(0.045, 0.085, length(q - vec2(0.22, 0.14)));
+  float glint = 1.0 - smoothstep(0.045, 0.085, length(q - vec2(0.16, 0.10)));
   // The head is closed under the eye: outside the fine lid, reveal real coat geometry.
   float lid = smoothstep(0.76, 0.82, aperture);
   iris = mix(iris, vec3(0.055, 0.024, 0.012), lid);
-  vec2 tearCorner = q - vec2(0.65, -0.12);
+  vec2 tearCorner = q - vec2(0.48, -0.09);
   float tear = exp(-40.0 * dot(tearCorner, tearCorner)) * lid;
   iris = mix(iris, vec3(0.095, 0.038, 0.016), tear * 0.45);
   diffuseColor.rgb = mix(iris, vec3(1.0, 0.88, 0.62), glint * (1.0 - lid));
@@ -594,7 +622,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const R = FOX_RIG;
   // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — small ear smoulders, tapered tail brush
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number, boolean?, number?][] = [
-    [body, [R.neck[1], R.neck[2]], 0.45, 3, 0.22, 0.10, 0.7],
+    [body, [R.neck[0], R.spine[3]], 0.65, 3, 0.14, 0.07, 0.7],
     [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 0, 0.18, 0.06, 0.8],
     [tail, R.tail.slice(4, 7), 0.15, 8, 0.58, 0.13, 0.8],
     [body, R.ear("l").slice(3), -1.0, 2, 0.14, 0.035, 0.8],
@@ -648,7 +676,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(random() * sourcePts.length)]! });
   }
 
-  const lookState = { bodyEmber: FOX_LOOK.bodyEmber, brushRelief: FOX_LOOK.brushRelief, furFringe: FOX_LOOK.furFringe, tailRadiance: FOX_LOOK.tailRadiance, eyeSocketLift: FOX_LOOK.eyeSocketLift };
+  const lookState = { emberSeams: FOX_LOOK.emberSeams, bodyEmber: FOX_LOOK.bodyEmber, brushRelief: FOX_LOOK.brushRelief, furFringe: FOX_LOOK.furFringe, tailRadiance: FOX_LOOK.tailRadiance, eyeSocketLift: FOX_LOOK.eyeSocketLift };
   const diagnostics = { look: lookState, tailBrush: root.userData.tailBrush, spineWisps: licks.filter((l) => l.spineFlow).length, coatHeatVertices: root.userData.coatHeatVertices as number, coatFringeLayers: root.userData.coatFringeLayers as number, coatFringeMode: root.userData.coatFringeMode, coatRuffVertices: root.userData.coatRuffVertices as number, coatSpiritRegions: root.userData.coatSpiritRegions, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
   group.userData.spiritFx = diagnostics;
 
@@ -777,6 +805,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       prev.copy(tmp); hasPrev = true;
       if (!visible) return;
       const L = FOX_LOOK;
+      lookState.emberSeams = L.emberSeams;
       lookState.bodyEmber = L.bodyEmber;
       lookState.brushRelief = L.brushRelief;
       lookState.furFringe = L.furFringe;
