@@ -20,12 +20,10 @@ image = (
     .run_commands('cd /opt/browser && npx playwright install chromium')
 )
 if modal.is_local():
-    # Keep the helper family together: static imports load before shot selection,
-    # so omitting an unrelated helper prevents every GPU capture from launching.
-    for helper in sorted((ROOT / 'tools').glob('*-capture.mjs')):
-        if helper.name != 'gpu-capture.mjs':
-            image = image.add_local_file(helper, f'/opt/browser/{helper.name}')
-    image = image.add_local_file(Path(os.environ.get('FOX_CAPTURE_SCRIPT', str(ROOT / 'tools/gpu-capture.mjs'))), '/opt/browser/gpu-capture.mjs')
+    for capture_module in sorted((ROOT / 'tools').glob('*.mjs')):
+        selected_module = Path(os.environ.get('FOX_CAPTURE_SCRIPT', str(capture_module))) if capture_module.name == 'gpu-capture.mjs' else capture_module
+        image = image.add_local_file(selected_module, f'/opt/browser/{capture_module.name}')
+
 
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)
