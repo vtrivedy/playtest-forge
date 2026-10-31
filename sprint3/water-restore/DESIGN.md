@@ -23,3 +23,9 @@ Baseline PNG water-pond-100 shows a dry gap. Independent raw-terrain probes (Sol
 ## R2 channel highlight correction
 
 Personal matched GPU review of 894193c confirms the flowing channel still reads as a cream plastic strip despite darker instance tint. The PBR light/specular and bright synthetic sky dominate the dark body. Give channel water dielectric water IOR (1.333), restrained specular intensity and a local luminance shoulder before the approximate sky reflection; lower that reflection's radiance. Keep bright accents sparse in the existing flow foam shader. Do not alter global lighting, stone, simulation, or pond shader in this pass. Recapture the same water-120 and crossing-90 views; channel must show a dark body between small warm reflections, not a uniformly pale plank.
+
+## R2 matched-image critique follow-up
+
+Opus independently rejects candidate894193c: channel overlap/ripple grid, muddy pond with haze rim, falls too faint. Preserve tiny cell overlap for geometric continuity but raise channel opacity to0.92 to reduce double-blend contrast; reduce transverse normal amplitude and broaden side feather. For pond, use muted dark pine/slate body, stronger grazing sky response, less bed bleed and a narrow0.90–1 shoreline fade. These are water-local values, no global palette/lighting changes. Raise flowing fall alpha floor0.36→0.55 so falling water remains visible against stone. Review all four matched frames again; no acceptance from source review alone.
+
+Opus source follow-up warns against compressing all radiance and reducing specular twice. Keep physical water IOR1.333 with specularIntensity1; apply a soft knee only to wet diffuse light above0.12, preserving real specular and dry cells. Add restrained foam radiance after the knee. This supersedes the initial all-light shoulder; it should retain small highlights rather than make a muddy ribbon.

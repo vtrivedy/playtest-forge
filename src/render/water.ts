@@ -67,15 +67,15 @@ export function createStylizedWater(
         vec3 R = reflect(-V, N);
         float skyWash = smoothstep(-0.15, 0.65, R.y);
         float reflectedGrove = sin(R.x * 8.0 + R.z * 5.0 + sin(a) * 0.16) * 0.5 + 0.5;
-        vec3 reflection = mix(uDeep * 0.55, uSky * 0.72, skyWash);
+        vec3 reflection = mix(uDeep * 0.55, uSky * 1.1, skyWash);
         reflection *= 0.82 + reflectedGrove * 0.18;
-        vec3 col = mix(body, reflection, 0.12 + fres * 0.68);
+        vec3 col = mix(body, reflection, 0.08 + fres * 0.85);
         // Narrow, broken amber glints, deliberately far below white/bloom.
         float glint = pow(max(0.0, sin(a * 2.1 + sin(b) * 0.6)), 24.0);
         glint *= smoothstep(0.25, 0.8, sin(b * 1.8) * 0.5 + 0.5);
         col += uSky * glint * (0.025 + fres * 0.065);
-        float shore = 1.0 - smoothstep(0.78, 1.0, r);
-        float alpha = mix(0.38, 0.82, depth) + fres * 0.12;
+        float shore = 1.0 - smoothstep(0.90, 1.0, r);
+        float alpha = mix(0.72, 0.95, depth) + fres * 0.04;
         gl_FragColor = vec4(col, alpha * shore);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
