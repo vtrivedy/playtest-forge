@@ -39,4 +39,5 @@ export { createAutumnParticles } from './leaves';
 export type { AutumnParticles, AutumnParticleOptions } from './leaves';
 
 export { createEmberMotes } from './emberMotes';
+export { createPaintSprouts } from './paintSprouts';
 export type { EmberMotes, EmberBurstOptions } from './emberMotes';
