@@ -1937,12 +1937,20 @@ try {
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
     const phaseTrace=[],supplyTrace=[];let nextSupplySample=0;
+    const ferryWait={frames:0,supportedFrames:0,longestUnsupportedSeconds:0,entryHeight:null,exitHeight:null};let unsupportedWaitFrames=0;
     const crossingSample=(st,p,phase,age)=>{
       const water=st.chem.water.find(w=>w.id==='reach-spout');
-      return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
+      return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,raftHeight:st.reach.raftHeight,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
     };
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
+      if(p.wait){
+        ferryWait.frames++;
+        if(ferryWait.entryHeight===null)ferryWait.entryHeight=st.reach.raftHeight;
+        ferryWait.exitHeight=st.reach.raftHeight;
+        if(st.grounded&&st.reach.supportedBy===0){ferryWait.supportedFrames++;unsupportedWaitFrames=0;}else unsupportedWaitFrames++;
+        ferryWait.longestUnsupportedSeconds=Math.max(ferryWait.longestUnsupportedSeconds,unsupportedWaitFrames/fps);
+      }
       if(st.t>=nextSupplySample){supplyTrace.push(crossingSample(st,p,phase,age));nextSupplySample=st.t+.5;}
       const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
       const sourceWater=st.chem.water.find(w=>w.id==='reach-spout');
@@ -1969,7 +1977,7 @@ try {
     const end=await RH('state');if(end.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=end.t;
     const eventOrder=Object.values(events).every(t=>t!==null)&&events.shadeFreedAt<events.sourceActivatedAt&&events.sourceActivatedAt<events.firstArrivalAt&&events.firstArrivalAt<events.bellLatchedAt;
     supplyTrace.push(crossingSample(end,points[phase],phase,age));
-    save('reach-acceptance.json',{phase,reached,phaseTrace,supplyTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
+    save('reach-acceptance.json',{phase,reached,phaseTrace,supplyTrace,ferryWait,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(!eventOrder)report.failures.push('Reach release/source/arrival/latch event order not observed');
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
