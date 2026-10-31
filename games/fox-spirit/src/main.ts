@@ -34,6 +34,7 @@ import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
+import { createCameraVisibilityProbe } from './cameraVisibility';
 import type { FoxAnimState } from './fox';
 import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
@@ -211,6 +212,8 @@ async function boot() {
       opacity: 0.85,
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), mat);
+    // GTAO's normal override ignores the radial alpha and would occlude as a solid card.
+    mesh.userData.forgeSkipAO = true;
     mesh.rotation.x = -Math.PI / 2;
     mesh.renderOrder = 1;
     scene.add(mesh);
@@ -534,6 +537,7 @@ async function boot() {
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'eyeSocketLift', 0, 1, 0.01);
   fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
+  fFox.add(FOX_LOOK, 'bodyEmber', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
@@ -697,7 +701,8 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world },
+    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world,
+      cameraVisibility: createCameraVisibilityProbe(scene, renderer, cam.camera, foxActor.group) },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
@@ -923,6 +928,7 @@ async function boot() {
           occlusion: occlusion.strength,
           sightBlocked: occlusion.detected,
           photo: !!photo,
+          lensTouchesCollider: col.cameraOccupied(cam.camera.position.x, cam.camera.position.y, cam.camera.position.z),
           foxNdc: cam.debug.fox,
           landingNdc: cam.debug.landing,
           internals: cam.debug.internals(),
@@ -1620,6 +1626,7 @@ async function boot() {
     cam.update(rawDt, {
       target: feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
       vel,
+      facing: fox.rotation.y,
       grounded,
       gliding,
       dashing,

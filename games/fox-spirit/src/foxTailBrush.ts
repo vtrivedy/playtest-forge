@@ -44,10 +44,31 @@ export function rebuildTailBrush(root: THREE.Object3D, metresPerUnit: number) {
     const lo = Math.max(0, t - 0.004), hi = Math.min(1, t + 0.004);
     return curve.getTangentAt(hi).sub(curve.getTangentAt(lo)).length() / Math.max(0.0001, (hi - lo) * length);
   };
-  const radiusAt = (t: number) => {
+  const safeRadiusAt = (t: number) => {
     // Keep even the outer fringe inside a tight bind-pose bend; preserve the spindle elsewhere.
     const k = Math.max(curvatureAt(t), curvatureAt(Math.max(0, t - 0.5 / segments)), curvatureAt(Math.min(1, t + 0.5 / segments)));
     return Math.min(profileRadiusAt(t), k > 0.0001 ? 0.60 / (k * 1.16) : Infinity);
+  };
+  const radii = Array.from({ length: segments + 1 }, (_, i) => safeRadiusAt(i / segments));
+  const peak = radii.indexOf(Math.max(...radii));
+  const monotone = () => {
+    for (let i = peak - 1; i >= 0; i--) radii[i] = Math.min(radii[i]!, radii[i + 1]!);
+    for (let i = peak + 1; i <= segments; i++) radii[i] = Math.min(radii[i]!, radii[i - 1]!);
+  };
+  monotone();
+  const maxRadiusStep = 0.42 * length / segments;
+  for (let i = 1; i <= peak; i++) radii[i] = Math.min(radii[i]!, radii[i - 1]! + maxRadiusStep);
+  for (let i = segments - 1; i >= peak; i--) radii[i] = Math.min(radii[i]!, radii[i + 1]! + maxRadiusStep);
+  monotone();
+  // Only reduce the safe envelope: smooth the pinches without reintroducing folded inner faces.
+  for (let pass = 0; pass < 4; pass++) {
+    const previous = [...radii];
+    for (let i = 1; i < segments; i++) radii[i] = Math.min(previous[i]!, (previous[i - 1]! + 2 * previous[i]! + previous[i + 1]!) * 0.25);
+    monotone();
+  }
+  const radiusAt = (t: number) => {
+    const index = THREE.MathUtils.clamp(t, 0, 1) * segments, lower = Math.min(segments - 1, Math.floor(index));
+    return THREE.MathUtils.lerp(radii[lower]!, radii[lower + 1]!, index - lower);
   };
   const makeGeometry = (shellScale: number) => {
     const positions: number[] = [], normals: number[] = [], uvs: number[] = [], skin: number[] = [], weights: number[] = [], indices: number[] = [];
@@ -73,7 +94,7 @@ export function rebuildTailBrush(root: THREE.Object3D, metresPerUnit: number) {
       previousTangent.copy(tangent); previousVertical.copy(vertical);
       const side = tangent.clone().cross(vertical).normalize();
       const radius = radiusAt(t) * shellScale;
-      const lo = Math.max(0, t - 0.001), hi = Math.min(1, t + 0.001);
+      const lo = Math.max(0, t - 1 / segments), hi = Math.min(1, t + 1 / segments);
       const slope = (radiusAt(hi) - radiusAt(lo)) * shellScale / Math.max(0.0001, (hi - lo) * length);
       for (let radial = 0; radial <= RADIAL; radial++) {
         const angle = radial / RADIAL * Math.PI * 2, c = Math.cos(angle), s = Math.sin(angle);
@@ -122,5 +143,5 @@ export function rebuildTailBrush(root: THREE.Object3D, metresPerUnit: number) {
     shell.castShadow = false; shell.computeBoundingBox(); shell.computeBoundingSphere(); shell.frustumCulled = false;
     tail.parent!.add(shell);
   }
-  root.userData.tailBrush = { type: 'closed-spindle', vertices: tail.geometry.getAttribute('position').count, radialSegments: RADIAL, rings: segments + 1, fringeLayers: 2, maxRadiusMetres: Math.max(...Array.from({ length: segments + 1 }, (_, i) => radiusAt(i / segments) * metresPerUnit)) };
+  root.userData.tailBrush = { type: 'closed-spindle', profile: 'monotone-safe', vertices: tail.geometry.getAttribute('position').count, radialSegments: RADIAL, rings: segments + 1, fringeLayers: 2, maxRadiusMetres: Math.max(...radii) * metresPerUnit };
 }

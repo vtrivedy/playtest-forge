@@ -377,6 +377,9 @@ function createShared(): HearthShared {
         // a cold column shows nothing; heat thins the stream rather than dimming it all evenly
         float alive = step(seed.y * 0.85, uHeat);
         vA = fade * alive * min(1.0, uHeat * 1.4);
+        // Lifted leaves must dissolve before a foreground sprite covers the fox.
+        // Keep distant column leaves and additive embers at their authored weight.
+        vA *= mix(1.0, smoothstep(0.8, 2.0, -mv.z), leaf);
         vLeaf = leaf;
         vHot = 1.0 - ph;
         vSpin = seed.z * 6.2832 + uTime * (1.5 + seed.y * 2.0);
