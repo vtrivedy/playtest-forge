@@ -1099,7 +1099,7 @@ async function boot() {
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
     else {
       // Authored analog input for tight ground turns; keep real controller/air physics.
-      const pace = onGround && auto.phase === 'run' ? THREE.MathUtils.clamp(wp.pace ?? 1, 0.1, 1) : 1;
+      const pace = onGround && auto.phase === 'run' && !auto.dashQueued ? THREE.MathUtils.clamp(wp.pace ?? 1, 0.1, 1) : 1;
       const scale = d > 1e-6 ? pace / d : 0;
       auto.wish.set(dx * scale, 0, dz * scale);
     }
