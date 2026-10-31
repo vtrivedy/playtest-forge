@@ -95,3 +95,9 @@ Remove the authored sine-foam chevrons from channel shading; physical specular, 
 For permanent restoration, preserve authored hue while compensating the sepia wash's lifted black floor: make restored midtone luminance about18% above its washed equivalent, bounded to1.65x gain; deep shadow stays deep. No new radial overlay, saturation wall or change to CPU mask probes. This supports gold/green/russet returning instead of a darker rust stain. The same already-soft mask controls its transition. Review before/mid/settled at the same unobstructed lens, and retain dark wet gaps/fox saturation priority.
 
 The scanned litter texture already carries orange/brown chroma; multiplying it by clean authored hues doubles that bias. In Reed land only, neutralize85% of the source texture chroma before applying the existing gold/russet/pine palette. Keep its value/detail, alpha, leaf placement and other regions unchanged.
+
+## Transient dash wake follow-up
+
+The d99 wake is still a dark stain because value compensation only covers permanent restoration; transient RT/aura masks expose the unlifted dark source material. Extend the same bounded hue-preserving value compensation to temporary masks too, at a gentler12% target versus18% permanent. Use the final brushed mask for the output blend as before; avoid adding a ground decal or a new bright disc. Retain the1.65 gain cap and existing trail lifetime/CPU probes. Review dash/wake/decayed in the next immutable capture.
+
+Sol source critique catches double attenuation: scaling the gain by cm and then blending by brushed can leave a decaying wake below washed value. Apply the bounded1.18 target to the chroma endpoint once and let the existing brushed mix handle all fade strength. Use the same endpoint target for permanent and transient masks, avoiding a darker permanent feather. Unmasked pixels remain exactly washed because their final blend is0; gain cap still preserves deep shadows.

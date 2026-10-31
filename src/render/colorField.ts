@@ -630,11 +630,11 @@ export class ColorField {
             + (noise21(vWorldPosCF.xz * 2.7 + 8.0) - 0.5) * 0.2;
           float brushed = clamp(cm + brushEdge * sin(cm * 3.14159265), 0.0, 1.0);
           // Sepia has a lifted dark floor. Restored colour should feel warmer/brighter,
-          // while retaining its authored hue and the same soft permanent front.
+          // while retaining authored hue and the same soft permanent/temporary fronts.
           float washedValue = dot(washed, vec3(0.2126, 0.7152, 0.0722));
           float restoredValue = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
           float aliveGain = clamp(washedValue * 1.18 / max(restoredValue, 0.002), 1.0, 1.65);
-          chroma *= mix(1.0, aliveGain, cfPermanent);
+          chroma *= aliveGain;
           outgoingLight = mix(washed, chroma, brushed);
           // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
           // without repainting it — stone stays stone, just sunlit
