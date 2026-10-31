@@ -340,6 +340,8 @@ async function boot() {
     folder.add(params, 'cadenceExponent', 0, 1, .05);
     folder.add(params, 'minStanceRatio', .2, 1, .01);
     folder.add(params, 'bodyBob', 0, 1, .01);
+    folder.add(params, 'takeoffCrouch', 0, .2, .005);
+    folder.add(params, 'takeoffPitch', 0, .2, .005);
     folder.add(params, 'rockDamp', 0, 2, .05);
     folder.add(params, 'headLevel', 0, 1, .05);
     folder.add(params, 'tailStream', 0, .03, .001);
@@ -1460,7 +1462,8 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent,
+        crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);

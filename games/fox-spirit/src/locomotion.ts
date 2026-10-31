@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { FOX_RIG } from './foxRig';
 
 export type MotionInput = {
-  lookYaw?: number; brake?: number; speed: number; grounded: boolean; yaw: number; verticalSpeed: number;
+  lookYaw?: number; brake?: number;
+  /** Jump windup progress 0..1: feet stay planted while the body loads onto its haunches. */
+  crouch?: number; speed: number; grounded: boolean; yaw: number; verticalSpeed: number;
   groundAt: (x: number, z: number, ceiling: number) => number;
 };
 import GAITS from '../../../assets/hero/spirit_fox.loco.json';
@@ -35,6 +37,7 @@ export class AuthoredLocomotion {
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
     minStanceRatio: .35, bodyBob: .45,
     // Glide carriage: share of per-stride back rock / head pitch removed, tail streaming and ribbon wave.
+    takeoffCrouch: .09, takeoffPitch: .07,
     rockDamp: 1.3, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
     headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { cadenceHz: 0, stanceRatio: 1, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
@@ -325,7 +328,13 @@ export class AuthoredLocomotion {
     const terrainTarget=this.input.grounded && Number.isFinite(rigGround) && Number.isFinite(actorGround)
       ? THREE.MathUtils.clamp(rigGround-actorGround,-.3,.3) : 0;
     this.terrainOffset=THREE.MathUtils.damp(this.terrainOffset,terrainTarget,25,dt);
-    this.root.position.y+=this.terrainOffset+landOffset-this.brake*this.params.brakeSquat;
+    // Standing jumps load the haunches; a gallop carries its momentum straight into the leap.
+    const crouch=THREE.MathUtils.smoothstep(this.input.crouch ?? 0,0,1)*(1-THREE.MathUtils.smoothstep(this.input.speed,1,3));
+    this.root.position.y+=this.terrainOffset+landOffset-this.brake*this.params.brakeSquat-crouch*this.params.takeoffCrouch;
+    if(crouch>0){
+      this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
+      this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(-crouch*this.params.takeoffPitch,0,0)));
+    }
     overlay(this.spine,new THREE.Vector3(1,0,0),-this.brake*this.params.brakePitch);
     const lookDelta=this.input.lookYaw===undefined ? 0 : Math.atan2(Math.sin(this.input.lookYaw-this.input.yaw),Math.cos(this.input.lookYaw-this.input.yaw));
     const look=this.lookSpring.step(THREE.MathUtils.clamp(lookDelta*this.params.headLead+this.turn*.04,-.32,.32),dt,this.params.headFrequency,this.params.headDamping);
@@ -391,7 +400,8 @@ export class AuthoredLocomotion {
         const d=GAITS[name].contacts[i]; const p=(phase-d.phase+1)%1;
         return sum+(p<d.duty*this.stanceRatio[name] ? (this.metrics.clipWeights[name] ?? 0) : 0);
       },0);
-      const stance=this.input.grounded && (locomoting ? support>.55 : (active==='idle' || active==='land'));
+      const windup=active==='jump_up' && (this.input.crouch ?? 0)>0 && this.input.speed<3;
+      const stance=this.input.grounded && (locomoting ? support>.55 : (active==='idle' || active==='land' || windup));
       if (stance) {
         const sample=foot.planted ? foot.anchor : paw;
         const ground=this.input.groundAt(sample.x,sample.z,this.group.position.y+.6);
