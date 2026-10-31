@@ -887,8 +887,9 @@ try {
     const pondCaptureStart = await page.evaluate(() => {
       const d = window.__gameHooks.debug.scene.userData.waterCapture;
       if (!d) return null;
-      d.checkNextCopy = true;
-      return {copies:d.copies,reflectionAttempts:d.reflectionAttempts,checkedCopies:d.checkedCopies};
+      d.bootGlError = d.glError; d.bootPriorGlError = d.priorGlError;
+      d.glError = 0; d.priorGlError = 0; d.checkNextCopy = true;
+      return {copies:d.copies,reflectionAttempts:d.reflectionAttempts,reflections:d.reflections,checkedCopies:d.checkedCopies,bootGlError:d.bootGlError,bootPriorGlError:d.bootPriorGlError};
     });
     await H('photo', [-23, 5, 70], [-30, 1, 61], 48); await advance(2); await shot('water-pond-frozen');
     await video('water-pond-grotto', 8 * fps, async i => {
@@ -909,8 +910,8 @@ try {
     });
     save('water-scene-capture.json', {before:pondCaptureStart,...waterCapture});
     const d = waterCapture.after, expected = waterCapture.expected;
-    if (!d || !pondCaptureStart || d.copies <= pondCaptureStart.copies || d.reflectionAttempts <= pondCaptureStart.reflectionAttempts || d.checkedCopies <= pondCaptureStart.checkedCopies
-      || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.invalidTargets) {
+    if (!d || !pondCaptureStart || d.copies <= pondCaptureStart.copies || d.reflections <= pondCaptureStart.reflections || d.checkedCopies <= pondCaptureStart.checkedCopies
+      || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.bootGlError || d.invalidTargets) {
       report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
     }
   }

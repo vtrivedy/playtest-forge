@@ -140,8 +140,8 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         outgoingLight -= waterDiffuse * (1.0 - kneeLuma / max(waterLuma, 0.0001)) * vWet;
         outgoingLight = mix(outgoingLight, waterSky, (0.06 + waterFresnel * 0.35) * vWet);
         vec3 rippleView = (viewMatrix * vec4(ripple, 0.0)).xyz;
-        vec3 bed = sceneWaterColor(rippleView.xy * 0.004 * vWet);
         float channelDepth = 1.0 - abs(vWaterUV.x - 0.5) * 2.0;
+        vec3 bed = sceneWaterColor(rippleView.xy * 0.055 * vWet * smoothstep(0.0, 0.35, channelDepth));
         vec3 clearBody = bed * mix(vec3(0.95, 0.97, 0.91), vec3(0.67, 0.83, 0.73), channelDepth);
         outgoingLight = mix(outgoingLight, clearBody, (0.84 - waterFresnel * 0.40) * vWet);
         outgoingLight += vec3(0.025, 0.02, 0.012) * foam * vWet;
