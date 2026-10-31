@@ -1,3 +1,4 @@
+import { createLanternhollow, hubPathDistance, hubClearance } from './regionLanternhollow';
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { routeRemnant } from './routeRemnants';
@@ -276,6 +277,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const mk = (o: THREE.MeshStandardMaterialParameters & { name: string }) =>
     new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, ...o });
   const M = {
+    hubPlaster: mk({ name: 'rv-hub-plaster', roughness: 0.96 }),
+    hubRoof: mk({ name: 'rv-hub-roof', roughness: 0.9 }),
+    hubDark: mk({ name: 'rv-hub-dark', roughness: 0.94 }),
+    hubLamp: mk({ name: 'rv-hub-lamp', roughness: 0.85, emissive: 0xe4b777, emissiveIntensity: 0.16 }),
     terrain: mk({ name: 'rv-terrain', roughness: 0.95 }),
     ground: mk({ name: 'rv-ground', roughness: 0.95 }),
     rock: mk({ name: 'rv-rock', roughness: 0.93 }),
@@ -531,7 +536,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       .map((p, i) => [p, route[i + 1]] as const)
       .filter(([a, b]) => b && a.ground && b.ground) as Array<readonly [Waypoint, Waypoint]>;
     const pathDist = (x: number, z: number) => {
-      let best = 1e9;
+      let best = hubPathDistance(x, z);
       for (const [a, b] of groundSegs) {
         const abx = b.x - a.x;
         const abz = b.z - a.z;
@@ -1951,6 +1956,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const lanternMesh = lanternB.toMesh(lanternMat, { cast: false });
   if (lanternMesh) group.add(lanternMesh);
 
+  // Lanternhollow shares the realm, terrain paint and material buckets; no chapter transition.
+  createLanternhollow(group, col, groundRaw, {
+    stone: bk('stone', -8, 85), wood: bk('wood', -8, 85),
+    plaster: bk('hubPlaster', -8, 85), roof: bk('hubRoof', -8, 85),
+    lamp: bk('hubLamp', -8, 85, false), dark: bk('hubDark', -8, 85),
+  }, patchable);
+
   // ==================================================================== MEADOW + PORTAL
   // portal ring of standing stones (0,92) and the first arch framing the Wellspring
   for (let k = 0; k < 7; k++) {
@@ -1999,7 +2011,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     // rock outcrops in three scales: a half-buried anchor, medium stones leaning on it, pebble spill
     const br = rng(606);
     const clear = (x: number, z: number, m: number) =>
-      insideIsland(x, z, 8) && !routeNear(route, x, z, m) && marshE(x, z) >= 1.15 && !inTerraces(x, z, 4) && Math.hypot(x, z + 58) >= 20 && !(z < -66 && Math.abs(x) < 24);
+      insideIsland(x, z, 8) && !hubClearance(x, z) && !routeNear(route, x, z, m) && marshE(x, z) >= 1.15 && !inTerraces(x, z, 4) && Math.hypot(x, z + 58) >= 20 && !(z < -66 && Math.abs(x) < 24);
     let seed = 0;
     for (let i = 0; i < 60; i++) {
       const x = (br() * 2 - 1) * 120;
@@ -2064,6 +2076,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const BRACKEN: [THREE.Color, THREE.Color] = [new THREE.Color(0x9a4a1e), new THREE.Color(0xc07a34)];
     const TUSSOCK: [THREE.Color, THREE.Color] = [new THREE.Color(0xc9a45a), new THREE.Color(0x9a8452)];
     const plant = (x: number, g: number, z: number, size: number, hue: THREE.Color, kind = lr()) => {
+      if (hubClearance(x, z)) return;
       // the arrival clearing (spawn → fox review stage (6, 78) → meadow still (6, 70)) stays open meadow
       const ct = THREE.MathUtils.clamp(((x - 0) * 6 + (z - 90) * -22) / (6 * 6 + 22 * 22), 0, 1);
       if (Math.hypot(x - 6 * ct, z - 90 + 22 * ct) < 9) return;
@@ -2147,7 +2160,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     for (let i = 0; i < 1400; i++) {
       const x = (lr() * 2 - 1) * 128;
       const z = (lr() * 2 - 1) * 100;
-      if (!insideIsland(x, z, 4) || routeNear(route, x, z, 1.6) || marshE(x, z) < 1.05) continue;
+      if (!insideIsland(x, z, 4) || hubClearance(x, z) || routeNear(route, x, z, 1.6) || marshE(x, z) < 1.05) continue;
       if (Math.hypot(x - POND.x, (z - POND.z) * 1.6) < 16 || Math.hypot(x, z + 58) < 17 || (z < -66 && Math.abs(x) < 24)) continue;
       const g = groundAtCover(x, z);
       if (!Number.isFinite(g) || Math.abs(g - groundRaw(x, z)) > 0.3) continue;
@@ -2400,6 +2413,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   let flood = 0;
 
   const zoneAt = (x: number, z: number) => {
+    if (z > 78 && Math.abs(x) < 36) return 'Lanternhollow';
     if (z < -42) return 'E · Wellspring Hill';
     if (marshE(x, z) < 1.15) return 'C · Reedmarsh';
     if (inTerraces(x, z, 0) || x < -95) return 'B · Windmill Rise';
@@ -2466,6 +2480,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
+      M.hubLamp.emissiveIntensity = 0.15 + Math.sin(t * 1.3) * 0.01;
       for (const water of waterVisuals) water.update(t);
       inkTime.value = t;
       const ev: RealmEvent[] = [];
