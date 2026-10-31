@@ -166,3 +166,25 @@ for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
   ascentViews.push({ verticalSpeed, extraHeight: +extraHeight.toFixed(3), extraCrane: +extraCrane.toFixed(3) });
 }
 console.log('Landing-preview lift CPU probe:', JSON.stringify(ascentViews));
+
+// Overhead decorative strings must not pump the solid boom; their timber posts
+// remain normal scenery. This is geometry-only and never creates a renderer.
+const stringScene = new THREE.Group();
+const stringMat = new THREE.MeshStandardMaterial();
+const stringPlane = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), stringMat);
+stringPlane.name = 'decorative-string-test';
+stringPlane.position.z = 2;
+stringPlane.userData.cameraDecoration = true;
+stringScene.add(stringPlane);
+const stringCamera = createFollowCamera({ scenery: stringScene });
+stringCamera.resize(1280, 720);
+stringCamera.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
+  gliding: false, dashing: false, airTime: 0, landing: null });
+assert.match(stringCamera.debug.internals(), /blocker=$/, 'decorations must not compress the solid boom');
+stringPlane.userData.cameraDecoration = false;
+const solidPostCamera = createFollowCamera({ scenery: stringScene });
+solidPostCamera.resize(1280, 720);
+solidPostCamera.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
+  gliding: false, dashing: false, airTime: 0, landing: null });
+assert.match(solidPostCamera.debug.internals(), /blocker=decorative-string-test/, 'solid scenery must still block');
+console.log('Decorative string / solid post camera distinction PASS');

@@ -302,7 +302,7 @@ export function createFollowCamera(opts: {
   opts.scenery?.updateWorldMatrix(true, true);
   opts.scenery?.traverse((o) => {
     const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh || mesh.userData.isOccluder) return;
+    if (!mesh.isMesh || mesh.userData.isOccluder || mesh.userData.cameraDecoration) return;
     const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     // Foliage has its own near-lens fade; reeds must not pump the solid boom.
     const solid = materials.some((m) => (m as THREE.MeshStandardMaterial).isMeshStandardMaterial

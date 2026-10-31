@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import assert from 'node:assert/strict';
-import { createLanternhollow, HUB_HOUSES, HUB_PATHS } from '../../games/fox-spirit/src/regionLanternhollow.ts';
+import { createLanternhollow, HUB_HOUSES, HUB_PATHS, HUB_FESTOON_POSTS, hubPathDistance } from '../../games/fox-spirit/src/regionLanternhollow.ts';
 import { Bucket } from '../../games/fox-spirit/src/russetKit.ts';
 import { CollisionWorld, colliderTopAt } from '../../games/fox-spirit/src/collision.ts';
 // CPU geometry only. Canvas drawing is stubbed; no renderer/browser is created.
@@ -15,21 +15,25 @@ const b = {stone:new Bucket(),wood:new Bucket(),plaster:new Bucket(),roof:new Bu
 const col = new CollisionWorld(()=>0), group = new THREE.Group();
 let hub!: ReturnType<typeof createLanternhollow>;
 try {
-  hub = createLanternhollow(group, col, () => 0, b, []);
+  hub = createLanternhollow(group, col, () => 0, b, [], { wood: new THREE.MeshStandardMaterial(), roof: new THREE.MeshStandardMaterial(), lamp: new THREE.MeshStandardMaterial(), dark: new THREE.MeshStandardMaterial() });
 } finally {
   if (originalDocument === undefined) Reflect.deleteProperty(globalThis, 'document');
   else globalThis.document = originalDocument;
 }
 // Practical lights stay allocated while the spatial mood fades their intensity.
 const practicals = group.children.filter((o): o is THREE.PointLight => (o as THREE.PointLight).isPointLight);
-assert.equal(practicals.length, 2);
+assert.equal(practicals.length, 3);
 hub.update(1, 1);
 assert.ok(hub.state().well > 0 && hub.state().porch > 0);
 assert.equal(hub.state().well, practicals[0].intensity);
 assert.equal(hub.state().porch, practicals[1].intensity);
+assert.equal(hub.state().plaza, practicals[2].intensity);
 hub.update(2, 0);
 assert.equal(hub.state().well, 0);
 assert.equal(hub.state().porch, 0);
+assert.equal(hub.state().plaza, 0);
+for (const [x,z] of HUB_FESTOON_POSTS) assert.ok(hubPathDistance(x,z) >= 2.3, `Festoon post crowds path: ${x},${z}`);
+for (const p of hub.festoon.pendants) assert.ok(p.bottom >= p.ground + 3, 'Pendant must clear jumping fox');
 assert.ok(practicals.every(light => light.visible), 'fading must not change shader light count');
 const spriteHits: THREE.Intersection[] = [];
 const probe = new THREE.Raycaster();
@@ -70,7 +74,7 @@ for(const [ax,az,bx,bz] of HUB_PATHS) {
   const steps=Math.ceil(Math.hypot(bx-ax,bz-az)*10);
   for(let i=0;i<=steps;i++){
     const x=ax+(bx-ax)*i/steps,z=az+(bz-az)*i/steps;
-    for(const c of col.colliders)if(['hub-cottage','hub-bench','hub-well','hub-pulley-post','hub-woodpile'].includes(c.tag ?? '') && colliderTopAt(c,x,z,.4)!==null)throw Error(`Path clips hub collider at ${x},${z}`);
+    for(const c of col.colliders)if(['hub-cottage','hub-bench','hub-well','hub-pulley-post','hub-woodpile','hub-festoon-post'].includes(c.tag ?? '') && colliderTopAt(c,x,z,.4)!==null)throw Error(`Path clips hub collider at ${x},${z}`);
   }
 }
 console.log(JSON.stringify({arrivalRouteSweepSamples:routeSweeps,smokeCameraFreeProbes:smokeProbes,pathSegmentsClear:HUB_PATHS.length,roofStrips:36,maxMeshColliderError:maxError,routePointsClear:8,colliders:col.colliders.length,vertices:Object.values(b).reduce((n,k)=>n+k.vertexCount,0)},null,2));

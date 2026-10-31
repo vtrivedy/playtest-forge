@@ -9,7 +9,7 @@ Lanternhollow occupies the existing arrival meadow within continuous Russetvale.
 | Object | Centre x,z | Size and height above ground | Collision |
 | --- | --- | --- | --- |
 | Bramble cottage | -18,92 | 5.2 × 4.2 m; eave 2.6 m, ridge 4 m, chimney 5.65 m | Body box, 12 roof strips, chimney |
-| Archive cottage | -26,88 | 5.6 × 4.6 m; eave 2.8 m, ridge 4.4 m | Body box, 12 roof strips |
+| Archive cottage | -26,88 | 5.6 × 4.6 m; eave 2.8 m, ridge 4.9 m | Body box, 12 roof strips |
 | East cottage | 12,95 | 5.2 × 4.2 m; eave 2.6 m, ridge 4 m | Body box, 12 roof strips |
 | Great Well | -8,85 | Outer radius about 1.6 m; parapet 0.93 m; pulley arch about 3.6 m | 12 masonry boxes, low post cylinders; overhead rig decorative |
 | Rest bench | -10,91 | 2.2 × 0.7 m; seat 0.8 m | Box; feet sunk into slope |
@@ -25,11 +25,11 @@ Roof meshes and collision use one gently rounded pitched profile sampled into 12
 
 The Great Well remains dry. A nonemissive carved stone maple identifies it without suggesting a Seedwell. The pulley is decorative above walking height. Seasonal completion is not faked; cumulative world-season progression remains future work.
 
-Three visible winter log stores have matching small colliders behind the cottages. Low autumn fern/grass groups occupy the opposite rear corners, away from trails. Eight faint umber smoke puffs rise from Bramble's chimney on the realm clock and opt out of raycasting. There are no invented NPCs or washing-line obstacles.
+Three visible winter log stores have matching small colliders behind the cottages. Low autumn fern/grass groups occupy the opposite rear corners, away from trails; coherent curled leaf drifts add ground detail. Eight faint umber smoke puffs rise from Bramble's chimney on the realm clock and opt out of raycasting. There are no invented NPCs or washing-line obstacles.
 
 ## Light and color
 
-Architectural stone, plaster, roof and timber remain in ColorField and begin sepia. Tiny window and lamp apertures retain amber emission at 0.5 ± 0.025. Two short-range, shadowless PointLights at the well and Bramble porch create real warm pools.
+Architectural stone, plaster, roof and timber remain in ColorField and begin sepia. Tiny window and lamp apertures retain amber emission at 0.5 ± 0.025. Three short-range, shadowless PointLights at the well, Bramble porch and plaza create real warm pools. Four amber pendants hang from one sagging cord on two timber posts, clear of the paths and jumping fox.
 
 The arrival basin has a continuous positional dusk blend: full by z88, gone by z68, fading beyond |x|45. Saved sky colors and key/hemi/rim values blend without compounding; fog color follows the sky while existing regional control retains fog density. Exposure is unchanged. Capture hooks and window.__game notes report dusk and actual practical intensities. Targets are available in lil-gui. One visual updater serves normal and turntable rendering. This mood adds no restoration state.
 
@@ -43,6 +43,6 @@ Geometry, lettering, maple relief and smoke alpha are original. Materials and lo
 
 Immutable GPU requests are tracked in /streams/hub-r2/capture-request.json. Evidence covers matched overview/exits, a lower arrival, well detail, live arrival/idle, natural chase and a checked context orbit. Photography and the natural Kiln route are requested separately or in combined runs. Personal PNG/state inspection and Opus visual agreement are required before self-landing. The first candidate was rejected; intermediate 1ab6d10 visibly improves warm apertures and wall detail but remains below the village bar.
 
-CPU checks cover 16 village paths against solid props, 970 meadow-route samples, 36 roof strips aligned within 1.67e-7 m, and eight camera-free smoke raycasts. Dusk tests guard against cumulative darkening and fog-density resets. TypeScript and the fox Vite build pass. These checks supplement remote play evidence.
+CPU checks cover 16 village paths against solid props, 970 meadow-route samples, 36 roof strips aligned within 2.2e-7 m, and eight camera-free smoke raycasts. Dusk tests guard against cumulative darkening and fog-density resets. TypeScript and the fox Vite build pass. These checks supplement remote play evidence.
 
 Run `npx tsx tools/tests/hub-geometry.ts` and `npx tsx tools/tests/hub-dusk.ts`. Neither creates a browser or renderer.

@@ -86,7 +86,7 @@ export type RealmEvent =
 export type Realm = {
   group: THREE.Group;
   updateHubVisuals: (time: number, dusk: number) => void;
-  hubState: () => { well: number; porch: number };
+  hubState: () => { well: number; porch: number; plaza: number };
   materials: THREE.MeshStandardMaterial[];
   collision: CollisionWorld;
   terrainY: (x: number, z: number) => number;
@@ -1968,7 +1968,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     stone: bk('stone', -8, 85), wood: bk('wood', -8, 85),
     plaster: bk('hubPlaster', -8, 85), roof: bk('hubRoof', -8, 85),
     lamp: bk('hubLamp', -8, 85, false), dark: bk('hubDark', -8, 85),
-  }, patchable);
+  }, patchable, { wood: M.wood, roof: M.hubRoof, lamp: M.hubLamp, dark: M.hubDark });
 
   // Curated domestic edge groups, kept low enough to preserve paws and path edges.
   for (const [hi, house] of HUB_HOUSES.entries()) {
@@ -1986,6 +1986,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         hue: new THREE.Color(0x795638), hue2: new THREE.Color(0xa27a49), cast: false,
       });
     }
+  }
+
+  // Coherent low autumn drifts, with the core trails and water kept clear.
+  for (const [i, [x, z]] of [[-12.5, 84], [-13, 91], [-10, 93], [-5, 85.5], [-19, 95.5], [-28, 91.5]].entries()) {
+    litterPatch(bk('litter', x!, z!, false), rng(9400 + i), x!, z!, .8, 18, (px, pz) => {
+      if (hubPathDistance(px, pz) <= 1.2 || Math.hypot(px + 8, pz - 85) < 1.9) return NaN;
+      if (((px - POND.x) / POND.rx) ** 2 + ((pz - POND.z) / POND.rz) ** 2 < 1.2) return NaN;
+      if (HUB_HOUSES.some(h => Math.abs(px - h.x) < h.w / 2 + .2 && Math.abs(pz - h.z) < h.d / 2 + .2)) return NaN;
+      return groundRaw(px, pz);
+    }, [PAL.leafBrown, PAL.leafBrown, PAL.russet, PAL.gold]);
   }
 
   // ==================================================================== MEADOW + PORTAL

@@ -670,7 +670,21 @@ try {
     await advance(60); await shot('hub-spawn-chase');
     save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
-    await H('teleport', 0, y, 94, Math.PI);
+    // Portrait staging only; natural spawn above is untouched. Real idle rig, no bone override.
+    const heroYaw = Math.atan2(3.1, .8) - Math.PI / 4;
+    await H('teleport', 0, y, 94, heroYaw); await advance(30);
+    const heroLens = [3.1, y + 1.3, 94.8], heroLook = [-6.5, y + .9, 89.5];
+    const compositionBlocker = await H('photoBlocker', heroLens, heroLook);
+    const foxSightBlocker = await H('photoBlocker', heroLens, [0, y + .35, 94]);
+    await H('photo', heroLens, heroLook, 46); await advance(2);
+    await shot('hub-hero-three-q');
+    const heroState = await H('state');
+    save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
+    if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
+    const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
+    save('hub-festoon-clearance.json', festoon);
+    if (festoon?.pendants.some(p => p.bottom < p.ground + 3)) report.failures.push('Hub pendant below 3m local clearance');
+    await H('teleport', 0, y, 94, Math.atan2(-8, -9));
     const hubViews = [
       ['arrival', [16, 10, 108], [-5, 2, 81], 52],
       ['arrival-close', [8, 3.8, 98], [-10, 2, 85], 55],
@@ -679,9 +693,12 @@ try {
       ['east-exit', [2, 6, 99], [18, 2, 80], 56],
       ['north-exit', [0, 5, 97], [0, 2, 65], 55],
     ];
+    const hubViewCameras = [];
     for (const [name, lens, target, fov] of hubViews) {
+      hubViewCameras.push({ name, lens, target, fov, blocker: await H('photoBlocker', lens, target) });
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
     }
+    save('hub-view-cameras.json', hubViewCameras);
     await H('photo', [8, 4.5, 101], [-8, 2, 86], 55); await advance(30);
     const initial = await H('state');
     await video('hub-arrive-idle', 15 * fps, async i => {
