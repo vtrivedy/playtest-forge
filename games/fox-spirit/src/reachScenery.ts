@@ -127,7 +127,7 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
 /** Local basin surface: quiet teal depth with restrained moving reflection, no pale foam disc. */
 export function createReachWater(group: THREE.Group) {
   const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
-    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),...{uTime:{value:0},uDeep:{value:new THREE.Color(0x223f40)},uSky:{value:new THREE.Color(0x9ba9a6)}}},
+    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),...{uTime:{value:0},uDeep:{value:new THREE.Color(0x1d3635)},uSky:{value:new THREE.Color(0x7f9690)}}},
     vertexShader:`#include <fog_pars_vertex>
       varying vec2 vUv; varying vec3 vWorld;
       void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;
@@ -137,8 +137,8 @@ export function createReachWater(group: THREE.Group) {
       uniform float uTime;uniform vec3 uDeep,uSky;varying vec2 vUv;varying vec3 vWorld;
       void main(){
         vec2 p=(vUv-.5)*2.;float r=length(p);
-        float edge=r+.018*sin(p.x*26.+sin(p.y*17.))+.012*sin(p.y*32.);
-        float alpha=1.-smoothstep(.94,1.,edge);
+        float edge=length(vec2(p.x*12./11.55,p.y*13./12.55))+.008*sin(p.x*26.+sin(p.y*17.))+.006*sin(p.y*32.);
+        float alpha=1.-smoothstep(.98,1.015,edge);
         vec2 bankP=vec2(p.x*12./11.35,-p.y*13./12.35);
         float bankAngle=atan(bankP.y,bankP.x);
         bool spillway=cos(bankAngle)<-.9||(sin(bankAngle)<-.45&&cos(bankAngle)<.55);
@@ -148,14 +148,14 @@ export function createReachWater(group: THREE.Group) {
         float b=vWorld.x*1.9-vWorld.z*.74+uTime*.45;
         vec3 n=normalize(vec3(cos(a)*.035+cos(b)*.018,1.,sin(a)*.04));
         vec3 view=normalize(cameraPosition-vWorld);float fres=pow(1.-max(dot(n,view),0.),3.);
-        float reflection=smoothstep(.35,.9,sin(a*.37+sin(b*.28)*.5))*.12;
-        vec3 color=mix(uDeep,uSky,.12+fres*.48+reflection);
+        float reflection=smoothstep(.35,.9,sin(a*.37+sin(b*.28)*.5))*.04;
+        vec3 color=mix(uDeep,uSky,.08+fres*.42+reflection);
         float ripple=pow(max(0.,sin(a*3.+sin(b))*.5+.5),18.);
-        color+=uSky*ripple*.045;
+        color+=uSky*ripple*.015;
         // Broken, thin tide edge, rather than a white filled ellipse.
         float shore=smoothstep(.85,.93,edge)*(1.-smoothstep(.94,.99,edge));
         color=mix(color,vec3(.31,.36,.30),shore*.3);
-        gl_FragColor=vec4(color,alpha*(.83+fres*.12));
+        gl_FragColor=vec4(color,alpha*(.95+fres*.04));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <fog_fragment>
@@ -180,11 +180,16 @@ export function createReachWater(group: THREE.Group) {
     fragmentShader:`#include <fog_pars_fragment>
       uniform float uTime;varying vec2 vUv;
       void main(){
-        float strands=.5+.5*sin(vUv.x*97.+sin(vUv.x*31.)*2.+vUv.y*3.+uTime*.7);
+        float strands=.5+.5*sin(vUv.x*97.+sin(vUv.x*31.)*2.+sin(vUv.y*14.+uTime*4.)*.5);
         float flow=.5+.5*sin(vUv.y*18.+uTime*2.8+sin(vUv.x*45.));
-        vec3 color=mix(vec3(.045,.095,.09),vec3(.23,.31,.28),strands*.45+flow*.12);
+        float sheet=smoothstep(.55,.85,strands);
+        float lip=smoothstep(.94,1.,vUv.y);
+        float foot=1.-smoothstep(0.,.09,vUv.y);
+        vec3 color=mix(vec3(.035,.08,.075),vec3(.16,.24,.21),sheet*.5+flow*.12);
+        color=mix(color,vec3(.32,.43,.38),lip*.4+foot*.5);
         float edge=smoothstep(0.,.025,vUv.x)*(1.-smoothstep(.975,1.,vUv.x));
-        gl_FragColor=vec4(color,(.46+strands*.16)*edge*smoothstep(0.,.08,vUv.y));
+        // Opaque falling strands with open air between them, not an even glass wall.
+        gl_FragColor=vec4(color,edge*min(.92,.015+sheet*.76+lip*.18+foot*.2));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <fog_fragment>
