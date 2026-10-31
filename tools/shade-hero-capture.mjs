@@ -57,7 +57,7 @@ export async function captureShadeHero({repo,getPage,H,advance,video,shot,save,r
 /** Same staged-observer review for old puzzle and new open habitat; live AI is never overridden. */
 export async function captureShadeBehavior({repo,getPage,H,video,save,report,id='shade-meadow',name='shade-meadow-behavior',review}) {
   review??=await createShadeLensReview({repo,getPage,H,report,save});
-  const page=getPage(),transitions=[],placements=[],before=await H('state');let missing=false;
+  const page=getPage(),observerTransitions=[],placements=[],before=await H('state');let missing=false;
   save(name+'-staging.json',{label:'10s staged observer teleports every15frames; actual actor AI, authored chase tuning, no forced actor state',nearFrames:[90,300],retreatFrames:[300,315]});
   const keyFrames=[0,89,180,299,300,315,390,480,599];
   await video(name,600,async frame=>{
@@ -74,12 +74,13 @@ export async function captureShadeBehavior({repo,getPage,H,video,save,report,id=
     },{id,near:frame>=90&&frame<300,retreat:frame>=300&&frame<315});
     placements.push({frame,observer});
     if(!observer){missing=true;return;}
-    if(transitions.at(-1)?.mode!==observer.mode)transitions.push({frame,mode:observer.mode});
+    if(observerTransitions.at(-1)?.mode!==observer.mode)observerTransitions.push({frame,mode:observer.mode});
     await H('teleport',...observer.pos);
   },undefined,review.options('Behavior',id,keyFrames));
   const take=report.videos[name],rows=take.trace,framed=rows.filter(r=>r.state.capture?.shadePresent),failed=framed.filter(r=>{const c=r.state.capture;return !c.fox?.inFrame||!c.shade?.inFrame||c.fox.heightFraction<=.15||c.shade.heightFraction<=.15;}).map(r=>r.frame),blocked=rows.filter(r=>!r.state.capture?.lens?.clear||r.state.capture?.lens?.noFit).map(r=>r.frame);
-  const after=await H('state'),expected=['patrol','chase','return','patrol'];let observed=0;for(const t of transitions)if(t.mode===expected[observed])observed++;
-  const checks={cycle:observed===expected.length,observers:!missing,framed:framed.length>0&&!failed.length,clear:!blocked.length,noHit:after.shades.hits===before.shades.hits,noDeath:after.deaths===before.deaths};
-  const result={passed:Object.values(checks).every(Boolean),checks,transitions,placements,failedFrames:failed,blockedFrames:blocked,state:after,game:await page.evaluate(()=>window.__game)};
+  const after=await H('state'),expected=['patrol','chase','return','patrol'],transitions=[];
+  for(const row of rows){const mode=row.state.shades.actors.find(a=>a.id===id)?.mode;if(transitions.at(-1)?.mode!==mode)transitions.push({frame:row.frame,mode});}
+  const checks={cycle:transitions.length===expected.length&&transitions.every((t,i)=>t.mode===expected[i]),observers:!missing,framed:framed.length>0&&!failed.length,clear:!blocked.length,noHit:after.shades.hits===before.shades.hits,noDeath:after.deaths===before.deaths};
+  const result={passed:Object.values(checks).every(Boolean),checks,transitions,observerTransitions,placements,failedFrames:failed,blockedFrames:blocked,state:after,game:await page.evaluate(()=>window.__game)};
   save(name+'-state.json',result);if(!result.passed)report.failures.push(name+': '+JSON.stringify(checks));return result;
 }

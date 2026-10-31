@@ -389,7 +389,7 @@ try {
     await boot(quality,true);
     await captureShadeHero({repo,getPage:()=>page,H,advance,video,shot,save,report});
   }
-  if (selected==='all') {
+  if (wants('shaderegression')) {
     if(fps!==60)throw Error('Shade encounter review requires60fps for fixed-step contact and every-six-frame release strips');
     await boot(quality, true);
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
