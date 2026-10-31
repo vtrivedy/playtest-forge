@@ -324,7 +324,10 @@ try {
       const core=h.debug.scene.getObjectByName(id)?.getObjectByName('shade-density-core');
       return {actorId:id,freed:actor.freed,method:'posed mesh vertices, shader displacement/alpha excluded',fox:bounds(h.debug.fox,true),shade:bounds(core,false),shadePresent:!actor.freed||actor.presence>.5,presence:actor.presence};
     },actorId);
-    const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,sample:frame=>keyFrames.includes(frame)?measurePair(id):undefined,label:(frame,state)=>{
+    const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,sample:async frame=>({
+      ...(keyFrames.includes(frame)?await measurePair(id):{actorId:id,lensOnly:true}),
+      lens:latestReviewLens.get(id)??{clear:false,noFit:true},
+    }),label:(frame,state)=>{
       const p=state?.capture;
       return `${id} f${frame} p${p?.presence??'?'} fox ${p?.fox?(p.fox.heightFraction*100).toFixed(0):'?'}% shade ${p?.shade?(p.shade.heightFraction*100).toFixed(0):'?'}%`;
     }});
@@ -393,9 +396,11 @@ try {
     const validatePair=name=>{
       const rows=report.videos[name].trace.filter(row=>row.state.capture?.shadePresent).map(row=>({frame:row.frame,...row.state.capture}));
       const failed=rows.filter(row=>!row.fox||!row.shade||row.fox.heightFraction<=.15||row.shade.heightFraction<=.15||!row.fox.inFrame||!row.shade.inFrame);
-      save(`${name}-framing.json`,{passed:rows.length>0&&failed.length===0,minimumHeightFraction:.15,rows,failedFrames:failed.map(row=>row.frame)});
+      const blocked=report.videos[name].trace.filter(row=>!row.state.capture?.lens?.clear||row.state.capture.lens.noFit).map(row=>row.frame);
+      if(blocked.length)report.failures.push(`Shade review lacks an unobstructed fitted pair lens in ${name}: frames ${blocked.join(',')}`);
+      save(`${name}-framing.json`,{passed:rows.length>0&&failed.length===0&&blocked.length===0,minimumHeightFraction:.15,rows,failedFrames:failed.map(row=>row.frame),blockedFrames:blocked});
       if(!rows.length||failed.length)report.failures.push(`Shade pair framing below director bar in ${name}: ${JSON.stringify(failed.map(row=>({frame:row.frame,fox:row.fox,shade:row.shade})))}`);
-      return rows.length>0&&failed.length===0;
+      return rows.length>0&&failed.length===0&&blocked.length===0;
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(({start:[x,y,z],center:[cx,cz],actorId}) => {
