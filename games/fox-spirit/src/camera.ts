@@ -485,10 +485,11 @@ export function createFollowCamera(opts: {
     const top = Math.atan2(p.y + 1.25 - lens.y, fh);
     let feet = Math.atan2(p.y - lens.y, fh);
     const fx = Math.sin(facing), fz = Math.cos(facing);
-    if (fx * (lens.x - p.x) + fz * (lens.z - p.z) > 0) {
+    const noseWeight = THREE.MathUtils.smoothstep((fx * (lens.x - p.x) + fz * (lens.z - p.z)) / fh, 0, .35);
+    if (noseWeight > 0) {
       // Descending toward the lens pitches the snout below the root line.
       const noseRange = Math.max(.3, Math.hypot(p.x + fx * .85 - lens.x, p.z + fz * .85 - lens.z));
-      feet = Math.min(feet, Math.atan2(p.y - .1 - lens.y, noseRange));
+      feet = THREE.MathUtils.lerp(feet, Math.min(feet, Math.atan2(p.y - .1 - lens.y, noseRange)), noseWeight);
     }
     const up = halfV * 0.6;
     const down = halfV * 0.78;
@@ -712,7 +713,14 @@ export function createFollowCamera(opts: {
       sceneryFade = sceneryLimit < 0.999 ? 1 - THREE.MathUtils.smoothstep(clearRange, 1.1, 1.8) : 0;
       const sceneryGoal = THREE.MathUtils.lerp(sceneryLimit, 1, sceneryFade);
       if (firstFrame) sceneryT = sceneryGoal;
-      else sceneryT = THREE.MathUtils.damp(sceneryT, sceneryGoal, sceneryGoal < sceneryT ? 24 : 2.2, dt);
+      else {
+        // Recover body room sooner after a tight squeeze; keep distant release
+        // leisurely and never speed up motion toward a new blocker.
+        const room = boomFocus.distanceTo(safeLens) * sceneryT;
+        const close = 1 - THREE.MathUtils.smoothstep(room, params.minDistance - .4, params.minDistance + .1);
+        const release = THREE.MathUtils.lerp(2.2, 5, close);
+        sceneryT = THREE.MathUtils.damp(sceneryT, sceneryGoal, sceneryGoal < sceneryT ? 24 : release, dt);
+      }
       safeLens.lerpVectors(boomFocus, safeLens, sceneryT);
       // Keep the spring independent of compression: release returns along the same
       // boom smoothly, rather than feeding a new collision impulse into its velocity.

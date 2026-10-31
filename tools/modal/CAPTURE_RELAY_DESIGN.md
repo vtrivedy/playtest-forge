@@ -21,3 +21,6 @@ Rendered frames without run.json/report.json are incomplete captures, not identi
 
 ### Reviewed transport completion protocol
 Opus review identified incomplete-download acceptance and cancellation cleanup blockers. Use canonical Python transport wrapper for every pinned game (archive requested/applied wrappers); pinned game SHA and JS modules remain unchanged. Children start in a separate process session. Remote cancellation kills the node process before archiving, and archives publish by rename. Local download validates the full tar and extracts to a temporary directory before publishing evidence with `.download-complete`. Nonzero client exit or missing marker cannot be `captured`. App-name causality remains unproven.
+
+### Final assembly
+The final-cut manifest can carry an optional continuous source (`continuous.path`, `seconds:60`, exact source/tool SHA). Copy its first60s without cuts/reordering/speed changes in the Modal GPU container and retain metadata. Trailer filename derives actual requested duration rather than a stale50s literal; final provenance covers both source types. Native hero PNGs are copied unchanged, not generated/painted.

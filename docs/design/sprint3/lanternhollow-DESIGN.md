@@ -2,7 +2,7 @@
 
 Current implementation specification. The correction, dusk and roof design documents in this directory record the design decisions and Opus critiques. Visual acceptance is pending the integrated remote capture.
 
-Lanternhollow occupies the existing arrival meadow within continuous Russetvale. The target is soft, gentle animated realism: weathered timber, warm plaster, muted rust roofs, a dry stone well and small amber practical lights. Arrival at (0, 90), the checkpoint, H-a approach at (4.5, 74.2), terrain heights and the route through Windmill Rise to Kiln remain intact.
+Lanternhollow occupies the existing arrival meadow within continuous Russetvale. The target is soft, gentle animated realism: weathered timber, warm plaster, muted rust roofs, a dry stone well and small amber practical lights. Natural arrival is now (-6,92), authored by the route stream; the old portal at (0,90), checkpoint, H-a approach at (4.5,74.2), terrain heights and continuous route through Windmill Rise to Kiln remain. The plaza prefix passes (-7.2,87) and (-4,88) before the portal.
 
 ## Layout and collision
 
@@ -15,7 +15,7 @@ Lanternhollow occupies the existing arrival meadow within continuous Russetvale.
 | Arrival cottage | -9,99.6 | 4.4 × 3.6 m; eave2.3 m, ridge3.55 m | Body box,12 roof strips |
 | Outer cottage | -37,86 | 5 × 4 m; eave2.5 m, ridge3.95 m | Body box,12 roof strips |
 | Market stores | -23.6,85.2 / -22.4,85.1 | Low timber crate and lidded barrel | Box/cylinder |
-| Communal cooking pot | -5,92 | Low stone ring0.25m; black pot/handles0.77m | Low ring cylinder +narrow pot cylinder |
+| Communal cooking pot | -12,93 | Low stone ring0.25m; black pot/handles0.77m | Low ring cylinder +narrow pot cylinder |
 | Great Well | -8,85 | Outer radius about 1.6 m; parapet 0.93 m; pulley arch about 3.6 m | 12 masonry boxes, low post cylinders; overhead rig decorative |
 | Rest bench | -10,91 | 2.2 × 0.7 m; seat 0.8 m | Box; feet sunk into slope |
 | Rise fingerboard | -10,67 | 2.3 × 0.42 m at height 1.65 m | Decorative; points toward (-34,56) |
@@ -34,9 +34,9 @@ Six visible winter log stores have matching small colliders behind the cottages.
 
 ## Light and color
 
-Architectural stone, plaster, roof and timber remain in ColorField and begin sepia. Tiny window and lamp apertures retain amber emission at 0.5 ± 0.025. Four short-range, shadowless PointLights at the well, Bramble porch, plaza and communal cooking pot create real warm pools. The low domestic cooking pot has contained3Dtongues beneath a black lidded pot/handles/trivet; no reactor registration, lift, restoration supply or rising ember cue. Solid ring/pot collision matches their visible extents; only flame VFX skips AO/raycast. Four amber pendants hang from one sagging cord on two timber posts, clear of the paths and jumping fox.
+Architectural stone, plaster, roof and timber remain in ColorField and begin sepia. Tiny window and lamp apertures retain amber emission at 0.5 ± 0.025. Four short-range, shadowless PointLights at the well, Bramble porch, plaza and communal cooking pot provide practical lighting. The selected2.5 strength multiplier yields authored targets10/7.5/7.5/10 before positional dusk/flicker. Own, Sol and Opus prefer its captured well treatment over4x; whole-hub acceptance remains pending. Cottage plaster tint is d5c7ad; the Archive main-wall.92 multiplier remains, while infills/gables retain the base tint. This palette experiment remains under visual review. The low domestic cooking pot has contained3Dtongues beneath a black lidded pot/handles/trivet; no reactor registration, lift, restoration supply or rising ember cue. Solid ring/pot collision matches their visible extents; only flame VFX skips AO/raycast. Twelve amber pendants hang on three sagging cords: the original four-lamp plaza span and two short four-lamp cottage spans. The latter use connected roof/ridge hooks and the existing west post; no new ground posts. Lamp footprints clear actual ground by at least3m. Hooks/cords are camera decorations; solid house/post blockers remain.
 
-The arrival basin has a continuous positional dusk blend: full by z88, gone by z68, fading beyond |x|45. Saved sky colors, horizon glow, cloud amount and key/hemi/rim values blend without compounding; fog color follows the sky while existing regional control retains fog density. Exposure is unchanged. Capture hooks and window.__game notes report dusk and actual practical intensities. Targets are available in lil-gui. One visual updater serves normal and turntable rendering. This mood adds no restoration state.
+The arrival basin has a continuous positional dusk blend: full by z88, gone by z68, fading beyond |x|45. Saved sky colors, horizon glow, cloud amount and key/hemi/rim values blend without compounding; fog color follows the sky while existing regional control retains fog density. Sun color scale.3 and size.0003 apply only in the hub, preserving shared Color identity and restoring saved originals outside. Exposure is unchanged. Capture hooks and window.__game notes report dusk and actual practical intensities. Targets are available in lil-gui. One visual updater serves normal and turntable rendering. This mood adds no restoration state.
 
 ## Player verbs
 
@@ -46,8 +46,12 @@ Arrive, explore the well apron, jump onto the low bench, dash toward the Rise an
 
 Geometry, lettering, maple relief and smoke alpha are original. Materials and low foliage reuse existing CC0 library assets listed in assets/library/CREDITS.md. No new downloads, paid assets or API keys.
 
-Immutable GPU requests are tracked in /streams/hub-r2/capture-request.json. Evidence covers matched overview/exits, a lower arrival, well detail, live arrival/idle, natural chase and a checked context orbit. Photography and the natural Kiln route are requested separately or in combined runs. Personal PNG/state inspection and Opus visual agreement are required before self-landing. The first candidate was rejected; intermediate 1ab6d10 visibly improves warm apertures and wall detail but remains below the village bar.
+Immutable GPU requests are tracked in /streams/hub-r2/capture-request.json. Evidence includes a natural-spawn still and15s live chase before teleport/photo, matched old/new plaster proof at natural and hero cameras, a close full-body hero, well/exits/hearth-lane stills, fixed-view arrival/idle and checked context orbit. Staging and live input are labelled separately. None establishes a full hub-to-Kiln clear.
 
-CPU checks cover24 village paths and the staged live-arrival diagonal against solid props, 970 meadow-route samples, pond/cliff bounds, 72 roof strips aligned within 2.2e-7 m, and eight camera-free smoke raycasts. Dusk tests guard against cumulative darkening and fog-density resets. TypeScript and the fox Vite build pass. These checks supplement remote play evidence.
+Latest personally inspected baseline b458abc includes all37 PNGs and window.__game/controller reports: grounded idle, zero deaths/assists, three lives and unchanged restoration; all540orbit poses clear. Machine green missed one completely black well still, so that package is not fully accepted. Earlier2d87 also received full37-PNG inspection. Opus06:40 agrees this is a readable lantern village and visible improvement, but final gate remains open for hearth crowding/dither, grey plaster and unorganized dark ground. Its critique is lanternhollow-opus-0640-visual.md. Current lighter plaster/hearth placement needs its own returned images before a floor pass. No extra density is approved by that critique.
 
-Run `npx tsx tools/tests/hub-geometry.ts` and `npx tsx tools/tests/hub-dusk.ts`. Neither creates a browser or renderer.
+The remote capture harness now checks actual hub PNG bytes, retains black first attempts, retries once with zero simulation and native paint callbacks, and compares camera/bone/state invariants. Context loss, persistent black or invariant drift fails. Remote video audits use explicit black thresholds and exact EOF frame duration. Canonical module packaging has one dependency checker. These are capture integrity checks, not art approval.
+
+CPU geometry covers24 village paths, staged arrival diagonal and1,104 actual plaza/meadow approach samples. The plaza prefix uses its reviewed.4m actor inflation; old meadow samples retain.55m. Pond/cliff bounds,72roof strips aligned within2.2e-7m,540animated fire poses and eight camera-free smoke probes pass. Dusk tests protect against cumulative darkening, preserve shared sun identity, restore realm values exactly and retain fog density. TypeScript and fox Vite builds pass.
+
+Run npx tsx tools/tests/hub-geometry.ts, npx tsx tools/tests/hub-dusk.ts, node tools/tests/hub-black-frames.mjs and python tools/tests/capture-module-packaging.py. These create no browser or renderer. Main integrations have followed explicit driver merge/build/landing instructions; maintenance landings do not constitute final visual acceptance.

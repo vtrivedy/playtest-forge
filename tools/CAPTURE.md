@@ -118,3 +118,6 @@ Inspect all views and compare tool hashes/settings before judging motion.
 `python3 tools/video-review-sheets.py VIDEO --out REVIEW` decodes every retained
 video frame into numbered sheets with a source hash and frame-range index. It
 provides evidence for manual visibility review and makes no automatic visibility claim.
+
+### Compound hip surface review
+`--shots worldgait,fox` runs only six `hip-*` clips: original weights, welded hip smoothing, and a magenta back-face diagnostic, each at live trot/run. This exact two-shot compound uses existing relay shot names and skips the long standard galleries to keep the diagnostic bounded. Each2s clip cuts from close side to rear-side at frame60; phase resets and original buffers are restored between clips. It does not adopt an asset repair. Inspect phase0.92 crops, source/plan audits, restore reports, native PNGs and full state. Magenta/FX-off frames are diagnostics, not beauty references. Standalone worldgait/fox requests retain their existing behavior.
