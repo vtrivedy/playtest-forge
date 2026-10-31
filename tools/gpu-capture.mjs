@@ -990,7 +990,7 @@ try {
     // high 3/4 lens beside the route (on the +Z side), looking at its midpoint
     let [nx,nz]=[-uz,ux];if(nz<0){nx=-nx;nz=-nz;}
     const my=await yAt(...M);
-    const lens=[[M[0]+nx*19-ux*6,my+19,M[1]+nz*19-uz*6],[M[0]-ux*3,my,M[1]-uz*3],55];
+    const lens=[[M[0]+nx*13-ux*3,my+25,M[1]+nz*13-uz*3],[M[0]-ux*2,my,M[1]-uz*2],58];
     await H('photo',...lens);await advance(2);await shot('paint-before-overview');await H('photoOff');await advance(2);
     const initial={state:await H('state'),game:await page.evaluate(()=>window.__game)};
     // progress u along S→E (m); pause 1.6 s at 45 %; walk the first 4 s, then trot
