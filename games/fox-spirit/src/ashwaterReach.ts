@@ -129,7 +129,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   stoneBlock(low,trs(179.5,30.4,-130),2.5,.5,1,1221,.08);
   const lowMesh=low.toMesh(mats[2]!,{cast:true,receive:true,boxUV:1.6});if(lowMesh)group.add(lowMesh);
   world.hearthSpots.push({id:'reach-steam',x:183,y:30,z:-128,height:13});
-  world.shadeSpots.push({id:'reach-drinker',speed:1.6,patrol:[[181,30,-118],[181,30,-111],[192,30,-111],[192,30,-118],[192,30,-111],[181,30,-111]]});
+  world.shadeSpots.push({id:'reach-drinker',speed:1.6,patrol:[[179,30,-118],[179,30,-109],[195.5,30,-109],[195.5,30,-118],[195.5,30,-109],[179,30,-109]]});
   const bankCheckpoint={pos:new THREE.Vector3(171,30,-130),lit:false};
   world.checkpoints.push(bankCheckpoint);
   const handles=[[173,30,-124],[201,36,-121]];
