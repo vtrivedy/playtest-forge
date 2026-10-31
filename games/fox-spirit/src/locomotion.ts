@@ -44,13 +44,13 @@ export class AuthoredLocomotion {
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
-    padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; correction: THREE.Vector3; strength: number; dot: THREE.Mesh }[] = [];
+    padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; correction: THREE.Vector3; strength: number; replantTime: number; dot: THREE.Mesh }[] = [];
   private debugGroup = new THREE.Group();
   private phase = 0;
   private lastActive = '';
   reset() {
     this.beforeMixer();
-    for (const foot of this.feet) { foot.planted=false; foot.correction.set(0,0,0); }
+    for (const foot of this.feet) { foot.planted=false; foot.correction.set(0,0,0); foot.replantTime=0; }
     this.nodSpring.value=0;this.nodSpring.velocity=0;
     this.tailLoadSpring.value=0;this.tailLoadSpring.velocity=0;
     this.lookSpring.value=0;this.lookSpring.velocity=0;
@@ -142,7 +142,7 @@ export class AuthoredLocomotion {
       padHeights.push(padWorld.y-floor);
       const dot = new THREE.Mesh(new THREE.SphereGeometry(.025,6,4), new THREE.MeshBasicMaterial({color:0xffcc44, depthTest:false}));
       this.debugGroup.add(dot);
-      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:upper.startsWith('thigh') ? root.getObjectByName(upper.replace('thigh','hind_foot')) : undefined,planted:false,anchor:v(),previousSolved:v(),correction:v(),strength:1,clearance:.005,dot});
+      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:upper.startsWith('thigh') ? root.getObjectByName(upper.replace('thigh','hind_foot')) : undefined,planted:false,anchor:v(),previousSolved:v(),correction:v(),strength:1,replantTime:0,clearance:.005,dot});
     }
     root.position.y-=padHeights.reduce((a,b)=>a+b,0)/padHeights.length;
     this.rootPosition.copy(root.position);
@@ -253,8 +253,8 @@ export class AuthoredLocomotion {
         const u=(this.phase-contact.phase+1)%1;
         let local=duty*u/stance;
         if(u>=stance) {
-          // Hermite swing: leave and re-enter stance at the stance clip rate (no paw-velocity kink at
-          // lift-off/touch-down), easing into the slower reach between. swingEase 0 = linear swing.
+          // Hermite swing approaches the stance clip rate at its endpoints. The 3x tangent cap
+          // keeps recovery monotone; capped cases retain a velocity mismatch. 0 = linear swing.
           const sw=(u-stance)/(1-stance), m=Math.min(3,1+(stance<duty ? (duty/stance)*(1-stance)/(1-duty)-1 : 0)*this.params.swingEase);
           local=duty+(1-duty)*(sw*sw*(3-2*sw)+m*(2*sw*sw*sw-3*sw*sw+sw));
         }
@@ -435,7 +435,13 @@ export class AuthoredLocomotion {
       let stance=this.input.grounded && (locomoting ? normalizedSupport>(foot.planted ? .45 : .55) : (active==='idle' || active==='land' || windup));
       const sample=foot.planted ? foot.anchor : paw;
       const ground=this.input.groundAt(sample.x,sample.z,this.group.position.y+.6);
-      if(!Number.isFinite(ground))stance=false;
+      foot.replantTime=Math.max(0,foot.replantTime-dt);
+      if(!Number.isFinite(ground) || foot.replantTime>0)stance=false;
+      // Release before the correction cap, then allow the authored leg to recover.
+      // Keeping an anchor at the cap would repeatedly count steps while the pad slid.
+      if(stance && foot.planted && Math.hypot(foot.anchor.x-paw.x,foot.anchor.z-paw.z)>this.params.maxCorrection*.9) {
+        stance=false; foot.replantTime=.08; this.metrics.earlySteps++;
+      }
       if (stance) {
         if (!foot.planted) {
           // Re-enter at the current solved pad, including any fading correction.
@@ -445,11 +451,6 @@ export class AuthoredLocomotion {
         }
         if(active==='idle')foot.anchor.lerp(paw,1-Math.exp(-5*dt));
         foot.anchor.y=ground+foot.clearance;
-        // A tight turn can pull a stance outside its reach. Transfer support and take a new step;
-        // don't solve an impossible fixed anchor or hide the event in the residual metric.
-        if(foot.planted && Math.hypot(foot.anchor.x-paw.x,foot.anchor.z-paw.z)>(Math.abs(this.turn)>1 ? .20 : .25)) {
-          foot.planted=false;foot.anchor.copy(paw).add(foot.correction).setY(ground+foot.clearance);foot.strength=this.params.plantStrength;this.metrics.earlySteps++;
-        }
         const delta=foot.anchor.clone().sub(paw);
         this.metrics.maxPlantError=Math.max(this.metrics.maxPlantError,Math.hypot(delta.x,delta.z));
         // Latch strength at touchdown: another pose fading in cannot move an anchor.

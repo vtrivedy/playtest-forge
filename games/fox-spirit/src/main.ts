@@ -1460,6 +1460,9 @@ async function boot() {
         } else if (landT > 0 && (speed < 1.5 || landT > .033)) {
           anim = 'land';
           fade = 0.05;
+        } else if (grounded && speed>1 && gaitSpeed<speed*.65) {
+          // Carry sideways/backward landing load in a brace, never a frozen forward walk.
+          anim='skid'; fade=.06;
         } else if (skidT > 0 && wish.lengthSq() < .01) {
           anim = 'skid'; fade = .06;
         } else if (speed < .6 && Math.abs(foxActor.locomotion?.metrics.turnRate ?? 0) > .8) {
