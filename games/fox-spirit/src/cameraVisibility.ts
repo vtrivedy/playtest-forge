@@ -16,9 +16,14 @@ export function createCameraVisibilityProbe(scene: THREE.Scene, renderer: THREE.
     let pair = clones.get(original);
     if (!pair) { pair = {}; clones.set(original, pair); }
     const key = white ? 'white' : 'black';
-    const clone = pair[key] ?? original.clone();
+    const MaterialType = original.constructor as new () => THREE.Material;
+    const clone = pair[key] ?? new MaterialType();
     if (synced.has(clone)) return clone;
-    clone.copy(original);
+    // Material.copy JSON-serializes userData. Live shader/texture metadata is
+    // neither a visual property nor safe to serialize on every diagnostic pass.
+    const copySource = Object.create(original) as THREE.Material;
+    copySource.userData = {};
+    clone.copy(copySource);
     clone.toneMapped = false;
     // Coverage is binary after the original alpha-test/discard shader logic.
     clone.blending = THREE.NoBlending;

@@ -7,6 +7,9 @@ const field=new ColorField(),mat=new THREE.MeshStandardMaterial();field.patchMat
 const shader=()=>({vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader,uniforms:THREE.UniformsUtils.clone(THREE.ShaderLib.standard.uniforms)});
 const live=shader();mat.onBeforeCompile(live as any,{} as any);
 scene.add(new THREE.Mesh(new THREE.PlaneGeometry(),mat));const fox=new THREE.Group();fox.add(new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial()));scene.add(fox);
+let serialized=0;
+const runtimeMetadata={toJSON(){serialized++;throw Error('Diagnostic copied live runtime metadata');}};
+mat.userData.runtimeMetadata=runtimeMetadata;
 let target: THREE.WebGLRenderTarget|null=null;const compiled=new Set();
 // API double ONLY invokes shader callbacks. No browser, canvas, WebGL context,
 // rasterization or real renderer is constructed or run. Pixel arrays are synthetic.
@@ -21,6 +24,8 @@ const probe=createCameraVisibilityProbe(scene,renderer,camera,fox);probe.measure
 const preserved=mat.userData.colorFieldShader===live;
 field.fox.set(7,8,9);field.syncMaterial(mat);
 const actual=(live.uniforms as any).uFox.value.toArray();
+assert.equal(serialized,0,'diagnostics never serialize live shader/texture metadata');
+assert.equal(mat.userData.runtimeMetadata,runtimeMetadata,'diagnostics preserve live metadata identity');
 assert.equal(preserved,true,'mask compilation preserves the live ColorField shader binding');
 assert.deepEqual(actual,[7,8,9],'later live colour updates still reach the world shader');
 assert.equal((scene.children[0] as THREE.Mesh).material,mat,'probe restores live material');
