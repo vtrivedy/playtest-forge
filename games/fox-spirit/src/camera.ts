@@ -114,19 +114,19 @@ export function createFollowCamera(opts: {
     distance: 3.8,
     runDistance: 3.0,
     minDistance: 2.6,
-    height: 1.25,
+    height: 1.55,
     lookHeight: 0.62,
     framingHeight: 0.65,
-    airDistance: 4.8,
-    glideDistance: 6.4,
+    airDistance: 4.2,
+    glideDistance: 4.8,
     fov: 54,
     runFov: 0,
-    glideFov: 7,
+    glideFov: 3,
     lag: 0.14,
     lookAhead: 1.6,
     recenterRate: 1.25,
     recenterDelay: 1.2,
-    sideBias: 0.55,
+    sideBias: 0.75,
     jumpTrack: 0.8,
     landingBias: 0.24,
     clearance: 0.55,
@@ -584,9 +584,9 @@ export function createFollowCamera(opts: {
         aim.x += (landAt.x - aim.x) * w;
         aim.z += (landAt.z - aim.z) * w;
         // drops: tilt toward the landing height and raise the lens so the ground you'll hit is visible
-        aim.y += (Math.max(landAt.y, focusY - 10) - focusY) * Math.min(0.7, 0.15 + drop * 0.07) * landW * descending;
-        dropLift = Math.min(3.5, drop * 0.3) * landW * descending;
-        goalDist += Math.min(2, Math.max(0, spread - 4) * 0.2 + drop * 0.1) * landW;
+        aim.y += (Math.max(landAt.y, focusY - 3) - focusY) * Math.min(0.35, 0.12 + drop * 0.04) * landW * descending;
+        dropLift = Math.min(0.8, drop * 0.1) * landW * descending;
+        goalDist += Math.min(0.8, Math.max(0, spread - 4) * 0.1 + drop * 0.04) * landW;
       }
       if (pullHold > 0) pullHold -= dt;
       pullAmt = THREE.MathUtils.damp(pullAmt, pullHold > 0 ? pullGoal : 0, pullHold > 0 ? 2.5 : 1.2, dt);
