@@ -608,7 +608,7 @@ try {
     for (const [name, lens, target, fov] of hubViews) {
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
     }
-    await H('photoOff'); await advance(30);
+    await H('photo', [12, 7, 105], [-10, 2, 85], 55); await advance(30);
     const initial = await H('state');
     await video('hub-arrive-idle', 15 * fps, async i => {
       // One staged starting point, then the live controller. Arrival pauses at the well lane.
@@ -616,7 +616,8 @@ try {
     }, undefined, {keyFrames: [0, 2*fps, 4*fps, 7*fps, 10*fps, 14*fps]});
     await H('setStick', null);
     const end = await H('state');
-    save('hub-acceptance.json', {label: 'Staged start then live arrival input and idle; still lenses are labelled staged', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
+    await H('photoOff'); await advance(30); await shot('hub-chase-arrived');
+    save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
   }
   if (wants('stills')) {
     await boot(quality, true);

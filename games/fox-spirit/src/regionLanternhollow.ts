@@ -94,6 +94,9 @@ export function createLanternhollow(
       col.add(boxCollider({ x: h.x, z: h.z + (z0 + z1) / 2, w: halfW * 2, d: z1 - z0, top: y0, top1: y1, bottom: y + h.eave - .18, tag: 'hub-roof' }));
       for (const sx of [-1, 1]) beam(new THREE.Vector3(h.x + sx * halfW, y0 - .04, h.z + z0), new THREE.Vector3(h.x + sx * halfW, y1 - .04, h.z + z1), .065);
     }
+    // Close the narrow gap between the wall plate and bowed roof at front/back.
+    const plateHeight = height(h.d / 2) - (y + h.eave);
+    for (const sz of [-1, 1]) box(b.plaster, h.x, y + h.eave + plateHeight / 2, h.z + sz * (h.d / 2 - .06), h.w, plateHeight + .03, .16, plaster);
     // Gable ends close the space beneath the roof, using the exact same arc.
     for (const sx of [-1, 1]) {
       const shape = new THREE.Shape(); shape.moveTo(-halfD + .46, y + h.eave);
@@ -115,11 +118,10 @@ export function createLanternhollow(
     const a = k / 12 * Math.PI * 2, x = wx + Math.sin(a) * 1.3, z = wz + Math.cos(a) * 1.3;
     const g = new RoundedBoxGeometry(.69, .85, .43, 2, .06);
     b.stone.add(g, trs(x, wy + .425, z, a), PAL.stone.clone().multiplyScalar(.88 + .1 * Math.sin(k * 4))); g.dispose();
-    col.add(boxCollider({ x, z, w: .75, d: .54, yaw: a, top: wy + .85, bottom: wy - .5, tag: 'hub-well' }));
+    col.add(boxCollider({ x, z, w: .75, d: .54, yaw: a, top: wy + .93, bottom: wy - .5, tag: 'hub-well' }));
     const coping = new RoundedBoxGeometry(.75, .16, .54, 2, .04);
     b.stone.add(coping, trs(x, wy + .85, z, a), PAL.stone); coping.dispose();
-    // cap and wall use the same collider top.
-    col.colliders[col.colliders.length - 1]!.top0 = col.colliders[col.colliders.length - 1]!.top1 = wy + .93;
+
   }
   for (const sx of [-1, 1]) {
     const x = wx + sx * 1.9;
