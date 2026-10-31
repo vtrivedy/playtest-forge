@@ -25,3 +25,7 @@ Opus visual critique independently confirms invisible wisps, transparent tail ba
 ## Round 2B — eye and coat follow-up
 
 Use Opus image critique: narrow the amber aperture, confine dark pigment to a fine lid boundary, blend the outer eye surface to coat rust. Do not remove geometry blindly. Restore moderate brush/normal detail and soft grazing fur coverage without stochastic frost; preserve the broad cream bib/socks. Existing CC0 source texture and geometry only, no new assets. Keep this a separate follow-up commit for review.
+
+## Round 2C — restrained skinned coat fringe
+
+Asset audit: there are four authored tail shells but no body shells. Moderate body normal/stroke tuning alone cannot break the silhouette. Add two thin surface-following coat layers sharing the FoxFur geometry, skeleton and bind matrices. Offset before skinning, about 0.8/1.6cm maximum at gameplay scale; shorten at feet/muzzle and vary length in broad combed clumps. Smooth grazing opacity, warm coat color, no random discard, no new shadows. This is a fur surface treatment, never a bone/proportion change. Expose fringe amount in existing look GUI and report layer count for capture auditing. Review against inflation/halo/seam regressions and retain only if remote evidence improves the concept read.
