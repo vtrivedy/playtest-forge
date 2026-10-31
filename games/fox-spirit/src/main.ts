@@ -1618,7 +1618,8 @@ async function boot() {
         } else if (!grounded && !offLedge) {
           fade = 0.1;
           if (gliding) anim = 'glide';
-          else if (vel.y > 2.2) anim = 'jump_up';
+          // Apex tuck early on the rise so short jumps don't clamp on jump_up's dangling last frame.
+          else if (vel.y > .9) anim = 'jump_up';
           else if (vel.y > -1.6) anim = 'jump_apex';
           else anim = 'jump_fall';
         } else if (landT > 0 && (speed < 1.5 || landT > .033)) {

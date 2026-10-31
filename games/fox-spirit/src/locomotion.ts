@@ -113,7 +113,7 @@ export class AuthoredLocomotion {
     spineGallop: 4, spineGallopPhase: .04, spineAir: 9, spineLand: 7, spineBendGain: 1.4, spineMaxDeg: 13, spineFrequency: 3.2, spineDamping: .8,
     /** Tail spring chain: deg per m/s² of forward accel (− = drops when accelerating), deg per m/s vertical (rising drags it
      * down), yaw deg per (rad/s · m/s). Root pitch ≤ tailMaxUpDeg above the clip, chain never past tailMaxElevDeg. */
-    tailAccel: 2.2, tailVertical: 3, tailTurn: 2.2, tailMaxUpDeg: 35, tailMaxElevDeg: 80, tailFrequency: 3.2, tailDamping: .72,
+    tailAccel: 1.2, tailVertical: 2.2, tailTurn: .8, tailMaxUpDeg: 28, tailMaxDownDeg: 15, tailMaxElevDeg: 30, tailYawMaxDeg: 12, tailFrequency: 3.4, tailDamping: .95,
     /** Carpus (fore) / hock (hind) give under stance load, degrees. */
     carpalGive: 14, maxGiveDeg: 18,
   };
@@ -513,16 +513,20 @@ export class AuthoredLocomotion {
     };
     const clipElev = tailElev();
     const upRoom = Math.max(0, Math.min(p.tailMaxUpDeg, p.tailMaxElevDeg - clipElev));
-    const pitchDrive = THREE.MathUtils.clamp(-this.accel * p.tailAccel - vy * p.tailVertical * (airborne ? 1 : .3), -p.tailMaxUpDeg, upRoom);
-    const yawDrive = THREE.MathUtils.clamp(this.turn * input.speed * p.tailTurn, -30, 30);
+    const downRoom = Math.max(0, Math.min(p.tailMaxDownDeg, clipElev - (-p.tailMaxElevDeg)));
+    // Soften brake flick: forward accel (negative when braking) only drives up at 35% strength.
+    const accelDrive = -this.accel * p.tailAccel * (this.accel < 0 ? .35 : 1);
+    const pitchDrive = THREE.MathUtils.clamp(accelDrive - vy * p.tailVertical * (airborne ? 1 : .3), -downRoom, upRoom);
+    const yawCap = p.tailYawMaxDeg;
+    const yawDrive = THREE.MathUtils.clamp(this.turn * input.speed * p.tailTurn, -yawCap, yawCap);
     let pitchSum = 0;
     this.tails.forEach((tail, i) => {
       const k = i / Math.max(1, this.tails.length - 1), share = i === 0 ? .4 : .6 / (this.tails.length - 1);
       const f = p.tailFrequency * (1 - .35 * k);
       const tp = this.tailPitch[i].step(pitchDrive * share, dt, f, p.tailDamping);
       const ty = this.tailYaw[i].step(yawDrive * share, dt, f, p.tailDamping);
-      // Bounded even mid-overshoot: the summed pitch never exceeds the room above the clip.
-      const allowed = THREE.MathUtils.clamp(tp, -p.tailMaxUpDeg - pitchSum, upRoom - pitchSum);
+      // Bounded even mid-overshoot: summed pitch stays inside absolute elev room.
+      const allowed = THREE.MathUtils.clamp(tp, -downRoom - pitchSum, upRoom - pitchSum);
       pitchSum += allowed;
       worldTurn(tail, lateral, allowed * DEG); // +X about the lateral axis raises a tail that points back (−Z)
       worldTurn(tail, UP, ty * DEG);
