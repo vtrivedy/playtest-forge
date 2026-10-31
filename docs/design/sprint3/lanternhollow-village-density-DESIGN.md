@@ -10,7 +10,7 @@ Replace Archive's old lane with(-29.2,87.5)→(-24,88.3)→(-18.7,87.2)→(-14,8
 
 Two low market stores at(-23.6,85.2),(-22.4,85.1): timber crate and small lidded barrel, with matching box/cylinder collision, outside trails and pond. A short run of original shallow irregular stepping stones follows the existing well lane; vertices sample ground so stones do not float. Tops project only2.5cm, below step tolerance; no separate blocking geometry or route lip.
 
-CPU checks: roof corners>=2m inside actual jagged island; arrival-edge doorstep>=4.5m inside; every new house/woodpile corner outside pond ellipse1.5; full meadow route and all village paths clear. tsc+fox build. GPU naturalchase/closehero,arrival/idle,exits and orbit must confirm grouping, roof separation, sightline and lighting. No visual approval of unrendered geometry.
+CPU checks: roof corners>=2m inside actual jagged island; every arrival-edge lane node>=4.5m inside; every new house/woodpile corner outside pond ellipse1.5; full meadow route and all village paths clear. tsc+fox build. GPU naturalchase/closehero,arrival/idle,exits and orbit must confirm grouping, roof separation, sightline and lighting. No visual approval of unrendered geometry.
 
 CPU sweep correction: Archive doorstep moved30cm outward toz87.5 so the0.4m fox clearance does not touch the wall collider.
 The connector bends through(-14,87.8) to clear Bramble’s solid winter store; direct diagonal grazed its0.4m inflated footprint.

@@ -41,7 +41,9 @@ const probe = new THREE.Raycaster();
 let smokeProbes = 0;
 group.traverse(o => { if ((o as THREE.Sprite).isSprite) { o.raycast(probe, spriteHits); smokeProbes++; } });
 if(smokeProbes !== 8 || spriteHits.length) throw Error('Decorative smoke entered camera-free blocker probes');
-for (const path of HUB_PATHS.filter(p => p[1] >= 100 || p[3] >= 100)) {
+const arrivalLanes = HUB_PATHS.filter(p => p[1] >= 100 || p[3] >= 100);
+assert.equal(arrivalLanes.length, 3, 'Arrival cliff sweep must not silently become empty');
+for (const path of arrivalLanes) {
   for (const [x,z] of [[path[0],path[1]],[path[2],path[3]]]) {
     assert.ok(outlineR(Math.atan2(z,x))-Math.hypot(x,z) >= 4.5, `Arrival lane crowds cliff: ${x},${z}`);
   }
@@ -49,7 +51,7 @@ for (const path of HUB_PATHS.filter(p => p[1] >= 100 || p[3] >= 100)) {
 let maxError=0;
 for (const house of HUB_HOUSES) {
   for (const [x,z] of MEADOW_TREES) {
-    assert.ok(Math.abs(x-house.x) > house.w/2+.8 || Math.abs(z-house.z) > house.d/2+.8, `Fixed tree overlaps cottage roof: ${x},${z}`);
+    assert.ok(Math.abs(x-house.x) > house.w/2+1.2 || Math.abs(z-house.z) > house.d/2+1.2, `Fixed tree overlaps cottage roof: ${x},${z}`);
   }
   // The jagged island edge is tighter than its nominal ellipse at the south-west.
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
