@@ -79,12 +79,26 @@ export function createOcclusionFader(
 
   const canopies: THREE.Object3D[] = [];
   scene.traverse((o) => {
-    if (o.userData?.isOccluder && (o as THREE.Mesh).isMesh) canopies.push(o);
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    let ancestor: THREE.Object3D | null = mesh;
+    while (ancestor) {
+      if (ancestor === opts.exclude) return;
+      ancestor = ancestor.parent;
+    }
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    // Include real crown cards as well as authored coarse proxies. Some worlds
+    // build foliage without a proxy; low ground cover must not open a cutout.
+    if (o.userData?.isOccluder || materials.some((m) =>
+      !/grass|reed|litter/i.test(m.name) && (m.userData.foliage || /canopy|leaves|leaf/i.test(m.name))
+    )) canopies.push(o);
   });
 
   const ray = new THREE.Raycaster();
   const chest = new THREE.Vector3();
   const head = new THREE.Vector3();
+  const flank = new THREE.Vector3();
+  const visibleCanopies: THREE.Object3D[] = [];
   const dir = new THREE.Vector3();
   const pt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
@@ -108,12 +122,14 @@ export function createOcclusionFader(
     // maple crowns: raycast (throttled by the caller)
     dir.multiplyScalar(1 / dist);
     ray.set(cam, dir);
+    ray.near = 0.05;
     ray.far = dist - 0.6;
-    return ray.intersectObjects(canopies, false).length > 0;
+    return ray.intersectObjects(visibleCanopies, false).length > 0;
   }
 
   return {
     patchScene,
+    get detected() { return lastBlocked; },
     /** Current cutout strength 0..1 (debug / metrics) */
     get strength() {
       return uOccStrength.value;
@@ -130,11 +146,27 @@ export function createOcclusionFader(
       chest.copy(foxPos).y += foxHeight * 0.45;
       head.copy(foxPos).y += foxHeight * 1.05;
       // sight test every other frame (canopy raycast is the expensive part)
-      if ((frame++ & 1) === 0) lastBlocked = sightBlocked(camera.position, chest) || sightBlocked(camera.position, head);
+      if ((frame++ & 1) === 0) {
+        visibleCanopies.length = 0;
+        for (const canopy of canopies) {
+          let ancestor: THREE.Object3D | null = canopy;
+          while (ancestor?.visible) ancestor = ancestor.parent;
+          if (!ancestor) visibleCanopies.push(canopy);
+        }
+        lastBlocked = sightBlocked(camera.position, chest) || sightBlocked(camera.position, head);
+        // Catch a crown edge across the torso while the centre line is clear.
+        for (const side of [-1, 1]) {
+          if (lastBlocked) break;
+          flank.copy(chest);
+          flank.x += Math.cos(foxYaw) * foxHeight * 0.35 * side;
+          flank.z -= Math.sin(foxYaw) * foxHeight * 0.35 * side;
+          lastBlocked = sightBlocked(camera.position, flank);
+        }
+      }
       if (lastBlocked || opts.blocked?.()) blockedHold = 0.35;
       else blockedHold -= dt;
       const goal = blockedHold > 0 ? 1 : 0;
-      uOccStrength.value = THREE.MathUtils.damp(uOccStrength.value, goal, goal > uOccStrength.value ? 10 : 4, dt);
+      uOccStrength.value = THREE.MathUtils.damp(uOccStrength.value, goal, goal > uOccStrength.value ? 40 : 4, dt);
 
       // screen bounds of the fox: feet, ears, snout and tail tip
       renderer.getDrawingBufferSize(size);
