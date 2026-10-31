@@ -103,6 +103,7 @@ export function createOcclusionFader(
   // A crown viewed from below still covers the hero. Keep render-sidedness
   // untouched; this material is used synchronously for sight queries only.
   const canopyQueryMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const canopyQueryArrays = new WeakMap<THREE.Material[], THREE.Material[]>();
   let silhouetteSample = 0;
   const dir = new THREE.Vector3();
   const pt = new THREE.Vector3();
@@ -136,7 +137,14 @@ export function createOcclusionFader(
       const mesh = canopy as THREE.Mesh;
       const renderMaterial = mesh.material;
       try {
-        mesh.material = canopyQueryMaterial;
+        if (Array.isArray(renderMaterial)) {
+          let queryArray = canopyQueryArrays.get(renderMaterial);
+          if (!queryArray || queryArray.length !== renderMaterial.length) {
+            queryArray = renderMaterial.map(() => canopyQueryMaterial);
+            canopyQueryArrays.set(renderMaterial, queryArray);
+          }
+          mesh.material = queryArray;
+        } else mesh.material = canopyQueryMaterial;
         mesh.raycast(ray, canopyHits);
       } finally {
         mesh.material = renderMaterial;
