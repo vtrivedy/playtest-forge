@@ -31,6 +31,9 @@ try {
   const near = patrolPos.clone().add(new THREE.Vector3(2.8,0,0));
   step(1.5, near);
   assert.equal(state().mode, 'chase');
+  const approachEvents = step(6, near);
+  assert.equal(approachEvents.filter(e => e.type === 'hit').length, 0, 'attraction must stop outside contact');
+  assert.ok(Math.hypot(state().pos[0]!-near.x,state().pos[2]!-near.z)>=sys.tun.hitRadius+.6, 'stationary fox keeps contact clearance');
   step(1/60, new THREE.Vector3(30,0,30));
   assert.equal(state().mode, 'return');
   step(8, new THREE.Vector3(30,0,30));
@@ -68,5 +71,5 @@ try {
   wall=false;
   for(let k=0;k<180;k++) obstructed.update(1/60,3+k/60,new THREE.Vector3(30,0,30),false);
   assert.ok(new THREE.Vector3().fromArray(obstructed.state()[0]!.pos).length()>1,'patrol must recover when obstacle clears');
-  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery'], final: state() }, null, 2));
+  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery'], final: state() }, null, 2));
 } finally { globalThis.fetch = originalFetch; THREE.DefaultLoadingManager.setURLModifier(url => url); }

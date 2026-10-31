@@ -389,7 +389,9 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
             const desired=Math.atan2(tmp.x,tmp.z);
             const delta=Math.atan2(Math.sin(desired-s.heading),Math.cos(desired-s.heading));
             s.heading+=delta*(1-Math.exp(-dt*2.4));
-            const step=Math.min(remaining,dt*(s.speed??tun.speed)*(s.mode==='chase'?1.25:1));
+            // Attraction draws near; the player chooses contact rather than being hunted into repeated hits.
+            const travel = s.mode==='chase' ? Math.max(0, remaining-tun.hitRadius-.65) : remaining;
+            const step=Math.min(travel,dt*(s.speed??tun.speed)*(s.mode==='chase'?1.25:1));
             // Flow directly toward the target; visual yaw damps independently so a turn cannot orbit it.
             const nx=s.pos.x+tmp.x/remaining*step,nz=s.pos.z+tmp.z/remaining*step;
             const floor=groundAt(nx,nz,s.pos.y+1);
