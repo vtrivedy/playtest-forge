@@ -3,6 +3,9 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { Bucket, PAL, trs } from './russetKit';
 import { boxCollider, cylCollider, type CollisionWorld } from './collision';
 
+/** Development comparison control; default selected from the captured 1x/2.5x/4x comparison. */
+export const HUB_PRACTICAL = { strength: 2.5 };
+
 /** Domestic scale, kept outside the existing arrival/hearth route. Original geometry. */
 export const HUB_FESTOON_POSTS = [[-12, 86.4], [6.6, 89.4]] as const;
 
@@ -47,7 +50,7 @@ export function createLanternhollow(
   b: HubBuckets, labelMaterials: THREE.MeshStandardMaterial[], decorMaterials: DecorMaterials,
 ) {
   const windowAmber = new THREE.Color(0xe9a860);
-  const plaster = new THREE.Color(0xc0ac86), roof = new THREE.Color(0x80513b), dark = new THREE.Color(0x30261e);
+  const plaster = new THREE.Color(0xd5c7ad), roof = new THREE.Color(0x80513b), dark = new THREE.Color(0x30261e);
   const rounded = (bucket: Bucket, x: number, y: number, z: number, w: number, h: number, d: number, tint: THREE.Color, radius = .06) => {
     const g = new RoundedBoxGeometry(w, h, d, 2, Math.min(radius, w / 4, h / 4, d / 4));
     bucket.add(g, trs(x, y, z), tint); g.dispose();
@@ -427,10 +430,10 @@ export function createLanternhollow(
     state: () => ({ well: wellLight.intensity, porch: porchLight.intensity, plaza: plazaLight.intensity, hearth: fireLight.intensity }),
     update(time: number, dusk: number) {
     const flicker = 1 + Math.sin(time * 1.3) * .04;
-    wellLight.intensity = 4 * dusk * flicker;
-    porchLight.intensity = 3 * dusk * flicker;
-    plazaLight.intensity = 3 * dusk * flicker;
-    fireLight.intensity = 4 * dusk * flicker;
+    wellLight.intensity = 4 * dusk * flicker * HUB_PRACTICAL.strength;
+    porchLight.intensity = 3 * dusk * flicker * HUB_PRACTICAL.strength;
+    plazaLight.intensity = 3 * dusk * flicker * HUB_PRACTICAL.strength;
+    fireLight.intensity = 4 * dusk * flicker * HUB_PRACTICAL.strength;
     for (const [i, flame] of flames.entries()) {
       const phase = time * 2.2 + i * 2.1;
       flame.position.set(hx + Math.cos(i * 2.1) * .16 + Math.sin(phase) * .018, hy + .12, hz + Math.sin(i * 2.1) * .16);

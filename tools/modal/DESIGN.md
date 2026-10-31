@@ -4,3 +4,12 @@ Generate a separate, unrigged candidate from the top-row standing three-quarter 
 
 ## Visual review update
 TRELLIS fails: opaque torn wisp sheets and lost eyes. Hunyuan preserves the face and fur better but turns the tail into a solid lobe and grows antlers above the ears. Keep both raw exports. Make a separate conservative Blender cleanup variant: trim only the high ear-wisp geometry, reduce/taper the exaggerated tail volume with continuous deformation, preserve UVs and texture, and render/review it before recommending. No rigging, adoption or GPU reroll.
+
+## 01:47 ET — include the water-wade capture module in GPU image
+The close meadow bf50cf8 job fails before browser boot: gpu-capture.mjs now statically imports water-wade-capture.mjs, but the Modal image copies only the older sibling modules. Include that sibling in the image at /opt/browser/water-wade-capture.mjs, matching the existing module packaging convention. This changes capture packaging only, not game behavior. Check the complete top-level import list against image copies and Python syntax before pushing; then retry the same ten-segment close fixture on the new immutable SHA. Preserve failed archive3409647f as evidence.
+
+## Bound contact-sheet payload after completed landing video
+Returned14582be showcase51e4a8fc records all2160frames, verified MP4 and complete per-frame state JSON, then the sheet browser closes during setContent. The74-card document embeds original full-resolution PNGs. The exact crash cause is unproven; bound that payload by making480px-wide JPEG thumbnails with the already-installed ffmpeg before embedding. Keep all original PNGs and state/video files unchanged. The visible sheet already displays cards480px wide, so this changes transport/decode cost rather than its layout. Existing game and capture cameras remain unchanged. Preserve the failed run and classify post-sheet acceptance as not executed, not a physics failure.
+
+## Main integration — canonical helper packaging and historical gait comparisons
+Take upstream's glob of capture modules instead of retaining the per-file image list. Keep water/route feature helpers resolved from the immutable checkout, but import them only inside their selected shot blocks. Historical2e gait/worldgait comparisons do not contain those newer feature files and must not fail on unused unconditional imports. This is one canonical feature source, with no fallback game/runtime path. Preserve closer meadow framing, landing support measurements and small contact-sheet payloads through the merge.
