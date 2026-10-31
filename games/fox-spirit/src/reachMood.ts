@@ -14,11 +14,14 @@ export function createReachMood(scene: THREE.Scene, lights: ReturnType<typeof ap
   const colors = Object.entries(target).map(([key, hex]) => [key as keyof typeof target, new THREE.Color(hex)] as const);
   const keyColor = lights.key.color.clone(), hemiColor = lights.hemi.color.clone(), groundColor = lights.hemi.groundColor.clone();
   const keyTarget = new THREE.Color(0xf5ddb4), hemiTarget = new THREE.Color(0xc4d6cd), groundTarget = new THREE.Color(0x60756f);
+  const sunColor = sky.params.sunColor.clone(), sunTarget = new THREE.Color(0xe3ece9);
   let weight = 0;
   return {
     update(x: number, z: number) {
       weight = reachMoodWeight(x, z);
       for (const [key, color] of colors) sky.params[key].lerp(color, weight);
+      // Mist and cloud lighting also consume sunColor, beyond the sky gradient.
+      sky.params.sunColor.copy(sunColor).lerp(sunTarget, weight);
       lights.key.color.copy(keyColor).lerp(keyTarget, weight);
       lights.hemi.color.copy(hemiColor).lerp(hemiTarget, weight);
       lights.hemi.groundColor.copy(groundColor).lerp(groundTarget, weight);
@@ -31,6 +34,7 @@ export function createReachMood(scene: THREE.Scene, lights: ReturnType<typeof ap
       }
     },
     state: () => ({ k: Number(weight.toFixed(3)), mist: `#${fog.color.getHexString()}`, horizon: `#${sky.params.horizon.getHexString()}`,
+      sun: `#${sky.params.sunColor.getHexString()}`,
       density: scene.fog instanceof THREE.FogExp2 ? scene.fog.density : null }),
   };
 }

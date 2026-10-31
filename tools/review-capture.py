@@ -17,6 +17,20 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def video_trace(folder: Path, video):
+    if 'trace' in video:
+        return video['trace']
+    if 'traceFile' not in video:
+        return []
+    source = (folder / video['traceFile']).resolve()
+    if source.parent != folder.resolve():
+        raise ValueError('Video trace must be in the capture folder')
+    trace = json.loads(source.read_text())['trace']
+    if len(trace) != video['traceSamples']:
+        raise ValueError('Video trace sample count differs from report')
+    return trace
+
+
 def contact_sheet(folder: Path):
     from PIL import Image, ImageDraw, ImageOps
     gait_sheet = folder / 'gait-contact-sheet.png'
@@ -28,12 +42,14 @@ def contact_sheet(folder: Path):
         return None
     report_file = folder / 'report.json'
     report = json.loads(report_file.read_text()) if report_file.exists() else {}
+    traces = {name: {row['frame']: row['state'] for row in video_trace(folder, video)}
+              for name, video in report.get('videos', {}).items()}
     labelled = []
     for p, label in entries:
         state = report.get('shots', {}).get(p.stem, {}).get('state')
         frame = re.fullmatch(r'(.+)-(\d{5})', p.stem)
         if frame:
-            state = next((r['state'] for r in report.get('videos', {}).get(frame[1], {}).get('trace', []) if r['frame'] == int(frame[2])), state)
+            state = traces.get(frame[1], {}).get(int(frame[2]), state)
         if state and 'auto' in state:
             label += f" | wp{state['auto']['idx']} d{state.get('deaths', '?')}"
             if state['auto'].get('stalled'):

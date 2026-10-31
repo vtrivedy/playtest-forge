@@ -14,10 +14,11 @@ const frame = (): CameraFrame => ({
 const tick = (cam: ReturnType<typeof createFollowCamera>, f: CameraFrame, count = 120, hz = 60) => {
   for (let i = 0; i < count; i++) cam.update(1 / hz, f);
 };
+const shoulderYaw = createFollowCamera().params.sideBias;
 const world = new THREE.Group();
 const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3, 0.3), new THREE.MeshStandardMaterial());
 post.name = 'decorative-post';
-post.position.set(Math.sin(0.34) * 2.1, 1.2, Math.cos(0.34) * 2.1);
+post.position.set(Math.sin(shoulderYaw) * 2.1, 1.2, Math.cos(shoulderYaw) * 2.1);
 world.add(post);
 const cam = createFollowCamera({ scenery: world });
 cam.resize(1920, 1080);
@@ -54,10 +55,11 @@ assert(maxNdc < 0.8, `Jump framing should remain inside safe frame: ${maxNdc}`);
 // A tall gameplay column must pull the camera in instead of lifting it overhead.
 const pillarWorld = new THREE.Group();
 const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 2.6, 12), new THREE.MeshStandardMaterial());
-pillar.position.set(Math.sin(0.34) * 2.1, 1.3, Math.cos(0.34) * 2.1);
+pillar.position.set(Math.sin(shoulderYaw) * 2.1, 1.3, Math.cos(shoulderYaw) * 2.1);
 pillarWorld.add(pillar);
 const pillarCam = createFollowCamera({ scenery: pillarWorld,
   surfaceAt: (x, z) => Math.hypot(x - pillar.position.x, z - pillar.position.z) < 0.45 ? 2.6 : 0,
+  lensBlocked: (x, y, z, radius) => Math.hypot(x - pillar.position.x, z - pillar.position.z) < .45 + radius && y - radius < 2.6 && y + radius > 0,
 });
 tick(pillarCam, frame());
 const columnPitch = Math.atan2(pillarCam.camera.position.y - 0.62, Math.hypot(pillarCam.camera.position.x, pillarCam.camera.position.z));
@@ -71,6 +73,7 @@ movingPillar.position.set(0, 1.3, 3.6);
 movingWorld.add(movingPillar);
 const crossing = createFollowCamera({ scenery: movingWorld,
   surfaceAt: (x, z) => Math.hypot(x, z - 3.6) < 0.45 ? 2.6 : 0,
+  lensBlocked: (x, y, z, radius) => Math.hypot(x, z - 3.6) < .45 + radius && y - radius < 2.6 && y + radius > 0,
 });
 const crossingFrame = frame();
 crossingFrame.target.x = -3;
@@ -114,7 +117,7 @@ const bowlCam = createFollowCamera({ scenery: bowlScene,
   surfaceAt: (x, z) => Math.hypot(x - hx, z - hz) < 0.82 ? 7 : 6,
 });
 bowlCam.resize(1280, 720);
-bowlCam.snapBehind(0.349 - Math.PI);
+bowlCam.snapBehind(0.349 - Math.PI + .34 - shoulderYaw); // retain captured physical lens azimuth
 const bowlFrame = frame();
 bowlFrame.target.set(-59.87092746862208, 6, 25.11017733045462);
 tick(bowlCam, bowlFrame);

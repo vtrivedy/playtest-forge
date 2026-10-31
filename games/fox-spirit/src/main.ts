@@ -1,3 +1,4 @@
+import { HUB_PRACTICAL } from './regionLanternhollow';
 import { createWind, type WindForce } from './chem/wind';
 import { createShades } from './encounters/shades';
 import { ShadeContact } from './encounters/contact';
@@ -223,6 +224,7 @@ async function boot() {
   const cam = createFollowCamera({
     scenery: world.group,
     surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
+    lensBlocked: (x, y, z, radius) => col.cameraOccupied(x, y, z, radius),
   });
   cam.snapBehind(spawnYaw);
   cam.camera.far = quality.far;
@@ -334,6 +336,7 @@ async function boot() {
     folder.add(params,'brakePitch',0,.2,.005);
     folder.add(params,'landSquash',0,.25,.005);
     folder.add(params,'landPitch',0,2,.05).name('land pitch rad/m');
+    folder.add(params,'stationarySupport',0,.08,.005).name('stationary support m');
     folder.add(params,'landFrequency',2,6,.1);
     folder.add(params, 'walkHz', 1, 3, .05);
     folder.add(params, 'trotHz', 1.2, 4, .05);
@@ -360,6 +363,11 @@ async function boot() {
     folder.add(params, 'plantStrength', 0, 1, .01);
     folder.add(params, 'maxCorrection', 0, .3, .01);
     folder.add(params, 'turnLean', 0, .1, .001);
+    folder.add(params, 'bankMax', 0, .35, .005);
+    folder.add(params, 'rootBank', 0, 1, .05);
+    folder.add(params, 'turnPlant', 0, 1.5, .05);
+    folder.add(params, 'gallopHeadHold', 0, 1.5, .05);
+    folder.add(params, 'suspensionLift', 0, .12, .005);
     folder.add(params, 'tailLag', 0, .3, .01);
     folder.add(params, 'pelvisBank', 0, 1, .05);
     folder.add(params, 'headRollStabilize', 0, 1, .05);
@@ -371,8 +379,10 @@ async function boot() {
   fFoxLook.add(FOX_LOOK,'emberRate',0,60,1);
   fFoxLook.add(FOX_LOOK,'lickScale',0,3,.01);
   fFoxLook.add(FOX_LOOK,'lickIntensity',0,3,.01);
-  const actionFeel = { jumpWindup: .05, jumpGatherBlend: .12 };
+  // Standing jumps load the haunches for ~8 frames; at speed the windup shrinks back to 3 so running jumps stay immediate.
+  const actionFeel = { jumpWindup: .05, standingWindup: .13, jumpGatherBlend: .12 };
   fFeel.add(actionFeel,'jumpWindup',0,.066,.001);
+  fFeel.add(actionFeel,'standingWindup',0,.2,.005);
   fFeel.add(actionFeel,'jumpGatherBlend',.04,.2,.01);
   const fAudio = gui.addFolder('Audio');
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
@@ -465,7 +475,7 @@ async function boot() {
   // Patch only after every world builder has added its materials and shader
   // hooks. In particular the grotto roof is built by water outside world.group.
   const occlusion = createOcclusionFader(scene, {
-    blocked: () => !photo && cam.debug.blocked(),
+    blocked: (camera, focus) => photo ? cam.debug.viewBlocked(focus, camera.position) : cam.debug.blocked(),
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
@@ -552,11 +562,14 @@ async function boot() {
   fFox.close();
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
   const fDusk = fLook.addFolder('Lanternhollow dusk');
+  fDusk.add(HUB_PRACTICAL, 'strength', .5, 4, .1).name('practical light strength');
   fDusk.add(HUB_DUSK, 'kOverride', -1, 1, .01).name('override (-1 auto)');
   fDusk.add(HUB_DUSK, 'key', .8, 2.5, .01);
   fDusk.add(HUB_DUSK, 'hemi', .2, .8, .01);
   fDusk.add(HUB_DUSK, 'rim', .4, 1.6, .01);
   fDusk.add(HUB_DUSK, 'skyScale', .5, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunScale', .1, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunSize', .0001, .006, .0001);
   fDusk.add(HUB_DUSK, 'sunBloom', 0, .3, .01);
   fDusk.add(HUB_DUSK, 'godRays', 0, .5, .01);
   fDusk.add(HUB_DUSK, 'horizonGlow', 0, .6, .01);
@@ -612,7 +625,7 @@ async function boot() {
   let airT = 0;
   let jumpedThisAir = false;
   let landT = 0;
-  let windupT = -1;
+  let windupT = -1, windupDur = .05;
   let skidT = 0;
   let previousSpeed = 0;
   let hitstop = 0;
@@ -703,7 +716,9 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world,
+    debug: { scene, renderer, post, colorField, camera: cam.camera,
+      // Explicit capture-only mutable tuning handle; other debug handles remain read-only.
+      hubPractical: HUB_PRACTICAL, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world,
       cameraVisibility: createCameraVisibilityProbe(scene, renderer, cam.camera, foxActor.group) },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
@@ -891,7 +906,7 @@ async function boot() {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
-        dusk: { ...hubDusk.state(), practical: world.hubState() },
+        dusk: { ...hubDusk.state(), practical: world.hubState(), practicalStrength: HUB_PRACTICAL.strength },
         reachMood: reachMood.state(),
         crown: crown.state(),
         reach: reach.state(),
@@ -929,6 +944,7 @@ async function boot() {
           yaw: cam.getYaw(),
           occlusion: occlusion.strength,
           sightBlocked: occlusion.detected,
+          softOccluders: occlusion.softBindings(),
           photo: !!photo,
           lensTouchesCollider: col.cameraOccupied(cam.camera.position.x, cam.camera.position.y, cam.camera.position.z),
           foxNdc: cam.debug.fox,
@@ -1277,15 +1293,22 @@ async function boot() {
       airT += dt;
     }
 
-    // Three 60Hz frames of visible load; coyote jumps keep immediate launch.
+    // Standing jumps load for ~8 frames, running jumps for 3; coyote jumps keep immediate launch.
     let jv: number | null = null;
     if (windupT >= 0) {
       windupT += dt;
-      if (windupT >= actionFeel.jumpWindup || !grounded) {
+      // Accelerating out of a standing gather shortens it; a committed windup never lengthens.
+      windupDur=Math.min(windupDur,THREE.MathUtils.lerp(Math.max(actionFeel.standingWindup,actionFeel.jumpWindup),actionFeel.jumpWindup,THREE.MathUtils.smoothstep(Math.hypot(vel.x,vel.z),1,3)));
+      if (windupT >= windupDur || !grounded) {
         windupT=-1;
+        // The press was committed when the windup began; a long standing gather must not outlive the buffer.
+        jumpFeel.buffer=Math.max(jumpFeel.buffer,1e-3);
         jv=jumpFeel.tryJump(feel.jumpVelocity * groundBounce,fox.position.y);
       }
-    } else if (grounded && jumpFeel.buffer>0 && actionFeel.jumpWindup>0) windupT=0;
+    } else if (grounded && jumpFeel.buffer>0 && actionFeel.jumpWindup>0) {
+      windupT=0;
+      windupDur=THREE.MathUtils.lerp(Math.max(actionFeel.standingWindup,actionFeel.jumpWindup),actionFeel.jumpWindup,THREE.MathUtils.smoothstep(Math.hypot(vel.x,vel.z),1,3));
+    }
     else jv=jumpFeel.tryJump(feel.jumpVelocity * groundBounce,fox.position.y);
     if (jv !== null) {
       vel.y = jv;
@@ -1544,7 +1567,7 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : gaitSpeed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : gaitSpeed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, crouch: windupT >= 0 && windupDur > 0 ? Math.min(1, (windupT + dt) / windupDur) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
@@ -1761,7 +1784,7 @@ async function boot() {
         `dashes=${feelMetrics.dashesUsed}`,
         `preset=${feelPreset}`,
         `quality=${quality.tier}`,
-        `dusk=${JSON.stringify({ ...hubDusk.state(), practical: world.hubState() })}`,
+        `dusk=${JSON.stringify({ ...hubDusk.state(), practical: world.hubState(), practicalStrength: HUB_PRACTICAL.strength })}`,
         `spirit=${JSON.stringify(foxActor.group.userData.spiritFx)}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',

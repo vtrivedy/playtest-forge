@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import assert from 'node:assert/strict';
-import { createLanternhollow, HUB_HOUSES, HUB_PATHS, HUB_FESTOON_POSTS, hubPathDistance } from '../../games/fox-spirit/src/regionLanternhollow.ts';
+import { createLanternhollow, HUB_HOUSES, HUB_PATHS, HUB_FESTOON_POSTS, hubPathDistance, HUB_PRACTICAL, HUB_HEARTH, hubHearthClearance } from '../../games/fox-spirit/src/regionLanternhollow.ts';
 import { outlineR, MEADOW_TREES, groundRaw } from '../../games/fox-spirit/src/russetvale.ts';
 import { Bucket } from '../../games/fox-spirit/src/russetKit.ts';
 import { CollisionWorld, colliderTopAt } from '../../games/fox-spirit/src/collision.ts';
@@ -69,6 +69,14 @@ assert.equal(hub.state().plaza, 0);
 assert.equal(hub.state().hearth, 0);
 for (const [x,z] of HUB_FESTOON_POSTS) assert.ok(hubPathDistance(x,z) >= 2.3, `Festoon post crowds path: ${x},${z}`);
 for (const p of hub.festoon.pendants) assert.ok(p.bottom >= p.ground + 3, 'Pendant must clear jumping fox');
+hub.update(1,1);
+const originalIntensities = practicals.map(p => p.intensity), originalStrength = HUB_PRACTICAL.strength;
+try {
+  HUB_PRACTICAL.strength = originalStrength * 2.5;
+  for (let i=0;i<1000;i++) hub.update(1,1);
+  for (const [i,p] of practicals.entries()) assert.ok(Math.abs(p.intensity-originalIntensities[i]*2.5)<1e-12, 'Practical strength must not accumulate');
+} finally { HUB_PRACTICAL.strength = originalStrength; hub.update(1,1); }
+assert.deepEqual(practicals.map(p => p.intensity), originalIntensities, 'Comparison must restore exact authored lights');
 assert.ok(practicals.every(light => light.visible), 'fading must not change shader light count');
 const spriteHits: THREE.Intersection[] = [];
 const probe = new THREE.Raycaster();
@@ -117,14 +125,15 @@ for(const [x,z] of [[0,90],[0,88],[0,80],[4.5,74.2],[13,75.5],[21,64],[-10,64],[
   for(const c of col.colliders) if(colliderTopAt(c,x,z,.55)!==null)throw Error(`Hub blocks route ${x},${z}: ${c.tag}`);
 }
 // Sweep the full authored meadow approach, not only its waypoint endpoints.
-const arrivalRoute = [[0,90],[0,80],[4.5,74.2],[13,75.5],[21,64],[-10,64],[-34,56]];
+const arrivalRoute = [[-6,92],[-7.2,87],[-4,88],[0,90],[0,80],[4.5,74.2],[13,75.5],[21,64],[-10,64],[-34,56]];
 let routeSweeps=0;
 for(let k=0;k<arrivalRoute.length-1;k++) {
   const [ax,az]=arrivalRoute[k], [bx,bz]=arrivalRoute[k+1];
   const steps=Math.ceil(Math.hypot(bx-ax,bz-az)*10);
   for(let i=0;i<=steps;i++) {
     const x=ax+(bx-ax)*i/steps,z=az+(bz-az)*i/steps;
-    for(const c of col.colliders) if(colliderTopAt(c,x,z,.55)!==null)throw Error(`Arrival route blocked by ${c.tag} at ${x},${z}`);
+    const clearance=k<3 ? .4 : .55; // new plaza prefix uses its reviewed actor radius; existing meadow margin stays .55
+    for(const c of col.colliders) if(colliderTopAt(c,x,z,clearance)!==null)throw Error(`Arrival route blocked by ${c.tag} at ${x},${z}`);
     routeSweeps++;
   }
 }
@@ -137,6 +146,8 @@ for(const [ax,az,bx,bz] of HUB_PATHS) {
 }
 console.log(JSON.stringify({arrivalRouteSweepSamples:routeSweeps,smokeCameraFreeProbes:smokeProbes,pathSegmentsClear:HUB_PATHS.length,roofStrips:HUB_HOUSES.length*12,maxMeshColliderError:maxError,routePointsClear:8,colliders:col.colliders.length,vertices:Object.values(b).reduce((n,k)=>n+k.vertexCount,0)},null,2));
 
+assert.ok(hubHearthClearance(HUB_HEARTH.x,HUB_HEARTH.z));
+assert.ok(!hubHearthClearance(-6,92), 'Hearth clearance must not swallow natural spawn');
 // The live arrival clip follows this diagonal through the real controller.
 for (let i = 0; i <= 100; i++) {
   const x = -5.15*i/100, z = 94-5.44*i/100;

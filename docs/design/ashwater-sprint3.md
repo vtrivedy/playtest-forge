@@ -84,3 +84,33 @@ Route peer follow-up: offset west staging/source gate toz−115 to avoid mesh-on
 
 ## Pour/route peer follow-up
 Opus code review requests metre-based falling flow independent of fill height, downward breakup of strands, a spillway edge that ends at the falling face, and a broken shore band only against banks. Keep the open falling-water silhouette pending GPU review rather than reintroducing a continuous translucent wall. Aim the source waypoint beyond its observed crossing gate. Extend CPU diagnostic to print actual native trunk radii and measure patrol and boarding-route clearances; retain real coupled timing/safety verification. These checks do not approve appearance or controller traversal.
+
+## Round 20 — preserve reversible-cycle failure evidence
+The first crossing now records half-second supply and phase traces, but the
+HIGH→LOW→HIGH controller run saves only its final state and four booleans. A
+missed sluice dash, an unheated vent and a failed landing therefore produce the
+same incomplete-cycle message with no timed evidence to distinguish them.
+Record cycle waypoint, phase age, position/velocity/grounding, level/fill,
+steam heat and dash/jump issuance every half-second, at phase transitions and
+at termination. Save these beside the existing cycle verdict; preserve all
+controls, timeout and acceptance predicates. This is diagnostic evidence only,
+not proof of traversal or appearance. Request the pushed immutable candidate
+through the GPU relay and personally review returned PNGs and game reports.
+
+## Round 27 — distinguish absent capture completion from identity mismatch
+Recovered rejected archive contains rendered PNGs but no run.json or report.json.
+The relay's single generic identity message hides whether a completed capture
+has wrong provenance or a capture stopped before writing its completion reports.
+Report missing completion filenames and individual failed identity checks in
+feedback, keeping every current acceptance requirement intact. Do not accept
+partial frames or infer a current visual verdict. This diagnostic-only change
+must pass Python syntax and synthetic missing/mismatched/matching identity cases;
+request existing immutable game candidate without replacing in-flight work.
+
+## Round 33 — rising-ferry support evidence
+Opus round32 identified missing support evidence during the height wait. Add
+raftHeight to each crossing sample and aggregate every captured wait frame:
+count, grounded-and-ferry-supported count, longest unsupported interval, entry
+and exit height. This diagnoses loss of support between half-second samples.
+Preserve controller inputs, timeouts and acceptance gates; pending GPU footage
+must decide whether boarding succeeds. No visual or gameplay approval from logs.
