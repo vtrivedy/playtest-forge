@@ -99,6 +99,7 @@ ${NOISE_GLSL}`,
         `#ifdef USE_MAP
   // Prefer broad painted values over the baked fine fur speckle.
   diffuseColor = vec4(diffuse, opacity) * texture2D(map, vMapUv, 0.4);
+  ${tail && !shell ? "diffuseColor.a = opacity;" : ""}
 #endif
 {
   // clumps elongated along the body (+Z forward in rest space) and down the legs
@@ -238,12 +239,12 @@ export function applyFoxLook(root: THREE.Object3D) {
           if (!n.includes('shell')) {
             mesh.renderOrder = 1;
             // Match the shadow silhouette to the visible disappearing tip.
-            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, alphaTest: 0.45 });
+            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
             depth.defines = { USE_UV: '' };
             depth.onBeforeCompile = (shader) => {
               shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', `
-diffuseColor.a = 1.0 - smoothstep(0.70, 0.90, 1.0 - vUv.y);
-#include <alphatest_fragment>`);
+// ShadowMap overwrites alphaTest from the opaque source material; use an explicit cutoff.
+if (1.0 - smoothstep(0.70, 0.90, 1.0 - vUv.y) < 0.45) discard;`);
             };
             depth.customProgramCacheKey = () => 'fox-tail-depth';
             mesh.customDepthMaterial = depth;
