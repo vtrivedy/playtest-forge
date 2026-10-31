@@ -94,9 +94,30 @@ export function createLanternhollow(
       box(b.wood, side + sx * .09, y + .98, h.z + .55, .19, .1, 1.02, PAL.wood);
     }
 
-    // Broad bowed roof, sampled once for BOTH mesh and collision (no floating roof collider).
+    // Structural braces break the broad end-wall plaster into credible timber bays.
+    for (const sx of [-1, 1]) {
+      const xx = h.x + sx * (h.w / 2 + .035);
+      for (const zz of [-1, 1]) beam(
+        new THREE.Vector3(xx, y + h.eave - .2, h.z + zz * (h.d / 2 - .2)),
+        new THREE.Vector3(xx, y + h.eave - .8, h.z + zz * (h.d / 2 - .85)), .045);
+    }
+    // Visible, grounded winter stores: safely behind the doorstep paths.
+    const pileX = h.x + h.w / 2 + .35, pileZ = h.z - h.d / 2 - .7;
+    const pileY = ground(pileX, pileZ) - .04;
+    for (let row = 0; row < 2; row++) for (let log = 0; log < 3 - row; log++) {
+      const xx = pileX + (log - 1 + row * .5) * .25;
+      beam(new THREE.Vector3(xx, pileY + .14 + row * .23, pileZ - .35),
+        new THREE.Vector3(xx, pileY + .14 + row * .23, pileZ + .35), .13);
+    }
+    col.add(boxCollider({ x: pileX, z: pileZ, w: .8, d: .72, top: pileY + .52, bottom: pileY - .15, tag: 'hub-woodpile' }));
+
+    // A gently rounded pitched roof: one profile feeds mesh, gables and collision.
     const halfD = h.d / 2 + .46, halfW = h.w / 2 + .45, steps = 12;
-    const height = (z: number) => y + h.eave + h.rise * Math.cos(z / halfD * Math.PI / 2);
+    const height = (z: number) => {
+      const t = Math.abs(z) / halfD, ridgeRound = .12;
+      const rise = 1 - (Math.hypot(t, ridgeRound) - ridgeRound) / (Math.hypot(1, ridgeRound) - ridgeRound);
+      return y + h.eave + h.rise * rise;
+    };
     for (let k = 0; k < steps; k++) {
       const z0 = -halfD + k / steps * halfD * 2, z1 = -halfD + (k + 1) / steps * halfD * 2;
       const y0 = height(z0), y1 = height(z1);
@@ -107,7 +128,8 @@ export function createLanternhollow(
       b.roof.add(g, trs(h.x + halfW, 0, h.z, -Math.PI / 2), roof.clone().multiplyScalar(.95 + .05 * Math.sin(k * 2.3)));
       g.dispose();
       col.add(boxCollider({ x: h.x, z: h.z + (z0 + z1) / 2, w: halfW * 2, d: z1 - z0, top: y0, top1: y1, bottom: y + h.eave - .18, tag: 'hub-roof' }));
-      for (const sx of [-1, 1]) beam(new THREE.Vector3(h.x + sx * halfW, y0 - .04, h.z + z0), new THREE.Vector3(h.x + sx * halfW, y1 - .04, h.z + z1), .10);
+      const edgeDrop = .11 * Math.hypot(1, (y1 - y0) / (z1 - z0));
+      for (const sx of [-1, 1]) beam(new THREE.Vector3(h.x + sx * halfW, y0 - edgeDrop, h.z + z0), new THREE.Vector3(h.x + sx * halfW, y1 - edgeDrop, h.z + z1), .10);
     }
     // Broad, low-contrast course lips break the smooth roof shell without a
     // noisy tile grid. All trim stays within 3 cm of the authored roof surface.
@@ -172,6 +194,14 @@ export function createLanternhollow(
   lamp(wx + 1.35, wy + 2.1, wz + .22);
   beam(new THREE.Vector3(wx + 1.77, wy + 2.75, wz), new THREE.Vector3(wx + 1.35, wy + 2.75, wz + .22), .04);
 
+  // Two real, short-range practical pools. No light discs or false restoration.
+  const wellLight = new THREE.PointLight(0xffb665, 4, 5, 2);
+  wellLight.position.set(wx + 1.15, wy + 1.8, wz + .85); parent.add(wellLight);
+  const bramble = HUB_HOUSES[0]!;
+  const porchLight = new THREE.PointLight(0xffb665, 3, 4.5, 2);
+  porchLight.position.set(bramble.x - 1.65, ground(bramble.x, bramble.z) + 1.8, bramble.z + bramble.d / 2 + .85);
+  parent.add(porchLight);
+
   const by = ground(-10, 91);
   box(b.wood, -10, by + .72, 91, 2.2, .16, .7, PAL.wood);
   for (const dx of [-.85, .85]) box(b.wood, -10 + dx, by + .275, 91, .16, .85, .58, PAL.wood);
@@ -221,7 +251,12 @@ export function createLanternhollow(
       parent.add(sign);
     }
   }
-  return (time: number) => {
+  return {
+    state: () => ({ well: wellLight.intensity, porch: porchLight.intensity }),
+    update(time: number, dusk: number) {
+    const flicker = 1 + Math.sin(time * 1.3) * .04;
+    wellLight.intensity = 4 * dusk * flicker;
+    porchLight.intensity = 3 * dusk * flicker;
     for (const [i, puff] of smoke.entries()) {
       const age = (time / 4.5 + i / smoke.length) % 1;
       puff.position.set(chimney.x - 1.6 + age * .7 + Math.sin(age * 5 + i) * .08,
@@ -231,5 +266,6 @@ export function createLanternhollow(
       puff.material.opacity = Math.sin(age * Math.PI) * .16;
       puff.material.rotation = i * 1.7 + age * .3;
     }
+    },
   };
 }
