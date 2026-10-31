@@ -804,7 +804,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   // Its cap preserves the visible footing over the foundation's eroded corners.
   {
     const p = sp(63.3, 10.375);
-    col.add(boxCollider({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 18, bottom: 13, tag: 'r5-landing' }));
+    col.add(boxCollider({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 18, bottom: 13, tag: 'stair-r5-landing' }));
     slab({ x: p.x, z: p.z, w: 1.25, d: 3.3, yaw: T_YAW, top: 17.8, bottom: 13, rough: 0.3, seed: 77, topColor: null });
     stoneBlock(bk('stone', p.x, p.z), trs(p.x, 17.9, p.z, T_YAW), 1.25, 0.2, 3.3, 7701, 0);
   }
