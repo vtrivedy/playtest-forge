@@ -40,13 +40,13 @@ export class AuthoredLocomotion {
     minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .8,
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
-    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .8, carpalFlexRun: .4, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .025, idleLook: .16, gallopFlex: .22, gallopFlexPhase: .8, weightRoll: .05, spineSway: .045, breath: .022,
+    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .65, carpalFlexRun: .4, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
+    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .045, idleHipShot: .07, idleLook: .16, gallopFlex: .22, gallopFlexPhase: .8, weightRoll: .04, spineSway: .08, breath: .022,
     runningGather: .45, tailAir: .05, airTuck: 1.25, airForeSwing: .55, airHindSwing: .45, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     headHold: .8, gallopHeadHold: 1.5, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .16, landPitch: 1, landFrequency: 3, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .16, landPitch: 1, landFrequency: 3, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .08, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     earlyTouches: 0, spineFlexCommand: 0, maxSwingLift: 0, airPose: 0, pelvisRoll: 0, spineSway: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -673,7 +673,9 @@ export class AuthoredLocomotion {
           }
         }
       }
-      const lift=this.swingLift[i]/Math.max(.001,gaitWeight), fold=this.swingFold[i]/Math.max(.001,gaitWeight);
+      // Coming out of a landing the forelegs plant and reach; folding them then reads as hooks.
+      const landed=1-THREE.MathUtils.clamp(-this.landSpring.value/.04,0,1);
+      const lift=this.swingLift[i]/Math.max(.001,gaitWeight), fold=landed*this.swingFold[i]/Math.max(.001,gaitWeight);
       const swinging=!stance && locomoting && this.input.grounded;
       if(swinging) {
         this.swingPose(foot,i,lift,fold,swingFloor);
@@ -765,7 +767,7 @@ export class AuthoredLocomotion {
     const w=(g:Gait)=>locomoting ? this.weights.get(g) ?? 0 : 0;
     const walk=w('walk'), trot=w('trot');
     const mid=(g:Gait,leg:number)=>{const c=GAITS[g].contacts[leg];return c.phase+c.duty*this.stanceRatio[g]/2;};
-    const wave=(leg:number,fn:(x:number)=>number)=>walk*fn(2*Math.PI*(this.phase-mid('walk',leg)))+trot*.6*fn(2*Math.PI*(this.phase-mid('trot',leg)));
+    const wave=(leg:number,fn:(x:number)=>number)=>walk*fn(2*Math.PI*(this.phase-mid('walk',leg)))+trot*fn(2*Math.PI*(this.phase-mid('trot',leg)));
     // Stance-side hip and shoulder ride up (+roll about forward raises the fox's left).
     const pelvisRoll=this.params.weightRoll*wave(2,Math.cos), chestRoll=this.params.weightRoll*wave(0,Math.cos);
     // Bob and roll only ever lower the body: legs already near full reach can't follow a rise (floating pads).
@@ -774,20 +776,21 @@ export class AuthoredLocomotion {
     const sway=this.params.spineSway*wave(2,Math.sin);
     const idle=this.input.grounded ? this.weights.get('idle') ?? 0 : 0;
     const breath=Math.sin(2*Math.PI*.27*this.time), shift=Math.sin(2*Math.PI*.07*this.time+1);
-    worldOverlay(this.spine,forward.clone(),pelvisRoll+idle*.012*shift);
+    // Idle stands hip-shot: one haunch dropped, shoulders countering, weight drifting slowly.
+    worldOverlay(this.spine,forward.clone(),pelvisRoll+idle*(this.params.idleHipShot+.012*shift));
     worldOverlay(this.spine,up.clone(),sway);
     const chest=this.spines[2], withers=this.spines[3];
-    worldOverlay(chest,forward.clone(),chestRoll-pelvisRoll-idle*.02*shift);
+    worldOverlay(chest,forward.clone(),chestRoll-pelvisRoll-idle*(this.params.idleHipShot*1.4+.02*shift));
     worldOverlay(chest,up.clone(),-2*sway);
     if(this.necks[0])worldOverlay(this.necks[0],up.clone(),sway*.8);
     // Gallop back: rounds through the gathered flight (legs folded under), lengthens through the extended one.
-    // Positive about the actor right axis lowers a forward-pointing bone: spines curl the chest down, pelvis tucks.
+    // Positive about the actor right axis lowers a forward-pointing bone: the spines curl the chest down.
     const run=locomoting ? this.weights.get('run') ?? 0 : 0;
     const flexPhase=Math.cos(2*Math.PI*(this.phase-this.params.gallopFlexPhase));
     // Rounding only: an extension past the authored line lifts the withers beyond the planted forelegs' reach.
     const flex=run*this.params.gallopFlex*(.5+.5*flexPhase);
     if(Math.abs(flex)>1e-4) {
-      worldOverlay(this.spine,right.clone(),-flex*.5);
+      // The pelvis stays put: tucking it opens a seam at the haunch.
       for(const spine of this.spines)worldOverlay(spine,right.clone(),flex/this.spines.length*1.5);
     }
     this.metrics.spineFlexCommand=flex;
