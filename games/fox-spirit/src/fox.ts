@@ -117,7 +117,6 @@ export async function createFox(): Promise<FoxActor> {
       if (!actions.has(name)) return;
       if (current === name) return;
       const next = actions.get(name)!;
-      const prev = current ? actions.get(current) : undefined;
       next.reset().setEffectiveTimeScale(1).play();
       locomotion.fadeSeconds = fade;
       current = name;

@@ -104,10 +104,6 @@ export function colliderTopAt(c: Collider, x: number, z: number, pad = 0): numbe
 }
 
 /** Local → world for a box collider frame (handy for dressing). */
-export function boxLocalToWorld(c: Collider, lx: number, lz: number): { x: number; z: number } {
-  return { x: c.x + lx * c.cos + lz * c.sin, z: c.z - lx * c.sin + lz * c.cos };
-}
-
 export class CollisionWorld {
   colliders: Collider[] = [];
   constructor(public terrain: (x: number, z: number) => number) {}

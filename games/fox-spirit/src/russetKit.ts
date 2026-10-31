@@ -258,7 +258,6 @@ function merged(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   return g;
 }
 
-const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
 const _e = new THREE.Euler();

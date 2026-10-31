@@ -41,4 +41,3 @@ export const FOX_RIG = {
 } as const;
 
 export const FOX_CLIPS = ['idle', 'run', 'jump_up', 'jump_apex', 'jump_fall', 'glide', 'dash', 'land', 'burst'] as const;
-export type FoxClip = (typeof FOX_CLIPS)[number];

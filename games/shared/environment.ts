@@ -1,46 +1,5 @@
 import * as THREE from 'three';
 
-/** Poly Haven studio HDRI (1k). */
-export const DEFAULT_HDRI =
-  'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr';
-
-const cache = new Map<string, THREE.DataTexture>();
-
-export async function loadHDRIEnvironment(
-  renderer: THREE.WebGLRenderer,
-  scene: THREE.Scene,
-  url: string = DEFAULT_HDRI,
-): Promise<THREE.DataTexture | null> {
-  try {
-    // Prefer HDRLoader (three r17x+); fall back to RGBELoader.
-    let LoaderCtor: new () => { loadAsync: (u: string) => Promise<THREE.DataTexture> };
-    try {
-      const mod = await import('three/examples/jsm/loaders/HDRLoader.js');
-      LoaderCtor = (mod as { HDRLoader: typeof LoaderCtor }).HDRLoader;
-    } catch {
-      const mod = await import('three/examples/jsm/loaders/RGBELoader.js');
-      LoaderCtor = (mod as { RGBELoader: typeof LoaderCtor }).RGBELoader;
-    }
-    let tex = cache.get(url);
-    if (!tex) {
-      tex = await new LoaderCtor().loadAsync(url);
-      tex.mapping = THREE.EquirectangularReflectionMapping;
-      cache.set(url, tex);
-    }
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    const env = pmrem.fromEquirectangular(tex).texture;
-    scene.environment = env;
-    scene.background = env;
-    scene.backgroundBlurriness = 0.45;
-    scene.backgroundIntensity = 0.65;
-    pmrem.dispose();
-    return tex;
-  } catch (err) {
-    console.warn('HDRI load failed', err);
-    return null;
-  }
-}
-
 export function applyStylizedIslandLights(scene: THREE.Scene): void {
   const hemi = new THREE.HemisphereLight(0x9ad0ff, 0x3a6040, 0.7);
   scene.add(hemi);

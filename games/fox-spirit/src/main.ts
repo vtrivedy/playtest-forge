@@ -24,7 +24,6 @@ import {
   matchFogToSky,
   syncFog,
   createDistantLand,
-  createFoxWisps,
   createAutumnParticles,
   detectQuality,
   createEmberMotes,
@@ -102,11 +101,8 @@ const feel: FoxFeel = { ...FEEL_PRESETS[feelPreset] };
 const jumpFeel = new JumpFeel();
 const feelMetrics = emptyFeelMetrics();
 const BLOOM = 0.16;
-/** Ember pickup freeze — just enough to register the hit; cooldown so ember lines don't stutter */
 /** Dash stroke (world-1.md §1.1): life s, strength (>1 punches through Shade drain), capsule radius m */
 const DASH_STROKE = { life: 6, strength: 1.5, radius: 1.6 };
-const HITSTOP_S = 0.03;
-const HITSTOP_COOLDOWN_S = 0.35;
 
 async function boot() {
   const hud = createHud();
@@ -729,7 +725,6 @@ async function boot() {
   let skidT = 0;
   let previousSpeed = 0;
   let hitstop = 0;
-  let lastHitstop = -1;
   let shrineOn = false;
   let fxEnabled = true;
   let turntableMode = false;
@@ -774,7 +769,6 @@ async function boot() {
   let photo: { pos: THREE.Vector3; look: THREE.Vector3; fov: number } | null = null;
   let elapsed = 0;
   let status: 'playing' | 'won' = 'playing';
-  let kickCooldown = 0;
   /** Manual clock: the harness advances sim time explicitly (deterministic captures on slow GPUs) */
   let manual = false;
   /** When set, step() keeps this clip instead of picking from locomotion (run-strip captures). */

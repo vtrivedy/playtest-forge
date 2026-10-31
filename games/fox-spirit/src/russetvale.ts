@@ -5,7 +5,7 @@ import { routeRemnant } from './routeRemnants';
 import { weatheredSurface } from './worldSurfaces';
 import * as THREE from 'three';
 import { createStylizedWater } from '../../../src/render';
-import { CollisionWorld, boxCollider, cylCollider, type Collider } from './collision';
+import { CollisionWorld, boxCollider, cylCollider } from './collision';
 import {
   Bucket,
   PAL,
@@ -45,7 +45,6 @@ import type { WindSpot } from './chem/wind';
 import { loadNatureKit, nearCameraFade, TWISTED, ROUND, type NatureVariant, type PlaceOpts } from './russetNature';
 import type { RootSpot, PadSpot } from './chem/growth';
 import { createReedmarshRegion, reedRuinGround, REED_SHADE_PATROL, type ReedmarshRegion } from './regionReedmarsh';
-import { waterSpots } from './chem/water';
 import type { ShadeSpot } from './encounters/shades';
 export type { ShadeSpot } from './encounters/shades';
 
