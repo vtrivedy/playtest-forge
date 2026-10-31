@@ -41,7 +41,7 @@ export class AuthoredLocomotion {
     takeoffCrouch: .09, takeoffPitch: .07,
     rockDamp: 1.3, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
     headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
-  metrics = { bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
+  metrics = { fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
@@ -59,6 +59,7 @@ export class AuthoredLocomotion {
     this.landSpring.value=0;this.landSpring.velocity=0;this.carriageReady=false;this.wasGrounded=true;this.previousVerticalSpeed=0;
     this.pelvisShare=0;
     this.metrics.authoredFlight=false;this.metrics.noSupport=false;this.metrics.windupActive=false;this.metrics.windupLoad=0;
+    this.metrics.fallPoseTime=0;this.metrics.fallPoseHeld=false;
     this.metrics.bankCommand=0;this.metrics.pelvisBankAngle=0;this.metrics.chestBankAngle=0;
     this.metrics.noSupportFrames=0;this.metrics.noSupportSeconds=0;this.metrics.contactReleaseFrames=0;this.metrics.lastLandingImpact=0;
     this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
@@ -455,6 +456,9 @@ export class AuthoredLocomotion {
     const gait=this.metrics.gait as Gait;
     const phase=this.phase;
     this.metrics.phase=phase;
+    const fallAction=this.actions.get('jump_fall');
+    this.metrics.fallPoseTime=active==='jump_fall' ? fallAction?.time ?? 0 : 0;
+    this.metrics.fallPoseHeld=active==='jump_fall' && !!fallAction?.paused && !!fallAction?.clampWhenFinished;
     this.footfalls.length=0;
     this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;
     const locomoting=['run','walk','trot'].includes(active);
