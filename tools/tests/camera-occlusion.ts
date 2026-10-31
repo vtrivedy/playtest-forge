@@ -31,10 +31,11 @@ assert.match(follow.debug.internals(), /blocker=single-sided-wall/);
 
 const scene = new THREE.Scene();
 const parent = new THREE.Group();
-const crownMat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
+const crownMat = new THREE.MeshStandardMaterial();
 crownMat.name = 'autumn-leaves';
 const crown = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), crownMat);
 crown.position.set(0, 0.5, 2);
+crown.rotation.y = Math.PI; // the camera sees the back of the rendered leaf card
 parent.add(crown); scene.add(parent); scene.updateMatrixWorld(true);
 const fader = createOcclusionFader(scene, { solidAt: () => -Infinity });
 const camera = new THREE.PerspectiveCamera(54, 16 / 9, 0.1, 100);
@@ -43,6 +44,8 @@ const renderer = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(1280, 7
 const step = () => fader.update(1 / 60, camera, renderer, new THREE.Vector3(), 0.55, 0);
 step();
 assert.equal(fader.detected, true, 'unproxied leaf material must block sight');
+assert.equal(crown.material, crownMat, 'canopy query must restore the rendered material');
+assert.equal(crownMat.side, THREE.FrontSide, 'canopy query must preserve render sidedness');
 assert.ok(fader.strength > 0, 'detected obstruction should begin opening the cutout');
 parent.visible = false;
 step(); step();

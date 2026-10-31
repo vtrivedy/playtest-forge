@@ -100,6 +100,9 @@ export function createOcclusionFader(
   const flank = new THREE.Vector3();
   const visibleCanopies: THREE.Object3D[] = [];
   const canopyHits: THREE.Intersection[] = [];
+  // A crown viewed from below still covers the hero. Keep render-sidedness
+  // untouched; this material is used synchronously for sight queries only.
+  const canopyQueryMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
   let silhouetteSample = 0;
   const dir = new THREE.Vector3();
   const pt = new THREE.Vector3();
@@ -130,7 +133,14 @@ export function createOcclusionFader(
       canopyHits.length = 0;
       // Stop on the first mesh hit; sorting every intersection in every crown
       // provides no additional information for this boolean visibility query.
-      (canopy as THREE.Mesh).raycast(ray, canopyHits);
+      const mesh = canopy as THREE.Mesh;
+      const renderMaterial = mesh.material;
+      try {
+        mesh.material = canopyQueryMaterial;
+        mesh.raycast(ray, canopyHits);
+      } finally {
+        mesh.material = renderMaterial;
+      }
       if (canopyHits.length) return true;
     }
     return false;
