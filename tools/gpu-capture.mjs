@@ -882,7 +882,7 @@ try {
     });
     const preflight=await page.evaluate(()=>{
       const h=window.__gameHooks,col=h.debug.world.collision,attempts=[];
-      for(const x of [40,24,6]) {
+      for(const x of [40]) {
         const failures=[];
         let previousY=null;
         for(let z=88;z>=68;z-=2) {
@@ -904,7 +904,14 @@ try {
     save('worldgait-preflight.json',preflight);
     if(preflight.x===null)throw Error('No clear terrain-only meadow review corridor');
     const segments=[];
-    for(const lens of ['side','three-quarter']) for(const [gait,stick,seconds] of [['walk',.18,3],['trot',.45,3],['run',1,2]]) {
+    const profiles=[
+      {gait:'walk',stick:.18,seconds:3},
+      {gait:'trot',stick:.45,seconds:3},
+      {gait:'run',stick:1,seconds:2},
+      {gait:'turn',stick:.45,seconds:3},
+      {gait:'jump',stick:.45,seconds:3},
+    ];
+    for(const lens of ['side','three-quarter']) for(const {gait,stick,seconds} of profiles) {
       await H('setKeys',[]);await H('setStick',0,0);await H('photoOff');
       const y=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[preflight.x,preflight.z]);
       await H('teleport',preflight.x,y,preflight.z,Math.PI);await advance(30);
@@ -915,8 +922,12 @@ try {
         await H('photo',[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
       };
       await frameLens(initial);
-      await video(name,seconds*fps,async()=>{await H('setStick',0,-stick);},undefined,{
-        traceEveryFrame:true,keyFrames:[0,Math.round(fps*.25),fps,seconds*fps-1],
+      await video(name,seconds*fps,async i=>{
+        const angle=gait==='turn' ? Math.max(0,i/fps-.5)*.6 : 0;
+        await H('setStick',Math.sin(angle)*stick,-Math.cos(angle)*stick);
+        await H('setKeys',gait==='jump' && i>=48 && i<63 ? ['Space'] : []);
+      },undefined,{
+        traceEveryFrame:true,keyFrames:gait==='jump' ? [0,48,51,57,63,72,84,96,120,seconds*fps-1] : gait==='turn' ? [0,30,60,90,120,150,seconds*fps-1] : [0,Math.round(fps*.25),fps,seconds*fps-1],
         afterStep:async(i,st)=>{
           if(st.deaths!==initial.deaths)throw Error(`${name}: death`);
           await frameLens(st);
@@ -932,13 +943,29 @@ try {
       const end=await H('state');
       const rows=report.videos[name].trace.filter(r=>r.frame>=fps),speeds=rows.map(r=>{const previous=report.videos[name].trace[r.frame-1].state.pos;return Math.hypot(r.state.pos[0]-previous[0],r.state.pos[2]-previous[2])/r.dt}).sort((a,b)=>a-b);
       const measured={medianSpeed:speeds[Math.floor(speeds.length/2)],groundedFraction:rows.filter(r=>r.state.grounded).length/rows.length,gaits:Object.fromEntries([...new Set(rows.map(r=>r.state.locomotion?.gait??r.state.anim))].map(g=>[g,rows.filter(r=>(r.state.locomotion?.gait??r.state.anim)===g).length]))};
-      measured.expectedGaitFraction=(measured.gaits[gait]??0)/rows.length;
+      measured.expectedGaitFraction=(measured.gaits[gait==='turn'||gait==='jump'?'trot':gait]??0)/rows.length;
       measured.expectedSpeed=9*stick;
       measured.speedFraction=measured.medianSpeed/measured.expectedSpeed;
-      segments.push({name,gait,stick,seconds,initial,end,measured,visibility,camera:`staged west-side ${lens} tracking photo lens, live controller`,reset:[preflight.x,y,preflight.z]});
+      const trace=report.videos[name].trace;
+      const firstAir=trace.findIndex(row=>(gait!=='jump'||row.frame>=48) && !row.state.grounded);
+      measured.groundedAtJumpInput=gait==='jump' ? trace.find(row=>row.frame===47)?.state.grounded===true : null;
+      const firstGroundAfterAir=firstAir>=0 ? trace.findIndex((row,index)=>index>firstAir && row.state.grounded) : -1;
+      measured.airFrames=firstGroundAfterAir>firstAir && firstAir>=0 ? firstGroundAfterAir-firstAir : 0;
+      measured.firstAirFrame=firstAir>=0 ? trace[firstAir].frame : null;
+      measured.groundedRecoveryFrames=firstGroundAfterAir>=0 ? trace.slice(firstGroundAfterAir).filter(row=>row.state.grounded).length : 0;
+      measured.landedAfterAir=firstGroundAfterAir>firstAir && firstAir>=0 && trace.slice(firstGroundAfterAir).every(row=>row.state.grounded) && end.grounded;
+      const maxMetric=key=>{const values=trace.map(row=>row.state.locomotion?.[key]).filter(Number.isFinite);return values.length ? Math.max(...values.map(Math.abs)) : null;};
+      measured.maxBankCommand=maxMetric('bankCommand');
+      measured.maxPelvisBank=maxMetric('pelvisBankAngle');
+      measured.bankTelemetryAvailable=measured.maxBankCommand!==null && measured.maxPelvisBank!==null;
+      measured.bankObserved=measured.bankTelemetryAvailable ? measured.maxBankCommand>.04 && measured.maxPelvisBank>.01 : null;
+      measured.headingChange=Math.abs(Math.atan2(Math.sin(end.foxYaw-initial.foxYaw),Math.cos(end.foxYaw-initial.foxYaw)));
+      const motionPassed=gait==='jump' ? measured.groundedAtJumpInput && measured.firstAirFrame<=64 && measured.airFrames>=6 && measured.groundedRecoveryFrames>=6 && measured.landedAfterAir : measured.groundedFraction>.95 && measured.expectedGaitFraction>.9 && (gait!=='turn'||measured.headingChange>.6 && measured.bankObserved!==false);
+      const passed=end.deaths===initial.deaths && !visibility.blocked.length && motionPassed && measured.speedFraction>.9 && measured.speedFraction<1.1;
+      segments.push({name,gait,stick,seconds,initial,end,measured,visibility,passed,camera:`staged west-side ${lens} world-offset tracking photo lens, relative angle changes during turn; live controller`,reset:[preflight.x,y,preflight.z]});
     }
-    save('worldgait-acceptance.json',{label:'Six staged live-input movement segments on a disclosed preflighted Arrival Meadow line; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths && s.visibility.blocked.length===0 && s.measured.groundedFraction>.95 && s.measured.expectedGaitFraction>.9 && s.measured.speedFraction>.9 && s.measured.speedFraction<1.1)});
-    if(segments.some(s=>s.visibility.blocked.length || s.measured.groundedFraction<=.95 || s.measured.expectedGaitFraction<=.9 || s.measured.speedFraction<=.9 || s.measured.speedFraction>=1.1))throw Error('World gait review requires clear chest/head/feet sight lines, grounded movement and measured requested gait/speed');
+    save('worldgait-acceptance.json',{label:'Ten staged live-input movement segments on a disclosed preflighted Arrival Meadow line, including turns and jumps; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof',segments,passed:segments.every(s=>s.passed)});
+    if(segments.some(s=>!s.passed))throw Error('World gait review requires clear chest/head/feet sight lines, measured requested movement, observed jump air and grounded recovery');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
