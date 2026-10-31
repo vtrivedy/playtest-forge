@@ -764,8 +764,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
 
   // Anchors are skinned surface points: resolve them after the final bone pose of this step with fresh world
   // matrices + bone palette (render-time hooks run after three.js uploads attributes = one render late).
+  // updateMatrixWorld (not updateWorldMatrix) so SkinnedMesh refreshes its attached bindMatrixInverse: a stale one
+  // shifts every anchor by the actor's motion since the last render (wisps floated ahead off the tail/ears, onto the muzzle).
   const anchorNow = () => {
-    group.updateWorldMatrix(true, true);
+    group.updateWorldMatrix(true, false);
+    group.updateMatrixWorld(true);
     for (const m of anchorMeshes) m.skeleton.update();
     const L = FOX_LOOK;
     licks.forEach((lk, i) => {

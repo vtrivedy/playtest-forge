@@ -1163,6 +1163,8 @@ try {
       {gait:'run',stick:1,seconds:2},
       {gait:'turn',stick:.45,seconds:3},
       {gait:'jump',stick:.45,seconds:3},
+      // Trot in, release the stick at 0.5 s, then hold: idle stills land >=0.5 s after release.
+      {gait:'idle',stick:.45,seconds:3},
     ].filter(profile=>!shortGlide || ['walk','trot','run'].includes(profile.gait))
       .map(profile=>shortGlide ? {...profile,seconds:2} : profile);
     for(const lens of ['side','three-quarter']) for(const {gait,stick,seconds} of profiles) {
@@ -1176,13 +1178,21 @@ try {
         const [x,y,z]=st.pos;
         await H('photo',[x+offset[0],y+offset[1],z+offset[2]],[x,y+.6,z],38);
       };
+      // Bare review lane: paint sprouts (grass/flower cards, absent on pre-paint SHAs) hide paws, crouch and landing.
+      await page.evaluate(()=>{const s=window.__gameHooks.debug.scene.getObjectByName('paint-sprouts');if(s)s.visible=false;});
       await frameLens(initial);
       await video(name,seconds*fps,async i=>{
         const angle=gait==='turn' ? -Math.max(0,i/fps-.5)*.6 : 0;
-        await H('setStick',Math.sin(angle)*stick,-Math.cos(angle)*stick);
+        const held=gait==='idle' && i>=F(30) ? 0 : stick;
+        await H('setStick',Math.sin(angle)*held,-Math.cos(angle)*held);
         await H('setKeys',gait==='jump' && i>=F(48) && i<F(63) ? ['Space'] : []);
       },undefined,{
-        traceEveryFrame:true,keyFrames:gait==='jump' ? [...new Set([0,48,51,54,57,60,63,66,69,72,78,84,96,120].map(F))].concat(seconds*fps-1) : gait==='turn' ? [0,30,60,90,120,150].map(F).concat(seconds*fps-1) : [0,Math.round(fps*.25),fps,seconds*fps-1],
+        traceEveryFrame:true,keyFrames:gait==='jump' ? [...new Set([0,...Array.from({length:30},(_,k)=>44+2*k),120].map(F))].concat(seconds*fps-1)
+          : gait==='turn' ? [0,30,60,75,90,105,120,150].map(F).concat(seconds*fps-1)
+          : gait==='idle' ? [60,90,120,150,175].map(F)
+          // Run: every frame of one second so gather (phase ~.85) and extension are both sampled.
+          : gait==='run' ? [0,...Array.from({length:fps},(_,k)=>fps/2+k)]
+          : [0,Math.round(fps*.25),fps,Math.round(fps*1.5),seconds*fps-1],
         afterStep:async(i,st)=>{
           if(st.deaths!==initial.deaths)throw Error(`${name}: death`);
           await frameLens(st);
@@ -1203,10 +1213,11 @@ try {
       });
       await H('setStick',0,0);await H('setKeys',[]);await shot(`${name}-end`);
       const end=await H('state');
-      const rows=report.videos[name].trace.filter(r=>r.frame>=fps),speeds=rows.map(r=>{const previous=report.videos[name].trace[r.frame-1].state.pos;return Math.hypot(r.state.pos[0]-previous[0],r.state.pos[2]-previous[2])/r.dt}).sort((a,b)=>a-b);
+      // Each video frame steps the sim 60/fps times at r.dt, so a frame spans r.dt*60/fps seconds (30fps: 2 steps).
+      const rows=report.videos[name].trace.filter(r=>gait==='idle' ? r.frame>=F(60) : r.frame>=fps),speeds=rows.map(r=>{const previous=report.videos[name].trace[r.frame-1].state.pos;return Math.hypot(r.state.pos[0]-previous[0],r.state.pos[2]-previous[2])/(r.dt*60/fps)}).sort((a,b)=>a-b);
       const measured={medianSpeed:speeds[Math.floor(speeds.length/2)],groundedFraction:rows.filter(r=>r.state.grounded).length/rows.length,gaits:Object.fromEntries([...new Set(rows.map(r=>r.state.locomotion?.gait??r.state.anim))].map(g=>[g,rows.filter(r=>(r.state.locomotion?.gait??r.state.anim)===g).length]))};
       measured.expectedGaitFraction=(measured.gaits[gait==='turn'||gait==='jump'?'trot':gait]??0)/rows.length;
-      measured.expectedSpeed=9*stick;
+      measured.expectedSpeed=gait==='idle' ? 0 : 9*stick;
       measured.speedFraction=measured.medianSpeed/measured.expectedSpeed;
       const trace=report.videos[name].trace;
       const firstAir=trace.findIndex(row=>(gait!=='jump'||row.frame>=F(48)) && !row.state.grounded);
@@ -1225,7 +1236,8 @@ try {
       const widths=rows.map(row=>row.state.capture?.framing?.headToTail?.widthFraction).filter(Number.isFinite).sort((a,b)=>a-b);
       measured.medianHeadToTailWidthFraction=widths.length ? widths[Math.floor(widths.length/2)] : null;
       const motionPassed=gait==='jump' ? measured.groundedAtJumpInput && measured.firstAirFrame<=F(64) && measured.airFrames>=F(6) && measured.groundedRecoveryFrames>=F(6) && measured.landedAfterAir : measured.groundedFraction>.95 && measured.expectedGaitFraction>.9 && (gait!=='turn'||measured.headingChange>.6 && measured.bankObserved!==false);
-      const passed=end.deaths===initial.deaths && !visibility.blocked.length && motionPassed && measured.speedFraction>.9 && measured.speedFraction<1.1;
+      const speedPassed=gait==='idle' ? measured.medianSpeed<.05 && measured.gaits.idle>0 : measured.speedFraction>.9 && measured.speedFraction<1.1;
+      const passed=end.deaths===initial.deaths && !visibility.blocked.length && (gait==='idle' || motionPassed) && speedPassed;
       segments.push({name,gait,stick,seconds,initial,end,measured,visibility,passed,camera:`staged west-side ${lens} world-offset tracking photo lens, relative angle changes during turn; live controller`,reset:[preflight.x,y,preflight.z]});
     }
     save('worldgait-acceptance.json',{selection:shortGlide?'worldstrides':'worldgait',label:`${shortGlide?'Six straight':'Ten including turns and jumps'} staged live-input movement segments on a disclosed preflighted Arrival Meadow line; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof`,segments,passed:segments.every(s=>s.passed)});
