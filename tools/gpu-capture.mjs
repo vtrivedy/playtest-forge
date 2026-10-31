@@ -2011,6 +2011,22 @@ try {
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
+    const rendererSnapshot = () => page.evaluate(() => {
+      const { renderer, scene, post } = window.__gameHooks.debug;
+      const rt = renderer.getRenderTarget();
+      const output = post.composer.passes.find(p => p.isOutputPass);
+      if (!output || !Number.isFinite(output.uniforms?.toneMappingExposure?.value)) throw Error('Route renderer snapshot requires OutputPass exposure');
+      return {
+        exposure: renderer.toneMappingExposure, toneMapping: renderer.toneMapping,
+        outputColorSpace: renderer.outputColorSpace,
+        renderTarget: rt ? { uuid: rt.uuid, width: rt.width, height: rt.height, samples: rt.samples, type: rt.texture.type, colorSpace: rt.texture.colorSpace } : null,
+        outputExposure: output.uniforms.toneMappingExposure.value,
+        post: { ...post.params },
+        fog: scene.fog ? { color: scene.fog.color.toArray(), density: scene.fog.density ?? null, near: scene.fog.near ?? null, far: scene.fog.far ?? null } : null,
+        water: scene.userData.waterCapture ? { ...scene.userData.waterCapture } : null,
+      };
+    });
+    const rendererBefore = kilnRoute ? await rendererSnapshot() : null;
     const start = await H('state');
     const spawnDistanceToFirst = Math.hypot(start.pos[0] - route[0].x, start.pos[1] - route[0].y, start.pos[2] - route[0].z);
     if (kilnRoute && (!Number.isFinite(spawnDistanceToFirst) || spawnDistanceToFirst > 1)) throw Error('Kiln proof must begin within one metre of the authored plaza spawn');
@@ -2021,6 +2037,7 @@ try {
     await H('autopilot', true, from, { assist: false });
     let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt;
     let kilnStopped = false;
+    const pawSupport = [];
     const continuity = { maxStepMeters: 0, maxStepFrame: null, jumpLimitMeters: Math.max(3, 90 / fps), firstLargeStep: null };
     const encounter = { initialHits: start.shades.hits, minWisps: start.shades.wisps, knockbackTravelMeters: 0 };
     let previousPos = start.pos, previousKnockback = start.shades.knockbackTravel ?? 0, previousHits = start.shades.hits;
@@ -2066,6 +2083,44 @@ try {
       } else lensSafety.missing++;
       const visibility = await visibilityReview.sample(i);
       if (visibility) audit.projectedVisibility = visibility;
+      const [px, py, pz] = st.pos, axisLength = Math.hypot(.684, .729);
+      const terraceS = ((px + 48) * -.684 + (pz - 52) * -.729) / axisLength;
+      const terraceT = ((px + 48) * .729 + (pz - 52) * -.684) / axisLength;
+      if (kilnRoute && st.grounded && py >= 17.9 && py <= 18.1 && terraceS >= 61 && terraceS <= 66.5 && terraceT >= 8.8 && terraceT <= 10.8) {
+        const contacts = await page.evaluate(async () => {
+          const { Vector3, Matrix3, Raycaster } = await import('/gpu-three.js');
+          const hooks = window.__gameHooks, { world, fox } = hooks.debug;
+          const feet = hooks.locomotion?.feet;
+          if (!Array.isArray(feet) || feet.length !== 4) throw Error('Paw audit requires four solved locomotion feet');
+          const before = { t: hooks.state().t, pos: fox.position.toArray(), quaternion: fox.quaternion.toArray() };
+          const native = [];
+          const isNative = m => m?.isMeshStandardMaterial && m.visible && m.depthWrite && !m.transparent && /stone|rock|ground|terrain/i.test(m.name);
+          world.group.traverse(o => {
+            if (!o.isMesh || o.isInstancedMesh) return;
+            for (let p = o; p; p = p.parent) if (!p.visible) return;
+            const materials = Array.isArray(o.material) ? o.material : [o.material];
+            if (materials.some(isNative)) native.push(o);
+          });
+          const ray = new Raycaster(), normalMatrix = new Matrix3();
+          ray.near = 0; ray.far = 2.5;
+          const result = feet.map(foot => {
+            const pad = foot.paw.localToWorld(foot.padLocal.clone());
+            if (![pad.x, pad.y, pad.z].every(Number.isFinite)) throw Error('Nonfinite solved paw pad');
+            ray.set(pad.clone().add(new Vector3(0, .5, 0)), new Vector3(0, -1, 0));
+            const hit = ray.intersectObjects(native, false).find(h => {
+              const material = Array.isArray(h.object.material) ? h.object.material[h.face?.materialIndex ?? 0] : h.object.material;
+              return isNative(material) && h.face && h.face.normal.clone().applyNormalMatrix(normalMatrix.getNormalMatrix(h.object.matrixWorld)).y > .25;
+            });
+            return { id: foot.paw.name, stance: foot.planted, pad: pad.toArray(), anchor: foot.anchor.toArray(),
+              surface: hit ? { y: hit.point.y, gap: pad.y - hit.point.y, object: hit.object.name } : null };
+          });
+          const after = { t: hooks.state().t, pos: fox.position.toArray(), quaternion: fox.quaternion.toArray() };
+          if (JSON.stringify(before) !== JSON.stringify(after)) throw Error('Paw audit changed simulation time or root pose');
+          return result;
+        });
+        const sample = { frame: i, time: st.t, terraceS, terraceT, contacts };
+        pawSupport.push(sample); audit.pawSupport = sample;
+      }
       if (kilnRoute) {
         const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
         if (step > continuity.maxStepMeters) { continuity.maxStepMeters = step; continuity.maxStepFrame = i; }
@@ -2165,7 +2220,11 @@ try {
     save('route-lens-safety.json', { ...lensSafety, passed: lensSafety.samples > 0 && lensSafety.occupied === 0 && lensSafety.missing === 0,
       scope: 'Every encoded frame, conservative .2m authored box/cylinder/terrain proximity; not exact visual mesh containment' });
     if (projectedVisibility.invalid || projectedVisibility.errors) report.failures.push(`Invalid GPU visibility masks: ${JSON.stringify(projectedVisibility)}`);
-    if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+    if (kilnRoute) {
+      save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+      save('route-renderer-state.json', { scope: 'Read-only snapshots bracketing the route across many reflection passes; not an atomic reflection-state leak test', before: rendererBefore, after: await rendererSnapshot() });
+      save('route-paw-support.json', { available: pawSupport.length > 0, scope: 'Bounded R5 turn: actual solved pad centres and stance flags vs upward opaque native stone/rock/ground triangles. Excludes full pad footprints, shader discard/displacement, instanced props, foliage, transparency and other support materials; no artistic contact or gameplay acceptance verdict', samples: pawSupport });
+    }
     await H('autopilot', false, state.auto.idx, { assist: false });
     await H('setKeys', []); await H('setStick', null); await shot('route-end');
 
