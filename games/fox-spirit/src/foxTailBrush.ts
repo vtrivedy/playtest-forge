@@ -3,7 +3,7 @@ import { FOX_RIG } from './foxRig';
 
 const RADIAL = 12;
 const RINGS_PER_SEGMENT = 4;
-const PROFILE: readonly [number, number][] = [[0, 0.07], [0.16, 0.11], [0.46, 0.15], [0.60, 0.12], [0.82, 0.075], [1, 0.022]];
+const PROFILE: readonly [number, number][] = [[0, 0.05], [0.16, 0.11], [0.46, 0.15], [0.60, 0.12], [0.82, 0.075], [1, 0.022]];
 
 /** Restyle the imported tail surface only. The authored skeleton, inverse binds and animation stay intact. */
 export function rebuildTailBrush(root: THREE.Object3D, metresPerUnit: number) {
