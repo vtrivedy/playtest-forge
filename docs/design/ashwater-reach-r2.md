@@ -61,3 +61,23 @@ Before conflict resolution: merge origin/main4bacc15 on s3-reach. The only confl
 Before code, 06:14 UTC. Main conflict already resolved at9c97912; feedback still only an older identity failure. Driver02:07 explicitly prioritizes glass-tank water and sepia sky. Existing rejected PNGs establish those failures; new candidate remains unreviewed. Code audit identifies a nonzero alpha floor plus continuous lip/foot on the165-degree spillway, and Reach gradients leaving the warm global sunColor untouched (also used by mist/cloud lighting).
 
 Scoped candidate: discard empty falling-water fragments, restrict strands into separated irregular spill clusters, and apply lip/foot only inside those clusters. Keep the surface footprint and all collisions/state/timing unchanged. Blend sky sunColor from a captured authored baseline toward pale daylight with the existing regional weight; restore baseline outside Reach each frame. Retain warm key/fox/copper accents. Report sun tint for per-shot inspection. No new assets/licenses. TypeScript and fox Vite required; push only s3-reach, request immutable remote comparison. No main merge or visual acceptance until personally inspecting valid PNGs/window.__game. Cross-model code critique requested; GPU review still decides whether holes look natural or merely patterned.
+
+
+## Round 26 — recovered relay frames, identity still rejected
+Personally inspected HIGH-basin, LOW-matched and hero-orchard PNGs from
+reach-r2 archive ea5fc32b8441. Relay identity verification failed; these frames
+must not establish current-commit acceptance. Unlike earlier missing-module
+archives, this archive contains rendered game evidence. Banks are present and
+dark; HIGH still reads as a round elevated reservoir with broad transparent
+water at the rim. LOW exposes the lane but repeated tall bank columns dominate.
+Hero-orchard places two huge masonry pillars ahead of the fox; sparse dead
+branches and pale mist lack a convincing drowned-orchard payoff.
+
+Report evidence: staged source arrival2.3s, latch6.7s, LOW fill0 and moodk1;
+report has no mood.sun field (the later candidate adds it). Therefore neither
+the latest daylight nor latest spillway discard changes can be assessed here.
+Do not tune the shared sky or change bank collision against unidentified frames.
+Next verified HIGH/LOW/hero capture must identify current pushed ref, tool and
+shot, include mood.sun and show whether broken spills eliminate the glass rim.
+If the ring still dominates, redesign only exposed spillway water silhouette
+first; preserve source timing, buoyancy, boarding gaps and low lane collision.
