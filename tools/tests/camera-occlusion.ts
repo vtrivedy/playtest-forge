@@ -182,9 +182,22 @@ for (const runDistance of [3.0, 3.3]) for (const speed of [0, 3.8, 9]) {
   const head = target.clone().add(new THREE.Vector3(0, speed ? 0.95 : 1.25, 0)).project(follow.camera);
   const centre = target.clone().add(new THREE.Vector3(0, 0.6, 0)).project(follow.camera);
   const angle = THREE.MathUtils.radToDeg(Math.atan2(Math.abs(follow.camera.position.x - target.x), Math.abs(follow.camera.position.z - target.z)));
-  assert.ok(centre.y < -0.2 && centre.y > -0.55, 'grounded chest sits below centre inside lower-third band');
+  assert.ok(centre.y <= -0.3 && centre.y > -0.55, 'grounded chest sits in lower-third band');
   assert.ok(foot.y > -0.95 && head.y < 0.85, 'proxy ears and feet remain inside frame');
   assert.ok(angle > 20, 'quartering lens preserves a side component at run speed');
   composition.push({ runDistance, speed, chestNdcY: +centre.y.toFixed(3), proxyHeightPx: +((head.y-foot.y)*360).toFixed(1), rearAngleDeg: +angle.toFixed(1) });
 }
 console.log('Chase composition CPU proxies:', JSON.stringify(composition));
+
+for (const velocity of [new THREE.Vector3(0, 0, 9), new THREE.Vector3(4.5, 0, -7.8)]) {
+  const follow = createFollowCamera();
+  follow.resize(1280, 720);
+  const target = new THREE.Vector3();
+  let minimumRange = Infinity;
+  for (let i = 0; i < 180; i++) {
+    target.addScaledVector(velocity, 1 / 60);
+    follow.update(1 / 60, { ...idleFrame, target, vel: velocity });
+    minimumRange = Math.min(minimumRange, follow.camera.position.distanceTo(target.clone().setY(target.y + follow.params.lookHeight)));
+  }
+  assert.ok(minimumRange >= follow.params.minDistance - 1e-6, 'toward-lens and off-axis motion retain actual body room');
+}

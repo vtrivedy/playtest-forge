@@ -163,6 +163,7 @@ export function createFollowCamera(opts: {
   let sceneryName = '';
   let sceneryFade = 0;
   let terrainFade = false;
+  let bodyRoomFade = false;
   let floorLift = 0;
   const landAt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
@@ -170,7 +171,7 @@ export function createFollowCamera(opts: {
   const debug = {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
-    blocked: () => terrainFade || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
+    blocked: () => terrainFade || bodyRoomFade || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
     internals: () =>
       `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} floorLift=${floorLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
   };
@@ -444,7 +445,7 @@ export function createFollowCamera(opts: {
     const fov = s.fov ?? params.fov;
     const need = (size * 0.62 + 2.2) / Math.tan(THREE.MathUtils.degToRad(fov * 0.5));
     // Look from the traversal side, swung 25° and raised so both subjects separate on screen
-    const a = yaw + params.sideBias + 0.45;
+    const a = yaw + 0.79; // reactive shots retain their authored angle as chase bias is tuned
     const elev = THREE.MathUtils.degToRad(18 + (s.rise ?? 10));
     shotPos.set(
       shotLook.x + Math.sin(a) * Math.cos(elev) * need,
@@ -559,8 +560,8 @@ export function createFollowCamera(opts: {
 
       // ---- boom length: ground → (sustained) air → glide. Short chained hops keep the ground boom.
       const airW = f.grounded ? 0 : THREE.MathUtils.smoothstep(f.airTime, 0.35, 0.9);
-      const groundDist = THREE.MathUtils.lerp(params.distance, params.runDistance,
-        THREE.MathUtils.smoothstep(speed, 1.5, 7.5));
+      const groundDist = Math.max(params.minDistance, THREE.MathUtils.lerp(params.distance, params.runDistance,
+        THREE.MathUtils.smoothstep(speed, 1.5, 7.5)));
       let goalDist = f.gliding
         ? params.glideDistance
         : THREE.MathUtils.lerp(groundDist, params.airDistance, airW);
@@ -570,11 +571,11 @@ export function createFollowCamera(opts: {
       if (hasLanding) landAt.copy(f.landing!);
       landW = THREE.MathUtils.damp(landW, hasLanding ? 1 : 0, hasLanding ? 6 : 4, dt);
       const baseY = f.grounded ? Math.max(focusY, p.y - 0.3) : focusY;
-      aim.set(p.x + lead.x * (1 - landW * 0.6), baseY + params.lookHeight + params.framingHeight * (1 - landW * 0.65), p.z + lead.z * (1 - landW * 0.6));
+      const descending = THREE.MathUtils.smoothstep(-f.vel.y, 0, 4);
+      aim.set(p.x + lead.x * (1 - landW * 0.6), baseY + params.lookHeight + params.framingHeight * (1 - landW * descending * 0.65), p.z + lead.z * (1 - landW * 0.6));
       if (landW > 0.001) {
         const spread = Math.hypot(landAt.x - p.x, landAt.z - p.z);
         const drop = Math.max(0, p.y - landAt.y);
-        const descending = THREE.MathUtils.smoothstep(-f.vel.y, 0, 4);
         const w = params.landingBias * Math.min(1, spread / 5) * landW * descending;
         aim.x += (landAt.x - aim.x) * w;
         aim.z += (landAt.z - aim.z) * w;
@@ -629,6 +630,14 @@ export function createFollowCamera(opts: {
       if (firstFrame) sceneryT = sceneryGoal;
       else sceneryT = THREE.MathUtils.damp(sceneryT, sceneryGoal, sceneryGoal < sceneryT ? 24 : 2.2, dt);
       safeLens.lerpVectors(boomFocus, rig, sceneryT);
+      // The target may run back toward a lagging lens even on open ground.
+      // Preserve actual body room without feeding the correction into the spring.
+      bodyRoomFade = false;
+      const bodyRange = safeLens.distanceTo(boomFocus);
+      if (bodyRange > 0.01 && bodyRange < params.minDistance) {
+        safeLens.sub(boomFocus).multiplyScalar(params.minDistance / bodyRange).add(boomFocus);
+        bodyRoomFade = sceneryFraction(boomFocus, safeLens) < 0.999;
+      }
       // Keep the spring independent of compression: release returns along the same
       // boom smoothly, rather than feeding a new collision impulse into its velocity.
       guardFraming(p, safeLens);
