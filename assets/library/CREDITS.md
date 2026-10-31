@@ -113,8 +113,18 @@ The Quaternius column also replaces Seedwell glyph supports within their existin
 envelopes. No new gameplay geometry or collision is introduced.
 
 ## Sprint 3 Lanternhollow
-Cottage walls, bowed roofs, domestic well/pulley, bench, lamps and fingerposts are
+Cottage walls, rounded pitched roofs, domestic well/pulley, bench, lamps and fingerposts are
 original procedural geometry. Sign lettering is generated at runtime with the
 local serif font; no external art or service. Reuses the existing CC0 Bricks085 /
 Rock035 masonry and bark_brown_02 timber surfaces listed above. No paid assets,
 new downloads or API keys.
+
+The sprint 3 lantern-village pass adds original timber festoon posts/cord and four-face
+pendants; leaf drifts reuse the original procedural maple atlas. Low ferns/grass use
+the CC0 Quaternius pieces listed above. No new downloads or paid assets.
+
+Lanternhollow village density pass: additional original cottage variants, timber market crate/lidded barrel and ground-fitted flagstones; no external asset downloads. Existing CC0 material sources above remain unchanged.
+
+Lanternhollow communal cooking pot, trivet, low stone ring and contained three-dimensional fire tongues are original procedural geometry/materials; no external assets or API used.
+
+Lanternhollow twelve-lantern pass: two additional cottage-mounted festoon cords and connected timber hooks reuse the original procedural lamp geometry/materials. No new external assets, downloads or API calls.

@@ -1051,8 +1051,40 @@ try {
     // Natural spawn, gravity warm-up and untouched chase before any staging.
     await advance(60); await shot('hub-spawn-chase');
     save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
+    // Live player view from natural spawn, before any teleport or photo camera.
+    const naturalInitial = await H('state');
+    await video('hub-natural-arrive-chase', 15 * fps, async i => {
+      await H('setStick', i < 3 * fps ? 0 : null, -.2);
+    }, undefined, {keyFrames: [0, 2*fps, 4*fps, 7*fps, 10*fps, 14*fps]});
+    await H('setStick', null);
+    const naturalEnd = await H('state');
+    const naturalDeaths = naturalEnd.deaths - naturalInitial.deaths;
+    const naturalAssists = naturalEnd.auto.assists - naturalInitial.auto.assists;
+    save('hub-natural-arrive-chase-acceptance.json', { staged: false,
+      label: 'Natural spawn; live analog input for 3s then 12s idle; untouched chase camera; no teleport, photo or pose override',
+      initial: naturalInitial, end: naturalEnd, deaths: naturalDeaths, assists: naturalAssists,
+      game: await page.evaluate(() => window.__game) });
+    if (naturalDeaths || naturalAssists || naturalEnd.auto.active || !naturalEnd.grounded || naturalEnd.anim !== 'idle') {
+      report.failures.push('Hub natural chase arrival did not finish grounded idle without deaths or assists');
+    }
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
-    await H('teleport', 0, y, 94, Math.PI);
+    // Portrait staging only; natural spawn above is untouched. Real idle rig, no bone override.
+    const heroYaw = Math.atan2(3.1, .8) - Math.PI / 4;
+    await H('teleport', 0, y, 94, heroYaw); await advance(30);
+    const heroLens = [3.1, y + 1.3, 94.8], heroLook = [-6.5, y + .9, 89.5];
+    const compositionBlocker = await H('photoBlocker', heroLens, heroLook);
+    const foxSightBlocker = await H('photoBlocker', heroLens, [0, y + .35, 94]);
+    await H('photo', heroLens, heroLook, 46); await advance(2);
+    await shot('hub-hero-three-q');
+    const heroState = await H('state');
+    save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
+    if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
+    const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
+    save('hub-festoon-clearance.json', festoon);
+    if (festoon?.pendants.length !== 12 || festoon?.cords?.length !== 3) report.failures.push('Hub must expose twelve pendants on three supported cords');
+    if (festoon?.pendants.some(p => p.bottom < p.ground + 3)) report.failures.push('Hub pendant below 3m local clearance');
+    if (festoon?.cords?.some(c => c.cordClearance < 3)) report.failures.push('Hub cord below 3m local clearance');
+    await H('teleport', 0, y, 94, Math.atan2(-8, -9));
     const hubViews = [
       ['arrival', [16, 10, 108], [-5, 2, 81], 52],
       ['arrival-close', [8, 3.8, 98], [-10, 2, 85], 55],
@@ -1061,10 +1093,14 @@ try {
       ['east-exit', [2, 6, 99], [18, 2, 80], 56],
       ['north-exit', [0, 5, 97], [0, 2, 65], 55],
     ];
+    const hubViewCameras = [];
     for (const [name, lens, target, fov] of hubViews) {
+      hubViewCameras.push({ name, lens, target, fov, blocker: await H('photoBlocker', lens, target) });
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
     }
-    await H('photo', [8, 4.5, 101], [-8, 2, 86], 55); await advance(30);
+    save('hub-view-cameras.json', hubViewCameras);
+    const arrivalCamera = { lens: [8, 4.5, 101], target: [-8, 2, 86], fov: 55, blocker: await H('photoBlocker', [8, 4.5, 101], [-8, 2, 86]) };
+    await H('photo', arrivalCamera.lens, arrivalCamera.target, arrivalCamera.fov); await advance(30);
     const initial = await H('state');
     await video('hub-arrive-idle', 15 * fps, async i => {
       // One staged starting point, then the live controller. Arrival pauses at the well lane.
@@ -1073,7 +1109,7 @@ try {
     await H('setStick', null);
     const end = await H('state');
     await H('photoOff'); await advance(30); await shot('hub-chase-arrived');
-    save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
+    save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', arrivalCamera, initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
     // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
     const orbitCameras = [];
     const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-10, 88));

@@ -1,16 +1,27 @@
-# Lanternhollow lantern identity — driver23:40
+# Lanternhollow lantern identity — current specification
 
-Before-code pass. Driver asks warm lanterns strung across the plaza, varied cottage roofs/eaves, textured warm ground and one fox three-quarter hero still. Current gameebe6358 has dusk,pitched roofs,well/porch pools and small hanging lamps; latest dedicated frames remain old1ab6d10. Do not call later work visually accepted.
+Driver23:40 asks warm lanterns across the plaza, varied cottage roofs/eaves, textured warm ground and one fox three-quarter hero still. This design preceded code; earlier proposals are preserved in git history. Latest dedicated images still represent old1ab6d10, so this pass has no visual approval.
 
 ## Quiet festoon row
-One restrained cord across the plaza,from(-12,88) to(7,88),supported by two original timber posts4.2m above local ground. Posts have full-height cylinder collision,radius about.18m,and participate in path/route/vegetation clearance checks. Cord is a quadratic sag with control point1.2m below the average endpoint height (actual midpoint sag.6m). Five small four-face amber lanterns hang at t1/6..5/6,scale.75 of the existing lantern; connect each hanger to the cord. Reuse the existing lamp material/emission; no new light material or color floor. Overhead cord/pendants are decorative,not platforms. Keep all posts off the natural route and existing hut/well/bench/portal geometry; review exact path margins first.
 
-Add one shadowless plaza-bounce PointLight under the row's centre,about2.5m above ground,intensity3,range6. It fades/flickers with the same dusk/realm-clock updater as well/porch lights. Total new practical lights becomes3,always allocated. Publish actual plaza intensity alongside well/porch; update the regression check. The source is deliberately a soft bounce proxy below the pendants,not an additive ground disc.
+Two original timber posts at W(-12,86.4) and E(6.6,89.4) stand4.2m above local ground, plus only the lift needed for pendant clearance. Full-height cylinders use radius.18m. Both anchors must remain≥2.3m from trail centres and join the path/route/vegetation checks.
 
-## Varied homes and ground
-Keep cottage centres/footprints. Raise only Archive's authored roof rise1.6→2.1m (ridge4.9m) for a steeper community-house silhouette; Bramble keeps its lower roof/chimney,East remains the modest cottage. One existing profile still feeds all roof mesh/gables/plates/collision; no new roof path or camera change. Recheck the western tree clearance and skyline.
+One quadratic cord uses a control point1m below the mean endpoint height (midpoint sag.5m). Four small four-face amber lanterns hang at t.20/.37/.72/.84, avoiding portal stones and the arrival centreline. Scale is.75 of the existing lamp. Their shortened hangers are.135m and meet the cord. Pendant bottoms stay≥ground+3.05m; any necessary lift raises the entire row and post tops together. Cord/pendants are decorative, not platforms, and opt out of gameplay boom compression. Solid posts remain blockers. All meshes remain visible to photoBlocker review. Existing shared materials and emission are reused.
 
-Add a few coherent low leaf drifts near the well/bench and house-edge groups,using existing original alpha-cut maple atlas and muted leaf-brown/russet/gold. Keep leaves below.1m and reject points inside solid footprints,pond ellipse or core trails. They stay under ColorField; passing fox aura/real warm lights provide color,not a fake restored plaza. No imported assets or new controls.
+A shadowless plaza bounce at t.62, approximately(-.47,88.26), sits ground+2.5m with intensity3 and range6. It uses the same dusk/flicker updater as well and porch lights. Total practical lights is3, always allocated; state reports actual well/porch/plaza intensities. This is real lighting, not a ground disc or restored-color floor.
 
-## Hero evidence
-Add `hub-hero-three-q` at the existing staged start,with camera(6,3,98),look(-5,1.8,85),FOV52. This is a labelled rear-three-quarter lens on the real idle fox,not a forced actor pose or gameplay-camera change. It should put fox foreground,well/strings middle-ground and cottages behind. Retain truly unstaged spawn chase and15s live arrival/idle plus context orbit. Capture immutable pushed SHA remotely,inspect every PNG/state and get Opus visual critique; fix/retest before self-landing.
+## Homes and ground
+
+Cottage positions and footprints stay fixed. Archive's roof rise is2.1m and ridge4.9m, giving a steeper community-house silhouette. Bramble retains its lower roof/chimney and East its modest roof. One profile feeds all roof meshes, gables, plates and collision. Check western tree/skyline overlap in the capture.
+
+Low curled leaf drifts near the well, bench and cottage edges reuse the original alpha-cut maple atlas and muted brown/russet/gold. Core trail distance≤1.2m, pond, house footprints and well ring are excluded. Leaf centres lie.03–.08m above ground; curled edges rise farther. ColorField remains active; fox aura and physical warm light supply color. No imported asset, new control or collectible loop.
+
+## Hero and gameplay evidence
+
+Capture the untouched natural spawn first. The separate portrait stages an idle fox at(0,g,94), heading outward at about.533rad, with no bone or animation override. Close lens(3.1,g+1.3,94.8), look(-6.5,g+.9,89.5), FOV46. Record requested/actual yaw, camera, composition blocker and fox sightline blocker. This is a labelled staged front-three-quarter portrait, not gameplay proof. Inspect the far cheek/eye, feet and nearby portal-column composition personally.
+
+Restore heading toward the well before the other review views and15s live arrival/idle. Retain natural end chase and18s context orbit with fixed checked height and per-frame blockers. No gameplay spawn/camera change. Save every static lens's blocker record as well as its PNG. Inspect immutable pushed SHA images/state and obtain Opus visual critique; fix/retest before self-landing.
+
+## Source review
+
+Opus design corrections set the final anchors, pendant spacing, hanger, light and lens above. Source review found no code correctness blockers; final fixes consolidate this spec, record hero blockers/actual yaw and clarify that the Bezier curve shares endpoint references with the post tops. Remote review remains mandatory.

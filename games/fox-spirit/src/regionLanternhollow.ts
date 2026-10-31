@@ -4,13 +4,20 @@ import { Bucket, PAL, trs } from './russetKit';
 import { boxCollider, cylCollider, type CollisionWorld } from './collision';
 
 /** Domestic scale, kept outside the existing arrival/hearth route. Original geometry. */
+export const HUB_FESTOON_POSTS = [[-12, 86.4], [6.6, 89.4]] as const;
+
 export const HUB_HOUSES = [
   { x: -18, z: 92, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: true },
-  { x: -26, z: 88, w: 5.6, d: 4.6, eave: 2.8, rise: 1.6, chimney: false },
+  { x: -28.5, z: 84.4, w: 5.6, d: 4.6, eave: 2.8, rise: 2.1, chimney: false },
   { x: 12, z: 95, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: false },
+  { x: -18, z: 84.6, w: 4.2, d: 3.8, eave: 2.3, rise: 1.2, chimney: false },
+  { x: -9, z: 99.6, w: 4.4, d: 3.6, eave: 2.3, rise: 1.25, chimney: false },
+  { x: -37, z: 86, w: 5, d: 4, eave: 2.5, rise: 1.45, chimney: false },
 ];
 export const HUB_PATHS = [
-  [-18, 95, -14, 95], [-14, 95, -12.5, 89.5], [-12.5, 89.5, -8, 88], [-26, 91, -24, 95], [-24, 95, -18, 95], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
+  [-18, 95, -14, 95], [-14, 95, -12.5, 89.5], [-12.5, 89.5, -8, 88], [-29.2, 87.5, -24, 88.3], [-24, 88.3, -18.7, 87.2], [-18.7, 87.2, -14, 87.8], [-14, 87.8, -12.5, 89.5],
+  [-9.7, 102.3, -5.7, 102.3], [-5.7, 102.3, -5, 100.5], [-5, 100.5, 0, 94],
+  [-37.7, 88.7, -34, 90], [-34, 90, -32, 88.5], [-32, 88.5, -29.2, 87.5], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
   [12, 98, 8, 99], [8, 99, 0, 94], [0, 80, 9, 88], [9, 88, 25, 88],
   [25, 88, 40, 68], [40, 68, 57, 40], [0, 80, -3, 45], [-3, 45, 0, 12],
 ] as const;
@@ -27,15 +34,17 @@ export function hubPathDistance(x: number, z: number): number {
 
 /** Exclude random vegetation/rocks from doorsteps, the well and new paths. */
 export function hubClearance(x: number, z: number): boolean {
-  return Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
+  return Math.hypot(x + 5, z - 92) < 1.7 || Math.hypot(x + 23.6, z - 85.2) < 1.2 || Math.hypot(x + 22.4, z - 85.1) < 1 || HUB_FESTOON_POSTS.some(([px, pz]) => Math.hypot(x - px, z - pz) < .9) || Math.hypot(x + 10, z - 91) < 2 || Math.hypot(x + 3, z - 78) < .7 || Math.hypot(x + 10, z - 67) < .7 || Math.hypot(x - 25, z - 88) < .7 || hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4 ||
     HUB_HOUSES.some(h => Math.abs(x - h.x) < h.w / 2 + 1.2 && Math.abs(z - h.z) < h.d / 2 + 1.2);
 }
 
+type LampBuckets = { wood: Bucket; roof: Bucket; lamp: Bucket; dark: Bucket };
+type DecorMaterials = Record<keyof LampBuckets, THREE.MeshStandardMaterial>;
 type HubBuckets = { stone: Bucket; wood: Bucket; plaster: Bucket; roof: Bucket; lamp: Bucket; dark: Bucket };
 
 export function createLanternhollow(
   parent: THREE.Group, col: CollisionWorld, ground: (x: number, z: number) => number,
-  b: HubBuckets, labelMaterials: THREE.MeshStandardMaterial[],
+  b: HubBuckets, labelMaterials: THREE.MeshStandardMaterial[], decorMaterials: DecorMaterials,
 ) {
   const windowAmber = new THREE.Color(0xe9a860);
   const plaster = new THREE.Color(0xc0ac86), roof = new THREE.Color(0x80513b), dark = new THREE.Color(0x30261e);
@@ -44,19 +53,19 @@ export function createLanternhollow(
     bucket.add(g, trs(x, y, z), tint); g.dispose();
   };
   const box = (bucket: Bucket, x: number, y: number, z: number, w: number, h: number, d: number, tint: THREE.Color) => rounded(bucket, x, y, z, w, h, d, tint);
-  const beam = (a: THREE.Vector3, c: THREE.Vector3, r: number) => {
+  const beam = (a: THREE.Vector3, c: THREE.Vector3, r: number, wood = b.wood) => {
     const delta = c.clone().sub(a), g = new THREE.CylinderGeometry(r, r * 1.1, delta.length(), 8);
     const m = new THREE.Matrix4().compose(a.clone().add(c).multiplyScalar(.5), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize()), new THREE.Vector3(1, 1, 1));
-    b.wood.add(g, m, PAL.wood); g.dispose();
+    wood.add(g, m, PAL.wood); g.dispose();
   };
-  const lamp = (x: number, y: number, z: number) => {
-    beam(new THREE.Vector3(x, y + .3, z), new THREE.Vector3(x, y + .65, z), .025);
-    box(b.dark, x, y, z, .36, .52, .32, dark);
+  const lamp = (x: number, y: number, z: number, scale = 1, hangerTop = .65, target: LampBuckets = b) => {
+    beam(new THREE.Vector3(x, y + .3 * scale, z), new THREE.Vector3(x, y + hangerTop * scale, z), .025 * scale, target.wood);
+    box(target.dark, x, y, z, .36 * scale, .52 * scale, .32 * scale, dark);
     for (const side of [-1, 1]) {
-      box(b.lamp, x, y, z + side * .17, .23, .32, .025, PAL.gold);
-      box(b.lamp, x + side * .19, y, z, .025, .32, .18, PAL.gold);
+      box(target.lamp, x, y, z + side * .17 * scale, .23 * scale, .32 * scale, .025 * scale, PAL.gold);
+      box(target.lamp, x + side * .19 * scale, y, z, .025 * scale, .32 * scale, .18 * scale, PAL.gold);
     }
-    box(b.roof, x, y + .3, z, .48, .1, .44, roof);
+    box(target.roof, x, y + .3 * scale, z, .48 * scale, .1 * scale, .44 * scale, roof);
   };
 
   for (const [index, h] of HUB_HOUSES.entries()) {
@@ -157,10 +166,40 @@ export function createLanternhollow(
       b.plaster.add(g, trs(h.x + sx * h.w / 2 + (sx < 0 ? .12 : 0), 0, h.z, -Math.PI / 2), plaster); g.dispose();
     }
     if (h.chimney) {
-      box(b.stone, h.x - 1.6, y + 3.8, h.z - .4, .75, 3.6, .75, PAL.stoneDark);
-      box(b.stone, h.x - 1.6, y + 5.55, h.z - .4, 1, .2, 1, PAL.stone);
-      col.add(boxCollider({ x: h.x - 1.6, z: h.z - .4, w: 1, d: 1, top: y + 5.65, bottom: y + 2, tag: 'hub-chimney' }));
+      box(b.stone, h.x - 1.6, y + 3.35, h.z - .4, .75, 2.1, .75, PAL.stoneDark);
+      box(b.stone, h.x - 1.6, y + 4.45, h.z - .4, 1, .2, 1, PAL.stone);
+      col.add(boxCollider({ x: h.x - 1.6, z: h.z - .4, w: 1, d: 1, top: y + 4.55, bottom: y + 2.3, tag: 'hub-chimney' }));
     }
+  }
+
+  // Low market stores occupy the gap between the western end walls.
+  {
+    const x = -23.6, z = 85.2, y = ground(x, z);
+    box(b.wood, x, y + .32, z, .85, .64, .7, PAL.wood);
+    for (const side of [-1, 1]) {
+      box(b.wood, x, y + .11, z + side * .365, .9, .12, .065, PAL.bark);
+      box(b.wood, x, y + .54, z + side * .365, .9, .12, .065, PAL.bark);
+      beam(new THREE.Vector3(x - .36, y + .16, z + side * .37), new THREE.Vector3(x + .36, y + .49, z + side * .37), .045);
+    }
+    col.add(boxCollider({ x, z, w: .95, d: .8, top: y + .66, bottom: y - .15, tag: 'hub-market' }));
+    const bx = -22.4, bz = 85.1, by = ground(bx, bz), r = .38;
+    const shell = new THREE.CylinderGeometry(r, r * .82, .56, 12);
+    b.wood.add(shell, trs(bx, by + .28, bz), PAL.wood.clone().multiplyScalar(.9)); shell.dispose();
+    for (const yy of [.10, .49]) {
+      const band = new THREE.TorusGeometry(yy < .2 ? r * .86 : r * .98, .025, 4, 12);
+      const matrix = new THREE.Matrix4().makeRotationX(Math.PI / 2); matrix.setPosition(bx, by + yy, bz);
+      b.dark.add(band, matrix, dark); band.dispose();
+    }
+    col.add(cylCollider({ x: bx, z: bz, r: r + .03, top: by + .56, bottom: by - .15, tag: 'hub-market' }));
+  }
+  // A few half-buried flagstones identify the well lane without creating steps.
+  for (let i = 0; i < 7; i++) {
+    const t = (i + .5) / 7, x = THREE.MathUtils.lerp(-12.5, -8, t), z = THREE.MathUtils.lerp(89.5, 88, t);
+    const g = new THREE.CylinderGeometry(.24 + (i % 3) * .035, .27, .1, 7);
+    g.rotateY(i * 1.17); // rotate before sampling terrain, never after the fit
+    const p = g.getAttribute('position');
+    for (let v = 0; v < p.count; v++) p.setY(v, ground(x + p.getX(v), z + p.getZ(v)) + p.getY(v) - .025);
+    g.computeVertexNormals(); b.stone.add(g, trs(x, 0, z), PAL.stone.clone().multiplyScalar(.8)); g.dispose();
   }
 
   // Domestic dry well: visible earth floor, low masonry ring, timber rope/pulley.
@@ -204,6 +243,126 @@ export function createLanternhollow(
   porchLight.position.set(bramble.x - 1.65, ground(bramble.x, bramble.z) + 1.8, bramble.z + bramble.d / 2 + .85);
   parent.add(porchLight);
 
+  // One quiet festoon gives the plaza a lantern-village silhouette.
+  const festoonBuckets: LampBuckets = { wood: new Bucket(), roof: new Bucket(), lamp: new Bucket(), dark: new Bucket() };
+  const endpoints = HUB_FESTOON_POSTS.map(([x, z]) => new THREE.Vector3(x, ground(x, z) + 4.2, z));
+  const originalPosts = endpoints.map(p => p.clone());
+  const middle = endpoints[0]!.clone().add(endpoints[1]!).multiplyScalar(.5); middle.y -= 1;
+  const cord = new THREE.QuadraticBezierCurve3(endpoints[0]!, middle, endpoints[1]!);
+  const pendantT = [.20, .37, .72, .84];
+  const scale = .75, hangerTop = .48, bottomDrop = (hangerTop + .26) * scale;
+  let lift = 0;
+  for (const t of pendantT) {
+    const point = cord.getPoint(t);
+    lift = Math.max(lift, ground(point.x, point.z) + 3.05 - (point.y - bottomDrop));
+  }
+  // Curve endpoints retain these Vector3 references, so the lift also raises post tops.
+  cord.v0.y += lift; cord.v1.y += lift; cord.v2.y += lift;
+  for (const [i, [x, z]] of HUB_FESTOON_POSTS.entries()) {
+    const gy = ground(x, z), top = endpoints[i]!.y;
+    beam(new THREE.Vector3(x, gy - .15, z), new THREE.Vector3(x, top, z), .13);
+    box(b.roof, x, top, z, .32, .08, .32, roof);
+    col.add(cylCollider({ x, z, r: .18, top: top + .04, bottom: gy - .2, tag: 'hub-festoon-post' }));
+  }
+  const cordGeo = new THREE.TubeGeometry(cord, 40, .018, 6, false);
+  festoonBuckets.wood.add(cordGeo, undefined, PAL.bark); cordGeo.dispose();
+  const cordSpecs = [{ name: 'plaza', curve: cord, stations: pendantT,
+    supports: ['plaza-west-post', 'plaza-east-post'] }];
+  const roofHook = (houseIndex: number, side: number) => {
+    const house = HUB_HOUSES[houseIndex]!;
+    const y = ground(house.x, house.z) + house.eave + house.rise;
+    const x = house.x + side * (house.w / 2 + .45);
+    // Ridge extension overlaps the gable framing; upright overlaps its joint.
+    beam(new THREE.Vector3(x - side * .6, y - .08, house.z),
+      new THREE.Vector3(x, y - .08, house.z), .065, festoonBuckets.wood);
+    const tip = new THREE.Vector3(x, y + .45, house.z);
+    beam(new THREE.Vector3(x, y - .16, house.z), tip, .055, festoonBuckets.wood);
+    return tip;
+  };
+  const addRoofCord = (name: string, start: THREE.Vector3, end: THREE.Vector3, supports: string[]) => {
+    const control = start.clone().add(end).multiplyScalar(.5); control.y -= .35;
+    const curve = new THREE.QuadraticBezierCurve3(start, control, end);
+    const geometry = new THREE.TubeGeometry(curve, 24, .018, 6, false);
+    festoonBuckets.wood.add(geometry, undefined, PAL.bark); geometry.dispose();
+    cordSpecs.push({ name, curve, stations: [.2, .4, .6, .8], supports });
+  };
+  addRoofCord('bramble', roofHook(0, 1), endpoints[0]!.clone(), ['bramble-east-ridge', 'plaza-west-post']);
+  addRoofCord('market', roofHook(1, 1), roofHook(3, -1), ['archive-east-ridge', 'pond-cottage-west-ridge']);
+  const cords = cordSpecs.map(spec => {
+    const pendants = spec.stations.map(t => {
+      const point = spec.curve.getPoint(t);
+      lamp(point.x, point.y - hangerTop * scale, point.z, scale, hangerTop, festoonBuckets);
+      // Check the whole lamp footprint, including the wider cap, against terrain.
+      let highestGround = -Infinity;
+      for (const dx of [-.18, 0, .18]) for (const dz of [-.165, 0, .165])
+        highestGround = Math.max(highestGround, ground(point.x + dx, point.z + dz));
+      return { point, bottom: point.y - bottomDrop, ground: highestGround };
+    });
+    let cordClearance = Infinity;
+    for (let i = 0; i <= 100; i++) {
+      const p = spec.curve.getPoint(i / 100);
+      cordClearance = Math.min(cordClearance, p.y - .018 - ground(p.x, p.z));
+    }
+    return { ...spec, pendants, cordClearance };
+  });
+  const pendants = cords.flatMap(c => c.pendants);
+  for (const key of ['wood', 'roof', 'lamp', 'dark'] as const) {
+    const mesh = festoonBuckets[key].toMesh(decorMaterials[key], { cast: false });
+    if (mesh) { mesh.name = `hub-festoon-${key}`; mesh.userData.cameraDecoration = true; parent.add(mesh); }
+  }
+  parent.userData.hubFestoon = { posts: endpoints.map(p => p.toArray()), originalPosts: originalPosts.map(p => p.toArray()), lift,
+    cords: cords.map(c => ({ name: c.name, supports: c.supports,
+      endpoints: [c.curve.v0.toArray(), c.curve.v2.toArray()], control: c.curve.v1.toArray(),
+      cordClearance: c.cordClearance,
+      pendants: c.pendants.map(p => ({ pos: p.point.toArray(), bottom: p.bottom, ground: p.ground })) })),
+    pendants: pendants.map(p => ({ pos: p.point.toArray(), bottom: p.bottom, ground: p.ground })) };
+  const bounce = cord.getPoint(.62);
+  const plazaLight = new THREE.PointLight(0xffb665, 3, 6, 2);
+  plazaLight.position.set(bounce.x, ground(bounce.x, bounce.z) + 2.5, bounce.z); parent.add(plazaLight);
+
+  // A communal cooking pot, distinct from the realm's tall traversal braziers.
+  const hx = -5, hz = 92, hy = ground(hx, hz);
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const g = new RoundedBoxGeometry(.32, .25, .24, 2, .035);
+    b.stone.add(g, trs(hx + Math.cos(a) * .5, hy + .125, hz + Math.sin(a) * .5, -a), PAL.stoneDark); g.dispose();
+  }
+  const ash = new THREE.CylinderGeometry(.4, .4, .06, 12);
+  b.dark.add(ash, trs(hx, hy + .05, hz), dark); ash.dispose();
+  const pot = new THREE.SphereGeometry(.3, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+  b.dark.add(pot, trs(hx, hy + .68, hz), dark); pot.dispose();
+  const lid = new THREE.CylinderGeometry(.31, .31, .04, 16);
+  b.dark.add(lid, trs(hx, hy + .7, hz), dark); lid.dispose();
+  box(b.dark, hx, hy + .745, hz, .13, .05, .07, dark);
+  for (const side of [-1, 1]) {
+    const handle = new THREE.TorusGeometry(.1, .025, 5, 12);
+    const m = new THREE.Matrix4().makeRotationY(Math.PI / 2); m.setPosition(hx + side * .32, hy + .63, hz);
+    b.dark.add(handle, m, dark); handle.dispose();
+  }
+  for (let i = 0; i < 3; i++) {
+    const a = i / 3 * Math.PI * 2;
+    const g = new THREE.CylinderGeometry(.025, .035, .58, 6);
+    b.dark.add(g, trs(hx + Math.cos(a) * .25, hy + .36, hz + Math.sin(a) * .25), dark); g.dispose();
+  }
+  col.add(cylCollider({ x: hx, z: hz, r: .67, top: hy + .25, bottom: hy - .1, tag: 'hub-cooking-ring' }));
+  col.add(cylCollider({ x: hx, z: hz, r: .45, top: hy + .77, bottom: hy + .25, tag: 'hub-cooking-pot' }));
+  const fireLight = new THREE.PointLight(0xffa653, 4, 5, 2);
+  fireLight.position.set(hx, hy + .7, hz); parent.add(fireLight);
+  const flameGeometry = new THREE.SphereGeometry(1, 10, 8);
+  const flamePos = flameGeometry.getAttribute('position');
+  for (let v = 0; v < flamePos.count; v++) {
+    const t = (flamePos.getY(v) + 1) * .5, taper = 1 - t * .75;
+    flamePos.setXYZ(v, flamePos.getX(v) * taper, t, flamePos.getZ(v) * taper);
+  }
+  const flameMaterial = new THREE.MeshBasicMaterial({ color: new THREE.Color(2, .48, .06),
+    transparent: true, opacity: .28, depthWrite: false, blending: THREE.AdditiveBlending });
+  const flames = Array.from({ length: 3 }, (_, i) => {
+    const mesh = new THREE.Mesh(flameGeometry, flameMaterial);
+    mesh.name = `hub-cooking-flame-${i}`; mesh.userData.forgeSkipAO = true;
+    mesh.userData.cameraDecoration = true; mesh.raycast = () => {};
+    parent.add(mesh); return mesh;
+  });
+
   const by = ground(-10, 91);
   box(b.wood, -10, by + .72, 91, 2.2, .16, .7, PAL.wood);
   for (const dx of [-.85, .85]) box(b.wood, -10 + dx, by + .275, 91, .16, .85, .58, PAL.wood);
@@ -220,9 +379,9 @@ export function createLanternhollow(
   smokeCtx.fillStyle = gradient; smokeCtx.fillRect(0, 0, 32, 32);
   const smokeTexture = new THREE.CanvasTexture(smokeCanvas);
   const chimney = HUB_HOUSES.find(h => h.chimney)!;
-  const chimneyY = ground(chimney.x, chimney.z) + 5.7;
+  const chimneyY = ground(chimney.x, chimney.z) + 4.6;
   const smoke = Array.from({ length: 8 }, () => {
-    const mat = new THREE.SpriteMaterial({ map: smokeTexture, color: 0x6e5a44, transparent: true, opacity: 0, depthWrite: false });
+    const mat = new THREE.SpriteMaterial({ map: smokeTexture, color: 0xa99b86, transparent: true, opacity: 0, depthWrite: false });
     const puff = new THREE.Sprite(mat);
     // Decorative smoke must not enter world/photography collision probes. Sprite
     // raycasts require a camera, while the photo-blocker ray intentionally has none.
@@ -264,18 +423,27 @@ export function createLanternhollow(
     }
   }
   return {
-    state: () => ({ well: wellLight.intensity, porch: porchLight.intensity }),
+    festoon: { posts: endpoints, pendants, cords },
+    state: () => ({ well: wellLight.intensity, porch: porchLight.intensity, plaza: plazaLight.intensity, hearth: fireLight.intensity }),
     update(time: number, dusk: number) {
     const flicker = 1 + Math.sin(time * 1.3) * .04;
     wellLight.intensity = 4 * dusk * flicker;
     porchLight.intensity = 3 * dusk * flicker;
+    plazaLight.intensity = 3 * dusk * flicker;
+    fireLight.intensity = 4 * dusk * flicker;
+    for (const [i, flame] of flames.entries()) {
+      const phase = time * 2.2 + i * 2.1;
+      flame.position.set(hx + Math.cos(i * 2.1) * .16 + Math.sin(phase) * .018, hy + .12, hz + Math.sin(i * 2.1) * .16);
+      flame.scale.set(.14, .22 + Math.sin(phase * 1.3) * .025, .14);
+      flame.rotation.z = Math.sin(phase) * .09;
+    }
     for (const [i, puff] of smoke.entries()) {
       const age = (time / 4.5 + i / smoke.length) % 1;
-      puff.position.set(chimney.x - 1.6 + age * .7 + Math.sin(age * 5 + i) * .08,
-        chimneyY + age * 2.7, chimney.z - .4 + age * .2);
-      const size = .3 + age * 1.1;
+      puff.position.set(chimney.x - 1.6 + age * 1.15 + Math.sin(age * 5 + i) * .08,
+        chimneyY + age * 1.4, chimney.z - .4 + age * .2);
+      const size = .25 + age * .65;
       puff.scale.set(size, size * 1.15, 1);
-      puff.material.opacity = Math.sin(age * Math.PI) * .16;
+      puff.material.opacity = Math.sin(age * Math.PI) * .075;
       puff.material.rotation = i * 1.7 + age * .3;
     }
     },
