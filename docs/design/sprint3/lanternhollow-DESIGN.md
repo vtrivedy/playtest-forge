@@ -1,35 +1,40 @@
 # Lanternhollow — continuous arrival hub
 
-Sprint 3 scope: a village within the existing arrival meadow, never a separate chapter. Soft, gentle animated realism; worn timber, warm plaster, muted rust roofs and small amber lamps. No new asset downloads or API keys.
+Current implementation specification. Revision decisions and pre-code proposals are recorded in [the GPU correction design](lanternhollow-r2-DESIGN.md); earlier commit versions preserve the initial blocking. Visual acceptance remains pending the integrated remote capture.
 
-Layout: arrival at (0,90) stays fixed. A dry Great Well at (-7,82) anchors a crescent of three modest dwellings west/east of the clear northbound lane. One taller chimney and a curved well canopy establish the silhouette; roofs stay below the distant mills. The opening lane (x=-3..3) and H-a approach (4.5,74.2) stay open. Village objects remain outside the existing continuous route, including the western turn toward Windmill Rise. Amberwood reads north; Reedmarsh east; Windmill Rise west. Three low timber fingerposts point to those actual destinations, with modest lanterns at the forks.
+Lanternhollow occupies the existing arrival meadow within the continuous Russetvale scene. Soft gentle animated realism: weathered timber, warm plaster, muted rust roofs, stone well and small amber practical lights. The existing arrival at (0,90), checkpoint, H-a approach (4.5,74.2), terrain height and route through Windmill Rise to Kiln remain intact.
 
-Verbs: arrive, wander the well apron, jump onto low benches, dash out to the Rise, or hold-jump at the existing H-a hearth. No pickups, currency, new buttons, gates or invented restoration mechanic. Dwelling bodies and the well receive matching collision; roofs are solid. Low furniture uses normal step-up collision. Preserve existing terrain, route and physics.
+## Layout and collision
 
-Color: all architectural materials join the existing ColorField patch list. Warm plaster and weathered stone dominate; restored rust timber and roof accents remain restrained. Lamps glow softly, never wash the plaza orange. The well remains visibly dry; no false world-completion state. Cumulative seasonal progression is deferred rather than faked.
+| Object | Centre x,z | Size / height | Collision |
+| --- | --- | --- | --- |
+| Bramble cottage | -18,92 | 5.2 × 4.2m; eave2.6/ridge4.0/chimney5.65 above ground | body box,12 sampled roof strips,chimney |
+| Archive cottage | -26,88 | 5.6 × 4.6m; eave2.8/ridge4.4 | body box,12 sampled roof strips |
+| East cottage | 12,95 | 5.2 × 4.2m; eave2.6/ridge4.0 | body box,12 sampled roof strips |
+| Great Well | -8,85 | ring outer radius about1.6m; parapet.93m; timber pulley arch about3.6m | 12 masonry boxes; low post cylinders; overhead rig decorative |
+| Rest bench | -10,91 | 2.2 × .7m; seat.8m | box,feet sunk into slope |
+| Rise fingerboard | -10,67 | 2.3 × .42m at1.65m | decorative; points toward(-34,56) |
+| Reedmarsh fingerboard | 25,88 | same | decorative; points toward(57,40) |
+| Amberwood fingerboard | -3,78 | same | decorative; points toward(0,12) |
 
-Assets: reuse existing world stone/timber textures (ambientCG Rock035/Bricks085, Poly Haven bark_brown_02, CC0; assets/library/CREDITS.md). Architecture is original procedural geometry with rounded roof profiles and broad, quiet surfaces. Existing kit trees frame the settlement; no dense mesh dump.
+The two western cottages form a crescent around the well; the east cottage frames arrival. Their footprints remain outside the central lane. Maple(-19,82) clears the western roof corner and sightline. The existing arch and portal stones stay in place.
 
-Review gate: request Opus critique before implementation. GPU captures at immutable pushed SHA: wide arrival, well/roof silhouette, three exits, 15-second real arrival/idle clip plus window.__game. Personally inspect returned PNGs and state reports, fix concrete defects, recapture once. Until then build-clean candidate only; no main merge or visual-quality claim.
+Bramble's doorstep bends(-18,95)→(-14,95)→(-12.5,89.5)→(-8,88), clearing its corner and the bench. Archive connects(-26,91)→(-24,95)→(-18,95). East connects(12,98)→(8,99)→(0,94). Other branches continue toward the existing realm destinations. Side trails use softly feathered terrain paint; extra packed-earth value contrast fades out from z80 to z72. No raised path geometry, hard color discs, scene changes or new gates.
 
-## Opus revision — exact blocking before meshes
+Roof meshes and top collision share the same12-strip bowed profile. Fascia grows downwards; course lips rise only2.5cm above the top. Gables and wall plates close the roof volume. Side walls have timber rails and narrow framed windows. Window and lamp apertures retain their authored amber light outside ColorField at emissive.5±.025 with slow breathing; no new PointLights. All architectural stone/plaster/roof/timber remains in ColorField and begins sepia.
 
-Opus critique saved in persistent artifacts (`opus-design-critique.md`). Supersedes the provisional placement/solid-roof/bench language above.
+The Great Well remains dry. Its nonemissive carved stone maple relief identifies the village landmark without suggesting a Seedwell or interactable restore. The pulley is decorative above walking height. No seasonal completion is faked. Cumulative world-season progression remains future work.
 
-| Object | Centre x,z | Footprint m | Eave/ridge/chimney m above local ground | Collision |
-|---|---|---|---|---|
-| Bramble cottage | -24,89 | 5.2 × 4.2 | 2.6 / 4.0 / 5.6 | box body, roof strips matching sampled slope |
-| Archive cottage | -34,84 | 5.6 × 4.6 | 2.8 / 4.4 / none | box body, matching roof strips |
-| East cottage | 17,93 | 5.2 × 4.2 | 2.6 / 4.0 / none | box body, matching roof strips; >15m from H-a shelf |
-| Great Well | -8,85 | ring outer r1.55; apron r2.6 | parapet .85; pulley arch 3.5 | 12 stone wall boxes; ground at bottom; pulley decorative above head |
-| Rest bench | -10,91 | 2.2 × .7 | seat .8 | box; >7m from any roof, cannot chain |
-| Rise fingerpost | -10,64 | .22 × .22 | 1.9 | decorative narrow post off path at x-10,z67 |
-| Reedmarsh fingerpost | 25,88 | .22 × .22 | 1.9 | decorative; points NE along authored worn-earth branch |
-| Amberwood fingerpost | -3,78 | .22 × .22 | 1.9 | decorative; points north along clear meadow lane |
+Bramble's chimney emits eight restrained umber smoke puffs with soft radial alpha, a4.5s rise and gentle drift. They use the realm clock and explicitly opt out of raycasting so they cannot interfere with the camera-free photoBlocker probe. No NPCs or washing-line obstacles are invented.
 
-All wall faces ≥6m from the arrival lane. No new checkpoint-looking columns or PointLights: small hanging amber lights use emissive intensity .16 and no bloom flare. The well is a low dry domestic stone ring with timber pulley and rope, without crest glow, glyphs or inlet; it is a village landmark, not a Seedwell. Ground remains unchanged; threshold paths and well apron participate in terrain path-distance paint. All village surfaces begin sepia under ColorField; aura/trail temporarily warm them. SW1 is too far away to affect hub; only the existing flood can restore it. No seasonal completion is faked. The Rise sign is beyond H-a; player can explore side branches freely. Northern/eastern paths aim at Amberwood/Reedmarsh without a portal or scene load. Decorative overhead pulley is explicitly non-landable; dwelling roof collision follows the same piecewise linear profile as its geometry.
+## Player verbs
 
-Blocking overlay: `lanternhollow-layout.svg` shows existing pond, trees, portal, arch, respawn, H-a shelf and route alongside the proposed footprints. Camera/skyline clearance remains a GPU review gate, not a claim from coordinates.
+Arrive, explore the well apron, jump onto the low bench, dash out toward the Rise, and hold-jump at H-a. Move + jump + dash retain their existing behavior. No collectible loop, currency, new buttons or prerequisite gates. Restoration uses the existing ColorField aura/trail and realm flood; no new hub-only restoration mechanic.
 
-## Implementation critique revision
-Archive moves west to (-34,84) to separate roofs. Its doorstep path bends via (-28,93) before Bramble's porch, avoiding the wall corner. Well-to-checkpoint access bends around the portal ring; east fork begins at the checkpoint rather than crossing the portal's standing stones. Side trails are narrower than the critical route and remain clear for their full length. Fingerboards align their long axis/arrow with actual destinations and carry correctly reversed lettering on both faces. Pulley posts block only at walking height (1.2m), so the decorative overhead rig cannot be a jump perch. Well masonry and bench feet sink .15–.2m into the slope. Front/back wall plates close the roof gap; gables extrude inward on both sides. Lamp hangers connect to wall brackets. These source corrections precede the first GPU review.
+## Assets and validation
+
+Original procedural geometry, lettering, maple relief and smoke alpha. Reuse existing CC0 Bricks085/Rock035 masonry and bark_brown_02 timber surfaces (assets/library/CREDITS.md). No new downloads, paid assets or API keys.
+
+Remote immutable capture requested for b791be5: matched overview, lower close arrival, well, three exits,15s live diagonal arrival/idle and natural chase, plus fox photography and the continuous Kiln route. Personal PNG/state inspection and Opus visual agreement are required before landing. First GPU candidate ee9459d was rejected for sparse grouping, blank walls, faint trails and unlit-looking lamps; the current pass addresses those specific defects but has no visual acceptance yet.
+
+CPU verification:16 path segments clear at.4m of cottage/bench/well/post footprints;970 meadow-route sweep samples clear at.55m of new colliders;36 roof strips align within1.66e-7m;8 decorative sprite camera-free raycasts return no hits/errors. TypeScript and fox Vite build pass. These checks supplement remote play evidence.
