@@ -757,8 +757,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   };
   // R1 entrance stair (0 → 2), straight up the front
   flightT(-6.5, 0, 0.1, 0.4, 0, 2, 3.4, 1);
-  // R2 lateral flight on k1 (2 → 6). Join the s12 terrace with 5cm overlap:
-  // the old s11.8 edge left a slot that dropped slow sidesteps to the y2 floor.
+  // R2 lateral flight on k1 (2 → 6). Its s12.05 high edge overlaps the
+  // s12 terrace support by 5cm; masonry and collider share the same flight.
   flightT(10.75, 11.2, 2, 10.75, 2.0, 6, 2.6, 2);
   // R3 jump chain on k2: broken pillar stumps (6 → 7.5 → 9 → 10)
   for (const [s, top, variant] of [[23, 7.5, 0], [25.5, 9.0, 1]] as const) {
@@ -780,8 +780,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     slab({ x: p.x, z: p.z, w: 2.6, d: 2.9, yaw: T_YAW, top: 14, bottom: 9.5, rough: 0.3, seed: 75, topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
   }
   // Wind gap: twenty flat metres, with the y10 terrace four metres below for recovery.
-  // R5 lateral flight on k4b (14 → 18), joined to the s64 terrace.
-  // Keep visible masonry and support together across the former 0.5m side slot.
+  // R5 lateral flight on k4b (14 → 18). Its s64.05 high edge overlaps the
+  // s64 terrace support by 5cm; masonry and collider share the same flight.
   flightT(62.85, 0.4, 14, 62.85, 9.8, 18, 2.4, 6);
   // R6 lateral flight on k5 (18 → 22)
   flightT(66, 9.8, 18, 66, 0.4, 22, 2.4, 7);
