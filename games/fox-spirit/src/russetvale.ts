@@ -609,7 +609,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         // Reed's restored reward needs authored autumn colour beneath the mask.
         // Keep submerged peat dark; collect leaves in irregular landward drifts.
         const reedLand = (1 - smooth01(1.0, 1.4, me)) * smooth01(-1.1, -0.4, y);
-        const reedDrift = smooth01(0.42, 0.65, n1) * reedLand;
+        const reedDrift = smooth01(0.42, 0.65, n1) * reedLand * (1 - pathK * 0.9) * (1 - hubWear);
         c.lerp(PAL.grassGold, reedDrift * 0.25);
         leafy = Math.max(leafy, reedDrift * 0.58);
         c.lerp(PAL.rockGrey, rimK * 0.7);
