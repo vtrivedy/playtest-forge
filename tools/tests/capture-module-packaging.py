@@ -3,6 +3,7 @@ import ast
 import posixpath
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / 'tools'
@@ -14,6 +15,7 @@ class ImageRecorder:
         self.mounts = {}
 
     def add_local_file(self, local, remote):
+        assert Path(local).is_file(), f'Missing mounted source: {local}'
         if remote in self.mounts:
             raise AssertionError(f'Duplicate capture mount: {remote}')
         self.mounts[remote] = Path(local).resolve()
@@ -24,7 +26,6 @@ blocks = [node for node in manifest.body
           if isinstance(node, ast.If) and ast.unparse(node.test) == 'modal.is_local()']
 if len(blocks) != 1:
     raise AssertionError('Expected one local capture-file mount block')
-from types import SimpleNamespace
 scope = {'ROOT': ROOT, 'Path': Path, 'image': recorder,
          'os': SimpleNamespace(environ={})}
 exec(compile(ast.Module(body=blocks[0].body, type_ignores=[]),

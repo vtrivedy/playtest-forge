@@ -101,7 +101,8 @@ export type FollowCamera = {
    */
   getYaw: () => number;
   resize: (w: number, h: number) => void;
-  debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string; blocked: () => boolean };
+  debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string; blocked: () => boolean;
+    viewBlocked: (focus: THREE.Vector3, lens: THREE.Vector3) => boolean };
 };
 
 const TAU = Math.PI * 2;
@@ -110,6 +111,8 @@ const wrap = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
 export function createFollowCamera(opts: {
   /** Walkable surface the boom must stay above; refY = height the camera is working at */
   surfaceAt?: (x: number, z: number, refY: number) => number;
+  /** Scene-owned solid-volume query; separate from one-way walkable floors. */
+  lensBlocked?: (x: number, y: number, z: number, radius: number) => boolean;
   /** Static world geometry, including decorative posts without gameplay colliders. */
   scenery?: THREE.Object3D;
   params?: Partial<CameraTunables>;
@@ -170,15 +173,22 @@ export function createFollowCamera(opts: {
   let sceneryFade = 0;
   let terrainFade = false;
   let floorLift = 0;
+  let lensUnresolved = false;
+  let relocatedSightBlocked = false;
   const landAt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   /** Where the fox / predicted landing sit on screen (NDC) — framing metrics for the harness */
   const debug = {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
-    blocked: () => terrainFade || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
+    blocked: () => terrainFade || relocatedSightBlocked || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
+    viewBlocked(focus: THREE.Vector3, lens: THREE.Vector3) {
+      const name = sceneryName;
+      try { return sceneryFraction(focus, lens) < .999; }
+      finally { sceneryName = name; }
+    },
     internals: () =>
-      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} floorLift=${floorLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
+      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} floorLift=${floorLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} lensUnresolved=${lensUnresolved} blocker=${sceneryName}`,
   };
   let shotW = 0;
   /** Active authored path (restore cinematic) */
@@ -360,6 +370,54 @@ export function createFollowCamera(opts: {
   const sightOrigin = new THREE.Vector3();
   const sightHits: THREE.Intersection[] = [];
   const safeLens = new THREE.Vector3();
+  const freeLens = new THREE.Vector3();
+  const previousLens = new THREE.Vector3();
+  const candidateLens = new THREE.Vector3();
+
+  function clearLensVolume(focus: THREE.Vector3, lens: THREE.Vector3, dt: number, firstFrame: boolean) {
+    const blocked = opts.lensBlocked;
+    if (!blocked || !blocked(lens.x, lens.y, lens.z, .35)) return false;
+    const dx = lens.x - focus.x, dz = lens.z - focus.z;
+    const range = Math.hypot(dx, dz);
+    if (range < .01) return false;
+    const ux = dx / range, uz = dz / range;
+    let best = Infinity;
+    const previousClear = !firstFrame && !blocked(previousLens.x, previousLens.y, previousLens.z, .2);
+    const floorClear = (point: THREE.Vector3) => {
+      const floor = opts.surfaceAt?.(point.x, point.z, point.y + 1.5);
+      return floor === undefined || !Number.isFinite(floor) || point.y >= floor + params.clearance * .8 - .00001;
+    };
+    const check = (x: number, z: number) => {
+      candidateLens.set(x, lens.y, z);
+      if (previousClear) {
+        const travel = candidateLens.distanceTo(previousLens), maximumStep = Math.max(.08, 16 * dt);
+        if (travel > maximumStep) candidateLens.lerpVectors(previousLens, candidateLens, maximumStep / travel);
+      }
+      const cost = candidateLens.distanceToSquared(lens) * .2 + (previousClear ? candidateLens.distanceToSquared(previousLens) * .8 : 0);
+      if (cost >= best || !floorClear(candidateLens) || blocked(candidateLens.x, candidateLens.y, candidateLens.z, .35)) return;
+      if (previousClear) {
+        const steps = Math.ceil(candidateLens.distanceTo(previousLens) / .1);
+        for (let i = 1; i < steps; i++) {
+          const t = i / steps;
+          if (blocked(THREE.MathUtils.lerp(previousLens.x, candidateLens.x, t),
+            THREE.MathUtils.lerp(previousLens.y, candidateLens.y, t),
+            THREE.MathUtils.lerp(previousLens.z, candidateLens.z, t), .2)) return;
+        }
+      }
+      best = cost; freeLens.copy(candidateLens);
+    };
+    const minimum = Math.min(range, params.minDistance);
+    const maximum = Math.max(range, params.distance) + .8;
+    for (let r = minimum; r <= maximum + .001; r += .1) check(focus.x + ux * r, focus.z + uz * r);
+    const sideRange = Math.max(range, params.minDistance);
+    for (const degrees of [15, -15, 30, -30, 45, -45, 60, -60]) {
+      const a = THREE.MathUtils.degToRad(degrees), c = Math.cos(a), s = Math.sin(a);
+      check(focus.x + (ux * c + uz * s) * sideRange, focus.z + (uz * c - ux * s) * sideRange);
+    }
+    if (Number.isFinite(best)) lens.copy(freeLens);
+    else if (previousClear && floorClear(previousLens)) { lens.copy(previousLens); return true; }
+    return Number.isFinite(best);
+  }
 
   /** A narrow three-ray boom catches posts at the edge of the lens as well as its centre. */
   function sceneryFraction(focus: THREE.Vector3, lens: THREE.Vector3) {
@@ -741,6 +799,7 @@ export function createFollowCamera(opts: {
       }
       shotW = Math.max(shotW, pathW);
       outPos.y += dip * (1 - shotW);
+      let relocated = shotW === 0 && clearLensVolume(boomFocus, outPos, dt, firstFrame);
       floorLift = 0;
       // the rendered lens (shot blend + dip) gets the same floor guarantee as the rig
       if (opts.surfaceAt) {
@@ -751,10 +810,16 @@ export function createFollowCamera(opts: {
         }
       }
 
+      // Recheck after the final floor adjustment; framing below changes only aim.
+      if (shotW === 0) relocated = clearLensVolume(boomFocus, outPos, dt, firstFrame) || relocated;
+      lensUnresolved = shotW === 0 && !!opts.lensBlocked?.(outPos.x, outPos.y, outPos.z, .2);
+      relocatedSightBlocked = shotW === 0 && relocated && sceneryFraction(boomFocus, outPos) < .999;
+
       // The final floor guarantee can raise the lens after compression / landing dip.
       // Guard the actual rendered pose too; authored cinematics keep their own composition.
       if (shotW === 0) guardFraming(p, outPos, f.facing, outLook);
       camera.position.copy(outPos);
+      previousLens.copy(outPos);
       camera.lookAt(outLook);
       // ---- trauma shake: small rotational wobble, squared falloff
       trauma = Math.max(0, trauma - dt * 1.6);
