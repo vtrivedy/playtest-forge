@@ -1,3 +1,4 @@
+import { captureReportSummary } from './capture-report-summary.mjs';
 import { blackFrameIntervals } from './hub-black-frames.mjs';
 import { captureFinale } from './finale-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
@@ -2373,7 +2374,10 @@ try {
 } catch (e) { report.failures.push(String(e.stack || e)); throw e; }
 finally {
   report.errors = errors; report.qualityLog = log;
-  save('report.json', report); save('perf.json', report.perf);
+  // Write completion atomically: the relay must never parse a partial report.
+  save('report.json.tmp', captureReportSummary(report));
+  fs.renameSync(path.join(out, 'report.json.tmp'), path.join(out, 'report.json'));
+  save('perf.json', report.perf);
   if (browser) await browser.close();
   server.close();
 }
