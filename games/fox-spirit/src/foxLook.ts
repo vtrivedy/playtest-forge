@@ -103,7 +103,7 @@ ${NOISE_GLSL}`,
         '#include <opaque_fragment>',
         `{
   float facing = saturate(dot(normal, normalize(vViewPosition)));
-  ${shell ? "diffuseColor.a *= (1.0 - smoothstep(0.12, 0.7, facing)) * 0.22; if (diffuseColor.a < 0.01) discard;" : ""}
+  ${shell ? `diffuseColor.a *= (1.0 - smoothstep(0.12, 0.7, facing)) * ${tail ? "0.075" : "0.22"}; if (diffuseColor.a < 0.01) discard;` : ""}
   float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
   outgoingLight += uRimColor * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
@@ -111,11 +111,11 @@ ${NOISE_GLSL}`,
   #ifdef USE_MAP
     // Authored tail UV: V=1 at the root, V=0 at tail_08.
     float tailAlong = 1.0 - vMapUv.y;
-    float tipHeat = smoothstep(0.60, 1.0, tailAlong);
-    outgoingLight += uRimColor * 0.25 * tipHeat;
-    float tipCoverage = 1.0 - smoothstep(0.60, 1.0, tailAlong);
+    float tipHeat = smoothstep(0.75, 1.0, tailAlong);
+    outgoingLight += uRimColor * 0.4 * tipHeat;
+    float tipCoverage = 1.0 - smoothstep(0.82, 1.0, tailAlong);
     diffuseColor.a *= tipCoverage;
-    if (diffuseColor.a < 0.02) discard;
+    if (diffuseColor.a < ${shell ? "0.01" : "0.45"}) discard;
   #endif` : ''}
 }
 #include <opaque_fragment>`,
@@ -215,16 +215,16 @@ export function applyFoxLook(root: THREE.Object3D) {
           mat.alphaTest = 0;
         }
         if (n.startsWith('foxtailfur')) {
-          mat.transparent = true;
+          mat.transparent = n.includes('shell');
           mat.depthWrite = !n.includes('shell');
           if (!n.includes('shell')) {
             mesh.renderOrder = 1;
             // Match the shadow silhouette to the visible disappearing tip.
-            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.02 });
+            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.45 });
             depth.onBeforeCompile = (shader) => {
               shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', `
 #ifdef USE_MAP
-  diffuseColor.a *= 1.0 - smoothstep(0.60, 1.0, 1.0 - vMapUv.y);
+  diffuseColor.a *= 1.0 - smoothstep(0.82, 1.0, 1.0 - vMapUv.y);
 #endif
 #include <alphatest_fragment>`);
             };
@@ -297,11 +297,13 @@ void main() {
   float width = mix(0.36, 0.07, y);
   float body = exp(-2.0 * x * x / (width * width));
   body *= smoothstep(0.0, 0.12, y) * (1.0 - smoothstep(0.6, 1.0, y));
-  float breathe = 0.4 + 0.6 * pow(0.5 + 0.5 * sin(uTime * 1.1 + vSeed * 3.0), 2.0);
-  vec3 col = mix(vec3(1.0, 0.25, 0.055), vec3(1.0, 0.65, 0.28), smoothstep(0.1, 0.85, y)) * 1.2;
-  float a = body * vAlpha * uIntensity * 0.32 * breathe;
+  // Broad, slow variation keeps the flame present between breaths, without glitter noise.
+  float breathe = 0.72 + 0.28 * sin(uTime * 1.1 + vSeed * 3.0);
+  body *= mix(0.65, 1.0, fxNoise(vec3(vUv * vec2(3.0, 4.0), uTime * 0.4 + vSeed)));
+  vec3 col = mix(vec3(1.0, 0.25, 0.055), vec3(1.0, 0.48, 0.12), smoothstep(0.1, 0.85, y)) * 1.2;
+  float a = body * vAlpha * uIntensity * 0.70 * breathe;
   if (a < 0.003) discard;
-  gl_FragColor = vec4(col * a, a * 0.3);
+  gl_FragColor = vec4(col * a, a * 0.65);
 }`;
 const EMBER_VERT = /* glsl */ `
 attribute float aSize; attribute float aHeat;
@@ -339,11 +341,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const R = FOX_RIG;
   // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — small ear smoulders, broad tail wake
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
-    [body, [R.spine[3], R.neck[0]], 0.45, 3, 0.12, 0.09, 0.7],
+    [body, [R.spine[3], R.neck[0]], 0.45, 3, 0.22, 0.12, 0.7],
     [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 0, 0.18, 0.06, 0.8],
-    [tail, R.tail.slice(2, 6), 0.15, 12, 0.36, 0.22, 0.9],
-    [body, R.ear("l").slice(2), -1.0, 2, 0.065, 0.05, 0.4],
-    [body, R.ear("r").slice(2), -1.0, 2, 0.065, 0.05, 0.4],
+    [tail, R.tail.slice(2, 6), 0.15, 12, 0.44, 0.27, 0.9],
+    [body, R.ear("l").slice(2), -1.0, 3, 0.16, 0.075, 0.4],
+    [body, R.ear("r").slice(2), -1.0, 3, 0.16, 0.075, 0.4],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
@@ -427,10 +429,11 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     const L = FOX_LOOK;
     licks.forEach((lk, i) => {
       anchorPos(lk.a, tmp);
-      aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
       dir.copy(up);
       if (lk.tailFlow) dir.multiplyScalar(0.55).add(backward.set(0, 0, -1).transformDirection(group.matrixWorld).multiplyScalar(0.9));
       dir.addScaledVector(vel, -L.lickStream * lk.lean * 0.25).normalize();
+      tmp.addScaledVector(dir, 0.015);
+      aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
       aDir.setXYZ(i, dir.x, dir.y, dir.z);
       const flick = 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
       const stretch = (0.65 + 0.35 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (1 + Math.min(1, speed * 0.12) * lk.lean);
@@ -472,7 +475,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       diagnostics.speed = Number(speed.toFixed(2));
       diagnostics.liveEmbers = 0;
       lickMat.uniforms.uTime!.value = t;
-      lickMat.uniforms.uIntensity!.value = L.lickIntensity * (0.5 + 0.5 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (gliding ? 1.25 : 1);
+      lickMat.uniforms.uIntensity!.value = L.lickIntensity * (0.8 + 0.4 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (gliding ? 1.25 : 1);
       spawnAcc += dt * (L.emberRate + L.emberRateSpeed * speed) * (gliding ? 1.6 : 1);
       pending = Math.min(N, pending + Math.floor(spawnAcc));
       spawnAcc -= Math.floor(spawnAcc);
