@@ -31,3 +31,9 @@ Opus independently rejects candidate894193c: channel overlap/ripple grid, muddy 
 Opus source follow-up warns against compressing all radiance and reducing specular twice. Keep physical water IOR1.333 with specularIntensity1; apply a soft knee only to wet diffuse light above0.12, preserving real specular and dry cells. Add restrained foam radiance after the knee. This supersedes the initial all-light shoulder; it should retain small highlights rather than make a muddy ribbon.
 
 Pond geometry follow-up: Opus calculates that the authored basin waterline lies beyond normalized radius1. Add optional shoreRadius (default1) so Wen's pond can cover radius1.18 with matching enlarged plane and proportional edge feather, avoiding a bare underwater ring. Add remote low-angle pond and creek stills because shared water-shader changes affect the creek too. No terrain or collision edits.
+
+## R2 Reed fog blanket and restore framing
+
+Integrated GPU restoration frames expose an opaque-looking cream basin before and after latch. Source audit finds14 overlapping12–24m mist planes at material opacity0.55 (0.3 after latch), above the ink. Reduce plane span to8–16m and opacity to0.12 while active/0.04 after latch, retaining their count/random draws and slow drift so scene placement remains deterministic. Preserve ink hazard and terrain. This targets the visible fog blanket instead of darkening all ground materials.
+
+Opus image review passes soft mask edges but rejects readability/framing. Move the staged fox to the safe Reed Seedwell island and use a southwest lens that includes origin and south front; tighten aura lens. Keep the same lens before/early/mid/settled. Do not adopt suggested green restore hues (ART LOCK forbids spring-green W1); judge the existing rust/gold wash after fog clears.

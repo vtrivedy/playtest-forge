@@ -748,7 +748,7 @@ try {
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
     if (!Number.isFinite(y) || y < -24) throw Error('Restoration review has no safe meadow surface');
     await H('teleport', 0, y, 70, Math.PI);
-    await H('photo', [10, y + 12, 82], [0, y, 68], 50);
+    await H('photo', [5, y + 6, 79], [-1, y, 70], 48);
     await advance(60); await shot('restoration-aura');
     await H('setStick', -1, 0); await H('setKeys', ['ShiftLeft']);
     await advance(6); await shot('restoration-dash');
@@ -758,7 +758,10 @@ try {
     await advance(360); await shot('restoration-wake-decayed');
     // Reed Seedwell is at (95, 10), radius 35: the south front crosses z=45.
     // The meadow lens cannot see it, so use a separate fixed lens for the matched front pair.
-    await H('photo', [81, 23, 68], [83, 0, 41], 52);
+    const reedY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(95, 10));
+    if (!Number.isFinite(reedY) || reedY < -24) throw Error('Restore front has no safe Reed island surface');
+    await H('teleport', 95, reedY, 10, Math.PI);
+    await H('photo', [68, 21, 44], [91, 1, 15], 60);
     await advance(1); await shot('restoration-front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
