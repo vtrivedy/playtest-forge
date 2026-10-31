@@ -51,3 +51,7 @@ Before code, 2026-10-31 05:43 UTC. Driver enabled reach-r2 polling at01:35ET; ex
 The ac86a80 relay archive contains no PNGs or game report. Its capture.log identifies ERR_MODULE_NOT_FOUND for /opt/browser/projected-visibility-capture.mjs, statically imported by gpu-capture.mjs but absent from the Modal image. Repair: include the existing helper beside the runner, with no game or capture behavior changes. All nine relative runner imports must have image destinations; Python and helper syntax must pass. Remote recapture remains mandatory before visual/controller acceptance.
 
 Process correction: the intended pre-edit scoped design write used a nonexistent sprint3/reach directory and failed; that failure was missed before the one-line packaging commit. This records the rationale after that commit without rewriting branch history.
+
+## Round23 — driver-requested main integration
+
+Before conflict resolution: merge origin/main4bacc15 on s3-reach. The only conflict is the capture packaging regression checker. Keep main's inert RecordingImage execution of the local mount block: it follows actual computed mounts and the new modal.is_local guard, replacing our earlier AST shape matcher. Preserve Reach supply/cycle traces from the automatic merge. No new game art or tuning. Run packaging check, TypeScript and fox Vite before pushing branch and integrating main as explicitly requested by driver02:07. Re-request immutable landed SHA; relay failures are not visual evidence.
