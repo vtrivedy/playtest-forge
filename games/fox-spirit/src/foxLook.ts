@@ -209,6 +209,7 @@ export function applyFoxLook(root: THREE.Object3D) {
         // The opaque coat supplies the soft shadow; shell shadow maps ignore our grazing-angle fade.
         if (n.includes('shell')) {
           mesh.castShadow = false;
+          mesh.renderOrder = 2;
           mat.transparent = true;
           mat.depthWrite = false;
           mat.alphaTest = 0;
@@ -216,6 +217,20 @@ export function applyFoxLook(root: THREE.Object3D) {
         if (n.startsWith('foxtailfur')) {
           mat.transparent = true;
           mat.depthWrite = !n.includes('shell');
+          if (!n.includes('shell')) {
+            mesh.renderOrder = 1;
+            // Match the shadow silhouette to the visible disappearing tip.
+            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.02 });
+            depth.onBeforeCompile = (shader) => {
+              shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', `
+#ifdef USE_MAP
+  diffuseColor.a *= 1.0 - smoothstep(0.60, 1.0, 1.0 - vMapUv.y);
+#endif
+#include <alphatest_fragment>`);
+            };
+            depth.customProgramCacheKey = () => 'fox-tail-depth';
+            mesh.customDepthMaterial = depth;
+          }
         }
         mat.color.setHex(0xffffff);
         mat.roughness = 0.85;
@@ -392,8 +407,8 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   });
   const embers = new THREE.Points(eg, emberMat);
   const drawingBufferSize = new THREE.Vector2();
-  embers.onBeforeRender = (renderer) => {
-    emberMat.uniforms.uScale!.value = renderer.getDrawingBufferSize(drawingBufferSize).y * 1.1;
+  embers.onBeforeRender = (renderer, _scene, camera) => {
+    emberMat.uniforms.uScale!.value = renderer.getDrawingBufferSize(drawingBufferSize).y * 0.5 * camera.projectionMatrix.elements[5]!;
   };
   embers.frustumCulled = false;
   embers.renderOrder = 3;
