@@ -228,36 +228,103 @@ try {
       return points.reduce((sum,p)=>[sum[0]+p[0]/points.length,sum[1]+p[2]/points.length],[0,0]);
     });
     let lens = null;
-    const camera = async () => {
-      const actor = await page.evaluate(() => window.__gameHooks.shades.state().actors[0]);
-      const [x,y,z] = actor.pos;
-      // Staged review lens stays outside the Kiln ring so masonry sits behind the animal.
-      const dx=x-reviewCenter[0],dz=z-reviewCenter[1],d=Math.hypot(dx,dz)||1;
-      const desired=[x+dx/d*6.5,y+2.8,z+dz/d*6.5];
-      lens=lens?lens.map((value,i)=>value+(desired[i]-value)*.12):desired;
-      const sight=await page.evaluate(({preferred,desired,look})=>{
-        const h=window.__gameHooks;
-        if(!h.photoBlocker)return {pos:preferred,checked:false};
-        const angle=Math.atan2(desired[2]-look[2],desired[0]-look[0]);
-        const candidates=[preferred,desired,...[.45,-.45,.9,-.9,1.4,-1.4,Math.PI].map(offset=>[look[0]+Math.cos(angle+offset)*6.5,look[1]+1.5,look[2]+Math.sin(angle+offset)*6.5])];
-        for(const pos of candidates)if(!h.photoBlocker(pos,look))return {pos,checked:true};
-        return {pos:preferred,checked:true,blocked:true};
-      },{preferred:lens,desired,look:[x,y+1.3,z]});
-      lens=sight.pos;
-      if(sight.blocked)report.shadeLensBlockedFrames=(report.shadeLensBlockedFrames||0)+1;
-      await H('photo', lens, [x,y+1.3,z],48);
+    const camera = async (actorId=actors[0].id) => {
+      const framing=await page.evaluate(({previous,actorId})=>{
+        const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===actorId),fox=h.debug.fox.position;
+        const [x,y,z]=actor.pos,fy=fox.y-(h.debug.foxFeetOffset??.02),V=fox.constructor;
+        const dx=fox.x-x,dz=fox.z-z,d=Math.hypot(dx,dz)||1,ux=dx/d,uz=dz/d;
+        const look=[x*.35+fox.x*.65,(y+(actor.height||3.1)*.5)*.35+(fy+(h.debug.foxHeight||1.25)*.5)*.65,z*.35+fox.z*.65];
+        const side=Math.atan2(ux,-uz);
+        const angles=[side-.65,side+Math.PI+.65,...[0,1,2,3,4,5,6,7].map(k=>k*Math.PI/4)];
+        const positions=[...(previous?[previous]:[]),...angles.map(a=>[look[0]+Math.cos(a)*6,Math.max(y,fy)+2.5,look[2]+Math.sin(a)*6])];
+        const testCamera=h.debug.camera.clone();
+        const point=new V(),right=new V();
+        let fallback=null;
+        for(const pos of positions){
+          let clearance;
+          for(const fov of [48,52,56]){
+          testCamera.position.fromArray(pos);testCamera.fov=fov;testCamera.lookAt(new V(...look));testCamera.updateProjectionMatrix();testCamera.updateMatrixWorld(true);
+          right.setFromMatrixColumn(testCamera.matrixWorld,0);
+          const bounds=(px,py,pz,height,width)=>{
+            let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+            for(const side of [-1,1])for(const up of [0,height]){
+              point.set(px,py+up,pz).addScaledVector(right,side*width/2).project(testCamera);
+              minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);minY=Math.min(minY,point.y);maxY=Math.max(maxY,point.y);
+            }
+            return {height:(maxY-minY)/2,inFrame:minX>-.94&&maxX<.94&&minY>-.94&&maxY<.94,bounds:[minX,maxX,minY,maxY]};
+          };
+          const foxBounds=bounds(fox.x,fy,fox.z,h.debug.foxHeight||1.25,2.8),shadeBounds=bounds(x,y,z,actor.height||3.1,2.4);
+          const a=foxBounds.bounds,b=shadeBounds.bounds;
+          const shared=Math.max(0,Math.min(a[1],b[1])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[2],b[2]));
+          const overlap=shared/Math.max(1e-6,Math.min((a[1]-a[0])*(a[3]-a[2]),(b[1]-b[0])*(b[3]-b[2])));
+          const fits=foxBounds.height>.19&&shadeBounds.height>.18&&foxBounds.inFrame&&shadeBounds.inFrame&&overlap<.3;
+          if(!fits)continue;
+          clearance??=!h.photoBlocker||(!h.photoBlocker(pos,[x,y+1.3,z])&&!h.photoBlocker(pos,[fox.x,fy+.6,fox.z]));
+          const clear=clearance;
+          const result={pos,look,fov,clear,noFit:false,overlap,fox:foxBounds,shade:shadeBounds};
+          fallback??=result;
+          if(clear)return result;
+          }
+        }
+        return fallback||{pos:positions[1]||positions[0],look,fov:56,clear:false,noFit:true};
+      },{previous:lens,actorId});
+      lens=framing.pos;
+      report.shadeReviewQuality??={};
+      const counts=report.shadeReviewQuality[actorId]??={noFit:0,occluded:0};
+      if(framing.noFit)counts.noFit++;else if(!framing.clear)counts.occluded++;
+      await H('photo',framing.pos,framing.look,framing.fov);
+    };
+    const measurePair=async actorId=>page.evaluate(id=>{
+      const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id),V=h.debug.fox.position.constructor;
+      const point=new V();
+      const bounds=(root,skinnedOnly)=>{
+        if(!root)return null;
+        root.updateWorldMatrix(true,true);
+        let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,minZ=Infinity,maxZ=-Infinity,vertices=0;
+        root.traverse(mesh=>{
+          if(!mesh.isMesh||(skinnedOnly&&!mesh.isSkinnedMesh))return;
+          let ancestor=mesh;while(ancestor){if(!ancestor.visible)return;ancestor=ancestor.parent;}
+          const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
+          if(materials.every(m=>!m.visible||m.opacity===0))return;
+          if(skinnedOnly&&/spirit[_-]?fx|wisps?|ember[_-]?wisp|smoulder|flame|spark|lick/i.test(mesh.name+' '+materials.map(m=>m.name).join(' ')))return;
+          if(mesh.isSkinnedMesh)mesh.skeleton.update();
+          for(let k=0;k<mesh.geometry.attributes.position.count;k++){
+            mesh.getVertexPosition(k,point).applyMatrix4(mesh.matrixWorld).project(h.debug.camera);
+            minX=Math.min(minX,point.x);maxX=Math.max(maxX,point.x);minY=Math.min(minY,point.y);maxY=Math.max(maxY,point.y);minZ=Math.min(minZ,point.z);maxZ=Math.max(maxZ,point.z);vertices++;
+          }
+        });
+        return vertices?{heightFraction:(maxY-minY)/2,inFrame:minX>=-1&&maxX<=1&&minY>=-1&&maxY<=1&&minZ>=-1&&maxZ<=1,vertices,bounds:[minX,maxX,minY,maxY]}:null;
+      };
+      const core=h.debug.scene.getObjectByName(id)?.getObjectByName('shade-density-core');
+      return {method:'posed mesh vertices, shader displacement/alpha excluded',fox:bounds(h.debug.fox,true),shade:bounds(core,false),shadePresent:!actor.freed||actor.presence>.5,presence:actor.presence};
+    },actorId);
+    const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,sample:frame=>keyFrames.includes(frame)?measurePair(id):undefined,label:(frame,state)=>{
+      const p=state?.capture;
+      return `${name} ${frame} fox ${p?.fox?(p.fox.heightFraction*100).toFixed(0):'?'}% shade ${p?.shade?(p.shade.heightFraction*100).toFixed(0):'?'}%`;
+    }});
+    const validatePair=name=>{
+      const rows=report.videos[name].trace.filter(row=>row.state.capture?.shadePresent).map(row=>({frame:row.frame,...row.state.capture}));
+      const failed=rows.filter(row=>!row.fox||!row.shade||row.fox.heightFraction<=.15||row.shade.heightFraction<=.15||!row.fox.inFrame||!row.shade.inFrame);
+      save(`${name}-framing.json`,{passed:rows.length>0&&failed.length===0,minimumHeightFraction:.15,rows,failedFrames:failed.map(row=>row.frame)});
+      if(!rows.length||failed.length)report.failures.push(`Shade pair framing below director bar in ${name}: ${JSON.stringify(failed.map(row=>({frame:row.frame,fox:row.fox,shade:row.shade})))}`);
     };
     const start = actors[0].pos;
-    const safePosition = await page.evaluate(([x,y,z]) => {
+    const safePosition = await page.evaluate(({start:[x,y,z],center:[cx,cz],actorId}) => {
       const col = window.__gameHooks.debug.world.collision;
       const patrol=window.__gameHooks.debug.world.shadeSpots[0].patrol;
-      for(let px=-117;px<=-107;px+=.25)for(let pz=-29;pz<=-19;pz+=.25){
-        if(Math.hypot(px+112,pz+24)>4.8)continue;
+      const guide=window.__gameHooks.debug.scene.getObjectByName(actorId+'-patrol-guide')?.children[0]?.geometry?.attributes.position;
+      const samples=guide?Array.from({length:guide.count},(_,k)=>[guide.getX(k),guide.getZ(k)]):patrol.map(p=>[p[0],p[2]]);
+      const clearance=window.__gameHooks.shades.tun.hitRadius+.65;
+      let best=null,bestDistance=Infinity;
+      for(let px=cx-5;px<=cx+5;px+=.25)for(let pz=cz-5;pz<=cz+5;pz+=.25){
+        if(Math.hypot(px-cx,pz-cz)>4.8)continue;
         if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2)continue;
-        if(patrol.every(q=>Math.hypot(q[0]-px,q[2]-pz)>2.1))return [px,y,pz];
+        const distance=Math.hypot(px-x,pz-z);
+        if(distance<bestDistance&&samples.every(q=>Math.hypot(q[0]-px,q[1]-pz)>clearance)){best=[px,y,pz];bestDistance=distance;}
       }
+      if(best)return best;
       throw Error('No safe patrol observer position');
-    }, start);
+    }, {start,center:reviewCenter,actorId:actors[0].id});
     const observerYaw = Math.atan2(start[0]-safePosition[0],start[2]-safePosition[2]);
     await H('teleport', ...safePosition, observerYaw);
     await camera();
@@ -296,7 +363,26 @@ try {
       return old;
     });
     await camera();
-    await video('shade-patrol', 120, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 30, 60, 90, 119] });
+    const originalDensity=await page.evaluate(()=>window.__gameHooks.shades.tun.inkDensity);
+    if(typeof originalDensity==='number'){
+      await H('advance',1,0,true);
+      const pose=await H('state');
+      const variants=[];
+      try{
+        for(const density of [2,3,4]){
+          await page.evaluate(value=>{window.__gameHooks.shades.tun.inkDensity=value;},density);
+          await H('advance',1,0,true);
+          const shotName=`shade-density-${density}`;
+          await shot(shotName);variants.push({density,shot:shotName,framing:await measurePair(actors[0].id)});
+        }
+      }finally{
+        await page.evaluate(value=>{window.__gameHooks.shades.tun.inkDensity=value;},originalDensity);
+        await H('advance',1,0,true);
+      }
+      save('shade-density-variants.json',{label:'Same pose/time/camera, core absorption only; variants are not acceptance',chosenDefault:originalDensity,pose:{time:pose.t,fox:pose.pos,foxYaw:pose.foxYaw},variants});
+    }
+    await video('shade-patrol', 120, ()=>camera(), undefined, pairOptions('Patrol',actors[0].id,[0,30,60,90,119]));
+    validatePair('shade-patrol');
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
     await page.evaluate(value => { if(typeof value==='number')window.__gameHooks.shades.tun.chaseDistance=value; }, chaseDistance);
     if(typeof chaseDistance==='number') {
@@ -307,11 +393,11 @@ try {
           const observer = await page.evaluate(near => {
             const h=window.__gameHooks, actor=h.shades.state().actors[0];
             const [x,y,z]=actor.pos, col=h.debug.world.collision;
-            const radius=near?2.9:8;
+            const radius=near?2.9:4.8;
             for(let k=0;k<64;k++) {
               const a=k/64*Math.PI*2,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
               const floor=col.groundAt(px,pz,y+.5).y;
-              if(Number.isFinite(floor)&&(!near||Math.abs(floor-y)<.3)&&!col.blocked(px,pz,floor))
+              if(Number.isFinite(floor)&&Math.abs(floor-y)<.3&&!col.blocked(px,pz,floor))
                 return {pos:[px,floor,pz,Math.atan2(x-px,z-pz)],mode:actor.mode};
             }
             return null;
@@ -321,7 +407,8 @@ try {
           await H('teleport',...observer.pos);
         }
         await camera();
-      },undefined,{traceEveryFrame:true,keyFrames:[0,89,180,299,390,480,599]});
+      },undefined,pairOptions('Behavior',actors[0].id,[0,89,180,299,390,480,599]));
+      validatePair('shade-behavior');
       const behavior=await page.evaluate(()=>window.__gameHooks.shades.state());
       save('shade-behavior-state.json',{transitions,state:behavior});
       const expected=['patrol','chase','return','patrol'];
@@ -333,6 +420,9 @@ try {
     await H('photoOff');
     await advance(30);
     await shot('shade-post-observer');
+    // A separate fresh session preserves the actual sepia-to-local-color release moment.
+    await boot(quality,true);lens=null;
+    save('shade-release-session-start.json',{label:'Fresh sepia session after behavior review; the next two dash releases share this session, with staged fox starts only',state:await H('state'),game:await page.evaluate(()=>window.__game)});
     await H('setKeys', []);
     let p = (await page.evaluate(() => window.__gameHooks.shades.state().actors[0])).pos;
     const contactSetup = await page.evaluate(([x,y,z]) => {
@@ -389,7 +479,8 @@ try {
     const dashControllerAfter=await video('shade-free', 120, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
       await camera();
-    }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 119] });
+    }, undefined, pairOptions('Release',actors[0].id,[0,5,12,24,45,75,119]));
+    validatePair('shade-free');
     save('shade-dash-controller.json',{before:dashControllerBefore.dash,after:dashControllerAfter.dash,label:'Actual controller activation; collisionActiveLastStep is the preceding simulated movement tick'});
     if(dashControllerBefore.dash&&dashControllerAfter.dash.used<=dashControllerBefore.dash.used)throw Error(`Shade dash input never activated controller ${JSON.stringify(dashControllerAfter.dash)}`);
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
@@ -482,11 +573,10 @@ try {
       },edge.pos);
       const before=await page.evaluate(()=>window.__gameHooks.shades.state());
       await H('teleport',...setup.pos,setup.yaw);
-      const [x,y,z]=edge.pos;
-      await H('photo',[x+5.5,y+3.8,z+5.5],[x,y+1.6,z],48);
       const edgeControllerBefore=await H('state');
       await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
-      const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,{traceEveryFrame:true,keyFrames:[0,5,12,24,36,48,75,119]});
+      const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}await camera('shade-hill-high');},undefined,pairOptions('Hill release','shade-hill-high',[0,5,12,24,36,48,75,119]));
+      validatePair('shade-clear-free');
       save('shade-edge-dash-controller.json',{before:edgeControllerBefore.dash,after:edgeControllerAfter.dash});
       if(edgeControllerBefore.dash&&edgeControllerAfter.dash.used<=edgeControllerBefore.dash.used)throw Error(`Second Shade dash input never activated controller ${JSON.stringify(edgeControllerAfter.dash)}`);
       const after=await page.evaluate(()=>window.__gameHooks.shades.state());

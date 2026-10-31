@@ -12,8 +12,8 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
  */
 export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 
-export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number; noticeDistance: number; noticeTime: number; leafSize: number; chaseDistance: number; chaseDelay: number; chaseLeash: number; chaseRest: number };
-export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 1.25, hitRadius: 1.1, knockback: 3, bob: 0.12, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.17, inkSize: 0.55, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14, chaseDistance: 3.8, chaseDelay: 1.2, chaseLeash: 4, chaseRest: 3 };
+export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number; inkDensity: number; noticeDistance: number; noticeTime: number; leafSize: number; chaseDistance: number; chaseDelay: number; chaseLeash: number; chaseRest: number };
+export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 1.25, hitRadius: 1.1, knockback: 3, bob: 0.12, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.17, inkSize: 0.55, inkDensity: 3, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14, chaseDistance: 3.8, chaseDelay: 1.2, chaseLeash: 4, chaseRest: 3 };
 
 type ShadeActor = {
   active: boolean;
@@ -111,7 +111,7 @@ const NOISE = /* glsl */ `
 
 function inkMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 }, uDensity: { value: 3 } },
     vertexShader: /* glsl */ `
       uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer;
       varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
@@ -138,7 +138,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer;
+      uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer, uDensity;
       varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
       ${NOISE}
       void main() {
@@ -153,7 +153,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         vec3 light = vec3(0.15, 0.10, 0.065);
         float wrap = dot(normalize(vWorldN), normalize(vec3(-0.4, 0.8, 0.5))) * 0.5 + 0.5;
         vec3 col = mix(core, light, wrap * 0.45 + n * 0.25 + rim * 0.18);
-        float alpha = (uLayer < 0.5 ? 0.7 : 0.11) * density * legFade;
+        float alpha = (uLayer < 0.5 ? 1.0-exp(-uDensity*density) : 0.11*density) * legFade;
         alpha *= (1.0 - smoothstep(0.42, 1.0, rim)) * dissolve * uPresence;
         gl_FragColor = vec4(col, alpha);
         #include <colorspace_fragment>
@@ -283,7 +283,7 @@ function crossesShade(from:THREE.Vector3,to:THREE.Vector3,origin:THREE.Vector3,r
   return enter<exit;
 }
 
-export type ShadeState = { id: string; pos: number[]; freed: boolean; mode: ShadeActor['mode']; presence: number; smokeParticles: number; notice: number; noticeYaw: number; heading: number; releaseAge: number; leaves: number; attractionRest: number };
+export type ShadeState = { id: string; pos: number[]; freed: boolean; mode: ShadeActor['mode']; presence: number; smokeParticles: number; notice: number; noticeYaw: number; heading: number; releaseAge: number; leaves: number; attractionRest: number; height: number };
 
 export type ShadeSystem = {
   readonly tun: ShadeTunables;
@@ -299,6 +299,7 @@ export type ShadeSystem = {
 export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groundAt: (x: number, z: number, y: number) => number, gui?: GUI, blocked: (x: number, z: number, y: number) => boolean = () => false): Promise<ShadeSystem> {
   const tun = { ...SHADE_DEFAULTS };
   const geo = await animalGeometry();
+  const animalHeight=geo.boundingBox!.max.y-geo.boundingBox!.min.y;
   const leafGeo = leafGeometry();
   const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, side: THREE.DoubleSide, transparent: true, depthWrite: false });
   const matrix = new THREE.Matrix4();
@@ -311,7 +312,9 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     const mat = inkMaterial();
     mat.uniforms.uSeed!.value = i * 7.3;
     const group = new THREE.Group();
+    group.name=s.id;
     const body = new THREE.Mesh(geo, mat);
+    body.name='shade-density-core';
     body.castShadow = false;
     body.renderOrder = 2;
     group.add(body);
@@ -345,6 +348,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       return { p, velocity: new THREE.Vector3(Math.sin(k * 2.4) * 0.12, 0.8 + (k % 7) * 0.1, Math.cos(k * 1.7) * 0.4), phase: k * 2.399, landed: null };
     });
     const debug = new THREE.Group();
+    debug.name=s.id+'-patrol-guide';
     const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(curve.getPoints(96)), new THREE.LineBasicMaterial({ color: 0xc9a04a }));
     debug.add(line);
     const ring = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 64 }, (_, k) => new THREE.Vector3(Math.cos(k / 64 * Math.PI * 2), 0.05, Math.sin(k / 64 * Math.PI * 2)))), new THREE.LineBasicMaterial({ color: 0xe08a2b }));
@@ -491,9 +495,11 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         s.mat.uniforms.uNoticeYaw!.value = s.noticeYaw;
         s.mat.uniforms.uTime!.value = t;
         s.mat.uniforms.uPresence!.value = s.presence;
+        s.mat.uniforms.uDensity!.value = tun.inkDensity;
         for (const material of s.layers) {
           material.uniforms.uTime!.value=t;
           material.uniforms.uPresence!.value=s.presence;
+          material.uniforms.uDensity!.value=tun.inkDensity;
           material.uniforms.uNoticeYaw!.value=s.noticeYaw;
         }
         if (!s.freed && (s.poolSampleAt.distanceToSquared(s.pos) > 0.0144 || s.poolRadius !== tun.drainRadius)) {
@@ -525,7 +531,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       return ev;
     },
     state() {
-      return shades.filter(s => s.active).map((s) => ({ id: s.id, pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, mode: s.mode, presence: Number(s.presence.toFixed(3)), smokeParticles: s.group.visible ? s.smoke.geometry.attributes.position!.count : 0, notice: Number(s.notice.toFixed(3)), noticeYaw: Number(s.noticeYaw.toFixed(3)), heading: Number(s.heading.toFixed(4)), attractionRest: Number(s.attractionRest.toFixed(3)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.leaves.visible ? s.leaves.count : 0 }));
+      return shades.filter(s => s.active).map((s) => ({ id: s.id, height: Number(animalHeight.toFixed(3)), pos: s.pos.toArray().map((v) => Number(v.toFixed(2))), freed: s.freed, mode: s.mode, presence: Number(s.presence.toFixed(3)), smokeParticles: s.group.visible ? s.smoke.geometry.attributes.position!.count : 0, notice: Number(s.notice.toFixed(3)), noticeYaw: Number(s.noticeYaw.toFixed(3)), heading: Number(s.heading.toFixed(4)), attractionRest: Number(s.attractionRest.toFixed(3)), releaseAge: Number(s.releaseAge.toFixed(3)), leaves: s.leaves.visible ? s.leaves.count : 0 }));
     },
   };
   if (gui) {
@@ -539,6 +545,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     f.add(tun, 'invulnerability', 0.3, 2, 0.05);
     f.add(tun, 'inkOpacity',0,.4,.01);
     f.add(tun, 'inkSize',.2,1.5,.05);
+    f.add(tun, 'inkDensity',1,5,.1).name('core optical density');
     f.add(tun, 'noticeDistance',3,10,.25);
     f.add(tun, 'chaseDistance',2,6,.1);
     f.add(tun, 'chaseDelay',.4,3,.1);
