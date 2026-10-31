@@ -782,6 +782,29 @@ try {
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
     await H('photoOff');
+    const soleProbe=await page.evaluate(async()=>{
+      const {Vector3}=await import('/gpu-three.js'),h=window.__gameHooks,root=h.debug.fox,meshes=[];
+      root.traverse(object=>{if(object.isSkinnedMesh&&!/fur|fringe|coat|heat|shell|glow|flame|spiritfx/i.test(object.name))meshes.push(object);});
+      const sets=['front_paw_l','front_paw_r','hind_paw_l','hind_paw_r'].map(name=>{
+        const vertices=[];
+        for(const mesh of meshes){const bone=mesh.skeleton.bones.findIndex(b=>b.name===name);if(bone<0)continue;const ix=mesh.geometry.getAttribute('skinIndex'),weights=mesh.geometry.getAttribute('skinWeight');
+          for(let i=0;i<ix.count;i++){let weight=0;for(let j=0;j<4;j++)if(ix.getComponent(i,j)===bone)weight+=weights.getComponent(i,j);if(weight>.2)vertices.push({mesh,index:i});}}
+        return {name,vertices,bone:root.getObjectByName(name)};
+      });
+      window.__captureLandingSoles=()=>{
+        root.updateWorldMatrix(true,true);for(const mesh of meshes)mesh.skeleton.update();
+        const p=new Vector3(),ceiling=root.getWorldPosition(new Vector3()).y+.6,col=h.debug.world.collision,terrain=h.debug.world.terrainY;
+        return {label:'Weighted core-paw vertex minima against terrain, not full silhouette or shadow proof',paws:sets.map(set=>{
+          const origin=set.bone?.getWorldPosition(new Vector3()),floor=origin?col.groundAt(origin.x,origin.z,ceiling).y:NaN;
+          const terrainOnly=!!origin&&Number.isFinite(floor)&&Math.abs(floor-terrain(origin.x,origin.z))<.02;
+          let minimum=Infinity;
+          if(terrainOnly)for(const vertex of set.vertices){vertex.mesh.localToWorld(vertex.mesh.getVertexPosition(vertex.index,p));minimum=Math.min(minimum,p.y-terrain(p.x,p.z));}
+          return {name:set.name,vertices:set.vertices.length,terrainOnly,minClearance:Number.isFinite(minimum)?minimum:null};
+        })};
+      };
+      return {label:'Core vertices with >20% corresponding paw weight; helpers excluded',meshes:meshes.map(mesh=>mesh.name),paws:sets.map(set=>({name:set.name,vertices:set.vertices.length}))};
+    });
+    save('landing-sole-probe.json',soleProbe);
     const n=Math.hypot(.684,.729),td=[-.684/n,-.729/n],tn=[.729/n,-.684/n];
     const sp=(s,t,y)=>[-48+td[0]*s+tn[0]*t,y,52+td[1]*s+tn[1]*t];
     const board=[.868243,-.496139];
@@ -798,10 +821,13 @@ try {
       {name:'Meadow long drop and landing',seconds:2,stick:[0,0],reset:[0,null,80],drop:8,settle:0},
       {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6},
     ];
-    const landingDefaults=await page.evaluate(()=>{const p=window.__gameHooks.locomotion.params;return {landSquash:p.landSquash,landPitch:p.landPitch}});
-    for(const [label,landSquash,landPitch] of [['baseline',.11,0],['squash',.20,0],['squash-pitch',.20,1]]) {
-      segments.push({name:`Landing A/B long drop ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],drop:8,settle:0,landingAB:{label,landSquash,landPitch}});
-      segments.push({name:`Landing A/B standing jump ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6,landingAB:{label,landSquash,landPitch}});
+    const landingDefaults=await page.evaluate(()=>{const h=window.__gameHooks.locomotion,p=h.params;
+      if(!Number.isFinite(p.stationarySupport)||typeof h.metrics.supportEvaluated!=='boolean'||!Number.isFinite(h.metrics.supportDrop))throw Error('Supported landing capture requires the support-capable game runtime');
+      return {landSquash:p.landSquash,landPitch:p.landPitch,stationarySupport:p.stationarySupport};});
+    save('landing-support-source.json',{gameCommit:execFileSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),landingDefaults,label:'Game runtime capability checked before changing parameters; compare commit against run.json and request ref'});
+    for(const [label,landSquash,landPitch,stationarySupport] of [['baseline',.11,0,0],['squash',.20,0,0],['squash-pitch',.20,1,0],['supported',.20,1,.06]]) {
+      segments.push({name:`Landing A/B long drop ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],drop:8,settle:0,landingAB:{label,landSquash,landPitch,stationarySupport}});
+      segments.push({name:`Landing A/B standing jump ${label}`,seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true,leadIn:6,landingAB:{label,landSquash,landPitch,stationarySupport}});
     }
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
@@ -812,13 +838,13 @@ try {
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
       if(segment.turn){const angle=local/fps*2;stick=[Math.sin(angle)*.45,-Math.cos(angle)*.45];}
-      if(local===0 && segment.landingAB)await page.evaluate(({landSquash,landPitch})=>Object.assign(window.__gameHooks.locomotion.params,{landSquash,landPitch}),segment.landingAB);
+      if(local===0 && segment.landingAB)await page.evaluate(({landSquash,landPitch,stationarySupport})=>Object.assign(window.__gameHooks.locomotion.params,{landSquash,landPitch,stationarySupport}),segment.landingAB);
       if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);reset[1]+=segment.drop??0;const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(segment.settle??18);}
       await H('setStick',...stick);
       await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local>=(segment.leadIn??0) && local<(segment.leadIn??0)+Math.round(.25*fps)?['Space']:[]);
     },undefined,{traceEveryFrame:true,keyFrames,sheetFrames,afterStep:async(i,state)=>{
       const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);
-    },sample:async()=>({label:'Evaluated world-space bone landmarks; mesh shape judged from retained PNGs',bones:await page.evaluate(()=>{const fox=window.__gameHooks.debug.fox;return Object.fromEntries(['pelvis','spine_04','head'].map(name=>{const b=fox.getObjectByName(name);return [name,b?.getWorldPosition(b.position.clone()).toArray()??null]}))})})});
+    },sample:async i=>await page.evaluate(probe=>{const fox=window.__gameHooks.debug.fox;return {label:'Evaluated bone landmarks and separately labeled weighted sole probe; retained PNG review required',bones:Object.fromEntries(['pelvis','spine_04','head'].map(name=>{const b=fox.getObjectByName(name);return [name,b?.getWorldPosition(b.position.clone()).toArray()??null]})),soles:probe?window.__captureLandingSoles():null};},!!at(i).landingAB)});
     await H('setKeys',[]);await H('setStick',null);
     await page.evaluate(config=>Object.assign(window.__gameHooks.locomotion.params,config),landingDefaults);
     const result=report.videos.showcase;
@@ -844,6 +870,7 @@ try {
       const firstAir=rows.findIndex(row=>!row.state.grounded);
       const landedIndex=firstAir>=0?rows.findIndex((row,index)=>index>firstAir && row.state.grounded):-1;
       const recovery=landedIndex>=0?rows.slice(landedIndex,landedIndex+12):[];
+      const lateRecovery=landedIndex>=0?rows.slice(landedIndex,landedIndex+60):[];
       const relative=(row,bone)=>row.state.capture?.bones?.[bone]?.[1]-row.state.pos[1];
       const before=landedIndex>0?rows[landedIndex-1]:null;
       return {name:segment.name,config:segment.landingAB,firstAir,landedIndex,frames:rows.length,
@@ -852,10 +879,19 @@ try {
         peakHeadDrop:before?relative(before,'head')-Math.min(...recovery.map(row=>relative(row,'head'))):null,
         compressionMaxResidual:Math.max(...recovery.map(row=>row.state.locomotion.maxResidual)),
         minCompressionContacts:Math.min(...recovery.map(row=>row.state.locomotion.stanceFeet)),
+        recoveryFrames:lateRecovery.length,
+        recoveryGrounded:lateRecovery.length===60&&lateRecovery.every(row=>row.state.grounded),
+        recoveryMaxResidual:Math.max(...lateRecovery.map(row=>row.state.locomotion.maxResidual)),
+        recoveryMinContacts:Math.min(...lateRecovery.map(row=>row.state.locomotion.stanceFeet)),
+        supportDropMax:Math.max(...lateRecovery.map(row=>row.state.locomotion.supportDrop??0)),
+        supportTelemetryComplete:lateRecovery.length===60&&lateRecovery.every(row=>row.state.locomotion.supportEvaluated===true&&Number.isFinite(row.state.locomotion.supportDrop)&&Number.isFinite(row.state.locomotion.supportRequested)&&row.state.locomotion.supportConflict===false&&row.state.locomotion.supportUnreachableFeet===0),
+        soleSamplesComplete:lateRecovery.length===60&&lateRecovery.every(row=>row.state.capture?.soles?.paws?.length===4&&row.state.capture.soles.paws.every(paw=>paw.terrainOnly&&paw.vertices>0&&Number.isFinite(paw.minClearance))),
+        soleMinClearance:Math.min(...lateRecovery.flatMap(row=>(row.state.capture?.soles?.paws??[]).map(paw=>paw.minClearance??Infinity))),
+        soleMaxClearance:Math.max(...lateRecovery.flatMap(row=>(row.state.capture?.soles?.paws??[]).map(paw=>paw.minClearance??-Infinity))),
         landed:firstAir>=0 && landedIndex>firstAir && rows.at(-1).state.grounded};
     });
-    const landingPass=take=>take.landed && take.frames===2*fps && take.minCompressionContacts===4 && take.compressionMaxResidual<.001 && [take.firstChestStep,take.peakChestDrop,take.peakHeadDrop].every(Number.isFinite);
-    save('landing-ab-acceptance.json',{label:'Same build/lens/live physics, three tunable sets; pose heights relative actor pivot and last airborne frame, not idle; no visual approval',takes:landingTakes,passed:landingTakes.every(landingPass)});
+    const landingPass=take=>take.landed && take.frames===2*fps && take.minCompressionContacts===4 && take.compressionMaxResidual<.001 && [take.firstChestStep,take.peakChestDrop,take.peakHeadDrop].every(Number.isFinite) && (!(take.config.stationarySupport>0)||take.recoveryFrames===60&&take.recoveryGrounded&&take.recoveryMinContacts===4&&take.recoveryMaxResidual<.001&&take.supportTelemetryComplete&&Number.isFinite(take.supportDropMax)&&take.supportDropMax>.005&&take.supportDropMax<=take.config.stationarySupport+.000001&&take.soleSamplesComplete&&take.soleMinClearance>-.01&&take.soleMaxClearance<.01);
+    save('landing-ab-acceptance.json',{label:'Same build/lens/live physics, four tunable sets; supported option checks60 recovery frames and weighted sole minima; pose heights relative actor pivot and last airborne frame, not idle; no visual approval',takes:landingTakes,passed:landingTakes.every(landingPass)});
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
     if(!landingTakes.every(landingPass))throw Error('Landing A/B must land with four compression contacts and submillimeter compression residual; visual review still required');
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
