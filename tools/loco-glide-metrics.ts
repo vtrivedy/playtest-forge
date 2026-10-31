@@ -25,6 +25,8 @@ const scaled = new THREE.Box3().setFromObject(root); root.position.y -= scaled.m
 const center = scaled.getCenter(new THREE.Vector3()); root.position.x -= center.x; root.position.z -= center.z;
 const mixer = new THREE.AnimationMixer(root);
 const loco = new AuthoredLocomotion(root, group, new Map(gltf.animations.map(c => [c.name, mixer.clipAction(c)])));
+// P='{"gallopHz":2.6}' overrides locomotion tunables for A/B sweeps.
+Object.assign(loco.params, JSON.parse(process.env.P ?? '{}'));
 const step = (speed: number, yaw: number, anim: string) => {
   loco.input = { speed, grounded: true, yaw, verticalSpeed: 0, groundAt: () => 0 };
   loco.beforeMixer(); loco.blend(1 / 60, anim); mixer.update(1 / 60); loco.afterMixer(1 / 60, anim); root.updateMatrixWorld(true);
