@@ -1096,12 +1096,17 @@ try {
 
   }
   if (wants('finale')) await captureFinale({H,boot,video,shot,save,getPage:()=>page,fps,out,execFileSync,fs,path});
-  if (wants('route')) {
+  if (wants('route') || wants('kilnroute')) {
     await boot(quality, true);
     const route = await H('route');
     save('route-waypoints.json', route);
     const from = Number(arg('route-from', '0')), requestedTo = Number(arg('route-to', '-1'));
-    const regional = from > 0 || requestedTo >= 0, to = requestedTo < 0 ? route.length : requestedTo;
+    const kilnRoute = wants('kilnroute');
+    const kilnFeed = route.findIndex(w => w.label === 'SW1-feed');
+    if (kilnRoute && kilnFeed < 0) throw Error('Kiln route requires an authored SW1-feed waypoint');
+    const to = kilnRoute ? kilnFeed + 1 : requestedTo < 0 ? route.length : requestedTo;
+    const regional = from > 0;
+    const bounded = kilnRoute || requestedTo >= 0;
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from >= to || to > route.length) throw Error('Invalid route waypoint interval');
     if (regional) {
       const wp = route[from];
@@ -1110,19 +1115,21 @@ try {
       await H('teleport', wp.x, floor, wp.z, Math.PI);
       await advance(3, false);
     }
-    save('route-plan.json', { from, to, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : 'Full unassisted restoration route' });
+    save('route-plan.json', { from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
     await H('autopilot', true, from, { assist: false });
     let restoredAt;
-    const name = regional ? `route-segment-staged-${from}-${to}` : 'route-unassisted';
+    const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const state = await video(name, Number(arg('route-seconds', '360')) * fps, async () => {}, (st, i) => {
-      if (regional) return st.auto.idx >= to || !st.auto.active;
+      if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     });
     await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
-    const passed = !(regional ? state.auto.idx < to : !state.restored) && !state.auto.assists && !state.deaths;
+    const endpointReached = bounded ? state.auto.idx >= to : state.restored;
+    const kilnLit = state.seedwells.some(s => s.id === 'SW1' && s.lit);
+    const passed = endpointReached && (!kilnRoute || kilnLit) && !state.auto.assists && !state.deaths;
     const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : state.auto.stalled ? 'stalled' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
-    save('route-acceptance.json', { passed, reason, from, to, staged: regional, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    save('route-acceptance.json', { passed, reason, from, to, staged: regional, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
     if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
