@@ -25,7 +25,7 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
     geo.computeVertexNormals(); bark.add(geo, undefined, barkColor); geo.dispose();
   }
   // Open crowns keep the ferry and bell readable; fine hanging twigs suggest willow/alder.
-  for (const [x, y, z, h] of [[176,30,-131,8],[195,30,-110,10],[210,36,-125,9],[217,31,-140,7],[179,30,-109,6]]) {
+  for (const [x, y, z, h] of [[176,30,-131,8],[194,30,-104,10],[210,36,-125,9],[217,31,-140,7],[175,30,-106,6]]) {
     branch([[x,y,z],[x+.3,y+h*.4,z-.2],[x-.5,y+h*.78,z+.4],[x+.2,y+h,z]], .28);
     for (let j = 0; j < 5; j++) {
       const a = j * 2.4 + x, reach = 1.5 + random() * 1.7;
@@ -40,10 +40,10 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
       }
     }
     // Exposed root knees around the flooded trunk, rather than lush ground-cover.
-    for (let j=0;j<4;j++) { const a=j*Math.PI/2; branch([[x+Math.cos(a)*1.2,y,z+Math.sin(a)*1.2],[x+Math.cos(a)*.55,y+.5,z+Math.sin(a)*.55],[x,y+1,z]],.14); }
+    for (let j=0;j<4;j++) { const a=j*Math.PI/2; branch([[x,y+1,z],[x+Math.cos(a)*.55,y+.5,z+Math.sin(a)*.55],[x+Math.cos(a)*1.2,y,z+Math.sin(a)*1.2]],.14); }
   }
   // Bank clusters stay clear of the source, handles, ferry and low-lane line.
-  for (const [cx,cz] of [[177,-108],[183,-107],[197,-111],[198,-126],[189,-132],[174,-133]]) {
+  for (const [cx,cz] of [[176,-106.5],[183,-104.5],[193,-104],[198,-132],[189,-132],[174,-133]]) {
     for (let i=0;i<16;i++) {
       const x=cx+(random()-.5)*2.8,z=cz+(random()-.5)*1.7,h=.6+random()*1.1;
       const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(x,30,z),new THREE.Vector3(x+.08,30+h*.6,z),new THREE.Vector3(x+.23,30+h,z+.1)]);
@@ -82,15 +82,19 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
 
 /** Local basin surface: quiet teal depth with restrained moving reflection, no pale foam disc. */
 export function createReachWater(group: THREE.Group) {
-  const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,
-    uniforms:{uTime:{value:0},uDeep:{value:new THREE.Color(0x223f40)},uSky:{value:new THREE.Color(0x9ba9a6)}},
-    vertexShader:`varying vec2 vUv; varying vec3 vWorld;
-      void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
-    fragmentShader:`uniform float uTime;uniform vec3 uDeep,uSky;varying vec2 vUv;varying vec3 vWorld;
+  const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
+    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),...{uTime:{value:0},uDeep:{value:new THREE.Color(0x223f40)},uSky:{value:new THREE.Color(0x9ba9a6)}}},
+    vertexShader:`#include <fog_pars_vertex>
+      varying vec2 vUv; varying vec3 vWorld;
+      void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader:`#include <fog_pars_fragment>
+      uniform float uTime;uniform vec3 uDeep,uSky;varying vec2 vUv;varying vec3 vWorld;
       void main(){
         vec2 p=(vUv-.5)*2.;float r=length(p);
         float edge=r+.018*sin(p.x*26.+sin(p.y*17.))+.012*sin(p.y*32.);
-        float alpha=smoothstep(1.,.89,edge);if(alpha<.005)discard;
+        float alpha=1.-smoothstep(.94,1.,edge);if(alpha<.005)discard;
         float a=vWorld.x*.6+vWorld.z*.83-uTime*.36;
         float b=vWorld.x*1.9-vWorld.z*.74+uTime*.45;
         vec3 n=normalize(vec3(cos(a)*.035+cos(b)*.018,1.,sin(a)*.04));
@@ -105,14 +109,44 @@ export function createReachWater(group: THREE.Group) {
         gl_FragColor=vec4(color,alpha*(.83+fres*.12));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
+        #include <fog_fragment>
       }`});
-  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(22,24),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(187,29.8,-118);mesh.name='reach-water';group.add(mesh);
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(24,26),mat);mesh.rotation.x=-Math.PI/2;mesh.position.set(187,29.8,-118);mesh.name='reach-water';mesh.renderOrder=0;group.add(mesh);
+  // Open west/south spillways have a falling body down to the cistern floor.
+  // This closes the visible air gap beneath HIGH water without blocking LOW traversal.
+  const curtainPositions:number[]=[],curtainUV:number[]=[],curtainIndices:number[]=[];
+  for(let i=0;i<=48;i++){
+    const a=(150+i/48*165)*Math.PI/180;
+    for(const y of [0,1]){curtainPositions.push(Math.cos(a)*11.55,y,Math.sin(a)*12.55);curtainUV.push(i/48,y);}
+    if(i<48){const j=i*2;curtainIndices.push(j,j+1,j+2,j+1,j+3,j+2);}
+  }
+  const curtainGeo=new THREE.BufferGeometry();curtainGeo.setAttribute('position',new THREE.Float32BufferAttribute(curtainPositions,3));curtainGeo.setAttribute('uv',new THREE.Float32BufferAttribute(curtainUV,2));curtainGeo.setIndex(curtainIndices);
+  const curtainMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
+    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),uTime:mat.uniforms.uTime!},
+    vertexShader:`#include <fog_pars_vertex>
+      varying vec2 vUv;
+      void main(){vUv=uv;vec4 mvPosition=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader:`#include <fog_pars_fragment>
+      uniform float uTime;varying vec2 vUv;
+      void main(){
+        float strands=.5+.5*sin(vUv.x*97.+sin(vUv.x*31.)*2.+vUv.y*3.+uTime*.7);
+        float flow=.5+.5*sin(vUv.y*18.+uTime*2.8+sin(vUv.x*45.));
+        vec3 color=mix(vec3(.045,.095,.09),vec3(.23,.31,.28),strands*.45+flow*.12);
+        float edge=smoothstep(0.,.025,vUv.x)*(1.-smoothstep(.975,1.,vUv.x));
+        gl_FragColor=vec4(color,(.46+strands*.16)*edge*smoothstep(0.,.08,vUv.y));
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        #include <fog_fragment>
+      }`});
+  const curtain=new THREE.Mesh(curtainGeo,curtainMat);curtain.position.set(187,30.02,-118);curtain.name='reach-spillway-water';curtain.renderOrder=0;group.add(curtain);
   // The same small wake follows each hull, independently of the fixed watermarks.
   const wakes:THREE.Mesh[]=[];
-  const wakeMat=new THREE.MeshBasicMaterial({color:0x91aaa3,transparent:true,opacity:.18,depthWrite:false,side:THREE.DoubleSide});
+  const wakeMat=new THREE.MeshBasicMaterial({color:0x91aaa3,transparent:true,opacity:.06,depthWrite:false,side:THREE.DoubleSide});
   for(const [x,z,rx,rz] of [[187,-118,3.3,3.7],[192,-124,1.4,1.9],[188,-129,1.4,1.9]]) {
-    const geo=new THREE.RingGeometry(.95,1,48);geo.scale(rx,rz,1);
-    const wake=new THREE.Mesh(geo,wakeMat);wake.rotation.x=-Math.PI/2;wake.position.set(x,30,z);group.add(wake);wakes.push(wake);
+    const geo=new THREE.RingGeometry(.97,1,32,1,.15*Math.PI,.6*Math.PI);geo.scale(rx,rz,1);
+    const wake=new THREE.Mesh(geo,wakeMat);wake.rotation.x=-Math.PI/2;wake.position.set(x,30,z);wake.renderOrder=1;group.add(wake);wakes.push(wake);
   }
-  return {mesh,update(time:number,fill:number){mat.uniforms.uTime!.value=time;mesh.position.y=29.8+6*fill;for(const [i,w] of wakes.entries()){w.position.y=mesh.position.y+.025;w.scale.setScalar(1+Math.sin(time*.8+i)*.025);w.visible=fill>.035;}}};
+  return {mesh,update(time:number,fill:number,rise=6,fillRate=0){mat.uniforms.uTime!.value=time;mesh.position.y=29.8+rise*fill;curtain.visible=mesh.position.y>30.06;curtain.scale.y=Math.max(.001,mesh.position.y-30.02);wakeMat.opacity=.025+Math.min(.08,Math.abs(fillRate)*.16);for(const [i,w] of wakes.entries()){w.position.y=mesh.position.y+.025;w.scale.setScalar(1+Math.sin(time*.8+i)*.025);w.visible=fill>.035;}}};
 }

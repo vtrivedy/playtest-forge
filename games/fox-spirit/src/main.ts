@@ -925,7 +925,7 @@ async function boot() {
   function respawn() {
     shades.resetSweep();
     shadeContact.respawn();
-    const p = world.respawnPos();
+    const p = reach.recoveryAt(foxActor.group.position) ?? world.respawnPos();
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
     prevFeet = p.y + 0.1;
     vel.set(0, 0, 0);
