@@ -264,12 +264,6 @@ async function boot() {
   });
   // spark bursts only (Seedwell, Wellspring, hearth flares) — no pickups
   const emberMotes = createEmberMotes(scene, { maxMotes: 0 });
-  const occlusion = createOcclusionFader(scene, {
-    blocked: () => !photo && cam.debug.blocked(),
-    solidAt: (x, z) => col.highestAt(x, z),
-    exclude: foxActor.group,
-  });
-
   const restore = createRestoreCinematic({
     colorField,
     shrinePos: world.wellspringPos,
@@ -372,6 +366,7 @@ async function boot() {
   fAudio.close();
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
+  fCam.add(cam.params, 'minDistance', 1.8, 3.2, 0.1).name('minimum terrain boom');
   fCam.add(cam.params, 'height', 0.5, 4, 0.05);
   fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
   fCam.add(cam.params, 'glideDistance', 3, 12, 0.1);
@@ -449,6 +444,13 @@ async function boot() {
   world.waterWashedAt = water.washedAt;
   world.waterInkAt = water.inkAt;
   const inlets = createInlets(scene, world.inletSpots, updrafts.hearths[0]!.ash);
+  // Patch only after every world builder has added its materials and shader
+  // hooks. In particular the grotto roof is built by water outside world.group.
+  const occlusion = createOcclusionFader(scene, {
+    blocked: () => !photo && cam.debug.blocked(),
+    solidAt: (x, z) => col.highestAt(x, z),
+    exclude: foxActor.group,
+  });
   /** Seedwell latched from its element: light it, and every reactor in its radius is restored for good */
   function latchSeedwell(i: number, quiet = false) {
     const sw = world.seedwells[i]!;

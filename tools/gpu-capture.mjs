@@ -1232,7 +1232,29 @@ try {
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
-    });
+    }, { sample: async (i) => {
+      // Bounded diagnostics for the camera stream's recorded hidden-wedge and
+      // over-compressed stair frames. Run only on the remote capture worker.
+      if (![765, 775, 780, 790, 800, 1080, 1110, 1140, 1620].includes(i)) return undefined;
+      const diagnostic = await page.evaluate(() => {
+        const { renderer, scene, camera } = window.__gameHooks.debug;
+        const materials = new Map();
+        scene.traverse(o => {
+          if (!o.isMesh) return;
+          for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+            const u = renderer.properties.get(m).uniforms;
+            if (m.isMeshStandardMaterial && !materials.has(m.uuid)) materials.set(m.uuid, {
+              name: m.name, cutout: !!u?.uOccFox,
+              centreDepth: u?.uOccFox?.value?.toArray(), radii: u?.uOccRad?.value?.toArray(), strength: u?.uOccStrength?.value,
+            });
+          }
+        });
+        return { camera: { position: camera.position.toArray(), quaternion: camera.quaternion.toArray(), projection: camera.projectionMatrix.toArray(), worldInverse: camera.matrixWorldInverse.toArray() }, drawingBuffer: [renderer.domElement.width, renderer.domElement.height], materials: [...materials.values()] };
+      });
+      save(`${name}-camera-frame-${i}.json`, diagnostic);
+      await page.screenshot({ path: path.join(out, `${name}-camera-frame-${i}.png`) });
+      return { cameraDiagnostic: `${name}-camera-frame-${i}.json` };
+    } });
     await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
     const endpointReached = kilnRoute ? kilnCompletion !== undefined && kilnCompletion.idx >= to : bounded ? state.auto.idx >= to : state.restored;
     const endpoint = route[to - 1];
