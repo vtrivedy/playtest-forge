@@ -1,4 +1,4 @@
-import { createLanternhollow, hubPathDistance, hubClearance } from './regionLanternhollow';
+import { createLanternhollow, hubPathDistance, hubClearance, HUB_HOUSES } from './regionLanternhollow';
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { routeRemnant } from './routeRemnants';
@@ -85,6 +85,8 @@ export type RealmEvent =
 
 export type Realm = {
   group: THREE.Group;
+  updateHubVisuals: (time: number, dusk: number) => void;
+  hubState: () => { well: number; porch: number };
   materials: THREE.MeshStandardMaterial[];
   collision: CollisionWorld;
   terrainY: (x: number, z: number) => number;
@@ -1167,15 +1169,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
-  const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xe6cfa8, transparent: true, depthWrite: false, opacity: 0.55 });
+  const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xe6cfa8, transparent: true, depthWrite: false, opacity: 0.12 });
   const mists: THREE.Mesh[] = [];
   for (let i = 0; i < 14; i++) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mistMat);
     const a = r() * Math.PI * 2;
     const d = Math.sqrt(r()) * 0.9;
     m.position.set(MARSH.x + Math.cos(a) * MARSH.rx * d, -1.32 + r() * 0.2, MARSH.z + Math.sin(a) * MARSH.rz * d);
-    m.scale.setScalar(12 + r() * 12);
-    m.rotation.x = -Math.PI / 2 + 0.06; // hugs the ink: never veils the tussocks or boardwalk
+    m.scale.setScalar(8 + r() * 8);
+    m.rotation.x = -Math.PI / 2; // stays above the ink instead of clipping into straight bands
     m.userData.phase = r() * 6.28;
     mists.push(m);
     group.add(m);
@@ -1962,11 +1964,29 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   if (lanternMesh) group.add(lanternMesh);
 
   // Lanternhollow shares the realm, terrain paint and material buckets; no chapter transition.
-  const updateLanternhollow = createLanternhollow(group, col, groundRaw, {
+  const lanternhollow = createLanternhollow(group, col, groundRaw, {
     stone: bk('stone', -8, 85), wood: bk('wood', -8, 85),
     plaster: bk('hubPlaster', -8, 85), roof: bk('hubRoof', -8, 85),
     lamp: bk('hubLamp', -8, 85, false), dark: bk('hubDark', -8, 85),
   }, patchable);
+
+  // Curated domestic edge groups, kept low enough to preserve paws and path edges.
+  for (const [hi, house] of HUB_HOUSES.entries()) {
+    const plants = rng(8200 + hi);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let k = 0; k < 4; k++) {
+      if (sx === 1 && sz === -1) continue; // solid winter-store corner
+      if (sz === 1) continue; // keep front door approaches open
+      const x = house.x + sx * (house.w / 2 + .5 + plants() * .65);
+      const z = house.z + sz * (house.d / 2 + .3 + plants() * .6);
+      if (Math.abs(x) < 6 && z > 72) continue;
+      if (hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4) continue;
+      const kind = k % 2 ? 'fern' : 'grass_wispy';
+      nature.place(kind, x, groundRaw(x, z) - .03, z, {
+        yaw: plants() * Math.PI * 2, scale: (.18 + plants() * .06) / nature.height(kind),
+        hue: new THREE.Color(0x795638), hue2: new THREE.Color(0xa27a49), cast: false,
+      });
+    }
+  }
 
   // ==================================================================== MEADOW + PORTAL
   // portal ring of standing stones (0,92) and the first arch framing the Wellspring
@@ -1987,7 +2007,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     archAt(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
   }
   // Wen's pond
-  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x393c30, colorShallow: 0x827657 });
+  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x293730, colorShallow: 0x5b604b, shoreRadius: 1.18 });
   waterVisuals.push(pond);
   pond.mesh.position.set(POND.x, POND.water, POND.z);
   pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
@@ -2428,6 +2448,11 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
 
   const realm: Realm = {
     group,
+    updateHubVisuals(time, dusk) {
+      lanternhollow.update(time, dusk);
+      M.hubLamp.emissiveIntensity = .5 + Math.sin(time * 1.3) * .025;
+    },
+    hubState: lanternhollow.state,
     materials: patchable,
     collision: col,
     terrainY,
@@ -2485,8 +2510,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
-      updateLanternhollow(t);
-      M.hubLamp.emissiveIntensity = 0.5 + Math.sin(t * 1.3) * 0.025;
       for (const water of waterVisuals) water.update(t);
       inkTime.value = t;
       const ev: RealmEvent[] = [];
@@ -2541,7 +2564,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       for (const m of mists) {
         const ph = m.userData.phase as number;
         m.position.x += Math.sin(t * 0.07 + ph) * dt * 0.4;
-        (m.material as THREE.MeshBasicMaterial).opacity = inkActive ? 0.55 : 0.3;
+        (m.material as THREE.MeshBasicMaterial).opacity = inkActive ? 0.12 : 0.04;
       }
 
       if (!wellLit) wsGlow.emissiveIntensity = 0.06 + flood;

@@ -5,11 +5,12 @@ import { loadNatureKit, type NatureVariant } from './russetNature';
 
 /** Original Reach geometry, built in metres. No new asset downloads; bark reuses the existing CC0 surface library. */
 export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMaterial) => void) {
-  const bark = new Bucket(), reeds = new Bucket(), leaves = new Bucket(), stone = new Bucket();
+  const bark = new Bucket(), joints = new Bucket(), reeds = new Bucket(), leaves = new Bucket(), stone = new Bucket();
   const random = rng(73104);
   const nature=await loadNatureKit();
   const breeze = { value: 0 };
-  bark.aux=[];reeds.aux=[];leaves.aux=[];
+  const twigRadius=.025;
+  bark.aux=[];joints.aux=[];reeds.aux=[];leaves.aux=[];
   const barkColor = new THREE.Color(0x505754), reedColor = new THREE.Color(0x777c69);
   function branch(points: number[][], radius: number) {
     const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p as [number, number, number])));
@@ -31,20 +32,54 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
   for (const [index,[x, y, z, h]] of trees.entries()) {
     const variant: NatureVariant=index%2?'dead_1':'dead_2';
     nature.place(variant,x,y,z,{scale:h/nature.height(variant),yaw:x*.31,hue:barkColor,bark:barkColor});
+  }
+  const treeStart=group.children.length;
+  for(const mat of nature.build(group))patch(mat);
+  const treeMeshes=group.children.slice(treeStart).filter(o=>{
+    const mesh=o as THREE.Mesh;if(!mesh.isMesh)return false;
+    const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
+    return materials.some(m=>m.name.includes('Bark'));
+  }) as THREE.Mesh[];
+  for(const mesh of treeMeshes)mesh.geometry.computeBoundingBox();
+  const triangle=new THREE.Triangle(),near=new THREE.Vector3();
+  // Geometry is baked in the group's local frame by NatureKit. Find a real bark
+  // attachment rather than assuming that a crooked trunk follows its root axis.
+  function barkAnchor(point:THREE.Vector3){
+    let best=Infinity;const result=new THREE.Vector3();
+    for(const mesh of treeMeshes){
+      const geo=mesh.geometry;if(geo.boundingBox!.distanceToPoint(point)>1)continue;
+      const p=geo.getAttribute('position'),index=geo.index,n=index?.count??p.count;
+      for(let i=0;i<n;i+=3){
+        triangle.a.fromBufferAttribute(p,index?index.getX(i):i);
+        triangle.b.fromBufferAttribute(p,index?index.getX(i+1):i+1);
+        triangle.c.fromBufferAttribute(p,index?index.getX(i+2):i+2);
+        triangle.closestPointToPoint(point,near);if(Math.abs(near.y-point.y)>.5)continue;
+        const d=point.distanceToSquared(near);
+        if(d<best){best=d;result.copy(near);}
+      }
+    }
+    if(!Number.isFinite(best))throw new Error('Reach twig has no nearby bark surface');
+    return result;
+  }
+  for(const [x,y,z,h] of trees){
     for (let j = 0; j < 5; j++) {
       const a = j * 2.4 + x, reach = 1.5 + random() * 1.7;
       const dx = Math.cos(a) * reach, dz = Math.sin(a) * reach, by = y+h*(.52+j*.065);
-      branch([[x,by,z],[x+dx*.5,by+.9,z+dz*.5],[x+dx,by+.3,z+dz],[x+dx*1.15,by-1.4,z+dz*1.15]], .09);
+      const root=barkAnchor(new THREE.Vector3(x,by,z));
+      // A small closed bark joint seals the open tube end without pushing through
+      // thin upper branches. Its centre touches the actual native bark surface.
+      const joint=new THREE.SphereGeometry(twigRadius*1.25,8,6);joint.translate(root.x,root.y,root.z);
+      joints.add(joint,undefined,barkColor);joint.dispose();
+      branch([[root.x,root.y,root.z],[root.x+dx*.5,root.y+.9,root.z+dz*.5],[root.x+dx,root.y+.3,root.z+dz],[root.x+dx*1.15,root.y-1.4,root.z+dz*1.15]], twigRadius);
       // Sparse, slender copper leaves, never a maple canopy mass.
       for (let k = 0; k < 7; k++) {
-        const t = k/7, ly = by+.2-t*1.7;
+        const t = k/7, ly = root.y+.2-t*1.7;
         const geo = new THREE.SphereGeometry(.035, 5, 3);
-        const matrix = new THREE.Matrix4().compose(new THREE.Vector3(x+dx*(1+t*.15),ly,z+dz*(1+t*.15)),new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,a,.3)),new THREE.Vector3(.55,1.8,.35));
+        const matrix = new THREE.Matrix4().compose(new THREE.Vector3(root.x+dx*(1+t*.15),ly,root.z+dz*(1+t*.15)),new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,a,.3)),new THREE.Vector3(.55,1.8,.35));
         leaves.auxDefault=1;leaves.add(geo, matrix, new THREE.Color(k%3 ? 0x987346 : 0x8b583c)); geo.dispose();
       }
     }
   }
-  for(const mat of nature.build(group))patch(mat);
   // Bank clusters stay clear of the source, handles, ferry and low-lane line.
   for (const [cx,cz] of [[176,-106.5],[183,-104.5],[193,-104],[198,-132],[189,-132],[174,-133]]) {
     for (let i=0;i<16;i++) {
@@ -80,6 +115,7 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
     }
     patch(mat);
     const mesh=bucket.toMesh(mat,{cast:true,receive:true});if(mesh)group.add(mesh);
+    if(bucket===bark){const knots=joints.toMesh(mat,{cast:true,receive:true});if(knots){knots.name='reach-twig-joints';group.add(knots);}}
   }
   return {update(time:number){breeze.value=time;}};
 }
