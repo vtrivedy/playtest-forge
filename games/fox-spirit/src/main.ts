@@ -335,8 +335,7 @@ async function boot() {
     folder.add(params, 'minStanceRatio', .2, 1, .01);
     folder.add(params, 'bodyBob', 0, 1, .01);
     folder.add(params, 'swingEase', 0, 1, .05);
-    folder.add(params, 'trotLift', 0, .05, .002);
-    folder.add(params, 'gallopLift', 0, .06, .002);
+    folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
     folder.add(params, 'takeoffPitch', 0, .2, .005);
     folder.add(params, 'rockDamp', 0, 2, .05);
