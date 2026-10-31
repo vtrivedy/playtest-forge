@@ -201,8 +201,8 @@ ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
   diffuseColor.rgb = mix(diffuseColor.rgb, charcoal, undercoat);
   float lowerLimb = 1.0 - smoothstep(1.20, 1.65, vRest.y);
   float darkStocking = lowerLimb * (1.0 - smoothstep(0.035, 0.10, lum));
-  // Stockings stay dark but warm umber, lightening up the leg, so wrist and hock angles read at gameplay distance.
-  vec3 stocking = mix(vec3(0.085, 0.045, 0.024), vec3(0.19, 0.082, 0.034), smoothstep(0.25, 1.45, vRest.y));
+  // Stockings stay dark but warm umber, lightening up the leg into the rust coat (no tube seam), so wrist and hock angles read at gameplay distance.
+  vec3 stocking = mix(vec3(0.085, 0.045, 0.024), vec3(0.30, 0.11, 0.035), smoothstep(0.25, 1.55, vRest.y));
   diffuseColor.rgb = mix(diffuseColor.rgb, stocking, darkStocking * 0.85 * clamp(coatAmount, 0.0, 1.0));
   float frontCoat = smoothstep(0.35, 1.25, vRest.z) * (1.0 - smoothstep(2.3, 2.6, vRest.y));
   float creamPigment = 1.0 - rustPigment;
