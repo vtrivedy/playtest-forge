@@ -78,7 +78,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         diffuseColor.rgb += vec3(0.16, 0.14, 0.10) * streak * uWaterFlow;
         // Dark gaps and soft margins let the bank show through the moving sheet.
         float margin = 1.0 - smoothstep(0.66, 1.0, abs(vWaterP.x) / uWaterHalfWidth);
-        diffuseColor.a *= margin * mix(1.0, 0.36 + ribbon * 0.35 + streak * travelling * 0.25, uWaterFlow);
+        diffuseColor.a *= margin * mix(1.0, 0.55 + ribbon * 0.25 + streak * travelling * 0.20, uWaterFlow);
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float fallFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
@@ -100,7 +100,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     const curve = new THREE.CatmullRomCurve3(spot.path, false, 'centripetal');
     const length = curve.getLength();
     const cells = Math.ceil(length / 0.25);
-    const surfaceMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0, ior: 1.333, specularIntensity: 0.2, transparent: true, opacity: 0.72, depthWrite: false, emissive: 0x263d36, emissiveIntensity: 0.06 });
+    const surfaceMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.28, metalness: 0, ior: 1.333, specularIntensity: 1, transparent: true, opacity: 0.92, depthWrite: false, emissive: 0x263d36, emissiveIntensity: 0.06 });
     const surface = new THREE.InstancedMesh(new THREE.PlaneGeometry(spot.width * 0.94, length / cells + 0.03), surfaceMat, cells);
     const flowD = new THREE.InstancedBufferAttribute(new Float32Array(cells), 1);
     const wetState = new THREE.InstancedBufferAttribute(new Float32Array(cells), 1);
@@ -118,19 +118,23 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         float foam = pow(max(0.0, sin(drift * 2.2 + sin(vWaterUV.x * 11.0) * 0.6)), 14.0);
         float edgeFoam = pow(abs(vWaterUV.x - 0.5) * 2.0, 10.0) * (0.5 + 0.5 * sin(drift * 3.0));
         diffuseColor.rgb += vec3(0.12, 0.105, 0.075) * (foam * 0.65 + edgeFoam * 0.35) * vWet;
-        diffuseColor.a *= 1.0 - smoothstep(0.78, 1.0, abs(vWaterUV.x - 0.5) * 2.0);
+        diffuseColor.a *= 1.0 - smoothstep(0.5, 1.0, abs(vWaterUV.x - 0.5) * 2.0);
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float waterFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
         float skyBand = 0.5 + 0.5 * sin(vFlowD * 0.38 + sin(vWaterUV.x * 5.0) - uWaterTime * 0.35);
         vec3 waterSky = mix(vec3(0.065, 0.052, 0.034), vec3(0.26, 0.20, 0.12), skyBand);
-        // Keep the strong world lights from turning the entire wet ribbon into cream.
-        float waterLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
-        outgoingLight *= 0.24 / (0.24 + waterLuma);
-        outgoingLight = mix(outgoingLight, waterSky, (0.18 + waterFresnel * 0.52) * vWet);
+        // Compress only bright wet diffuse light; real specular and dry ink retain their cues.
+        vec3 waterDiffuse = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
+        float waterLuma = dot(waterDiffuse, vec3(0.2126, 0.7152, 0.0722));
+        float excess = max(0.0, waterLuma - 0.12);
+        float kneeLuma = min(waterLuma, 0.12) + excess / (1.0 + excess / 0.18);
+        outgoingLight -= waterDiffuse * (1.0 - kneeLuma / max(waterLuma, 0.0001)) * vWet;
+        outgoingLight = mix(outgoingLight, waterSky, (0.06 + waterFresnel * 0.35) * vWet);
+        outgoingLight += vec3(0.08, 0.06, 0.03) * foam * vWet;
         #include <opaque_fragment>`);
       shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
-        vec3 ripple = vec3(sin(vFlowD * 3.4 - uWaterTime * 8.0) * 0.19, 0.0, sin(vWaterUV.x * 16.0 + vFlowD * 2.1 - uWaterTime * 6.0) * 0.14);
+        vec3 ripple = vec3(sin(vFlowD * 3.4 - uWaterTime * 8.0) * 0.08, 0.0, sin(vWaterUV.x * 16.0 + vFlowD * 2.1 - uWaterTime * 6.0) * 0.03);
         normal = normalize(normal + (viewMatrix * vec4(ripple, 0.0)).xyz * vWet);
       `);
     };
