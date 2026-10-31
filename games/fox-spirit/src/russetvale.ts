@@ -445,7 +445,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   WS(1.5, 0, 2);
   WS(6, 6, 2);
   WS(10.5, 12.8, 2);
-  WS(10.5, 2.6, 6);
+  WS(10.5, 0.5, 6); // stand on the R2 landing before turning onto terrace 2
   WS(14.5, 2.4, 6);
   WS(17.2, 6.5, 6, { label: 'cp-mills' });
   WS(24.2, 9.7, 6, { act: 'dash', label: 'hearth-brush' });
@@ -756,6 +756,14 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   flightT(-6.5, 0, 0.1, 0.4, 0, 2, 3.4, 1);
   // R2 lateral flight on k1 (2 → 6)
   flightT(10.5, 11.2, 2, 10.5, 2.0, 6, 2.6, 2);
+  // The stair top is at s10.5; the upper terrace begins at s12. Join them
+  // beyond the last riser so a turn cannot drop the fox back to the y2 floor.
+  {
+    const p = sp(10.6, 0.4);
+    col.add(boxCollider({ x: p.x, z: p.z, w: 3.2, d: 2.8, yaw: T_YAW, top: 6, bottom: 1.5, tag: 'r2-landing' }));
+    slab({ x: p.x, z: p.z, w: 3.2, d: 2.8, yaw: T_YAW, top: 6, bottom: 1.5, rough: 0.3, seed: 74,
+      topColor: PAL.stone.clone().lerp(PAL.pathEarth, 0.35) });
+  }
   // R3 jump chain on k2: broken pillar stumps (6 → 7.5 → 9 → 10)
   for (const [s, top, variant] of [[23, 7.5, 0], [25.5, 9.0, 1]] as const) {
     const p = sp(s, -1);

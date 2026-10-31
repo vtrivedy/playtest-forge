@@ -6,6 +6,32 @@ import { CollisionWorld } from '../games/fox-spirit/src/collision';
 // Simulation checks do not load or judge the world's image assets.
 THREE.TextureLoader.prototype.load = function () { return new THREE.Texture(); };
 const water = createWater(new THREE.Scene(), new CollisionWorld(() => -2));
+// A transparent ribbon must have shared seams and upward triangles, not
+// overlapping per-cell planes or folded inner bends that double-blend.
+for (const w of water.waters) {
+  const geometry = w.surface.geometry, position = geometry.getAttribute('position');
+  const flow = geometry.getAttribute('aFlowD'), normal = geometry.getAttribute('normal');
+  assert.equal(position.count, w.samples.length * 6);
+  const rings = new Map<number, { points: Set<string>; normals: Set<string> }>();
+  for (let i = 0; i < position.count; i++) {
+    const point = [position.getX(i), position.getY(i), position.getZ(i)];
+    assert(point.every(Number.isFinite), `${w.spot.id}: finite ribbon positions`);
+    const ring = rings.get(flow.getX(i)) ?? { points: new Set<string>(), normals: new Set<string>() };
+    ring.points.add(point.join(',')); ring.normals.add([normal.getX(i), normal.getY(i), normal.getZ(i)].join(','));
+    rings.set(flow.getX(i), ring);
+  }
+  assert.equal(rings.size, w.samples.length + 1);
+  for (const ring of rings.values()) {
+    assert.equal(ring.points.size, 2, `${w.spot.id}: exact shared seam positions`);
+    assert.equal(ring.normals.size, 1, `${w.spot.id}: smooth shared seam normals`);
+  }
+  for (let i = 0; i < position.count; i += 3) {
+    const ax = position.getX(i + 1) - position.getX(i), az = position.getZ(i + 1) - position.getZ(i);
+    const bx = position.getX(i + 2) - position.getX(i), bz = position.getZ(i + 2) - position.getZ(i);
+    assert(az * bx - ax * bz > 0, `${w.spot.id}: upward, unfolded transparent triangle ${i / 3}`);
+  }
+}
+console.log('Continuous water ribbon seams/winding: PASS');
 let t = 0;
 function step(seconds: number, supply: number) { for (let i = 0; i < Math.round(seconds * 120); i++) { t += 1 / 120; water.update(1 / 120, t, () => supply); } }
 step(0.59, 1);

@@ -1,10 +1,16 @@
 """Poll Modal agent requests and relay GPU evidence. No local browser."""
-import argparse, concurrent.futures, hashlib, io, json, os, re, subprocess, tarfile, tempfile, time
+import argparse, concurrent.futures, hashlib, io, json, os, re, signal, subprocess, tarfile, tempfile, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+STOP_REQUESTED = False
+
+def request_stop(*_):
+    global STOP_REQUESTED
+    STOP_REQUESTED = True
+
 DEADLINE = 1793439600  # 2026-10-31 05:40 ET; final packaging is separate.
-SHOTS = set('probe perf route kilnroute hub orbit fox gait stills water shade turntable updraft wind growth levels windgap marshmouth reed crown flow showcase reach reachview reachsafe finale feel'.split())
+SHOTS = set('probe perf route kilnroute hub orbit fox gait worldgait stills water shade turntable updraft wind growth levels windgap marshmouth reed crown flow showcase reach reachview reachsafe finale feel'.split())
 
 def cli(args, **kw):
     return subprocess.run(args, text=True, capture_output=True, timeout=60, **kw)
@@ -16,6 +22,11 @@ def capture_request(stream, request, folder):
     ref=request.get('ref', request.get('sha',''))
     if not isinstance(ref,str): raise ValueError('ref must be a string')
     ref=ref.lower()
+    latest_file=folder.parents[1]/f'{stream}-request.json'
+    if latest_file.exists() and request.get('stage')!='before':
+        latest=json.loads(latest_file.read_text())
+        if isinstance(latest,dict) and latest.get('ref',latest.get('sha'))!=ref:
+            return {'status':'superseded','reason':'Newer immutable ref queued before this job started; no GPU launched'}
     shots=request.get('shots','stills')
     if isinstance(shots,list) and all(isinstance(s,str) for s in shots): shots=','.join(shots)
     if not isinstance(shots,str): raise ValueError('shots must be a string or list of strings')
@@ -23,7 +34,7 @@ def capture_request(stream, request, folder):
     if time.time() >= DEADLINE: raise ValueError('Relay deadline reached; request expired')
     if request.get('gpu','A10') not in {'A10','L4'}: raise ValueError('Only A10 or L4 GPUs supported')
     for key,limit in [('route_seconds',600),('orbit_seconds',60)]:
-        val=request.get(key,request.get(key.replace('_','-'),1))
+        val=request.get(key.replace('_','-'),request.get(key,1))
         if not isinstance(val,(int,float)) or not 0 < val <= limit: raise ValueError(f'{key} must be between 1 and {limit}')
     if not re.fullmatch('[0-9a-fA-F]{40}',ref) or not set(shots.split(',')) <= SHOTS:
         result={'status':'rejected','reason':'ref must be an immutable pushed 40-character SHA; shots must be supported'}
@@ -35,7 +46,7 @@ def capture_request(stream, request, folder):
         source_root=Path(source.name)
         bundle=subprocess.check_output(['git','archive',ref,'tools'],cwd=ROOT)
         with tarfile.open(fileobj=io.BytesIO(bundle)) as tar:tar.extractall(source_root,filter='data')
-        if 'gait' in shots.split(',') and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
+        if shots == 'gait' and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
             (source_root/'tools/gpu-capture.mjs').write_bytes(Path(os.environ['FOX_GAIT_CAPTURE_SCRIPT']).read_bytes())
         command=['modal','run','--detach',str(source_root/'tools/modal/gpu_capture.py'),'--ref',ref,'--shots',shots,'--out',str(folder/'evidence')]
         options={'size':'1920x1080' if 'gait' in shots.split(',') else '1280x720','fps':60,'route-seconds':120}
@@ -46,8 +57,7 @@ def capture_request(stream, request, folder):
             value=request.get(key,request.get(key.replace('-','_')))
             if value is not None:command+=['--'+key,str(value)]
         capture_env=dict(os.environ)
-        if 'gait' in shots.split(',') and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
-            capture_env['FOX_CAPTURE_SCRIPT']=os.environ['FOX_GAIT_CAPTURE_SCRIPT']
+        capture_env.pop('FOX_CAPTURE_SCRIPT',None)
         with (folder/'modal.log').open('w') as log:
             proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env)
         source.cleanup()
@@ -64,6 +74,9 @@ def capture_request(stream, request, folder):
             result.update(status='capture-failed',verificationError='Missing or mismatched commit, shot or tool identity')
         elif run.get('status')=='failed' or report.get('failures') or report.get('errors'):
             result['status']='capture-failed'
+        elif run.get('status')=='success':
+            result['status']='captured'
+            if proc.returncode:result['transportWarning']=f'Client exit {proc.returncode}; verified durable capture succeeded'
         archive=folder/'evidence.tar'
         with tarfile.open(archive,'w') as tar:
             if evidence.exists():tar.add(evidence,arcname='evidence')
@@ -101,16 +114,40 @@ def process(stream, request, folder):
         (folder/'result.json').write_text(json.dumps(result,indent=2))
         print(json.dumps(result),flush=True)
 
+def republish_safe(stream,folder,result=None):
+    try:
+        if result is None:result=json.loads((folder/'result.json').read_text())
+        if not result.get('feedbackUploaded') or (folder/'evidence.tar').exists() and not result.get('archive'):publish(stream,folder,result)
+    except Exception as exc:print(f'republish {stream}/{folder.name}: {exc}',flush=True)
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out',type=Path,required=True)
     ap.add_argument('--streams',default='loco,loco-glide,fox-ember,hub,reach,route-clear,camera,water-restore,shade')
     ap.add_argument('--once',action='store_true')
+    ap.add_argument('--workers',type=int,default=2,choices=[1,2,4])
     args=ap.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True)
-    pool=concurrent.futures.ThreadPoolExecutor(max_workers=2);pending={}
+    pool=concurrent.futures.ThreadPoolExecutor(max_workers=args.workers);pending={}
     active=set()
-    while time.time()<DEADLINE:
-        for stream in args.streams.split(','):
+    def enqueue(stream,request):
+        key=hashlib.sha256(json.dumps(request,sort_keys=True).encode()).hexdigest()[:12]
+        folder=args.out/stream/key
+        if folder in active:return
+        if (folder/'result.json').exists():
+            republish_safe(stream,folder)
+            return
+        if (folder/'modal.log').exists():
+            republish_safe(stream,folder,{'status':'interrupted','reason':'Prior client interrupted; recover printed durable run ID instead of duplicating GPU work'})
+            return
+        folder.mkdir(parents=True,exist_ok=True);active.add(folder);(folder/'queued.json').write_text(json.dumps(request,indent=2))
+        print(f'queued {stream} {key}',flush=True)
+        pending[pool.submit(process,stream,request,folder)]=folder
+    signal.signal(signal.SIGTERM,request_stop);signal.signal(signal.SIGINT,request_stop)
+    while time.time()<DEADLINE and not STOP_REQUESTED:
+        roster=args.out/'streams.txt'
+        names=roster.read_text().replace(',',' ').split() if roster.exists() else args.streams.split(',')
+        for stream in names:
+            if not re.fullmatch(r'[a-z0-9-]+',stream):continue
             target=args.out/f'{stream}-request.json'
             try:got=cli(['modal','volume','get','fox-agent-streams',f'{stream}/capture-request.json',str(target),'--force'])
             except (subprocess.TimeoutExpired,OSError) as exc:
@@ -118,19 +155,13 @@ def main():
             if got.returncode:continue
             try:request=json.loads(target.read_text())
             except (ValueError,OSError):continue
-            key=hashlib.sha256(json.dumps(request,sort_keys=True).encode()).hexdigest()[:12]
-            folder=args.out/stream/key
-            if folder in active:continue
-            if (folder/'result.json').exists():
-                result=json.loads((folder/'result.json').read_text())
-                if not result.get('feedbackUploaded') or (folder/'evidence.tar').exists() and not result.get('archive'):publish(stream,folder,result)
-                continue
-            if (folder/'modal.log').exists():
-                publish(stream,folder,{'status':'interrupted','reason':'Prior client interrupted; recover printed durable run ID instead of duplicating GPU work'})
-                continue
-            folder.mkdir(parents=True,exist_ok=True);active.add(folder);(folder/'queued.json').write_text(json.dumps(request,indent=2))
-            print(f'queued {stream} {key}',flush=True)
-            pending[pool.submit(process,stream,request,folder)]=folder
+            enqueue(stream,request)
+            if isinstance(request,dict):
+                for shot in request.get('followup_shots',[]):
+                    follow={k:request[k] for k in ['ref','size','fps','quality'] if k in request}
+                    follow.update(shots=shot,reason=f'Follow-up {shot} for {request.get("ref")}')
+                    enqueue(stream,follow)
+                if isinstance(request.get('also'),dict):enqueue(stream,request['also'])
         for task,folder in list(pending.items()):
             if task.done():
                 try:task.result()
