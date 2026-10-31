@@ -16,6 +16,7 @@ import {
 import {
   createForgeRenderer,
   createColorField,
+  PaintLayer,
   createPostStack,
   createPaintedSky,
   applyLookdevLights,
@@ -243,8 +244,12 @@ async function boot() {
     maskSize: 512,
   });
   colorField.initMask(renderer);
-  crown.init(renderer);
-  reach.init(renderer);
+  // the fox's persistent paint covers the valley plus the Crown and Reach (visual only)
+  const paint = new PaintLayer({ minX: -140, maxX: 165, minZ: -165, maxZ: 115 });
+  paint.init(renderer);
+  colorField.paint = paint;
+  crown.init(renderer, paint);
+  reach.init(renderer, paint);
   colorField.groundAt = (x, z) => col.highestAt(x, z);
   // restored stone stays stone: masonry and cliff rock keep a muted warm grey, foliage/earth carry the colour
   const RESTORED_CHROMA: Record<string, number> = { 'rv-stone': 0.5, 'rv-rock': 0.75, 'rv-terrain': 0.62, 'rv-ground': 0.62 };
@@ -421,6 +426,7 @@ async function boot() {
       const byDash = h.reactor.probes.some((q) => colorField.strokeAt(q) > 0.9);
       if (byDash) dashStruck.add(h);
       h.flare = byDash ? 1.6 : 1;
+      paint.splash(h.base.x, h.base.z, byDash ? 6.5 : 5);
       emberMotes.burst(h.base.clone().setY(h.base.y + 0.3), { count: byDash ? 60 : 26, speed: byDash ? [2, 5] : [1.2, 3.2], lift: 0.9, buoyancy: 0.8, life: [0.8, 1.8], flash: byDash ? 1.4 : 0.8, size: [0.04, 0.1], heat: 0.7 });
       audio.play('checkpoint');
       // the breath lets go: ground leaves round the hearth lift into the column
@@ -441,6 +447,7 @@ async function boot() {
       if (byDash) rootStruck.add(r);
       r.flare = byDash ? 1.6 : 1;
       const k = r.spot.knot;
+      paint.splash(k.x, k.z, byDash ? 5 : 4);
       emberMotes.burst(k.clone().setY(k.y + 0.6), { count: byDash ? 40 : 20, speed: [0.8, 2.4], lift: 0.6, buoyancy: 0.5, life: [0.8, 1.6], flash: byDash ? 1.2 : 0.7, size: [0.03, 0.08], heat: 0.6 });
       autumnFX.swirl(k.clone().setY(k.y + 0.2), byDash ? 30 : 18, 1.4);
       audio.play('checkpoint');
@@ -498,7 +505,10 @@ async function boot() {
     if (inlet) inlet.latched = true;
     const ev = world.latchSeedwell(i);
     if (quiet) colorField.restore(sw.pos, sw.radius, 0.05);
-    else handleEvents(ev);
+    else {
+      paint.splash(sw.pos.x, sw.pos.z, 7);
+      handleEvents(ev);
+    }
     saveLatches();
   }
   /** Latches are saved (world-1.md §1.4): restored on load without the ceremony. `?fresh` starts sepia. */
@@ -527,6 +537,61 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'strength', 1, 2, 0.05);
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
+  // Paint trail (DESIGN-paint-trail.md): pawfalls bloom, the path stays painted, drips bleed past it
+  const PAINT_FEEL = { idlePool: 3.2, gradeRadius: 9, grade: 0.45 };
+  const fPaint = gui.addFolder('Paint trail');
+  fPaint.add(paint.tun, 'ribbonRadius', 0.5, 3, 0.05);
+  fPaint.add(paint.tun, 'ribbonSpacing', 0.2, 1.5, 0.05);
+  fPaint.add(paint.tun, 'pawRadius', 0.2, 1.6, 0.05);
+  fPaint.add(paint.tun, 'dripSpacing', 2, 15, 0.5);
+  fPaint.add(paint.tun, 'dripRadius', 1, 5, 0.1);
+  fPaint.add(paint.tun, 'bloomLife', 0.3, 3, 0.05);
+  fPaint.add(paint.tun, 'strength', 0.2, 1, 0.05);
+  fPaint.add(PAINT_FEEL, 'idlePool', 1, 5, 0.1).name('idle pool max r');
+  fPaint.add(PAINT_FEEL, 'grade', 0, 1, 0.05).name('grade from paint');
+  fPaint.close();
+  const paintLast = new THREE.Vector3(NaN, 0, 0);
+  let paintDist = 0;
+  let dripDist = 0;
+  let idleT = 0;
+  let paintLocal = 0;
+  function layPaint(dt: number, dashing: boolean) {
+    const fox = foxActor.group;
+    const feetY = fox.position.y - foxActor.feetOffset;
+    const gy = col.groundAt(fox.position.x, fox.position.z, feetY + 0.3).y;
+    // the brush touches paper only near the ground: a high glide leaves no band
+    const nearK = Number.isFinite(gy) ? 1 - THREE.MathUtils.smoothstep(feetY - gy, 0.6, 2.8) : 0;
+    const step = Number.isNaN(paintLast.x) ? 0 : Math.hypot(fox.position.x - paintLast.x, fox.position.z - paintLast.z);
+    paintLast.copy(fox.position);
+    // teleports / respawns are not brush strokes
+    if (step > 3) return;
+    const speed = dt > 0 ? step / dt : 0;
+    const T = paint.tun;
+    paintDist += step;
+    dripDist += step;
+    if (paintDist >= T.ribbonSpacing) {
+      paintDist = 0;
+      const r = T.ribbonRadius * THREE.MathUtils.lerp(0.85, 1, Math.min(1, speed / 8)) * (dashing ? 1.3 : 1);
+      if (nearK > 0.02) paint.bloom(fox.position.x + (Math.random() - 0.5) * 0.5, fox.position.z + (Math.random() - 0.5) * 0.5, r, T.strength * nearK);
+    }
+    if (dripDist >= T.dripSpacing) {
+      dripDist = Math.random() * T.dripSpacing * 0.4;
+      if (nearK > 0.5) {
+        // a drip runs off the brush to one side and spreads past the path
+        const side = (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 1.4);
+        const yaw = fox.rotation.y;
+        paint.bloom(fox.position.x + Math.cos(yaw) * side, fox.position.z - Math.sin(yaw) * side, T.dripRadius * (0.7 + Math.random() * 0.5), T.strength * 0.95, T.bloomLife * 1.6);
+      }
+    }
+    // standing still: the colour keeps soaking out from under the paws
+    idleT = grounded && speed < 0.4 ? idleT + dt : 0;
+    if (idleT > 0.5 && Math.floor((idleT - dt) / 0.7) !== Math.floor(idleT / 0.7))
+      paint.bloom(fox.position.x, fox.position.z, Math.min(PAINT_FEEL.idlePool, 1.2 + idleT * 0.3), T.strength, 2);
+    // pawfalls: each planted paw blooms where it lands
+    if (grounded)
+      for (const paw of foxActor.locomotion?.footfalls ?? [])
+        paint.bloom(paw.x, paw.z, T.pawRadius * (0.85 + Math.random() * 0.3), T.strength, T.bloomLife * 0.8);
+  }
   let inColumn = false;
   let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
@@ -1509,6 +1574,8 @@ async function boot() {
         shadeContact.frees++;
         const wash = e.pos.clone().setY(e.pos.y - 1.4);
         colorField.stroke(wash, wash.clone(), { life: 6, strength: 1.2, radius: shades.tun.drainRadius });
+        // the memory it held spills back into the paper for good
+        paint.splash(e.pos.x, e.pos.z, shades.tun.drainRadius * 2.2, 2.6);
         hitstop = 0.08;
         cam.shake(0.12);
         audio.play('bridge');
@@ -1602,6 +1669,7 @@ async function boot() {
         rootStruck.clear();
       }
     }
+    layPaint(dt, dashing);
     colorField.update(dt);
     if (colorField.globalColor >= 0.99) water.restoreAll();
     crown.sync(dt, colorField);
@@ -1710,6 +1778,7 @@ async function boot() {
     const fox = foxActor.group;
     if (quality.shadowEvery > 1) renderer.shadowMap.needsUpdate = drawFrame % quality.shadowEvery === 0;
     drawFrame++;
+    paint.render(dt);
     colorField.renderMask(dt);
     for (const m of world.materials) colorField.syncMaterial(m);
 
@@ -1752,7 +1821,10 @@ async function boot() {
       foxActor.height, fox.rotation.y, foxHeadBone.getWorldPosition(foxHeadPosition));
     // grade follows the flood: faded sepia → rich autumn over the 6 s wave
     // exposure stays put; the grade only follows once the front has left the summit
-    post.params.restore = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;
+    // ...and before it, the paint the fox has laid round itself warms the grade locally
+    paintLocal = THREE.MathUtils.damp(paintLocal, paint.coverageAround(fox.position.x, fox.position.z, PAINT_FEEL.gradeRadius), 1.5, dt);
+    const flood = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;
+    post.params.restore = Math.max(flood, PAINT_FEEL.grade * paintLocal);
 
     // keep film grain off the hero
     heroNdc.set(fox.position.x, fox.position.y - foxActor.feetOffset + foxActor.height * 0.45, fox.position.z).project(cam.camera);
@@ -1777,6 +1849,7 @@ async function boot() {
       backend,
       crown: crown.state(),
       reach: reach.state(),
+      paint: { laid: paint.laid, areaM2: paint.paintedArea, local: Number(paintLocal.toFixed(3)), wet: paint.blooms.length, grade: Number(post.params.restore.toFixed(3)) },
       winCondition: 'Wake the valley: feed the Seedwells from its elements, then the Ember Wellspring',
       chem: { water: water.state(), growth: growth.state().roots, updraft: updrafts.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), latched: q.latched })) },
       notes: [

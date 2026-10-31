@@ -8,8 +8,8 @@
 export { createForgeRenderer } from './forgeRenderer';
 export type { ForgeRenderer, RendererOptions } from './forgeRenderer';
 
-export { ColorField, createColorField } from './colorField';
-export type { ColorFieldOptions, RestoreOptions, RestoreRegion, TrailSample } from './colorField';
+export { ColorField, PaintLayer, createColorField } from './colorField';
+export type { ColorFieldOptions, RestoreOptions, RestoreRegion, TrailSample, PaintTuning } from './colorField';
 
 export { createPostStack } from './postStack';
 export type { PostStack, PostStackOptions, GradeParams } from './postStack';

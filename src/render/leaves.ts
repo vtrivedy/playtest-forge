@@ -158,6 +158,9 @@ function makeLeafMaterial(atlas: THREE.Texture, field?: ColorField) {
     uUseMask: { value: 0 },
     uBounds: { value: new THREE.Vector4(-24, 24, -24, 24) },
     uGlobalColor: { value: 0 },
+    uPaintMap: field?.paint?.uniforms.uPaintMap ?? { value: null as THREE.Texture | null },
+    uPaintBounds: field?.paint?.uniforms.uPaintBounds ?? { value: new THREE.Vector4(0, 1, 0, 1) },
+    uPaintOn: field?.paint?.uniforms.uPaintOn ?? { value: 0 },
   };
   const mat = new THREE.MeshLambertMaterial({
     map: atlas,
@@ -195,6 +198,9 @@ function makeLeafMaterial(atlas: THREE.Texture, field?: ColorField) {
         uniform float uUseMask;
         uniform vec4 uBounds;
         uniform float uGlobalColor;
+        uniform sampler2D uPaintMap;
+        uniform vec4 uPaintBounds;
+        uniform float uPaintOn;
         varying vec3 vLeafWorld;
         float leafRestored = 0.0;`,
       )
@@ -210,6 +216,13 @@ function makeLeafMaterial(atlas: THREE.Texture, field?: ColorField) {
               vec2 sources = texture2D(uMask, muv).rg;
               m = max(m, max(sources.r * temporaryVisibilityAt(vLeafWorld), sources.g));
             }
+          }
+          if (uPaintOn > 0.5) {
+            // leaves drifting over the fox's paint path catch its colour
+            vec2 puv = vec2((vLeafWorld.x - uPaintBounds.x) / (uPaintBounds.y - uPaintBounds.x),
+                            (vLeafWorld.z - uPaintBounds.z) / (uPaintBounds.w - uPaintBounds.z));
+            if (all(greaterThanEqual(puv, vec2(0.0))) && all(lessThanEqual(puv, vec2(1.0))))
+              m = max(m, texture2D(uPaintMap, puv).r * temporaryVisibilityAt(vLeafWorld));
           }
           m = clamp(m, 0.0, 1.0);
           float luma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));

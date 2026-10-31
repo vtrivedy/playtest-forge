@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type GUI from 'lil-gui';
-import { createColorField } from '../../../src/render';
+import { createColorField, type PaintLayer } from '../../../src/render';
 import type { Realm } from './russetvale';
 import { boxCollider, cylCollider } from './collision';
 import { loadNatureKit } from './russetNature';
@@ -110,7 +110,7 @@ export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
     bowl,
     contains(p: THREE.Vector3) { return p.x < -25 && p.z < -99; },
     supplyAt(p: THREE.Vector3) { return field.sample(p); },
-    init(renderer: THREE.WebGLRenderer) { field.initMask(renderer); },
+    init(renderer: THREE.WebGLRenderer, paint: PaintLayer) { field.initMask(renderer); field.paint = paint; },
     sync(dt: number, source: ReturnType<typeof createColorField>) {
       // Only this region's permanent wavefront ages here; source lifetimes stay owned by the main field.
       field.trail = []; field.strokes = []; field.update(dt);
