@@ -1,5 +1,28 @@
 import * as THREE from 'three';
 
+/** Visual drain shares the gameplay cylinder's height, with a soft painterly XZ boundary. */
+const MAX_VISUAL_DRAINS = 16;
+export const VISUAL_DRAIN_GLSL = /* glsl */ `
+  uniform vec4 uVisualDrains[16];
+  uniform int uVisualDrainCount;
+  float temporaryVisibilityAt(vec3 p) {
+    if (uVisualDrainCount == 0) return 1.0;
+    float visibility = 1.0;
+    float brush = sin(p.x * 1.7 + sin(p.z * 1.3)) * 0.065
+                + sin(p.z * 3.1 + p.x * 0.7) * 0.035;
+    for (int i = 0; i < 16; i++) {
+      if (i >= uVisualDrainCount) break;
+      vec4 drain = uVisualDrains[i];
+      float distanceXZ = distance(p.xz, drain.xz) + brush;
+      float feather = min(0.75, drain.w * 0.35);
+      float influence = (1.0 - smoothstep(drain.w - feather, drain.w, distanceXZ))
+                      * (1.0 - smoothstep(3.5, 4.0, abs(p.y - drain.y)));
+      visibility = min(visibility, 1.0 - influence);
+    }
+    return visibility;
+  }
+`;
+
 export type TrailSample = { x: number; y: number; z: number; life: number };
 
 /** A deliberate colour stroke (the fox's dash): a capsule a→b that outlives the trail and can exceed 1. */
@@ -59,6 +82,13 @@ export class ColorField {
   private _accum = 0;
   restores: RestoreRegion[] = [];
   strokes: ColorStroke[] = [];
+  /** Visual-only active Shade volumes; raw sample() remains unchanged for gameplay supply probes. */
+  visualDrains: Array<{ center: THREE.Vector3; radius: number }> = [];
+  /** Shared renderer uniforms for world materials and the leaf mask consumer. */
+  readonly visualDrainUniforms = {
+    uVisualDrains: { value: Array.from({ length: MAX_VISUAL_DRAINS }, () => new THREE.Vector4()) },
+    uVisualDrainCount: { value: 0 },
+  };
   /** Walkable height under (x, z) — airborne trail fades out of the ground mask with height (no decal band under a glide) */
   groundAt: ((x: number, z: number) => number) | null = null;
   /** Visual-only warmth (e.g. a lit hearth tinting its surroundings): stamped into the mask, never read by sample() */
@@ -82,6 +112,7 @@ export class ColorField {
   private stampNoise: THREE.InstancedBufferAttribute | null = null;
   private stampInner: THREE.InstancedBufferAttribute | null = null;
   private stampRestore: THREE.InstancedBufferAttribute | null = null;
+  private stampDrainSource: THREE.InstancedBufferAttribute | null = null;
   private static readonly MAX_STAMPS = 128;
   private readonly _stampMatrix = new THREE.Matrix4();
   private maskSize: number;
@@ -258,6 +289,8 @@ export class ColorField {
         attribute float aNoise;
         attribute float aInner;
         attribute vec2 aRestore;
+        attribute vec2 aDrainSource;
+        varying vec2 vDrainSource;
         varying vec2 vRestore;
         varying vec2 vCenter;
         varying vec2 vUv;
@@ -272,10 +305,12 @@ export class ColorField {
           vNoise = aNoise;
           vInner = aInner;
           vRestore = aRestore;
+          vDrainSource = aDrainSource;
           vCenter = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */ `
+        varying vec2 vDrainSource;
         varying vec2 vUv;
         varying float vStrength;
         varying float vNoise;
@@ -308,7 +343,11 @@ export class ColorField {
             soft *= 1.0 - smoothstep(0.82, 1.0, length(p));
             ink = soft * soft * (3.0 - 2.0 * soft) * vStrength;
           }
-          gl_FragColor = vec4(ink, ink, ink, 1.0);
+          // Keep provenance before Max blending; evaluate drains at the receiving surface.
+          float shape = vStrength > 0.0001 ? ink / vStrength : 0.0;
+          float strongStroke = shape * vDrainSource.x > 1.0 ? 1.0 : 0.0;
+          float protectedSource = max(vDrainSource.y, strongStroke);
+          gl_FragColor = vec4(ink, ink * protectedSource, 0.0, 1.0);
         }`,
     });
     const N = ColorField.MAX_STAMPS;
@@ -318,14 +357,17 @@ export class ColorField {
     this.stampNoise = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
     this.stampInner = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
     this.stampRestore = new THREE.InstancedBufferAttribute(new Float32Array(N * 2), 2);
+    this.stampDrainSource = new THREE.InstancedBufferAttribute(new Float32Array(N * 2), 2);
     this.stampStrength.setUsage(THREE.DynamicDrawUsage);
     this.stampNoise.setUsage(THREE.DynamicDrawUsage);
     this.stampInner.setUsage(THREE.DynamicDrawUsage);
     this.stampRestore.setUsage(THREE.DynamicDrawUsage);
+    this.stampDrainSource.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aStrength', this.stampStrength);
     geo.setAttribute('aNoise', this.stampNoise);
     geo.setAttribute('aInner', this.stampInner);
     geo.setAttribute('aRestore', this.stampRestore);
+    geo.setAttribute('aDrainSource', this.stampDrainSource);
     this.stampMesh = new THREE.InstancedMesh(geo, this.stampMat, N);
     this.stampMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.stampMesh.frustumCulled = false;
@@ -352,6 +394,7 @@ export class ColorField {
     if (!this.maskRT || !this._renderer || !this.maskScene || !this.maskCam || !this.stampMesh || !this.stampMat) {
       return;
     }
+    this.syncVisualDrains();
     const renderer = this._renderer;
     const prevTarget = renderer.getRenderTarget();
     const prevAutoClear = renderer.autoClear;
@@ -365,7 +408,7 @@ export class ColorField {
     renderer.clear();
     renderer.autoClear = false;
 
-    const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number; inner: number; restore?: RestoreRegion }> = [];
+    const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number; inner: number; restore?: RestoreRegion; strokeStrength?: number; protected?: boolean }> = [];
 
     for (const r of this.restores) {
       if (r.radius > 0.01) {
@@ -379,6 +422,7 @@ export class ColorField {
           size: outer * 2,
           strength: 1,
           restore: r,
+          protected: true,
           noise: Math.min(0.12, (edge * 0.5) / outer),
           inner: Math.max(0, (r.radius - edge) / outer),
         });
@@ -415,7 +459,7 @@ export class ColorField {
     }
 
     for (const g of this.glows) {
-      if (g.strength > 0.01) stamps.push({ x: g.x, z: g.z, size: g.radius * 2, strength: g.strength, noise: 0.12, inner: 0.35 });
+      if (g.strength > 0.01) stamps.push({ x: g.x, z: g.z, size: g.radius * 2, strength: g.strength, noise: 0.12, inner: 0.35, protected: true });
     }
     // strokes: a bead of stamps along each capsule, brighter and longer-lived than the trail
     for (const st of this.strokes) {
@@ -424,7 +468,7 @@ export class ColorField {
       const k = Math.min(1, this.strokeStrength(st));
       for (let i = 0; i <= n; i++) {
         const u = i / n;
-        stamps.push({ x: st.a.x + (st.b.x - st.a.x) * u, z: st.a.z + (st.b.z - st.a.z) * u, size: st.radius * 2.2, strength: 0.95 * k, noise: 0.08, inner: 0.5 });
+        stamps.push({ x: st.a.x + (st.b.x - st.a.x) * u, z: st.a.z + (st.b.z - st.a.z) * u, size: st.radius * 2.2, strength: 0.95 * k, noise: 0.08, inner: 0.5, strokeStrength: this.strokeStrength(st) });
       }
     }
 
@@ -435,6 +479,7 @@ export class ColorField {
       const s = stamps[i]!;
       m.makeScale(s.size, 1, s.size).setPosition(s.x, 0, s.z);
       mesh.setMatrixAt(i, m);
+      this.stampDrainSource!.setXY(i, s.strokeStrength ?? 0, s.protected ? 1 : 0);
       this.stampStrength!.setX(i, s.strength);
       this.stampNoise!.setX(i, s.noise);
       this.stampInner!.setX(i, s.inner);
@@ -442,6 +487,7 @@ export class ColorField {
     }
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
+    this.stampDrainSource!.needsUpdate = true;
     this.stampStrength!.needsUpdate = true;
     this.stampNoise!.needsUpdate = true;
     this.stampInner!.needsUpdate = true;
@@ -453,6 +499,16 @@ export class ColorField {
     void dt;
   }
 
+  private syncVisualDrains(): void {
+    const count = Math.min(MAX_VISUAL_DRAINS, this.visualDrains.length);
+    this.visualDrainUniforms.uVisualDrainCount.value = count;
+    for (let i = 0; i < count; i++) {
+      const drain = this.visualDrains[i]!;
+      this.visualDrainUniforms.uVisualDrains.value[i]!.set(drain.center.x, drain.center.y, drain.center.z, Math.max(0.01, drain.radius));
+    }
+  }
+
+  /** RG provenance mask: red = all sources, green = permanent/glow or strong-stroke protected color. */
   getMaskTexture(): THREE.Texture | null {
     return this.maskRT?.texture ?? null;
   }
@@ -466,6 +522,7 @@ export class ColorField {
     const prev = mat.onBeforeCompile;
     mat.onBeforeCompile = (shader, renderer) => {
       prev.call(mat, shader, renderer); // keep material-specific patches (e.g. ground blend)
+      Object.assign(shader.uniforms, field.visualDrainUniforms);
       shader.uniforms.uFox = { value: field.fox.clone() };
       shader.uniforms.uAura = { value: field.auraRadius };
       shader.uniforms.uTrailRadius = { value: field.trailRadius };
@@ -509,6 +566,7 @@ export class ColorField {
           `#include <common>
           varying vec3 vWorldPosCF;
           varying vec3 vWorldNormalCF;
+          ${VISUAL_DRAIN_GLSL}
           uniform vec3 uFox;
           uniform float uAura;
           uniform float uTrailRadius;
@@ -542,6 +600,7 @@ export class ColorField {
           }
 
           float colorMaskAt(vec3 p) {
+            float temporaryVisibility = temporaryVisibilityAt(p);
             float s = uGlobalColor;
             cfRim = 0.0;
             cfPermanent = uGlobalColor;
@@ -551,7 +610,8 @@ export class ColorField {
                 (p.z - uBounds.z) / (uBounds.w - uBounds.z)
               );
               if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-                s = max(s, texture2D(uMaskMap, uv).r);
+                vec2 sources = texture2D(uMaskMap, uv).rg;
+                s = max(s, max(sources.r * temporaryVisibility, sources.g));
               }
             }
             // analytic restores with ink-bleed edge
@@ -575,7 +635,7 @@ export class ColorField {
             float an = (noise21(p.xz * 0.6) - 0.5) * 0.35 + (noise21(p.xz * 2.3) - 0.5) * 0.15;
             float ad = distance(p, uFox) / uAura + an;
             float af = 1.0 - smoothstep(0.15, 1.0, ad);
-            s = max(s, af * af);
+            s = max(s, af * af * temporaryVisibility);
             // the mask RT already carries the trail; the analytic loop is the no-RT fallback
             for (int i = 0; i < 24; i++) {
               if (i >= uTrailCount || uUseMaskMap > 0.5) break;
@@ -583,7 +643,7 @@ export class ColorField {
               float life = uTrail[i*4+3];
               float td = distance(p, tp);
               float fall = 1.0 - clamp(td / uTrailRadius, 0.0, 1.0);
-              s = max(s, fall * fall * (life / uTrailLife));
+              s = max(s, fall * fall * (life / uTrailLife) * temporaryVisibility);
             }
             return clamp(s, 0.0, 1.0);
           }
@@ -645,6 +705,7 @@ export class ColorField {
     const shader = (mat.userData as { colorFieldShader?: { uniforms: Record<string, { value: unknown }> } })
       .colorFieldShader;
     if (!shader) return;
+    this.syncVisualDrains();
     const u = shader.uniforms;
     (u.uFox!.value as THREE.Vector3).copy(this.fox);
     u.uAura!.value = this.auraRadius;

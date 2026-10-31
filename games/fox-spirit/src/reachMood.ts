@@ -24,7 +24,13 @@ export function createReachMood(scene: THREE.Scene, lights: ReturnType<typeof ap
       lights.hemi.groundColor.copy(groundColor).lerp(groundTarget, weight);
       fog.color.copy(sky.params.mist);
       if (scene.fog) scene.fog.color.copy(fog.color);
+      // Use the authored density, never last frame's result: otherwise the
+      // spatial blend compounds into clear air over successive updates.
+      if (weight > 0 && scene.fog instanceof THREE.FogExp2) {
+        scene.fog.density = fog.density * THREE.MathUtils.lerp(1, .4, weight);
+      }
     },
-    state: () => ({ k: Number(weight.toFixed(3)), mist: `#${fog.color.getHexString()}`, horizon: `#${sky.params.horizon.getHexString()}` }),
+    state: () => ({ k: Number(weight.toFixed(3)), mist: `#${fog.color.getHexString()}`, horizon: `#${sky.params.horizon.getHexString()}`,
+      density: scene.fog instanceof THREE.FogExp2 ? scene.fog.density : null }),
   };
 }

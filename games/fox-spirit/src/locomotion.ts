@@ -40,8 +40,8 @@ export class AuthoredLocomotion {
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     headHold: 1.2, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
-  metrics = { fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landPitch: 0, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+  metrics = { landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
@@ -59,7 +59,7 @@ export class AuthoredLocomotion {
     this.landSpring.value=0;this.landSpring.velocity=0;this.carriageReady=false;this.wasGrounded=true;this.previousVerticalSpeed=0;
     this.pelvisShare=0;
     this.metrics.authoredFlight=false;this.metrics.noSupport=false;this.metrics.windupActive=false;this.metrics.windupLoad=0;
-    this.metrics.fallPoseTime=0;this.metrics.fallPoseHeld=false;
+    this.metrics.fallPoseTime=0;this.metrics.fallPoseHeld=false;this.metrics.landPitch=0;
     this.metrics.bankCommand=0;this.metrics.pelvisBankAngle=0;this.metrics.chestBankAngle=0;
     this.metrics.noSupportFrames=0;this.metrics.noSupportSeconds=0;this.metrics.contactReleaseFrames=0;this.metrics.lastLandingImpact=0;this.metrics.earlyTouches=0;
     this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
@@ -411,6 +411,13 @@ export class AuthoredLocomotion {
     this.metrics.windupLoad=crouch;
     this.metrics.windupActive=this.input.grounded && active==='jump_up' && (this.input.crouch ?? 0)>0;
     this.root.position.y+=this.terrainOffset+landOffset-this.brake*this.params.brakeSquat-crouch*this.params.takeoffCrouch;
+    // Radians per meter of compression: shoulders lead the landing load.
+    const landingPitch=Math.max(0,-landOffset)*this.params.landPitch;
+    this.metrics.landPitch=landingPitch;
+    if(landingPitch>0){
+      this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
+      this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(landingPitch,0,0)));
+    }
     if(crouch>0){
       this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
       this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(-crouch*this.params.takeoffPitch,0,0)));

@@ -88,7 +88,7 @@ export type RealmEvent =
 export type Realm = {
   group: THREE.Group;
   updateHubVisuals: (time: number, dusk: number) => void;
-  hubState: () => { well: number; porch: number };
+  hubState: () => { well: number; porch: number; plaza: number; hearth: number };
   materials: THREE.MeshStandardMaterial[];
   collision: CollisionWorld;
   terrainY: (x: number, z: number) => number;
@@ -174,7 +174,7 @@ function smooth01(e0: number, e1: number, x: number): number {
 }
 
 /** Raw ground height (no void). */
-function groundRaw(x: number, z: number): number {
+export function groundRaw(x: number, z: number): number {
   const meadowW = smooth01(10, 50, z); // rolling south, calmer north
   let h =
     0.35 +
@@ -223,8 +223,8 @@ const AMBER_TREES: Array<[number, number, number, number]> = [
   [20, -16, 16, 1],
 ];
 
-const MEADOW_TREES: Array<[number, number, number, number]> = [
-  [-19, 82, 9, 1],
+export const MEADOW_TREES: Array<[number, number, number, number]> = [
+  [-44, 83, 9, 1], // relocated from the new cottage plot; stable index preserves other tree seeds
   [16, 82, 8, 2],
   [-34, 76, 10, 0],
   [30, 70, 9, 3],
@@ -1998,7 +1998,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     stone: bk('stone', -8, 85), wood: bk('wood', -8, 85),
     plaster: bk('hubPlaster', -8, 85), roof: bk('hubRoof', -8, 85),
     lamp: bk('hubLamp', -8, 85, false), dark: bk('hubDark', -8, 85),
-  }, patchable);
+  }, patchable, { wood: M.wood, roof: M.hubRoof, lamp: M.hubLamp, dark: M.hubDark });
 
   // Curated domestic edge groups, kept low enough to preserve paws and path edges.
   for (const [hi, house] of HUB_HOUSES.entries()) {
@@ -2018,16 +2018,18 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     }
   }
 
-  // ==================================================================== MEADOW + PORTAL
-  // portal ring of standing stones (0,92) and the first arch framing the Wellspring
-  for (let k = 0; k < 7; k++) {
-    const a = (k / 7) * Math.PI * 2 - Math.PI / 2 + 0.45;
-    const px = Math.cos(a) * 5.4;
-    const pz = 92 + Math.sin(a) * 5.4;
-    if (pz > 94) continue; // keep the camera side open
-    const h = 1.6 + ((k * 53) % 7) * 0.25;
-    bk('stone', px, pz).add(lanternColumn, trs(px, groundRaw(px, pz) - 0.1, pz, -a, 0.55 / 0.61, h / 1.9, 0.55 / 0.61, 0.06, 0.05), PAL.stone);
+  // Coherent low autumn drifts, with the core trails and water kept clear.
+  for (const [i, [x, z]] of [[-12.5, 84], [-13, 91], [-10, 93], [-5, 85.5], [-19, 95.5], [-28, 91.5]].entries()) {
+    litterPatch(bk('litter', x!, z!, false), rng(9400 + i), x!, z!, .8, 18, (px, pz) => {
+      if (hubPathDistance(px, pz) <= 1.2 || Math.hypot(px + 8, pz - 85) < 1.9) return NaN;
+      if (((px - POND.x) / POND.rx) ** 2 + ((pz - POND.z) / POND.rz) ** 2 < 1.2) return NaN;
+      if (HUB_HOUSES.some(h => Math.abs(px - h.x) < h.w / 2 + .2 && Math.abs(pz - h.z) < h.d / 2 + .2)) return NaN;
+      return groundRaw(px, pz);
+    }, [PAL.leafBrown, PAL.leafBrown, PAL.russet, PAL.gold]);
   }
+
+  // ==================================================================== MEADOW + PORTAL
+  // The village arch remains; decorative arrival-ring columns obscured the chase view.
   {
     const y = groundRaw(0, 85);
     archAt(bk('stone', 0, 85), 0, y - 0.1, 85, 0.06, { span: 3.6, pillarH: 4.2, seed: 250, pointed: true });
