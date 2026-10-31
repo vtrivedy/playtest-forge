@@ -347,6 +347,7 @@ async function boot() {
     folder.add(params,'landPitch',0,2,.05).name('land pitch rad/m');
     folder.add(params,'stationarySupport',0,.08,.005).name('stationary support m');
     folder.add(params,'landFrequency',2,6,.1);
+    folder.add(params,'landDamping',.4,1.2,.05);
     folder.add(params, 'walkHz', 1, 3, .05);
     folder.add(params, 'trotHz', 1.2, 4, .05);
     folder.add(params, 'gallopHz', 1.5, 5, .05);
