@@ -219,7 +219,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         w.fall.castShadow = !!w.gate && !flowing;
         w.glass.roughness = flowing ? 0.18 : 0.25;
         w.glass.opacity = (w.spot.gate ? 0.82 : 0.68) - (w.spot.gate ? 0.22 : 0.08) * w.reactor.heat;
-        w.glass.emissiveIntensity = 0.025 + w.reactor.heat * 0.025 + warning * (0.12 + Math.sin(time * 12) * 0.07);
+        w.glass.emissiveIntensity = (w.spot.gate ? 0.09 : 0.025) + w.reactor.heat * 0.025 + warning * (0.12 + Math.sin(time * 12) * 0.07);
         w.light.intensity = 0.8 + w.reactor.heat * 1.2;
         const fallBottom = flowing ? w.spot.path[0]!.y : w.spot.foot.y;
         w.fall.scale.y = (w.spot.lip.y - fallBottom) / (w.spot.lip.y - w.spot.foot.y);

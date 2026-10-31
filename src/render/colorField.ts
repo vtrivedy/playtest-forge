@@ -242,9 +242,7 @@ export class ColorField {
 
     // All stamps (restores + fox + trail) go out as one instanced draw per frame
     this.stampMat = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-      },
+      uniforms: {},
       transparent: true,
       // Sources combine by strongest contribution, exactly as sample() does.
       // Summing overlapping trail stamps turned their soft edges into a hard disc.
@@ -278,7 +276,6 @@ export class ColorField {
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */ `
-        uniform float uTime;
         varying vec2 vUv;
         varying float vStrength;
         varying float vNoise;
@@ -295,21 +292,21 @@ export class ColorField {
         varying vec2 vWorld;
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
-          // Stationary world-space brush noise: neighbouring stamps share one ragged,
-          // organic edge instead of each repeating the same disc outline
-          float n = ((noise(vWorld * 0.55) - 0.5) * 1.6 + (noise(vWorld * 2.1) - 0.5) * 0.7) * vNoise;
-          // Reserve an unpainted border for outward brush variation. Without it,
-          // negative noise leaves nonzero ink at the quad edge: visible rectangles.
-          float d = length(p) + n;
-          float soft = 1.0 - smoothstep(vInner, 0.88, d);
-          soft *= 1.0 - smoothstep(0.82, 1.0, length(p));
-          float ink = soft * soft * (3.0 - 2.0 * soft) * vStrength;
+          float ink;
           if (vRestore.y > 0.0) {
             // Same metres, stationary noise and feather as the analytic material front.
             // Leaves sampling this RT must not see a larger circular restore halo.
             float edge = vRestore.y;
             float brush = ((noise(vWorld * 0.35) - 0.5) * 0.8 + (noise(vWorld * 1.7) - 0.5) * 0.35) * edge * 1.6;
             ink = 1.0 - smoothstep(vRestore.x - edge + brush, vRestore.x + edge * 0.5 + brush, distance(vWorld, vCenter));
+          } else {
+            // Stationary world-space brush noise makes neighbouring stains coherent.
+            float n = ((noise(vWorld * 0.55) - 0.5) * 1.6 + (noise(vWorld * 2.1) - 0.5) * 0.7) * vNoise;
+            float d = length(p) + n;
+            float soft = 1.0 - smoothstep(vInner, 0.88, d);
+            // Fade before the square boundary so outward bleed cannot make rectangles.
+            soft *= 1.0 - smoothstep(0.82, 1.0, length(p));
+            ink = soft * soft * (3.0 - 2.0 * soft) * vStrength;
           }
           gl_FragColor = vec4(ink, ink, ink, 1.0);
         }`,
@@ -449,7 +446,6 @@ export class ColorField {
     this.stampNoise!.needsUpdate = true;
     this.stampInner!.needsUpdate = true;
     this.stampRestore!.needsUpdate = true;
-    this.stampMat.uniforms.uTime!.value = this.time;
     renderer.render(this.maskScene, this.maskCam);
 
     renderer.setRenderTarget(prevTarget);
@@ -489,7 +485,6 @@ export class ColorField {
       shader.uniforms.uBounds = {
         value: new THREE.Vector4(field.bounds.minX, field.bounds.maxX, field.bounds.minZ, field.bounds.maxZ),
       };
-      shader.uniforms.uTime = { value: 0 };
       shader.uniforms.uRestoredChroma = { value: (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1 };
 
       (mat.userData as { colorFieldShader?: typeof shader }).colorFieldShader = shader;
@@ -534,8 +529,7 @@ export class ColorField {
           uniform sampler2D uMaskMap;
           uniform float uUseMaskMap;
           uniform vec4 uBounds;
-          uniform float uTime;
-
+  
           float hash21(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
           }
@@ -658,7 +652,6 @@ export class ColorField {
     u.uTrailLife!.value = this.trailLife;
     u.uGlobalColor!.value = this.globalColor;
     if (u.uRestoredChroma) u.uRestoredChroma.value = (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1;
-    u.uTime!.value = this.time;
     (u.uBounds!.value as THREE.Vector4).set(
       this.bounds.minX,
       this.bounds.maxX,
