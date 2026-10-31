@@ -132,6 +132,24 @@ try {
   async function shot(name) {
     await page.screenshot({ path: path.join(out, `${name}.png`), animations: 'disabled' });
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
+    if (name.startsWith('reachview-')) {
+      // Validate the snapshot belonging to this PNG, after its staged teleport/lens.
+      // This observes the same simulated water; it never sets a puzzle state.
+      const { reach, reachMood } = report.shots[name].state;
+      const expectedLevel = name.startsWith('reachview-low-') ? 'low' : 'high';
+      const fillMatches = Number.isFinite(reach?.fill) && (expectedLevel === 'high' ? reach.fill >= .99 : reach.fill <= .02);
+      const checks = {
+        expectedLevel,
+        actualLevel: reach?.level,
+        fill: reach?.fill,
+        moodWeight: reachMood?.k,
+        waterMatches: reach?.level === expectedLevel && fillMatches,
+        moodMatches: reachMood?.k === 1,
+      };
+      save(`${name}-acceptance.json`, checks);
+      if (!checks.waterMatches) report.failures.push(`${name}: labelled ${expectedLevel.toUpperCase()} water state does not match PNG snapshot`);
+      if (!checks.moodMatches) report.failures.push(`${name}: Reach mood is not fully blended at photo position`);
+    }
   }
   await boot(quality);
   await shot('hardware-probe');
