@@ -664,6 +664,10 @@ try {
     await H('setKeys', []); await H('setStick', null);
     await advance(60); await shot('restoration-wake');
     await advance(360); await shot('restoration-wake-decayed');
+    // Reed Seedwell is at (95, 10), radius 35: the south front crosses z=45.
+    // The meadow lens cannot see it, so use a separate fixed lens for the matched front pair.
+    await H('photo', [81, 23, 68], [83, 0, 41], 52);
+    await advance(1); await shot('restoration-front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
     for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['settled', 240]]) {
