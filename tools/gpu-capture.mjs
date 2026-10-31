@@ -582,16 +582,18 @@ try {
       {name:'Windmill slope jump and land',seconds:3,stick:td.map(v=>v*.18),jump:true,reset:sp(-4,0,.1+1.9*2.5/6.9)},
       {name:'Meadow dash',seconds:1,stick:[0,-1],dash:true,reset:[0,null,86]},
       {name:'Windmill brake and settle',seconds:2,stick:[0,0]},
+      {name:'Meadow long drop and landing',seconds:2,stick:[0,0],reset:[0,null,80],drop:8,settle:0},
+      {name:'Meadow standing gather and recovery',seconds:2,stick:[0,0],reset:[8,null,88],jump:true,standing:true},
     ];
     let cursor=0;for(const segment of segments){segment.start=cursor;cursor+=segment.seconds*fps;segment.end=cursor;}
     const at=i=>segments.find(segment=>i<segment.end);
-    const keyFrames=segments.flatMap(segment=>[segment.start+Math.round(fps*.25),segment.end-1]);
-    save('showcase-script.json',{label:'20 seconds in real World1, live controller, staged segment cuts, standard gameplay camera, no forced poses or grade',segments});
+    const keyFrames=segments.flatMap(segment=>segment.standing ? [0,1,2,3,5,8,15,30,45,65].map(f=>segment.start+f).concat(segment.end-1) : segment.drop ? [.08,.25,.4,.55,.7,1,1.5].map(t=>segment.start+Math.round(fps*t)).concat(segment.end-1) : [segment.start+Math.round(fps*.25),segment.end-1]);
+    save('showcase-script.json',{label:'World1 live controller, staged segment cuts, tracked three-quarter review camera, no forced poses or grade',segments});
     await video('showcase',cursor,async i=>{
       const segment=at(i),local=i-segment.start;
       let stick=segment.stick;
       if(segment.turn){const angle=local/fps*2;stick=[Math.sin(angle)*.45,-Math.cos(angle)*.45];}
-      if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(18);}
+      if(local===0 && segment.reset){const reset=[...segment.reset];if(reset[1]===null)reset[1]=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[reset[0],reset[2]]);reset[1]+=segment.drop??0;const yaw=Math.atan2(stick[0],stick[1]);await H('teleport',...reset,yaw);await H('photoOff');await H('setStick',0,0);await H('setKeys',[]);await advance(segment.settle??18);}
       await H('setStick',...stick);
       await H('setKeys',segment.dash && local===0 ? ['ShiftLeft'] : segment.jump && local<Math.round(.25*fps)?['Space']:[]);
     },undefined,{traceEveryFrame:true,keyFrames,afterStep:async(i,state)=>{const[x,y,z]=state.pos;await H('photo',[x-5.6,y+1.6,z+2],[x,y+.65,z],42);}});
@@ -603,9 +605,19 @@ try {
     const landed=air>=0?rows.slice(air+1).find(row=>row.state.grounded):null;
     const pos=landed?.state.pos;
     const terraceS=pos ? (pos[0]+48)*td[0]+(pos[2]-52)*td[1] : null;
-    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'standard gameplay',slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
+    const drop=segments.find(segment=>segment.drop);
+    const dropRows=result.trace.filter(row=>row.frame>=drop.start && row.frame<drop.end);
+    const longDropFallSeconds=dropRows.filter(row=>row.state.anim==='jump_fall').reduce((sum,row)=>sum+row.dt,0);
+    const longDropLanded=dropRows.some(row=>row.state.grounded);
+    const longDropHeldFrames=dropRows.filter(row=>row.state.anim==='jump_fall' && row.state.locomotion?.fallPoseHeld).length;
+    const standing=segments.find(segment=>segment.standing);
+    const standingRows=result.trace.filter(row=>row.frame>=standing.start && row.frame<standing.end);
+    const standingWindupFrames=standingRows.filter(row=>row.state.locomotion?.windupActive).length;
+    const standingJumpAirborne=standingRows.some(row=>!row.state.grounded);
+    const standingJumpLanded=standingRows.at(-1)?.state.grounded ?? false;
+    const acceptance={seconds:cursor/fps,frames:cursor,world:'Reedmarsh + Arrival Meadow + Windmill Rise',camera:'tracked three-quarter review lens',longDropHeight:drop.drop,longDropFallSeconds,longDropLanded,longDropHeldFrames,standingWindupFrames,standingJumpAirborne,standingJumpLanded,slopeJumpAirborne:air>=0,slopeLanding:pos??null,terraceS,landedOnIncline:terraceS!==null && terraceS> -6.5 && terraceS<.4,deaths:(await H('state')).deaths};
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
-    if(!acceptance.landedOnIncline || acceptance.deaths)throw Error('World showcase did not complete safely with an incline landing');
+    if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
@@ -1217,11 +1229,15 @@ try {
     // Staged source hold uses real colour supply; no basin, seal or float state is assigned.
     await RH('teleport',173,30,-116,Math.PI/2);await advance(900,false);
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
+    await RH('teleport',187,36,-118,Math.PI/2);await RH('photo',[151,49,-103],[188,33,-120],52);await advance(2);await shot('reachview-high-basin');
     await RH('teleport',214,31,-137,Math.PI/2);
-    await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-payoff-vista');
+    await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-lower-islet');
+    await RH('teleport',207,36,-123,-Math.PI/2);
+    await RH('photo',[216,42,-134],[184,34,-115],52);await advance(2);await shot('reachview-payoff-vista');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
+    await RH('teleport',187,30,-118,Math.PI/2);await RH('photo',[151,49,-103],[188,33,-120],52);await advance(2);await shot('reachview-low-basin');
     save('reachview-state.json',await RH('state'));
   }
   if (wants('reach')) {
@@ -1241,23 +1257,31 @@ try {
     const end=await RH('state');save('reach-acceptance.json',{phase,reached,end});
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
-      let cycle=0,cycleAge=0,cyclePaint=false;
-      const lowSeen={value:false};
+      let cycle=0,cycleAge=0,cyclePaint=false,ventHopIssued=false;
+      const lowSeen={value:false};let lowLaneVisited=false,steamRise=false;
       await video('reach-level-cycle',30*fps,async()=>{
         const st=await RH('state');cycleAge+=1/fps;
         const targets=[[201,36,-121],[201,36,-121],[183,30,-128],[183,30,-128],[173,30,-124],[173,30,-124]].map(p=>[p[0]-70,p[1],p[2]]);
         const p=targets[cycle],dx=p[0]-st.pos[0],dz=p[2]-st.pos[2],d=Math.hypot(dx,dz);
-        const ready=cycle===1?st.reach.fill<.02:cycle===3?cycleAge>1.2:cycle===5?st.reach.fill>.99:d<.8&&st.pos[1]>=p[1]-.5;
-        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;cycle++;cycleAge=0;cyclePaint=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
+        const atFooting=d<.8&&st.grounded&&Math.abs(st.pos[1]-p[1])<.6;
+        const ready=cycle===0?st.reach.level==='low':cycle===1?st.reach.fill<.02:cycle===2?atFooting:cycle===3?cycleAge>1.2&&st.pos[1]>34:cycle===4?st.reach.level==='high':st.reach.fill>.99;
+        if(ready&&cycleAge>.2&&cycle<5){if(cycle===1)lowSeen.value=true;if(cycle===2)lowLaneVisited=true;if(cycle===3)steamRise=true;cycle++;cycleAge=0;cyclePaint=false;ventHopIssued=false;console.log('REACH CYCLE',cycle,JSON.stringify(st.reach));}
         const t=targets[cycle],vx=t[0]-st.pos[0],vz=t[2]-st.pos[2],len=Math.hypot(vx,vz);
-        await RH('setStick',len>.25?vx/len*Math.min(.8,len):0,len>.25?vz/len*Math.min(.8,len):0);
-        const keys=cycle===2||cycle===3&&cycleAge>.3?['Space']:[];
-        if([0,3,4].includes(cycle)&&len<2.8&&!cyclePaint){keys.push('ShiftLeft');cyclePaint=true;}
+        let sx=len>.25?vx/len*Math.min(.8,len):0,sz=len>.25?vz/len*Math.min(.8,len):0;
+        const steamHot=st.chem.hearths.some(h=>h.id==='reach-steam'&&h.heat>=.5);
+        if(cycle===3&&cyclePaint&&cycleAge>.5&&st.grounded&&len<.8&&Math.hypot(st.vel[0],st.vel[2])<1&&steamHot)ventHopIssued=true;
+        const keys=((cycle===2&&len>3)||(cycle===3&&ventHopIssued))?['Space']:[];
+        if([0,3,4].includes(cycle)&&len<2.8&&st.grounded&&Math.abs(st.pos[1]-t[1])<.6&&!cyclePaint){
+          // A dash needs a direction even after the fox has stopped at the lever.
+          if(Math.hypot(sx,sz)<.1){sx=-1;sz=0;}
+          keys.push('ShiftLeft');cyclePaint=true;
+        }
+        await RH('setStick',sx,sz);
         await RH('setKeys',keys);
       },st=>cycle===5&&st.reach.level==='high'&&st.reach.fill>.99||st.deaths>end.deaths||cycleAge>10,{keyFrames:[0,4*fps,8*fps,12*fps,16*fps]});
       await RH('setKeys',[]);await RH('setStick',null);await shot('reach-cycle-end');
-      const cy=await RH('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,end:cy});
-      if(cycle!==5||!lowSeen.value||cy.reach.fill<.99)report.failures.push('Reach reversible water cycle incomplete');
+      const cy=await RH('state');save('reach-cycle-acceptance.json',{cycle,lowSeen:lowSeen.value,lowLaneVisited,steamRise,end:cy});
+      if(cycle!==5||!lowSeen.value||!lowLaneVisited||!steamRise||cy.reach.level!=='high'||!cy.reach.restored||cy.reach.fill<.99)report.failures.push('Reach reversible water cycle incomplete');
     }
     // Staged architecture views are separate from the real summit-to-basin traversal above.
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reach-overview');
