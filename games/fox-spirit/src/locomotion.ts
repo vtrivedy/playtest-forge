@@ -316,11 +316,12 @@ export class AuthoredLocomotion {
         foot.planted = true; foot.anchor.copy(pad);
         if (locoW > .5 && input.speed > 1) this.footfalls.push(pad.clone().setY(ground));
       } else if (foot.stance < .4) foot.planted = false;
-      if (foot.planted && p.footLock > 0) {
+      // Only gait stance locks XZ; idle/turn/land clips place (and step) their own paws, IK just fits them to the ground.
+      if (foot.planted && p.footLock > 0 && locoW > 1e-3) {
         const want = foot.anchor.clone().sub(pad).setY(0);
         this.metrics.maxPlantError = Math.max(this.metrics.maxPlantError, want.length());
         if (want.length() > p.maxLock) { want.setLength(p.maxLock); foot.anchor.copy(pad).add(want); }
-        foot.lock.copy(want).multiplyScalar(p.footLock);
+        foot.lock.copy(want).multiplyScalar(p.footLock * locoW);
       } else foot.lock.multiplyScalar(Math.exp(-dt / .06));
       // Vertical: stance pads sit on their own ground hit; swing pads follow the terrain under them (never below it).
       const offset = ground - actorGround;
