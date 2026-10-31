@@ -34,13 +34,13 @@ export function createStylizedWater(
       void main() {
         vec3 p = position;
         vLocal = position.xy / uHalf;
-        float w1 = sin(p.x * 0.35 + uTime * 1.1) * 0.08;
-        float w2 = cos(p.y * 0.28 + uTime * 0.9) * 0.06;
+        float w1 = sin(p.x * 0.55 + uTime * 0.65) * 0.025;
+        float w2 = cos(p.y * 0.43 + uTime * 0.48) * 0.018;
         // plane is XZ; geometry PlaneGeometry → local y is up after rot
         p.z += w1 + w2;
         vec4 wpos = modelMatrix * vec4(p, 1.0);
         vWorld = wpos.xyz;
-        vN = normalize(mat3(modelMatrix) * normalize(vec3(-cos(p.x*0.35+uTime*1.1)*0.35*0.08, sin(p.y*0.28+uTime*0.9)*0.28*0.06, 1.0)));
+        vN = normalize(mat3(modelMatrix) * normalize(vec3(-cos(p.x*0.55+uTime*0.65)*0.55*0.025, sin(p.y*0.43+uTime*0.48)*0.43*0.018, 1.0)));
         gl_Position = projectionMatrix * viewMatrix * wpos;
       }`,
     fragmentShader: /* glsl */ `
@@ -51,19 +51,32 @@ export function createStylizedWater(
       varying vec2 vLocal;
       void main() {
         vec3 V = normalize(cameraPosition - vWorld);
-        float fres = pow(1.0 - max(0.0, dot(normalize(vN), V)), 3.0);
-        float bands = sin(vWorld.x * 0.8 + vWorld.z * 0.55 + uTime * 1.5) * 0.5 + 0.5;
-        vec3 col = mix(uDeep, uShallow, bands * 0.45 + 0.2);
-        col = mix(col, uSky, fres * 0.65);
-        // radial fade into sky mist — no hard square edge at the horizon
+        // Broad crossed swells bend reflections without a noisy photographic normal map.
+        vec2 q = vWorld.xz;
+        float a = dot(q, vec2(0.72, 0.38)) - uTime * 0.55;
+        float b = dot(q, vec2(-0.31, 0.64)) + uTime * 0.38;
+        vec3 N = normalize(vN + vec3(cos(a) * 0.055, 0.0, cos(b) * 0.045));
+        float fres = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 4.0);
         float r = length(vLocal);
-        // Broad soft sky reflections, with small travelling highlights instead of a flat grey rim.
-        float ripple = sin(vWorld.x * 3.1 + vWorld.z * 1.7 - uTime * 2.5) + sin(vWorld.x * 1.3 - vWorld.z * 2.9 + uTime * 1.8);
-        float glint = pow(max(0.0, ripple * 0.5), 14.0);
-        col += uSky * glint * 0.12;
-        col = mix(col, uShallow, smoothstep(0.7, 1.0, r) * 0.25);
-        float alpha = mix(0.72, 0.92, fres) * smoothstep(1.0, 0.7, r);
-        gl_FragColor = vec4(col, alpha);
+        // Authored elliptical basin: transparent shallows darken toward the centre.
+        // This is a depth suggestion, not a scene-depth/refraction buffer.
+        float depth = 1.0 - smoothstep(0.15, 1.0, r);
+        float bedLight = sin(a + sin(b) * 0.55) * sin(b * 1.3) * 0.5 + 0.5;
+        vec3 body = mix(uShallow * 0.66, uDeep * 0.7, depth);
+        body += uShallow * bedLight * (1.0 - depth) * 0.075;
+        vec3 R = reflect(-V, N);
+        float skyWash = smoothstep(-0.15, 0.65, R.y);
+        float reflectedGrove = sin(R.x * 8.0 + R.z * 5.0 + sin(a) * 0.16) * 0.5 + 0.5;
+        vec3 reflection = mix(uDeep * 0.55, uSky * 0.72, skyWash);
+        reflection *= 0.82 + reflectedGrove * 0.18;
+        vec3 col = mix(body, reflection, 0.12 + fres * 0.68);
+        // Narrow, broken amber glints, deliberately far below white/bloom.
+        float glint = pow(max(0.0, sin(a * 2.1 + sin(b) * 0.6)), 24.0);
+        glint *= smoothstep(0.25, 0.8, sin(b * 1.8) * 0.5 + 0.5);
+        col += uSky * glint * (0.025 + fres * 0.065);
+        float shore = 1.0 - smoothstep(0.78, 1.0, r);
+        float alpha = mix(0.38, 0.82, depth) + fres * 0.12;
+        gl_FragColor = vec4(col, alpha * shore);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
