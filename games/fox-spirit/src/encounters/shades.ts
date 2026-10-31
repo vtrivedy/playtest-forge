@@ -11,8 +11,8 @@ import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferG
  */
 export type ShadeSpot = { id: string; patrol: Array<[number, number, number]>; speed?: number; afterLatch?: string };
 
-export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number; noticeDistance: number; noticeTime: number; leafSize: number };
-export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 1.25, hitRadius: 1.1, knockback: 3, bob: 0.12, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.26, inkSize: 0.8, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14 };
+export type ShadeTunables = { drainRadius: number; speed: number; hitRadius: number; knockback: number; bob: number; releaseTime: number; invulnerability: number; debug: boolean; inkOpacity: number; inkSize: number; noticeDistance: number; noticeTime: number; leafSize: number; chaseDistance: number; chaseDelay: number; chaseLeash: number };
+export const SHADE_DEFAULTS: ShadeTunables = { drainRadius: 3, speed: 1.25, hitRadius: 1.1, knockback: 3, bob: 0.12, releaseTime: 1.2, invulnerability: 1, debug: false, inkOpacity: 0.26, inkSize: 0.8, noticeDistance: 6, noticeTime: 0.3, leafSize: 0.14, chaseDistance: 3.8, chaseDelay: 1.2, chaseLeash: 4 };
 
 type ShadeActor = {
   active: boolean;
@@ -26,7 +26,6 @@ type ShadeActor = {
   heading: number;
   group: THREE.Group;
   mat: THREE.ShaderMaterial;
-  fringe: THREE.ShaderMaterial;
   layers: THREE.ShaderMaterial[];
   mode: 'patrol' | 'chase' | 'return' | 'released';
   nearTime: number;
@@ -110,9 +109,9 @@ const NOISE = /* glsl */ `
 
 function inkMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uFringe: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 } },
     vertexShader: /* glsl */ `
-      uniform float uTime, uPresence, uSeed, uFringe, uNoticeYaw, uLayer;
+      uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer;
       varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
       ${NOISE}
       void main() {
@@ -136,7 +135,7 @@ function inkMaterial(): THREE.ShaderMaterial {
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
-      uniform float uTime, uPresence, uSeed, uFringe, uNoticeYaw, uLayer;
+      uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer;
       varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
       ${NOISE}
       void main() {
@@ -163,7 +162,7 @@ function inkMaterial(): THREE.ShaderMaterial {
   });
 }
 
-/** Sparse paper-wash wisps: original analytic sprites, no texture or external asset. */
+/** Animal-volume ink wisps: original analytic sprites, no texture or external asset. */
 function inkWisps(seed: number, source: THREE.BufferGeometry) {
   const g = new THREE.BufferGeometry();
   // Sample the real animal surface, pulling inward to populate its depth instead of a halo plane.
@@ -259,7 +258,7 @@ export type ShadeSystem = {
   state: () => Array<{ id: string; pos: number[]; freed: boolean }>;
 };
 
-export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groundAt: (x: number, z: number, y: number) => number, gui?: GUI): Promise<ShadeSystem> {
+export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groundAt: (x: number, z: number, y: number) => number, gui?: GUI, blocked: (x: number, z: number, y: number) => boolean = () => false): Promise<ShadeSystem> {
   const tun = { ...SHADE_DEFAULTS };
   const geo = await animalGeometry();
   const leafGeo = leafGeometry();
@@ -286,7 +285,6 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       group.add(wash);
       layers.push(material);
     }
-    const fringe = layers[0]!;
     const smoke=inkWisps(i, geo);
     group.add(smoke);
     const eyes=new THREE.Group();eyes.position.set(0,1.45,.48);
@@ -320,7 +318,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { layers, mode: 'patrol', nearTime: 0, notice: 0, noticeYaw: 0, active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, fringe, smoke, eyes, pool, presence: 1, freed: false };
+    return { layers, mode: 'patrol', nearTime: 0, notice: 0, noticeYaw: 0, active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, smoke, eyes, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
@@ -378,9 +376,9 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           const patrol = s.curve.getPointAt(s.u);
           const distance = Math.hypot(fox.x-s.pos.x,fox.z-s.pos.z);
           const onLevel = Math.abs(fox.y-s.pos.y)<2;
-          s.nearTime = distance < 3.8 && onLevel ? s.nearTime + dt : 0;
-          if (s.mode === 'chase' && (distance > 7 || !onLevel || s.pos.distanceTo(patrol)>4)) s.mode='return';
-          if (s.mode === 'patrol' && s.nearTime > 1.2) s.mode='chase';
+          s.nearTime = distance < tun.chaseDistance && onLevel ? s.nearTime + dt : 0;
+          if (s.mode === 'chase' && (distance > 7 || !onLevel || s.pos.distanceTo(patrol)>tun.chaseLeash)) s.mode='return';
+          if (s.mode === 'patrol' && s.nearTime > tun.chaseDelay) s.mode='chase';
           if (s.mode === 'return' && s.pos.distanceTo(patrol)<.4) { s.mode='patrol'; s.nearTime=0; }
           const target = s.mode === 'chase' ? fox : patrol;
           tmp.copy(target).sub(s.pos).setY(0);
@@ -392,7 +390,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
             const step=Math.min(remaining,dt*(s.speed??tun.speed)*(s.mode==='chase'?1.25:1));
             const nx=s.pos.x+Math.sin(s.heading)*step,nz=s.pos.z+Math.cos(s.heading)*step;
             const floor=groundAt(nx,nz,s.pos.y+1);
-            if(Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<.6) s.pos.set(nx,floor,nz);
+            if(Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<.6&&!blocked(nx,nz,floor)) s.pos.set(nx,floor,nz);
             else s.mode='return';
           }
           const near = Math.hypot(fox.x-s.pos.x,fox.z-s.pos.z)<tun.noticeDistance && Math.abs(fox.y-s.pos.y)<3;
@@ -430,7 +428,6 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         s.eyes.rotation.y=s.noticeYaw;
         s.eyes.visible=!s.freed;
         s.mat.uniforms.uNoticeYaw!.value = s.noticeYaw;
-        s.fringe.uniforms.uNoticeYaw!.value = s.noticeYaw;
         s.mat.uniforms.uTime!.value = t;
         s.mat.uniforms.uPresence!.value = s.presence;
         for (const material of s.layers) {
@@ -482,6 +479,9 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     f.add(tun, 'inkOpacity',0,.4,.01);
     f.add(tun, 'inkSize',.2,1.5,.05);
     f.add(tun, 'noticeDistance',3,10,.25);
+    f.add(tun, 'chaseDistance',2,6,.1);
+    f.add(tun, 'chaseDelay',.4,3,.1);
+    f.add(tun, 'chaseLeash',2,6,.1);
     f.add(tun, 'noticeTime',.15,.6,.05);
     f.add(tun, 'leafSize',.06,.22,.01);
     f.add(tun, 'debug');
