@@ -35,6 +35,7 @@ export async function captureShadeHero({repo,getPage,H,advance,video,shot,save,r
   await H('teleport',...setup.pos,setup.yaw);await H('setKeys',[]);await H('setStick',null);
   await review.camera(id,setup.heldLens);await advance(0);
   const before=await H('state'),beforeHash=await review.matrix();
+  const fieldBefore=await page.evaluate(id=>{const h=window.__gameHooks,a=h.shades.state().actors.find(a=>a.id===id),p=new h.debug.fox.position.constructor(...a.pos);return{pos:a.pos,draining:h.shades.drains(...a.pos),raw:h.debug.colorField.sample(p)};},id);
   await shot('shade-hero-before');
   save('shade-hero-before.json',{game:await page.evaluate(()=>window.__game),matrixHash:beforeHash,framing:await review.measure(id),setup});
   await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
@@ -47,7 +48,13 @@ export async function captureShadeHero({repo,getPage,H,advance,video,shot,save,r
   const blocked=rows.filter(r=>!r.state.capture?.lens?.clear||r.state.capture?.lens?.noFit).map(r=>r.frame);
   const floors=await page.evaluate(positions=>positions.map(p=>{const y=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;return Number.isFinite(y)?p[1]-y:null;}),rows.map(r=>r.state.pos));
   const states=await page.evaluate(()=>window.__gameHooks.shades.state()),actor=states.actors.find(a=>a.id===id);
-  const checks={dryGround:dry(actor.pos)&&rows.every(r=>dry(r.state.pos)),realFree:actor.freed&&states.frees===before.shades.frees+1,heldCamera:hashes.length===1&&hashes[0]===beforeHash,framed:framed.length>0&&!badPair.length,clear:!blocked.length,supported:floors.every(gap=>gap!==null&&Math.abs(gap)<=.15)&&after.grounded,noDeath:after.deaths===before.deaths,noExtraHit:states.hits===before.shades.hits,realDash:after.dash.used>before.dash.used};
+  const wash=await page.evaluate(id=>{
+    const h=window.__gameHooks,a=h.shades.state().actors.find(a=>a.id===id),f=h.debug.colorField,p=new h.debug.fox.position.constructor(...a.pos);
+    const stroke=f.strokes.find(s=>Math.abs(s.radius-h.shades.tun.drainRadius)<.001&&Math.abs(s.strength-1.2)<.001&&Math.hypot(s.a.x-p.x,s.a.z-p.z)<.05);
+    return{pos:a.pos,releaseAge:a.releaseAge,draining:h.shades.drains(...a.pos),raw:f.sample(p),stroke:stroke?{life:stroke.life,effectiveStrength:f.strokeStrength(stroke),radius:stroke.radius,center:stroke.a.toArray()}:null};
+  },id);
+  save('shade-hero-color-return.json',{before:fieldBefore,after:wash,label:'Read-only live field probes around actual release; PNGs remain art evidence'});
+  const checks={releaseWash:fieldBefore.draining&&!wash.draining&&!!wash.stroke&&Math.abs(wash.stroke.life+wash.releaseAge-6)<.06&&wash.stroke.effectiveStrength>1,dryGround:dry(actor.pos)&&rows.every(r=>dry(r.state.pos)),realFree:actor.freed&&states.frees===before.shades.frees+1,heldCamera:hashes.length===1&&hashes[0]===beforeHash,framed:framed.length>0&&!badPair.length,clear:!blocked.length,supported:floors.every(gap=>gap!==null&&Math.abs(gap)<=.15)&&after.grounded,noDeath:after.deaths===before.deaths,noExtraHit:states.hits===before.shades.hits,realDash:after.dash.used>before.dash.used};
   const result={passed:Object.values(checks).every(Boolean),checks,badPair,blocked,hashes,frames:rows.length,maximumFloorGap:Math.max(...floors.map(v=>v??Infinity)),before,after,game:await page.evaluate(()=>window.__game)};
   save('shade-hero-acceptance.json',result);
   if(!result.passed)report.failures.push('Open meadow release failed: '+JSON.stringify(checks));
