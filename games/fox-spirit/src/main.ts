@@ -338,7 +338,7 @@ async function boot() {
     folder.add(params,'tailLoad',0,.4,.01);
     folder.add(params,'brakeSquat',0,.08,.002);
     folder.add(params,'brakePitch',0,.2,.005);
-    folder.add(params,'landSquash',0,.25,.005);
+    folder.add(params,'landSquash',0,.4,.005);
     folder.add(params,'landPitch',0,2,.05).name('land pitch rad/m');
     folder.add(params,'stationarySupport',0,.08,.005).name('stationary support m');
     folder.add(params,'landFrequency',2,6,.1);
@@ -372,6 +372,7 @@ async function boot() {
     folder.add(params, 'turnPlant', 0, 1.5, .05);
     folder.add(params, 'gallopHeadHold', 0, 1.5, .05);
     folder.add(params, 'suspensionLift', 0, .12, .005);
+    folder.add(params, 'gatherLift', 0, .15, .005);
     folder.add(params, 'tailLag', 0, .3, .01);
     folder.add(params, 'pelvisBank', 0, 1, .05);
     folder.add(params, 'headRollStabilize', 0, 1, .05);
