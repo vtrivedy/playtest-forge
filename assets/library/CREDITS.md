@@ -126,3 +126,5 @@ the CC0 Quaternius pieces listed above. No new downloads or paid assets.
 Lanternhollow village density pass: additional original cottage variants, timber market crate/lidded barrel and ground-fitted flagstones; no external asset downloads. Existing CC0 material sources above remain unchanged.
 
 Lanternhollow communal cooking pot, trivet, low stone ring and contained three-dimensional fire tongues are original procedural geometry/materials; no external assets or API used.
+
+Lanternhollow twelve-lantern pass: two additional cottage-mounted festoon cords and connected timber hooks reuse the original procedural lamp geometry/materials. No new external assets, downloads or API calls.

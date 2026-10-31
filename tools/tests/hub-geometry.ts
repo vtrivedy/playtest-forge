@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import assert from 'node:assert/strict';
 import { createLanternhollow, HUB_HOUSES, HUB_PATHS, HUB_FESTOON_POSTS, hubPathDistance } from '../../games/fox-spirit/src/regionLanternhollow.ts';
-import { outlineR, MEADOW_TREES } from '../../games/fox-spirit/src/russetvale.ts';
+import { outlineR, MEADOW_TREES, groundRaw } from '../../games/fox-spirit/src/russetvale.ts';
 import { Bucket } from '../../games/fox-spirit/src/russetKit.ts';
 import { CollisionWorld, colliderTopAt } from '../../games/fox-spirit/src/collision.ts';
 // CPU geometry only. Canvas drawing is stubbed; no renderer/browser is created.
@@ -17,6 +17,38 @@ const col = new CollisionWorld(()=>0), group = new THREE.Group();
 let hub!: ReturnType<typeof createLanternhollow>;
 try {
   hub = createLanternhollow(group, col, () => 0, b, [], { wood: new THREE.MeshStandardMaterial(), roof: new THREE.MeshStandardMaterial(), lamp: new THREE.MeshStandardMaterial(), dark: new THREE.MeshStandardMaterial() });
+  const terrainBuckets = {stone:new Bucket(),wood:new Bucket(),plaster:new Bucket(),roof:new Bucket(),lamp:new Bucket(),dark:new Bucket()};
+  const terrainGroup = new THREE.Group();
+  const actual = createLanternhollow(terrainGroup, new CollisionWorld(groundRaw), groundRaw, terrainBuckets, [],
+    { wood: new THREE.MeshStandardMaterial(), roof: new THREE.MeshStandardMaterial(), lamp: new THREE.MeshStandardMaterial(), dark: new THREE.MeshStandardMaterial() });
+  assert.equal(actual.festoon.cords.length, 3);
+  assert.equal(actual.festoon.pendants.length, 12);
+  const telemetry = terrainGroup.userData.hubFestoon;
+  assert.equal(telemetry.originalPosts.length, 2);
+  assert.deepEqual(actual.festoon.cords[1].curve.v2.toArray(), actual.festoon.posts[0].toArray(), 'Bramble must meet final plaza post');
+  for (const p of actual.festoon.pendants) {
+    for (let ix = 0; ix <= 20; ix++) for (let iz = 0; iz <= 20; iz++) {
+      assert.ok(p.bottom-groundRaw(p.point.x-.18+ix*.018, p.point.z-.165+iz*.0165) >= 3,
+        'Dense independent real-terrain probe found low lamp');
+    }
+  }
+
+  for (const c of actual.festoon.cords) {
+    assert.ok(c.cordClearance >= 3, `${c.name} cord too low on real terrain: ${c.cordClearance}`);
+    for (const p of c.pendants) assert.ok(p.bottom >= p.ground + 3, `${c.name} lantern too low on real terrain: ${p.bottom-p.ground}`);
+    for (let i = 1; i < 100; i++) {
+      const p = c.curve.getPoint(i/100);
+      for (const h of HUB_HOUSES) {
+        assert.ok(Math.abs(p.x-h.x) > h.w/2+.45+.018 || Math.abs(p.z-h.z) > h.d/2+.46+.018,
+          `${c.name} cord crosses roof interior`);
+      }
+    }
+    for (const p of c.pendants) for (const h of HUB_HOUSES) {
+      assert.ok(Math.abs(p.point.x-h.x) > h.w/2+.45+.18 || Math.abs(p.point.z-h.z) > h.d/2+.46+.165,
+        `${c.name} lamp overlaps roof footprint`);
+    }
+  }
+
 } finally {
   if (originalDocument === undefined) Reflect.deleteProperty(globalThis, 'document');
   else globalThis.document = originalDocument;

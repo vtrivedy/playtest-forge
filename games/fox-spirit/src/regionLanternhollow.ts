@@ -246,6 +246,7 @@ export function createLanternhollow(
   // One quiet festoon gives the plaza a lantern-village silhouette.
   const festoonBuckets: LampBuckets = { wood: new Bucket(), roof: new Bucket(), lamp: new Bucket(), dark: new Bucket() };
   const endpoints = HUB_FESTOON_POSTS.map(([x, z]) => new THREE.Vector3(x, ground(x, z) + 4.2, z));
+  const originalPosts = endpoints.map(p => p.clone());
   const middle = endpoints[0]!.clone().add(endpoints[1]!).multiplyScalar(.5); middle.y -= 1;
   const cord = new THREE.QuadraticBezierCurve3(endpoints[0]!, middle, endpoints[1]!);
   const pendantT = [.20, .37, .72, .84];
@@ -265,16 +266,55 @@ export function createLanternhollow(
   }
   const cordGeo = new THREE.TubeGeometry(cord, 40, .018, 6, false);
   festoonBuckets.wood.add(cordGeo, undefined, PAL.bark); cordGeo.dispose();
-  const pendants = pendantT.map(t => {
-    const point = cord.getPoint(t);
-    lamp(point.x, point.y - hangerTop * scale, point.z, scale, hangerTop, festoonBuckets);
-    return { point, bottom: point.y - bottomDrop, ground: ground(point.x, point.z) };
+  const cordSpecs = [{ name: 'plaza', curve: cord, stations: pendantT,
+    supports: ['plaza-west-post', 'plaza-east-post'] }];
+  const roofHook = (houseIndex: number, side: number) => {
+    const house = HUB_HOUSES[houseIndex]!;
+    const y = ground(house.x, house.z) + house.eave + house.rise;
+    const x = house.x + side * (house.w / 2 + .45);
+    // Ridge extension overlaps the gable framing; upright overlaps its joint.
+    beam(new THREE.Vector3(x - side * .6, y - .08, house.z),
+      new THREE.Vector3(x, y - .08, house.z), .065, festoonBuckets.wood);
+    const tip = new THREE.Vector3(x, y + .45, house.z);
+    beam(new THREE.Vector3(x, y - .16, house.z), tip, .055, festoonBuckets.wood);
+    return tip;
+  };
+  const addRoofCord = (name: string, start: THREE.Vector3, end: THREE.Vector3, supports: string[]) => {
+    const control = start.clone().add(end).multiplyScalar(.5); control.y -= .35;
+    const curve = new THREE.QuadraticBezierCurve3(start, control, end);
+    const geometry = new THREE.TubeGeometry(curve, 24, .018, 6, false);
+    festoonBuckets.wood.add(geometry, undefined, PAL.bark); geometry.dispose();
+    cordSpecs.push({ name, curve, stations: [.2, .4, .6, .8], supports });
+  };
+  addRoofCord('bramble', roofHook(0, 1), endpoints[0]!.clone(), ['bramble-east-ridge', 'plaza-west-post']);
+  addRoofCord('market', roofHook(1, 1), roofHook(3, -1), ['archive-east-ridge', 'pond-cottage-west-ridge']);
+  const cords = cordSpecs.map(spec => {
+    const pendants = spec.stations.map(t => {
+      const point = spec.curve.getPoint(t);
+      lamp(point.x, point.y - hangerTop * scale, point.z, scale, hangerTop, festoonBuckets);
+      // Check the whole lamp footprint, including the wider cap, against terrain.
+      let highestGround = -Infinity;
+      for (const dx of [-.18, 0, .18]) for (const dz of [-.165, 0, .165])
+        highestGround = Math.max(highestGround, ground(point.x + dx, point.z + dz));
+      return { point, bottom: point.y - bottomDrop, ground: highestGround };
+    });
+    let cordClearance = Infinity;
+    for (let i = 0; i <= 100; i++) {
+      const p = spec.curve.getPoint(i / 100);
+      cordClearance = Math.min(cordClearance, p.y - .018 - ground(p.x, p.z));
+    }
+    return { ...spec, pendants, cordClearance };
   });
+  const pendants = cords.flatMap(c => c.pendants);
   for (const key of ['wood', 'roof', 'lamp', 'dark'] as const) {
     const mesh = festoonBuckets[key].toMesh(decorMaterials[key], { cast: false });
     if (mesh) { mesh.name = `hub-festoon-${key}`; mesh.userData.cameraDecoration = true; parent.add(mesh); }
   }
-  parent.userData.hubFestoon = { posts: endpoints.map(p => p.toArray()), lift,
+  parent.userData.hubFestoon = { posts: endpoints.map(p => p.toArray()), originalPosts: originalPosts.map(p => p.toArray()), lift,
+    cords: cords.map(c => ({ name: c.name, supports: c.supports,
+      endpoints: [c.curve.v0.toArray(), c.curve.v2.toArray()], control: c.curve.v1.toArray(),
+      cordClearance: c.cordClearance,
+      pendants: c.pendants.map(p => ({ pos: p.point.toArray(), bottom: p.bottom, ground: p.ground })) })),
     pendants: pendants.map(p => ({ pos: p.point.toArray(), bottom: p.bottom, ground: p.ground })) };
   const bounce = cord.getPoint(.62);
   const plazaLight = new THREE.PointLight(0xffb665, 3, 6, 2);
@@ -383,7 +423,7 @@ export function createLanternhollow(
     }
   }
   return {
-    festoon: { posts: endpoints, pendants },
+    festoon: { posts: endpoints, pendants, cords },
     state: () => ({ well: wellLight.intensity, porch: porchLight.intensity, plaza: plazaLight.intensity, hearth: fireLight.intensity }),
     update(time: number, dusk: number) {
     const flicker = 1 + Math.sin(time * 1.3) * .04;

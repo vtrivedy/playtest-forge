@@ -172,7 +172,7 @@ function smooth01(e0: number, e1: number, x: number): number {
 }
 
 /** Raw ground height (no void). */
-function groundRaw(x: number, z: number): number {
+export function groundRaw(x: number, z: number): number {
   const meadowW = smooth01(10, 50, z); // rolling south, calmer north
   let h =
     0.35 +
