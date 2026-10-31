@@ -52,8 +52,10 @@ export function createLanternhollow(
   const lamp = (x: number, y: number, z: number) => {
     beam(new THREE.Vector3(x, y + .3, z), new THREE.Vector3(x, y + .65, z), .025);
     box(b.dark, x, y, z, .36, .52, .32, dark);
-    box(b.lamp, x, y, z + .17, .23, .32, .025, PAL.gold);
-    box(b.lamp, x + .19, y, z, .025, .32, .18, PAL.gold);
+    for (const side of [-1, 1]) {
+      box(b.lamp, x, y, z + side * .17, .23, .32, .025, PAL.gold);
+      box(b.lamp, x + side * .19, y, z, .025, .32, .18, PAL.gold);
+    }
     box(b.roof, x, y + .3, z, .48, .1, .44, roof);
   };
 
