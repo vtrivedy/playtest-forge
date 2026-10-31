@@ -50,7 +50,7 @@ export function createLanternhollow(
   b: HubBuckets, labelMaterials: THREE.MeshStandardMaterial[], decorMaterials: DecorMaterials,
 ) {
   const windowAmber = new THREE.Color(0xe9a860);
-  const plaster = new THREE.Color(0xc0ac86), roof = new THREE.Color(0x80513b), dark = new THREE.Color(0x30261e);
+  const plaster = new THREE.Color(0xd5c7ad), roof = new THREE.Color(0x80513b), dark = new THREE.Color(0x30261e);
   const rounded = (bucket: Bucket, x: number, y: number, z: number, w: number, h: number, d: number, tint: THREE.Color, radius = .06) => {
     const g = new RoundedBoxGeometry(w, h, d, 2, Math.min(radius, w / 4, h / 4, d / 4));
     bucket.add(g, trs(x, y, z), tint); g.dispose();
