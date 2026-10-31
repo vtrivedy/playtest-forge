@@ -286,6 +286,9 @@ export function createFollowCamera(opts: {
   // query-only chunks: otherwise three short rays still visit an entire bucket's
   // triangles. Positions are shared; these meshes never enter the render scene.
   const scenery: { source: THREE.Mesh; probe: THREE.Mesh }[] = [];
+  // Query back faces too: the focus can enter a thin wall during a turn.
+  // Never change render materials (shared buckets would change their appearance).
+  const queryMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
   opts.scenery?.updateWorldMatrix(true, true);
   opts.scenery?.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -325,7 +328,7 @@ export function createFollowCamera(opts: {
       g.setIndex(chunk.indices);
       g.boundingBox = chunk.bounds;
       g.boundingSphere = chunk.bounds.getBoundingSphere(new THREE.Sphere());
-      const probe = new THREE.Mesh(g, mesh.material);
+      const probe = new THREE.Mesh(g, queryMaterial);
       probe.matrixWorld.copy(mesh.matrixWorld);
       scenery.push({ source: mesh, probe });
     }
@@ -358,7 +361,16 @@ export function createFollowCamera(opts: {
         while (parent && parent.visible) parent = parent.parent;
         if (parent) continue;
         sightHits.length = 0;
-        probe.raycast(sight, sightHits);
+        // Live props retain transforms, instance buffers and morph state. A
+        // synchronous query-only material swap is restored before any render.
+        if (probe !== mesh) probe.matrixWorld.copy(mesh.matrixWorld);
+        const renderMaterial = probe.material;
+        try {
+          probe.material = queryMaterial;
+          probe.raycast(sight, sightHits);
+        } finally {
+          probe.material = renderMaterial;
+        }
         for (const hit of sightHits) {
           if (hit.distance < nearest) {
             nearest = hit.distance;
