@@ -341,9 +341,11 @@ try {
     const stream = probe.streams[0];
     if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
     let blackDetect;
-    if(name.startsWith('hub-')) {
+    const cameraAudit = name.startsWith('crown-') || name.startsWith('route-continuous');
+    if(name.startsWith('hub-') || cameraAudit) {
+      const pixelThreshold = cameraAudit ? .04 : .02, frameThreshold = cameraAudit ? 24 : 20;
       const scan=spawnSync('ffmpeg',['-hide_banner','-nostats','-threads','1','-i',output,
-        '-vf','blackdetect=d=0.02:pix_th=0.02:pic_th=0.999,blackframe=amount=99:threshold=20','-an','-f','null','-'],
+        '-vf',`blackdetect=d=0.02:pix_th=${pixelThreshold}:pic_th=0.999,blackframe=amount=99:threshold=${frameThreshold}`,'-an','-f','null','-'],
         {encoding:'utf8',maxBuffer:4*1024*1024,timeout:60000,killSignal:'SIGKILL'});
       const log=scan.stderr??String(scan.error??'');
       fs.writeFileSync(path.join(out,name+'-blackdetect.log'),log);
@@ -351,7 +353,7 @@ try {
         .map(m=>({start:Number(m[1]),end:Number(m[2]),duration:Number(m[3])}));
       const frameIntervals=blackFrameIntervals(log,fps);
       blackDetect={status:scan.status,error:scan.error?.message??null,signal:scan.signal,
-        thresholds:{duration:.02,pixel:.02,frame:.999,frameAuditPercent:99,frameAuditY:20},
+        thresholds:{duration:.02,pixel:pixelThreshold,frame:.999,frameAuditPercent:99,frameAuditY:frameThreshold},
         intervals,frameIntervals};
       if(scan.status!==0 || scan.error || intervals.length || frameIntervals.some(run=>run.duration>=.02)) report.failures.push(name+': black video frame detected or detector failed');
     }
