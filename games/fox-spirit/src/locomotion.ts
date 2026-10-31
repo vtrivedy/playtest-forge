@@ -7,6 +7,10 @@ export type MotionInput = {
 };
 import GAITS from '../../../assets/hero/spirit_fox.loco.json';
 type Gait = keyof typeof GAITS;
+const GAIT_NAMES = Object.keys(GAITS) as Gait[];
+/** Speed each gait's designed cadence is quoted at (gait-gym bands). */
+const CADENCE_REF: Record<Gait, number> = { walk: 1.5, trot: 3.8, run: 8.4 };
+type GaitParts = { body: THREE.AnimationAction; legs: THREE.AnimationAction[]; bobMean: THREE.Vector3[] };
 const v = () => new THREE.Vector3();
 const q = () => new THREE.Quaternion();
 class Spring {
@@ -24,8 +28,11 @@ class Spring {
 /** Authored pose is evaluated first; contact correction only moves a two-bone chain. */
 export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
+    // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
+    walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
+    minStanceRatio: .35, bodyBob: .45,
     headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
-  metrics = { brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
+  metrics = { cadenceHz: 0, stanceRatio: 1, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
@@ -76,6 +83,11 @@ export class AuthoredLocomotion {
   private spine?: THREE.Object3D;
   private tailBone?: THREE.Object3D;
   private overlays: { bone: THREE.Object3D; rotation: THREE.Quaternion }[] = [];
+  /** Each gait clip split into body + four legs so every leg can run its own warped clip time. */
+  private parts = new Map<Gait, GaitParts>();
+  private bobBones: THREE.Object3D[] = [];
+  /** Stance time / authored stance time per gait: < 1 compresses stance and lengthens the swing. */
+  private stanceRatio: Record<Gait, number> = { walk: 1, trot: 1, run: 1 };
   constructor(private root: THREE.Object3D, private group: THREE.Group,
     private actions: Map<string, THREE.AnimationAction>) {
     this.rootPosition=root.position.clone();
@@ -127,9 +139,41 @@ export class AuthoredLocomotion {
     this.rootPosition.copy(root.position);
     root.updateWorldMatrix(true,true);
     this.standingPelvisHeight=this.spine!.getWorldPosition(v()).y-floor;
+    this.splitGaits(root);
     this.debugGroup.name='LocomotionContactDebug';
     group.add(this.debugGroup);
   }
+  private splitGaits(root: THREE.Object3D) {
+    const legs=[FOX_RIG.foreleg('l'),FOX_RIG.foreleg('r'),FOX_RIG.hindleg('l'),FOX_RIG.hindleg('r')].map(l=>Object.values(l) as string[]);
+    const legBones=new Set(legs.flat());
+    const bobNames=[FOX_RIG.root,FOX_RIG.pelvis];
+    this.bobBones=bobNames.map(n=>root.getObjectByName(n)!);
+    const boneOf=(t:THREE.KeyframeTrack)=>t.name.slice(0,t.name.lastIndexOf('.'));
+    for(const gait of GAIT_NAMES) {
+      const source=this.actions.get(gait);
+      if(!source)throw new Error(`FOX clip ${gait} missing`);
+      const clip=source.getClip(), mixer=source.getMixer();
+      const sample=(name:string,property:'quaternion'|'position')=>{
+        const track=clip.tracks.find(t=>t.name===`${name}.${property}`);
+        if(!track)throw new Error(`FOX clip ${gait} has no ${name}.${property}`);
+        // three's typings omit createInterpolant; it picks the track's own (slerp for quaternions).
+        const interpolant=(track as unknown as {createInterpolant():THREE.Interpolant}).createInterpolant(), size=track.getValueSize(), sum=new Array(size).fill(0);
+        const first=Array.from(interpolant.evaluate(0) as ArrayLike<number>);
+        for(let i=0;i<32;i++) {
+          const value=Array.from(interpolant.evaluate(clip.duration*i/32) as ArrayLike<number>);
+          const sign=size===4 && value.reduce((a,x,j)=>a+x*first[j],0)<0 ? -1 : 1;
+          value.forEach((x,j)=>sum[j]+=sign*x/32);
+        }
+        return sum;
+      };
+      this.parts.set(gait,{
+        body: mixer.clipAction(new THREE.AnimationClip(`${gait}_body`,clip.duration,clip.tracks.filter(t=>!legBones.has(boneOf(t))))),
+        legs: legs.map((names,i)=>mixer.clipAction(new THREE.AnimationClip(`${gait}_leg${i}`,clip.duration,clip.tracks.filter(t=>names.includes(boneOf(t)))))),
+        bobMean: bobNames.map(n=>new THREE.Vector3().fromArray(sample(n,'position'))),
+      });
+    }
+  }
+  private hz(gait: Gait) { return gait==='walk' ? this.params.walkHz : gait==='trot' ? this.params.trotHz : this.params.gallopHz; }
   /** Undo last frame's additive layer before the mixer supplies the next authored pose. */
   beforeMixer() {
     for (let i=this.overlays.length-1;i>=0;i--) {const o=this.overlays[i];o.bone.quaternion.copy(o.rotation);}
@@ -146,31 +190,67 @@ export class AuthoredLocomotion {
     const trotToGallop=THREE.MathUtils.smoothstep(speed,this.params.gallopSpeed-.25,this.params.gallopSpeed+.25);
     const weights = {walk:1-walkToTrot,trot:walkToTrot*(1-trotToGallop),run:trotToGallop};
     let dominant: Gait='walk';
-    for (const name of Object.keys(GAITS) as Gait[]) if (weights[name]>weights[dominant]) dominant=name;
-    const stride = (Object.keys(GAITS) as Gait[]).reduce((sum,name) =>
-      sum + weights[name]*GAITS[name].stride*this.armScale, 0);
-    if(locomoting) this.phase=(this.phase+dt*speed/Math.max(.01,stride))%1;
+    for (const name of GAIT_NAMES) if (weights[name]>weights[dominant]) dominant=name;
+    // Designed cadence, bounded so stance is never slower than the ground (no skating) and never
+    // compressed below minStanceRatio. Lower cadence than the clip's natural one buys suspension.
+    const reach=(g:Gait)=>GAITS[g].stride*this.armScale;
+    let cadence=0;
+    for(const g of GAIT_NAMES) {
+      const natural=speed/reach(g);
+      const designed=this.hz(g)*Math.pow(Math.max(speed,.05)/CADENCE_REF[g],this.params.cadenceExponent);
+      cadence+=weights[g]*THREE.MathUtils.clamp(designed,natural*this.params.minStanceRatio,natural);
+    }
+    for(const g of GAIT_NAMES) this.stanceRatio[g]=speed>.01 ? THREE.MathUtils.clamp(reach(g)*cadence/speed,this.params.minStanceRatio,1) : 1;
+    if(locomoting) this.phase=(this.phase+dt*cadence)%1;
+    this.metrics.cadenceHz=cadence; this.metrics.playback=cadence; this.metrics.stanceRatio=this.stanceRatio[dominant];
     const alpha=this.fadeSeconds<=0 ? 1 : 1-Math.exp(-4*dt/this.fadeSeconds);
+    const drive=(action:THREE.AnimationAction,weight:number,time?:number)=>{
+      if(weight>1e-5 && !action.isScheduled()) action.play();
+      action.enabled=true;
+      action.setEffectiveWeight(weight);
+      if(time===undefined)return;
+      action.paused=false;
+      action.time=time;
+      action.setEffectiveTimeScale(0);
+    };
     for(const [name,action] of this.actions) {
       const target=locomoting ? (weights[name as Gait] ?? 0) : name===active ? 1 : 0;
       const weight=THREE.MathUtils.lerp(this.weights.get(name) ?? 0,target,alpha);
       this.weights.set(name,weight);
-      if(weight>1e-5 && !action.isScheduled()) action.play();
-      action.enabled=true;
-      action.setEffectiveWeight(weight);
-      if(name in GAITS) {
-        action.paused=false;
-        action.time=this.phase*action.getClip().duration;
-        action.setEffectiveTimeScale(0);
-        if(name===dominant)this.metrics.playback=speed*action.getClip().duration/Math.max(.01,stride);
-      }
+      const parts=this.parts.get(name as Gait);
+      if(!parts) { drive(action,weight); continue; }
+      // The whole clip never plays; its body and per-leg splits do.
+      action.enabled=false; action.setEffectiveWeight(0);
+      const gait=name as Gait, duration=action.getClip().duration;
+      drive(parts.body,weight,this.phase*duration);
+      GAITS[gait].contacts.forEach((contact,i)=>{
+        // Per-leg warp: stance [0,duty) of the leg's own cycle is compressed to duty·ratio so the pad
+        // sweeps at ground speed; the remaining time is a longer, slower swing.
+        const duty=contact.duty, stance=duty*this.stanceRatio[gait];
+        const u=(this.phase-contact.phase+1)%1;
+        const local=u<stance ? duty*u/stance : duty+(1-duty)*(u-stance)/(1-stance);
+        drive(parts.legs[i],weight,((contact.phase+local)%1)*duration);
+      });
     }
     if (this.lastGait!==dominant) { for(const foot of this.feet)foot.planted=false; this.lastGait=dominant; }
     this.metrics.gait=locomoting ? dominant : active;
     this.metrics.clipWeights=Object.fromEntries(this.weights);
   }
+  /** Float the body over the legs: pull the clip's root/pelvis bob toward its cycle mean. */
+  private glideLayer() {
+    let total=0;
+    for(const g of GAIT_NAMES) total+=this.weights.get(g) ?? 0;
+    if(total<1e-3)return;
+    const keep=1-(1-this.params.bodyBob)*Math.min(1,total);
+    this.bobBones.forEach((bone,i)=>{
+      const m=v();
+      for(const g of GAIT_NAMES) m.addScaledVector(this.parts.get(g)!.bobMean[i],(this.weights.get(g) ?? 0)/total);
+      bone.position.sub(m).multiplyScalar(keep).add(m);
+    });
+  }
   afterMixer(dt: number, active: string) {
     const step=Math.max(dt,.00001);
+    this.glideLayer();
     if(this.input.grounded && !this.wasGrounded) {
       const impact=THREE.MathUtils.clamp(-this.previousVerticalSpeed/14,.15,1);
       this.landSpring.velocity-=this.params.landSquash*impact*16;
@@ -272,7 +352,7 @@ export class AuthoredLocomotion {
       
       const support=(Object.keys(GAITS) as Gait[]).reduce((sum,name)=> {
         const d=GAITS[name].contacts[i]; const p=(phase-d.phase+1)%1;
-        return sum+(p<d.duty ? (this.metrics.clipWeights[name] ?? 0) : 0);
+        return sum+(p<d.duty*this.stanceRatio[name] ? (this.metrics.clipWeights[name] ?? 0) : 0);
       },0);
       const stance=this.input.grounded && (locomoting ? support>.55 : (active==='idle' || active==='land'));
       if (stance) {
