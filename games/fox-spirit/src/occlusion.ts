@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bindHeroSoftOccluder } from './cameraSoftOcclusion';
 
 /**
  * Keeps the fox readable behind ruins, arches, rock and maple crowns.
@@ -77,9 +78,12 @@ export function createOcclusionFader(
     opts.exclude?.traverse((o) => skip.add(o));
     scene.traverse((o) => {
       const mesh = o as THREE.Mesh;
-      if (!mesh.isMesh || skip.has(o)) return;
+      if ((!mesh.isMesh && !(o as THREE.Points).isPoints) || !mesh.material || skip.has(o)) return;
       const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const m of mats) if ((m as THREE.MeshStandardMaterial)?.isMeshStandardMaterial) patch(m as THREE.MeshStandardMaterial);
+      for (const m of mats) {
+        bindHeroSoftOccluder(m, uOccFox, uOccRad);
+        if (mesh.isMesh && (m as THREE.MeshStandardMaterial)?.isMeshStandardMaterial) patch(m as THREE.MeshStandardMaterial);
+      }
     });
   }
   patchScene();
