@@ -1,4 +1,4 @@
-import { createLanternhollow, hubPathDistance, hubClearance } from './regionLanternhollow';
+import { createLanternhollow, hubPathDistance, hubClearance, HUB_HOUSES } from './regionLanternhollow';
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { routeRemnant } from './routeRemnants';
@@ -85,6 +85,8 @@ export type RealmEvent =
 
 export type Realm = {
   group: THREE.Group;
+  updateHubVisuals: (time: number, dusk: number) => void;
+  hubState: () => { well: number; porch: number };
   materials: THREE.MeshStandardMaterial[];
   collision: CollisionWorld;
   terrainY: (x: number, z: number) => number;
@@ -1962,11 +1964,29 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   if (lanternMesh) group.add(lanternMesh);
 
   // Lanternhollow shares the realm, terrain paint and material buckets; no chapter transition.
-  const updateLanternhollow = createLanternhollow(group, col, groundRaw, {
+  const lanternhollow = createLanternhollow(group, col, groundRaw, {
     stone: bk('stone', -8, 85), wood: bk('wood', -8, 85),
     plaster: bk('hubPlaster', -8, 85), roof: bk('hubRoof', -8, 85),
     lamp: bk('hubLamp', -8, 85, false), dark: bk('hubDark', -8, 85),
   }, patchable);
+
+  // Curated domestic edge groups, kept low enough to preserve paws and path edges.
+  for (const [hi, house] of HUB_HOUSES.entries()) {
+    const plants = rng(8200 + hi);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let k = 0; k < 4; k++) {
+      if (sx === 1 && sz === -1) continue; // solid winter-store corner
+      if (sz === 1) continue; // keep front door approaches open
+      const x = house.x + sx * (house.w / 2 + .5 + plants() * .65);
+      const z = house.z + sz * (house.d / 2 + .3 + plants() * .6);
+      if (Math.abs(x) < 6 && z > 72) continue;
+      if (hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4) continue;
+      const kind = k % 2 ? 'fern' : 'grass_wispy';
+      nature.place(kind, x, groundRaw(x, z) - .03, z, {
+        yaw: plants() * Math.PI * 2, scale: (.18 + plants() * .06) / nature.height(kind),
+        hue: new THREE.Color(0x795638), hue2: new THREE.Color(0xa27a49), cast: false,
+      });
+    }
+  }
 
   // ==================================================================== MEADOW + PORTAL
   // portal ring of standing stones (0,92) and the first arch framing the Wellspring
@@ -2428,6 +2448,11 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
 
   const realm: Realm = {
     group,
+    updateHubVisuals(time, dusk) {
+      lanternhollow.update(time, dusk);
+      M.hubLamp.emissiveIntensity = .5 + Math.sin(time * 1.3) * .025;
+    },
+    hubState: lanternhollow.state,
     materials: patchable,
     collision: col,
     terrainY,
@@ -2485,8 +2510,6 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
-      updateLanternhollow(t);
-      M.hubLamp.emissiveIntensity = 0.5 + Math.sin(t * 1.3) * 0.025;
       for (const water of waterVisuals) water.update(t);
       inkTime.value = t;
       const ev: RealmEvent[] = [];

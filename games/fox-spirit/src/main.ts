@@ -28,6 +28,7 @@ import {
   createEmberMotes,
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
+import { createHubDusk, hubDuskWeight, HUB_DUSK } from './hubDusk';
 import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
@@ -149,6 +150,7 @@ async function boot() {
     cloudAmount: 0.6,
   });
   matchFogToSky(scene, fog, sky.params.mist);
+  const hubDusk = createHubDusk(scene, lights, sky, fog);
   const distant = createDistantLand(scene, {
     silhouette: new THREE.Color(0x4a3a3c),
     haze: sky.params.mist,
@@ -336,10 +338,11 @@ async function boot() {
     folder.add(params, 'bodyBob', 0, 1, .01);
     folder.add(params, 'swingEase', 0, 1, .05);
     folder.add(params, 'swingTuck', 0, .8, .01);
+    folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
     folder.add(params, 'takeoffPitch', 0, .2, .005);
-    folder.add(params, 'rockDamp', 0, 2, .05);
+    folder.add(params, 'headHold', 0, 1.5, .05);
     folder.add(params, 'headLevel', 0, 1, .05);
     folder.add(params, 'tailStream', 0, .03, .001);
     folder.add(params, 'tailWave', 0, .15, .005);
@@ -525,6 +528,15 @@ async function boot() {
   fFox.add(FOX_LOOK, 'emberSize', 0.005, 0.08, 0.001);
   fFox.close();
   fLook.add(renderer, 'toneMappingExposure', 0.6, 1.8, 0.01).name('exposure');
+  const fDusk = fLook.addFolder('Lanternhollow dusk');
+  fDusk.add(HUB_DUSK, 'kOverride', -1, 1, .01).name('override (-1 auto)');
+  fDusk.add(HUB_DUSK, 'key', .8, 2.5, .01);
+  fDusk.add(HUB_DUSK, 'hemi', .2, .8, .01);
+  fDusk.add(HUB_DUSK, 'rim', .4, 1.6, .01);
+  fDusk.add(HUB_DUSK, 'skyScale', .5, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunBloom', 0, .3, .01);
+  fDusk.add(HUB_DUSK, 'godRays', 0, .5, .01);
+  fDusk.close();
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
   fLook.add(post.params, 'bloomStrength', 0, 1, 0.01);
   fLook.add(post.params, 'bloomThreshold', 0, 2, 0.01);
@@ -851,6 +863,7 @@ async function boot() {
         zone,
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
+        dusk: { ...hubDusk.state(), practical: world.hubState() },
         crown: crown.state(),
         reach: reach.state(),
         albumPages: world.reedRegion.pageFound ? ['reed-ruin'] : [],
@@ -1610,6 +1623,8 @@ async function boot() {
     // Wisps / autumn
     autumnFX.update(dt, fox.position);
     emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
+    hubDusk.update(fox.position.x, fox.position.z);
+    world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
     sky.update(dt);
     distant.update(dt);
 
@@ -1682,6 +1697,7 @@ async function boot() {
         `dashes=${feelMetrics.dashesUsed}`,
         `preset=${feelPreset}`,
         `quality=${quality.tier}`,
+        `dusk=${JSON.stringify({ ...hubDusk.state(), practical: world.hubState() })}`,
         `spirit=${JSON.stringify(foxActor.group.userData.spiritFx)}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',
@@ -1736,6 +1752,8 @@ async function boot() {
       contactShadow.position.set(tx, ty + 0.03, tz);
       contactShadow.scale.set(1, 1, 1);
       (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
+      hubDusk.update(fox.position.x, fox.position.z);
+      world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
       sky.update(rawDt);
       post.render();
       requestAnimationFrame(tick);
