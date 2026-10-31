@@ -203,6 +203,54 @@ try {
     save('hub-still-attempts.json',report.hubStillAttempts);
     if(!attempt.recovered || !attempt.invariantsMatch) report.failures.push(name+': black still recovery failed or changed pose/camera/state');
   }
+  async function capturePlasterComparison(label) {
+    await H('advance',0,1/60,true);
+    const entry=await page.evaluate(()=>{
+      const material=window.__gameHooks.debug.world.materials.find(m=>m.name==='rv-hub-plaster');
+      if(!material) throw Error('Plaster comparison material missing');
+      return {uuid:material.uuid,color:material.color.toArray()};
+    });
+    const invariant=async()=>{
+      const fixed=await hubStillInvariant();
+      const other=await page.evaluate(()=>window.__gameHooks.debug.world.materials
+        .filter(m=>m.name!=='rv-hub-plaster').map(m=>({name:m.name,color:m.color?.toArray(),
+          emissive:m.emissive?.toArray(),emissiveIntensity:m.emissiveIntensity})));
+      return {...fixed,otherMaterials:other,fullDigest:createHash('sha256')
+        .update(fixed.digest+JSON.stringify(other)).digest('hex')};
+    };
+    const before=await invariant(), variants=[];
+    try {
+      for(const variant of ['old','new']) {
+        const paint=await page.evaluate(async ({variant,entry})=>{
+          const {Color}=await import('/gpu-three.js');
+          const material=window.__gameHooks.debug.world.materials.find(m=>m.uuid===entry.uuid);
+          if(!material) throw Error('Plaster material identity changed');
+          const oldPaint=new Color(0xc0ac86),newPaint=new Color(0xd5c7ad);
+          const ratio=variant==='old'?[oldPaint.r/newPaint.r,oldPaint.g/newPaint.g,oldPaint.b/newPaint.b]:[1,1,1];
+          material.color.fromArray(entry.color.map((value,i)=>value*ratio[i]));
+          return {uuid:material.uuid,color:material.color.toArray(),ratio};
+        },{variant,entry});
+        await H('advance',0,1/60,true);
+        const filename='hub-plaster-'+label+'-'+variant;
+        await captureStill(filename);
+        const proof=await invariant();
+        variants.push({variant,filename,paint,proof,game:await page.evaluate(()=>window.__game)});
+        if(proof.fullDigest!==before.fullDigest) report.failures.push(filename+': plaster comparison changed pose/camera/state/other materials');
+      }
+    } finally {
+      await page.evaluate(entry=>{
+        const material=window.__gameHooks.debug.world.materials.find(m=>m.uuid===entry.uuid);
+        if(!material) throw Error('Cannot restore plaster material');
+        material.color.fromArray(entry.color);
+      },entry);
+      await H('advance',0,1/60,true);
+      const restored=await invariant();
+      const restoredColor=await page.evaluate(uuid=>window.__gameHooks.debug.world.materials.find(m=>m.uuid===uuid)?.color.toArray(),entry.uuid);
+      save('hub-plaster-'+label+'-comparison.json',{label:'Staged old/new plaster proof; fixed light, pose, camera and game state',entry,before,variants,restored,restoredColor});
+      if(restored.fullDigest!==before.fullDigest || JSON.stringify(restoredColor)!==JSON.stringify(entry.color))
+        report.failures.push('Plaster comparison failed exact restoration at '+label);
+    }
+  }
   async function shot(name) {
     await captureStill(name);
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
@@ -1259,6 +1307,7 @@ try {
     // Natural spawn, gravity warm-up and untouched chase before any staging.
     await advance(60); await shot('hub-spawn-chase');
     save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
+    await capturePlasterComparison('spawn');
     // Live player view from natural spawn, before any teleport or photo camera.
     const naturalInitial = await H('state');
     await video('hub-natural-arrive-chase', 15 * fps, async i => {
@@ -1306,6 +1355,7 @@ try {
 
     save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
     if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
+    await capturePlasterComparison('hero');
     const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
     save('hub-festoon-clearance.json', festoon);
     if (festoon?.pendants.length !== 12 || festoon?.cords?.length !== 3) report.failures.push('Hub must expose twelve pendants on three supported cords');
@@ -1316,6 +1366,7 @@ try {
       ['arrival', [16, 10, 108], [-5, 2, 81], 52],
       ['arrival-close', [8, 3.8, 98], [-10, 2, 85], 55],
       ['well', [-2, 4, 91], [-9, 2, 82], 52],
+      ['hearth-lane', [-5.5, 3.4, 98], [-13.5, 1.4, 91], 52],
       ['west-exit', [-7, 7, 96], [-23, 2, 71], 56],
       ['east-exit', [2, 6, 99], [18, 2, 80], 56],
       ['north-exit', [0, 5, 97], [0, 2, 65], 55],
@@ -1437,7 +1488,7 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
-  if (wants('restoration') || wants('water')) {
+  if (wants('restoration') || wants('water') || wants('stills')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
@@ -1455,26 +1506,60 @@ try {
     // The meadow lens cannot see it, so use a separate fixed lens for the matched front pair.
     const framing = await page.evaluate(() => {
       const h = window.__gameHooks, attempts = [];
-      for (const [x,z] of [[95,13],[93,10],[97,10],[95,7],[90,15]]) {
+      for (const [x,z] of [[69,28.2],[84,36]]) {
         const y = h.debug.world.collision.highestAt(x,z);
         if (!Number.isFinite(y) || y < -.5 || y > 4) continue;
+        const closeLook = [x+9,y-1.2,z-8.2];
+        const poolProbes = [[78,-1.2,26],[81,-1.2,27],[77,-1.2,28]];
+        const closeLens = [[x-5,y+2.1,z+3.8],[x-6.5,y+3,z+4],[x-5,y+4,z+5],[x-4,y+2.7,z+5]].find(lens => {
+          const foxBlockers = [.1,.5,.9].map(k => h.photoBlocker(lens,[x,y+h.debug.foxHeight*k,z]));
+          const poolBlockers = poolProbes.map(point => h.photoBlocker(lens,point));
+          attempts.push({kind:'close',fox:[x,y,z],lens,foxBlockers,poolBlockers});
+          return foxBlockers.filter(b => !b).length >= 2 && poolBlockers.filter(b => !b).length >= 2;
+        });
+        if (!closeLens) continue;
         for (const lens of [[68,34,44],[65,34,18],[112,35,0],[78,40,-6],[95,45,30]]) {
-          const blocker = h.photoBlocker(lens,[x,y+.6,z]);
-          attempts.push({fox:[x,y,z],lens,blocker});
-          if (!blocker) return {fox:[x,y,z],lens,look:[(x+95)/2,y+.6,(z+10)/2],attempts};
+          const foxBlockers = [.1,.5,.9].map(k => h.photoBlocker(lens,[x,y+h.debug.foxHeight*k,z]));
+          const poolBlockers = poolProbes.map(point => h.photoBlocker(lens,point));
+          attempts.push({kind:'overview',fox:[x,y,z],lens,foxBlockers,poolBlockers});
+          if (foxBlockers.filter(b=>!b).length>=2 && poolBlockers.filter(b=>!b).length>=2) return {fox:[x,y,z],lens,look:[(x+95)/2,y+.6,(z+10)/2],closeLens,closeLook,poolProbes,attempts};
         }
       }
       return {attempts};
     });
     save('restoration-framing.json', framing);
-    if (!framing.fox) throw Error('No unobstructed safe Reed restoration review lens');
+    if (!framing.fox || !framing.closeLens) throw Error('No unobstructed safe Reed restoration review lens pair');
     await H('teleport', ...framing.fox, Math.PI);
-    await H('photo', framing.lens, framing.look, 60);
-    await advance(1); await shot('restoration-front-before');
+    await advance(30, false);
+    const restoreBaseline = await H('state');
+    const restoreFrame = async name => {
+      const phase = await H('state');
+      const drift = Math.hypot(...phase.pos.map((value,i) => value-restoreBaseline.pos[i]));
+      if (phase.deaths !== restoreBaseline.deaths || drift > .15) report.failures.push(`Restore fox moved or died at ${name}: drift=${drift}, deaths=${phase.deaths-restoreBaseline.deaths}`);
+      const saveComposition = async (view,minimumHeight) => {
+        const composition = await page.evaluate(pool => {
+        const h=window.__gameHooks, fox=h.debug.fox, camera=h.debug.camera;
+        const feet=fox.position.clone(); feet.y-=h.debug.foxFeetOffset;
+        const head=feet.clone(); head.y+=h.debug.foxHeight;
+        const bottom=feet.clone().project(camera), top=head.clone().project(camera);
+        const inside = p => Math.abs(p.x)<.95 && Math.abs(p.y)<.95 && p.z>-1 && p.z<1;
+        const foxBlockers=[.1,.5,.9].map(k => h.photoBlocker(camera.position.toArray(),feet.clone().lerp(head,k).toArray()));
+        const poolVisible=pool.map(point => ({point,inside:inside(feet.clone().set(...point).project(camera)),blocker:h.photoBlocker(camera.position.toArray(),point)}));
+        return {proxyHeightPx:Math.abs(top.y-bottom.y)*innerHeight/2,inside:inside(bottom)&&inside(top),foxBlockers,poolVisible};
+        },framing.poolProbes);
+        save(`restoration-${view}-${name}-composition.json`,{...composition,drift,deaths:phase.deaths-restoreBaseline.deaths,state:await H('state'),label:'CPU composition proxies, not pixel-visibility or visual acceptance'});
+        if (!composition.inside || composition.proxyHeightPx<minimumHeight || composition.foxBlockers.filter(b=>!b).length<2 || composition.poolVisible.filter(p=>p.inside&&!p.blocker).length<2) report.failures.push(`Restore ${view} composition gate failed at ${name}`);
+      };
+      await H('photo', framing.lens, framing.look, 60); await advance(0); await shot(`restoration-${name}`);
+      await saveComposition('overview',0);
+      await H('photo', framing.closeLens, framing.closeLook, 48); await advance(0); await shot(`restoration-close-${name}`);
+      await saveComposition('close',48);
+    };
+    await restoreFrame('front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
     for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['water-reveal', 39], ['settled', 201]]) {
-      await advance(frames); await shot(`restoration-${name}`);
+      await advance(frames, false); await restoreFrame(name);
     }
     await H('photo', [64, 3, 43], [82, -1.7, 20], 52); await advance(2); await shot('restoration-water-vista');
     await H('perf', 6);
@@ -1483,6 +1568,19 @@ try {
     const reedMedian = [...reedPerf].sort((a, b) => a.msPerFrame - b.msPerFrame)[2];
     save('restoration-water-perf.json', { ...reedMedian, samples: reedPerf, method: 'Warm median of five GPU-synchronized render-only perf(6) batches with native wall clock; simulation paused' });
     if (!reedPerf.every(sample => sample.msPerFrame > 0 && Number.isFinite(sample.fps))) throw Error('Invalid restored Reed performance timing');
+    const restoreRenderer = await page.evaluate(() => {
+      const h = window.__gameHooks, d = h.debug.scene.userData.waterCapture;
+      const target = h.debug.post.composer.readBuffer;
+      return { waterScene: d ? { ...d } : null, width: target.width, height: target.height, type: target.texture.type, shadowType: h.debug.renderer.shadowMap.type, finalGlError: h.debug.renderer.getContext().getError() };
+    });
+    save('restoration-water-renderer.json', restoreRenderer);
+    const rd = restoreRenderer.waterScene;
+    if (!rd || rd.shadowTypeAtFirstPrepare !== 1 || restoreRenderer.shadowType !== 1
+      || rd.copies < 1 || rd.reflections < 1 || rd.checkedCopies < 1 || rd.invalidTargets
+      || rd.type !== 1016 || rd.type !== restoreRenderer.type || rd.width !== restoreRenderer.width || rd.height !== restoreRenderer.height
+      || rd.glError || rd.priorGlError || rd.bootGlError || rd.bootPriorGlError || restoreRenderer.finalGlError) {
+      report.failures.push(`Restoration water renderer gate failed: ${JSON.stringify(restoreRenderer)}`);
+    }
     save('restoration-provenance.json', {
       label: 'STAGED fixed-lens visual review: real dash input, then staged public Seedwell latches',
       note: 'All three staged latches activate their normal Shade encounters; actors may enter the Reed frame.',
@@ -1921,6 +2019,9 @@ try {
     await RH('photo',[220,44,-122],[190,34,-119],52);await advance(2);await shot('reachview-payoff-vista');
     // A closer comparison avoids the east-bank trunk without moving the scene.
     await RH('photo',[213,39,-121],[192,34,-120],52);await advance(2);await shot('reachview-hero-orchard');
+    // Verified old hero crosses bell pillars; compare from their north side.
+    await RH('teleport',204,36,-118,-Math.PI/2);
+    await RH('photo',[210,40,-110],[198,35,-118],52);await advance(60,false);await shot('reachview-hero-clear');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
