@@ -1475,6 +1475,9 @@ async function boot() {
       }
     }
 
+    colorField.visualDrains = shades.state().filter(actor => !actor.freed).map(actor => ({
+      center: new THREE.Vector3().fromArray(actor.pos), radius: shades.tun.drainRadius,
+    }));
 
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
     const speed = Math.hypot(vel.x, vel.z);

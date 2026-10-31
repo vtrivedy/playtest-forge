@@ -229,6 +229,8 @@ try {
       return points.reduce((sum,p)=>[sum[0]+p[0]/points.length,sum[1]+p[2]/points.length],[0,0]);
     });
     let lens = null;
+    const releaseStagingFailures=[];
+    const latestReviewLens=new Map();
     const camera = async (actorId=actors[0].id) => {
       const framing=await page.evaluate(({previous,actorId})=>{
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===actorId),fox=h.debug.fox.position;
@@ -269,6 +271,7 @@ try {
         }
         return fallback||{pos:positions[1]||positions[0],look,fov:56,clear:false,noFit:true};
       },{previous:lens,actorId});
+      latestReviewLens.set(actorId,{clear:framing.clear,noFit:framing.noFit});
       lens=framing.pos;
       report.shadeReviewQuality??={};
       const counts=report.shadeReviewQuality[actorId]??={noFit:0,occluded:0};
@@ -303,11 +306,35 @@ try {
       const p=state?.capture;
       return `${id} f${frame} p${p?.presence??'?'} fox ${p?.fox?(p.fox.heightFraction*100).toFixed(0):'?'}% shade ${p?.shade?(p.shade.heightFraction*100).toFixed(0):'?'}%`;
     }});
+    const validateRunout=async(name,setup,maxDrop=.25)=>{
+      const take=report.videos[name],rows=take.trace.map(row=>row.state);
+      let airborne=0,longestAirborne=0,maxLateral=0;
+      for(const row of rows){
+        airborne=row.grounded?0:airborne+1;longestAirborne=Math.max(longestAirborne,airborne);
+        const dx=row.pos[0]-setup.pos[0],dz=row.pos[2]-setup.pos[2];
+        maxLateral=Math.max(maxLateral,Math.abs(dx*setup.direction[1]-dz*setup.direction[0]));
+      }
+      const firstMoving=rows.find(row=>Math.hypot(row.vel[0],row.vel[2])>.5),v=firstMoving?.vel;
+      const direction=v?[v[0]/Math.hypot(v[0],v[2]),v[2]/Math.hypot(v[0],v[2])]:null;
+      const minimumY=Math.min(...rows.map(row=>row.pos[1]));
+      const support=await page.evaluate(positions=>positions.map(p=>{const floor=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;return {floor:Number.isFinite(floor)?floor:null,gap:Number.isFinite(floor)?p[1]-floor:null};}),rows.map(row=>row.pos));
+      const reasons=[];
+      if(rows.some(row=>row.deaths>take.start.deaths))reasons.push('death during release take');
+      if(maxDrop!==null&&minimumY<setup.pos[1]-maxDrop)reasons.push('dropped below validated floor band');
+      if(support.some(sample=>sample.gap===null||sample.gap>.55))reasons.push('more than0.55m above supporting floor');
+      if(!take.end.grounded||longestAirborne>Math.ceil(fps*.2))reasons.push('unsupported beyond brief stair settling');
+      if(maxLateral>.35)reasons.push('left validated runway corridor');
+      const result={passed:!reasons.length,label:'Staged runway support/trajectory check; no controller intervention',reasons,setup,maxDrop,minimumY,maximumFloorGap:Math.max(...support.map(sample=>sample.gap??Infinity)),longestAirborneFrames:longestAirborne,maxLateral,actualInitialDirection:direction,finalPosition:take.end.pos,finalGrounded:take.end.grounded};
+      save(`${name}-runout.json`,result);
+      for(const reason of reasons){const failure=`${name} staging: ${reason}`;releaseStagingFailures.push(failure);report.failures.push(failure);}
+      return result;
+    };
     const validatePair=name=>{
       const rows=report.videos[name].trace.filter(row=>row.state.capture?.shadePresent).map(row=>({frame:row.frame,...row.state.capture}));
       const failed=rows.filter(row=>!row.fox||!row.shade||row.fox.heightFraction<=.15||row.shade.heightFraction<=.15||!row.fox.inFrame||!row.shade.inFrame);
       save(`${name}-framing.json`,{passed:rows.length>0&&failed.length===0,minimumHeightFraction:.15,rows,failedFrames:failed.map(row=>row.frame)});
       if(!rows.length||failed.length)report.failures.push(`Shade pair framing below director bar in ${name}: ${JSON.stringify(failed.map(row=>({frame:row.frame,fox:row.fox,shade:row.shade})))}`);
+      return rows.length>0&&failed.length===0;
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(({start:[x,y,z],center:[cx,cz],actorId}) => {
@@ -389,6 +416,39 @@ try {
         await advance(0);
       }
       save('shade-density-variants.json',{label:'Same pose/time/camera, core absorption only; variants are not acceptance',chosenDefault:originalDensity,pose:{time:pose.t,fox:pose.pos,foxYaw:pose.foxYaw},variants});
+    }
+    if(await page.evaluate(()=>Array.isArray(window.__gameHooks.debug.colorField.visualDrains))){
+      await page.evaluate(id=>{
+        const h=window.__gameHooks,field=h.debug.colorField,actor=h.shades.state().actors.find(a=>a.id===id),V=field.fox.constructor;
+        window.__shadeVisualDiagnostic={field,center:new V(...actor.pos),radius:h.shades.tun.drainRadius,saved:{fox:field.fox.clone(),trail:field.trail,strokes:field.strokes,restores:field.restores,glows:field.glows,visualDrains:field.visualDrains,globalColor:field.globalColor}};
+      },actors[0].id);
+      const variants=[];
+      try{
+        for(const variant of ['weak-no-drain','weak-drained','strong-drained','permanent-drained']){
+          const source=await page.evaluate(variant=>{
+            const {field,center,radius}=window.__shadeVisualDiagnostic;
+            field.trail=[];field.strokes=[];field.restores=[];field.glows=[];field.globalColor=0;field.fox.copy(center);
+            field.visualDrains=variant==='weak-no-drain'?[]:[{center:center.clone(),radius}];
+            if(variant==='strong-drained')field.stroke(center,center,{life:6,strength:1.5,radius});
+            if(variant==='permanent-drained'){const restore=field.restore(center,radius,.2);restore.radius=radius;restore.t=1;restore.rim=0;}
+            return {variant,center:center.toArray(),radius,drains:field.visualDrains.length,strokeStrength:field.strokes[0]?.strength??0,permanent:field.restores.length};
+          },variant);
+          await advance(0);
+          const name=`shade-visual-${variant}`;await shot(name);variants.push({...source,shot:name});
+        }
+      }finally{
+        const restored=await page.evaluate(()=>{
+          const diagnostic=window.__shadeVisualDiagnostic,{field,saved}=diagnostic;
+          field.fox.copy(saved.fox);
+          for(const key of ['trail','strokes','restores','glows','visualDrains','globalColor'])field[key]=saved[key];
+          const result={passed:field.fox.equals(saved.fox)&&['trail','strokes','restores','glows','visualDrains','globalColor'].every(key=>field[key]===saved[key]),label:'Exact original source references, fox position and global fill restored; no simulation step in gallery'};
+          delete window.__shadeVisualDiagnostic;return result;
+        });
+        save('shade-visual-source-restoration.json',restored);
+        await advance(0);
+        if(!restored.passed)report.failures.push('Visual-source diagnostic failed to restore field');
+      }
+      save('shade-visual-source-variants.json',{label:'Controlled ColorField sources at frozen actor pose/time; shader diagnostic, not natural release or visual acceptance',variants});
     }
     await video('shade-patrol', 120, ()=>camera(), undefined, pairOptions('Patrol',actors[0].id,[0,30,60,90,119]));
     validatePair('shade-patrol');
@@ -479,7 +539,7 @@ try {
       const col=window.__gameHooks.debug.world.collision;
       for(let k=0;k<128;k++){
         const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=.1;r<3.1;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
+        for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2){safe=false;break;}}
         if(safe)return {pos:[x+dx*2.7,y,z+dz*2.7], direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
       }throw Error('No clear dash approach');
     },p);
@@ -495,6 +555,7 @@ try {
       await camera();
     }, undefined, pairOptions('Release',actors[0].id,[0,5,12,24,45,75,119]));
     validatePair('shade-free');
+    await validateRunout('shade-free',dashSetup);
     save('shade-dash-controller.json',{before:dashControllerBefore.dash,after:dashControllerAfter.dash,label:'Actual controller activation; collisionActiveLastStep is the preceding simulated movement tick'});
     if(dashControllerBefore.dash&&dashControllerAfter.dash.used<=dashControllerBefore.dash.used)throw Error(`Shade dash input never activated controller ${JSON.stringify(dashControllerAfter.dash)}`);
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
@@ -550,7 +611,7 @@ try {
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
     await advance(0);
     await shot('shade-after-free');
-    save('shade-acceptance.json', { passed:!contactFailure, releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    save('shade-acceptance.json', { passed:!contactFailure&&releaseStagingFailures.length===0, stagingFailures:[...releaseStagingFailures], releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
     let edge = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
     if(!edge || edge.freed)throw Error('No live high-hill Shade for clear encounter evidence');
     if(edge && !edge.freed){
@@ -581,7 +642,8 @@ try {
         const col=window.__gameHooks.debug.world.collision;
         for(let k=0;k<128;k++){
           const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-          for(let r=-2;r<3;r+=.1){const px=x+dx*r,pz=z+dz*r,fy=col.groundAt(px,pz,y+2.5).y;if(!Number.isFinite(fy)||Math.abs(fy-y)>2.4||col.blocked(px,pz,fy+.01)){safe=false;break;}}
+          const previousFloors=new Map();
+          for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width,fy=col.groundAt(px,pz,y+2.5).y,previous=previousFloors.get(width);if(!Number.isFinite(fy)||Math.abs(fy-y)>2.4||(previous!==undefined&&Math.abs(fy-previous)>.3)||col.blocked(px,pz,fy+.01)){safe=false;break;}previousFloors.set(width,fy);}
           if(safe)return{pos:[x+dx*2.7,col.groundAt(x+dx*2.7,z+dz*2.7,y+2.5).y,z+dz*2.7],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
         }throw Error('No safe restored-edge dash runway');
       },edge.pos);
@@ -592,19 +654,20 @@ try {
       lens=null;
       const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}await camera('shade-hill-high');},undefined,pairOptions('Hill release','shade-hill-high',[0,5,12,24,36,48,75,119]));
       validatePair('shade-clear-free');
+      await validateRunout('shade-clear-free',setup,null);
       save('shade-edge-dash-controller.json',{before:edgeControllerBefore.dash,after:edgeControllerAfter.dash});
       if(edgeControllerBefore.dash&&edgeControllerAfter.dash.used<=edgeControllerBefore.dash.used)throw Error(`Second Shade dash input never activated controller ${JSON.stringify(edgeControllerAfter.dash)}`);
       const after=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(after.frees!==before.frees+1||after.hits!==before.hits||!after.actors.find(a=>a.id==='shade-hill-high')?.freed)throw Error(`Restored-edge dash failed ${JSON.stringify(after)}`);
       const releasedIds=after.actors.filter(a=>a.freed).map(a=>a.id);
       if(after.frees<2||releasedIds.length<2)throw Error(`Two distinct dash releases missing ${JSON.stringify(after)}`);
-      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0,releasePassed:true,contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
+      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0,releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
       await shot('shade-two-freed');
       await advance(180,false);await advance(0);await shot('shade-clear-litter');
       await advance(600,false);await advance(0);await shot('shade-clear-empty');
       const end=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(end.actors.find(a=>a.id==='shade-hill-high').leaves!==0)throw Error('Edge dissolve did not end empty');
-      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0,releasePassed:true,contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
+      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0,releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
     }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
@@ -613,8 +676,8 @@ try {
       const [x,y,z]=actor.pos,col=window.__gameHooks.debug.world.collision;
       for(let k=0;k<128;k++){
         const a=k/128*Math.PI*2,dx=Math.cos(a),dz=Math.sin(a);let safe=true;
-        for(let r=-2;r<3;r+=.1)if(col.blocked(x+dx*r,z+dz*r,y)||Math.abs(col.groundAt(x+dx*r,z+dz*r,y+.1).y-y)>.2){safe=false;break;}
-        if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],yaw:Math.atan2(-dx,-dz)};
+        for(let r=-5.5;r<3.1&&safe;r+=.1)for(const width of [-.35,0,.35]){const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2){safe=false;break;}}
+        if(safe)return {pos:[x+dx*2.6,y,z+dz*2.6],direction:[-dx,-dz],yaw:Math.atan2(-dx,-dz)};
       }throw Error('No clear live dash approach');
     });
     await H('teleport', ...live.pos, live.yaw);
@@ -624,30 +687,54 @@ try {
     await video('shade-play', 120, async i => {
       if(i===12){await page.keyboard.up('w');await page.keyboard.up('Shift');}
     }, undefined, {traceEveryFrame:true,keyFrames:[0,6,12,24,45,90,119]});
+    const liveRunout=await validateRunout('shade-play',live);
     const liveResult=await page.evaluate(()=>window.__gameHooks.shades.state());
     if(liveResult.frees!==1||liveResult.hits!==0)throw Error(`Live dash failed ${JSON.stringify(liveResult)}`);
-    save('shade-live-acceptance.json',{label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
-    const flume = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
-    if(flume){
-      await H('teleport',95,6,18,0);
-      await H('photo',[103,10,31],[99,5,23],48);
-      await video('shade-flume',120,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,90,119]});
-      const result=await page.evaluate(()=>window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-flume'));
-      if(result.pos[1]<3.5||result.pos[1]>7)throw Error('Flume Shade left elevated channel');
-      save('shade-flume-acceptance.json',{actor:result,game:await page.evaluate(()=>window.__game)});
-      for(const [id,observer,lens,target] of [
-        ['shade-hill-low',[8,12,-67],[11,20,-60],[0,15,-68.7]],
-        ['shade-hill-high',[8,32.8,-79.5],[12,41,-73],[0,35,-80.5]],
-      ]){
-        await H('teleport',...observer,0);await H('photo',lens,target,48);
-        await video(id,90,async()=>{},undefined,{traceEveryFrame:true,keyFrames:[0,30,60,89]});
-        const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
-        if(!actor)throw Error(`Missing ${id}`);
-        save(`${id}-acceptance.json`,actor);
-      }
-
+    save('shade-live-acceptance.json',{passed:liveRunout.passed,runout:liveRunout,label:'STAGED start, actual W + Shift keyboard, normal third-person camera, no forced release',start:live,end:liveResult,game:await page.evaluate(()=>window.__game)});
+    // Regional review uses the same close actor-aware lens as patrol, not distant fixed vistas.
+    for(const [id,frames,keyFrames] of [
+      ['shade-flume',120,[0,30,60,90,119]],
+      ['shade-hill-low',90,[0,30,60,89]],
+      ['shade-hill-high',90,[0,30,60,89]],
+    ]){
+      const setup=await page.evaluate(id=>{
+        const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
+        if(!actor)return {failure:`Missing ${id}`};
+        const [x,y,z]=actor.pos,col=h.debug.world.collision;
+        for(const radius of [4.3,4.8,3.4,3.1,2.8])for(let k=0;k<64;k++){
+          const a=k*Math.PI*2/64,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
+          const floor=col.groundAt(px,pz,y+.6).y;
+          if(!Number.isFinite(floor)||Math.abs(floor-y)>.6||col.blocked(px,pz,floor))continue;
+          // Reject unsupported edges across the fox's footprint.
+          if([[.3,0],[-.3,0],[0,.3],[0,-.3]].some(([dx,dz])=>Math.abs(col.groundAt(px+dx,pz+dz,floor+.2).y-floor)>.3))continue;
+          return {pos:[px,floor,pz],yaw:Math.atan2(x-px,z-pz),actor:actor.pos,label:'Staged nearby observer on actual actor floor; live behavior preserved'};
+        }
+        return {failure:`No nearby supported observer for ${id}`,actor:actor.pos};
+      },id);
+      save(`${id}-observer-setup.json`,setup);
+      if(setup.failure){report.failures.push(setup.failure);continue;}
+      await H('teleport',...setup.pos,setup.yaw);lens=null;
+      await camera(id);
+      const lensTrace=[];
+      await video(id,frames,async frame=>{await camera(id);lensTrace.push({frame,...latestReviewLens.get(id)});},undefined,pairOptions('Regional',id,keyFrames));
+      const framingPassed=validatePair(id);
+      const take=report.videos[id],rows=take.trace.map(row=>row.state);
+      const support=await page.evaluate(positions=>positions.map(p=>{
+        const floor=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;
+        return {floor:Number.isFinite(floor)?floor:null,gap:Number.isFinite(floor)?p[1]-floor:null};
+      }),rows.map(row=>row.pos));
+      let airborne=0,longestAirborne=0;
+      for(const row of rows){airborne=row.grounded?0:airborne+1;longestAirborne=Math.max(longestAirborne,airborne);}
+      const failures=framingPassed?[]:['projected pair framing failed'];
+      if(lensTrace.some(row=>!row.clear||row.noFit))failures.push('no unobstructed fitted pair lens');
+      if(rows.some(row=>row.deaths>take.start.deaths))failures.push('observer died');
+      if(support.some(row=>row.gap===null||row.gap>.55)||longestAirborne>Math.ceil(fps*.2)||!take.end.grounded)failures.push('observer lost supporting floor');
+      save(`${id}-visibility-support.json`,{passed:!failures.length,failures,lensTrace,support,longestAirborneFrames:longestAirborne,label:'Actual regional lens decisions and traced floor support; no forced animal state'});
+      for(const failure of failures)report.failures.push(`${id}: ${failure}`);
+      const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
+      if(id==='shade-flume'&&(actor.pos[1]<3.5||actor.pos[1]>7))report.failures.push('Flume Shade left elevated channel');
+      save(`${id}-acceptance.json`,{passed:!failures.length,failures,actor,setup,game:await page.evaluate(()=>window.__game)});
     }
-
 
     // Stored contact failures survive later exceptions and keep the final process result failed.
   }
