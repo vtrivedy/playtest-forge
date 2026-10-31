@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { prepareSceneWater } from './waterScene';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -352,6 +353,7 @@ export function createPostStack(
       U.uGrain!.value = params.grain;
       U.uTime!.value = performance.now() * 0.001;
       if (paintPass) paintPass.uniforms.uPaint!.value = params.painterly;
+      prepareSceneWater(renderer, scene, camera);
       composer.render();
     },
     dispose() {
