@@ -48,5 +48,21 @@ try {
   step(10, new THREE.Vector3(30,0,30));
   assert.equal(state().smokeParticles, 0);
   assert.equal(state().leaves, 0);
-  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end'], final: state() }, null, 2));
+  // Authored route heights can differ from sampled terrain; return arrival is horizontal.
+  const sloped = await createShades(new THREE.Scene(), [{ id:'slope', patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]] }], () => .5);
+  for(let k=0;k<180;k++) sloped.update(1/60,k/60,new THREE.Vector3(30,0,30),false);
+  const nearSlope=new THREE.Vector3().fromArray(sloped.state()[0]!.pos).add(new THREE.Vector3(2.8,0,0));
+  for(let k=0;k<90;k++) sloped.update(1/60,3+k/60,nearSlope,false);
+  assert.equal(sloped.state()[0]!.mode,'chase');
+  for(let k=0;k<480;k++) sloped.update(1/60,5+k/60,new THREE.Vector3(30,0,30),false);
+  assert.equal(sloped.state()[0]!.mode,'patrol','height mismatch must not trap return');
+  let wall=true;
+  const obstructed=await createShades(new THREE.Scene(),[{id:'wall',patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0,undefined,()=>wall);
+  for(let k=0;k<180;k++) obstructed.update(1/60,k/60,new THREE.Vector3(30,0,30),false);
+  assert.equal(obstructed.state()[0]!.mode,'patrol','blocked patrol must keep its route target moving');
+  assert.deepEqual(obstructed.state()[0]!.pos,[0,0,0],'wall must prevent displacement');
+  wall=false;
+  for(let k=0;k<180;k++) obstructed.update(1/60,3+k/60,new THREE.Vector3(30,0,30),false);
+  assert.ok(new THREE.Vector3().fromArray(obstructed.state()[0]!.pos).length()>1,'patrol must recover when obstacle clears');
+  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'terrain-height mismatch return', 'blocked patrol recovery'], final: state() }, null, 2));
 } finally { globalThis.fetch = originalFetch; THREE.DefaultLoadingManager.setURLModifier(url => url); }
