@@ -2756,6 +2756,9 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
         gHue = mix(gHue, gBankHue, gReedLand * 0.85);
         vec3 gLeafBase = mix(gLeaf.rgb, vec3(dot(gLeaf.rgb, vec3(0.2126, 0.7152, 0.0722))), gReedLand * 0.85);
         vec3 gLeafCol = gLeafBase * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
+        // Pale dry litter catches restored light; keep soil/worn paths and
+        // physically shaded gaps dark instead of lifting the whole scene.
+        gLeafCol *= 1.0 + gReedLand * 0.35;
         diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);
         // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of
         // dry olive-gold grass where the litter thins, so open ground never reads as one plane
