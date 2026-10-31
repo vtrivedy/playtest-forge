@@ -11,7 +11,7 @@ import { weatheredSurface } from './worldSurfaces';
 
 /** Water stores height: an arriving front fills a basin and raises its ferry. */
 export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
-  const group = new THREE.Group(); group.name = 'ashwater-reach'; scene.add(group);
+  const group = new THREE.Group(); group.name = 'ashwater-reach'; world.group.add(group);
   const rock = new Bucket(), stone = new Bucket(), wood = new Bucket(), roots = new Bucket();
   const col = world.collision;
   const colliderStart=col.colliders.length;
@@ -167,7 +167,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     sync(dt:number,base:ReturnType<typeof createColorField>){field.trail=[];field.strokes=[];field.update(dt);field.setFox(base.fox);field.trail=base.trail.map(t=>({...t}));field.strokes=base.strokes.map(t=>({...t}));field.renderMask(dt);for(const m of mats)field.syncMaterial(m);},
     update(dt:number,fox:THREE.Vector3,feetY:number,grounded:boolean,flood:boolean,dashing:boolean,drained:boolean){
       const localFox=fox.clone();localFox.x-=offsetX;
-      if(Math.hypot(fox.x-bankCheckpoint.pos.x,fox.z-bankCheckpoint.pos.z)<4.5&&Math.abs(feetY-bankCheckpoint.pos.y)<3)recoveryVisited=true;
+      if(flood&&grounded&&fox.x>68&&fox.z<-80)recoveryVisited=true;
       open=flood;gate.enabled=!open;gateMesh.visible=!open;
       toggleCooldown=Math.max(0,toggleCooldown-dt);drinks=drained&&!restored;
       if(dashing&&!wasDash&&toggleCooldown===0&&handles.some(([x,y,z])=>Math.hypot(localFox.x-x,localFox.z-z)<3&&Math.abs(feetY-y)<2)){level=level==='high'?'low':'high';toggleCooldown=.6;warning=tun.warningTime;refillDelay=level==='high'?1.8:0;}
@@ -192,12 +192,12 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       for(const [i,f] of floats.entries()){
         const motion=floatMotion[i]!,on=supportedBy===i;
         const buoyant=THREE.MathUtils.smoothstep(fill,0,.12)*(retained?.2:1);
-        motion.offset=on?0:Math.sin(field.time*1.3+i*2.1)*.018*buoyant;
+        motion.offset=THREE.MathUtils.damp(motion.offset,on?0:Math.sin(field.time*1.3+i*2.1)*.018*buoyant,12,dt);
         f.mesh.position.y=f.base+tun.rise*fill;
         f.c.top0=f.c.top1=f.mesh.position.y;f.c.bottom=f.mesh.position.y-.5;
         // Only the render child heaves. The planted deck/collider stays deterministic.
         const hull=f.mesh.children[0]!;hull.position.y=motion.offset;
-        hull.rotation.z=on?0:Math.sin(field.time*.9+i)*.004*buoyant;
+        hull.rotation.z=THREE.MathUtils.damp(hull.rotation.z,on?0:Math.sin(field.time*.9+i)*.004*buoyant,12,dt);
       }
       lake.update(field.time,fill,tun.rise,actualFillRate);scenery.update(field.time);
       for(const [i,mist] of mistBanks.entries()){mist.position.y=pool.position.y+.15;mist.position.x+=(Math.sin(field.time*.2+i)*.015)*dt;}

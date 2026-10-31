@@ -25,7 +25,8 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
     geo.computeVertexNormals(); bark.add(geo, undefined, barkColor); geo.dispose();
   }
   // Open crowns keep the ferry and bell readable; fine hanging twigs suggest willow/alder.
-  for (const [x, y, z, h] of [[176,30,-131,8],[194,30,-104,10],[210,36,-125,9],[217,31,-140,7],[175,30,-106,6]]) {
+  const trees=[[176,30,-131,8],[194,30,-104,10],[210,36,-125,9],[217,31,-140,7],[175,30,-106,6]];
+  for (const [x, y, z, h] of trees) {
     branch([[x,y,z],[x+.3,y+h*.4,z-.2],[x-.5,y+h*.78,z+.4],[x+.2,y+h,z]], .28);
     for (let j = 0; j < 5; j++) {
       const a = j * 2.4 + x, reach = 1.5 + random() * 1.7;
@@ -46,6 +47,7 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
   for (const [cx,cz] of [[176,-106.5],[183,-104.5],[193,-104],[198,-132],[189,-132],[174,-133]]) {
     for (let i=0;i<16;i++) {
       const x=cx+(random()-.5)*2.8,z=cz+(random()-.5)*1.7,h=.6+random()*1.1;
+      if(trees.some(([tx,ty,tz])=>ty===30&&Math.hypot(x!-tx!,z!-tz!)<1.45))continue;
       const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(x,30,z),new THREE.Vector3(x+.08,30+h*.6,z),new THREE.Vector3(x+.23,30+h,z+.1)]);
       const stem=new THREE.TubeGeometry(curve,3,.018,3,false);
       const weight=new Float32Array(stem.getAttribute('position').count);for(let j=0;j<weight.length;j++)weight[j]=Math.floor(j/4)/3;
@@ -94,7 +96,12 @@ export function createReachWater(group: THREE.Group) {
       void main(){
         vec2 p=(vUv-.5)*2.;float r=length(p);
         float edge=r+.018*sin(p.x*26.+sin(p.y*17.))+.012*sin(p.y*32.);
-        float alpha=1.-smoothstep(.94,1.,edge);if(alpha<.005)discard;
+        float alpha=1.-smoothstep(.94,1.,edge);
+        vec2 bankP=vec2(p.x*12./11.35,-p.y*13./12.35);
+        float bankAngle=atan(bankP.y,bankP.x);
+        bool spillway=cos(bankAngle)<-.9||(sin(bankAngle)<-.45&&cos(bankAngle)<.55);
+        if(!spillway)alpha=1.-smoothstep(1.,1.025,length(bankP));
+        if(alpha<.005)discard;
         float a=vWorld.x*.6+vWorld.z*.83-uTime*.36;
         float b=vWorld.x*1.9-vWorld.z*.74+uTime*.45;
         vec3 n=normalize(vec3(cos(a)*.035+cos(b)*.018,1.,sin(a)*.04));
@@ -140,7 +147,7 @@ export function createReachWater(group: THREE.Group) {
         #include <colorspace_fragment>
         #include <fog_fragment>
       }`});
-  const curtain=new THREE.Mesh(curtainGeo,curtainMat);curtain.position.set(187,30.02,-118);curtain.name='reach-spillway-water';curtain.renderOrder=0;group.add(curtain);
+  const curtain=new THREE.Mesh(curtainGeo,curtainMat);curtain.position.set(187,30.02,-118);curtain.name='reach-spillway-water';curtain.renderOrder=-1;curtain.visible=false;group.add(curtain);
   // The same small wake follows each hull, independently of the fixed watermarks.
   const wakes:THREE.Mesh[]=[];
   const wakeMat=new THREE.MeshBasicMaterial({color:0x91aaa3,transparent:true,opacity:.06,depthWrite:false,side:THREE.DoubleSide});
