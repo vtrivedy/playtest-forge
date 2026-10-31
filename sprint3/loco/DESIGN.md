@@ -34,3 +34,11 @@ Frozen GPU traces confirm phase-warp alternative cadence 1.85/2.15/2.40 Hz versu
 
 ## Phase-warp contact continuity experiment
 Integrated phase-warp CPU ramp peaks at .077m residual / 4.63m/s solved-pad slide. Compare preserving stance across reporting-label changes, normalized contact vote hysteresis, stable plant strength, and 40ms correction release already developed on Sol. Keep these only if ramp/turn/reverse metrics do not regress materially; residual and slide remain visible. No acceptance based on metrics alone.
+
+## Toe-clearance probe
+Fixed core-mesh vertices confirm integrated near-floor recovery movement is real: trot near-floor median .44m/s vs baseline .005, gallop p95 7.63m/s vs 1.26. These samples include toe-off/touchdown and do not alone prove skating, but warrant a controlled trial. Try a bounded 0 / 1.5 / 3cm minimum recovery clearance, eased to zero at touchdown/toe-off, only for grounded free paws. The same two-bone solver applies it; do not redefine support or hide residual metrics. Report recovery clearance separately. Reject if it creates floating pads or breaks reach; request a fresh capture if retained.
+
+Recovery-clearance floor rejected: 1.5/3cm trials did not reduce near-floor high-speed tails and elevated the walk pads. Runtime restored. Next compare full endpoint-tangent swing ease (1.0 versus .35); the existing comment promises continuous clip rate only at 1.0. Keep only if diagnostics improve without worsened reach.
+
+## Integration critique follow-up
+Opus review found head-bob gait-label discontinuity, mutable plant strength, correction release bypasses (re-step/quick re-entry/missing terrain), stance-ratio remapping during acceleration, and full-vector speed driving forward gaits on sideways landings. Restore evaluated-weight head bob; latch full plantStrength on touchdown and preserve the currently corrected contact when re-anchoring; treat missing terrain as recovery instead of returning early; drive grounded cadence with nonnegative forward velocity projection. Keep actual total speed for physics and action selection. Probe swingEase .35/.65/1: full tangent substantially improves flat near-floor walk/trot p95 (.77→.003 and 5.58→.43m/s), though gallop still ~4.26m/s, so pick 1 with explicit gallop risk. Instrument stance-ratio rate before changing its timing model.
