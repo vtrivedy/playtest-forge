@@ -1,15 +1,17 @@
 import * as THREE from 'three';
 
 /** CC0 library scans, projected in metres so merged and scaled props share a surface. */
-export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false, timberCoordinates: 'world' | 'local' = 'world'): void {
+export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false, timberCoordinates: 'world' | 'local' = 'world', mineral: 'masonry' | 'rock' = 'masonry'): void {
+  const rock = !timber && mineral === 'rock';
   const hullTimber = timber && timberCoordinates === 'local';
   const texture = new THREE.TextureLoader().load(timber
     ? '/assets/library/textures/bark_brown_02/bark_brown_02_Diffuse_1k.jpg'
+    : rock ? '/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg'
     : '/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_Color.jpg');
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
-  const topTexture = timber ? texture : new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg');
+  const topTexture = timber || rock ? texture : new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg');
   topTexture.wrapS = topTexture.wrapT = THREE.RepeatWrapping;
   topTexture.colorSpace = THREE.SRGBColorSpace;
   topTexture.anisotropy = 8;
@@ -29,12 +31,12 @@ export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec3 wsWeights = pow(abs(normalize(vWSNormal)), vec3(4.0));
         wsWeights /= max(dot(wsWeights, vec3(1.0)), 0.001);
-        vec3 wsP = vWSPoint * ${hullTimber ? 'vec3(0.72, 0.16, 0.08)' : timber ? 'vec3(0.72, 0.16, 0.72)' : 'vec3(0.25)'};
+        vec3 wsP = vWSPoint * ${hullTimber ? 'vec3(0.72, 0.16, 0.08)' : timber ? 'vec3(0.72, 0.16, 0.72)' : rock ? 'vec3(0.12)' : 'vec3(0.25)'};
         vec3 wsScan = texture2D(uWSScan, wsP.zy).rgb * wsWeights.x
           + texture2D(uWSTop, wsP.xz).rgb * wsWeights.y
           + texture2D(uWSScan, wsP.xy).rgb * wsWeights.z;
         float wsValue = dot(wsScan, vec3(0.3, 0.59, 0.11));
-        diffuseColor.rgb *= clamp(0.38 + wsValue * 2.2, 0.36, 1.3);
+        diffuseColor.rgb *= ${rock ? 'clamp(0.88 + wsValue * 0.45, 0.88, 1.12)' : 'clamp(0.38 + wsValue * 2.2, 0.36, 1.3)'};
         ${hullTimber ? `
         // Hull-space grain follows the physical lengthwise planks as they rise.
         // Geometry supplies board seams; avoid painting diagonal joints over it.
@@ -47,6 +49,10 @@ export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false
         float wsBoard = floor((vWSPoint.x + vWSPoint.z) / 0.28);
         float wsJoint = smoothstep(0.014, 0.042, abs(fract((vWSPoint.x + vWSPoint.z) / 0.28) - 0.5));
         diffuseColor.rgb *= mix(0.58, 1.0, wsJoint) * (0.91 + sin(wsBoard * 7.13) * 0.09);
+        ` : rock ? `
+        // Broad damp slate patches; no brick joints or green moss.
+        float wsWet = smoothstep(0.15, 0.8, sin(vWSPoint.x * 0.37 + sin(vWSPoint.z * 0.29)) * sin(vWSPoint.y * 0.43 + vWSPoint.z * 0.21));
+        diffuseColor.rgb *= 1.0 - wsWet * 0.08;
         ` : `
         float wsPatch = sin(vWSPoint.x * 1.3 + sin(vWSPoint.z * 1.8)) * sin(vWSPoint.z * 0.8 + vWSPoint.y * 0.7);
         float wsMoss = smoothstep(0.0, 0.6, wsPatch) * (0.2 + 0.8 * smoothstep(0.3, 0.85, vWSNormal.y));
@@ -58,8 +64,8 @@ export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false
         roughnessFactor = clamp(roughnessFactor * (0.8 + wsValue * 0.55), 0.65, 1.0);`)
       .replace('#include <normal_fragment_begin>', `#include <normal_fragment_begin>
         // Screen derivatives add soft relief without UV seams on merged props.
-        normal = normalize(normal + vec3(-dFdx(wsValue), -dFdy(wsValue), 0.0) * 1.8);`);
+        normal = normalize(normal + vec3(-dFdx(wsValue), -dFdy(wsValue), 0.0) * ${rock ? '0.65' : '1.8'});`);
   };
-  mat.customProgramCacheKey = () => `${key}|world-surface-${hullTimber ? 'hull-timber' : timber ? 'timber' : 'stone'}`;
+  mat.customProgramCacheKey = () => `${key}|world-surface-${hullTimber ? 'hull-timber' : timber ? 'timber' : rock ? 'rock-v1' : 'stone'}`;
   mat.needsUpdate = true;
 }

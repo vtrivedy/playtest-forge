@@ -2006,6 +2006,8 @@ try {
     if(!high.reach.restored||high.reach.fill<.99)report.failures.push('Reach HIGH photo setup did not receive sustained water');
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
     await RH('teleport',187,36,-118,Math.PI/2);await RH('photo',[161,45,-107],[188,33,-120],52);await advance(2);await shot('reachview-high-basin');
+    // Matched low-angle shoreline evidence; original overviews remain unchanged.
+    await RH('teleport',173,30,-130,Math.PI/2);await RH('photo',[169,38,-128],[201,33,-122],58);await advance(2);await shot('reachview-high-shoreline');
     await RH('teleport',214,31,-137,Math.PI/2);
     await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-lower-islet');
     await RH('teleport',207,36,-123,-Math.PI/2);
@@ -2018,6 +2020,7 @@ try {
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
+    await RH('teleport',173,30,-130,Math.PI/2);await RH('photo',[169,38,-128],[201,33,-122],58);await advance(2);await shot('reachview-low-shoreline');
     await RH('teleport',187,30,-118,Math.PI/2);await RH('photo',[161,45,-107],[188,33,-120],52);await advance(2);await shot('reachview-low-basin');
     const low=await RH('state');save('reachview-state.json',low);if(low.reach.level!=='low'||low.reach.fill>.02)report.failures.push('Reach LOW photo setup did not drain');
   }

@@ -72,7 +72,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   for (const z of [-123,-113]) stoneBlock(stone,trs(187,30.35,z),12,.7,.6,980+z,.08);
   for(let i=0;i<7;i++) stoneBlock(stone,trs(192.2,30.4+i*.9,-118),.4,.2,1.2,990+i,.04);
   // Cistern banks meet HIGH water. Two broken spillways preserve source boarding
-  // and the LOW lane; the high-water surface no longer floats above an empty floor.
+  // and the LOW lane. HIGH spillway edges remain above the dry-safe LOW floor.
   for (let i=0;i<24;i++) {
     const a=i/24*Math.PI*2;
     if (Math.cos(a)<-.9 || (Math.sin(a)<-.45 && Math.cos(a)<.55)) continue;
@@ -121,7 +121,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       bucket.col[i]=tint.r*value;bucket.col[i+1]=tint.g*value;bucket.col[i+2]=tint.b*value;
     }
     const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86});mat.name=`reach-${name}`;
-    if(name!=='rv-rock')weatheredSurface(mat,name==='rv-bark'); mat.userData.cfRestoredChroma=name==='rv-bark'?.45:.65; field.patchMaterial(mat); mats.push(mat);
+    weatheredSurface(mat,name==='rv-bark','world',name==='rv-rock'?'rock':'masonry'); mat.userData.cfRestoredChroma=name==='rv-bark'?.45:.65; field.patchMaterial(mat); mats.push(mat);
     const mesh=bucket.toMesh(mat,{cast:true,receive:true,boxUV:name==='rv-rock'?4:1.6}); if(mesh)group.add(mesh);
   }
   const scenery=await dressReach(group, mat => { field.patchMaterial(mat); mats.push(mat); });
