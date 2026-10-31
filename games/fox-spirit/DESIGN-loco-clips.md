@@ -2,6 +2,8 @@
 
 Vivek (Oct 31 after chase clip): movement is "so weird and unnatural" — "doesn't flow or look natural at all." Four sprints of procedural overlays on the Blender-baked clips have plateaued (hovering paws, stiff spine, stick fores, tail flips). **Change approach:** trust authored clips; use tried-and-true game animation patterns only. No novel experiments.
 
+> **Superseded in part by `DESIGN-loco-flow.md` (sprint 5 anim2):** linear crossfades → inertialization, idle entry table → runtime pose search, jump clips re-authored, bounded spine/tail/carpal additives added. Where they differ, the flow doc wins.
+
 ## Asset decision
 **Keep** `assets/hero/spirit_fox.glb` (project-owned Blender-baked clips: idle, walk, trot, run, jump_up, jump_apex, jump_fall, land, dash, glide, skid, turn_*, burst). Matches art lock (burnt-orange ember fox + fx bones).
 
