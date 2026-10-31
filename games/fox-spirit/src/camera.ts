@@ -466,6 +466,10 @@ export function createFollowCamera(opts: {
     },
     pathState: () => (path ? { t: path.t, w: path.w, yielding: path.yielding } : null),
     playShot(s) {
+      // Global restoration may light a seedwell across the realm. A reactive
+      // celebration must never take the lens away from the travelling hero.
+      const hero = s.subjects[0];
+      if (!hero || s.subjects.some((subject) => subject.distanceToSquared(hero) > 12 * 12)) return;
       // a shot already on screen just extends; restarting would pop from its pose back to traversal
       if (shot) {
         if (!shot.yielding) shot.end = Math.max(shot.end, shot.t + s.holdS + (shot.blendS ?? 0.6));
@@ -630,7 +634,7 @@ export function createFollowCamera(opts: {
           // reward framing yields to play: any jump/dash, or the fox / its landing leaving the safe
           // frame, starts the blend-out from the *current* weight (works mid blend-in, no pop)
           ndc.set(p.x, p.y + 0.6, p.z).project(camera);
-          let leaving = Math.abs(ndc.x) > 0.8 || Math.abs(ndc.y) > 0.8 || ndc.z > 1 || !f.grounded || f.dashing;
+          let leaving = speed > 1.5 || Math.abs(ndc.x) > 0.8 || Math.abs(ndc.y) > 0.8 || ndc.z > 1 || !f.grounded || f.dashing;
           if (!leaving && f.landing) {
             ndc.copy(f.landing).project(camera);
             leaving = Math.abs(ndc.x) > 0.85 || Math.abs(ndc.y) > 0.85 || ndc.z > 1;

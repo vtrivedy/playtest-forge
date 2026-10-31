@@ -77,3 +77,27 @@ crown.geometry.addGroup(0, crown.geometry.index!.count, 0);
 step(); step();
 assert.equal(fader.detected, true, 'grouped back-facing canopy triangles block sight');
 console.log('PASS: back-face boom/crown, render material isolation, live props, material groups, hidden ancestor, fade release');
+
+// Reactive celebration shots must never turn a restored run into a realm-wide
+// panorama. Authored restoration paths have their own explicit camera contract.
+const celebration = createFollowCamera();
+celebration.resize(1280, 720);
+const hero = new THREE.Vector3();
+const idleFrame = { target: hero, vel: new THREE.Vector3(), grounded: true,
+  gliding: false, dashing: false, airTime: 0, landing: null };
+celebration.update(1 / 60, idleFrame);
+celebration.playShot({ subjects: [hero.clone(), new THREE.Vector3(100, 20, -70)], holdS: 1.7 });
+for (let i = 0; i < 60; i++) celebration.update(1 / 60, idleFrame);
+assert.match(celebration.debug.internals(), /shot=0\.00/, 'remote seedwell must not take the lens');
+assert.ok(celebration.camera.position.distanceTo(hero) < 6, 'remote celebration keeps traversal distance');
+
+celebration.playShot({ subjects: [hero.clone(), new THREE.Vector3(0, 0, -4)], holdS: 1.7 });
+for (let i = 0; i < 60; i++) celebration.update(1 / 60, idleFrame);
+assert.match(celebration.debug.internals(), /shot=1\.00/, 'stopped local celebrations retain composition');
+for (let i = 0; i < 60; i++) {
+  hero.z -= 9 / 60;
+  celebration.update(1 / 60, { ...idleFrame, vel: new THREE.Vector3(0, 0, -9) });
+}
+assert.match(celebration.debug.internals(), /shot=0\.00/, 'running yields the local celebration');
+assert.ok(celebration.camera.position.distanceTo(hero) < 7, 'running returns to readable chase distance');
+console.log('PASS: remote celebration rejected, local idle shot retained, running takes camera back');
