@@ -96,7 +96,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     const trim=new THREE.BoxGeometry(6.2,.06,.12);trim.translate(0,-.01,z);
     wood.add(trim,undefined,new THREE.Color(0xa99f87));trim.dispose();
   }
-  const timber = new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9}); weatheredSurface(timber,true); field.patchMaterial(timber); mats.push(timber);
+  const timber = new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9}); weatheredSurface(timber,true,'local'); field.patchMaterial(timber); mats.push(timber);
   const ferry = wood.toMesh(timber,{cast:true,receive:true,boxUV:1.4}); if(ferry) raft.add(ferry);
   raft.position.set(187,30,-118);
   const raftCol=col.add(boxCollider({x:187,z:-118,w:6.2,d:7,top:30,bottom:29.5,tag:'reach-ferry'}));
