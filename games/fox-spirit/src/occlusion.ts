@@ -20,9 +20,10 @@ export function createOcclusionFader(
     blocked?: () => boolean;
   },
 ) {
-  // x,y = centre of the fox's projected bounds (framebuffer px), z = fox view depth (m); radii in px
+  // xy = projected centre (px), z = view depth (m), w = lower cutout edge (px).
   const uOccFox = { value: new THREE.Vector4(0, 0, 0, 1) };
   const uOccRad = { value: new THREE.Vector2(1, 1) };
+  const uOccFootFade = { value: 1 };
   const uOccStrength = { value: 0 };
   const patched = new WeakSet<THREE.Material>();
 
@@ -36,12 +37,14 @@ export function createOcclusionFader(
       shader.uniforms.uOccFox = uOccFox;
       shader.uniforms.uOccStrength = uOccStrength;
       shader.uniforms.uOccRad = uOccRad;
+      shader.uniforms.uOccFootFade = uOccFootFade;
       shader.fragmentShader = shader.fragmentShader
         .replace(
           '#include <common>',
           `#include <common>
           uniform vec4 uOccFox;
           uniform vec2 uOccRad;
+          uniform float uOccFootFade;
           uniform float uOccStrength;`,
         )
         .replace(
@@ -52,6 +55,8 @@ export function createOcclusionFader(
             float occNear = uOccFox.z - vViewPosition.z; // vViewPosition = -mvPosition → +depth
             // soft-edged ellipse fitted to the fox; nearby geometry counts from 0.45 m in front
             float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear);
+            // Clear only pixels the hero can occupy; preserve the floor below its feet.
+            occCut *= smoothstep(uOccFox.w, uOccFox.w + uOccFootFade, gl_FragCoord.y);
             // 4x4 Bayer stipple — no sorting, no blending, keeps a ghost of the occluder
             vec2 occP = mod(floor(gl_FragCoord.xy), 4.0);
             vec2 occLo = mod(occP, 2.0);
@@ -61,7 +66,7 @@ export function createOcclusionFader(
           }`,
         );
     };
-    mat.customProgramCacheKey = () => `${prevKey}|occ-cutout`;
+    mat.customProgramCacheKey = () => `${prevKey}|occ-cutout-footline`;
     mat.needsUpdate = true;
   }
 
@@ -212,7 +217,9 @@ export function createOcclusionFader(
       const pad = size.y * 0.03;
       uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 1.05 + pad), Math.max(size.y * 0.05, (y1 - y0) * 1.05 + pad));
       const depth = chest.applyMatrix4(camera.matrixWorldInverse).z * -1;
-      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, 1);
+      const footFade = Math.max(1, size.y * 0.005);
+      uOccFootFade.value = footFade;
+      uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, y0 - 2 * footFade);
     },
   };
 }
