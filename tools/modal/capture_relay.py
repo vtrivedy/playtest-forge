@@ -69,6 +69,9 @@ def capture_request(stream, request, folder):
             result.update(status='capture-failed',verificationError='Missing or mismatched commit, shot or tool identity')
         elif run.get('status')=='failed' or report.get('failures') or report.get('errors'):
             result['status']='capture-failed'
+        elif run.get('status')=='success':
+            result['status']='captured'
+            if proc.returncode:result['transportWarning']=f'Client exit {proc.returncode}; verified durable capture succeeded'
         archive=folder/'evidence.tar'
         with tarfile.open(archive,'w') as tar:
             if evidence.exists():tar.add(evidence,arcname='evidence')
