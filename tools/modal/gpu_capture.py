@@ -21,6 +21,7 @@ image = (
 )
 if modal.is_local():
     image = image.add_local_file(ROOT / 'tools/finale-capture.mjs', '/opt/browser/finale-capture.mjs')
+    image = image.add_local_file(ROOT / 'tools/hub-black-frames.mjs', '/opt/browser/hub-black-frames.mjs')
     image = image.add_local_file(ROOT / 'tools/water-wade-capture.mjs', '/opt/browser/water-wade-capture.mjs')
     image = image.add_local_file(Path(os.environ.get('FOX_CAPTURE_SCRIPT', str(ROOT / 'tools/gpu-capture.mjs'))), '/opt/browser/gpu-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/levels-capture.mjs', '/opt/browser/levels-capture.mjs')

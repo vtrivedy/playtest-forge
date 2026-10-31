@@ -1,3 +1,4 @@
+import { blackFrameIntervals } from './hub-black-frames.mjs';
 import { captureFinale } from './finale-capture.mjs';
 import { captureWadeVisibility } from './water-wade-capture.mjs';
 import { projectedVisibilityReview } from './projected-visibility-capture.mjs';
@@ -13,7 +14,7 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 const arg = (k, d) => process.argv.includes(`--${k}`) ? process.argv[process.argv.indexOf(`--${k}`) + 1] : d;
 const repo = arg('repo', process.cwd()), out = arg('out', '/tmp/gpu-capture');
@@ -91,7 +92,9 @@ try {
   await context.addInitScript(() => {
     let seed = 42;
     Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-    document.addEventListener('webglcontextlost', e => console.warn('CONTEXT LOSS EVENT', e.target.width, e.target.height, e.target.isConnected, e.statusMessage), true);
+    window.__gpuContextLost = false;
+    document.addEventListener('webglcontextlost', e => { window.__gpuContextLost = true; console.warn('CONTEXT LOSS EVENT', e.target.width, e.target.height, e.target.isConnected, e.statusMessage); }, true);
+    window.__gpuNativeRaf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = () => 0;
     window.cancelAnimationFrame = () => {};
   });
@@ -131,8 +134,68 @@ try {
     if (await page.evaluate(() => window.__gameHooks.debug.renderer.getContext().isContextLost())) throw Error('WebGL context lost after warmup');
     return H('state');
   }
+  async function screenshotPixels(buffer) {
+    return page.evaluate(async encoded => {
+      const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));
+      const bitmap=await createImageBitmap(new Blob([bytes],{type:'image/png'}));
+      const canvas=new OffscreenCanvas(128,72), ctx=canvas.getContext('2d',{willReadFrequently:true});
+      ctx.drawImage(bitmap,0,0,128,72); bitmap.close();
+      const data=ctx.getImageData(0,0,128,72).data;
+      let maxChannel=0;
+      for(let i=0;i<data.length;i+=4) maxChannel=Math.max(maxChannel,data[i],data[i+1],data[i+2]);
+      return {width:128,height:72,maxChannel,black:maxChannel<=3};
+    },buffer.toString('base64'));
+  }
+  async function hubStillInvariant() {
+    const state=await H('state');
+    const pose=await page.evaluate(()=>{
+      const {camera,fox}=window.__gameHooks.debug;
+      camera.updateMatrixWorld(true); fox.updateWorldMatrix(true,true);
+      const bones=[]; fox.traverse(o=>{if(o.isBone)bones.push([o.name,o.matrixWorld.toArray()]);});
+      return {camera:{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),
+        projection:camera.projectionMatrix.toArray()},fox:{position:fox.position.toArray(),
+        quaternion:fox.quaternion.toArray(),scale:fox.scale.toArray()},bones};
+    });
+    const fixed={pose,t:state.t,anim:state.anim,grounded:state.grounded,deaths:state.deaths,
+      assists:state.auto.assists,restored:state.restored,seedwells:state.seedwells,restore:state.restore,
+      grade:state.look.grade,dusk:state.dusk};
+    return {state,pose,digest:createHash('sha256').update(JSON.stringify(fixed)).digest('hex')};
+  }
+  async function captureStill(name) {
+    const assertHealthy=async()=>{
+      if(!name.startsWith('hub-')) return;
+      const healthy=await page.evaluate(()=>!window.__gpuContextLost &&
+        !window.__gameHooks.debug.renderer.getContext().isContextLost());
+      if(!healthy) throw Error(name+': WebGL context loss invalidates still evidence');
+    };
+    await assertHealthy();
+    const filename=path.join(out,name+'.png');
+    const first=await page.screenshot({path:filename,animations:'disabled'});
+    if(!name.startsWith('hub-')) return;
+    await assertHealthy();
+    const pixels=await screenshotPixels(first);
+    if(!pixels.black) return;
+    const attemptName=name+'-attempt-1-black.png', before=await hubStillInvariant(), started=Date.now();
+    fs.renameSync(filename,path.join(out,attemptName));
+    report.hubStillAttempts??={};
+    const attempt=report.hubStillAttempts[name]={preserved:attemptName,first:pixels,before};
+    save('hub-still-attempts.json',report.hubStillAttempts);
+    await H('advance',0,1/60,true);
+    await page.evaluate(()=>new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(Error('Native compositor barrier timed out')),5000);
+      window.__gpuNativeRaf(()=>window.__gpuNativeRaf(()=>{clearTimeout(timer);resolve();}));
+    }));
+    const retry=await page.screenshot({path:filename,animations:'disabled'});
+    await assertHealthy();
+    attempt.retry=await screenshotPixels(retry); attempt.after=await hubStillInvariant();
+    attempt.hostElapsedMs=Date.now()-started;
+    attempt.recovered=!attempt.retry.black;
+    attempt.invariantsMatch=attempt.before.digest===attempt.after.digest;
+    save('hub-still-attempts.json',report.hubStillAttempts);
+    if(!attempt.recovered || !attempt.invariantsMatch) report.failures.push(name+': black still recovery failed or changed pose/camera/state');
+  }
   async function shot(name) {
-    await page.screenshot({ path: path.join(out, `${name}.png`), animations: 'disabled' });
+    await captureStill(name);
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
     if (name.startsWith('reachview-')) {
       // Validate the snapshot belonging to this PNG, after its staged teleport/lens.
@@ -211,7 +274,7 @@ try {
           if (!options.traceEveryFrame) trace.push({ frame: i, state, game: await page.evaluate(() => window.__game) });
           console.log('FRAME', name, i, 'sim', state.t.toFixed(2), 'wp', state.auto.idx, 'restored', state.restored);
         }
-        if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
+        if (options.keyFrames?.includes(i) || i % (10 * fps) === 0 || state.restore.phase !== 'idle' && state.restore.age <= 8 && i % (fps / 2) === 0) { const filename = `${name}-${String(i).padStart(5, '0')}.png`; if(name.startsWith('hub-')) await captureStill(filename.replace(/\.png$/,'')); else await page.screenshot({ path: path.join(out, filename) }); frames.push(filename); }
         if (stop?.(state, i)) break;
       }
     } finally { encoder.stdin.end(); }
@@ -220,7 +283,22 @@ try {
     const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', output], { encoding: 'utf8' }));
     const stream = probe.streams[0];
     if (stream.width !== width || stream.height !== height || stream.r_frame_rate !== `${fps}/1` || Number(stream.nb_frames) !== count) throw Error(`Invalid video: ${JSON.stringify(stream)}`);
-    report.videos[name] = { frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
+    let blackDetect;
+    if(name.startsWith('hub-')) {
+      const scan=spawnSync('ffmpeg',['-hide_banner','-nostats','-threads','1','-i',output,
+        '-vf','blackdetect=d=0.02:pix_th=0.02:pic_th=0.999,blackframe=amount=99:threshold=20','-an','-f','null','-'],
+        {encoding:'utf8',maxBuffer:4*1024*1024,timeout:60000,killSignal:'SIGKILL'});
+      const log=scan.stderr??String(scan.error??'');
+      fs.writeFileSync(path.join(out,name+'-blackdetect.log'),log);
+      const intervals=[...log.matchAll(/black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/g)]
+        .map(m=>({start:Number(m[1]),end:Number(m[2]),duration:Number(m[3])}));
+      const frameIntervals=blackFrameIntervals(log,fps);
+      blackDetect={status:scan.status,error:scan.error?.message??null,signal:scan.signal,
+        thresholds:{duration:.02,pixel:.02,frame:.999,frameAuditPercent:99,frameAuditY:20},
+        intervals,frameIntervals};
+      if(scan.status!==0 || scan.error || intervals.length || frameIntervals.some(run=>run.duration>=.02)) report.failures.push(name+': black video frame detected or detector failed');
+    }
+    report.videos[name] = { blackDetect, frames: count, duration: count / fps, wallSeconds: (Date.now() - started) / 1000, start, end: state, simulationHz: options.dt ? 'variable; see per-frame dt in trace' : 60, stepsPerVideoFrame: 60 / fps, seed: 42, trace, reviewFrames: frames, ffprobe: probe, audio: 'Silent: fixed-clock rendering; audio capture optional and omitted' };
     save(`${name}.json`, report.videos[name]);
     if (options.keyFrames) {
       const sheetPage = await context.newPage();
