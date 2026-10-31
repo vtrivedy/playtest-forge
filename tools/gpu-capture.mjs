@@ -242,6 +242,9 @@ try {
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
     if (!actors.length) throw Error('No Shade encounter authored');
     save('shade-script.json', { label: 'STAGED placement, live patrol/contact and real controller dash; no forced free or health edit', actor: actors[0] });
+    const kilnLitter = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.shadeKilnLitter ?? null);
+    save('shade-kiln-litter-placement.json', kilnLitter);
+    if (kilnLitter && kilnLitter.cards === 0) report.failures.push('All Kiln color-payoff leaf cards were rejected by floor guards');
     const reviewCenter=await page.evaluate(()=>{
       const points=window.__gameHooks.debug.world.shadeSpots[0].patrol;
       return points.reduce((sum,p)=>[sum[0]+p[0]/points.length,sum[1]+p[2]/points.length],[0,0]);
