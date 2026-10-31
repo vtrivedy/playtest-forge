@@ -1142,10 +1142,14 @@ try {
     // Explicit staged setup for a supply-loss stress test; basin/float/seal states stay simulated.
     await RH('teleport',172,30,-110,Math.PI/2);await advance(20,false);
     const bank=await RH('state');save('reach-bank-checkpoint.json',bank);if(!bank.reach.recoveryVisited)report.failures.push('Reach bank recovery did not activate');
-    await RH('teleport',173,30,-116,Math.PI/2);await advance(60,false);
-    await RH('teleport',188,30,-129,Math.PI/2);await RH('photo',[170,44,-103],[188,33,-123],52);
+    await RH('teleport',173,30,-116,Math.PI/2);
+    let supplied=await RH('state');
+    for(let i=0;i<200&&!(supplied.reach.arrived&&supplied.reach.fill>=.4);i++){await advance(6,false);supplied=await RH('state');}
+    save('reach-supply-loss-setup.json',supplied);
+    if(!supplied.reach.arrived||supplied.reach.fill<.4||supplied.reach.restored)throw Error('Supply-loss setup did not reach a live partial fill');
+    await RH('teleport',188,supplied.reach.floats[2].height,-129,Math.PI/2);await RH('photo',[170,44,-103],[188,33,-123],52);
     await video('reach-retained-supply-loss',8*fps,async i=>{
-      if(i===3*fps)await page.evaluate(()=>window.__gameHooks.chem.colorDrains.push(p=>p.x>100&&p.x<108));
+      if(i===0)await page.evaluate(()=>window.__gameHooks.chem.colorDrains.push(p=>p.x>100&&p.x<108));
     },undefined,{keyFrames:[0,2*fps,4*fps,6*fps]});
     const held=await RH('state');save('reach-retention-acceptance.json',held);
     if(!held.reach.retained||held.reach.restored||held.reach.seal>0||!held.grounded)report.failures.push('Occupied float retention or no-false-latch test failed');
@@ -1166,6 +1170,7 @@ try {
     await boot(quality,true);await RH('forceRestore');await advance(660,false);
     // Staged source hold uses real colour supply; no basin, seal or float state is assigned.
     await RH('teleport',173,30,-116,Math.PI/2);await advance(900,false);
+    const high=await RH('state');if(!high.reach.restored||high.reach.fill<.99)report.failures.push('Reach HIGH photo setup did not receive sustained water');
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
     await RH('teleport',187,36,-118,Math.PI/2);await RH('photo',[151,49,-103],[188,33,-120],52);await advance(2);await shot('reachview-high-basin');
     await RH('teleport',214,31,-137,Math.PI/2);
@@ -1176,23 +1181,30 @@ try {
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
     await RH('teleport',187,30,-118,Math.PI/2);await RH('photo',[151,49,-103],[188,33,-120],52);await advance(2);await shot('reachview-low-basin');
-    save('reachview-state.json',await RH('state'));
+    const low=await RH('state');save('reachview-state.json',low);if(low.reach.level!=='low'||low.reach.fill>.02)report.failures.push('Reach LOW photo setup did not drain');
   }
   if (wants('reach')) {
     await boot(quality,true); await RH('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
-    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:173,y:30,z:-116,dash:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
-    let phase=0,age=0,reached=false,painted=false;
+    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:173,y:30,z:-116,dash:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
+    let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
+      const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
+      if(p.shade){if(!drinker)throw Error('Reach drinker missing');p.x=drinker.pos[0];p.z=drinker.pos[2];}
       const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
-      if(d<.8&&st.pos[1]>=p.y-.4&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
-      const q=points[phase],vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
-      await RH('setStick',len>.2?vx/len*Math.min(1,len):0,len>.2?vz/len*Math.min(1,len):0);
-      const keys=q.jump?['Space']:[];if(q.dash&&len<3&&!painted){keys.push('ShiftLeft');painted=true;}await RH('setKeys',keys);
+      const ready=p.shade?drinker.freed:d<.8&&st.pos[1]>=p.y-.4;
+      if(p.shade&&drinker.freed&&!shadeShot){await shot('reach-drinker-released');shadeShot=true;}
+      if(ready&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
+      const q=points[phase];if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
+      const vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
+      let sx=len>.2?vx/len*Math.min(1,len):0,sz=len>.2?vz/len*Math.min(1,len):0;
+      const keys=q.jump?['Space']:[];
+      if((q.dash||q.shade)&&len<3&&!painted&&(!q.shade||st.grounded)){if(Math.hypot(sx,sz)<.1){sx=1;sz=0;}keys.push('ShiftLeft');painted=true;dashAttempt=age;}
+      await RH('setStick',sx,sz);await RH('setKeys',keys);
     },st=>reached&&st.reach.restored||st.deaths>0||age>12,{keyFrames:[0,10*fps,20*fps,25*fps]});
     await RH('setKeys',[]);await RH('setStick',null);await advance(30);await shot('reach-end');
-    const end=await RH('state');save('reach-acceptance.json',{phase,reached,end});
+    const end=await RH('state');save('reach-acceptance.json',{phase,reached,strategy:'real dash release before source, then ferry',shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
       let cycle=0,cycleAge=0,cyclePaint=false,ventHopIssued=false;
@@ -1224,7 +1236,7 @@ try {
     // Staged architecture views are separate from the real summit-to-basin traversal above.
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reach-overview');
     await RH('teleport',187,end.reach.raftHeight,-118,Math.PI/2);await RH('photo',[172,43,-99],[194,34,-121],52);await advance(2);await shot('reach-ferry-and-bell');
-    if(!reached||!end.reach.restored||end.deaths)report.failures.push('Reach first crossing incomplete');
+    if(!reached||!end.reach.restored||end.deaths||!end.shades.actors.find(s=>s.id==='reach-drinker')?.freed)report.failures.push('Reach first crossing incomplete');
   }
   if (wants('crown')) {
     await boot(quality, true);
