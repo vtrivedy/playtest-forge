@@ -227,11 +227,21 @@ try {
     const camera = async () => {
       const actor = await page.evaluate(() => window.__gameHooks.shades.state().actors[0]);
       const [x,y,z] = actor.pos;
-      if(!lens){
-        const dx=x+112,dz=z+24,d=Math.hypot(dx,dz)||1;
-        lens=[x+dx/d*8,y+3.6,z+dz/d*8];
-      }
-      await H('photo', lens, [x,y+1.2,z],48);
+      // Staged review lens stays outside the Kiln ring so masonry sits behind the animal.
+      const dx=x+112,dz=z+24,d=Math.hypot(dx,dz)||1;
+      const desired=[x+dx/d*6.5,y+2.8,z+dz/d*6.5];
+      lens=lens?lens.map((value,i)=>value+(desired[i]-value)*.12):desired;
+      const sight=await page.evaluate(({preferred,desired,look})=>{
+        const h=window.__gameHooks;
+        if(!h.photoBlocker)return {pos:preferred,checked:false};
+        const angle=Math.atan2(desired[2]-look[2],desired[0]-look[0]);
+        const candidates=[preferred,desired,...[.45,-.45,.9,-.9,1.4,-1.4,Math.PI].map(offset=>[look[0]+Math.cos(angle+offset)*6.5,look[1]+1.5,look[2]+Math.sin(angle+offset)*6.5])];
+        for(const pos of candidates)if(!h.photoBlocker(pos,look))return {pos,checked:true};
+        return {pos:preferred,checked:true,blocked:true};
+      },{preferred:lens,desired,look:[x,y+1.3,z]});
+      lens=sight.pos;
+      if(sight.blocked)report.shadeLensBlockedFrames=(report.shadeLensBlockedFrames||0)+1;
+      await H('photo', lens, [x,y+1.3,z],48);
     };
     const start = actors[0].pos;
     const safePosition = await page.evaluate(([x,y,z]) => {
@@ -326,8 +336,8 @@ try {
       for (let k=0;k<128;k++) {
         const a=k/128*Math.PI*2, dx=Math.cos(a), dz=Math.sin(a);
         let safe=true;
-        for(let r=.55;r<4.6;r+=.1) {
-          const px=x+dx*r,pz=z+dz*r;
+        for(let r=.4;r<4.8&&safe;r+=.1) for(const width of [-.35,0,.35]) {
+          const px=x+dx*r-dz*width,pz=z+dz*r+dx*width;
           if(col.blocked(px,pz,y)||Math.abs(col.groundAt(px,pz,y+.1).y-y)>.2) { safe=false; break; }
         }
         if(safe)return {pos:[x+dx*1.45,y,z+dz*1.45], direction:[dx,dz]};
@@ -335,14 +345,19 @@ try {
       throw Error('No 3m wall-free contact direction');
     }, p);
     save('shade-contact-setup.json', contactSetup);
-    await H('teleport', ...contactSetup.pos, Math.PI);
+    await H('teleport', ...contactSetup.pos, Math.atan2(-contactSetup.direction[0],-contactSetup.direction[1]));
     lens=null;
     await camera();
     let contactFrame=null;
     await H('setStick', -contactSetup.direction[0], -contactSetup.direction[1]);
     await video('shade-contact', 110, async i => {
       const current=await page.evaluate(()=>window.__gameHooks.shades.state());
-      if(current.hits>0&&contactFrame===null){contactFrame=i-1;await H('setStick',null);}
+      if(current.hits>0&&contactFrame===null){
+        contactFrame=i-1;await H('setStick',null);
+        const state=await H('state'),actor=current.actors[0];
+        const dx=state.pos[0]-actor.pos[0],dz=state.pos[2]-actor.pos[2],length=Math.hypot(dx,dz)||1;
+        save('shade-contact-impact.json',{frame:contactFrame,fox:state.pos,actor:actor.pos,direction:[dx/length,dz/length],planned:contactSetup.direction,angleDegrees:Math.acos(Math.max(-1,Math.min(1,(dx*contactSetup.direction[0]+dz*contactSetup.direction[1])/length)))*180/Math.PI});
+      }
       await camera();
     }, (state,i)=>contactFrame!==null&&i>=contactFrame+61, { traceEveryFrame: true, keyFrames: [0, 6, 12, 18, 36, 60] });
     await H('setStick', null);
