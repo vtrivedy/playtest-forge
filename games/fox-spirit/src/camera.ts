@@ -41,10 +41,13 @@ export type CameraPath = {
 
 export type CameraTunables = {
   distance: number;
+  runDistance: number;
   /** Terrain compression hands off to the cutout before the lens enters the animal. */
   minDistance: number;
   height: number;
   lookHeight: number;
+  /** Composition offset above the chest; kept separate from collision focus. */
+  framingHeight: number;
   airDistance: number;
   glideDistance: number;
   fov: number;
@@ -109,19 +112,21 @@ export function createFollowCamera(opts: {
 } = {}): FollowCamera {
   const params: CameraTunables = {
     distance: 3.8,
+    runDistance: 3.0,
     minDistance: 2.6,
     height: 1.25,
     lookHeight: 0.62,
+    framingHeight: 0.65,
     airDistance: 4.8,
     glideDistance: 6.4,
     fov: 54,
-    runFov: 3,
+    runFov: 0,
     glideFov: 7,
     lag: 0.14,
     lookAhead: 1.6,
     recenterRate: 1.25,
     recenterDelay: 1.2,
-    sideBias: 0.34,
+    sideBias: 0.55,
     jumpTrack: 0.8,
     landingBias: 0.24,
     clearance: 0.55,
@@ -150,6 +155,7 @@ export function createFollowCamera(opts: {
   let shot: (CameraShot & { t: number; end: number; yielding?: boolean }) | null = null;
   let shotStill = 1;
   let landW = 0;
+  let compositionLandW = 0;
   let liftNow = 0;
   let boomT = 1;
   let boomLift = 0;
@@ -439,7 +445,7 @@ export function createFollowCamera(opts: {
     const fov = s.fov ?? params.fov;
     const need = (size * 0.62 + 2.2) / Math.tan(THREE.MathUtils.degToRad(fov * 0.5));
     // Look from the traversal side, swung 25° and raised so both subjects separate on screen
-    const a = yaw + params.sideBias + 0.45;
+    const a = yaw + 0.79; // reactive shots retain their authored angle as chase bias is tuned
     const elev = THREE.MathUtils.degToRad(18 + (s.rise ?? 10));
     shotPos.set(
       shotLook.x + Math.sin(a) * Math.cos(elev) * need,
@@ -554,20 +560,26 @@ export function createFollowCamera(opts: {
 
       // ---- boom length: ground → (sustained) air → glide. Short chained hops keep the ground boom.
       const airW = f.grounded ? 0 : THREE.MathUtils.smoothstep(f.airTime, 0.35, 0.9);
+      const groundDist = Math.max(params.minDistance, THREE.MathUtils.lerp(params.distance, params.runDistance,
+        THREE.MathUtils.smoothstep(speed, 1.5, 7.5)));
       let goalDist = f.gliding
         ? params.glideDistance
-        : THREE.MathUtils.lerp(params.distance, params.airDistance, airW);
+        : THREE.MathUtils.lerp(groundDist, params.airDistance, airW);
       let dropLift = 0;
       // ---- look target: fox + look-ahead; airborne, slide toward the predicted landing so it stays in frame
       const hasLanding = !!f.landing && !f.grounded;
       if (hasLanding) landAt.copy(f.landing!);
       landW = THREE.MathUtils.damp(landW, hasLanding ? 1 : 0, hasLanding ? 6 : 4, dt);
       const baseY = f.grounded ? Math.max(focusY, p.y - 0.3) : focusY;
-      aim.set(p.x + lead.x * (1 - landW * 0.6), baseY + params.lookHeight, p.z + lead.z * (1 - landW * 0.6));
+      const descending = THREE.MathUtils.smoothstep(-f.vel.y, 0, 4);
+      // Short hops retain the ground composition. Sustained descending glides
+      // ease toward more landing room, then release gently after touchdown.
+      const compositionGoal = landW * descending * THREE.MathUtils.smoothstep(f.airTime, 0.75, 1.5);
+      compositionLandW = THREE.MathUtils.damp(compositionLandW, compositionGoal, compositionGoal > compositionLandW ? 6 : 4, dt);
+      aim.set(p.x + lead.x * (1 - landW * 0.6), baseY + params.lookHeight + params.framingHeight * (1 - compositionLandW * 0.65), p.z + lead.z * (1 - landW * 0.6));
       if (landW > 0.001) {
         const spread = Math.hypot(landAt.x - p.x, landAt.z - p.z);
         const drop = Math.max(0, p.y - landAt.y);
-        const descending = THREE.MathUtils.smoothstep(-f.vel.y, 0, 4);
         const w = params.landingBias * Math.min(1, spread / 5) * landW * descending;
         aim.x += (landAt.x - aim.x) * w;
         aim.z += (landAt.z - aim.z) * w;
@@ -612,16 +624,23 @@ export function createFollowCamera(opts: {
       // Test the spring's actual pose, not just its destination. Otherwise a turn's
       // interpolated arc can pass straight through a pillar even with a safe goal.
       boomFocus.set(p.x, p.y + params.lookHeight, p.z);
-      sceneryLimit = sceneryFraction(boomFocus, rig);
+      // Correct open-ground spring lag before testing scenery, so wall
+      // compression still has the final say and cannot be undone afterward.
+      safeLens.copy(rig);
+      const bodyRange = safeLens.distanceTo(boomFocus);
+      if (bodyRange > 0.01 && bodyRange < params.minDistance) {
+        safeLens.sub(boomFocus).multiplyScalar(params.minDistance / bodyRange).add(boomFocus);
+      }
+      sceneryLimit = sceneryFraction(boomFocus, safeLens);
       // A very short boom cannot fit the full animal. Ease into the existing world
       // cutout instead of zooming through the fox's ears. The overlap is continuous:
       // distant posts pull in, close bowls fade, and the damped transition stays covered.
-      const clearRange = boomFocus.distanceTo(rig) * sceneryLimit;
+      const clearRange = boomFocus.distanceTo(safeLens) * sceneryLimit;
       sceneryFade = sceneryLimit < 0.999 ? 1 - THREE.MathUtils.smoothstep(clearRange, 1.1, 1.8) : 0;
       const sceneryGoal = THREE.MathUtils.lerp(sceneryLimit, 1, sceneryFade);
       if (firstFrame) sceneryT = sceneryGoal;
       else sceneryT = THREE.MathUtils.damp(sceneryT, sceneryGoal, sceneryGoal < sceneryT ? 24 : 2.2, dt);
-      safeLens.lerpVectors(boomFocus, rig, sceneryT);
+      safeLens.lerpVectors(boomFocus, safeLens, sceneryT);
       // Keep the spring independent of compression: release returns along the same
       // boom smoothly, rather than feeding a new collision impulse into its velocity.
       guardFraming(p, safeLens);

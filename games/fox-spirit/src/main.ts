@@ -369,6 +369,8 @@ async function boot() {
   fAudio.close();
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
+  fCam.add(cam.params, 'runDistance', 2.6, 5, 0.1);
+  fCam.add(cam.params, 'framingHeight', 0, 1, 0.05);
   fCam.add(cam.params, 'minDistance', 1.8, 3.2, 0.1).name('minimum terrain boom');
   fCam.add(cam.params, 'height', 0.5, 4, 0.05);
   fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
