@@ -68,6 +68,22 @@ camera.position.set(0, 0.6, 4); camera.lookAt(0, 0.3, 0);
 const renderer = { getDrawingBufferSize: (out: THREE.Vector2) => out.set(1280, 720) } as THREE.WebGLRenderer;
 const step = () => fader.update(1 / 60, camera, renderer, new THREE.Vector3(), 0.55, 0);
 step();
+// The shader's floor protection uses column 1 of the *view* rotation, not
+// camera-up or the transposed column. Exercise pitched/rolled camera transforms.
+for (const eye of [new THREE.Vector3(4, 2, 3), new THREE.Vector3(-3, 8, 1)]) {
+  camera.position.copy(eye); camera.up.set(0.2, 1, 0.1); camera.lookAt(0, 0.6, 0);
+  camera.updateMatrixWorld(true);
+  const column = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorldInverse, 1);
+  for (const world of [new THREE.Vector3(1, -2, 3), new THREE.Vector3(-4, 6, -1)]) {
+    const viewPosition = world.clone().applyMatrix4(camera.matrixWorldInverse).negate();
+    assert.ok(Math.abs(camera.position.y - column.dot(viewPosition) - world.y) < 1e-9,
+      'fragment height reconstruction must preserve floor height under pitch/roll');
+  }
+}
+fader.update(1 / 60, camera, renderer, new THREE.Vector3(0, 7.25, 0), 0.55, 0);
+assert.equal(shader.uniforms.uOccFox.value.w, 7.25, 'floor protection follows current feet height');
+camera.up.set(0, 1, 0); camera.position.set(0, 0.6, 4); camera.lookAt(0, 0.3, 0);
+step(); step();
 assert.equal(fader.detected, true, 'unproxied leaf material must block sight');
 assert.equal(crown.material, crownMat, 'canopy query must restore the rendered material');
 assert.equal(crownMat.side, THREE.FrontSide, 'canopy query must preserve render sidedness');

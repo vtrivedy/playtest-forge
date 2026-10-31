@@ -8,6 +8,23 @@ import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 
+/** Shader-shaped decorative meshes can opt out of GTAO's override-material depth pass.
+ * Their underlying opaque surfaces still supply AO; color-pass visibility is restored even on errors. */
+export function withAOExclusions<T>(scene: THREE.Scene, draw: () => T): T {
+  const hidden: THREE.Object3D[] = [];
+  scene.traverse((object) => {
+    if (object.visible && object.userData.forgeSkipAO === true) {
+      hidden.push(object);
+      object.visible = false;
+    }
+  });
+  try {
+    return draw();
+  } finally {
+    for (const object of hidden) object.visible = true;
+  }
+}
+
 export type PostStackOptions = {
   bloomStrength?: number;
   bloomRadius?: number;
@@ -274,6 +291,8 @@ export function createPostStack(
     gtao.blendIntensity = 0.45;
     gtao.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.5, thickness: 1.2, scale: 1, samples: 12 });
     gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
+    const renderAO = gtao.render.bind(gtao);
+    gtao.render = (...args: Parameters<typeof renderAO>) => withAOExclusions(scene, () => renderAO(...args));
     composer.addPass(gtao);
   }
 
