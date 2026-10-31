@@ -337,6 +337,8 @@ async function boot() {
     folder.add(params, 'swingEase', 0, 1, .05);
     folder.add(params, 'headBob', 0, 1, .05);
     folder.add(params, 'swingTuck', 0, .8, .01);
+    folder.add(params, 'releaseSwing', .12, .4, .01);
+    folder.add(params, 'carpalCurl', 0, .7, .01);
     folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
