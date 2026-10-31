@@ -205,7 +205,7 @@ try {
     if (options.keyFrames) {
       const sheetPage = await context.newPage();
       try {
-        await sheetPage.setViewportSize({ width: 1920, height: 1080 });
+        await sheetPage.setViewportSize({ width: 1920, height: 1 });
         const cards = (options.sheetFrames ?? options.keyFrames).filter(frame => frame < count).map(frame => {
           const filename = `${name}-${String(frame).padStart(5, '0')}.png`;
           const label = options.label?.(frame, trace.find(sample => sample.frame === frame)?.state) ?? `${name} frame ${frame}`;
@@ -757,9 +757,26 @@ try {
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
     await H('setFeelPreset','brisk');
+    // Freeze the same physical sight query for old and new game SHAs.
+    await page.evaluate(async()=>{
+      const {Vector3,Raycaster}=await import('/gpu-three.js');
+      const world=window.__gameHooks.debug.world.group,ray=new Raycaster();
+      const visible=object=>{for(let node=object;node;node=node.parent)if(!node.visible)return false;return true;};
+      window.__captureWorldSight=(camera,targets)=>{
+        world.updateWorldMatrix(true,true);
+        return targets.map(target=>{
+          const origin=new Vector3(...target),lens=new Vector3(...camera),delta=lens.clone().sub(origin),distance=delta.length();
+          if(distance<.2)return null;
+          ray.near=.05;ray.far=distance-.05;delta.normalize();ray.set(origin,delta);
+          let hit=ray.intersectObject(world,true).find(item=>visible(item.object));
+          if(!hit){ray.set(lens,delta.clone().negate());hit=ray.intersectObject(world,true).find(item=>visible(item.object));}
+          return hit?{distance:hit.distance,name:hit.object.name,point:hit.point.toArray()}:null;
+        });
+      };
+    });
     const preflight=await page.evaluate(()=>{
       const h=window.__gameHooks,col=h.debug.world.collision,attempts=[];
-      for(const x of [6,40,24]) {
+      for(const x of [40,24,6]) {
         const failures=[];
         let previousY=null;
         for(let z=88;z>=68;z-=2) {
@@ -767,9 +784,9 @@ try {
           if(!Number.isFinite(floor) || Math.abs(floor-terrain)>.2 || (previousY!==null && Math.abs(floor-previousY)>.4))failures.push({z,footing:[floor,terrain,previousY]});
           previousY=floor;
           for(const lens of ['side','three-quarter']) {
-            const camera=[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const camera=[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)];
             const targets=[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]];
-            const blockers=targets.map(target=>h.photoBlocker(camera,target));
+            const blockers=window.__captureWorldSight(camera,targets);
             if(blockers.some(Boolean))failures.push({z,lens,blockers});
           }
         }
@@ -789,7 +806,7 @@ try {
       const visibility={sampledFrames:0,blocked:[]};
       const frameLens=async st=>{
         const [x,y,z]=st.pos;
-        await H('photo',[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
+        await H('photo',[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
       };
       await frameLens(initial);
       await video(name,seconds*fps,async()=>{await H('setStick',0,-stick);},undefined,{
@@ -798,8 +815,8 @@ try {
           if(st.deaths!==initial.deaths)throw Error(`${name}: death`);
           await frameLens(st);
           {
-            const [x,y,z]=st.pos, camera=[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)];
-            const blockers=await page.evaluate(([camera,targets])=>targets.map(target=>window.__gameHooks.photoBlocker(camera,target)),[camera,[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]]]);
+            const [x,y,z]=st.pos, camera=[x-4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const blockers=await page.evaluate(([camera,targets])=>window.__captureWorldSight(camera,targets),[camera,[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]]]);
             visibility.sampledFrames++;
             if(blockers.some(Boolean))visibility.blocked.push({frame:i,blockers});
           }
@@ -812,7 +829,7 @@ try {
       measured.expectedGaitFraction=(measured.gaits[gait]??0)/rows.length;
       measured.expectedSpeed=9*stick;
       measured.speedFraction=measured.medianSpeed/measured.expectedSpeed;
-      segments.push({name,gait,stick,seconds,initial,end,measured,visibility,camera:`staged ${lens} tracking photo lens, live controller`,reset:[preflight.x,y,preflight.z]});
+      segments.push({name,gait,stick,seconds,initial,end,measured,visibility,camera:`staged west-side ${lens} tracking photo lens, live controller`,reset:[preflight.x,y,preflight.z]});
     }
     save('worldgait-acceptance.json',{label:'Six staged live-input movement segments on a disclosed preflighted Arrival Meadow line; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths && s.visibility.blocked.length===0 && s.measured.groundedFraction>.95 && s.measured.expectedGaitFraction>.9 && s.measured.speedFraction>.9 && s.measured.speedFraction<1.1)});
     if(segments.some(s=>s.visibility.blocked.length || s.measured.groundedFraction<=.95 || s.measured.expectedGaitFraction<=.9 || s.measured.speedFraction<=.9 || s.measured.speedFraction>=1.1))throw Error('World gait review requires clear chest/head/feet sight lines, grounded movement and measured requested gait/speed');
