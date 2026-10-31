@@ -1,0 +1,9 @@
+# Sprint 3: continuous hub → Kiln route
+
+Scope: maintain one authored route and real movement/element physics from Lanternhollow through Windmill Rise to SW1. The current checkout starts at Russetvale portal; hub integration depends on the hub stream. Do not represent that portal as the hub or pre-light elements to fake completion.
+
+First pass: fix capture provenance so a route starting at index zero and stopping at a bounded endpoint remains continuous, while any relocated start remains explicitly staged. Preserve the full-realm capture path. Support named endpoints for the Kiln feed beat so upstream hub route insertion cannot invalidate a hardcoded index. Record start, endpoint, deaths, assists, latch state and traversal completion; a Kiln clear requires SW1 lit. Require a 60-second clip budget and personally inspect GPU PNGs and window.__game reports before landing.
+
+Next pass is evidence driven: repair route stalls and remaining placeholder presentation identified in captures, preserving authored chemistry and safe recovery. Coordinate through persistent STATUS notes with hub/camera/water streams. No gait, camera, water, restoration, or character rewrites in this stream. Existing CC0 Quaternius assets only if presentation changes are needed.
+
+Validation: node syntax check for capture tooling, npx tsc --noEmit and fox Vite build for game edits; immutable pushed SHA capture requests; review PNGs and state; cross-model critique and one retest after fixes. No local browser/render. Missing sprint3 style file, COMMON.md, sprint2 critic and external lessons are recorded as unavailable in this checkout; supplied soft gentle animated realism brief governs.
