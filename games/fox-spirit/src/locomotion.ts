@@ -149,8 +149,8 @@ export class AuthoredLocomotion {
     }
     const locomoting=['run','walk','trot'].includes(active);
     const speed=this.input.speed;
-    const walkToTrot=THREE.MathUtils.smoothstep(speed,this.params.trotSpeed-.65,this.params.trotSpeed+.65);
-    const trotToGallop=THREE.MathUtils.smoothstep(speed,this.params.gallopSpeed-.8,this.params.gallopSpeed+.8);
+    const walkToTrot=THREE.MathUtils.smoothstep(speed,this.params.trotSpeed-.35,this.params.trotSpeed+.35);
+    const trotToGallop=THREE.MathUtils.smoothstep(speed,this.params.gallopSpeed-.35,this.params.gallopSpeed+.35);
     const weights = {walk:1-walkToTrot,trot:walkToTrot*(1-trotToGallop),run:trotToGallop};
 
     // All grounded clips share one phase. Cadence must use the evaluated blend,
@@ -294,7 +294,7 @@ export class AuthoredLocomotion {
         const d=GAITS[name].contacts[i]; const p=(phase-d.phase+1)%1;
         return sum+(p<d.duty ? (this.metrics.clipWeights[name] ?? 0) : 0);
       },0)/Math.max(.001,gaitWeight);
-      const stance=this.input.grounded && (locomoting ? support>(foot.planted ? .3 : .55) : (active==='idle' || active==='land'));
+      const stance=this.input.grounded && (locomoting ? support>(foot.planted ? .45 : .55) : (active==='idle' || active==='land'));
       if (stance) {
         const sample=foot.planted ? foot.anchor : paw;
         const ground=this.input.groundAt(sample.x,sample.z,this.group.position.y+.6);
