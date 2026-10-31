@@ -40,8 +40,8 @@ export class AuthoredLocomotion {
     // Glide carriage: share of per-stride back rock / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     rockDamp: 1.3, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
-  metrics = { cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .11, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnLean: .045, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+  metrics = { bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
@@ -57,6 +57,10 @@ export class AuthoredLocomotion {
     this.lookSpring.value=0;this.lookSpring.velocity=0;
     this.brake=0;
     this.landSpring.value=0;this.landSpring.velocity=0;this.carriageReady=false;this.wasGrounded=true;this.previousVerticalSpeed=0;
+    this.pelvisShare=0;
+    this.metrics.authoredFlight=false;this.metrics.noSupport=false;this.metrics.windupActive=false;this.metrics.windupLoad=0;
+    this.metrics.bankCommand=0;this.metrics.pelvisBankAngle=0;this.metrics.chestBankAngle=0;
+    this.metrics.noSupportFrames=0;this.metrics.noSupportSeconds=0;this.metrics.contactReleaseFrames=0;this.metrics.lastLandingImpact=0;
     this.turn=0; this.yaw=this.group.rotation.y; this.pitch=0;
     this.leanSpring.value=0;this.leanSpring.velocity=0;
     this.pitchSpring.value=0;this.pitchSpring.velocity=0;
@@ -73,6 +77,8 @@ export class AuthoredLocomotion {
   private pitch = 0;
   private turn = 0;
   private lean = 0;
+  private pelvisShare=0;
+  private bankRestUp: {bone:THREE.Object3D;up:THREE.Vector3}[]=[];
   private tail = 0;
   private leanSpring=new Spring();
   private pitchSpring=new Spring();
@@ -110,6 +116,7 @@ export class AuthoredLocomotion {
     this.yaw=group.rotation.y;
     this.spine = root.getObjectByName(FOX_RIG.pelvis);
     this.spines=FOX_RIG.spine.map(n=>root.getObjectByName(n)).filter((b):b is THREE.Object3D=>!!b);
+    this.bankRestUp=[this.spine!,this.spines[this.spines.length-1]].map(bone=>({bone,up:new THREE.Vector3(0,1,0).applyQuaternion(bone.getWorldQuaternion(q()).invert())}));
     this.necks=FOX_RIG.neck.map(n=>root.getObjectByName(n)).filter((b):b is THREE.Object3D=>!!b);
     this.head=root.getObjectByName(FOX_RIG.head);
     this.tailBone = root.getObjectByName(FOX_RIG.tail[0]);
@@ -337,8 +344,9 @@ export class AuthoredLocomotion {
     const step=Math.max(dt,.00001);
     this.glideLayer();
     if(this.input.grounded && !this.wasGrounded) {
-      const impact=THREE.MathUtils.clamp(-this.previousVerticalSpeed/14,.15,1);
-      this.landSpring.velocity-=this.params.landSquash*impact*16;
+      const impact=THREE.MathUtils.clamp(-this.previousVerticalSpeed/14,0,1);
+      this.landSpring.velocity-=this.params.landSquash*Math.max(.15,impact)*16;
+      this.metrics.lastLandingImpact=impact;
     }
     this.wasGrounded=this.input.grounded;this.previousVerticalSpeed=this.input.verticalSpeed;
     const landOffset=this.landSpring.step(0,dt,this.params.landFrequency,.75);
@@ -349,6 +357,8 @@ export class AuthoredLocomotion {
     this.turn=THREE.MathUtils.damp(this.turn,dy/step,12,dt);
     this.metrics.turnRate=this.turn;
     this.lean=this.leanSpring.step(THREE.MathUtils.clamp(-this.turn*this.input.speed*this.params.turnLean,-.16,.16),dt,this.params.springFrequency,this.params.springDamping);
+    this.metrics.bankCommand=this.lean;
+    this.pelvisShare=THREE.MathUtils.damp(this.pelvisShare,this.input.grounded ? this.params.pelvisBank : 0,12,dt);
     this.tail=THREE.MathUtils.damp(this.tail,-this.turn*this.params.tailLag,7,dt);
     const overlay=(bone:THREE.Object3D|undefined,axis:THREE.Vector3,angle:number)=>{
       if (!bone) return;
@@ -379,6 +389,8 @@ export class AuthoredLocomotion {
     this.terrainOffset=THREE.MathUtils.damp(this.terrainOffset,terrainTarget,25,dt);
     // Standing jumps load the haunches; a gallop carries its momentum straight into the leap.
     const crouch=THREE.MathUtils.smoothstep(this.input.crouch ?? 0,0,1)*(1-THREE.MathUtils.smoothstep(this.input.speed,1,3));
+    this.metrics.windupLoad=crouch;
+    this.metrics.windupActive=this.input.grounded && active==='jump_up' && (this.input.crouch ?? 0)>0;
     this.root.position.y+=this.terrainOffset+landOffset-this.brake*this.params.brakeSquat-crouch*this.params.takeoffCrouch;
     if(crouch>0){
       this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
@@ -393,7 +405,13 @@ export class AuthoredLocomotion {
       const localAxis=worldAxis.clone().applyQuaternion(bone.getWorldQuaternion(q()).invert());
       overlay(bone,localAxis,angle);
     };
-    for(const spine of this.spines)worldOverlay(spine,new THREE.Vector3(Math.sin(this.input.yaw),0,Math.cos(this.input.yaw)),this.lean/this.spines.length);
+    const bankAxis=new THREE.Vector3(Math.sin(this.input.yaw),0,Math.cos(this.input.yaw));
+    // Load the hips as well as the shoulders; total chest bank stays bounded by the same lean.
+    worldOverlay(this.spine,bankAxis.clone(),this.lean*this.pelvisShare);
+    for(const spine of this.spines)worldOverlay(spine,bankAxis.clone(),this.lean*(1-this.pelvisShare)/this.spines.length);
+    const headBank=-this.lean*this.params.headRollStabilize;
+    for(const neck of this.necks)worldOverlay(neck,bankAxis.clone(),headBank*.5/this.necks.length);
+    worldOverlay(this.head,bankAxis.clone(),headBank*.5);
     const bend=THREE.MathUtils.clamp(this.turn*.035,-.14,.14);
     for(let i=0;i<this.spines.length;i++)worldOverlay(this.spines[i],new THREE.Vector3(0,1,0),bend/this.spines.length);
     for(const neck of this.necks)worldOverlay(neck,new THREE.Vector3(0,1,0),look*.22);
@@ -441,6 +459,7 @@ export class AuthoredLocomotion {
     this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;
     const locomoting=['run','walk','trot'].includes(active);
     this.debugGroup.visible=this.params.debug;
+    let authoredSupportFeet=0;
     this.feet.forEach((foot,i)=>{
       const paw=foot.paw.localToWorld(foot.padLocal.clone());
       const padOffset=paw.clone().sub(foot.paw.getWorldPosition(v()));
@@ -451,6 +470,7 @@ export class AuthoredLocomotion {
         return sum+(p<d.duty*this.stanceRatio[name] ? (this.metrics.clipWeights[name] ?? 0) : 0);
       },0);
       const normalizedSupport=support/Math.max(.001,gaitWeight);
+      if(normalizedSupport>.5)authoredSupportFeet++;
       const windup=active==='jump_up' && (this.input.crouch ?? 0)>0 && this.input.speed<3;
       let stance=this.input.grounded && (locomoting ? normalizedSupport>(foot.planted ? .45 : .55) : (active==='idle' || active==='land' || windup));
       const sample=foot.planted ? foot.anchor : paw;
@@ -509,6 +529,20 @@ export class AuthoredLocomotion {
       foot.dot.position.copy(this.group.worldToLocal(foot.anchor.clone()));
       foot.dot.visible=stance;
     });
+    this.metrics.authoredFlight=this.input.grounded && locomoting && authoredSupportFeet===0;
+    this.metrics.noSupport=this.input.grounded && locomoting && this.metrics.stanceFeet===0;
+    if(this.metrics.noSupport && dt>0) {
+      this.metrics.noSupportFrames++; this.metrics.noSupportSeconds+=dt;
+      if(!this.metrics.authoredFlight)this.metrics.contactReleaseFrames++;
+    }
+    const left=new THREE.Vector3(Math.cos(this.input.yaw),0,-Math.sin(this.input.yaw));
+    // Rest-relative up projected into the actor heading plane measures the evaluated pose.
+    const bankAngles=this.bankRestUp.map(({bone,up})=>{
+      bone.updateWorldMatrix(true,false);
+      const actualUp=up.clone().applyQuaternion(bone.getWorldQuaternion(q()));
+      return -Math.atan2(actualUp.dot(left),actualUp.y);
+    });
+    [this.metrics.pelvisBankAngle,this.metrics.chestBankAngle]=bankAngles;
     if (!locomoting) this.metrics.gait=active;
   }
   private solve(upper:THREE.Object3D, lower:THREE.Object3D, paw:THREE.Object3D,target:THREE.Vector3,poleSign:number) {

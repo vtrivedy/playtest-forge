@@ -349,6 +349,8 @@ async function boot() {
     folder.add(params, 'maxCorrection', 0, .3, .01);
     folder.add(params, 'turnLean', 0, .1, .001);
     folder.add(params, 'tailLag', 0, .3, .01);
+    folder.add(params, 'pelvisBank', 0, 1, .05);
+    folder.add(params, 'headRollStabilize', 0, 1, .05);
     folder.add(params, 'springFrequency', 1, 6, .1);
     folder.add(params, 'springDamping', .4, 1.5, .05);
     folder.add(params, 'debug');
