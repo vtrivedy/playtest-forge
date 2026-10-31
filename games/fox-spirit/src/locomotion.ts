@@ -12,6 +12,7 @@ type Gait = keyof typeof GAITS;
 /** Measured: rotating the gaze about the actor right axis raises +Y pitch, so the correction flips. */
 const CARRIAGE_SIGN = -1;
 
+
 const GAIT_NAMES = Object.keys(GAITS) as Gait[];
 /** Speed each gait's designed cadence is quoted at (gait-gym bands). */
 const CADENCE_REF: Record<Gait, number> = { walk: 1.5, trot: 3.8, run: 9 };
@@ -35,7 +36,7 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: .35,
+    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, swingTuck: .35,
     // Glide carriage: share of per-stride back rock / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     rockDamp: 1.3, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
@@ -97,6 +98,8 @@ export class AuthoredLocomotion {
   private flexBones: THREE.Object3D[] = [];
   /** Stance time / authored stance time per gait: < 1 compresses stance and lengthens the swing. */
   private stanceRatio: Record<Gait, number> = { walk: 1, trot: 1, run: 1 };
+  /** Per-foot swing tuck 0..1 (blended over gaits): folds the lower leg so a slowed swing clears the ground. */
+  private tuck = [0, 0, 0, 0];
   constructor(private root: THREE.Object3D, private group: THREE.Group,
     private actions: Map<string, THREE.AnimationAction>) {
     this.rootPosition=root.position.clone();
@@ -228,6 +231,7 @@ export class AuthoredLocomotion {
       action.time=time;
       action.setEffectiveTimeScale(0);
     };
+    this.tuck.fill(0);
     for(const [name,action] of this.actions) {
       const target=locomoting ? (weights[name as Gait] ?? 0) : name===active ? 1 : 0;
       const weight=THREE.MathUtils.lerp(this.weights.get(name) ?? 0,target,alpha);
@@ -249,6 +253,8 @@ export class AuthoredLocomotion {
           // lift-off/touch-down), easing into the slower reach between. swingEase 0 = linear swing.
           const sw=(u-stance)/(1-stance), m=Math.min(3,1+(stance<duty ? (duty/stance)*(1-stance)/(1-duty)-1 : 0)*this.params.swingEase);
           local=duty+(1-duty)*(sw*sw*(3-2*sw)+m*(2*sw*sw*sw-3*sw*sw+sw));
+          // Tuck grows with the suspension the warp added (none at the authored cadence).
+          if(locomoting)this.tuck[i]+=weight*Math.sin(Math.PI*sw)*(1-this.stanceRatio[gait]);
         }
         drive(parts.legs[i],weight,((contact.phase+local)%1)*duration);
       });
@@ -259,6 +265,13 @@ export class AuthoredLocomotion {
   }
   /** Float the body over the legs: pull the clip's root/pelvis bob toward its cycle mean. */
   private glideLayer() {
+    this.feet.forEach((foot,i)=>{
+      // Measured: negative rotation about the lower bone's local X folds forearm and shin.
+      const angle=-this.tuck[i]*this.params.swingTuck;
+      if(Math.abs(angle)<1e-4)return;
+      this.overlays.push({bone:foot.lower,rotation:foot.lower.quaternion.clone()});
+      foot.lower.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),angle));
+    });
     let total=0;
     for(const g of GAIT_NAMES) total+=this.weights.get(g) ?? 0;
     if(total<1e-3)return;
