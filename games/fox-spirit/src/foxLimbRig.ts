@@ -12,7 +12,7 @@ export const LIMB_RIG = {
   /** Skin blend half-width around the carpus, fraction of forearm length. */
   carpusBlend: 0.08,
   /** Radial scale per bone (1 = authored). */
-  mass: { upperarm: 1.12, forearm: 1.3, carpus: 1.22, thigh: 1.06, shin: 1.22, foot: 1.38 } as Record<string, number>,
+  mass: { upperarm: 1.12, forearm: 1.3, carpus: 1.22, thigh: 1, shin: 1.22, foot: 1.38 } as Record<string, number>,
   /** Paw width (across the paw only, keeps the pad floor). */
   pawWidth: 1.14,
 };
