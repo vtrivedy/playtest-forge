@@ -205,7 +205,7 @@ ${NOISE_GLSL}`,
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeAlpha}-${innerHeat ? 'warm' : 'plain'}`;
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeAlpha}-${mat.alphaTest}-${innerHeat ? 'warm' : 'plain'}`;
   mat.needsUpdate = true;
 }
 
@@ -354,6 +354,11 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
         mask[i] += sw.getComponent(i, k) * amount;
       }
       heat[i * 2 + 1] = restNormals.getY(i);
+      const eyeCenter = p.getX(i) > 0 ? eyeUniforms.uEyeL.value : eyeUniforms.uEyeR.value;
+      const eyeRadius = Math.max(0.0001, eyeUniforms.uEyeR0.value);
+      const eyeX = (p.getZ(i) - eyeCenter.z) / eyeRadius;
+      const eyeY = (p.getY(i) - eyeCenter.y) / eyeRadius + eyeX * 0.10;
+      ruff[i] *= THREE.MathUtils.smoothstep(Math.hypot(eyeX, eyeY / 0.5), 1.4, 2.8);
       if (heat[i * 2]! > 0.05 && restNormals.getY(i) > 0.2) coatHeatVertices++;
       if (ruff[i]! > 0.05) coatRuffVertices++;
     }
