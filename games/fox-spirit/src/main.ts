@@ -525,11 +525,15 @@ async function boot() {
   fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
   fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
+  fFox.add(FOX_LOOK, 'eyeSocketLift', 0, 1, 0.01);
   fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
   fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickStream', 0, 1, 0.01);
+  fFox.add(FOX_LOOK, 'coreRadiance', 0, 8, 0.1);
+  fFox.add(FOX_LOOK, 'tailRadiance', 0, 8, 0.1);
+  fFox.add(FOX_LOOK, 'emberRadiance', 0, 6, 0.1);
   fFox.add(FOX_LOOK, 'emberRate', 0, 60, 1);
   fFox.add(FOX_LOOK, 'emberSize', 0.005, 0.08, 0.001);
   fFox.close();
