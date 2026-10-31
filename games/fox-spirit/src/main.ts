@@ -369,20 +369,21 @@ async function boot() {
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
   fAudio.close();
+  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
   fCam.add(cam.params, 'runDistance', 2.6, 5, 0.1);
   fCam.add(cam.params, 'framingHeight', 0, 1, 0.05);
   fCam.add(cam.params, 'minDistance', 1.8, 3.2, 0.1).name('minimum terrain boom');
-  fCam.add(cam.params, 'height', 0.5, 4, 0.05);
+  fCam.add(baseCam, 'height', 0.5, 4, 0.05);
   fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
-  fCam.add(cam.params, 'glideDistance', 3, 12, 0.1);
+  fCam.add(baseCam, 'glideDistance', 3, 12, 0.1);
   fCam.add(cam.params, 'fov', 35, 80, 0.5);
   fCam.add(cam.params, 'lag', 0.04, 0.5, 0.01);
   fCam.add(cam.params, 'lookAhead', 0, 4, 0.05);
   fCam.add(cam.params, 'recenterRate', 0, 4, 0.05);
   fCam.add(cam.params, 'sideBias', -0.6, 0.6, 0.01);
-  fCam.add(cam.params, 'jumpTrack', 0, 1, 0.01);
+  fCam.add(baseCam, 'jumpTrack', 0, 1, 0.01);
   fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
   fCam.add(cam.params, 'shake', 0, 2, 0.05);
   fCam.close();
@@ -500,7 +501,6 @@ async function boot() {
   fStroke.add(DASH_STROKE, 'radius', 0.6, 3, 0.05);
   fStroke.close();
   let inColumn = false;
-  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
   let hearthLeafT = 0;
   let dashStroke: ColorStroke | null = null;
   const dashStruck = new Set<Hearth>();
@@ -1102,7 +1102,12 @@ async function boot() {
     const waitWind = !!prevLabel?.startsWith('wind-ready:') && (wind.state().find(w => w.id === prevLabel.slice(11))?.heat ?? 0) < 0.98;
     const waitBridge = waitWind || waitLift || waitWash || waitFinale || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
     if ((auto.phase === 'air' && d < 0.6) || waitBridge) auto.wish.set(0, 0, 0);
-    else auto.wish.set(dx / d, 0, dz / d);
+    else {
+      // Full-stick steering orbits tight targets with the fox's smooth turn arc.
+      // Use ordinary analog braking; keep action takeoffs and airborne control full.
+      const approach = onGround && auto.phase === 'run' && !auto.dashQueued && !wp.act ? Math.min(1, d / 3) : 1;
+      auto.wish.set(dx / Math.max(d, 0.001) * approach, 0, dz / Math.max(d, 0.001) * approach);
+    }
     if (auto.phase === 'run') auto.space = false;
     if (auto.dashQueued) {
       auto.dash = true;
@@ -1298,8 +1303,8 @@ async function boot() {
     // ride framing: the lens follows the full rise in a column (normal jumps keep the partial track)
     const riding = inColumn || (gliding && lift.k > 0);
     cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, riding ? 1 : baseCam.jumpTrack, 3, dt);
-    // and rides above the fox, pulled in, looking down the column (the source stays in frame, the sun leaves it)
-    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 2.4 : baseCam.height, 2.2, dt);
+    // A small rise preserves the chase silhouette instead of craning over the column.
+    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 0.4 : baseCam.height, 2.2, dt);
     cam.params.glideDistance = THREE.MathUtils.damp(cam.params.glideDistance, riding ? baseCam.glideDistance - 0.9 : baseCam.glideDistance, 2.2, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
