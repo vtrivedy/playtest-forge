@@ -1937,7 +1937,7 @@ try {
     const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,board:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
-    const phaseTrace=[],supplyTrace=[];let nextSupplySample=0;
+    const phaseTrace=[],supplyTrace=[],boardingTrace=[];let nextSupplySample=0;
     const ferryWait={frames:0,supportedFrames:0,longestUnsupportedSeconds:0,entryHeight:null,exitHeight:null};let unsupportedWaitFrames=0;
     const crossingSample=(st,p,phase,age)=>{
       const water=st.chem.water.find(w=>w.id==='reach-spout');
@@ -1945,6 +1945,7 @@ try {
     };
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
+      if(p.board||p.wait)boardingTrace.push(crossingSample(st,p,phase,age));
       if(p.wait){
         ferryWait.frames++;
         if(ferryWait.entryHeight===null)ferryWait.entryHeight=st.reach.raftHeight;
@@ -1978,7 +1979,7 @@ try {
     const end=await RH('state');if(end.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=end.t;
     const eventOrder=Object.values(events).every(t=>t!==null)&&events.shadeFreedAt<events.sourceActivatedAt&&events.sourceActivatedAt<events.firstArrivalAt&&events.firstArrivalAt<events.bellLatchedAt;
     supplyTrace.push(crossingSample(end,points[phase],phase,age));
-    save('reach-acceptance.json',{phase,reached,phaseTrace,supplyTrace,ferryWait,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
+    save('reach-acceptance.json',{phase,reached,phaseTrace,supplyTrace,boardingTrace,ferryWait,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(!eventOrder)report.failures.push('Reach release/source/arrival/latch event order not observed');
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
