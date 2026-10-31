@@ -1436,7 +1436,7 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
-  if (wants('restoration') || wants('water')) {
+  if (wants('restoration') || wants('water') || wants('stills')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
@@ -1482,6 +1482,19 @@ try {
     const reedMedian = [...reedPerf].sort((a, b) => a.msPerFrame - b.msPerFrame)[2];
     save('restoration-water-perf.json', { ...reedMedian, samples: reedPerf, method: 'Warm median of five GPU-synchronized render-only perf(6) batches with native wall clock; simulation paused' });
     if (!reedPerf.every(sample => sample.msPerFrame > 0 && Number.isFinite(sample.fps))) throw Error('Invalid restored Reed performance timing');
+    const restoreRenderer = await page.evaluate(() => {
+      const h = window.__gameHooks, d = h.debug.scene.userData.waterCapture;
+      const target = h.debug.post.composer.readBuffer;
+      return { waterScene: d ? { ...d } : null, width: target.width, height: target.height, type: target.texture.type, shadowType: h.debug.renderer.shadowMap.type, finalGlError: h.debug.renderer.getContext().getError() };
+    });
+    save('restoration-water-renderer.json', restoreRenderer);
+    const rd = restoreRenderer.waterScene;
+    if (!rd || rd.shadowTypeAtFirstPrepare !== 1 || restoreRenderer.shadowType !== 1
+      || rd.copies < 1 || rd.reflections < 1 || rd.checkedCopies < 1 || rd.invalidTargets
+      || rd.type !== 1016 || rd.type !== restoreRenderer.type || rd.width !== restoreRenderer.width || rd.height !== restoreRenderer.height
+      || rd.glError || rd.priorGlError || rd.bootGlError || rd.bootPriorGlError || restoreRenderer.finalGlError) {
+      report.failures.push(`Restoration water renderer gate failed: ${JSON.stringify(restoreRenderer)}`);
+    }
     save('restoration-provenance.json', {
       label: 'STAGED fixed-lens visual review: real dash input, then staged public Seedwell latches',
       note: 'All three staged latches activate their normal Shade encounters; actors may enter the Reed frame.',
