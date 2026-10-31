@@ -21,7 +21,7 @@ Uniformly slowing the clip makes feet skate (stance foot moves slower than the g
    duty′ = duty · k · stride · cadence / speed, clamped to [minDuty, duty].
 3. **Swing amplitude k.** Upper leg bones (upperarm / thigh) rotate about their cycle-mean pose scaled by `k_gait` (≈1.15–1.3), giving genuinely longer strides so duty doesn't collapse.
 4. **Body bob damping.** Pelvis/root translation tracks are pulled toward their cycle mean by `bodyBob` (keep ~45%) so the torso floats over the legs instead of pogoing; spine flow comes from the existing lean/bend springs plus a slow hip-sway spring.
-5. **Damped body path (main.ts).** Ground velocity uses a critically damped approach with lower accel (glide preset), and grounded yaw follows a spring-limited turn rate instead of a hard linear clamp. Input stays responsive (<150 ms to 90% speed).
+5. **Damped body path (main.ts).** Ground velocity uses a critically damped approach with lower accel (glide preset), and grounded yaw follows a spring-limited turn rate instead of a hard linear clamp. Response: ~0.35 s to 90% speed at groundEase 11 (critically damped, ideal 3.9/ω) — deliberately softer than main's 77 ms snap; tunable.
 
 Untouched: jump/dash/glide gameplay numbers (level gaps are tuned to them), `moveSpeed` 8.4.
 

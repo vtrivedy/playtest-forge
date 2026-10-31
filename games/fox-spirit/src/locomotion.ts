@@ -265,6 +265,7 @@ export class AuthoredLocomotion {
   private backPitchSpring=new Spring();
   private headPitchSpring=new Spring();
   private carriageReady=false;
+  private ribbon=0;
   /** Pitch of a bone's +Y in the world (chain bones point toward their child along +Y). */
   private static pitchOf(bone:THREE.Object3D) {
     const d=new THREE.Vector3(0,1,0).applyQuaternion(bone.getWorldQuaternion(q()));
@@ -277,7 +278,7 @@ export class AuthoredLocomotion {
     this.root.updateWorldMatrix(true,true);
     const pelvis=this.spine.getWorldPosition(v()), withers=chest.getWorldPosition(v());
     const back=Math.atan2(withers.y-pelvis.y,Math.hypot(withers.x-pelvis.x,withers.z-pelvis.z));
-    if(!this.carriageReady){this.backPitchSpring.value=back;this.headPitchSpring.value=AuthoredLocomotion.pitchOf(this.head);this.carriageReady=true;}
+    if(!this.carriageReady){this.backPitchSpring.value=back;this.headPitchSpring.value=AuthoredLocomotion.pitchOf(this.head);this.backPitchSpring.velocity=this.headPitchSpring.velocity=0;this.carriageReady=true;}
     const backSmooth=this.backPitchSpring.step(back,dt,1.2,1);
     // Positive rotation about the actor's right axis lowers a forward-pointing line.
     const rock=(back-backSmooth)*this.params.rockDamp;
@@ -347,7 +348,7 @@ export class AuthoredLocomotion {
     const worldOverlay=(bone:THREE.Object3D|undefined,worldAxis:THREE.Vector3,angle:number)=>{
       if(!bone)return;
       bone.updateWorldMatrix(true,false);
-      const localAxis=worldAxis.applyQuaternion(bone.getWorldQuaternion(q()).invert());
+      const localAxis=worldAxis.clone().applyQuaternion(bone.getWorldQuaternion(q()).invert());
       overlay(bone,localAxis,angle);
     };
     for(const spine of this.spines)worldOverlay(spine,new THREE.Vector3(Math.sin(this.input.yaw),0,Math.cos(this.input.yaw)),this.lean/this.spines.length);
@@ -362,14 +363,14 @@ export class AuthoredLocomotion {
     worldOverlay(this.head,right,-this.pitch*this.params.headStabilize+nod);
     const tailLoad=this.tailLoadSpring.step(this.params.tailLoad-this.input.speed*this.params.tailStream-landOffset*3+this.brake*.10+(this.input.grounded ? 0 : THREE.MathUtils.clamp(this.input.verticalSpeed*.015,-.1,.15)),dt,2.8,.8);
     overlay(this.tailBone,new THREE.Vector3(1,0,0),tailLoad);
-    const locomotingNow=this.input.grounded && ['run','walk','trot'].includes(active);
+    this.ribbon=THREE.MathUtils.damp(this.ribbon,this.input.grounded && ['run','walk','trot'].includes(active) ? 1 : 0,4,dt);
     let tailTarget=THREE.MathUtils.clamp(-this.turn*this.params.tailLag,-.25,.25);
     for(let i=0;i<this.tails.length;i++) {
       const bone=this.tails[i]; const spring=this.tailSprings[i];
       const angle=spring.step(tailTarget,dt,Math.max(1.2,this.params.springFrequency-i*.16),this.params.springDamping);
       overlay(bone,new THREE.Vector3(0,0,1),angle*(i===0 ? 1 : .35));
       // Ribbon: a pitch wave travelling down the tail, locked to the stride.
-      if(locomotingNow)overlay(bone,new THREE.Vector3(1,0,0),this.params.tailWave*Math.sin(2*Math.PI*this.phase-i*this.params.tailWaveLag));
+      overlay(bone,new THREE.Vector3(1,0,0),this.ribbon*this.params.tailWave*Math.sin(2*Math.PI*this.phase-i*this.params.tailWaveLag));
       tailTarget=angle*.9;
     }
 
