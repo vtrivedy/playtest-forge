@@ -854,6 +854,7 @@ export class ColorField {
             vec3 own = max(mix(vec3(chromaLuma), chroma, 1.25), 0.0);
             // watercolour on paper sits a little lighter and cleaner than the dead soil it covers
             vec3 groundPaint = mix(own, chromaLuma * pal * 1.22, uPalette) * dens * (1.0 - backrun * 0.12);
+            groundPaint = max(mix(vec3(dot(groundPaint, vec3(0.2126, 0.7152, 0.0722))), groundPaint, 1.25), 0.0) * 1.05;
             float up = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
             // lichen patches follow the surface (gp folds height in), not horizontal bands
             float lichen = smoothstep(0.55, 0.75, noise21(gpP * 0.9 + 3.0) * 0.7 + noise21(gpP * 3.1) * 0.3);
