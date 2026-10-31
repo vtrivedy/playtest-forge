@@ -105,6 +105,8 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
     const wetState = new THREE.BufferAttribute(new Float32Array(cells * 6), 1);
     const waterColors = new THREE.BufferAttribute(new Float32Array(cells * 18), 3);
     wetState.setUsage(THREE.DynamicDrawUsage); waterColors.setUsage(THREE.DynamicDrawUsage);
+    const dryWater = new THREE.Color(0x261f18);
+    for (let i = 0; i < waterColors.count; i++) waterColors.setXYZ(i, dryWater.r, dryWater.g, dryWater.b);
     surfaceGeometry.setAttribute('aWet', wetState); surfaceGeometry.setAttribute('color', waterColors);
     const surface = new THREE.Mesh(surfaceGeometry, surfaceMat);
     surfaceMat.onBeforeCompile = shader => {
@@ -119,7 +121,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         float foam = pow(max(0.0, sin(drift * 2.2 + sin(vWaterUV.x * 11.0) * 0.6)), 14.0);
         float edgeFoam = pow(abs(vWaterUV.x - 0.5) * 2.0, 10.0) * (0.5 + 0.5 * sin(drift * 3.0));
         diffuseColor.rgb += vec3(0.12, 0.105, 0.075) * (foam * 0.65 + edgeFoam * 0.35) * vWet;
-        diffuseColor.a *= (1.0 - smoothstep(0.5, 1.0, abs(vWaterUV.x - 0.5) * 2.0)) * mix(vWet, 1.0, uWaterWash);
+        diffuseColor.a *= 1.0 - smoothstep(0.5, 1.0, abs(vWaterUV.x - 0.5) * 2.0);
       `);
       shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `
         float waterFresnel = pow(1.0 - clamp(abs(dot(normal, geometryViewDir)), 0.0, 1.0), 3.0);
@@ -139,7 +141,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
         normal = normalize(normal + (viewMatrix * vec4(ripple, 0.0)).xyz * vWet);
       `);
     };
-    surface.receiveShadow = true; surface.frustumCulled = false; scene.add(surface);
+    surface.receiveShadow = true; scene.add(surface);
     const samples = Array.from({ length: cells }, (_, i) => {
       const d = (i + 0.5) * length / cells;
       const p = curve.getPointAt(d / length), tangent = curve.getTangentAt(d / length);
@@ -197,7 +199,7 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
       const before = boundaries[Math.max(0, i - 1)]!, after = boundaries[Math.min(cells, i + 1)]!;
       const turn = Math.atan2(Math.sin(after.yaw - before.yaw), Math.cos(after.yaw - before.yaw));
       if (Math.abs(turn) > 0.0001) {
-        const innerWidth = Math.min(spot.width * 0.47, (after.d - before.d) / Math.abs(turn) * 0.45);
+        const innerWidth = Math.min(spot.width * 0.47, (after.d - before.d) / Math.abs(turn) * 0.65);
         if (turn > 0) edge.rightWidth = innerWidth;
         else edge.leftWidth = innerWidth;
       }
