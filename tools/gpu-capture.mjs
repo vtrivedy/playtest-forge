@@ -104,7 +104,7 @@ try {
     page = await context.newPage();
     page.setDefaultTimeout(180000);
     page.on('pageerror', e => { errors.push(String(e)); console.error('PAGEERROR', String(e)); });
-    page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error') errors.push(m.text()); if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
+    page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error' || m.text().includes('Mismatch between texture format and sampler type')) { if (!errors.includes(m.text())) errors.push(m.text()); } if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
     await page.goto(`http://127.0.0.1:5180/?q=${q}&fresh${query}`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { polling: 100 });
     await H('setManual', true);
@@ -752,14 +752,40 @@ try {
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
   if (wants('worldgait')) {
+    if(fps!==60)throw Error('World gait comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
+    await H('setFeelPreset','brisk');
+    const preflight=await page.evaluate(()=>{
+      const h=window.__gameHooks,col=h.debug.world.collision,attempts=[];
+      for(const x of [6,40,24]) {
+        const failures=[];
+        let previousY=null;
+        for(let z=88;z>=68;z-=2) {
+          const floor=col.highestAt(x,z),terrain=h.debug.world.terrainY(x,z),y=floor+.02;
+          if(!Number.isFinite(floor) || Math.abs(floor-terrain)>.2 || (previousY!==null && Math.abs(floor-previousY)>.4))failures.push({z,footing:[floor,terrain,previousY]});
+          previousY=floor;
+          for(const lens of ['side','three-quarter']) {
+            const camera=[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const targets=[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]];
+            const blockers=targets.map(target=>h.photoBlocker(camera,target));
+            if(blockers.some(Boolean))failures.push({z,lens,blockers});
+          }
+        }
+        attempts.push({x,failures});
+        if(!failures.length)return {x,z:88,attempts};
+      }
+      return {x:null,z:88,attempts};
+    });
+    save('worldgait-preflight.json',preflight);
+    if(preflight.x===null)throw Error('No clear terrain-only meadow review corridor');
     const segments=[];
     for(const lens of ['side','three-quarter']) for(const [gait,stick,seconds] of [['walk',.18,3],['trot',.45,3],['run',1,2]]) {
       await H('setKeys',[]);await H('setStick',0,0);await H('photoOff');
-      const y=await page.evaluate(()=>window.__gameHooks.debug.world.collision.highestAt(40,88));
-      await H('teleport',40,y,88,Math.PI);await advance(30);
+      const y=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[preflight.x,preflight.z]);
+      await H('teleport',preflight.x,y,preflight.z,Math.PI);await advance(30);
       const name=`worldgait-${lens}-${gait}`, initial=await H('state');
+      const visibility={sampledFrames:0,blocked:[]};
       const frameLens=async st=>{
         const [x,y,z]=st.pos;
         await H('photo',[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
@@ -767,15 +793,28 @@ try {
       await frameLens(initial);
       await video(name,seconds*fps,async()=>{await H('setStick',0,-stick);},undefined,{
         traceEveryFrame:true,keyFrames:[0,Math.round(fps*.25),fps,seconds*fps-1],
-        afterStep:async(i,st)=>{if(st.deaths!==initial.deaths)throw Error(`${name}: death`);await frameLens(st);}
+        afterStep:async(i,st)=>{
+          if(st.deaths!==initial.deaths)throw Error(`${name}: death`);
+          await frameLens(st);
+          {
+            const [x,y,z]=st.pos, camera=[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const blockers=await page.evaluate(([camera,targets])=>targets.map(target=>window.__gameHooks.photoBlocker(camera,target)),[camera,[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]]]);
+            visibility.sampledFrames++;
+            if(blockers.some(Boolean))visibility.blocked.push({frame:i,blockers});
+          }
+        }
       });
       await H('setStick',0,0);await H('setKeys',[]);await shot(`${name}-end`);
       const end=await H('state');
-      const rows=report.videos[name].trace.filter(r=>r.frame>=fps),speeds=rows.map(r=>Math.hypot(r.state.vel[0],r.state.vel[2])).sort((a,b)=>a-b);
+      const rows=report.videos[name].trace.filter(r=>r.frame>=fps),speeds=rows.map(r=>{const previous=report.videos[name].trace[r.frame-1].state.pos;return Math.hypot(r.state.pos[0]-previous[0],r.state.pos[2]-previous[2])/r.dt}).sort((a,b)=>a-b);
       const measured={medianSpeed:speeds[Math.floor(speeds.length/2)],groundedFraction:rows.filter(r=>r.state.grounded).length/rows.length,gaits:Object.fromEntries([...new Set(rows.map(r=>r.state.locomotion?.gait??r.state.anim))].map(g=>[g,rows.filter(r=>(r.state.locomotion?.gait??r.state.anim)===g).length]))};
-      segments.push({name,gait,stick,seconds,initial,end,measured,camera:`staged ${lens} tracking photo lens, live controller`,reset:[40,y,88]});
+      measured.expectedGaitFraction=(measured.gaits[gait]??0)/rows.length;
+      measured.expectedSpeed=9*stick;
+      measured.speedFraction=measured.medianSpeed/measured.expectedSpeed;
+      segments.push({name,gait,stick,seconds,initial,end,measured,visibility,camera:`staged ${lens} tracking photo lens, live controller`,reset:[preflight.x,y,preflight.z]});
     }
-    save('worldgait-acceptance.json',{label:'Six staged movement segments on the east Arrival Meadow line (40,88); no forced animation poses; not a continuous route or gameplay-camera proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths)});
+    save('worldgait-acceptance.json',{label:'Six staged live-input movement segments on a disclosed preflighted Arrival Meadow line; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths && s.visibility.blocked.length===0 && s.measured.groundedFraction>.95 && s.measured.expectedGaitFraction>.9 && s.measured.speedFraction>.9 && s.measured.speedFraction<1.1)});
+    if(segments.some(s=>s.visibility.blocked.length || s.measured.groundedFraction<=.95 || s.measured.expectedGaitFraction<=.9 || s.measured.speedFraction<=.9 || s.measured.speedFraction>=1.1))throw Error('World gait review requires clear chest/head/feet sight lines, grounded movement and measured requested gait/speed');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
@@ -1045,6 +1084,13 @@ try {
     });
     save('water-reed-result.json', await H('state'));
     await H('teleport', -30, 0, 65, Math.PI); await H('setStick', 0, 0);
+    const pondCaptureStart = await page.evaluate(() => {
+      const d = window.__gameHooks.debug.scene.userData.waterCapture;
+      if (!d) return null;
+      d.bootGlError = d.glError; d.bootPriorGlError = d.priorGlError;
+      d.glError = 0; d.priorGlError = 0; d.checkNextCopy = true;
+      return {copies:d.copies,reflectionAttempts:d.reflectionAttempts,reflections:d.reflections,checkedCopies:d.checkedCopies,bootGlError:d.bootGlError,bootPriorGlError:d.bootPriorGlError};
+    });
     await H('photo', [-23, 5, 70], [-30, 1, 61], 48); await advance(2); await shot('water-pond-frozen');
     await video('water-pond-grotto', 8 * fps, async i => {
       if (i === 15) { await H('setStick', 0, -1); await H('setKeys', ['ShiftLeft']); }
@@ -1056,10 +1102,18 @@ try {
     save('water-pond-result.json', await H('state'));
     await H('photo', [-7, 7, 79], [-23, 0, 66], 52); await advance(2); await shot('water-pond-vista');
     await H('photo', [-6, 1.3, 78], [-24, -0.22, 68], 52); await advance(2); await shot('water-pond-grazing');
-    await H('photo', [8, 3, 3], [8, -3.2, -7], 52); await advance(2); await shot('water-creek');
-    const waterCapture = await page.evaluate(() => window.__gameHooks.debug.scene.userData.waterCapture ?? null);
-    save('water-scene-capture.json', waterCapture);
-    if (waterCapture?.glError) report.failures.push(`Water framebuffer copy GL error ${waterCapture.glError}`);
+    await H('photo', [8, 12, 4], [8, -3.2, -7], 52); await advance(2); await shot('water-creek');
+    const waterCapture = await page.evaluate(() => {
+      const h = window.__gameHooks, d = h.debug.scene.userData.waterCapture;
+      const buffer = h.debug.post.composer.readBuffer;
+      return {after:d ?? null,expected:{width:buffer.width,height:buffer.height,type:buffer.texture.type,shadowType:h.debug.renderer.shadowMap.type}};
+    });
+    save('water-scene-capture.json', {before:pondCaptureStart,...waterCapture});
+    const d = waterCapture.after, expected = waterCapture.expected;
+    if (!d || !pondCaptureStart || d.copies <= pondCaptureStart.copies || d.reflections <= pondCaptureStart.reflections || d.checkedCopies <= pondCaptureStart.checkedCopies
+      || d.shadowTypeAtFirstPrepare !== 1 || expected.shadowType !== 1 || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.bootGlError || d.bootPriorGlError || d.invalidTargets) {
+      report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
+    }
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
@@ -1417,21 +1471,21 @@ try {
     save('reachview-setup.json',{strategy:'STAGED aura-only source hold, real parcels/inlet',firstArrivalAfterSeconds:firstArrivalAt,bellLatchedAfterSeconds:latchAt,sourceHoldSeconds:sourceHoldFrames/60,colourSettleSeconds:4,high});
     if(!high.reach.restored||high.reach.fill<.99)report.failures.push('Reach HIGH photo setup did not receive sustained water');
     await RH('teleport',150,38,-96,Math.PI/2);await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-high-arrival');
-    await RH('teleport',187,36,-118,Math.PI/2);await RH('photo',[151,49,-103],[188,33,-120],52);await advance(2);await shot('reachview-high-basin');
+    await RH('teleport',187,36,-118,Math.PI/2);await RH('photo',[161,45,-107],[188,33,-120],52);await advance(2);await shot('reachview-high-basin');
     await RH('teleport',214,31,-137,Math.PI/2);
     await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-lower-islet');
     await RH('teleport',207,36,-123,-Math.PI/2);
-    await RH('photo',[216,42,-134],[184,34,-115],52);await advance(2);await shot('reachview-payoff-vista');
+    await RH('photo',[220,44,-122],[190,34,-119],52);await advance(2);await shot('reachview-payoff-vista');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
-    await RH('teleport',187,30,-118,Math.PI/2);await RH('photo',[151,49,-103],[188,33,-120],52);await advance(2);await shot('reachview-low-basin');
+    await RH('teleport',187,30,-118,Math.PI/2);await RH('photo',[161,45,-107],[188,33,-120],52);await advance(2);await shot('reachview-low-basin');
     const low=await RH('state');save('reachview-state.json',low);if(low.reach.level!=='low'||low.reach.fill>.02)report.failures.push('Reach LOW photo setup did not drain');
   }
   if (wants('reach')) {
     await boot(quality,true); await RH('forceRestore'); await advance(660,false);
     await H('teleport',12,38,-90,Math.PI/2); await advance(2); await shot('reach-summit-entry');
-    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:173,y:30,z:-116,dash:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
+    const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115},{x:175,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
     await video('reach-first-crossing',65*fps,async()=>{
@@ -1444,10 +1498,10 @@ try {
       if(st.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=st.t;
       if(p.shade){if(!drinker)throw Error('Reach drinker missing');p.x=drinker.pos[0];p.z=drinker.pos[2];}
       const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
-      const ready=p.shade?drinker.freed:d<.8&&st.pos[1]>=p.y-.4;
+      const ready=p.shade?drinker.freed:p.source?st.pos[0]>=103&&Math.abs(st.pos[2]+115)<1.2&&events.sourceActivatedAt!==null:d<.8&&st.pos[1]>=p.y-.4;
       if(p.shade&&drinker.freed&&!shadeShot){await shot('reach-drinker-released');shadeShot=true;}
       if(ready&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
-      const q=points[phase];if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
+      const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&events.sourceActivatedAt===null)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
       const vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
       let sx=len>.2?vx/len*Math.min(1,len):0,sz=len>.2?vz/len*Math.min(1,len):0;
       const keys=q.jump?['Space']:[];

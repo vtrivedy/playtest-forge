@@ -45,6 +45,8 @@ export type CameraTunables = {
   /** Terrain compression hands off to the cutout before the lens enters the animal. */
   minDistance: number;
   height: number;
+  /** Extra lens height on the ground; flight retains the proportional boom rule. */
+  groundLift: number;
   lookHeight: number;
   /** Composition offset above the chest; kept separate from collision focus. */
   framingHeight: number;
@@ -115,13 +117,14 @@ export function createFollowCamera(opts: {
     runDistance: 3.0,
     minDistance: 2.6,
     height: 1.25,
+    groundLift: 0.3,
     lookHeight: 0.62,
     framingHeight: 0.65,
-    airDistance: 4.8,
-    glideDistance: 6.4,
+    airDistance: 4.2,
+    glideDistance: 4.8,
     fov: 54,
     runFov: 0,
-    glideFov: 7,
+    glideFov: 3,
     lag: 0.14,
     lookAhead: 1.6,
     recenterRate: 1.25,
@@ -584,9 +587,9 @@ export function createFollowCamera(opts: {
         aim.x += (landAt.x - aim.x) * w;
         aim.z += (landAt.z - aim.z) * w;
         // drops: tilt toward the landing height and raise the lens so the ground you'll hit is visible
-        aim.y += (Math.max(landAt.y, focusY - 10) - focusY) * Math.min(0.7, 0.15 + drop * 0.07) * landW * descending;
-        dropLift = Math.min(3.5, drop * 0.3) * landW * descending;
-        goalDist += Math.min(2, Math.max(0, spread - 4) * 0.2 + drop * 0.1) * landW;
+        aim.y += (Math.max(landAt.y, focusY - 3) - focusY) * Math.min(0.35, 0.12 + drop * 0.04) * landW * descending;
+        dropLift = Math.min(0.8, drop * 0.1) * landW * descending;
+        goalDist += Math.min(0.8, Math.max(0, spread - 4) * 0.1 + drop * 0.04) * landW;
       }
       if (pullHold > 0) pullHold -= dt;
       pullAmt = THREE.MathUtils.damp(pullAmt, pullHold > 0 ? pullGoal : 0, pullHold > 0 ? 2.5 : 1.2, dt);
@@ -594,7 +597,9 @@ export function createFollowCamera(opts: {
       dist = THREE.MathUtils.damp(dist, goalDist, goalDist > dist ? 2.2 : 1.4, dt);
 
       liftNow = THREE.MathUtils.damp(liftNow, dropLift, 3, dt);
-      const pitchLift = params.height * (dist / params.distance) + pitchBias * dist + pullAmt * 0.3 + liftNow;
+      const flightW = f.gliding ? 1 : airW;
+      const lensHeight = THREE.MathUtils.lerp(params.height + params.groundLift, params.height * (dist / params.distance), flightW);
+      const pitchLift = lensHeight + pitchBias * dist + pullAmt * 0.3 + liftNow;
       const lensYaw = yaw + params.sideBias;
       desired.set(p.x + Math.sin(lensYaw) * dist + lead.x * 0.3, focusY + pitchLift, p.z + Math.cos(lensYaw) * dist + lead.z * 0.3);
       // boom collision: pull in fast, release slowly; lift eases (no pops at ledges/walls)
