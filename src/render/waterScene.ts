@@ -7,9 +7,8 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
   let texture = new THREE.FramebufferTexture(1, 1);
   let captureArmed = false;
   const reflections = new Map<THREE.Object3D, (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => void>();
-  const diagnostics = { prepared: 0, copies: 0, reflectionAttempts: 0, width: 0, height: 0, type: 0, glError: 0 };
+  const diagnostics = { prepared: 0, copies: 0, reflectionAttempts: 0, width: 0, height: 0, type: 0, glError: 0, priorGlError: 0, invalidTargets: 0, checkedCopies: 0, checkNextCopy: true };
   scene.userData.waterCapture = diagnostics;
-  const size = new THREE.Vector2();
   const skins = new Set<THREE.Object3D>();
   const uniforms = {
     uSceneWaterColor: { value: texture },
@@ -26,7 +25,9 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
       scene.updateMatrixWorld(true); camera.updateMatrixWorld(true);
       const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       for (const [skin, reflect] of reflections) {
-        if (skin.visible && skin instanceof THREE.Mesh && frustum.intersectsObject(skin)) { diagnostics.reflectionAttempts++; reflect(renderer, camera); }
+        let visible = skin.visible;
+        for (let parent = skin.parent; parent; parent = parent.parent) visible = visible && parent.visible;
+        if (visible && skin.layers.test(camera.layers) && skin instanceof THREE.Mesh && frustum.intersectsObject(skin)) { diagnostics.reflectionAttempts++; reflect(renderer, camera); }
       }
       diagnostics.prepared++;
       captureArmed = true;
@@ -37,17 +38,21 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
     },
     withoutSkins(render: () => void) {
       const visibility = Array.from(skins, skin => [skin, skin.visible] as const);
+      // These point sprites are sized for the canvas, not a512 reflection target.
+      scene.traverse(object => { if (object instanceof THREE.Points && !skins.has(object)) visibility.push([object, object.visible]); });
       for (const [skin] of visibility) skin.visible = false;
       try { render(); } finally { for (const [skin, visible] of visibility) skin.visible = visible; }
     },
     capture(renderer: THREE.WebGLRenderer) {
       if (!captureArmed) return;
       const target = renderer.getRenderTarget();
-      if (!target || target.samples > 0) throw new Error('Scene water requires the forge single-sample composer colour target');
-      renderer.getDrawingBufferSize(size);
-      const width = target?.width ?? size.x, height = target?.height ?? size.y;
-      const type = target?.texture.type ?? THREE.UnsignedByteType;
-      const format = target?.texture.format ?? THREE.RGBAFormat;
+      if (!target || target.samples > 0) {
+        diagnostics.invalidTargets++; captureArmed = false;
+        if (diagnostics.invalidTargets === 1) console.error('Scene water requires the forge single-sample composer colour target');
+        return;
+      }
+      const width = target.width, height = target.height;
+      const type = target.texture.type, format = target.texture.format;
       if (texture.image.width !== width || texture.image.height !== height || texture.type !== type || texture.format !== format) {
         texture.dispose(); texture = new THREE.FramebufferTexture(width, height);
         texture.type = type; texture.format = format;
@@ -57,8 +62,19 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
       uniforms.uSceneWaterSize.value.set(width, height);
       // The forge composer uses a single-sample colour target. Match its type
       // (usually half float) rather than clipping HDR into an 8-bit copy.
+      const context = diagnostics.checkNextCopy ? renderer.getContext() : null;
+      if (context) {
+        for (let i = 0; i < 8; i++) {
+          const error = context.getError();
+          if (!error) break;
+          diagnostics.priorGlError ||= error;
+        }
+      }
       renderer.copyFramebufferToTexture(texture);
-      if (diagnostics.copies === 0) diagnostics.glError = renderer.getContext().getError();
+      if (context) {
+        diagnostics.glError ||= context.getError();
+        diagnostics.checkedCopies++; diagnostics.checkNextCopy = false;
+      }
       diagnostics.copies++; diagnostics.width = width; diagnostics.height = height; diagnostics.type = type;
       captureArmed = false;
     },
