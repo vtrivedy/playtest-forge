@@ -49,7 +49,9 @@ import type { ColorStroke } from '../../../src/render/colorField';
  * Fox feel presets, tuned on Russetvale's real gaps (marsh stones 5 m, chasm jump+dash, glide line).
  * `fallGravity` gives weight on the way down; `apexHang` floats the top of a held jump.
  */
-type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number };
+/** `groundEase` (rad/s) is the critically damped ground-velocity response and `turnEase` the yaw-rate response:
+ * the body path accelerates and turns in smooth curves instead of first-order snaps. */
+type FoxFeel = FeelParams & { fallGravity: number; apexHang: number; glideSink: number; glideForward: number; glideDelay: number; groundEase: number; turnEase: number };
 const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
   spring: {
     ...PRESET_SPRING,
@@ -65,6 +67,8 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     glideSink: 2.5,
     glideForward: 7.9,
     glideDelay: 0.1,
+    groundEase: 10,
+    turnEase: 7,
   },
   brisk: {
     ...PRESET_BRISK,
@@ -82,6 +86,8 @@ const FEEL_PRESETS: Record<'spring' | 'brisk', FoxFeel> = {
     glideSink: 2.7,
     glideForward: 8.4,
     glideDelay: 0.08,
+    groundEase: 11,
+    turnEase: 7,
   },
 };
 const presetParam = new URLSearchParams(location.search).get('feel');
@@ -302,6 +308,8 @@ async function boot() {
   gui.add({ brisk: () => usePreset('brisk') }, 'brisk');
   const fFeel = gui.addFolder('Fox');
   fFeel.add(feel, 'moveSpeed', 4, 14, 0.1).listen();
+  fFeel.add(feel, 'groundEase', 4, 30, 0.5).listen();
+  fFeel.add(feel, 'turnEase', 2, 20, 0.5).listen();
   fFeel.add(feel, 'jumpVelocity', 6, 16, 0.1).listen();
   fFeel.add(feel, 'gravity', 10, 40, 0.5).listen();
   fFeel.add(feel, 'fallGravity', 1, 2.2, 0.05).listen();
@@ -326,6 +334,22 @@ async function boot() {
     folder.add(params,'brakePitch',0,.2,.005);
     folder.add(params,'landSquash',0,.2,.005);
     folder.add(params,'landFrequency',2,6,.1);
+    folder.add(params, 'walkHz', 1, 3, .05);
+    folder.add(params, 'trotHz', 1.2, 4, .05);
+    folder.add(params, 'gallopHz', 1.5, 5, .05);
+    folder.add(params, 'cadenceExponent', 0, 1, .05);
+    folder.add(params, 'minStanceRatio', .2, 1, .01);
+    folder.add(params, 'bodyBob', 0, 1, .01);
+    folder.add(params, 'swingEase', 0, 1, .05);
+    folder.add(params, 'trotLift', 0, .05, .002);
+    folder.add(params, 'gallopLift', 0, .06, .002);
+    folder.add(params, 'takeoffCrouch', 0, .2, .005);
+    folder.add(params, 'takeoffPitch', 0, .2, .005);
+    folder.add(params, 'rockDamp', 0, 2, .05);
+    folder.add(params, 'headLevel', 0, 1, .05);
+    folder.add(params, 'tailStream', 0, .03, .001);
+    folder.add(params, 'tailWave', 0, .15, .005);
+    folder.add(params, 'tailWaveLag', 0, 1.5, .05);
     folder.add(params, 'trotSpeed', 2, 6, .1);
     folder.add(params, 'gallopSpeed', 4, 10, .1);
     folder.add(params, 'plantStrength', 0, 1, .01);
@@ -378,7 +402,7 @@ async function boot() {
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
   const summitHearth = updrafts.hearths.find((h) => h.spot.id === SUMMIT_REPAIR.hearthId);
   let summitSeal = 0;
-  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
+  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui, (x, z, y) => col.blocked(x, z, y));
   // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
   let frontFxT = 0;
   const growth = createGrowth(scene, world.rootSpots, world.padSpots, world.collision, {
@@ -538,6 +562,11 @@ async function boot() {
   });
 
   const vel = new THREE.Vector3();
+  // Ground body-path state: acceleration of the horizontal velocity, the velocity it last produced
+  // (anything else wrote vel since — wall, teleport, knockback — so the spring restarts), and yaw rate.
+  const groundAccel = new THREE.Vector3();
+  const groundVelOut = new THREE.Vector3();
+  let yawRate = 0;
   let grounded = false;
   let dashT = 0;
   let gliding = false;
@@ -925,7 +954,7 @@ async function boot() {
   function respawn() {
     shades.resetSweep();
     shadeContact.respawn();
-    const p = world.respawnPos();
+    const p = reach.recoveryAt(foxActor.group.position) ?? world.respawnPos();
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
     prevFeet = p.y + 0.1;
     vel.set(0, 0, 0);
@@ -1309,12 +1338,27 @@ async function boot() {
       if(grounded && wish.lengthSq()>.001) {
         const targetYaw=Math.atan2(wish.x,wish.z);
         const error=Math.atan2(Math.sin(targetYaw-fox.rotation.y),Math.cos(targetYaw-fox.rotation.y));
-        fox.rotation.y+=THREE.MathUtils.clamp(error,-4.5*dt,4.5*dt);
+        // Yaw rate eases in and out (ζ≈.7 with turnRate) so the spine carves arcs, never snaps.
+        yawRate=THREE.MathUtils.damp(yawRate,THREE.MathUtils.clamp(error*feel.turnEase,-4.5,4.5),feel.turnRate,dt);
+        fox.rotation.y+=yawRate*dt;
         // Brake through a reversal; forward drive returns as the body points into the input.
         const drive=Math.max(0,Math.cos(error));
         desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
+      } else yawRate=0;
+      if (grounded) {
+        // Critically damped: velocity changes with continuous acceleration (no first-frame jerk).
+        if (cur.distanceToSquared(groundVelOut) > 1e-4) groundAccel.set(0, 0, 0);
+        const w = feel.groundEase;
+        const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n;
+        for (let i = 0; i < n; i++) {
+          groundAccel.addScaledVector(desired.clone().sub(cur), w * w * h).addScaledVector(groundAccel, -2 * w * h);
+          cur.addScaledVector(groundAccel, h);
+        }
+        groundVelOut.copy(cur);
+      } else {
+        groundAccel.set(0, 0, 0);
+        cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
       }
-      cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));
       vel.x = cur.x;
       vel.z = cur.z;
     }
@@ -1361,6 +1405,8 @@ async function boot() {
     for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
       if (e.type === 'freed') {
         shadeContact.frees++;
+        const wash = e.pos.clone().setY(e.pos.y - 1.4);
+        colorField.stroke(wash, wash.clone(), { life: 6, strength: 1.2, radius: shades.tun.drainRadius });
         hitstop = 0.08;
         cam.shake(0.12);
         audio.play('bridge');
@@ -1419,7 +1465,8 @@ async function boot() {
           // Authored locomotion computes cadence from stance sweep and blended stride length.
         }
       }
-      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
+      foxActor.setMotion?.({ speed: harnessAnimLock==='run' ? 9 : harnessAnimLock==='walk' ? 1.4 : harnessAnimLock==='trot' ? 3.8 : speed, grounded, yaw: fox.rotation.y, verticalSpeed: vel.y, brake: brakeIntent,
+        crouch: windupT >= 0 && actionFeel.jumpWindup > 0 ? Math.min(1, (windupT + dt) / actionFeel.jumpWindup) : 0, lookYaw: wish.lengthSq()>.001 ? Math.atan2(wish.x,wish.z) : fox.rotation.y,
         groundAt: (x, z, ceiling) => col.groundAt(x, z, ceiling).y });
       foxActor.setAnim(anim, fade);
       foxActor.setTimeScale(rate);
@@ -1632,6 +1679,7 @@ async function boot() {
         `dashes=${feelMetrics.dashesUsed}`,
         `preset=${feelPreset}`,
         `quality=${quality.tier}`,
+        `spirit=${JSON.stringify(foxActor.group.userData.spiritFx)}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',
       ],
