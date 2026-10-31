@@ -263,7 +263,7 @@ async function boot() {
   // spark bursts only (Seedwell, Wellspring, hearth flares) — no pickups
   const emberMotes = createEmberMotes(scene, { maxMotes: 0 });
   const occlusion = createOcclusionFader(scene, {
-    blocked: cam.debug.blocked,
+    blocked: () => !photo && cam.debug.blocked(),
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
@@ -338,6 +338,8 @@ async function boot() {
     folder.add(params, 'cadenceExponent', 0, 1, .05);
     folder.add(params, 'minStanceRatio', .2, 1, .01);
     folder.add(params, 'bodyBob', 0, 1, .01);
+    folder.add(params, 'trotLift', 0, .08, .005);
+    folder.add(params, 'gallopLift', 0, .08, .005);
     folder.add(params, 'swingEase', 0, 1, .05);
     folder.add(params, 'headBob', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
@@ -399,7 +401,7 @@ async function boot() {
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
   const summitHearth = updrafts.hearths.find((h) => h.spot.id === SUMMIT_REPAIR.hearthId);
   let summitSeal = 0;
-  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
+  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui, (x, z, y) => col.blocked(x, z, y));
   // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
   let frontFxT = 0;
   const growth = createGrowth(scene, world.rootSpots, world.padSpots, world.collision, {
@@ -876,6 +878,7 @@ async function boot() {
           fov: cam.camera.fov,
           yaw: cam.getYaw(),
           occlusion: occlusion.strength,
+          sightBlocked: occlusion.detected,
           photo: !!photo,
           foxNdc: cam.debug.fox,
           landingNdc: cam.debug.landing,
@@ -947,7 +950,7 @@ async function boot() {
   function respawn() {
     shades.resetSweep();
     shadeContact.respawn();
-    const p = world.respawnPos();
+    const p = reach.recoveryAt(foxActor.group.position) ?? world.respawnPos();
     foxActor.group.position.set(p.x, p.y + foxActor.feetOffset + 0.1, p.z);
     prevFeet = p.y + 0.1;
     vel.set(0, 0, 0);
@@ -1404,6 +1407,8 @@ async function boot() {
     for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
       if (e.type === 'freed') {
         shadeContact.frees++;
+        const wash = e.pos.clone().setY(e.pos.y - 1.4);
+        colorField.stroke(wash, wash.clone(), { life: 6, strength: 1.2, radius: shades.tun.drainRadius });
         hitstop = 0.08;
         cam.shake(0.12);
         audio.play('bridge');
@@ -1554,7 +1559,6 @@ async function boot() {
       airTime: airT,
       landing: landingValid ? landing : null,
     });
-    occlusion.update(rawDt, cam.camera, renderer, feetPos, foxActor.height, fox.rotation.y);
     // Permanent wavefronts only: the fox's own saturated aura must not keep ambience warm.
     let audioRestore = colorField.globalColor;
     for (const region of colorField.restores) {
@@ -1632,6 +1636,11 @@ async function boot() {
         cam.camera.updateProjectionMatrix();
       }
     }
+    // Fit the cutout to the rendered lens, including review/photo overrides.
+    // Simulation can run several steps without drawing in the capture harness.
+    occlusion.update(dt, cam.camera, renderer,
+      feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
+      foxActor.height, fox.rotation.y);
     // grade follows the flood: faded sepia → rich autumn over the 6 s wave
     // exposure stays put; the grade only follows once the front has left the summit
     post.params.restore = restore.floodAge >= 0 ? THREE.MathUtils.smootherstep(restore.floodAge, 1.2, 6) : 0;
@@ -1673,6 +1682,7 @@ async function boot() {
         `dashes=${feelMetrics.dashesUsed}`,
         `preset=${feelPreset}`,
         `quality=${quality.tier}`,
+        `spirit=${JSON.stringify(foxActor.group.userData.spiritFx)}`,
         auto.active ? `auto=${auto.idx}/${world.route.length} assists=${auto.assists}` : 'auto=off',
         gliding ? 'glide' : grounded ? 'ground' : 'air',
       ],

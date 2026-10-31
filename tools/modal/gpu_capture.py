@@ -21,7 +21,7 @@ image = (
 )
 if modal.is_local():
     image = image.add_local_file(ROOT / 'tools/finale-capture.mjs', '/opt/browser/finale-capture.mjs')
-    image = image.add_local_file(ROOT / 'tools/gpu-capture.mjs', '/opt/browser/gpu-capture.mjs')
+    image = image.add_local_file(Path(os.environ.get('FOX_CAPTURE_SCRIPT', str(ROOT / 'tools/gpu-capture.mjs'))), '/opt/browser/gpu-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/levels-capture.mjs', '/opt/browser/levels-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/windgap-capture.mjs', '/opt/browser/windgap-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/marshmouth-capture.mjs', '/opt/browser/marshmouth-capture.mjs')
@@ -129,7 +129,7 @@ def main(ref: str = 'main', shots: str = 'all', route_seconds: int = 360,
         raise ValueError('Invalid backend or quality')
     if fps not in {30, 60} or not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', size) or route_seconds <= 0 or orbit_seconds <= 0:
         raise ValueError('Invalid capture dimensions, fps or duration')
-    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'reed', 'crown', 'flow', 'showcase', 'reach', 'reachview', 'reachsafe', 'finale', 'feel'}:
+    if shots != 'all' and not set(shots.split(',')) <= {'probe', 'perf', 'route', 'kilnroute', 'orbit', 'fox', 'gait', 'stills', 'water', 'shade', 'turntable', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'reed', 'crown', 'flow', 'showcase', 'reach', 'reachview', 'reachsafe', 'finale', 'feel'}:
         raise ValueError('Unknown capture shot')
     if not fetch_only and fps != 60 and (shots == 'all' or 'gait' in shots.split(',')):
         raise ValueError('Gait requires --fps 60')

@@ -35,7 +35,7 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45, swingEase: 1, headBob: .35,
+    minStanceRatio: .35, bodyBob: .45, trotLift: .01, gallopLift: .02, swingEase: 1, headBob: .35,
     // Glide carriage: share of per-stride back rock / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     rockDamp: 1.3, headLevel: .75, tailStream: .012, tailWave: .045, tailWaveLag: .7,
@@ -271,10 +271,17 @@ export class AuthoredLocomotion {
     for(const g of GAIT_NAMES) total+=this.weights.get(g) ?? 0;
     if(total<1e-3)return;
     const keep=1-(1-this.params.bodyBob)*Math.min(1,total);
+    // Carry the body higher at speed: legs extend, stance pads stay down through IK.
+    const lift=((this.weights.get('trot') ?? 0)*this.params.trotLift+(this.weights.get('run') ?? 0)*this.params.gallopLift);
     this.bobBones.forEach((bone,i)=>{
       const m=v();
       for(const g of GAIT_NAMES) m.addScaledVector(this.parts.get(g)!.bobMean[i],(this.weights.get(g) ?? 0)/total);
       bone.position.sub(m).multiplyScalar(keep).add(m);
+      if(i===0 && lift>0 && bone.parent) {
+        // World-up metres into the parent's space (its matrixWorld from last frame: scale/axes are constant).
+        const base=bone.parent.getWorldPosition(v()), parent=bone.parent;
+        bone.position.add(parent.worldToLocal(base.clone().setY(base.y+lift)).sub(parent.worldToLocal(base)));
+      }
     });
   }
   private backPitchSpring=new Spring();
