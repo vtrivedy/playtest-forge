@@ -248,6 +248,8 @@ function poolMaterial(): THREE.ShaderMaterial {
   });
 }
 
+export type ShadeState = { id: string; pos: number[]; freed: boolean; mode: ShadeActor['mode']; presence: number; smokeParticles: number; notice: number; noticeYaw: number; heading: number; releaseAge: number; leaves: number };
+
 export type ShadeSystem = {
   readonly tun: ShadeTunables;
   /** True if p is inside an active Shade's drain */
@@ -256,7 +258,7 @@ export type ShadeSystem = {
   update: (dt: number, t: number, fox: THREE.Vector3, dashing: boolean) => Array<{ type: 'freed' | 'hit'; id: string; pos: THREE.Vector3 }>;
   resetSweep: () => void;
   activateAfterLatch: (id: string) => void;
-  state: () => Array<{ id: string; pos: number[]; freed: boolean }>;
+  state: () => ShadeState[];
 };
 
 export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groundAt: (x: number, z: number, y: number) => number, gui?: GUI, blocked: (x: number, z: number, y: number) => boolean = () => false): Promise<ShadeSystem> {
