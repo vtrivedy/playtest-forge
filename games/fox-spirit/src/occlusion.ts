@@ -60,7 +60,7 @@ export function createOcclusionFader(
             float occUp = smoothstep(0.65, 0.80, dot(viewMatrix[1].xyz, normal));
             float occStepFloor = 1.0 - smoothstep(uOccFox.w + 0.45, uOccFox.w + 0.65, occWorldY);
             occAboveFeet *= 1.0 - occUp * occStepFloor;
-            float occCut = uOccStrength * (1.0 - smoothstep(0.70, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear) * occAboveFeet;
+            float occCut = uOccStrength * (1.0 - smoothstep(0.45, 1.0, occR)) * smoothstep(-0.15, 0.3, occNear) * occAboveFeet;
             // Stable one-pixel threshold; no coarse repeating checker or
             // temporal jitter in the SMAA pipeline (which has no TAA history).
             float occB = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
@@ -217,7 +217,7 @@ export function createOcclusionFader(
         y0 = Math.min(y0, py); y1 = Math.max(y1, py);
       }
       const pad = size.y * 0.03;
-      uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 0.70 + pad), Math.max(size.y * 0.05, (y1 - y0) * 0.70 + pad));
+      uOccRad.value.set(Math.max(size.y * 0.05, (x1 - x0) * 1.05 + pad), Math.max(size.y * 0.05, (y1 - y0) * 1.05 + pad));
       const depth = chest.applyMatrix4(camera.matrixWorldInverse).z * -1;
       uOccFox.value.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, depth, foxPos.y);
     },
