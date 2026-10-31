@@ -305,10 +305,7 @@ export function createFollowCamera(opts: {
     if (!position) return;
     if (position.count < 3000 || Array.isArray(mesh.material) || (mesh as THREE.InstancedMesh).isInstancedMesh || (mesh as THREE.SkinnedMesh).isSkinnedMesh) {
       geometry.computeBoundingBox();
-      const probe = mesh.clone(false);
-      probe.material = queryMaterial;
-      probe.matrixWorld.copy(mesh.matrixWorld);
-      scenery.push({ source: mesh, probe });
+      scenery.push({ source: mesh, probe: mesh });
       return;
     }
     const chunks = new Map<string, { indices: number[]; bounds: THREE.Box3 }>();
@@ -364,7 +361,16 @@ export function createFollowCamera(opts: {
         while (parent && parent.visible) parent = parent.parent;
         if (parent) continue;
         sightHits.length = 0;
-        probe.raycast(sight, sightHits);
+        // Live props retain transforms, instance buffers and morph state. A
+        // synchronous query-only material swap is restored before any render.
+        if (probe !== mesh) probe.matrixWorld.copy(mesh.matrixWorld);
+        const renderMaterial = probe.material;
+        try {
+          probe.material = queryMaterial;
+          probe.raycast(sight, sightHits);
+        } finally {
+          probe.material = renderMaterial;
+        }
         for (const hit of sightHits) {
           if (hit.distance < nearest) {
             nearest = hit.distance;
