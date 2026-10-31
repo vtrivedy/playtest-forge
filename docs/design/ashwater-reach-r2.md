@@ -29,3 +29,7 @@ Scoped correction before code: reduce Reach atmospheric density to40% of authore
 ## Hero framing comparison — 04:53 UTC
 
 Personally inspected prior payoff-vista PNG: tree rooted at local(210,36,-125) fills the right third from camera(220,44,-122), with bell and pale missing terrain. Preserve that comparison frame and add one lower/closer staged hero angle from(213,39,-121) toward(192,34,-120), same fox position on bell shelf(207,36,-123). This puts the foreground trunk outside the horizontal lens, brings fox camera-distance from~15m to~7m, and keeps the orchard across the water. No asset moves or gameplay camera change. New shot remains explicitly staged and carries same HIGH/mood snapshot acceptance checks. GPU decides framing; coordinate calculations alone are not approval.
+
+## Continuation 3 — real crossing failure diagnostics
+
+Before code, 2026-10-31. The current candidate remains pending remote GPU review; no new art tuning from unobserved results. Record a compact state sample whenever the real-input crossing advances a waypoint and at its final stop: phase, waypoint, phase age, distance, fox position/velocity/grounding, source heat/flow/arrival and Reach fill/support/latch. Save the samples beside existing acceptance events. Preserve all input, termination, simulation timing and success predicates. This makes another source/boarding timeout actionable without labelling scripted CPU checks as play evidence. Validate JavaScript syntax and diff; remote GPU still provides actual traversal proof.
