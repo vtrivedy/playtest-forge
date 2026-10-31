@@ -112,17 +112,18 @@ function patchFur(mat: THREE.MeshStandardMaterial, fringeLength = 0, fringeCutof
   const tail = mat.name.toLowerCase().startsWith('foxtailfur');
   const innerHeat = mat.name.toLowerCase() === 'foxfur';
   const coat = mat.name.toLowerCase().startsWith('foxfur');
+  const heatedCoat = coat;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, furUniforms, eyeUniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
 varying vec3 vRest;
-${innerHeat ? 'attribute vec2 aInnerHeat; attribute vec4 aSpiritCoat; varying vec2 vInnerHeat; varying vec4 vSpiritCoat;' : ''}
+${heatedCoat ? 'attribute vec2 aInnerHeat; attribute vec4 aSpiritCoat; varying vec2 vInnerHeat; varying vec4 vSpiritCoat;' : ''}
 ${fringeLength || innerHeat ? 'attribute float aFurMask; varying float vFurMask;' : ''}
 ${fringeLength ? `uniform float uFringe; attribute float aRuffMask; varying float vRuffMask;` : ''}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vRest = position;
-${innerHeat ? 'vInnerHeat = aInnerHeat; vSpiritCoat = aSpiritCoat;' : ''}
+${heatedCoat ? 'vInnerHeat = aInnerHeat; vSpiritCoat = aSpiritCoat;' : ''}
 ${fringeLength || innerHeat ? 'vFurMask = aFurMask;' : ''}
 ${fringeLength ? `
   // Offset in bind space before skinning, so fringe follows the exact authored pose.
@@ -135,7 +136,8 @@ ${fringeLength ? `
         '#include <common>',
         `#include <common>
 varying vec3 vRest;
-${innerHeat ? 'uniform float uTime; uniform float uBodyEmber; uniform float uBrushRelief; uniform float uHeroMetres; varying vec2 vInnerHeat; varying vec4 vSpiritCoat;' : ''}
+${heatedCoat ? 'uniform float uTime; uniform float uBodyEmber; uniform float uHeroMetres; varying vec2 vInnerHeat; varying vec4 vSpiritCoat;' : ''}
+${innerHeat ? 'uniform float uBrushRelief;' : ''}
 ${coat ? `uniform vec3 uEyeL; uniform vec3 uEyeR; uniform float uEyeR0; uniform float uSocketLift;
 ${EYE_APERTURE_GLSL}` : ''}
 ${fringeLength || innerHeat ? 'varying float vFurMask;' : ''}
@@ -180,7 +182,7 @@ ${innerHeat ? BROAD_FUR_RELIEF_GLSL : ''}`,
   float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
   vec3 graded = mix(vec3(lum), c, uSatVal.x) * uTint;
   diffuseColor.rgb = mix(c, graded, smoothstep(0.25, 0.55, sat)) * uSatVal.y;
-  ${innerHeat ? `
+  ${heatedCoat ? `
   float coatAmount = clamp(uBodyEmber, 0.0, 1.5);
   float rustPigment = smoothstep(1.6, 2.2, c.r / max(0.001, c.g));
   float undercoat = vSpiritCoat.w * rustPigment * smoothstep(0.35, 0.60, sat) * 0.24 * coatAmount;
@@ -203,31 +205,33 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
   float reliefEye = smoothstep(1.4, 3.2, foxSocketExtent(foxEyeCoordinates(vRest, reliefCenter, uEyeR0)));
   float reliefRust = smoothstep(1.6, 2.2, diffuseColor.r / max(0.001, diffuseColor.g));
   float reliefMask = vFurMask * reliefEye * reliefRust;
-  float reliefThroat = smoothstep(0.6, 1.3, vRest.z);
+  float reliefThroat = smoothstep(0.6, 1.3, vRest.z)
+    * (1.0 - smoothstep(-0.6, -0.1, vInnerHeat.y))
+    * (1.0 - smoothstep(2.3, 2.6, vRest.y));
   normal = foxBroadFurNormal(-vViewPosition, normal, vRest * uHeroMetres, reliefThroat, reliefMask, uBrushRelief, faceDirection);` : ''}`)
       .replace(
         '#include <opaque_fragment>',
         `{
   float facing = saturate(dot(${fringeLength ? 'normalize(vNormal)' : innerHeat ? 'foxCoatBaseNormal' : 'normal'}, normalize(vViewPosition)));
-  ${fringeLength ? `vec3 tuftQ = vRest * vec3(10.0, 10.0, 3.0);
+  ${fringeLength ? `vec3 tuftQ = vRest * vec3(30.0, 30.0, 4.0);
   float tuft = fxNoise(tuftQ);
   float tuftCoverage = smoothstep(${fringeLength > 0.04 ? "0.4, 0.8" : "0.1, 0.5"}, tuft);
   float tuftFootprint = length(abs(dFdx(tuftQ)) + abs(dFdy(tuftQ)));
-  tuftCoverage = mix(tuftCoverage, 0.5, smoothstep(0.35, 0.8, tuftFootprint));
-  float furCoverage = tuftCoverage * max(vFurMask, vRuffMask) * uFringe
+  tuftCoverage = mix(tuftCoverage, ${ (fringeCutoff * 0.7).toFixed(3) }, smoothstep(0.35, 0.8, tuftFootprint));
+  float furCoverage = tuftCoverage * max(vFurMask, vRuffMask) * clamp(uFringe, 0.0, 1.0)
     * (1.0 - smoothstep(0.05, 0.45, facing));
   if (furCoverage < ${fringeCutoff.toFixed(3)}) discard;
   diffuseColor.a = 1.0;` : ''}
-  ${innerHeat ? `
+  ${heatedCoat ? `
   float chroma = (max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)) - min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b))) / max(0.0001, max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b)));
   float warmth = vInnerHeat.x * smoothstep(0.2, 0.7, vInnerHeat.y) * smoothstep(0.25, 0.55, chroma);
   warmth *= mix(0.35, 1.0, pow(1.0 - facing, 1.3));
   float heatBreath = 0.85 + 0.15 * sin(uTime * 1.1);
-  outgoingLight += vec3(1.0, 0.30, 0.06) * uRim.z * warmth * heatBreath;
+  ${innerHeat ? 'outgoingLight += vec3(1.0, 0.30, 0.06) * uRim.z * warmth * heatBreath;' : ''}
   // Buried heat spreads through thin ear tissue and softly through the upper paw/back coat.
   // Broad skin weights provide the feather; only the opaque coat emits this layer.
-  float throughCoat = mix(0.60, 1.0, pow(1.0 - facing, 1.2));
-  float emberHeat = vSpiritCoat.x * 2.8 + vSpiritCoat.y * 0.22 + vSpiritCoat.z * 0.18;
+  float throughCoat = ${fringeLength ? '1.0' : 'mix(0.60, 1.0, pow(1.0 - facing, 1.2))'};
+  float emberHeat = vSpiritCoat.x * 2.8 ${fringeLength ? '' : '+ vSpiritCoat.y * 0.22'} + vSpiritCoat.z * 0.40;
   outgoingLight += vec3(0.80, 0.23, 0.025) * emberHeat * throughCoat * heatBreath * clamp(uBodyEmber, 0.0, 1.5);
   ` : ''}
   float fres = pow(1.0 - facing, uRim.y);
@@ -251,7 +255,7 @@ ${innerHeat ? `vec3 foxCoatBaseNormal = normal;
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeCutoff}-${mat.alphaTest}-${innerHeat ? 'warm-relief-v1' : 'plain'}`;
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeCutoff}-${mat.alphaTest}-${innerHeat ? 'warm-relief-v1' : heatedCoat ? 'warm-cutout-v1' : 'plain'}`;
   mat.needsUpdate = true;
 }
 
@@ -407,7 +411,7 @@ export function applyFoxLook(root: THREE.Object3D, targetHeight = 1.25) {
         const weight = sw.getComponent(i, k);
         spirit[i * 4] += (earHeat.get(name) ?? 0) * weight;
         if (pawBones.has(name)) { spirit[i * 4 + 1] += weight; pawFloorSum += weight * pawFloor.get(name)!; }
-        if (heatBones.has(name)) spirit[i * 4 + 2] += weight;
+        if (heatBones.has(name) || name === R.pelvis) spirit[i * 4 + 2] += weight;
         if (heatBones.has(name) || name === R.pelvis) spirit[i * 4 + 3] += weight;
         let ruffAmount = throatBones.has(name)
           ? THREE.MathUtils.smoothstep(restNormals.getZ(i), 0.15, 0.65) * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.25, 2.60)) : 0;

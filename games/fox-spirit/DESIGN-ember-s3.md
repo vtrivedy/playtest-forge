@@ -135,3 +135,21 @@ Try one bounded broadfur-relief pass on opaque rustcoat only: physicalnoise-cell
 Socketcleanup also removes saturated bakedamber pixels immediately around the old iris footprint while protecting cream byitsblue/greenratio. Narrowing only the procedural cap can otherwise reveal a second painted iris underneath. Keep one renderedeye representation: actualcap suppliesamber/slit/tear, coat suppliesrust/cream and realshading.
 
 Verifieda873fox-only capture67a9072 nowcompletes:22PNGs+16decodedframes personallyread,fullface,__gameprofile/masks,0errors/failures. Fur stillhas plastic-wrap ghostedges; low-opacitycontinuous shells fail thefurbar. Switch existing2bodyfringe layers to opaque noise-cut coverage atsilhouette (no extra layers), no rim/emission copies. Lateexplicitcutoffs0.28/0.46,depthwrite,trueFrontSide. Filter unresolvedcoverage towardmean0.5 usingfootprint toavoidcrawlingfur/frost atchase. Longruffremainsonly530throat/cheeks, shortjawfuzz≤1cm. UnderlyingcorestillgroundsAO/shadow; bodyfringeexcludedfromGTAO. Reject solidcollartubes/plates/plushinflation; preservebodyEmber/brushReliefcomparisons. Modecutout reportedforcapture.
+
+## Driver02:07 — proposed ember-furl warmth refinement (Opusreview next)
+
+Director stillcallsbodyordinaryfox ona873 images; askswarmchest/paws/underfurgradient andcoalcrack/emberfleckpattern. Currentbackheat.18/paw.22 isquiet; chestfront receivesalmostnoheatbecausebackmaskrequiresupnormals. Propose back.65,paw.75, front-chestgradient1.5×undercoatmask withmodelZfrontfeather; retainear2.8. Extendbackmaskoverpelvis forcontinuouswarmhandofftotail.
+
+Propose broad, soft deeporange ember-furl contours inside rustcoat (physicalcell5.5×12×22cm,neckflowrotated), notwhite/darkfreckles, hardrunes orpaintedstickers. Staticadvectedbodyfield with≤12%slowbreath; footprintfiltertowardstablemeanatdistance. Corepeak~2linearradiance, cream/eyeexcludedfrompattern; chestcreamgetsonlysubtlewarmgradient. ExistingbodyEmber0/1 andnewemberSeams0/1 isolatebaseheat/pattern.
+
+Opaque-cutout refinement: coreand2bodyfringe can sharewarmgrade/emission becauseonlynearestsurvivingfragmentcontributes (depthwrite,trueopaqueoverwrite). Oldtransparentlayerswouldadddoubleglow, butthatconditionwasremoved. Preserve noemissiverimcopies; reliefnormalremainsoncoreonly. SharedsamevRest/skinmaskkeepsfurclumpheatcoherent andpreventsouterfurhidinginnerwarmth. NeedOpusdesignreview,thenGPU; thissectionisnotyetimplemented.
+
+## Opus06:44 review — selected corrections
+
+a873FAIL; attachedtail/earwarmth improved butsmoothfur/goggle/decorativewhiteflames stillblock. c2unseen codeblockers: farcoverage0.5 passesbothcutoffs (plushband), opaqueunheatedfringe hidescoreheat; throatflow affectsentirehead; tuftcut blobs. Correctfarmean to0.7×cutoff withcoverageamountclamped≤1, ventral/belowjawflowgate, combedtuftfreq30,30,4. Sharegradefullyacrossopaquefur; shareemissiononlydorsal/ear/tailjoin,no grazingboostonfringe. Core-onlyrelief retained; testitsvisibility beforeincreasingheight.
+
+WarmthproposalREVISED: back.40withpelvis; limb.50softband4–6cmABOVE rust/darksockboundary, nottoes. Creammax10%warmcolour/emission≤.1; heatatbib-rustborder/underruff. Sparsehair-aligned18–25cmlong/1.5–2.5cmacrossstreaks gated~30cm,≤20%rust; lowerflankscalm. Radiance.8–1.0,edge(.85,.22,.03)/centre(1,.35,.06),base×.7halo~1cm. ≤10%breath,very slow1–2cm/sflow; distantmean×.6. Noisocontourloops/tigerstripes/lavasocks. Addeyeupwardoutertilt/lowerlidcalm. Implementinreviewablepasses.
+
+Tailbake remainsblocked onrootpinch/sausage: ellipserootshapedtopelvis/blendpelvis-tail0, singlepeak35–45%,outertipfeatherlocks5–7insteadbluntclosedmass. Keepthinundercoatcoreclosedtoavoidoldcup; outerlocksopenvisually. Geometrychangesneednewdesign/audits/GPUbeforebake.
+
+FirstOpusfixpassimplementsfarcutoff/flow/strandshape,back.4+pelvis,sharedopaquegradeanddorsal/ear-onlyfringeheatwithoutgrazingboost. Existingquiettoeheat.22kepttemporarily; revisedlimbplacementandstreakpatternfollowinaseparatepass. Nochestlamp/isocontourpatternadded.
