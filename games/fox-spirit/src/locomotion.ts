@@ -42,7 +42,7 @@ export class AuthoredLocomotion {
     headHold: 1.2, gallopHeadHold: .8, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
     headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, brakeSquat: .04, brakePitch: .09, landSquash: .20, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
-    earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
+    earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
     padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; correction: THREE.Vector3; strength: number; replantTime: number; releaseCorrection: THREE.Vector3; releaseProgress: number; phaseRelease: boolean; dot: THREE.Mesh }[] = [];
@@ -549,7 +549,7 @@ export class AuthoredLocomotion {
     this.metrics.fallPoseTime=active==='jump_fall' ? fallAction?.time ?? 0 : 0;
     this.metrics.fallPoseHeld=active==='jump_fall' && !!fallAction?.paused && !!fallAction?.clampWhenFinished;
     this.footfalls.length=0;
-    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;this.metrics.groundClampFeet=0;this.metrics.maxSwingPenetration=0;this.metrics.maxSwingResidual=0;this.metrics.phaseReleaseFeet=0;
+    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;this.metrics.maxTouchdownShift=0;this.metrics.groundClampFeet=0;this.metrics.maxSwingPenetration=0;this.metrics.maxSwingResidual=0;this.metrics.phaseReleaseFeet=0;
     const locomoting=['run','walk','trot'].includes(active);
     this.debugGroup.visible=this.params.debug;
     let authoredSupportFeet=0;
@@ -591,16 +591,13 @@ export class AuthoredLocomotion {
           if(locomoting && this.input.speed>1) this.footfalls.push(paw.clone().setY(ground));
         }
         foot.anchor.copy(this.contactAnchor(foot,paw,ground,active,dt));
-        if(touchdown && locomoting && this.metrics.cadenceHz>1e-4) {
-          // Carved turn: the hips yaw over a planted pad. Plant where the pad will be at mid-stance so the
-          // stance drift runs -d/2..+d/2 instead of 0..d (outer feet otherwise hit the re-step cap every stride).
-          const stanceSeconds=GAIT_NAMES.reduce((sum,g)=>sum+(this.metrics.clipWeights[g] ?? 0)*GAITS[g].contacts[i].duty*this.stanceRatio[g],0)/Math.max(.001,gaitWeight)/this.metrics.cadenceHz;
-          // Slow walk pivots keep the authored plant (long stance over-rotates the prediction).
-          const striding=1-(this.metrics.clipWeights.walk ?? 0)/Math.max(.001,gaitWeight);
-          const angle=THREE.MathUtils.clamp(this.turn*stanceSeconds*.5*this.params.turnPlant*striding,-.35,.35);
-          const pivot=this.group.position;
-          foot.anchor.sub(pivot).applyAxisAngle(new THREE.Vector3(0,1,0),angle).add(pivot);
-          foot.anchor.y=ground+foot.clearance;
+        if(touchdown && locomoting && this.input.grounded) {
+          const plant=this.turnPlant(i,paw,gaitWeight);
+          if(plant.lengthSq()>0){
+            const before=foot.anchor.clone();
+            foot.anchor.copy(paw).add(plant);foot.anchor.y=before.y;
+            this.metrics.maxTouchdownShift=Math.max(this.metrics.maxTouchdownShift,before.distanceTo(foot.anchor));
+          }
         }
         const delta=foot.anchor.clone().sub(paw);
         this.metrics.maxPlantError=Math.max(this.metrics.maxPlantError,Math.hypot(delta.x,delta.z));
@@ -626,6 +623,11 @@ export class AuthoredLocomotion {
         } else {
           foot.phaseRelease=false;
           foot.correction.multiplyScalar(Math.exp(-dt/.04));
+        }
+        if(normalRelease && !foot.phaseRelease && swingProgress>.5) {
+          // Steer late swing toward the turn plant so the touchdown latch below barely moves the paw.
+          const lead=this.turnPlant(i,paw,gaitWeight).multiplyScalar(THREE.MathUtils.smoothstep(swingProgress,.5,.9));
+          foot.correction.x=lead.x;foot.correction.z=lead.z;
         }
         if(foot.correction.lengthSq()<1e-8)foot.correction.set(0,0,0);
       }
@@ -677,6 +679,18 @@ export class AuthoredLocomotion {
     });
     [this.metrics.pelvisBankAngle,this.metrics.chestBankAngle]=bankAngles;
     if (!locomoting) this.metrics.gait=active;
+  }
+  /** Carved turn: the hips yaw over a planted pad, so a pad planted where it lands drifts 0..d through stance and
+   * the outer feet hit the re-step cap. Offset to the predicted mid-stance point instead (drift -d/2..+d/2). */
+  private turnPlant(i:number,pad:THREE.Vector3,gaitWeight:number) {
+    const out=v();
+    if(this.params.turnPlant<=0 || this.metrics.cadenceHz<1e-4)return out;
+    const stanceSeconds=GAIT_NAMES.reduce((sum,g)=>sum+(this.metrics.clipWeights[g] ?? 0)*GAITS[g].contacts[i].duty*this.stanceRatio[g],0)/Math.max(.001,gaitWeight)/this.metrics.cadenceHz;
+    // Slow walk pivots keep the authored plant (long stance over-rotates the prediction).
+    const striding=1-(this.metrics.clipWeights.walk ?? 0)/Math.max(.001,gaitWeight);
+    const angle=THREE.MathUtils.clamp(this.turn*stanceSeconds*.5*this.params.turnPlant*striding,-.35,.35);
+    const pivot=this.group.position;
+    return out.copy(pad).sub(pivot).applyAxisAngle(new THREE.Vector3(0,1,0),angle).add(pivot).sub(pad).setY(0).clampLength(0,this.params.maxCorrection);
   }
   /** Two-bone (fore) or hock-preserving (hind) solve that puts the paw bone at target, keeping pad orientation. */
   private placePaw(foot:{upper:THREE.Object3D;lower:THREE.Object3D;paw:THREE.Object3D;hock?:THREE.Object3D},target:THREE.Vector3) {

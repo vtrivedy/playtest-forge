@@ -1294,6 +1294,8 @@ async function boot() {
     let jv: number | null = null;
     if (windupT >= 0) {
       windupT += dt;
+      // Accelerating out of a standing gather shortens it; a committed windup never lengthens.
+      windupDur=Math.min(windupDur,THREE.MathUtils.lerp(Math.max(actionFeel.standingWindup,actionFeel.jumpWindup),actionFeel.jumpWindup,THREE.MathUtils.smoothstep(Math.hypot(vel.x,vel.z),1,3)));
       if (windupT >= windupDur || !grounded) {
         windupT=-1;
         // The press was committed when the windup began; a long standing gather must not outlive the buffer.

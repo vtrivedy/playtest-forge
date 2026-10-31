@@ -35,3 +35,10 @@ Walk pivot (1.62 m/s) and every straight gait unchanged (cadence 1.85/2.15/2.40,
 - rootBank=1: grounded bank applied as a whole-body roll about the ground line (legs lean with it) instead of spine roll that lifted the outer hip; turnLean .055 / bankMax .2.
 - Jump: standingWindup .13 s (≈8 frames), speed-gated back to .05 s by 3 m/s; buffer latched through the windup. Landing .20 squash / 1.0 pitch (A/B'd candidate).
 - gallopHeadHold .8 (was 1.2 for all gaits): neck-vs-back kink range per gallop stride 39.9°→34.2°, head bob 2.2→4.6 cm. Watch for loss of quiet head in capture.
+
+## Sol cross-critique (artifacts/sol-critique-97e58fa.md) → follow-up
+- Touchdown snap from pre-rotating the anchor: now late swing (progress .5→.9) steers the paw toward the turn plant via the
+  existing correction, and touchdown latches the exact mid-stance anchor. Touchdown shift ~96–160 mm → ~5–18 mm (one 94 mm outlier at 2.9 m/s);
+  stance metrics identical to the snap version (residual p95 0/3/0 mm). New metric `maxTouchdownShift`.
+- Windup accelerating out of a standing gather now shortens (never lengthens).
+- Rejected: buffer-latch concern (latch only runs at windup completion; reset clears windupT). Ground sample at the shifted anchor: ≤.16 m XZ, accepted.
