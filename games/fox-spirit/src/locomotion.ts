@@ -24,6 +24,7 @@ const AIR_STATES = new Set(['jump_apex', 'jump_fall', 'glide', 'dash', 'burst'])
 const v = () => new THREE.Vector3();
 const q = () => new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
+const MATCH_BINS = 64;
 
 class Spring {
   value = 0; velocity = 0;
@@ -82,7 +83,11 @@ export class AuthoredLocomotion {
   fadeSeconds = .16;
 
   private feet: Foot[] = [];
-  private phase = 0;
+  /** Per-gait cycle phase; all advance at the shared cadence. Gait changes re-enter the new clip pose-matched. */
+  private phases: Record<Gait, number> = { walk: 0, trot: 0, run: 0 };
+  /** match[`${from}>${to}`][bin] = phase of `to` whose leg pose best matches `from` at bin/MATCH_BINS; entry[g] = best match to idle. */
+  private match = new Map<string, Float32Array>();
+  private entry: Record<Gait, number> = { walk: 0, trot: 0, run: 0 };
   private locoWeight = 0;
   private share: Record<Gait, number> = { walk: 1, trot: 0, run: 0 };
   private gait: Gait = 'walk';
@@ -160,6 +165,51 @@ export class AuthoredLocomotion {
     root.updateWorldMatrix(true, true);
     this.shadows.name = 'PawContactShadows';
     group.add(this.shadows);
+    this.buildPoseMatch();
+  }
+
+  /** Sync markers by pose matching: sample each gait's leg pose (elbow/stifle, carpus/hock, pad, plus the pose a few
+   * bins later for direction of travel) and, for every gait pair, find the entry phase of the new gait closest to the
+   * old one. Walk (lateral), trot (diagonal) and gallop (rotary) have different footfall orders, so equal phases
+   * would cross-blend opposite leg configurations. */
+  private buildPoseMatch() {
+    const mixer = this.actions.get('walk')!.getMixer();
+    const all = [...this.actions.values()];
+    const sample = (name: string, phase: number) => {
+      for (const a of all) { a.play(); a.setEffectiveWeight(0); }
+      const a = this.actions.get(name)!;
+      a.setEffectiveTimeScale(0); a.setEffectiveWeight(1); a.time = phase * a.getClip().duration;
+      mixer.update(0); this.root.updateMatrixWorld(true);
+      const out: number[] = [];
+      for (const f of this.feet) for (const o of [f.lower.getWorldPosition(v()), f.hock.getWorldPosition(v()), f.paw.localToWorld(f.padLocal.clone())])
+        out.push(...this.group.worldToLocal(o).toArray());
+      return out;
+    };
+    const poses = new Map<string, number[][]>();
+    for (const g of GAIT_NAMES) poses.set(g, Array.from({ length: MATCH_BINS }, (_, i) => sample(g, i / MATCH_BINS)));
+    const idle = sample('idle', 0);
+    for (const a of all) a.setEffectiveWeight(0);
+    const d2 = (a: number[], b: number[]) => a.reduce((s, x, k) => s + (x - b[k]) ** 2, 0);
+    const lookAhead = 3;
+    for (const from of GAIT_NAMES) for (const to of GAIT_NAMES) {
+      if (from === to) continue;
+      const A = poses.get(from)!, B = poses.get(to)!, table = new Float32Array(MATCH_BINS);
+      for (let i = 0; i < MATCH_BINS; i++) {
+        let best = 0, bestD = Infinity;
+        for (let j = 0; j < MATCH_BINS; j++) {
+          const d = d2(A[i], B[j]) + d2(A[(i + lookAhead) % MATCH_BINS], B[(j + lookAhead) % MATCH_BINS]);
+          if (d < bestD) { bestD = d; best = j; }
+        }
+        table[i] = best / MATCH_BINS;
+      }
+      this.match.set(`${from}>${to}`, table);
+    }
+    for (const g of GAIT_NAMES) {
+      const B = poses.get(g)!;
+      let best = 0, bestD = Infinity;
+      B.forEach((pose, j) => { const d = d2(idle, pose); if (d < bestD) { bestD = d; best = j; } });
+      this.entry[g] = best / MATCH_BINS;
+    }
   }
 
   reset() {
@@ -195,7 +245,13 @@ export class AuthoredLocomotion {
     let index = order.indexOf(this.gait);
     while (index < 2 && speed > ups[index] * (1 + h)) index++;
     while (index > 0 && speed < ups[index - 1] * (1 - h)) index--;
+    const previous = this.gait;
     this.gait = order[index];
+    if (entering) this.phases[this.gait] = this.entry[this.gait];
+    else if (previous !== this.gait) {
+      const bin = Math.floor(this.phases[previous] * MATCH_BINS) % MATCH_BINS;
+      this.phases[this.gait] = this.match.get(`${previous}>${this.gait}`)![bin];
+    }
     const shareStep = entering ? 1 : dt / Math.max(1e-3, p.gaitFade);
     let shareTotal = 0;
     for (const g of GAIT_NAMES) {
@@ -212,7 +268,7 @@ export class AuthoredLocomotion {
       natural += this.share[g] / this.actions.get(g)!.getClip().duration;
     }
     const cadence = THREE.MathUtils.clamp(speed / Math.max(1e-3, stride), natural * p.minRate, natural * p.maxRate);
-    if (this.locoWeight > 0 || locomoting) this.phase = (this.phase + dt * cadence) % 1;
+    if (this.locoWeight > 0 || locomoting) for (const g of GAIT_NAMES) this.phases[g] = (this.phases[g] + dt * cadence) % 1;
 
     // Linear crossfades; the locomotion blend tree fades as one state.
     this.locoWeight = toward(this.locoWeight, locomoting ? 1 : 0);
@@ -227,7 +283,7 @@ export class AuthoredLocomotion {
       let w: number;
       if (isGait(name)) {
         w = this.locoWeight * this.share[name] * norm;
-        action.time = this.phase * action.getClip().duration;
+        action.time = this.phases[name] * action.getClip().duration;
         action.setEffectiveTimeScale(0);
         action.paused = false;
       } else w = (this.weights.get(name) ?? 0) * norm;
@@ -239,7 +295,7 @@ export class AuthoredLocomotion {
     let dominant: Gait = 'walk';
     for (const g of GAIT_NAMES) if (this.share[g] > this.share[dominant]) dominant = g;
     this.metrics.gait = locomoting ? dominant : active;
-    this.metrics.phase = this.phase;
+    this.metrics.phase = this.phases[this.gait];
     this.metrics.cadenceHz = locomoting ? cadence : 0;
     this.metrics.playback = locomoting ? cadence / natural : 1;
   }
@@ -296,11 +352,12 @@ export class AuthoredLocomotion {
       // Stance weight from the authored contact windows on the shared phase (soft 3 % edges).
       let gaitStance = 0;
       for (const g of GAIT_NAMES) {
-        const c = GAITS[g].contacts[i], u = (this.phase - c.phase + 1) % 1, e = .03;
+        const c = GAITS[g].contacts[i], u = (this.phases[g] - c.phase + 1) % 1, e = .03;
         gaitStance += this.share[g] * THREE.MathUtils.smoothstep(u, 0, e) * (1 - THREE.MathUtils.smoothstep(u, c.duty - e, c.duty));
       }
       const stanceTarget = !input.grounded ? 0 : locoW * gaitStance + (1 - locoW) * (standing ? 1 : 0);
-      foot.stance = stanceTarget;
+      // ~40 ms ease so a touchdown (or a state change) seats the paw instead of snapping it.
+      foot.stance += (stanceTarget - foot.stance) * (1 - Math.exp(-dt / .04));
       const ground = input.groundAt(pad.x, pad.z, ceiling);
       if (!solveFeet || !Number.isFinite(ground)) {
         foot.planted = false; foot.lock.set(0, 0, 0); plans.push(null);
