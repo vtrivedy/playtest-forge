@@ -21,8 +21,8 @@ def validate(stream, model, branch):
         raise ValueError('stream must be 1–48 lowercase letters/digits/hyphens')
     if model not in {'sol', 'opus'}:
         raise ValueError('model must be sol or opus')
-    if not re.fullmatch(r's[23]-[a-z0-9][a-z0-9-]{0,60}', branch):
-        raise ValueError('branch must be a simple s2-* or s3-* name')
+    if not re.fullmatch(r's[2-4]-[a-z0-9][a-z0-9-]{0,60}', branch):
+        raise ValueError('branch must be a simple s2-*/s3-*/s4-* name')
 
 
 def credentials():
