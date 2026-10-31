@@ -21,7 +21,7 @@ image = (
 )
 if modal.is_local():
     image = image.add_local_file(ROOT / 'tools/finale-capture.mjs', '/opt/browser/finale-capture.mjs')
-    image = image.add_local_file(ROOT / 'tools/water-wade-capture.mjs', '/opt/browser/water-wade-capture.mjs')
+    image = image.add_local_file(ROOT / 'tools/projected-visibility-capture.mjs', '/opt/browser/projected-visibility-capture.mjs')
     image = image.add_local_file(Path(os.environ.get('FOX_CAPTURE_SCRIPT', str(ROOT / 'tools/gpu-capture.mjs'))), '/opt/browser/gpu-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/levels-capture.mjs', '/opt/browser/levels-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/windgap-capture.mjs', '/opt/browser/windgap-capture.mjs')
@@ -29,6 +29,7 @@ if modal.is_local():
     image = image.add_local_file(ROOT / 'tools/reed-capture.mjs', '/opt/browser/reed-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/reed-entry-capture.mjs', '/opt/browser/reed-entry-capture.mjs')
     image = image.add_local_file(ROOT / 'tools/reed-aftermath-capture.mjs', '/opt/browser/reed-aftermath-capture.mjs')
+    image = image.add_local_file(ROOT / 'tools/water-wade-capture.mjs', '/opt/browser/water-wade-capture.mjs')
 
 @app.function(image=image, gpu=['L4', 'A10'], cpu=8, memory=16384,
               timeout=10800, volumes={'/captures': results}, scaledown_window=2)

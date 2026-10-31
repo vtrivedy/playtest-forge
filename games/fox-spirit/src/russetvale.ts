@@ -1866,6 +1866,27 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       patrol.push([h2.x + Math.cos(a) * r, h2.y, h2.z + Math.sin(a) * r]);
     }
     shadeSpots.push({ id: 'shade-kiln', patrol });
+    // Small caught-leaf drifts give the draining memory real autumn color to release.
+    // Use the existing litter material/mask; the stone itself stays restrained.
+    const kilnLeafCards: number[][] = [];
+    const leafFloor = (x: number, z: number) => {
+      const floor = col.groundAt(x, z, h2.y + 0.05).y;
+      if (!Number.isFinite(floor) || Math.abs(floor - h2.y) > 0.15 || col.blocked(x, z, floor)) return NaN;
+      if (Math.hypot(x - h2.x, z - h2.z) < 1.2) return NaN;
+      for (const [dx, dz] of [[0.24, 0], [-0.24, 0], [0, 0.24], [0, -0.24],
+        [0.24, 0.24], [-0.24, 0.24], [0.24, -0.24], [-0.24, -0.24]] as const) {
+        const nearby = col.groundAt(x + dx, z + dz, floor + 0.05).y;
+        if (!Number.isFinite(nearby) || Math.abs(nearby - floor) > 0.15 || col.blocked(x + dx, z + dz, floor)) return NaN;
+      }
+      kilnLeafCards.push([x, floor, z]);
+      return floor;
+    };
+    for (const [index, count, radius] of [[1, 18, 0.8], [4, 24, 1.0], [7, 16, 0.75]] as const) {
+      const [x, , z] = patrol[index]!;
+      litterPatch(bk('litter', x, z, false), rng(3640 + index), x, z, radius, count, leafFloor,
+        [PAL.leafBrown, PAL.russet, PAL.gold]);
+    }
+    group.userData.shadeKilnLitter = { attempted: 58, cards: kilnLeafCards.length, positions: kilnLeafCards };
   }
   // Wind river (§3.3 beat 6): from the top of H2's column over the Kiln, east above the Amberwood crowns,
   // down onto the arena's west rim. Woken briefly by colour at the Seedwell; flows for good once SW1 latches
