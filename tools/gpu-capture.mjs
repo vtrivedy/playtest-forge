@@ -1365,7 +1365,6 @@ try {
       report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
     }
 
-    const { captureWadeVisibility } = await import(path.resolve(repo, 'tools/water-wade-capture.mjs'));
     await captureWadeVisibility({ H, boot, video, shot, save, getPage: () => page, fps, quality });
   }
   if (wants('updraft')) {
@@ -1901,7 +1900,6 @@ try {
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const budgetFrames = Number(arg('route-seconds', kilnRoute ? '60' : '360')) * fps;
     const minimumIdleFrames = 10 * fps;
-    const { projectedVisibilityReview } = await import(path.resolve(repo, 'tools/projected-visibility-capture.mjs'));
     const visibilityReview = projectedVisibilityReview({ getPage: () => page, fs, path, out, name, save, fps });
     if (kilnRoute && budgetFrames < 60 * fps) throw Error('Kiln proof requires a capture budget of at least 60 seconds');
     const state = await video(name, budgetFrames, async () => {

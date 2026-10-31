@@ -165,3 +165,5 @@ Independent Sol actually inspected side/low wade, pond vista, restored Reed vist
 ## Driver02:07 main integration9c97912
 
 Merge latest camera/shade/capture work. Single conflict is the packaging checker: keep main's newer inert RecordingImage mount evaluation with empty environment stubs, replacing this branch's earlier AST-pattern workaround. It checks actual mounted sources as well as recursive imports without importing Modal. Retain the water reveal/value/transmission work and native clock/fresh-scene water gates through automatic capture-script merge. Validate tsc/fox build, source water checks, capture module packaging and node syntax before backup. Combined-ref image gate still required; cancelled partialb389 is not acceptance.
+
+Capture merge follow-up: main now loads both helper modules once at module scope from pathToFileURL(immutable repo path). Remove this branch's redundant local dynamic loads at water/route invocation sites; retain main's single current import path. Node/package validation only, no game appearance change.
