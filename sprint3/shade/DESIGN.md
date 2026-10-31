@@ -9,3 +9,5 @@ Validation: tsc and fox Vite build, immutable branch push, request remote shade 
 Assets: existing /assets/library/animals/quaternius_stag.glb (Quaternius CC0); all smoke/noise/motes are original procedural code, no new downloaded assets.
 
 Code critique follow-up: pause patrol phase while pursuing/returning so the return point is reachable; damp visual yaw independently from displacement. Check world walls as well as terrain. Render back shells before core/front shells, anchor wrap lighting in world space, and preserve every mote's drift at release. Remove eye sprites and retain only 20 settling leaves. Pursuit attracts the shade's existing drain zone toward warmth; player contact/invulnerability rules stay in the existing contact system.
+
+Capture scope: extend tools/gpu-capture.mjs shade shot only. Temporarily suppress attraction during the isolated patrol shot (restore original value afterward); add a labeled 10-second staged observer clip that places the fox at safe terrain positions near/far from the live animal. Never force mode/release/health. Save actor mode transitions from actual simulation. Existing real-controller contact/dash assertions remain.
