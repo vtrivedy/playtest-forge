@@ -111,3 +111,7 @@ Flow can still be in its last holding-warning interval. Pass the existing warnin
 ## Pond reflection restraint after independent Sol image review
 
 Sol actually inspected d99 via view_image (not unavailable attachments): pond PASS improvement versus baseline, final readability FAIL because sharp brown mirror shapes merge with bank. Soften scenery reflection with a compact five-tap kernel at512 (centre0.4, four axial neighbours0.15, radius1.5texels), retaining genuine scene content and Fresnel. Cool only the existing pond depth tint slightly (deep0x294f47/shallow0x708d7d, absorption.18); preserve transparent shallow bed, geometry, warm sky and Reed settings. No foam ring or broad white highlight. Validate dark clear water rather than putty, reflection cost via existing warmperf and same pond vista/grazing pair.
+
+## Dash evidence lens cleanup
+
+The d99 dash/wake frames contain a large white H-a shelf arc at the right/bottom edge. Keep the meadow stage and real input sequence, shift only the fixed review lens from(5,y+6,79) to(-6,y+6,79), on the clear west side. Match every dash/wake frame at that lens; this changes capture composition only.
