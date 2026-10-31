@@ -85,3 +85,85 @@ GPU b807005/5d403d3 show lost opaque geometry plus repeated shadow sampler/type 
 Boot reflection starts disabled until its first valid render; readiness ignores hidden/out-of-layer shadow lights. Capture treats sampler/type mismatch warnings as errors and records/requires shadowMap.type=PCF(1), making the formerly silent dropped-draw failure explicit.
 
 Opus confirms PCF/startup repair but tightens proof: record shadow type at the first prepare (before any mirror/main draw can normalize it) and require1; also fail on preserved bootPriorGlError so the original1282 cannot be hidden by pond-scope reset. End-of-sequence shadow type alone is insufficient.
+
+## After valid d99 GPU: Reed payoff and clean restored value
+
+Fresh d99/0e8333ed passes renderer/runtime gates and personal inspection proves the pond now reflects scenery and reveals shallows. Remaining concrete defects: flat channel chevrons, cleared Reed basin is bare dark mud, restored colour still muddy. Opus quota resets06:40UTC; Sol CLI image attachments were unavailable, so its provisional output is not counted as visual approval.
+
+Remove the authored sine-foam chevrons from channel shading; physical specular, refracted bed and ripple normals supply flow cues. Put a shallow clear Reed water skin at floor+0.18 under the existing sinking ink. It is hidden while inkActive, appears after the existing latch/flood clears the hazard, and does not alter ink state, sink timing, collisions, pads or route. Reuse the tested scene-water shader/reflection path; use a restrained dark teal depth tint. Limit mirror distance per surface to avoid distant duplicate scene renders. Add a dedicated restored-Reed water vista and record warm-render performance.
+
+For permanent restoration, preserve authored hue while compensating the sepia wash's lifted black floor: make restored midtone luminance about18% above its washed equivalent, bounded to1.65x gain; deep shadow stays deep. No new radial overlay, saturation wall or change to CPU mask probes. This supports gold/green/russet returning instead of a darker rust stain. The same already-soft mask controls its transition. Review before/mid/settled at the same unobstructed lens, and retain dark wet gaps/fox saturation priority.
+
+The scanned litter texture already carries orange/brown chroma; multiplying it by clean authored hues doubles that bias. In Reed land only, neutralize85% of the source texture chroma before applying the existing gold/russet/pine palette. Keep its value/detail, alpha, leaf placement and other regions unchanged.
+
+## Transient dash wake follow-up
+
+The d99 wake is still a dark stain because value compensation only covers permanent restoration; transient RT/aura masks expose the unlifted dark source material. Extend the same bounded hue-preserving value compensation to temporary masks too, at a gentler12% target versus18% permanent. Use the final brushed mask for the output blend as before; avoid adding a ground decal or a new bright disc. Retain the1.65 gain cap and existing trail lifetime/CPU probes. Review dash/wake/decayed in the next immutable capture.
+
+Sol source critique catches double attenuation: scaling the gain by cm and then blending by brushed can leave a decaying wake below washed value. Apply the bounded1.18 target to the chroma endpoint once and let the existing brushed mix handle all fade strength. Use the same endpoint target for permanent and transient masks, avoiding a darker permanent feather. Unmasked pixels remain exactly washed because their final blend is0; gain cap still preserves deep shadows.
+
+## Flowing falls: same real scene-water path
+
+Personally inspected d99 Reed falls remain pale straight curtains. Reuse the validated shared scene sampler for flowing waterfall sheets, while preserving frozen gate appearance/cast shadow and reactor warning colours. Composite a softly distorted bank once at flowing alpha1 inside existing ragged margins, retaining PBR Fresnel/specular and restrained moving streaks. Register falls as skins so mirror rendering excludes their screen-space sampling; no new render targets, physics, timing or waterfall footprint changes. GPU review must show readable moving water without making a closed gate visually vanish.
+
+Flow can still be in its last holding-warning interval. Pass the existing warning scalar to the fall shader and taper refraction back to the original PBR warning colour as warning reaches1, so the brightening safety cue survives the new composition. This consumes existing reactor state only.
+
+## Pond reflection restraint after independent Sol image review
+
+Sol actually inspected d99 via view_image (not unavailable attachments): pond PASS improvement versus baseline, final readability FAIL because sharp brown mirror shapes merge with bank. Soften scenery reflection with a compact five-tap kernel at512 (centre0.4, four axial neighbours0.15, radius1.5texels), retaining genuine scene content and Fresnel. Cool only the existing pond depth tint slightly (deep0x294f47/shallow0x708d7d, absorption.18); preserve transparent shallow bed, geometry, warm sky and Reed settings. No foam ring or broad white highlight. Validate dark clear water rather than putty, reflection cost via existing warmperf and same pond vista/grazing pair.
+
+## Dash evidence lens cleanup
+
+The d99 dash/wake frames contain a large white H-a shelf arc at the right/bottom edge. Keep the meadow stage and real input sequence, shift only the fixed review lens from(5,y+6,79) to(-6,y+6,79), on the clear west side. Match every dash/wake frame at that lens; this changes capture composition only.
+
+## Remote harness import repair (391499c GPU startup failure)
+
+The integrated capture script statically imports new water-wade-capture.mjs, but the existing Modal image does not package that file. GPU68fa397eaf49 fails at Node module resolution before any render/report, so it is not game/exposure evidence. Load the optional wade helper from the immutable fetched repo tools directory inside its existing water-coverage branch. This avoids a stale image dependency and binds the helper to the requested commit. No browser run locally; node syntax check only, then fresh remote request.
+
+## Fresh-scene wading capture validation
+
+Independent Sol audit of ebffd87 finds that the new wade helper boots three fresh scenes after the existing pond GL gate, but checks only deaths. Add per-view evidence and assertions for scene-colour copy progress, supported first/current PCF, matching half-float composer dimensions, and zero GL/invalid-target errors. Rearm copy diagnostics before each video frame to check later copies too; preserve boot errors rather than clearing them. Record reflection counters but do not require a mirror from a below-surface/culled lens. Save each view's renderer summary before a failure throws. No game renderer, camera path, collision or appearance changes. Keep the already pending ebffd87 request immutable; apply the stronger evidence gate to the next requested ref.
+
+## Main integration ac86a80
+
+Merge current main as requested by driver01:35. Preserve the deferred immutable-repo water-wade import in the single capture conflict. Main adds a projected-visibility helper whose static import has the same stale Modal-image risk; load it from the immutable repo immediately before route-only use. Preserve main's camera, fox, shade and route changes. Required tsc/fox build and capture syntax checks before backup push. Appearance remains gated on fresh combined-ref GPU review.
+
+## 7240f4c actual-image follow-up: continuous reveal and broad wash
+
+All47 captured PNGs personally scanned on four sheets, with pond/settled/Reed vista full-size. Independent Sol actual-image critique agrees PASS improvement vs baseline, FAIL final: near-circular restore sector, disconnected teal water ovals at mid, heavy murky reflection. Opus still rate-limited until06:40UTC. Renderer report is clean PCF1/HDR1016/copy/mirror/GL0; no current white-out.
+
+The disconnected ovals occur while the globally sinking opaque ink intersects the +/-0.043m water ripple. Keep restored water hidden until ink is below its trough, then fade water uniformly from0 to1 over the next0.3m of existing sink travel. Do not change sink rate, hazard, pad/collision, latch or water level. A shader uniform defaults1 for other skins. Add a restrained world-space shoreline variation (<=0.55m) within the existing feather so lake edges are not mathematically perfect ellipses.
+
+Restore contour: add a stationary broad13m-scale noise octave, bounded +/-1.5 feather widths, to both analytic and RT permanent fronts. Retain existing finer brush octaves and soft transition. Expand permanent stamp support to radius+3.1edge so the broader bleed never clips into rectangles. CPU gameplay sampling and restore timing stay untouched; leaves and terrain still use matched fronts. No extra rings, particles or discs.
+
+Capture perf bug: water fixed-clock boot overrides performance.now, so perf(6) reports0ms. Preserve a native bound clock before overriding, make the override configurable, and temporarily restore native performance.now only inside synchronous render-only perf hooks, then restore fixed time in finally. Record warmed median samples for the Reed vista and reject nonpositive timings. No game-time/simulation changes or local render. Request combined-ref retest after required builds and independent source check.
+
+Sol source follow-up catches outward shoreline perturbation at the plane's axis intercepts. Keep all shoreline displacement inward (0..0.016 normalized radius) so original outer-boundary alpha is exactly zero; no exposed square support. Other reveal/noise/support/clock changes pass source review, not visual acceptance.
+
+## Restored leaf value follow-up queued after b389c93
+
+7240f4c same-camera bank ROI(430,430..1080,650) moves from75.34 display luma before to67.86 settled; d99 settled was56.74. This is measurable improvement but still below the before state's value, consistent with personal/independent muddy-bank failure. ROI includes objects/shadows and is diagnostic only.
+
+Keep b389c93 capture immutable to assess contour/reveal in isolation. Prepare a separate Reed-local albedo pass: brighten only existing above-water litter (gReedLand) by up to35% before physical lighting and before the shared wash. Keep neutralized leaf detail/alpha/hue, paths/soil, other regions and all geometry unchanged. This makes authored gold leaves carry the payoff rather than raising global exposure, fog or generic restore gain/shadow floor. The mask still reveals those materials naturally; no emission, new decal or blanket bright ring. Source critique first; only request this separate candidate after reviewing b389c93 or relay progress. GPU must compare the same before/mid/settled frame and ensure gold does not drown out fox or make the pressed-state floor conspicuously brighter.
+
+## ebffd87 actual wake: bounded ground compensation
+
+Full-size restoration-dash.png still shows a dark brown scorch streak despite the corrected one-time endpoint gain. Source cause: cap1.65 can leave ground chroma far below the lifted sepia endpoint (e.g. lit ground luminance0.02 vs washed0.06 -> capped0.033, hence darkening on restore). Raise only rv-ground/rv-terrain's cap to4.0 while retaining the same washed*1.18 target and hue ratio. Stone/other materials keep1.65. This is a maximum allowance, not a4x brightness multiplier: ground requiring a gain between1 and4 reaches18% above washed (already-brighter source colours and the existing front rim can exceed that target), and near-black shadows remain bounded rather than forcibly matching the washed floor. Existing final brushed mask performs fading once; no new overlay or new temporary/permanent divergence (existing permanent hue/tint differences remain). CPU samples/masks/physics untouched. Separate follow-up candidate, needs same dash/wake/decayed and restore before/settled GPU review, not visual acceptance from this numerical example.
+
+## Main9003dd8 packaging check maintenance
+
+Merged main's automatic *.mjs mount loop. Its new capture-module test still recognizes only literal add_local_file destinations and falsely flags every static helper as missing. Extend the AST-only check to recognize the explicit tools/*.mjs loop plus /opt/browser/{loop-variable.name} destination. Preserve recursive static-import source existence and tools-directory escape checks; no Modal/browser execution or environment reads. This validates main's current packaging structure, not GPU output.
+
+## Capture the continuous reveal itself
+
+Current fixed-camera stages are0,.3,1,5seconds and skip the new fade at1.2..2.06seconds. Add restoration-water-reveal at1.65seconds (39frames after mid), then201frames to retain the unchanged5second settled state. Same lens, real existing latch event and identical total simulation time. This is next-candidate evidence only; keep already pendingb389 request immutable.
+
+## ebffd87 water-lens critique: submerged detail
+
+Independent Sol actually inspected side/low wade, pond vista, restored Reed vista and thin washbridge. Meaningful baseline improvement, finalFAIL: at grazing views the near-full scenery/fox reflection obscures underwater legs/bed, and restored basin broad patches feel planar. Preserve real mirror and existing five-tap softness; lower only pond/creek/Reed skin reflection ceiling from0.96 to0.72 (base0.02 + Fresnel*0.70). This leaves at least28% scene-transmitted colour at maximum grazing reflection, avoiding a moving local clarity disc or extra effects. Existing depth tint, ripples, shoreline, geometry and collision remain. The physical ribbon washbridge is unaffected. No new pass/assets/cost. Prepare separate candidate while current3b request stays immutable. GPU compare low/side wade and pond/Reed vista: limbs/bed clearer, recognizable scenery reflection retained, no flat putty regression. No quality approval from source.
+
+## Driver02:07 main integration9c97912
+
+Merge latest camera/shade/capture work. Single conflict is the packaging checker: keep main's newer inert RecordingImage mount evaluation with empty environment stubs, replacing this branch's earlier AST-pattern workaround. It checks actual mounted sources as well as recursive imports without importing Modal. Retain the water reveal/value/transmission work and native clock/fresh-scene water gates through automatic capture-script merge. Validate tsc/fox build, source water checks, capture module packaging and node syntax before backup. Combined-ref image gate still required; cancelled partialb389 is not acceptance.
+
+Capture merge follow-up: main now loads both helper modules once at module scope from pathToFileURL(immutable repo path). Remove this branch's redundant local dynamic loads at water/route invocation sites; retain main's single current import path. Node/package validation only, no game appearance change.

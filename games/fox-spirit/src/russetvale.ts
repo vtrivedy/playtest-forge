@@ -984,6 +984,13 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   ink.receiveShadow = true;
   group.add(ink);
   let inkActive = true;
+  // Restoring Reed clears the ink into ankle-deep water, with the same safe floor.
+  const reedWater = createStylizedWater(scene, { size: 60, y: MARSH.floor + 0.18, colorDeep: 0x247b74, colorShallow: 0x668779, reflection: true, reflectionDistance: 70, depthTint: 0.22 });
+  reedWater.mesh.position.set(MARSH.x, MARSH.floor + 0.18, MARSH.z);
+  reedWater.mesh.scale.set(MARSH.rx / 30, MARSH.rz / 30, 1);
+  reedWater.mesh.visible = false;
+  reedWater.material.uniforms.uReveal!.value = 0;
+  waterVisuals.push(reedWater);
 
   // boardwalk on stilts (56,37)→(65,31)
   const plankWalk = (a: { x: number; z: number }, b: { x: number; z: number }, top: number, w: number) => {
@@ -2060,7 +2067,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     archAt(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
   }
   // Wen's pond
-  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x293730, colorShallow: 0x5b604b, shoreRadius: 1.18, reflection: true });
+  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x294f47, colorShallow: 0x708d7d, depthTint: 0.18, shoreRadius: 1.18, reflection: true });
   waterVisuals.push(pond);
   pond.mesh.position.set(POND.x, POND.water, POND.z);
   pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
@@ -2599,11 +2606,16 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         if (bridgeT >= 1) bridgeC.enabled = true;
       }
 
-      // ink pools dry after SW2
+      // Ink sinks after SW2, revealing the shallow clear water and original floor.
       if (!inkActive && ink.position.y > MARSH.floor - 1.2) {
         ink.position.y -= dt * 0.35;
         inkMat.roughness = Math.min(0.9, inkMat.roughness + dt * 0.2);
       }
+      // Wait until the sinking opaque sheet clears the deepest ripple trough:
+      // intersecting the two skins reveals disconnected flat-looking teal ovals.
+      const reedClearance = MARSH.floor + 0.18 - 0.05 - ink.position.y;
+      reedWater.mesh.visible = !inkActive && reedClearance > 0;
+      reedWater.material.uniforms.uReveal!.value = THREE.MathUtils.smoothstep(reedClearance, 0, 0.3);
 
       // windmills: turn while in colour before SW1, for good after
       const sw1 = seedwells[0]!.lit;
@@ -2742,7 +2754,11 @@ function groundBlend(mat: THREE.MeshStandardMaterial, tex: { leaf: THREE.Texture
           : gBankRank < 0.80 ? vec3(0.57, 0.21, 0.08)
           : gBankRank < 0.94 ? vec3(0.42, 0.30, 0.17) : vec3(0.09, 0.19, 0.105);
         gHue = mix(gHue, gBankHue, gReedLand * 0.85);
-        vec3 gLeafCol = gLeaf.rgb * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
+        vec3 gLeafBase = mix(gLeaf.rgb, vec3(dot(gLeaf.rgb, vec3(0.2126, 0.7152, 0.0722))), gReedLand * 0.85);
+        vec3 gLeafCol = gLeafBase * gHue * mix(vec3(1.0), vColor.rgb * 1.6, 0.2);
+        // Pale dry litter catches restored light; keep soil/worn paths and
+        // physically shaded gaps dark instead of lifting the whole scene.
+        gLeafCol *= 1.0 + gReedLand * 0.35;
         diffuseColor.rgb *= mix(gSoil * vColor.rgb, gLeafCol * 1.15, gVis);
         // painted macro breakup: damp umber hollows ↔ sun-dried pale earth, and patches of
         // dry olive-gold grass where the litter thins, so open ground never reads as one plane

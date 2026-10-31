@@ -102,6 +102,12 @@ try {
   let page;
   const H = (fn, ...args) => page.evaluate(([f, a]) => {
     if (f === 'advance' && window.__gpuFixedClock) window.__gpuTime += a[0] * a[1] * 1000;
+    if (f === 'perf' && window.__gpuFixedClock) {
+      const fixedNow = performance.now;
+      Object.defineProperty(performance, 'now', { value: window.__gpuNativeNow, configurable: true });
+      try { return window.__gameHooks[f](...a); }
+      finally { Object.defineProperty(performance, 'now', { value: fixedNow, configurable: true }); }
+    }
     return window.__gameHooks[f](...a);
   }, [fn, args]);
   const advance = (n, render = true) => H('advance', n, 1 / 60, render);
@@ -117,7 +123,8 @@ try {
     if (fixedClock) await page.evaluate(() => {
       window.__gpuFixedClock = true;
       window.__gpuTime = window.__gameHooks.state().t * 1000;
-      Object.defineProperty(performance, 'now', { value: () => window.__gpuTime });
+      window.__gpuNativeNow = performance.now.bind(performance);
+      Object.defineProperty(performance, 'now', { value: () => window.__gpuTime, configurable: true });
     });
     const gl = await page.evaluate(() => {
       const gl = window.__gameHooks.debug.renderer.getContext();
@@ -1435,7 +1442,7 @@ try {
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
     if (!Number.isFinite(y) || y < -24) throw Error('Restoration review has no safe meadow surface');
     await H('teleport', 0, y, 70, Math.PI);
-    await H('photo', [5, y + 6, 79], [-1, y, 70], 48);
+    await H('photo', [-6, y + 6, 79], [-1, y, 70], 48);
     await advance(60); await shot('restoration-aura');
     await H('setStick', -1, 0); await H('setKeys', ['ShiftLeft']);
     await advance(6); await shot('restoration-dash');
@@ -1465,9 +1472,16 @@ try {
     await advance(1); await shot('restoration-front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
-    for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['settled', 240]]) {
+    for (const [name, frames] of [['front-early', 18], ['front-mid', 42], ['water-reveal', 39], ['settled', 201]]) {
       await advance(frames); await shot(`restoration-${name}`);
     }
+    await H('photo', [64, 3, 43], [82, -1.7, 20], 52); await advance(2); await shot('restoration-water-vista');
+    await H('perf', 6);
+    const reedPerf = [];
+    for (let i = 0; i < 5; i++) reedPerf.push(await H('perf', 6));
+    const reedMedian = [...reedPerf].sort((a, b) => a.msPerFrame - b.msPerFrame)[2];
+    save('restoration-water-perf.json', { ...reedMedian, samples: reedPerf, method: 'Warm median of five GPU-synchronized render-only perf(6) batches with native wall clock; simulation paused' });
+    if (!reedPerf.every(sample => sample.msPerFrame > 0 && Number.isFinite(sample.fps))) throw Error('Invalid restored Reed performance timing');
     save('restoration-provenance.json', {
       label: 'STAGED fixed-lens visual review: real dash input, then staged public Seedwell latches',
       note: 'All three staged latches activate their normal Shade encounters; actors may enter the Reed frame.',
