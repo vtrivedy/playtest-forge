@@ -761,7 +761,10 @@ try {
     const reedY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(95, 10));
     if (!Number.isFinite(reedY) || reedY < -24) throw Error('Restore front has no safe Reed island surface');
     await H('teleport', 95, reedY, 10, Math.PI);
-    await H('photo', [68, 21, 44], [91, 1, 15], 60);
+    const restoreLens = [68, 21, 44];
+    const restoreLook = [91, 1, 15];
+    save('restoration-framing.json', { lens: restoreLens, look: restoreLook, fox: [95, reedY, 10], blocker: await H('photoBlocker', restoreLens, [95, reedY + 0.5, 10]) });
+    await H('photo', restoreLens, restoreLook, 60);
     await advance(1); await shot('restoration-front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');

@@ -1177,7 +1177,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const d = Math.sqrt(r()) * 0.9;
     m.position.set(MARSH.x + Math.cos(a) * MARSH.rx * d, -1.32 + r() * 0.2, MARSH.z + Math.sin(a) * MARSH.rz * d);
     m.scale.setScalar(8 + r() * 8);
-    m.rotation.x = -Math.PI / 2 + 0.06; // hugs the ink: never veils the tussocks or boardwalk
+    m.rotation.x = -Math.PI / 2; // stays above the ink instead of clipping into straight bands
     m.userData.phase = r() * 6.28;
     mists.push(m);
     group.add(m);
