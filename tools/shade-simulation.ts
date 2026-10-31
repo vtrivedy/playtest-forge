@@ -108,5 +108,23 @@ try {
     recovered ||= recovery.state()[0]!.mode==='patrol';
   }
   assert.equal(recovered,true,'blocked return must resume patrol after its timeout');
-  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery', 'latch activation', 'dash during chase', 'blocked chase retreats', 'return stall recovery'], final: state() }, null, 2));
+  // Mirror the capture's ten-second observer schedule on a controlled loop.
+  // Actual authored terrain still belongs to the remote GPU playtest.
+  const behavior=await createShades(new THREE.Scene(),[{id:'behavior',patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0);
+  const modes:string[]=[];
+  const stagedFox=new THREE.Vector3(20,0,20);
+  for(let frame=0;frame<600;frame++){
+    if(frame%15===0){
+      const actor=behavior.state()[0]!;
+      if(modes.at(-1)!==actor.mode)modes.push(actor.mode);
+      stagedFox.fromArray(actor.pos).add(new THREE.Vector3(frame>=90&&frame<300?2.9:8,0,0));
+    }
+    const events=behavior.update(1/60,frame/60,stagedFox,false);
+    assert.equal(events.length,0,'staged observer must stay outside contact');
+  }
+  const expectedModes=['patrol','chase','return','patrol'];
+  let observedModes=0;
+  for(const mode of modes)if(mode===expectedModes[observedModes])observedModes++;
+  assert.equal(observedModes,expectedModes.length,`capture observer schedule must show complete cycle: ${modes}`);
+  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery', 'latch activation', 'dash during chase', 'blocked chase retreats', 'return stall recovery', 'ten-second ordered observer cycle'], final: state() }, null, 2));
 } finally { globalThis.fetch = originalFetch; THREE.DefaultLoadingManager.setURLModifier(url => url); }
