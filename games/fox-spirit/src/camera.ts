@@ -41,6 +41,8 @@ export type CameraPath = {
 
 export type CameraTunables = {
   distance: number;
+  /** Terrain compression hands off to the cutout before the lens enters the animal. */
+  minDistance: number;
   height: number;
   lookHeight: number;
   airDistance: number;
@@ -107,6 +109,7 @@ export function createFollowCamera(opts: {
 } = {}): FollowCamera {
   const params: CameraTunables = {
     distance: 3.8,
+    minDistance: 2.6,
     height: 1.25,
     lookHeight: 0.62,
     airDistance: 4.8,
@@ -154,13 +157,14 @@ export function createFollowCamera(opts: {
   let sceneryLimit = 1;
   let sceneryName = '';
   let sceneryFade = 0;
+  let terrainFade = false;
   const landAt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   /** Where the fox / predicted landing sit on screen (NDC) — framing metrics for the harness */
   const debug = {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
-    blocked: () => sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
+    blocked: () => terrainFade || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
     internals: () =>
       `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
   };
@@ -240,10 +244,11 @@ export function createFollowCamera(opts: {
    * rises too steeply, pull in to just short of the first blocking sample. Returns the boom
    * fraction to keep and the lift to add (callers smooth these — no pops).
    */
-  const boom = { t: 1, lift: 0 };
+  const boom = { t: 1, lift: 0, fade: false };
   function sweepBoom(focus: THREE.Vector3, cam: THREE.Vector3) {
     boom.t = 1;
     boom.lift = 0;
+    boom.fade = false;
     if (!opts.surfaceAt) return boom;
     const steps = 10;
     let lift = 0;
@@ -273,7 +278,10 @@ export function createFollowCamera(opts: {
         break;
       }
     }
-    boom.t = Math.max(0.3, (firstBlocked - 1) / steps);
+    const collisionT = Math.max(0.3, (firstBlocked - 1) / steps);
+    const readableT = Math.min(1, params.minDistance / Math.max(0.01, focus.distanceTo(cam)));
+    boom.t = Math.max(collisionT, readableT);
+    boom.fade = readableT > collisionT;
     boom.lift = maxLift;
     return boom;
   }
@@ -579,6 +587,7 @@ export function createFollowCamera(opts: {
       // boom collision: pull in fast, release slowly; lift eases (no pops at ledges/walls)
       boomFocus.set(p.x, focusY + params.lookHeight, p.z);
       const b = sweepBoom(boomFocus, desired);
+      terrainFade = b.fade;
       if (!initialized) {
         boomT = b.t;
         boomLift = b.lift;

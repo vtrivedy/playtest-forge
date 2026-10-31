@@ -113,3 +113,21 @@ for (let i = 0; i < 60; i++) {
 assert.match(celebration.debug.internals(), /shot=0\.00/, 'running yields the local celebration');
 assert.ok(celebration.camera.position.distanceTo(hero) < 7, 'running returns to readable chase distance');
 console.log('PASS: remote celebration rejected, local idle shot retained, running takes camera back');
+
+// A tall stair behind the lens used to force a fixed .30 fraction (~1m),
+// filling the image with the fox's torso. Compare minimum-distance variations
+// on identical CPU geometry; these metrics are not visual acceptance.
+const terrainVariations = [];
+for (const minDistance of [2.2, 2.6, 3.0]) {
+  const stair = createFollowCamera({ params: { minDistance }, surfaceAt: (_x, z) => z > 0.5 ? 2 : 0 });
+  stair.resize(1280, 720);
+  for (let i = 0; i < 120; i++) stair.update(1 / 60, { ...idleFrame, target: new THREE.Vector3() });
+  const pos = stair.camera.position;
+  const horizontal = Math.hypot(pos.x, pos.z);
+  assert.ok(horizontal > minDistance * 0.8, 'terrain fallback preserves horizontal body room');
+  assert.ok(pos.y >= 2, 'readability floor retains the final ground clearance');
+  assert.equal(stair.debug.blocked(), true, 'unresolved terrain requests a cutout');
+  assert.ok(stair.camera.projectionMatrix.elements.every(Number.isFinite));
+  terrainVariations.push({ minDistance, horizontal: +horizontal.toFixed(3), height: +pos.y.toFixed(3), cutout: stair.debug.blocked() });
+}
+console.log('Terrain boom CPU variations:', JSON.stringify(terrainVariations));
