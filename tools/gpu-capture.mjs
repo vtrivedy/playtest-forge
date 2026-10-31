@@ -619,6 +619,29 @@ try {
     save('showcase-acceptance.json',acceptance);save('showcase.json',result);
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
+  if (wants('worldgait')) {
+    await boot(quality,true);
+    await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
+    const segments=[];
+    for(const lens of ['side','three-quarter']) for(const [gait,stick,seconds] of [['walk',.18,3],['trot',.45,3],['run',1,2]]) {
+      await H('setKeys',[]);await H('setStick',0,0);await H('photoOff');
+      const y=await page.evaluate(()=>window.__gameHooks.debug.world.collision.highestAt(0,88));
+      await H('teleport',0,y,88,Math.PI);await advance(30);
+      const name=`worldgait-${lens}-${gait}`, initial=await H('state');
+      const frameLens=async st=>{
+        const [x,y,z]=st.pos;
+        await H('photo',[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
+      };
+      await frameLens(initial);
+      await video(name,seconds*fps,async()=>{await H('setStick',0,-stick);},undefined,{
+        traceEveryFrame:true,keyFrames:[0,Math.round(fps*.25),fps,seconds*fps-1],
+        afterStep:async(i,st)=>{if(st.deaths!==initial.deaths)throw Error(`${name}: death`);await frameLens(st);}
+      });
+      await H('setStick',0,0);await H('setKeys',[]);await shot(`${name}-end`);
+      const end=await H('state');segments.push({name,gait,stick,seconds,initial,end,camera:`staged ${lens} tracking photo lens, live controller`,reset:[0,y,88]});
+    }
+    save('worldgait-acceptance.json',{label:'Six staged movement segments in Arrival Meadow; no forced animation poses; not a continuous route or gameplay-camera proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths)});
+  }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
     await boot(quality, true, '&gym=gait');

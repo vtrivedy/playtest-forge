@@ -79,7 +79,7 @@ def main():
     if not re.fullmatch(r'[1-9][0-9]*x[1-9][0-9]*', args.size):
         parser.error('Size must be WIDTHxHEIGHT with positive integers')
     shots = args.shots.split(',')
-    if not shots or not set(shots) <= {'gait', 'route', 'stills', 'perf', 'orbit', 'probe', 'fox', 'water', 'shade', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'reed', 'turntable', 'flow', 'crown', 'showcase', 'finale'}:
+    if not shots or not set(shots) <= {'gait', 'worldgait', 'route', 'stills', 'perf', 'orbit', 'probe', 'fox', 'water', 'shade', 'updraft', 'wind', 'growth', 'levels', 'windgap', 'marshmouth', 'reed', 'turntable', 'flow', 'crown', 'showcase', 'finale'}:
         parser.error('Unknown shot')
     # Exact remote branch name; immutable SHA inputs are also accepted.
     remote = subprocess.check_output(['git', 'ls-remote', '--heads', 'origin', f'refs/heads/{args.ref}'], cwd=ROOT, text=True).splitlines()
