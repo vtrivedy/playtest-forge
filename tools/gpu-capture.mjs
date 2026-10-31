@@ -620,14 +620,40 @@ try {
     if(!acceptance.landedOnIncline || !longDropLanded || longDropFallSeconds<.4 || !longDropHeldFrames || standingWindupFrames<2 || !standingJumpAirborne || !standingJumpLanded || acceptance.deaths)throw Error('World showcase must complete incline landing, held long-fall pose, and standing gather/jump/land without deaths');
   }
   if (wants('worldgait')) {
+    if(fps!==60)throw Error('World gait comparison requires60fps');
     await boot(quality,true);
     await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
+    await H('setFeelPreset','brisk');
+    const preflight=await page.evaluate(()=>{
+      const h=window.__gameHooks,col=h.debug.world.collision,attempts=[];
+      for(const x of [6,40,24]) {
+        const failures=[];
+        let previousY=null;
+        for(let z=88;z>=68;z-=2) {
+          const floor=col.highestAt(x,z),terrain=h.debug.world.terrainY(x,z),y=floor+.02;
+          if(!Number.isFinite(floor) || Math.abs(floor-terrain)>.2 || (previousY!==null && Math.abs(floor-previousY)>.4))failures.push({z,footing:[floor,terrain,previousY]});
+          previousY=floor;
+          for(const lens of ['side','three-quarter']) {
+            const camera=[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const targets=[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]];
+            const blockers=targets.map(target=>h.photoBlocker(camera,target));
+            if(blockers.some(Boolean))failures.push({z,lens,blockers});
+          }
+        }
+        attempts.push({x,failures});
+        if(!failures.length)return {x,z:88,attempts};
+      }
+      return {x:null,z:88,attempts};
+    });
+    save('worldgait-preflight.json',preflight);
+    if(preflight.x===null)throw Error('No clear terrain-only meadow review corridor');
     const segments=[];
     for(const lens of ['side','three-quarter']) for(const [gait,stick,seconds] of [['walk',.18,3],['trot',.45,3],['run',1,2]]) {
       await H('setKeys',[]);await H('setStick',0,0);await H('photoOff');
-      const y=await page.evaluate(()=>window.__gameHooks.debug.world.collision.highestAt(40,88));
-      await H('teleport',40,y,88,Math.PI);await advance(30);
+      const y=await page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[preflight.x,preflight.z]);
+      await H('teleport',preflight.x,y,preflight.z,Math.PI);await advance(30);
       const name=`worldgait-${lens}-${gait}`, initial=await H('state');
+      const visibility={sampledFrames:0,blocked:[]};
       const frameLens=async st=>{
         const [x,y,z]=st.pos;
         await H('photo',[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)],[x,y+.6,z],38);
@@ -635,15 +661,28 @@ try {
       await frameLens(initial);
       await video(name,seconds*fps,async()=>{await H('setStick',0,-stick);},undefined,{
         traceEveryFrame:true,keyFrames:[0,Math.round(fps*.25),fps,seconds*fps-1],
-        afterStep:async(i,st)=>{if(st.deaths!==initial.deaths)throw Error(`${name}: death`);await frameLens(st);}
+        afterStep:async(i,st)=>{
+          if(st.deaths!==initial.deaths)throw Error(`${name}: death`);
+          await frameLens(st);
+          {
+            const [x,y,z]=st.pos, camera=[x+4.7,y+1.2,z+(lens==='side'?.25:3.5)];
+            const blockers=await page.evaluate(([camera,targets])=>targets.map(target=>window.__gameHooks.photoBlocker(camera,target)),[camera,[[x,y+.6,z],[x,y+.95,z],[x,y+.1,z-.45],[x,y+.1,z+.45]]]);
+            visibility.sampledFrames++;
+            if(blockers.some(Boolean))visibility.blocked.push({frame:i,blockers});
+          }
+        }
       });
       await H('setStick',0,0);await H('setKeys',[]);await shot(`${name}-end`);
       const end=await H('state');
-      const rows=report.videos[name].trace.filter(r=>r.frame>=fps),speeds=rows.map(r=>Math.hypot(r.state.vel[0],r.state.vel[2])).sort((a,b)=>a-b);
+      const rows=report.videos[name].trace.filter(r=>r.frame>=fps),speeds=rows.map(r=>{const previous=report.videos[name].trace[r.frame-1].state.pos;return Math.hypot(r.state.pos[0]-previous[0],r.state.pos[2]-previous[2])/r.dt}).sort((a,b)=>a-b);
       const measured={medianSpeed:speeds[Math.floor(speeds.length/2)],groundedFraction:rows.filter(r=>r.state.grounded).length/rows.length,gaits:Object.fromEntries([...new Set(rows.map(r=>r.state.locomotion?.gait??r.state.anim))].map(g=>[g,rows.filter(r=>(r.state.locomotion?.gait??r.state.anim)===g).length]))};
-      segments.push({name,gait,stick,seconds,initial,end,measured,camera:`staged ${lens} tracking photo lens, live controller`,reset:[40,y,88]});
+      measured.expectedGaitFraction=(measured.gaits[gait]??0)/rows.length;
+      measured.expectedSpeed=9*stick;
+      measured.speedFraction=measured.medianSpeed/measured.expectedSpeed;
+      segments.push({name,gait,stick,seconds,initial,end,measured,visibility,camera:`staged ${lens} tracking photo lens, live controller`,reset:[preflight.x,y,preflight.z]});
     }
-    save('worldgait-acceptance.json',{label:'Six staged movement segments on the east Arrival Meadow line (40,88); no forced animation poses; not a continuous route or gameplay-camera proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths)});
+    save('worldgait-acceptance.json',{label:'Six staged live-input movement segments on a disclosed preflighted Arrival Meadow line; world.group chest/head/feet rays checked every frame; manual full-frame visibility review still required; brisk preset9m/s; not gameplay-camera or continuous-route proof',segments,passed:segments.every(s=>s.end.deaths===s.initial.deaths && s.visibility.blocked.length===0 && s.measured.groundedFraction>.95 && s.measured.expectedGaitFraction>.9 && s.measured.speedFraction>.9 && s.measured.speedFraction<1.1)});
+    if(segments.some(s=>s.visibility.blocked.length || s.measured.groundedFraction<=.95 || s.measured.expectedGaitFraction<=.9 || s.measured.speedFraction<=.9 || s.measured.speedFraction>=1.1))throw Error('World gait review requires clear chest/head/feet sight lines, grounded movement and measured requested gait/speed');
   }
   if (wants('gait')) {
     if (fps !== 60) throw Error('Gait capture requires 60 fps for identical input-edge timing');
