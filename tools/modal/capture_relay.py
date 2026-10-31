@@ -1,10 +1,10 @@
 """Poll Modal agent requests and relay GPU evidence. No local browser."""
-import argparse, concurrent.futures, hashlib, json, os, re, subprocess, tarfile, time
+import argparse, concurrent.futures, hashlib, io, json, os, re, subprocess, tarfile, tempfile, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DEADLINE = 1793439600  # 2026-10-31 05:40 ET; final packaging is separate.
-SHOTS = set('probe perf route kilnroute orbit fox gait stills water shade turntable updraft wind growth levels windgap marshmouth reed crown flow showcase reach reachview reachsafe finale feel'.split())
+SHOTS = set('probe perf route kilnroute hub orbit fox gait stills water shade turntable updraft wind growth levels windgap marshmouth reed crown flow showcase reach reachview reachsafe finale feel'.split())
 
 def cli(args, **kw):
     return subprocess.run(args, text=True, capture_output=True, timeout=60, **kw)
@@ -28,7 +28,16 @@ def capture_request(stream, request, folder):
     if not re.fullmatch('[0-9a-fA-F]{40}',ref) or not set(shots.split(',')) <= SHOTS:
         result={'status':'rejected','reason':'ref must be an immutable pushed 40-character SHA; shots must be supported'}
     else:
-        command=['modal','run','--detach','tools/modal/gpu_capture.py','--ref',ref,'--shots',shots,'--out',str(folder/'evidence')]
+        if cli(['git','cat-file','-e',ref+'^{commit}'],cwd=ROOT).returncode:
+            fetched=cli(['git','fetch','origin',ref],cwd=ROOT)
+            if fetched.returncode:raise ValueError('Requested commit is not fetchable from origin')
+        source=tempfile.TemporaryDirectory(prefix='fox-relay-tools-')
+        source_root=Path(source.name)
+        bundle=subprocess.check_output(['git','archive',ref,'tools'],cwd=ROOT)
+        with tarfile.open(fileobj=io.BytesIO(bundle)) as tar:tar.extractall(source_root,filter='data')
+        if 'gait' in shots.split(',') and os.environ.get('FOX_GAIT_CAPTURE_SCRIPT'):
+            (source_root/'tools/gpu-capture.mjs').write_bytes(Path(os.environ['FOX_GAIT_CAPTURE_SCRIPT']).read_bytes())
+        command=['modal','run','--detach',str(source_root/'tools/modal/gpu_capture.py'),'--ref',ref,'--shots',shots,'--out',str(folder/'evidence')]
         options={'size':'1920x1080' if 'gait' in shots.split(',') else '1280x720','fps':60,'route-seconds':120}
         for key,default in options.items():
             value=request.get(key,request.get(key.replace('-','_'),default))
@@ -41,6 +50,7 @@ def capture_request(stream, request, folder):
             capture_env['FOX_CAPTURE_SCRIPT']=os.environ['FOX_GAIT_CAPTURE_SCRIPT']
         with (folder/'modal.log').open('w') as log:
             proc=subprocess.run(command,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,timeout=max(1,DEADLINE-time.time()),env=capture_env)
+        source.cleanup()
         evidence=folder/'evidence'
         result={'status':'captured' if proc.returncode==0 else 'capture-failed','exit':proc.returncode,'ref':ref,'shots':shots,'path':str(evidence)}
         for name in ['run.json','report.json']:
@@ -97,7 +107,7 @@ def main():
     ap.add_argument('--streams',default='loco,loco-glide,fox-ember,hub,reach,route-clear,camera,water-restore,shade')
     ap.add_argument('--once',action='store_true')
     args=ap.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True)
-    pool=concurrent.futures.ThreadPoolExecutor(max_workers=1);pending={}
+    pool=concurrent.futures.ThreadPoolExecutor(max_workers=2);pending={}
     active=set()
     while time.time()<DEADLINE:
         for stream in args.streams.split(','):
