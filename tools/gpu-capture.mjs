@@ -1480,6 +1480,11 @@ try {
     const points=[{x:104,y:38,z:-90},{x:132,y:38,z:-90},{x:148,y:38,z:-90},{x:154,y:38,z:-102},{x:160,y:38,z:-108},{x:174,y:30,z:-130},{x:185,y:30,z:-128},{x:187,y:30,z:-118,shade:true},{x:174,y:30,z:-130},{x:169,y:30,z:-115,settle:true},{x:173,y:30,z:-115,dash:true,source:true},{x:187,y:30,z:-118,dash:true},{x:187,y:36.35,z:-118,wait:true},{x:189,y:36,z:-118},{x:196,y:36,z:-118,jump:true},{x:202,y:36,z:-118}].map(p=>({...p,x:p.x-70}));
     let phase=0,age=0,reached=false,painted=false,dashAttempt=-1,shadeShot=false;
     const events={shadeFreedAt:null,sourceActivatedAt:null,firstArrivalAt:null,bellLatchedAt:null};
+    const phaseTrace=[];
+    const crossingSample=(st,p,phase,age)=>{
+      const water=st.chem.water.find(w=>w.id==='reach-spout');
+      return {t:st.t,phase,age,waypoint:{x:p.x,y:p.y,z:p.z},distance:Math.hypot(p.x-st.pos[0],p.z-st.pos[2]),pos:st.pos,vel:st.vel,grounded:st.grounded,source:water?{heat:water.heat,flowing:water.flowing,arriving:water.arriving}:null,reach:{fill:st.reach.fill,supportedBy:st.reach.supportedBy,retained:st.reach.retained,seal:st.reach.seal,restored:st.reach.restored}};
+    };
     await video('reach-first-crossing',65*fps,async()=>{
       const st=await RH('state'),p=points[phase];age+=1/fps;
       const drinker=st.shades.actors.find(s=>s.id==='reach-drinker');
@@ -1492,7 +1497,7 @@ try {
       const dx=p.x-st.pos[0],dz=p.z-st.pos[2],d=Math.hypot(dx,dz);
       const ready=p.shade?drinker.freed:p.source?sourceWater?.flowing:p.settle?d<.3&&st.grounded&&Math.abs(st.pos[1]-p.y)<.6&&Math.hypot(st.vel[0],st.vel[2])<.7:d<.8&&st.pos[1]>=p.y-.4;
       if(p.shade&&drinker.freed&&!shadeShot){await shot('reach-drinker-released');shadeShot=true;}
-      if(ready&&age>.15){if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
+      if(ready&&age>.15){phaseTrace.push(crossingSample(st,p,phase,age));if(phase===points.length-1)reached=st.grounded;else{phase++;age=0;painted=false;dashAttempt=-1;console.log('REACH PHASE',phase,JSON.stringify(st.reach));}}
       const q=points[phase];if(q.source&&painted&&age-dashAttempt>1&&!sourceWater?.flowing)painted=false;if(q.shade){q.x=drinker.pos[0];q.z=drinker.pos[2];if(painted&&age-dashAttempt>1)painted=false;}
       const vx=q.x-st.pos[0],vz=q.z-st.pos[2],len=Math.hypot(vx,vz);
       let sx=len>.2?vx/len*Math.min(1,len):0,sz=len>.2?vz/len*Math.min(1,len):0;
@@ -1503,7 +1508,7 @@ try {
     await RH('setKeys',[]);await RH('setStick',null);await advance(30);await shot('reach-end');
     const end=await RH('state');if(end.reach.restored&&events.bellLatchedAt===null)events.bellLatchedAt=end.t;
     const eventOrder=Object.values(events).every(t=>t!==null)&&events.shadeFreedAt<events.sourceActivatedAt&&events.sourceActivatedAt<events.firstArrivalAt&&events.firstArrivalAt<events.bellLatchedAt;
-    save('reach-acceptance.json',{phase,reached,strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
+    save('reach-acceptance.json',{phase,reached,phaseTrace,finalWaypoint:crossingSample(end,points[phase],phase,age),strategy:'real dash release before source, then ferry',events,eventOrder,shadeFreed:end.shades.actors.find(s=>s.id==='reach-drinker')?.freed,end});
     if(!eventOrder)report.failures.push('Reach release/source/arrival/latch event order not observed');
     if(reached&&end.reach.restored){
       await RH('photo',[167,48,-99],[190,32,-121],52);
