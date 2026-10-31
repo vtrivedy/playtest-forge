@@ -13,7 +13,8 @@ import type { WindSystem } from './chem/wind';
 export async function createListeningCrown(scene: THREE.Scene, world: Realm) {
   const group = new THREE.Group();
   group.name = 'listening-crown';
-  scene.add(group);
+  // Include Crown's decorative masonry in the realm's camera boom queries.
+  world.group.add(group);
   const stone = new Bucket(), rock = new Bucket(), roots = new Bucket();
   const col = world.collision;
   // This ruin is beyond the valley's flood. It owns a region field with the same
