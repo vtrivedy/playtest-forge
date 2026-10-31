@@ -512,6 +512,7 @@ async function boot() {
   fFox.add(FOX_LOOK, 'furValue', 0.5, 1.5, 0.01);
   fFox.add(FOX_LOOK, 'strokeStrength', 0, 0.5, 0.01);
   fFox.add(FOX_LOOK, 'strokeScale', 0.25, 4, 0.01);
+  fFox.add(FOX_LOOK, 'furFringe', 0, 1.5, 0.01);
   fFox.add(FOX_LOOK, 'rimStrength', 0, 2, 0.01);
   fFox.add(FOX_LOOK, 'rimPower', 1, 8, 0.1);
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
