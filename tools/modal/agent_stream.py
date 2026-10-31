@@ -21,8 +21,8 @@ def validate(stream, model, branch):
         raise ValueError('stream must be 1–48 lowercase letters/digits/hyphens')
     if model not in {'sol', 'opus'}:
         raise ValueError('model must be sol or opus')
-    if not re.fullmatch(r's2-[a-z0-9][a-z0-9-]{0,60}', branch):
-        raise ValueError('branch must be a simple s2-* name')
+    if not re.fullmatch(r's[23]-[a-z0-9][a-z0-9-]{0,60}', branch):
+        raise ValueError('branch must be a simple s2-* or s3-* name')
 
 
 def credentials():
@@ -286,10 +286,10 @@ def main(stream: str = '', model: str = 'sol', branch: str = '', brief: str = ''
         entry = {**entry, **registry.get(f'{stop}:launch', {})}
         print(f'Stop requested for {stop}; allow 30s plus final push. Emergency: modal app stop {entry.get("app_id", "APP_ID")}')
         return
-    branch = branch or f's2-{stream}'
+    branch = branch or f's3-{stream}'
     validate(stream, model, branch)
-    if not 60 <= duration <= 9000:
-        raise ValueError('duration must be 60–9000 seconds')
+    if not 60 <= duration <= 28800:
+        raise ValueError('duration must be 60–28800 seconds')
     if not brief:
         raise ValueError('--brief path-or-text is required')
     try:
