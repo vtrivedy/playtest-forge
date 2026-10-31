@@ -41,6 +41,8 @@ export type CameraPath = {
 
 export type CameraTunables = {
   distance: number;
+  /** Terrain compression hands off to the cutout before the lens enters the animal. */
+  minDistance: number;
   height: number;
   lookHeight: number;
   airDistance: number;
@@ -107,6 +109,7 @@ export function createFollowCamera(opts: {
 } = {}): FollowCamera {
   const params: CameraTunables = {
     distance: 3.8,
+    minDistance: 2.6,
     height: 1.25,
     lookHeight: 0.62,
     airDistance: 4.8,
@@ -154,15 +157,17 @@ export function createFollowCamera(opts: {
   let sceneryLimit = 1;
   let sceneryName = '';
   let sceneryFade = 0;
+  let terrainFade = false;
+  let floorLift = 0;
   const landAt = new THREE.Vector3();
   const ndc = new THREE.Vector3();
   /** Where the fox / predicted landing sit on screen (NDC) — framing metrics for the harness */
   const debug = {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
-    blocked: () => sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
+    blocked: () => terrainFade || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
     internals: () =>
-      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
+      `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} floorLift=${floorLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} blocker=${sceneryName}`,
   };
   let shotW = 0;
   /** Active authored path (restore cinematic) */
@@ -240,10 +245,11 @@ export function createFollowCamera(opts: {
    * rises too steeply, pull in to just short of the first blocking sample. Returns the boom
    * fraction to keep and the lift to add (callers smooth these — no pops).
    */
-  const boom = { t: 1, lift: 0 };
-  function sweepBoom(focus: THREE.Vector3, cam: THREE.Vector3) {
+  const boom = { t: 1, lift: 0, fade: false };
+  function sweepBoom(focus: THREE.Vector3, cam: THREE.Vector3, preserveBodyRoom = true) {
     boom.t = 1;
     boom.lift = 0;
+    boom.fade = false;
     if (!opts.surfaceAt) return boom;
     const steps = 10;
     let lift = 0;
@@ -273,7 +279,10 @@ export function createFollowCamera(opts: {
         break;
       }
     }
-    boom.t = Math.max(0.3, (firstBlocked - 1) / steps);
+    const collisionT = Math.max(0.3, (firstBlocked - 1) / steps);
+    const readableT = preserveBodyRoom ? Math.min(1, params.minDistance / Math.max(0.01, focus.distanceTo(cam))) : 0;
+    boom.t = Math.max(collisionT, readableT);
+    boom.fade = readableT > collisionT;
     boom.lift = maxLift;
     return boom;
   }
@@ -289,6 +298,7 @@ export function createFollowCamera(opts: {
   // Query back faces too: the focus can enter a thin wall during a turn.
   // Never change render materials (shared buckets would change their appearance).
   const queryMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const queryArrays = new WeakMap<THREE.Material[], THREE.Material[]>();
   opts.scenery?.updateWorldMatrix(true, true);
   opts.scenery?.traverse((o) => {
     const mesh = o as THREE.Mesh;
@@ -366,7 +376,14 @@ export function createFollowCamera(opts: {
         if (probe !== mesh) probe.matrixWorld.copy(mesh.matrixWorld);
         const renderMaterial = probe.material;
         try {
-          probe.material = queryMaterial;
+          if (Array.isArray(renderMaterial)) {
+            let queryArray = queryArrays.get(renderMaterial);
+            if (!queryArray || queryArray.length !== renderMaterial.length) {
+              queryArray = renderMaterial.map(() => queryMaterial);
+              queryArrays.set(renderMaterial, queryArray);
+            }
+            probe.material = queryArray;
+          } else probe.material = queryMaterial;
           probe.raycast(sight, sightHits);
         } finally {
           probe.material = renderMaterial;
@@ -429,7 +446,7 @@ export function createFollowCamera(opts: {
       shotLook.y + Math.sin(elev) * need,
       shotLook.z + Math.cos(a) * Math.cos(elev) * need,
     );
-    const b = sweepBoom(shotLook, shotPos);
+    const b = sweepBoom(shotLook, shotPos, false);
     applyBoom(shotLook, shotPos, b.t, b.lift);
   }
 
@@ -458,6 +475,10 @@ export function createFollowCamera(opts: {
     },
     pathState: () => (path ? { t: path.t, w: path.w, yielding: path.yielding } : null),
     playShot(s) {
+      // Global restoration may light a seedwell across the realm. A reactive
+      // celebration must never take the lens away from the travelling hero.
+      const hero = s.subjects[0];
+      if (!hero || s.subjects.some((subject) => subject.distanceToSquared(hero) > 12 * 12)) return;
       // a shot already on screen just extends; restarting would pop from its pose back to traversal
       if (shot) {
         if (!shot.yielding) shot.end = Math.max(shot.end, shot.t + s.holdS + (shot.blendS ?? 0.6));
@@ -552,7 +573,7 @@ export function createFollowCamera(opts: {
         aim.z += (landAt.z - aim.z) * w;
         // drops: tilt toward the landing height and raise the lens so the ground you'll hit is visible
         aim.y += (Math.max(landAt.y, focusY - 10) - focusY) * Math.min(0.7, 0.15 + drop * 0.07) * landW * descending;
-        dropLift = Math.min(3.5, drop * 0.3) * landW;
+        dropLift = Math.min(3.5, drop * 0.3) * landW * descending;
         goalDist += Math.min(2, Math.max(0, spread - 4) * 0.2 + drop * 0.1) * landW;
       }
       if (pullHold > 0) pullHold -= dt;
@@ -567,6 +588,7 @@ export function createFollowCamera(opts: {
       // boom collision: pull in fast, release slowly; lift eases (no pops at ledges/walls)
       boomFocus.set(p.x, focusY + params.lookHeight, p.z);
       const b = sweepBoom(boomFocus, desired);
+      terrainFade = b.fade;
       if (!initialized) {
         boomT = b.t;
         boomLift = b.lift;
@@ -622,7 +644,7 @@ export function createFollowCamera(opts: {
           // reward framing yields to play: any jump/dash, or the fox / its landing leaving the safe
           // frame, starts the blend-out from the *current* weight (works mid blend-in, no pop)
           ndc.set(p.x, p.y + 0.6, p.z).project(camera);
-          let leaving = Math.abs(ndc.x) > 0.8 || Math.abs(ndc.y) > 0.8 || ndc.z > 1 || !f.grounded || f.dashing;
+          let leaving = speed > 1.5 || Math.abs(ndc.x) > 0.8 || Math.abs(ndc.y) > 0.8 || ndc.z > 1 || !f.grounded || f.dashing;
           if (!leaving && f.landing) {
             ndc.copy(f.landing).project(camera);
             leaving = Math.abs(ndc.x) > 0.85 || Math.abs(ndc.y) > 0.85 || ndc.z > 1;
@@ -685,10 +707,14 @@ export function createFollowCamera(opts: {
       }
       shotW = Math.max(shotW, pathW);
       outPos.y += dip * (1 - shotW);
+      floorLift = 0;
       // the rendered lens (shot blend + dip) gets the same floor guarantee as the rig
       if (opts.surfaceAt) {
         const floor = opts.surfaceAt(outPos.x, outPos.z, outPos.y + 1.5);
-        if (Number.isFinite(floor) && outPos.y < floor + params.clearance * 0.8) outPos.y = floor + params.clearance * 0.8;
+        if (Number.isFinite(floor) && outPos.y < floor + params.clearance * 0.8) {
+          floorLift = floor + params.clearance * 0.8 - outPos.y;
+          outPos.y += floorLift;
+        }
       }
 
       // The final floor guarantee can raise the lens after compression / landing dip.

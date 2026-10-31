@@ -10,8 +10,10 @@ export const FOX_LOOK = {
   furSaturation: 0.85,
   furValue: 0.95,
   /** painterly value strokes (object-space clumps laid along the body) */
-  strokeStrength: 0.12,
+  strokeStrength: 0.18,
   strokeScale: 1.0,
+  /** Amount of the two thin skinned coat fringe layers; 0 returns to the original surface. */
+  furFringe: 1.0,
   /** broken amber rim at grazing angles = the spirit glow at the silhouette */
   rimStrength: 0.22,
   rimPower: 2.5,
@@ -28,6 +30,7 @@ export const FOX_LOOK = {
 };
 
 type FurUniforms = {
+  uFringe: { value: number };
   uTint: { value: THREE.Vector3 };
   uSatVal: { value: THREE.Vector2 };
   uStroke: { value: THREE.Vector2 };
@@ -35,6 +38,7 @@ type FurUniforms = {
   uRimColor: { value: THREE.Color };
 };
 const furUniforms: FurUniforms = {
+  uFringe: { value: 1 },
   uTint: { value: new THREE.Vector3() },
   uSatVal: { value: new THREE.Vector2() },
   uStroke: { value: new THREE.Vector2() },
@@ -46,6 +50,7 @@ const eyeMats: THREE.MeshStandardMaterial[] = [];
 /** Push FOX_LOOK into the shared uniforms (cheap; call per frame). */
 function syncLook() {
   const L = FOX_LOOK;
+  furUniforms.uFringe.value = L.furFringe;
   furUniforms.uTint.value.set(...L.furTint);
   furUniforms.uSatVal.value.set(L.furSaturation, L.furValue);
   furUniforms.uStroke.value.set(L.strokeStrength, L.strokeScale);
@@ -64,19 +69,28 @@ float fxNoise(vec3 x) {
                  mix(fxHash(i + vec3(0, 1, 1)), fxHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
 }`;
 
-function patchFur(mat: THREE.MeshStandardMaterial) {
+function patchFur(mat: THREE.MeshStandardMaterial, fringeLength = 0, fringeAlpha = 0.22) {
   const shell = mat.name.toLowerCase().includes("shell");
   const tail = mat.name.toLowerCase().startsWith('foxtailfur');
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, furUniforms);
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vRest;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
+      .replace('#include <common>', `#include <common>
+varying vec3 vRest;
+${fringeLength ? `uniform float uFringe; attribute float aFurMask; varying float vFurMask;` : ''}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vRest = position;
+${fringeLength ? `
+  // Offset in bind space before skinning, so fringe follows the exact authored pose.
+  vFurMask = aFurMask;
+  transformed += normalize(normal + vec3(0.0, -0.2, -0.2)) * ${fringeLength.toFixed(3)} * uFringe * aFurMask;
+` : ''}`);
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
 varying vec3 vRest;
+${fringeLength ? 'uniform float uFringe; varying float vFurMask;' : ''}
 uniform vec3 uTint; uniform vec2 uSatVal; uniform vec2 uStroke; uniform vec4 uRim; uniform vec3 uRimColor;
 ${NOISE_GLSL}`,
       )
@@ -84,7 +98,8 @@ ${NOISE_GLSL}`,
         '#include <map_fragment>',
         `#ifdef USE_MAP
   // Prefer broad painted values over the baked fine fur speckle.
-  diffuseColor = vec4(diffuse, opacity) * texture2D(map, vMapUv, 1.0);
+  diffuseColor = vec4(diffuse, opacity) * texture2D(map, vMapUv, 0.4);
+  ${tail && !shell ? "diffuseColor.a = opacity;" : ""}
 #endif
 {
   // clumps elongated along the body (+Z forward in rest space) and down the legs
@@ -97,31 +112,37 @@ ${NOISE_GLSL}`,
   float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
   vec3 graded = mix(vec3(lum), c, uSatVal.x) * uTint;
   diffuseColor.rgb = mix(c, graded, smoothstep(0.25, 0.55, sat)) * uSatVal.y;
+  ${tail ? `
+  #ifdef USE_MAP
+    float handoff = smoothstep(0.50, 0.82, 1.0 - vMapUv.y);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.80, 0.35, 0.07), handoff * 0.6);
+  #endif` : ''}
 }`,
       )
       .replace(
         '#include <opaque_fragment>',
         `{
-  float facing = saturate(dot(normal, normalize(vViewPosition)));
-  ${shell ? "diffuseColor.a *= (1.0 - smoothstep(0.12, 0.7, facing)) * 0.22; if (diffuseColor.a < 0.01) discard;" : ""}
+  float facing = saturate(dot(${fringeLength ? 'normalize(vNormal)' : 'normal'}, normalize(vViewPosition)));
+  ${shell ? `diffuseColor.a *= (1.0 - smoothstep(0.05, 0.45, facing)) * ${tail ? "0.075" : fringeAlpha.toFixed(3)}; if (diffuseColor.a < 0.01) discard;` : ""}
+  ${fringeLength ? `float tuft = fxNoise(vRest * vec3(10.0, 10.0, 3.0)); diffuseColor.a *= smoothstep(${fringeLength > 0.04 ? "0.4, 0.8" : "0.1, 0.5"}, tuft) * vFurMask * uFringe; if (diffuseColor.a < 0.001) discard;` : ''}
   float fres = pow(1.0 - facing, uRim.y);
   float strands = smoothstep(0.2, 0.8, fxNoise(vRest * vec3(9.0, 6.0, 2.5)));
-  outgoingLight += uRimColor * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
+  outgoingLight += uRimColor * ${fringeLength ? "0.0" : "1.0"} * uRim.x * fres * (0.35 + 0.65 * strands) * diffuseColor.a;
   ${tail ? `
   #ifdef USE_MAP
     // Authored tail UV: V=1 at the root, V=0 at tail_08.
     float tailAlong = 1.0 - vMapUv.y;
-    float tipHeat = smoothstep(0.60, 1.0, tailAlong);
-    outgoingLight += uRimColor * 0.25 * tipHeat;
-    float tipCoverage = 1.0 - smoothstep(0.60, 1.0, tailAlong);
-    diffuseColor.a *= tipCoverage;
-    if (diffuseColor.a < 0.02) discard;
+    float tipHeat = smoothstep(0.68, 0.88, tailAlong);
+    outgoingLight += vec3(1.0, 0.4, 0.075) * 0.4 * tipHeat;
+    float tipCoverage = 1.0 - smoothstep(0.70, 0.90, tailAlong);
+    ${shell ? "diffuseColor.a *= tipCoverage;" : "diffuseColor.a = tipCoverage;"}
+    if (diffuseColor.a < ${shell ? "0.01" : "0.45"}) discard;
   #endif` : ''}
 }
 #include <opaque_fragment>`,
       );
   };
-  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}`;
+  mat.customProgramCacheKey = () => `fox-fur-${shell ? 'edge' : 'body'}-${tail ? 'tail' : 'coat'}-${fringeLength}-${fringeAlpha}`;
   mat.needsUpdate = true;
 }
 
@@ -159,17 +180,19 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
         `{
   vec3 c = vRest.x > 0.0 ? uEyeL : uEyeR;
   vec2 q = (vRest.zy - c.zy) / uEyeR0;          // forward, up in units of the eye radius
+  q.y += q.x * 0.10; // the rear corner rises subtly into the brow
   float d = length(q);
-  float aperture = length(q / vec2(1.0, 0.62));
-  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.2, 0.78)));
+  float aperture = length(q / vec2(1.0, 0.5));
+  if (aperture > 0.82) discard;
+  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.12, 0.30)));
   vec3 iris = mix(vec3(0.48, 0.23, 0.055), vec3(0.22, 0.075, 0.018), smoothstep(0.15, 0.85, d));
-  iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.7, 0.95, d));   // limbal ring + lid shadow
+  iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.74, 0.78, aperture));   // fine umber iris boundary
   iris = mix(iris, vec3(0.02, 0.01, 0.008), pupil);
-  float glint = 1.0 - smoothstep(0.08, 0.14, length(q - vec2(0.3, 0.32)));
-  // Warm lid rim encloses an almond aperture; no white sclera ring.
-  float lid = smoothstep(0.72, 0.98, aperture);
-  iris = mix(iris, vec3(0.045, 0.019, 0.009), lid);
-  vec2 tearCorner = q - vec2(0.8, -0.25);
+  float glint = 1.0 - smoothstep(0.045, 0.085, length(q - vec2(0.22, 0.14)));
+  // The head is closed under the eye: outside the fine lid, reveal real coat geometry.
+  float lid = smoothstep(0.76, 0.82, aperture);
+  iris = mix(iris, vec3(0.055, 0.024, 0.012), lid);
+  vec2 tearCorner = q - vec2(0.72, -0.15);
   float tear = exp(-40.0 * dot(tearCorner, tearCorner)) * lid;
   iris = mix(iris, vec3(0.095, 0.038, 0.016), tear * 0.45);
   diffuseColor.rgb = mix(iris, vec3(1.0, 0.88, 0.62), glint * (1.0 - lid));
@@ -186,6 +209,7 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
 
 /** Material pass over the loaded GLB (spirit FX cards, eyes, nose, fur). */
 export function applyFoxLook(root: THREE.Object3D) {
+  const coats: { mesh: THREE.SkinnedMesh; mat: THREE.MeshStandardMaterial }[] = [];
   root.traverse((c) => {
     if (!(c as THREE.Mesh).isMesh) return;
     const mesh = c as THREE.Mesh;
@@ -206,6 +230,7 @@ export function applyFoxLook(root: THREE.Object3D) {
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
       } else if (n.includes('fur')) {
+        if (n === 'foxfur' && (mesh as THREE.SkinnedMesh).isSkinnedMesh) coats.push({ mesh: mesh as THREE.SkinnedMesh, mat });
         // The opaque coat supplies the soft shadow; shell shadow maps ignore our grazing-angle fade.
         if (n.includes('shell')) {
           mesh.castShadow = false;
@@ -215,18 +240,17 @@ export function applyFoxLook(root: THREE.Object3D) {
           mat.alphaTest = 0;
         }
         if (n.startsWith('foxtailfur')) {
-          mat.transparent = true;
+          mat.transparent = n.includes('shell');
           mat.depthWrite = !n.includes('shell');
           if (!n.includes('shell')) {
             mesh.renderOrder = 1;
             // Match the shadow silhouette to the visible disappearing tip.
-            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: mat.map, alphaTest: 0.02 });
+            const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+            depth.defines = { USE_UV: '' };
             depth.onBeforeCompile = (shader) => {
               shader.fragmentShader = shader.fragmentShader.replace('#include <alphatest_fragment>', `
-#ifdef USE_MAP
-  diffuseColor.a *= 1.0 - smoothstep(0.60, 1.0, 1.0 - vMapUv.y);
-#endif
-#include <alphatest_fragment>`);
+// ShadowMap overwrites alphaTest from the opaque source material; use an explicit cutoff.
+if (1.0 - smoothstep(0.70, 0.90, 1.0 - vUv.y) < 0.45) discard;`);
             };
             depth.customProgramCacheKey = () => 'fox-tail-depth';
             mesh.customDepthMaterial = depth;
@@ -234,20 +258,58 @@ export function applyFoxLook(root: THREE.Object3D) {
         }
         mat.color.setHex(0xffffff);
         mat.roughness = 0.85;
-        mat.normalScale.setScalar(0.2);
+        mat.normalScale.setScalar(0.35);
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
         patchFur(mat);
       }
     }
   });
+  // Append after traversal: each surface shares the source skeleton and bind matrices, never new bones.
+  for (const { mesh, mat } of coats) {
+    const R = FOX_RIG;
+    const full = new Set<string>([R.pelvis, ...R.spine, ...R.neck]);
+    const short = new Set<string>(['l', 'r'].flatMap((side) => {
+      const s = side as 'l' | 'r', f = R.foreleg(s), h = R.hindleg(s);
+      return [f.scapula, f.upper, h.hip, h.thigh];
+    }));
+    const g = mesh.geometry, si = g.getAttribute('skinIndex'), sw = g.getAttribute('skinWeight'), p = g.getAttribute('position');
+    const mask = new Float32Array(si.count);
+    for (let i = 0; i < si.count; i++) {
+      for (let k = 0; k < 4; k++) {
+        const name = mesh.skeleton.bones[si.getComponent(i, k)]?.name ?? '';
+        let amount = full.has(name) ? 1 : short.has(name) ? 0.5 : 0;
+        if (name === R.head) amount = 0.5 * (1 - THREE.MathUtils.smoothstep(p.getZ(i), 0.85, 1.28)) * (1 - THREE.MathUtils.smoothstep(p.getY(i), 2.6, 2.85));
+        mask[i] += sw.getComponent(i, k) * amount;
+      }
+    }
+    g.setAttribute('aFurMask', new THREE.BufferAttribute(mask, 1));
+    for (const [i, [length, alpha]] of [[0.03, 0.35], [0.06, 0.25]].entries()) {
+      const fringe = mesh.clone(false);
+      const material = mat.clone();
+      material.name = `FoxFurShellCoat${i + 1}`;
+      material.transparent = true;
+      material.depthWrite = false;
+      material.alphaTest = 0;
+      material.normalMap = null;
+      patchFur(material, length, alpha);
+      fringe.name = `FoxCoatFringe${i + 1}`;
+      fringe.material = material;
+      fringe.castShadow = false;
+      fringe.receiveShadow = true;
+      fringe.renderOrder = 2;
+      fringe.frustumCulled = false;
+      mesh.parent!.add(fringe);
+    }
+  }
+  root.userData.coatFringeLayers = coats.length * 2;
   syncLook();
 }
 
 // ------------------------------------------------------------------------------------------- spirit fire
 
 type Anchor = { mesh: THREE.SkinnedMesh; index: number };
-type Lick = { a: Anchor; h: number; w: number; seed: number; lean: number; tailFlow: boolean };
+type Lick = { a: Anchor; h: number; w: number; seed: number; lean: number; tailFlow: boolean; flow?: { from: THREE.Bone; to: THREE.Bone; after?: THREE.Bone } };
 
 /** Surface points whose dominant bone is in `bones` and whose rest normal points up enough. */
 function surfacePoints(mesh: THREE.SkinnedMesh, bones: readonly string[], minUp: number): number[] {
@@ -268,26 +330,28 @@ function surfacePoints(mesh: THREE.SkinnedMesh, bones: readonly string[], minUp:
 }
 
 const LICK_VERT = /* glsl */ `
-attribute vec3 aPos; attribute vec3 aDir; attribute vec3 aShape; // w, h, seed
+attribute vec3 aPos; attribute vec3 aDir; attribute vec3 aBend; attribute vec4 aShape; // w, h, seed, crest
 attribute float aAlpha;
-varying vec2 vUv; varying float vSeed; varying float vAlpha;
+varying vec2 vUv; varying float vSeed; varying float vAlpha; varying float vCrest;
 void main() {
-  vUv = uv; vSeed = aShape.z; vAlpha = aAlpha;
-  vec3 viewDir = normalize(cameraPosition - aPos);
-  vec3 across = cross(aDir, viewDir);
+  vUv = uv; vSeed = aShape.z; vAlpha = aAlpha; vCrest = aShape.w;
+  vec3 center = aPos + (aDir * uv.y + aBend * uv.y * uv.y) * aShape.y;
+  vec3 tangent = normalize(aDir + 2.0 * aBend * uv.y);
+  vec3 viewDir = normalize(cameraPosition - center);
+  vec3 across = cross(tangent, viewDir);
   // A nearly head-on wisp still has a stable width.
-  vec3 fallback = cross(aDir, vec3(0.0, 0.0, 1.0));
-  if (length(fallback) < 0.01) fallback = cross(aDir, vec3(0.0, 1.0, 0.0));
+  vec3 fallback = cross(tangent, vec3(0.0, 0.0, 1.0));
+  if (length(fallback) < 0.01) fallback = cross(tangent, vec3(0.0, 1.0, 0.0));
   fallback = normalize(fallback);
   if (dot(fallback, across) < 0.0) fallback = -fallback;
   vec3 side = normalize(mix(fallback, across, smoothstep(0.0, 0.05, length(across))));
   float bend = sin(uv.y * 4.5 + aShape.z) * uv.y * uv.y * aShape.x * 0.65;
-  vec3 p = aPos + side * ((uv.x - 0.5) * aShape.x + bend) + aDir * uv.y * aShape.y;
+  vec3 p = center + side * ((uv.x - 0.5) * aShape.x + bend);
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
 const LICK_FRAG = /* glsl */ `
 uniform float uTime; uniform float uIntensity;
-varying vec2 vUv; varying float vSeed; varying float vAlpha;
+varying vec2 vUv; varying float vSeed; varying float vAlpha; varying float vCrest;
 ${NOISE_GLSL}
 void main() {
   float y = vUv.y;
@@ -297,11 +361,15 @@ void main() {
   float width = mix(0.36, 0.07, y);
   float body = exp(-2.0 * x * x / (width * width));
   body *= smoothstep(0.0, 0.12, y) * (1.0 - smoothstep(0.6, 1.0, y));
-  float breathe = 0.4 + 0.6 * pow(0.5 + 0.5 * sin(uTime * 1.1 + vSeed * 3.0), 2.0);
-  vec3 col = mix(vec3(1.0, 0.25, 0.055), vec3(1.0, 0.65, 0.28), smoothstep(0.1, 0.85, y)) * 1.2;
-  float a = body * vAlpha * uIntensity * 0.32 * breathe;
+  // Broad, slow variation keeps the flame present between breaths, without glitter noise.
+  float breathe = 0.72 + 0.28 * sin(uTime * 1.1 + vSeed * 3.0);
+  body *= mix(0.65, 1.0, fxNoise(vec3(vUv * vec2(3.0, 4.0), uTime * 0.4 + vSeed)));
+  vec3 rootColor = mix(vec3(1.0, 0.26, 0.04), vec3(0.95, 0.16, 0.025), vCrest);
+  vec3 tipColor = mix(vec3(1.0, 0.50, 0.13), vec3(0.95, 0.34, 0.06), vCrest);
+  vec3 col = mix(rootColor, tipColor, smoothstep(0.1, 0.85, y));
+  float a = body * vAlpha * uIntensity * 0.70 * breathe;
   if (a < 0.003) discard;
-  gl_FragColor = vec4(col * a, a * 0.3);
+  gl_FragColor = vec4(col * a, a * 0.85);
 }`;
 const EMBER_VERT = /* glsl */ `
 attribute float aSize; attribute float aHeat;
@@ -337,13 +405,13 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const body = skinned.find((m) => matName(m) === 'foxfur');
   const tail = skinned.find((m) => matName(m) === 'foxtailfur');
   const R = FOX_RIG;
-  // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — small ear smoulders, broad tail wake
+  // [mesh, bones, min rest normal.y, wisps, height m, width m, lean back] — small ear smoulders, tapered tail brush
   const spec: [THREE.SkinnedMesh | undefined, readonly string[], number, number, number, number, number][] = [
-    [body, [R.spine[3], R.neck[0]], 0.45, 3, 0.12, 0.09, 0.7],
+    [body, [R.neck[1], R.neck[2]], 0.45, 3, 0.22, 0.10, 0.7],
     [body, [R.spine[1], R.spine[2], R.spine[0], R.pelvis], 0.75, 0, 0.18, 0.06, 0.8],
-    [tail, R.tail.slice(2, 6), 0.15, 12, 0.36, 0.22, 0.9],
-    [body, R.ear("l").slice(2), -1.0, 2, 0.065, 0.05, 0.4],
-    [body, R.ear("r").slice(2), -1.0, 2, 0.065, 0.05, 0.4],
+    [tail, R.tail.slice(4, 7), 0.15, 8, 0.58, 0.13, 0.8],
+    [body, R.ear("l").slice(3), -1.0, 2, 0.14, 0.035, 0.8],
+    [body, R.ear("r").slice(3), -1.0, 2, 0.14, 0.035, 0.8],
   ];
   const licks: Lick[] = [];
   const emberPool: Anchor[] = [];
@@ -351,11 +419,35 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
   for (const [mesh, bones, minUp, n, h, w, lean] of spec) {
     if (!mesh) continue;
-    const pts = surfacePoints(mesh, bones, minUp);
+    const surface = surfacePoints(mesh, bones, minUp);
+    const uv = mesh.geometry.getAttribute('uv');
+    const pts = mesh === tail ? surface.filter((i) => 1 - uv.getY(i) >= 0.55) : surface;
     if (!pts.length) continue;
+    const crest = mesh !== tail && n > 0;
+    const ear = bones.some((b) => b.startsWith('ear_'));
+    const positions = mesh.geometry.getAttribute('position');
+    const highest = crest ? Math.max(...pts.map((i) => positions.getY(i))) : 0;
+    const wickPts = crest ? pts.filter((i) => positions.getY(i) >= highest - (ear ? 0.015 : 0.08)) : pts;
+    const joints = mesh.geometry.getAttribute('skinIndex'), weights = mesh.geometry.getAttribute('skinWeight');
+    const pointBone = (index: number) => {
+      let slot = 0;
+      for (let k = 1; k < 4; k++) if (weights.getComponent(index, k) > weights.getComponent(index, slot)) slot = k;
+      return mesh.skeleton.bones[joints.getComponent(index, slot)]!;
+    };
+    const tailBuckets = mesh === tail ? bones.map((name) => pts.filter((index) => pointBone(index).name === name)) : [];
     for (let i = 0; i < n; i++) {
-      const index = pts[Math.floor(rnd() * pts.length)]!;
-      licks.push({ a: { mesh, index }, h: h * (0.7 + 0.6 * rnd()), w: w * (0.8 + 0.4 * rnd()), seed: rnd() * 10, lean, tailFlow: mesh === tail });
+      const bucket = mesh === tail ? tailBuckets[i % tailBuckets.length]! : wickPts;
+      const candidates = bucket.length ? bucket : pts;
+      const index = candidates[Math.floor(rnd() * candidates.length)]!;
+      let flow: Lick['flow'];
+      if (mesh === tail) {
+        const from = pointBone(index);
+        const segment = R.tail.findIndex((name) => name === from.name);
+        const to = mesh.skeleton.bones.find((bone) => bone.name === R.tail[segment + 1]);
+        const after = mesh.skeleton.bones.find((bone) => bone.name === R.tail[segment + 2]);
+        if (to) flow = { from, to, after };
+      }
+      licks.push({ a: { mesh, index }, h: h * (0.7 + 0.6 * rnd()), w: w * (0.8 + 0.4 * rnd()), seed: rnd() * 10, lean, tailFlow: mesh === tail, flow });
     }
     const sparkPts = mesh === tail ? surfacePoints(mesh, R.tail.slice(2, 6), -1) : pts;
     const sourcePts = sparkPts.length ? sparkPts : pts;
@@ -363,7 +455,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     for (let i = 0; i < count; i++) emberPool.push({ mesh, index: sourcePts[Math.floor(rnd() * sourcePts.length)]! });
   }
 
-  const diagnostics = { wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
+  const diagnostics = { coatFringeLayers: root.userData.coatFringeLayers as number, wisps: licks.length, sourceAnchors: emberPool.length, liveEmbers: 0, speed: 0, visible: true };
   group.userData.spiritFx = diagnostics;
 
   // flame licks: one instanced billboard per lick
@@ -374,9 +466,10 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   lg.setAttribute('uv', quad.getAttribute('uv'));
   const aPos = new THREE.InstancedBufferAttribute(new Float32Array(licks.length * 3), 3);
   const aDir = new THREE.InstancedBufferAttribute(new Float32Array(licks.length * 3), 3);
-  const aShape = new THREE.InstancedBufferAttribute(new Float32Array(licks.length * 3), 3);
+  const aBend = new THREE.InstancedBufferAttribute(new Float32Array(licks.length * 3), 3);
+  const aShape = new THREE.InstancedBufferAttribute(new Float32Array(licks.length * 4), 4);
   const aAlpha = new THREE.InstancedBufferAttribute(new Float32Array(licks.length), 1);
-  for (const [k, a] of Object.entries({ aPos, aDir, aShape, aAlpha })) {
+  for (const [k, a] of Object.entries({ aPos, aDir, aBend, aShape, aAlpha })) {
     a.setUsage(THREE.DynamicDrawUsage);
     lg.setAttribute(k, a);
   }
@@ -414,7 +507,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
   embers.renderOrder = 3;
 
   const tmp = new THREE.Vector3(), prev = new THREE.Vector3(), vel = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-  const dir = new THREE.Vector3(), backward = new THREE.Vector3();
+  const dir = new THREE.Vector3(), backward = new THREE.Vector3(), curve = new THREE.Vector3();
   let hasPrev = false, visible = true, spawnAcc = 0, pending = 0, next = 0, time = 0, speed = 0;
   const anchorPos = (a: Anchor, out: THREE.Vector3) => a.mesh.getVertexPosition(a.index, out).applyMatrix4(a.mesh.matrixWorld);
   const anchorMeshes = [...new Set([...licks.map((l) => l.a.mesh), ...emberPool.map((a) => a.mesh)])];
@@ -427,17 +520,34 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
     const L = FOX_LOOK;
     licks.forEach((lk, i) => {
       anchorPos(lk.a, tmp);
+      if (lk.flow) {
+        dir.setFromMatrixPosition(lk.flow.to.matrixWorld);
+        backward.setFromMatrixPosition(lk.flow.from.matrixWorld);
+        dir.sub(backward).normalize().addScaledVector(up, 0.12);
+        if (lk.flow.after) {
+          curve.setFromMatrixPosition(lk.flow.after.matrixWorld);
+          backward.setFromMatrixPosition(lk.flow.to.matrixWorld);
+          curve.sub(backward).normalize();
+        } else curve.copy(dir);
+        curve.addScaledVector(up, 0.5).normalize();
+      } else {
+        backward.set(0, 0, -1).transformDirection(group.matrixWorld);
+        dir.copy(up).multiplyScalar(0.8).addScaledVector(backward, 0.65);
+      }
+      dir.addScaledVector(vel, -L.lickStream * lk.lean * (lk.tailFlow ? 0.04 : 0.25)).normalize();
+      if (lk.flow) curve.sub(dir).multiplyScalar(0.5);
+      else curve.set(0, 0, 0);
+      aBend.setXYZ(i, curve.x, curve.y, curve.z);
+      tmp.addScaledVector(dir, 0.015);
       aPos.setXYZ(i, tmp.x, tmp.y, tmp.z);
-      dir.copy(up);
-      if (lk.tailFlow) dir.multiplyScalar(0.55).add(backward.set(0, 0, -1).transformDirection(group.matrixWorld).multiplyScalar(0.9));
-      dir.addScaledVector(vel, -L.lickStream * lk.lean * 0.25).normalize();
       aDir.setXYZ(i, dir.x, dir.y, dir.z);
       const flick = 0.75 + 0.25 * Math.sin(time * (5 + lk.seed) + lk.seed * 3) * Math.sin(time * 2.3 + lk.seed);
-      const stretch = (0.65 + 0.35 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (1 + Math.min(1, speed * 0.12) * lk.lean);
-      aShape.setXYZ(i, lk.w * L.lickScale, lk.h * L.lickScale * flick * stretch, lk.seed);
+      const restScale = lk.tailFlow ? 0.65 : 0.95;
+      const stretch = THREE.MathUtils.lerp(restScale, 1, THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (1 + Math.min(1, speed * 0.12) * lk.lean);
+      aShape.setXYZW(i, lk.w * L.lickScale, lk.h * L.lickScale * flick * stretch, lk.seed, lk.tailFlow ? 0 : 1);
       aAlpha.setX(i, 0.45 + 0.35 * flick);
     });
-    aPos.needsUpdate = aDir.needsUpdate = aShape.needsUpdate = aAlpha.needsUpdate = true;
+    aPos.needsUpdate = aDir.needsUpdate = aBend.needsUpdate = aShape.needsUpdate = aAlpha.needsUpdate = true;
     for (; pending > 0 && emberPool.length; pending--) {
       const i = next; next = (next + 1) % N;
       anchorPos(emberPool[Math.floor(rnd() * emberPool.length)]!, tmp);
@@ -472,7 +582,7 @@ export function createSpiritFx(root: THREE.Object3D, group: THREE.Object3D): Spi
       diagnostics.speed = Number(speed.toFixed(2));
       diagnostics.liveEmbers = 0;
       lickMat.uniforms.uTime!.value = t;
-      lickMat.uniforms.uIntensity!.value = L.lickIntensity * (0.5 + 0.5 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (gliding ? 1.25 : 1);
+      lickMat.uniforms.uIntensity!.value = L.lickIntensity * (0.8 + 0.4 * THREE.MathUtils.smoothstep(speed, 0.5, 6)) * (gliding ? 1.25 : 1);
       spawnAcc += dt * (L.emberRate + L.emberRateSpeed * speed) * (gliding ? 1.6 : 1);
       pending = Math.min(N, pending + Math.floor(spawnAcc));
       spawnAcc -= Math.floor(spawnAcc);

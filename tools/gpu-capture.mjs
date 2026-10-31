@@ -663,6 +663,59 @@ try {
     report.videos.gait.game = await page.evaluate(() => window.__game);
     save('gait.json', report.videos.gait);
   }
+  if (wants('hub')) {
+    await boot(quality, true);
+    await page.addStyleTag({ content: '.lil-gui,#hud{visibility:hidden!important}' });
+    const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
+    await H('teleport', 0, y, 94, Math.PI);
+    const hubViews = [
+      ['arrival', [16, 10, 108], [-5, 2, 81], 52],
+      ['arrival-close', [8, 3.8, 98], [-10, 2, 85], 55],
+      ['well', [-2, 4, 91], [-9, 2, 82], 52],
+      ['west-exit', [-7, 7, 96], [-23, 2, 71], 56],
+      ['east-exit', [2, 6, 99], [18, 2, 80], 56],
+      ['north-exit', [0, 5, 97], [0, 2, 65], 55],
+    ];
+    for (const [name, lens, target, fov] of hubViews) {
+      await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
+    }
+    await H('photo', [8, 4.5, 101], [-8, 2, 86], 55); await advance(30);
+    const initial = await H('state');
+    await video('hub-arrive-idle', 15 * fps, async i => {
+      // One staged starting point, then the live controller. Arrival pauses at the well lane.
+      if (i < 3 * fps) await H('setStick', -.2, -.2); else await H('setStick', null);
+    }, undefined, {keyFrames: [0, 2*fps, 4*fps, 7*fps, 10*fps, 14*fps]});
+    await H('setStick', null);
+    const end = await H('state');
+    await H('photoOff'); await advance(30); await shot('hub-chase-arrived');
+    save('hub-acceptance.json', {label: 'Staged start and fixed village lens, then live arrival input and idle; separate chase still; no forced poses', initial, end, deaths: end.deaths-initial.deaths, game: await page.evaluate(() => window.__game)});
+    // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
+    const orbitCameras = [];
+    const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-7, 90));
+    const orbitTarget = [-7, targetGround + 1.2, 90];
+    const orbitLens = (angle, height) => [-9 + Math.sin(angle) * 30, height, 88 + Math.cos(angle) * 24];
+    // One fixed clearance height avoids frame-to-frame camera pops. The ellipse
+    // stays >2m outside every cottage roof footprint; low close/chase shots above
+    // retain the player-scale views. Every captured pose is checked and logged.
+    let orbitHeight = targetGround + 14;
+    for (const height of [6, 8, 10, 12, 14].map(h => targetGround + h)) {
+      let clear = true;
+      for (let j = 0; j < 36 && clear; j++) clear = !(await H('photoBlocker', orbitLens(j / 36 * Math.PI * 2, height), orbitTarget));
+      if (clear) { orbitHeight = height; break; }
+    }
+    let orbitBlocked = 0;
+    await video('hub-orbit', 18 * fps, async i => {
+      const lens = orbitLens(i / (18 * fps - 1) * Math.PI * 2, orbitHeight);
+      const blocker = await H('photoBlocker', lens, orbitTarget);
+      if (blocker) orbitBlocked++;
+      orbitCameras.push({ frame: i, lens, target: orbitTarget, blocker });
+      await H('photo', lens, orbitTarget, 58);
+    }, undefined, {keyFrames: [0, 3*fps, 6*fps, 9*fps, 12*fps, 15*fps, 18*fps-1]});
+    save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, blockedFrames: orbitBlocked, cameras: orbitCameras });
+    if (orbitBlocked) report.failures.push(`Hub context orbit has ${orbitBlocked} blocked review frames`);
+    await H('photoOff');
+
+  }
   if (wants('stills')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
@@ -689,22 +742,29 @@ try {
     await H('forceRestore'); await advance(660, false);
     await poseStill('establish-restored', poses.establish);
   }
-  if (wants('restoration')) {
+  if (wants('restoration') || wants('water')) {
     await boot(quality, true);
     await page.addStyleTag({ content: '#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }' });
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 70));
     if (!Number.isFinite(y) || y < -24) throw Error('Restoration review has no safe meadow surface');
     await H('teleport', 0, y, 70, Math.PI);
-    await H('photo', [10, y + 12, 82], [0, y, 68], 50);
+    await H('photo', [5, y + 6, 79], [-1, y, 70], 48);
     await advance(60); await shot('restoration-aura');
-    await H('setStick', 0, -1); await H('setKeys', ['ShiftLeft']);
-    await advance(18); await shot('restoration-dash');
+    await H('setStick', -1, 0); await H('setKeys', ['ShiftLeft']);
+    await advance(6); await shot('restoration-dash');
+    await advance(12);
     await H('setKeys', []); await H('setStick', null);
     await advance(60); await shot('restoration-wake');
     await advance(360); await shot('restoration-wake-decayed');
     // Reed Seedwell is at (95, 10), radius 35: the south front crosses z=45.
     // The meadow lens cannot see it, so use a separate fixed lens for the matched front pair.
-    await H('photo', [81, 23, 68], [83, 0, 41], 52);
+    const reedY = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(95, 10));
+    if (!Number.isFinite(reedY) || reedY < -24) throw Error('Restore front has no safe Reed island surface');
+    await H('teleport', 95, reedY, 10, Math.PI);
+    const restoreLens = [68, 21, 44];
+    const restoreLook = [91, 1, 15];
+    save('restoration-framing.json', { lens: restoreLens, look: restoreLook, fox: [95, reedY, 10], blocker: await H('photoBlocker', restoreLens, [95, reedY + 0.5, 10]) });
+    await H('photo', restoreLens, restoreLook, 60);
     await advance(1); await shot('restoration-front-before');
     // Existing staged latch hook exercises real Seedwell restore events, not a synthetic mask.
     await H('lightSeedwells');
@@ -713,6 +773,7 @@ try {
     }
     save('restoration-provenance.json', {
       label: 'STAGED fixed-lens visual review: real dash input, then staged public Seedwell latches',
+      note: 'All three staged latches activate their normal Shade encounters; actors may enter the Reed frame.',
       state: await H('state'), game: await page.evaluate(() => window.__game),
     });
   }
@@ -761,6 +822,8 @@ try {
     await H('setStick', null); await H('setKeys', []);
     save('water-pond-result.json', await H('state'));
     await H('photo', [-7, 7, 79], [-23, 0, 66], 52); await advance(2); await shot('water-pond-vista');
+    await H('photo', [-6, 1.3, 78], [-24, -0.22, 68], 52); await advance(2); await shot('water-pond-grazing');
+    await H('photo', [8, 3, 3], [8, -3.2, -7], 52); await advance(2); await shot('water-creek');
   }
   if (wants('updraft')) {
     // Heat element acceptance (docs/design/world-1.md §5.4): real inputs, no assists.
@@ -1077,7 +1140,7 @@ try {
   if (wants('reachsafe')) {
     await boot(quality,true);await RH('forceRestore');await advance(660,false);
     // Explicit staged setup for a supply-loss stress test; basin/float/seal states stay simulated.
-    await RH('teleport',171,30,-130,Math.PI/2);await advance(20,false);
+    await RH('teleport',172,30,-110,Math.PI/2);await advance(20,false);
     const bank=await RH('state');save('reach-bank-checkpoint.json',bank);if(!bank.reach.recoveryVisited)report.failures.push('Reach bank recovery did not activate');
     await RH('teleport',173,30,-116,Math.PI/2);await advance(60,false);
     await RH('teleport',188,30,-129,Math.PI/2);await RH('photo',[170,44,-103],[188,33,-123],52);
@@ -1094,7 +1157,7 @@ try {
     const t0=(await RH('state')).t;
     await RH('photoOff');await RH('setStick',-1,0);
     await video('reach-boarding-recovery',8*fps,async()=>{},st=>st.deaths>held.deaths&&Math.hypot(st.pos[0]-101,st.pos[2]+130)<3);
-    await RH('setStick',null);await shot('reach-recovered-bank');
+    await RH('setStick',null);await advance(60);await shot('reach-recovered-bank');
     const recovered=await RH('state'),seconds=recovered.t-t0;
     save('reach-recovery-acceptance.json',{seconds,deathsBefore:held.deaths,deathsAfter:recovered.deaths,end:recovered});
     if(recovered.deaths!==held.deaths+1||seconds>10||Math.hypot(recovered.pos[0]-101,recovered.pos[2]+130)>3)report.failures.push('Reach boarding recovery exceeded safe checkpoint contract');
@@ -1225,45 +1288,110 @@ try {
     }
     const start = await H('state');
     const spawnDistanceToFirst = Math.hypot(start.pos[0] - route[0].x, start.pos[1] - route[0].y, start.pos[2] - route[0].z);
+    if (kilnRoute && start.zone !== 'Lanternhollow') throw Error('Kiln proof requires natural spawn in the built Lanternhollow hub');
     if (kilnRoute && start.seedwells.some(s => s.id === 'SW1' && s.lit)) throw Error('Kiln proof requires an initially unlit SW1');
-    save('route-plan.json', { schemaVersion: 2, start: { pos: start.pos, seedwells: start.seedwells, deaths: start.deaths, auto: start.auto }, spawnDistanceToFirst, from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
+    save('route-plan.json', { schemaVersion: 2, start: { pos: start.pos, seedwells: start.seedwells, deaths: start.deaths, auto: start.auto }, spawnDistanceToFirst, from, to, endpoint: route[to - 1].label ?? null, staged: regional, label: regional ? 'Staged regional start; real unassisted traversal; does not prove realm completion' : kilnRoute ? 'Continuous Lanternhollow-to-Kiln clear plus live endpoint idle; no full-realm claim' : bounded ? 'Continuous route from natural spawn to authored endpoint; does not prove realm completion' : 'Full unassisted restoration route' });
     await H('autopilot', true, from, { assist: false });
-    let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion;
+    let restoredAt, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt;
     let kilnStopped = false;
+    const continuity = { maxStepMeters: 0, maxStepFrame: null, jumpLimitMeters: Math.max(3, 90 / fps), firstLargeStep: null };
+    const encounter = { initialHits: start.shades.hits, minWisps: start.shades.wisps, knockbackTravelMeters: 0 };
+    let previousPos = start.pos, previousKnockback = start.shades.knockbackTravel ?? 0, previousHits = start.shades.hits;
+    const framing = { samples: 0, outside: 0, maxAbsX: 0, maxAbsY: 0, firstFailure: null, failures: [] };
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const budgetFrames = Number(arg('route-seconds', '360')) * fps;
     if (kilnRoute && budgetFrames < 60 * fps) throw Error('Kiln proof requires a capture budget of at least 60 seconds');
     const state = await video(name, budgetFrames, async () => {
       if (kilnCompletedAt !== undefined && !kilnStopped) {
         await H('autopilot', false, kilnCompletion.idx, { assist: false });
-        await H('setKeys', []);
-        await H('setStick', null);
+        await H('setKeys', []); await H('setStick', null);
         kilnStopped = true;
       }
     }, (st, i) => {
       if (kilnLatchedAt === undefined && st.seedwells.some(s => s.id === 'SW1' && s.lit)) kilnLatchedAt = i;
       if (kilnRoute) {
-        if (kilnCompletedAt === undefined && st.auto.idx >= to && st.seedwells.some(s => s.id === 'SW1' && s.lit)) {
+        const endpoint = route[to - 1];
+        const distanceToFeed = Math.hypot(st.pos[0] - endpoint.x, st.pos[2] - endpoint.z);
+        const nearFeed = distanceToFeed <= 3 && Math.abs(st.pos[1] - endpoint.y) <= 1;
+        if (firstFeedCrossing === undefined && st.auto.idx >= to) firstFeedCrossing = { frame: i, pos: st.pos, distanceToFeed, grounded: st.grounded, kilnLit: st.seedwells.some(s => s.id === 'SW1' && s.lit) };
+        if (kilnCompletedAt === undefined && st.auto.idx >= to && st.seedwells.some(s => s.id === 'SW1' && s.lit) && st.grounded && nearFeed) {
           kilnCompletedAt = i;
-          kilnCompletion = { idx: st.auto.idx, pos: st.pos, t: st.t };
+          kilnCompletion = { idx: st.auto.idx, pos: st.pos, t: st.t, distanceToFeed, grounded: st.grounded, shades: { hits: st.shades.hits, wisps: st.shades.wisps } };
         }
-        // Hold the real endpoint under live physics for the remainder of the minute.
-        // Stalls remain short failed captures; a stopped successful bot is intentional.
-        return st.deaths > 0 || kilnCompletedAt === undefined && !st.auto.active || kilnCompletedAt !== undefined && i + 1 >= budgetFrames;
+        if (kilnCompletedAt !== undefined && departedAt === undefined && distanceToFeed > 3) departedAt = i;
+        // Explicit driver gate: real endpoint idle through 60s, never freeze physics/rendering.
+        return st.deaths > 0 || kilnCompletedAt === undefined && !st.auto.active || kilnCompletedAt !== undefined && i + 1 >= 60 * fps;
       }
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
-    });
-    await H('autopilot', false, state.auto.idx, { assist: false }); await shot('route-end');
+    }, { traceEveryFrame: budgetFrames <= 60 * fps, sample: async (i, st) => {
+      const audit = {};
+      if (kilnRoute) {
+        const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
+        if (step > continuity.maxStepMeters) { continuity.maxStepMeters = step; continuity.maxStepFrame = i; }
+        if ((!Number.isFinite(step) || step > continuity.jumpLimitMeters) && continuity.firstLargeStep === null) continuity.firstLargeStep = { frame: i, meters: Number.isFinite(step) ? step : String(step), from: previousPos, to: st.pos };
+        previousPos = st.pos;
+        encounter.minWisps = Math.min(encounter.minWisps, st.shades.wisps);
+        const knockback = st.shades.knockbackTravel ?? 0;
+        encounter.knockbackTravelMeters += st.shades.hits > previousHits ? knockback : Math.max(0, knockback - previousKnockback);
+        previousKnockback = knockback; previousHits = st.shades.hits;
+        const ndc = await page.evaluate(() => {
+          const { fox, camera } = window.__gameHooks.debug;
+          const focus = fox.getWorldPosition(fox.position.clone());
+          focus.y += 0.6;
+          return focus.project(camera).toArray();
+        });
+        const inFrame = ndc.every(v => Number.isFinite(v) && Math.abs(v) <= 1);
+        framing.samples++;
+        if (Number.isFinite(ndc[0])) framing.maxAbsX = Math.max(framing.maxAbsX, Math.abs(ndc[0]));
+        if (Number.isFinite(ndc[1])) framing.maxAbsY = Math.max(framing.maxAbsY, Math.abs(ndc[1]));
+        const finite = ndc.every(Number.isFinite);
+        const serialNdc = ndc.map(v => Number.isFinite(v) ? v : String(v));
+        if (!inFrame) {
+          framing.outside++;
+          const failure = { frame: i, ndc: serialNdc, finite };
+          framing.firstFailure ??= failure;
+          if (framing.failures.length < 16) framing.failures.push(failure);
+        }
+        Object.assign(audit, { foxFocusNdc: serialNdc, foxFocusFinite: finite, foxFocusInFrame: inFrame });
+      }
+      // Bounded diagnostics for the camera stream's recorded hidden-wedge and
+      // over-compressed stair frames. Run only on the remote capture worker.
+      if (![765, 775, 780, 790, 800, 1080, 1110, 1140, 1620].includes(i)) return Object.keys(audit).length ? audit : undefined;
+      const diagnostic = await page.evaluate(() => {
+        const { renderer, scene, camera } = window.__gameHooks.debug;
+        const materials = new Map();
+        scene.traverse(o => {
+          if (!o.isMesh) return;
+          for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+            const u = renderer.properties.get(m).uniforms;
+            if (m.isMeshStandardMaterial && !materials.has(m.uuid)) materials.set(m.uuid, {
+              name: m.name, cutout: !!u?.uOccFox,
+              centreDepth: u?.uOccFox?.value?.toArray(), radii: u?.uOccRad?.value?.toArray(), strength: u?.uOccStrength?.value,
+            });
+          }
+        });
+        return { camera: { position: camera.position.toArray(), quaternion: camera.quaternion.toArray(), projection: camera.projectionMatrix.toArray(), worldInverse: camera.matrixWorldInverse.toArray() }, drawingBuffer: [renderer.domElement.width, renderer.domElement.height], materials: [...materials.values()] };
+      });
+      save(`${name}-camera-frame-${i}.json`, diagnostic);
+      await page.screenshot({ path: path.join(out, `${name}-camera-frame-${i}.png`) });
+      return { ...audit, cameraDiagnostic: `${name}-camera-frame-${i}.json` };
+    } });
+    if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
+    await H('autopilot', false, state.auto.idx, { assist: false });
+    await H('setKeys', []); await H('setStick', null); await shot('route-end');
+
     const endpointReached = kilnRoute ? kilnCompletion !== undefined && kilnCompletion.idx >= to : bounded ? state.auto.idx >= to : state.restored;
     const endpoint = route[to - 1];
     const endpointDistance = Math.hypot(state.pos[0] - endpoint.x, state.pos[2] - endpoint.z);
     const endpointStable = endpointDistance <= 3 && Math.abs(state.pos[1] - endpoint.y) <= 1 && state.grounded;
     const kilnLit = state.seedwells.some(s => s.id === 'SW1' && s.lit);
-    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && endpointStable && report.videos[name].frames >= 60 * fps) && !state.auto.assists && !state.deaths;
-    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnCompletion && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
-    save('route-acceptance.json', { schemaVersion: 2, passed, reason, from, to, staged: regional, kilnLatchedAt, kilnCompletedAt, kilnCompletion, endpointDistance, endpointStable, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
+    const passed = endpointReached && (!kilnRoute || kilnLit && kilnLatchedAt !== undefined && kilnStopped && kilnCompletedAt < 60 * fps - 1 && departedAt === undefined && endpointStable && !state.auto.stalled && continuity.firstLargeStep === null && framing.samples === report.videos[name].frames && framing.outside === 0 && report.videos[name].frames >= 60 * fps) && !state.auto.assists && !state.deaths;
+    const reason = passed ? 'passed' : state.deaths ? 'deaths' : state.auto.assists ? 'assisted' : endpointReached && kilnRoute && !kilnLit ? 'kiln-unlit' : kilnRoute && endpointReached && (!kilnStopped || kilnCompletedAt >= 60 * fps - 1) ? 'arrival-too-late-for-idle' : kilnRoute && endpointReached && departedAt !== undefined ? 'idle-drift' : kilnRoute && endpointReached && !endpointStable ? 'endpoint-drift' : state.auto.stalled ? 'stalled' : kilnRoute && continuity.firstLargeStep ? 'position-jump' : endpointReached && kilnRoute && framing.outside > 0 ? 'fox-out-of-frame' : kilnRoute && !endpointReached && firstFeedCrossing ? 'arrival-missing' : report.videos[name].frames >= Number(arg('route-seconds', '360')) * fps ? 'budget' : 'incomplete';
+    const failureFrame = reason === 'idle-drift' ? departedAt : reason === 'fox-out-of-frame' ? framing.firstFailure.frame : reason === 'position-jump' ? continuity.firstLargeStep.frame : report.videos[name].frames - 1;
+    const failurePhase = passed ? null : kilnCompletedAt === undefined || failureFrame < kilnCompletedAt ? 'pre-arrival' : 'post-arrival';
+    save('route-acceptance.json', { schemaVersion: 3, passed, reason, from, to, staged: regional, postKiln: kilnRoute ? 'Live endpoint idle through 60s; bot and keys cleared, physics/rendering continue' : null, kilnLatchedAt, kilnCompletedAt, kilnCompletion, firstFeedCrossing, departedAt, failurePhase, failureFrame: passed ? null : failureFrame, postArrivalSeconds: kilnCompletedAt === undefined ? null : (report.videos[name].frames - kilnCompletedAt - 1) / fps, finalDistanceToFeed: endpointDistance, finalNearFeedStable: endpointStable, continuity: kilnRoute ? continuity : null, encounter: kilnRoute ? { ...encounter, finalHits: state.shades.hits, hitsBeforeArrival: kilnCompletion ? kilnCompletion.shades.hits - encounter.initialHits : state.shades.hits - encounter.initialHits, hitsAfterArrival: kilnCompletion ? state.shades.hits - kilnCompletion.shades.hits : null } : null, framing: kilnRoute ? { samples: framing.samples, outside: framing.outside, maxAbsX: framing.maxAbsX, maxAbsY: framing.maxAbsY, firstFailure: framing.firstFailure } : null, endpointArrivalSeconds: kilnCompletedAt === undefined ? null : (kilnCompletedAt + 1) / fps, duration: report.videos[name].duration, startPos: start.pos, spawnDistanceToFirst, endpoint: route[to - 1].label ?? null, endpointReached, kilnLit, auto: state.auto, restored: state.restored, deaths: state.deaths });
     if (!passed) report.failures.push(`Route ${reason}: ${JSON.stringify(state.auto)}, restored=${state.restored}, deaths=${state.deaths}, interval=${from}-${to}`);
   }
   if (wants('orbit')) {
