@@ -257,17 +257,18 @@ try {
       const framing=await page.evaluate(({previous,actorId})=>{
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===actorId),fox=h.debug.fox.position;
         const [x,y,z]=actor.pos,fy=fox.y-(h.debug.foxFeetOffset??.02),V=fox.constructor;
+        const contactOverlap=!!h.state().dash?.collisionActiveLastStep||(actor.freed&&actor.releaseAge<.7);
         const dx=fox.x-x,dz=fox.z-z,d=Math.hypot(dx,dz)||1,ux=dx/d,uz=dz/d;
         const look=[x*.35+fox.x*.65,(y+(actor.height||3.1)*.5)*.35+(fy+(h.debug.foxHeight||1.25)*.5)*.65,z*.35+fox.z*.65];
         const side=Math.atan2(ux,-uz);
         const angles=[side-.65,side+Math.PI+.65,...[0,1,2,3,4,5,6,7].map(k=>k*Math.PI/4)];
-        const positions=[...(previous?[previous]:[]),...angles.map(a=>[look[0]+Math.cos(a)*6,Math.max(y,fy)+2.5,look[2]+Math.sin(a)*6])];
+        const positions=[...(previous?[previous]:[]),...[2.5,4].flatMap(eye=>angles.flatMap(a=>[5.2,6,6.8].map(radius=>[look[0]+Math.cos(a)*radius,Math.max(y,fy)+eye,look[2]+Math.sin(a)*radius])))];
         const testCamera=h.debug.camera.clone();
         const point=new V(),right=new V();
         let fallback=null;
         for(const pos of positions){
           let clearance;
-          for(const fov of [48,52,56]){
+          for(const fov of [42,48,52,56]){
           testCamera.position.fromArray(pos);testCamera.fov=fov;testCamera.lookAt(new V(...look));testCamera.updateProjectionMatrix();testCamera.updateMatrixWorld(true);
           right.setFromMatrixColumn(testCamera.matrixWorld,0);
           const bounds=(px,py,pz,height,width)=>{
@@ -282,7 +283,7 @@ try {
           const a=foxBounds.bounds,b=shadeBounds.bounds;
           const shared=Math.max(0,Math.min(a[1],b[1])-Math.max(a[0],b[0]))*Math.max(0,Math.min(a[3],b[3])-Math.max(a[2],b[2]));
           const overlap=shared/Math.max(1e-6,Math.min((a[1]-a[0])*(a[3]-a[2]),(b[1]-b[0])*(b[3]-b[2])));
-          const fits=foxBounds.height>.19&&shadeBounds.height>.18&&foxBounds.inFrame&&shadeBounds.inFrame&&overlap<.3;
+          const fits=foxBounds.height>.21&&shadeBounds.height>.18&&foxBounds.inFrame&&shadeBounds.inFrame&&(contactOverlap||overlap<.3);
           if(!fits)continue;
           clearance??=!!h.photoBlocker&&[
             [x,y+1.3,z],
@@ -293,14 +294,14 @@ try {
             [fox.x+Math.sin(h.debug.fox.rotation.y)*.6,fy+.9,fox.z+Math.cos(h.debug.fox.rotation.y)*.6],
           ].every(target=>!h.photoBlocker(pos,target));
           const clear=clearance;
-          const result={pos,look,fov,clear,noFit:false,overlap,fox:foxBounds,shade:shadeBounds};
+          const result={pos,look,fov,clear,noFit:false,overlap,contactOverlap,fox:foxBounds,shade:shadeBounds};
           fallback??=result;
           if(clear)return result;
           }
         }
         return fallback||{pos:positions[1]||positions[0],look,fov:56,clear:false,noFit:true};
       },{previous:lens,actorId});
-      latestReviewLens.set(actorId,{clear:framing.clear,noFit:framing.noFit});
+      latestReviewLens.set(actorId,{clear:framing.clear,noFit:framing.noFit,overlap:framing.overlap??null,contactOverlap:framing.contactOverlap??false});
       lens=framing.pos;
       report.shadeReviewQuality??={};
       const counts=report.shadeReviewQuality[actorId]??={noFit:0,occluded:0};
@@ -331,7 +332,7 @@ try {
       const core=h.debug.scene.getObjectByName(id)?.getObjectByName('shade-density-core');
       return {actorId:id,freed:actor.freed,method:'posed mesh vertices, shader displacement/alpha excluded',fox:bounds(h.debug.fox,true),shade:bounds(core,false),shadePresent:!actor.freed||actor.presence>.5,presence:actor.presence};
     },actorId);
-    const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,sample:async frame=>({
+    const pairOptions=(name,id,keyFrames)=>({traceEveryFrame:true,keyFrames,afterStep:()=>camera(id),sample:async frame=>({
       ...(keyFrames.includes(frame)?await measurePair(id):{actorId:id,lensOnly:true}),
       lens:latestReviewLens.get(id)??{clear:false,noFit:true},
     }),label:(frame,state)=>{
@@ -523,7 +524,7 @@ try {
       }
       save('shade-visual-source-variants.json',{label:'Controlled ColorField sources at frozen actor pose/time; shader diagnostic, not natural release or visual acceptance',variants});
     }
-    await video('shade-patrol', 120, ()=>camera(), undefined, pairOptions('Patrol',actors[0].id,[0,30,60,90,119]));
+    await video('shade-patrol', 120, async()=>{}, undefined, pairOptions('Patrol',actors[0].id,[0,30,60,90,119]));
     validatePair('shade-patrol');
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
     await page.evaluate(value => { if(typeof value==='number')window.__gameHooks.shades.tun.chaseDistance=value; }, chaseDistance);
@@ -553,7 +554,6 @@ try {
             await H('teleport',...observer.pos);
           }
         }
-        await camera();
       },undefined,pairOptions('Behavior',actors[0].id,[0,89,180,299,390,480,599]));
       validatePair('shade-behavior');
       const behavior=await page.evaluate(()=>window.__gameHooks.shades.state());
@@ -615,11 +615,11 @@ try {
     await H('setKeys', ['ShiftLeft']);
     lens=null;
     await camera();
-    const dashControllerAfter=await video('shade-free', 120, async i => {
+    const releaseKeyFrames=[...Array.from({length:30},(_,i)=>i*6),179];
+    const dashControllerAfter=await video('shade-free', 180, async i => {
       if (i === 12) { await H('setKeys', []); await H('setStick', null); }
-      await camera();
-    }, undefined, pairOptions('Release',actors[0].id,[0,5,12,24,45,75,119]));
-    validatePair('shade-free');
+    }, undefined, pairOptions('Release',actors[0].id,releaseKeyFrames));
+    const releaseFramingPassed=validatePair('shade-free');
     await validateRunout('shade-free',dashSetup);
     save('shade-dash-controller.json',{before:dashControllerBefore.dash,after:dashControllerAfter.dash,label:'Actual controller activation; collisionActiveLastStep is the preceding simulated movement tick'});
     if(dashControllerBefore.dash&&dashControllerAfter.dash.used<=dashControllerBefore.dash.used)throw Error(`Shade dash input never activated controller ${JSON.stringify(dashControllerAfter.dash)}`);
@@ -630,10 +630,10 @@ try {
       const wash=await page.evaluate(()=>{
         const h=window.__gameHooks,actor=h.shades.state().actors[0],field=h.debug.colorField;
         const stroke=field.strokes.find(s=>Math.abs(s.radius-h.shades.tun.drainRadius)<.001&&Math.abs(s.strength-1.2)<.001&&Math.hypot(s.a.x-actor.pos[0],s.a.z-actor.pos[2])<.05);
-        return stroke?{life:stroke.life,strength:field.strokeStrength(stroke),radius:stroke.radius,center:stroke.a.toArray()}:null;
+        return stroke?{life:stroke.life,releaseAge:actor.releaseAge,strength:field.strokeStrength(stroke),radius:stroke.radius,center:stroke.a.toArray()}:null;
       });
       save('shade-release-wash.json',wash);
-      if(!wash||wash.life<3.8||wash.strength<1)throw Error(`Missing six-second shade release wash ${JSON.stringify(wash)}`);
+      if(!wash||Math.abs(wash.life+wash.releaseAge-6)>.06||wash.strength<1)throw Error(`Missing six-second shade release wash ${JSON.stringify(wash)}`);
     }
     await shot('shade-wash-normal');
     const occlusionSaved=await page.evaluate(()=>{
@@ -676,7 +676,7 @@ try {
     if (!(await page.evaluate(() => window.__gameHooks.shades.state().actors[0].freed))) throw Error('Shade respawned');
     await advance(0);
     await shot('shade-after-free');
-    save('shade-acceptance.json', { passed:!contactFailure&&releaseStagingFailures.length===0, stagingFailures:[...releaseStagingFailures], releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
+    save('shade-acceptance.json', { passed:!contactFailure&&releaseStagingFailures.length===0&&releaseFramingPassed, framingPassed:releaseFramingPassed, stagingFailures:[...releaseStagingFailures], releasePassed:true, contactFailures:[...shadeContactFailures], contact, freed, noRespawn: true, game: await page.evaluate(() => window.__game) });
     let edge = await page.evaluate(() => window.__gameHooks.shades.state().actors.find(a=>a.id==='shade-hill-high'));
     if(!edge || edge.freed)throw Error('No live high-hill Shade for clear encounter evidence');
     if(edge && !edge.freed){
@@ -717,8 +717,8 @@ try {
       const edgeControllerBefore=await H('state');
       await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
       lens=null;
-      const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}await camera('shade-hill-high');},undefined,pairOptions('Hill release','shade-hill-high',[0,5,12,24,36,48,75,119]));
-      validatePair('shade-clear-free');
+      const edgeControllerAfter=await video('shade-clear-free',180,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}},undefined,pairOptions('Hill release','shade-hill-high',releaseKeyFrames));
+      const edgeFramingPassed=validatePair('shade-clear-free');
       await validateRunout('shade-clear-free',setup,null);
       save('shade-edge-dash-controller.json',{before:edgeControllerBefore.dash,after:edgeControllerAfter.dash});
       if(edgeControllerBefore.dash&&edgeControllerAfter.dash.used<=edgeControllerBefore.dash.used)throw Error(`Second Shade dash input never activated controller ${JSON.stringify(edgeControllerAfter.dash)}`);
@@ -726,13 +726,13 @@ try {
       if(after.frees!==before.frees+1||after.hits!==before.hits||!after.actors.find(a=>a.id==='shade-hill-high')?.freed)throw Error(`Restored-edge dash failed ${JSON.stringify(after)}`);
       const releasedIds=after.actors.filter(a=>a.freed).map(a=>a.id);
       if(after.frees<2||releasedIds.length<2)throw Error(`Two distinct dash releases missing ${JSON.stringify(after)}`);
-      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0,releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
+      save('shade-two-frees-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0&&releaseFramingPassed&&edgeFramingPassed,framing:{first:releaseFramingPassed,second:edgeFramingPassed},releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Two staged fox teleports in the same session, distinct authored Shades freed by real controller dash; no forced actor release',first:freed,second:after,releasedIds,game:await page.evaluate(()=>window.__game)});
       await shot('shade-two-freed');
       await advance(180,false);await advance(0);await shot('shade-clear-litter');
       await advance(600,false);await advance(0);await shot('shade-clear-empty');
       const end=await page.evaluate(()=>window.__gameHooks.shades.state());
       if(end.actors.find(a=>a.id==='shade-hill-high').leaves!==0)throw Error('Edge dissolve did not end empty');
-      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0,releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
+      save('shade-clear-acceptance.json',{passed:shadeContactFailures.length===0&&releaseStagingFailures.length===0&&releaseFramingPassed&&edgeFramingPassed,framing:{first:releaseFramingPassed,second:edgeFramingPassed},releasePassed:true,stagingFailures:[...releaseStagingFailures],contactFailures:[...shadeContactFailures],label:'Staged high-hill contact and real controller dash with clear exterior lens; no forced free',setup,before,after,end,game:await page.evaluate(()=>window.__game)});
     }
     // Separate live third-person take: same encounter and controller, actual keyboard events.
     await boot(quality, true);
@@ -774,10 +774,10 @@ try {
       if(setup.failure){report.failures.push(setup.failure);continue;}
       await H('teleport',...setup.pos,setup.yaw);lens=null;
       await camera(id);
-      const lensTrace=[];
-      await video(id,frames,async frame=>{await camera(id);lensTrace.push({frame,...latestReviewLens.get(id)});},undefined,pairOptions('Regional',id,keyFrames));
+      await video(id,frames,async()=>{},undefined,pairOptions('Regional',id,keyFrames));
       const framingPassed=validatePair(id);
       const take=report.videos[id],rows=take.trace.map(row=>row.state);
+      const lensTrace=take.trace.map(row=>({frame:row.frame,...row.state.capture.lens}));
       const support=await page.evaluate(positions=>positions.map(p=>{
         const floor=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;
         return {floor:Number.isFinite(floor)?floor:null,gap:Number.isFinite(floor)?p[1]-floor:null};
