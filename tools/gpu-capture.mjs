@@ -283,7 +283,7 @@ try {
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
     await page.evaluate(value => { if(typeof value==='number')window.__gameHooks.shades.tun.chaseDistance=value; }, chaseDistance);
     if(typeof chaseDistance==='number') {
-      save('shade-behavior-staging.json', {label:'10-second staged observer placement; live modes, terrain checks and attraction; no forced actor state', nearFrames:[90,390]});
+      save('shade-behavior-staging.json', {label:'10-second staged observer placement; live modes, terrain checks and attraction; no forced actor state', nearFrames:[90,300]});
       const transitions=[];
       await video('shade-behavior', 600, async frame => {
         if(frame%15===0) {
@@ -298,16 +298,19 @@ try {
                 return {pos:[px,floor,pz,Math.atan2(x-px,z-pz)],mode:actor.mode};
             }
             return null;
-          },frame>=90&&frame<390);
+          },frame>=90&&frame<300);
           if(!observer)throw Error('No safe staged shade behavior observer');
           if(transitions.at(-1)?.mode!==observer.mode)transitions.push({frame,mode:observer.mode});
           await H('teleport',...observer.pos);
         }
         await camera();
-      },undefined,{traceEveryFrame:true,keyFrames:[0,89,180,300,390,480,599]});
+      },undefined,{traceEveryFrame:true,keyFrames:[0,89,180,299,390,480,599]});
       const behavior=await page.evaluate(()=>window.__gameHooks.shades.state());
       save('shade-behavior-state.json',{transitions,state:behavior});
-      if(!['patrol','chase','return'].every(mode=>transitions.some(t=>t.mode===mode)))throw Error(`Missing live shade behavior transition ${JSON.stringify(transitions)}`);
+      const expected=['patrol','chase','return','patrol'];
+      let observed=0;
+      for(const transition of transitions)if(transition.mode===expected[observed])observed++;
+      if(observed!==expected.length)throw Error(`Missing ordered live shade behavior cycle ${JSON.stringify(transitions)}`);
       if(behavior.hits!==0)throw Error('Staged behavior observer was hit');
     }
     await H('photoOff');
@@ -363,6 +366,7 @@ try {
     }, undefined, { traceEveryFrame: true, keyFrames: [0, 5, 12, 24, 45, 75, 119] });
     const freed = await page.evaluate(() => window.__gameHooks.shades.state());
     if (freed.frees !== 1 || !freed.actors[0].freed || freed.hits !== contact.hits || freed.wisps < contact.wisps) throw Error(`Shade freeing failed: ${JSON.stringify(freed)}`);
+    // The original baseline predates the release wash; only the new attraction-enabled candidate owes this assertion.
     if(typeof chaseDistance==='number') {
       const wash=await page.evaluate(()=>{
         const h=window.__gameHooks,actor=h.shades.state().actors[0],field=h.debug.colorField;
