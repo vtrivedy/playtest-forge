@@ -529,15 +529,17 @@ export class AuthoredLocomotion {
       } else {
         const normalRelease=locomoting && this.input.grounded && Number.isFinite(ground) && foot.replantTime===0;
         const gallopWeight=(this.metrics.clipWeights.run ?? 0)/Math.max(.001,gaitWeight);
-        if(normalRelease && gallopWeight>.5 && foot.planted && swingProgress<this.params.releaseSwing && this.metrics.cadenceHz>1e-4) {
-          // Refresh against this frame's pose. The previous frame's offset is already stale.
-          foot.releaseCorrection.copy(foot.anchor).sub(paw).clampLength(0,this.params.maxCorrection).multiplyScalar(foot.strength);
+        if(i<2 && normalRelease && gallopWeight>.5 && foot.planted && swingProgress<this.params.releaseSwing && this.metrics.cadenceHz>1e-4) {
+          // Refresh XZ against this frame's pose; preserve the existing vertical fade below.
+          foot.releaseCorrection.copy(foot.anchor).sub(paw).setY(0).clampLength(0,this.params.maxCorrection).multiplyScalar(foot.strength);
           foot.releaseProgress=swingProgress;foot.phaseRelease=true;
         }
         if(normalRelease && foot.phaseRelease) {
           foot.releaseProgress=Math.max(foot.releaseProgress,swingProgress);
           const keep=1-THREE.MathUtils.smoothstep(foot.releaseProgress,0,this.params.releaseSwing);
-          foot.correction.copy(foot.releaseCorrection).multiplyScalar(keep);
+          const vertical=foot.correction.y*Math.exp(-dt/.04);
+          foot.correction.copy(foot.releaseCorrection).multiplyScalar(keep).setY(vertical);
+          foot.correction.clampLength(0,this.params.maxCorrection);
           this.metrics.phaseReleaseFeet++;
           if(keep<=0){foot.phaseRelease=false;foot.releaseCorrection.set(0,0,0);}
         } else {

@@ -46,9 +46,9 @@ const pads=['front_paw_l','front_paw_r','hind_paw_l','hind_paw_r'].map(name=>{
 const stats=(xs:number[])=>{xs.sort((a,b)=>a-b);return {n:xs.length,min:xs[0],median:xs[Math.floor(xs.length*.5)],p95:xs[Math.floor(xs.length*.95)],max:xs[xs.length-1]}};
 for(const speed of [1.62,4.05,9]) {
  loco.reset();group.position.set(0,0,0);group.rotation.y=0;
- const phaseSamples:Record<string,{height:number[];near:number[]}>={};
+ const phaseSamples:Record<string,{height:number[];near:number[];step:number[]}>={};
  let previous:THREE.Vector3[]=[];const near:number[]=[],flatNear:number[]=[],height:number[]=[],cadence:number[]=[]; let noSupport=0,maxResidual=0;
- for(let i=0;i<600;i++){
+ for(let i=0;i<1800;i++){
   jitterSeed=(Math.imul(jitterSeed,1664525)+1013904223)>>>0;
   const dt=(1+(jitterSeed/4294967296*2-1)*dtJitter)/60;
   group.position.z+=speed*dt;group.updateMatrixWorld(true);loco.input={speed,grounded:true,yaw:0,verticalSpeed:0,groundAt:()=>0};
@@ -62,8 +62,8 @@ for(const speed of [1.62,4.05,9]) {
     const gait=GAITS[loco.metrics.gait as keyof typeof GAITS];
     const contact=gait.contacts[j],u=(loco.metrics.phase-contact.phase+1)%1,end=contact.duty*loco.metrics.stanceRatio,sw=(u-end)/(1-end);
     const band=u<end ? 'stance' : sw<.12 ? 'lift' : sw>.84 ? 'reach' : 'recovery';
-    const phase=phaseSamples[`${j<2 ? 'fore' : 'hind'}:${band}`] ??= {height:[],near:[]};
-    phase.height.push(p.y);
+    const phase=phaseSamples[`${j<2 ? 'fore' : 'hind'}:${band}`] ??= {height:[],near:[],step:[]};
+    phase.height.push(p.y);phase.step.push(Math.abs(p.y-previous[j].y));
     if(Math.abs(p.y)<.02&&Math.abs(previous[j].y)<.02) {
      const horizontal=Math.hypot(p.x-previous[j].x,p.z-previous[j].z)/dt;
      near.push(horizontal);phase.near.push(horizontal);
@@ -73,5 +73,5 @@ for(const speed of [1.62,4.05,9]) {
   }
   previous=now;
  }
- console.log(JSON.stringify({speed,dtJitter,swingEase:loco.params.swingEase,releaseSwing:loco.params.releaseSwing,carpalCurl:loco.params.carpalCurl,cadence:stats(cadence),noSupportFraction:noSupport/299,maxResidual,nearFloorSlide:stats(near),flatNearFloorSlide:stats(flatNear),height:stats(height),phases:Object.fromEntries(Object.entries(phaseSamples).map(([name,p])=>[name,{height:stats(p.height),nearFloor:stats(p.near)}])),landmarks:pads.map(p=>({mesh:p.mesh.name,index:p.index}))}));
+ console.log(JSON.stringify({speed,dtJitter,swingEase:loco.params.swingEase,releaseSwing:loco.params.releaseSwing,carpalCurl:loco.params.carpalCurl,cadence:stats(cadence),noSupportFraction:noSupport/1499,maxResidual,nearFloorSlide:stats(near),flatNearFloorSlide:stats(flatNear),height:stats(height),phases:Object.fromEntries(Object.entries(phaseSamples).map(([name,p])=>[name,{height:stats(p.height),nearFloor:stats(p.near),verticalStep:stats(p.step)}])),landmarks:pads.map(p=>({mesh:p.mesh.name,index:p.index}))}));
 }
