@@ -29,6 +29,7 @@ import {
 } from '../../../src/render';
 import { createRussetvale, type Waypoint } from './russetvale';
 import { createHubDusk, hubDuskWeight, HUB_DUSK } from './hubDusk';
+import { createReachMood } from './reachMood';
 import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
@@ -149,6 +150,7 @@ async function boot() {
   });
   matchFogToSky(scene, fog, sky.params.mist);
   const hubDusk = createHubDusk(scene, lights, sky, fog);
+  const reachMood = createReachMood(scene, lights, sky, fog);
   const distant = createDistantLand(scene, {
     silhouette: new THREE.Color(0x4a3a3c),
     haze: sky.params.mist,
@@ -875,6 +877,7 @@ async function boot() {
         seedwells: world.seedwells.map((s) => ({ id: s.id, lit: s.lit })),
         chem: { water: water.state(), ...updrafts.state(), wind: wind.state(), growth: growth.state(), inlets: inlets.inlets.map((q) => ({ seedwell: world.seedwells[q.seedwell]!.id, seal: Number(q.seal.toFixed(3)), fed: q.fed, latched: q.latched })) },
         dusk: { ...hubDusk.state(), practical: world.hubState() },
+        reachMood: reachMood.state(),
         crown: crown.state(),
         reach: reach.state(),
         albumPages: world.reedRegion.pageFound ? ['reed-ruin'] : [],
@@ -1661,6 +1664,7 @@ async function boot() {
     autumnFX.update(dt, fox.position);
     emberMotes.update(dt, fox.position.clone().setY(fox.position.y + 0.3));
     hubDusk.update(fox.position.x, fox.position.z);
+    reachMood.update(fox.position.x, fox.position.z);
     world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
     sky.update(dt);
     distant.update(dt);
@@ -1790,6 +1794,7 @@ async function boot() {
       contactShadow.scale.set(1, 1, 1);
       (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
       hubDusk.update(fox.position.x, fox.position.z);
+      reachMood.update(fox.position.x, fox.position.z);
       world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
       sky.update(rawDt);
       post.render();

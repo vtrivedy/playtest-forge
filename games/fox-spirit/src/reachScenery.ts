@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { Bucket, rng } from './russetKit';
 import { weatheredSurface } from './worldSurfaces';
 import { loadNatureKit, type NatureVariant } from './russetNature';
+import { cylCollider, type Collider } from './collision';
 
 /** Original Reach geometry, built in metres. No new asset downloads; bark reuses the existing CC0 surface library. */
 export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMaterial) => void) {
   const bark = new Bucket(), joints = new Bucket(), reeds = new Bucket(), leaves = new Bucket(), stone = new Bucket();
   const random = rng(73104);
   const nature=await loadNatureKit();
+  const trunks: Collider[]=[];
   const breeze = { value: 0 };
   const twigRadius=.025;
   bark.aux=[];joints.aux=[];reeds.aux=[];leaves.aux=[];
@@ -28,10 +30,12 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
     geo.computeVertexNormals(); bark.add(geo, undefined, barkColor); geo.dispose();
   }
   // Open crowns keep the ferry and bell readable; fine hanging twigs suggest willow/alder.
-  const trees=[[176,30,-131,8],[194,30,-104,10],[210,36,-125,9],[217,31,-140,7],[175,30,-106,6]];
+  const trees=[[176,30,-131,8],[187,30,-110.5,10],[210,36,-125,9],[217,31,-140,7],[175,30,-106,6]];
   for (const [index,[x, y, z, h]] of trees.entries()) {
     const variant: NatureVariant=index%2?'dead_1':'dead_2';
-    nature.place(variant,x,y,z,{scale:h/nature.height(variant),yaw:x*.31,hue:barkColor,bark:barkColor});
+    const scale=h/nature.height(variant);
+    nature.place(variant,x,y,z,{scale,yaw:x*.31,hue:barkColor,bark:barkColor});
+    trunks.push(cylCollider({x,z,r:nature.trunkR(variant)*scale+.15,top:y+h*.75,bottom:y-.5,tag:'reach-trunk'}));
   }
   const treeStart=group.children.length;
   for(const mat of nature.build(group))patch(mat);
@@ -117,7 +121,7 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
     const mesh=bucket.toMesh(mat,{cast:true,receive:true});if(mesh)group.add(mesh);
     if(bucket===bark){const knots=joints.toMesh(mat,{cast:true,receive:true});if(knots){knots.name='reach-twig-joints';group.add(knots);}}
   }
-  return {update(time:number){breeze.value=time;}};
+  return {trunks,update(time:number){breeze.value=time;}};
 }
 
 /** Local basin surface: quiet teal depth with restrained moving reflection, no pale foam disc. */
