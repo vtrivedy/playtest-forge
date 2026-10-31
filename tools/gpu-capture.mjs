@@ -1,5 +1,6 @@
 import { captureFinale } from './finale-capture.mjs';
 import { captureWadeVisibility } from './water-wade-capture.mjs';
+import { projectedVisibilityReview } from './projected-visibility-capture.mjs';
 /** Modal-only hardware GL capture; see tools/modal/gpu_capture.py for entrypoint. */
 import { chromium } from 'playwright';
 import { captureLevels } from './levels-capture.mjs';
@@ -1809,6 +1810,7 @@ try {
     const name = regional ? `route-segment-staged-${from}-${to}` : kilnRoute ? 'route-continuous-kiln' : bounded ? `route-continuous-${to}` : 'route-unassisted';
     const budgetFrames = Number(arg('route-seconds', kilnRoute ? '60' : '360')) * fps;
     const minimumIdleFrames = 10 * fps;
+    const visibilityReview = projectedVisibilityReview({ getPage: () => page, fs, path, out, name, save, fps });
     if (kilnRoute && budgetFrames < 60 * fps) throw Error('Kiln proof requires a capture budget of at least 60 seconds');
     const state = await video(name, budgetFrames, async () => {
       if (kilnCompletedAt !== undefined && !kilnStopped) {
@@ -1836,6 +1838,8 @@ try {
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
     }, { traceEveryFrame: kilnRoute || budgetFrames <= 60 * fps, sample: async (i, st) => {
       const audit = {};
+      const visibility = await visibilityReview.sample(i);
+      if (visibility) audit.projectedVisibility = visibility;
       if (kilnRoute) {
         const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
         if (step > continuity.maxStepMeters) { continuity.maxStepMeters = step; continuity.maxStepFrame = i; }
@@ -1931,6 +1935,8 @@ try {
       await page.screenshot({ path: path.join(out, `${name}-camera-frame-${i}.png`) });
       return { ...audit, cameraDiagnostic: `${name}-camera-frame-${i}.json` };
     } });
+    const projectedVisibility = await visibilityReview.finish();
+    if (projectedVisibility.invalid || projectedVisibility.errors) report.failures.push(`Invalid GPU visibility masks: ${JSON.stringify(projectedVisibility)}`);
     if (kilnRoute) save('route-framing.json', { ...framing, scope: 'Every encoded frame; fox focus point only, not full silhouette or occlusion' });
     await H('autopilot', false, state.auto.idx, { assist: false });
     await H('setKeys', []); await H('setStick', null); await shot('route-end');

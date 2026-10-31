@@ -34,6 +34,7 @@ import { createListeningCrown } from './listeningCrown';
 import { createAshwaterReach } from './ashwaterReach';
 import { createFox } from './fox';
 import { createFollowCamera } from './camera';
+import { createCameraVisibilityProbe } from './cameraVisibility';
 import type { FoxAnimState } from './fox';
 import { createGameAudio, surfaceOf } from './audio';
 import { createHud } from './hud';
@@ -700,7 +701,8 @@ async function boot() {
     },
     locomotion: foxActor.locomotion,
     /** Debug handles for lookdev probes (read-only use from the harness) */
-    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world },
+    debug: { scene, renderer, post, colorField, camera: cam.camera, fox: foxActor.group, foxHeight:foxActor.height, foxFeetOffset:foxActor.feetOffset, world,
+      cameraVisibility: createCameraVisibilityProbe(scene, renderer, cam.camera, foxActor.group) },
     /** Colour-chemistry hooks for other modules (encounters push drain predicates; see world-1.md §1.2) */
     chem: { water, updrafts, inlets, growth, colorDrains, supplyAt },
     fx: { autumnFX, emberMotes },
@@ -926,6 +928,7 @@ async function boot() {
           occlusion: occlusion.strength,
           sightBlocked: occlusion.detected,
           photo: !!photo,
+          lensTouchesCollider: col.cameraOccupied(cam.camera.position.x, cam.camera.position.y, cam.camera.position.z),
           foxNdc: cam.debug.fox,
           landingNdc: cam.debug.landing,
           internals: cam.debug.internals(),
@@ -1623,6 +1626,7 @@ async function boot() {
     cam.update(rawDt, {
       target: feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
       vel,
+      facing: fox.rotation.y,
       grounded,
       gliding,
       dashing,
