@@ -209,6 +209,30 @@ for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
 }
 console.log('Landing-preview lift CPU probe:', JSON.stringify(ascentViews));
 
+// Ground-only elevation must not leak into sustained flight. Compare two live
+// rigs with deliberately different ground tuning, not a copied height formula.
+for (const gliding of [false, true]) {
+  const groundLow = createFollowCamera({ params: { groundLift: 0 } });
+  const groundHigh = createFollowCamera({ params: { groundLift: 0.6 } });
+  const flight = { ...idleFrame, target: new THREE.Vector3(0, 10, 0), grounded: false,
+    gliding, airTime: 2, vel: new THREE.Vector3(0, -2.7, -8), landing: new THREE.Vector3(0, 0, -8) };
+  for (let i = 0; i < 180; i++) { groundLow.update(1 / 60, flight); groundHigh.update(1 / 60, flight); }
+  assert.ok(groundLow.camera.position.distanceTo(groundHigh.camera.position) < 1e-8,
+    'sustained air/glide camera must ignore ground-only elevation');
+  assert.ok(groundLow.camera.quaternion.angleTo(groundHigh.camera.quaternion) < 1e-7);
+}
+const rideViews = [];
+for (const [label, height, glideDistance] of [['previous ride proportions', 1.65, 5.5], ['restrained ride proportions', 1.4, 4.8]] as const) {
+  const follow = createFollowCamera({ params: { height, glideDistance } });
+  const frame = { ...idleFrame, target: new THREE.Vector3(0, 10, 0), grounded: false,
+    gliding: true, airTime: 2, vel: new THREE.Vector3(0, -2.7, -8), landing: new THREE.Vector3(0, 0, -8) };
+  for (let i = 0; i < 180; i++) follow.update(1 / 60, frame);
+  const direction = follow.camera.getWorldDirection(new THREE.Vector3());
+  rideViews.push({ label, viewPitchDeg: THREE.MathUtils.radToDeg(Math.asin(-direction.y)), range: follow.camera.position.distanceTo(frame.target) });
+}
+assert.ok(rideViews[1]!.viewPitchDeg <= rideViews[0]!.viewPitchDeg, 'closer ride must not also steepen the view');
+console.log('Flight tuning CPU poses (not image proof):', JSON.stringify(rideViews));
+
 // Geometry proxies for the image-driven composition pass. The .95m running
 // silhouette is an estimate, not an image measurement or substitute for GPU review.
 const composition = [];

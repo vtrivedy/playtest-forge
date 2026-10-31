@@ -371,20 +371,21 @@ async function boot() {
   fAudio.add(audio.settings, 'volume', 0, 1, 0.01).name('Master volume').onChange(audio.syncSettings);
   fAudio.add(audio.settings, 'muted').name('Mute (M)').listen().onChange(audio.syncSettings);
   fAudio.close();
-  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height, glideDistance: cam.params.glideDistance };
+  const baseCam = { jumpTrack: cam.params.jumpTrack, height: cam.params.height };
   const fCam = gui.addFolder('Camera');
   fCam.add(cam.params, 'distance', 2.5, 9, 0.1);
   fCam.add(cam.params, 'runDistance', 2.6, 5, 0.1);
   fCam.add(cam.params, 'framingHeight', 0, 1, 0.05);
   fCam.add(cam.params, 'minDistance', 1.8, 3.2, 0.1).name('minimum terrain boom');
   fCam.add(baseCam, 'height', 0.5, 4, 0.05);
+  fCam.add(cam.params, 'groundLift', 0, 0.6, 0.01);
   fCam.add(cam.params, 'airDistance', 3, 10, 0.1);
-  fCam.add(baseCam, 'glideDistance', 3, 12, 0.1);
+  fCam.add(cam.params, 'glideDistance', 3, 12, 0.1);
   fCam.add(cam.params, 'fov', 35, 80, 0.5);
   fCam.add(cam.params, 'lag', 0.04, 0.5, 0.01);
   fCam.add(cam.params, 'lookAhead', 0, 4, 0.05);
   fCam.add(cam.params, 'recenterRate', 0, 4, 0.05);
-  fCam.add(cam.params, 'sideBias', -0.9, 0.9, 0.01);
+  fCam.add(cam.params, 'sideBias', -0.6, 0.6, 0.01);
   fCam.add(baseCam, 'jumpTrack', 0, 1, 0.01);
   fCam.add(cam.params, 'landingBias', 0, 1, 0.01);
   fCam.add(cam.params, 'shake', 0, 2, 0.05);
@@ -1319,8 +1320,7 @@ async function boot() {
     const riding = inColumn || (gliding && lift.k > 0);
     cam.params.jumpTrack = THREE.MathUtils.damp(cam.params.jumpTrack, riding ? 1 : baseCam.jumpTrack, 3, dt);
     // A small rise preserves the chase silhouette instead of craning over the column.
-    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 0.4 : baseCam.height, 2.2, dt);
-    cam.params.glideDistance = THREE.MathUtils.damp(cam.params.glideDistance, riding ? baseCam.glideDistance - 0.9 : baseCam.glideDistance, 2.2, dt);
+    cam.params.height = THREE.MathUtils.damp(cam.params.height, riding ? baseCam.height + 0.15 : baseCam.height, 2.2, dt);
     // glide: hold jump while falling, after a short hold so a held full jump doesn't snap into it.
     // In a burning column glide starts at once and persists through the rise while jump is held.
     glideHoldT = !grounded && spaceDown && !dashing && (vel.y < 0 || gliding || inColumn) ? glideHoldT + dt : 0;
