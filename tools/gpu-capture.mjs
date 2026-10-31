@@ -1466,6 +1466,8 @@ try {
     await RH('photo',[218,33.5,-145],[194,33.5,-118],52);await advance(2);await shot('reachview-lower-islet');
     await RH('teleport',207,36,-123,-Math.PI/2);
     await RH('photo',[220,44,-122],[190,34,-119],52);await advance(2);await shot('reachview-payoff-vista');
+    // A closer comparison avoids the east-bank trunk without moving the scene.
+    await RH('photo',[213,39,-121],[192,34,-120],52);await advance(2);await shot('reachview-hero-orchard');
     await RH('teleport',201,36,-121,-Math.PI/2);await RH('setStick',-1,0);await RH('setKeys',['ShiftLeft']);await advance(1);await RH('setKeys',[]);await RH('setStick',null);await advance(260,false);
     await RH('photo',[139,52,-91],[187,32,-118],52);await advance(2);await shot('reachview-low-matched');
     await RH('photo',[167,48,-99],[190,32,-121],52);await advance(2);await shot('reachview-low-lane');
