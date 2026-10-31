@@ -125,7 +125,7 @@ def main():
     ap.add_argument('--out',type=Path,required=True)
     ap.add_argument('--streams',default='loco,loco-glide,fox-ember,hub,reach,route-clear,camera,water-restore,shade')
     ap.add_argument('--once',action='store_true')
-    ap.add_argument('--workers',type=int,default=2,choices=[1,2])
+    ap.add_argument('--workers',type=int,default=2,choices=[1,2,4])
     args=ap.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True)
     pool=concurrent.futures.ThreadPoolExecutor(max_workers=args.workers);pending={}
     active=set()
