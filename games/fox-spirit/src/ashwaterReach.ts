@@ -11,7 +11,7 @@ import { weatheredSurface } from './worldSurfaces';
 
 /** Water stores height: an arriving front fills a basin and raises its ferry. */
 export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
-  const group = new THREE.Group(); group.name = 'ashwater-reach'; scene.add(group);
+  const group = new THREE.Group(); group.name = 'ashwater-reach'; world.group.add(group);
   const rock = new Bucket(), stone = new Bucket(), wood = new Bucket(), roots = new Bucket();
   const col = world.collision;
   const colliderStart=col.colliders.length;
@@ -78,8 +78,8 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     if (Math.cos(a)<-.9 || (Math.sin(a)<-.45 && Math.cos(a)<.55)) continue;
     const x=187+Math.cos(a)*11.35,z=-118+Math.sin(a)*12.35;
     const yaw=-a;
-    stoneBlock(stone,trs(x,33.1,z,yaw),.85,6.6,3.25,1300+i,.12);
-    col.add(boxCollider({x,z,w:.85,d:3.25,yaw,top:36.4,bottom:29.8,tag:'reach-bank'}));
+    rockSlab(rock,{x,z,top:36.4,bottom:29.4,w:2.2,d:3.25,seed:1300+i,rough:.24,topColor:PAL.stone,overhang:.25});
+    col.add(boxCollider({x,z,w:2.2,d:3.25,yaw,top:36.4,bottom:29.8,tag:'reach-bank'}));
   }
   const raft = new THREE.Group(); raft.name='reach-ferry'; group.add(raft);
   for (const x of [-2.35,2.35]) stoneBlock(wood,trs(x,-.52,0),.7,.65,6.6,1001+x,.08);
@@ -101,16 +101,16 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   const rr=rng(1050); for(let i=0;i<12;i++) hangingRoot(roots,rr,165+rr()*48,29.8,-132+rr()*2,4+rr()*5,new THREE.Vector2(0,1),.13);
   for(const [bucket,name] of [[rock,'rv-rock'],[stone,'rv-stone'],[roots,'rv-bark']] as const) {
     // Keep the shared geometry grammar, but give Reach its own wet slate palette.
-    const tint = new THREE.Color(name === 'rv-rock' ? 0x737e7c : name === 'rv-stone' ? 0xa7aaa0 : 0x505b55);
+    const tint = new THREE.Color(name === 'rv-rock' ? 0x79999b : name === 'rv-stone' ? 0xa7aaa0 : 0x505b55);
     for (let i=0; i<bucket.col.length; i+=3) {
-      const value = Math.min(1.2, .5 + (bucket.col[i]!*.3+bucket.col[i+1]!*.59+bucket.col[i+2]!*.11));
+      const value = (bucket.col[i]!*.3+bucket.col[i+1]!*.59+bucket.col[i+2]!*.11) / (tint.r*.3+tint.g*.59+tint.b*.11);
       bucket.col[i]=tint.r*value;bucket.col[i+1]=tint.g*value;bucket.col[i+2]=tint.b*value;
     }
     const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86});mat.name=`reach-${name}`;
-    weatheredSurface(mat,name==='rv-bark'); mat.userData.cfRestoredChroma=name==='rv-bark'?.45:.3; field.patchMaterial(mat); mats.push(mat);
+    if(name!=='rv-rock')weatheredSurface(mat,name==='rv-bark'); mat.userData.cfRestoredChroma=name==='rv-bark'?.45:.65; field.patchMaterial(mat); mats.push(mat);
     const mesh=bucket.toMesh(mat,{cast:true,receive:true,boxUV:name==='rv-rock'?4:1.6}); if(mesh)group.add(mesh);
   }
-  const scenery=dressReach(group, mat => { field.patchMaterial(mat); mats.push(mat); });
+  const scenery=await dressReach(group, mat => { field.patchMaterial(mat); mats.push(mat); });
   const bellMat=new THREE.MeshStandardMaterial({color:0x8b5832,metalness:.6,roughness:.5,emissive:0xc17530,emissiveIntensity:.02});
   const bell=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(.9,0),new THREE.Vector2(.65,.25),new THREE.Vector2(.55,1.05),new THREE.Vector2(.2,1.35),new THREE.Vector2(0,1.45)],20),bellMat);
   bell.position.set(207,40.5,-119);group.add(bell);field.patchMaterial(bellMat);mats.push(bellMat);
@@ -129,7 +129,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
   stoneBlock(low,trs(179.5,30.4,-130),2.5,.5,1,1221,.08);
   const lowMesh=low.toMesh(mats[2]!,{cast:true,receive:true,boxUV:1.6});if(lowMesh)group.add(lowMesh);
   world.hearthSpots.push({id:'reach-steam',x:183,y:30,z:-128,height:13});
-  world.shadeSpots.push({id:'reach-drinker',speed:1.6,patrol:[[183,30,-120],[186,30,-122],[190,30,-120],[186,30,-116]]});
+  world.shadeSpots.push({id:'reach-drinker',speed:1.6,patrol:[[184.5,30,-118],[188.5,30,-118],[187,30,-118.8],[185,30,-117.3]]});
   const bankCheckpoint={pos:new THREE.Vector3(171,30,-130),lit:false};
   world.checkpoints.push(bankCheckpoint);
   const handles=[[173,30,-124],[201,36,-121]];
@@ -167,7 +167,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
     sync(dt:number,base:ReturnType<typeof createColorField>){field.trail=[];field.strokes=[];field.update(dt);field.setFox(base.fox);field.trail=base.trail.map(t=>({...t}));field.strokes=base.strokes.map(t=>({...t}));field.renderMask(dt);for(const m of mats)field.syncMaterial(m);},
     update(dt:number,fox:THREE.Vector3,feetY:number,grounded:boolean,flood:boolean,dashing:boolean,drained:boolean){
       const localFox=fox.clone();localFox.x-=offsetX;
-      if(Math.hypot(fox.x-bankCheckpoint.pos.x,fox.z-bankCheckpoint.pos.z)<4.5&&Math.abs(feetY-bankCheckpoint.pos.y)<3)recoveryVisited=true;
+      if(flood&&grounded&&fox.x>68&&fox.z<-80)recoveryVisited=true;
       open=flood;gate.enabled=!open;gateMesh.visible=!open;
       toggleCooldown=Math.max(0,toggleCooldown-dt);drinks=drained&&!restored;
       if(dashing&&!wasDash&&toggleCooldown===0&&handles.some(([x,y,z])=>Math.hypot(localFox.x-x,localFox.z-z)<3&&Math.abs(feetY-y)<2)){level=level==='high'?'low':'high';toggleCooldown=.6;warning=tun.warningTime;refillDelay=level==='high'?1.8:0;}
@@ -192,12 +192,12 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       for(const [i,f] of floats.entries()){
         const motion=floatMotion[i]!,on=supportedBy===i;
         const buoyant=THREE.MathUtils.smoothstep(fill,0,.12)*(retained?.2:1);
-        motion.offset=on?0:Math.sin(field.time*1.3+i*2.1)*.018*buoyant;
+        motion.offset=THREE.MathUtils.damp(motion.offset,on?0:Math.sin(field.time*1.3+i*2.1)*.018*buoyant,12,dt);
         f.mesh.position.y=f.base+tun.rise*fill;
         f.c.top0=f.c.top1=f.mesh.position.y;f.c.bottom=f.mesh.position.y-.5;
         // Only the render child heaves. The planted deck/collider stays deterministic.
         const hull=f.mesh.children[0]!;hull.position.y=motion.offset;
-        hull.rotation.z=on?0:Math.sin(field.time*.9+i)*.004*buoyant;
+        hull.rotation.z=THREE.MathUtils.damp(hull.rotation.z,on?0:Math.sin(field.time*.9+i)*.004*buoyant,12,dt);
       }
       lake.update(field.time,fill,tun.rise,actualFillRate);scenery.update(field.time);
       for(const [i,mist] of mistBanks.entries()){mist.position.y=pool.position.y+.15;mist.position.x+=(Math.sin(field.time*.2+i)*.015)*dt;}

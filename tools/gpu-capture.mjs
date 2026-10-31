@@ -1084,7 +1084,7 @@ try {
   if (wants('reachsafe')) {
     await boot(quality,true);await RH('forceRestore');await advance(660,false);
     // Explicit staged setup for a supply-loss stress test; basin/float/seal states stay simulated.
-    await RH('teleport',171,30,-130,Math.PI/2);await advance(20,false);
+    await RH('teleport',172,30,-110,Math.PI/2);await advance(20,false);
     const bank=await RH('state');save('reach-bank-checkpoint.json',bank);if(!bank.reach.recoveryVisited)report.failures.push('Reach bank recovery did not activate');
     await RH('teleport',173,30,-116,Math.PI/2);await advance(60,false);
     await RH('teleport',188,30,-129,Math.PI/2);await RH('photo',[170,44,-103],[188,33,-123],52);
@@ -1101,7 +1101,7 @@ try {
     const t0=(await RH('state')).t;
     await RH('photoOff');await RH('setStick',-1,0);
     await video('reach-boarding-recovery',8*fps,async()=>{},st=>st.deaths>held.deaths&&Math.hypot(st.pos[0]-101,st.pos[2]+130)<3);
-    await RH('setStick',null);await shot('reach-recovered-bank');
+    await RH('setStick',null);await advance(60);await shot('reach-recovered-bank');
     const recovered=await RH('state'),seconds=recovered.t-t0;
     save('reach-recovery-acceptance.json',{seconds,deathsBefore:held.deaths,deathsAfter:recovered.deaths,end:recovered});
     if(recovered.deaths!==held.deaths+1||seconds>10||Math.hypot(recovered.pos[0]-101,recovered.pos[2]+130)>3)report.failures.push('Reach boarding recovery exceeded safe checkpoint contract');
