@@ -37,6 +37,7 @@ export function createLanternhollow(
   parent: THREE.Group, col: CollisionWorld, ground: (x: number, z: number) => number,
   b: HubBuckets, labelMaterials: THREE.MeshStandardMaterial[],
 ) {
+  const windowAmber = new THREE.Color(0xe9a860);
   const plaster = new THREE.Color(0xc0ac86), roof = new THREE.Color(0x80513b), dark = new THREE.Color(0x30261e);
   const rounded = (bucket: Bucket, x: number, y: number, z: number, w: number, h: number, d: number, tint: THREE.Color, radius = .06) => {
     const g = new RoundedBoxGeometry(w, h, d, 2, Math.min(radius, w / 4, h / 4, d / 4));
@@ -72,12 +73,33 @@ export function createLanternhollow(
     box(b.wood, h.x - .7, y + .78, h.z + h.d / 2 + .12, .91, 1.5, .08, PAL.wood.clone().multiplyScalar(.8));
     for (const dx of [-.28, 0, .28]) box(b.wood, h.x - .7 + dx, y + .78, h.z + h.d / 2 + .17, .025, 1.4, .035, PAL.bark);
     box(b.dark, h.x + 1.15, y + 1.45, h.z + h.d / 2 + .07, .94, .84, .08, dark);
-    box(b.lamp, h.x + 1.15, y + 1.45, h.z + h.d / 2 + .12, .72, .64, .025, plaster);
+    box(b.lamp, h.x + 1.15, y + 1.45, h.z + h.d / 2 + .12, .72, .64, .025, windowAmber);
     box(b.wood, h.x + 1.15, y + 1.45, h.z + h.d / 2 + .15, .075, .72, .07, PAL.wood);
     box(b.wood, h.x + 1.15, y + 1.45, h.z + h.d / 2 + .15, .8, .075, .07, PAL.wood);
     for (const dx of [-.58, .58]) box(b.wood, h.x + 1.15 + dx, y + 1.45, h.z + h.d / 2 + .12, .25, .85, .1, PAL.wood);
     lamp(h.x - 1.65, y + 1.9, h.z + h.d / 2 + .3);
     beam(new THREE.Vector3(h.x - 1.65, y + 2.55, h.z + h.d / 2), new THREE.Vector3(h.x - 1.65, y + 2.55, h.z + h.d / 2 + .3), .04);
+
+    // End walls face the arrival/well lenses: a quiet timber frame and inset
+    // window give these broad plaster surfaces a domestic scale at chase distance.
+    for (const sx of [-1, 1]) {
+      const side = h.x + sx * (h.w / 2 + .035);
+      for (const yy of [.65, h.eave - .12])
+        box(b.wood, side, y + yy, h.z, .11, .12, h.d, PAL.wood);
+      box(b.wood, side, y + h.eave / 2, h.z - .65, .12, h.eave, .13, PAL.wood);
+      box(b.dark, side + sx * .035, y + 1.5, h.z + .55, .08, .96, .85, dark);
+      box(b.lamp, side + sx * .08, y + 1.5, h.z + .55, .025, .76, .65, windowAmber);
+      box(b.wood, side + sx * .105, y + 1.5, h.z + .55, .06, .82, .065, PAL.wood);
+      box(b.wood, side + sx * .105, y + 1.5, h.z + .55, .06, .065, .72, PAL.wood);
+      box(b.wood, side + sx * .09, y + .98, h.z + .55, .19, .1, 1.02, PAL.wood);
+    }
+
+    // A shallow stack is tucked into the solid wall footprint, never in the lane.
+    for (let row = 0; row < 2; row++) for (let log = 0; log < 3 - row; log++) {
+      const zz = h.z - .7 + log * .22 + row * .11;
+      beam(new THREE.Vector3(h.x + h.w / 2 - .45, y + .48 + row * .18, zz),
+        new THREE.Vector3(h.x + h.w / 2 + .08, y + .48 + row * .18, zz), .1);
+    }
 
     // Broad bowed roof, sampled once for BOTH mesh and collision (no floating roof collider).
     const halfD = h.d / 2 + .46, halfW = h.w / 2 + .45, steps = 12;
@@ -93,6 +115,18 @@ export function createLanternhollow(
       g.dispose();
       col.add(boxCollider({ x: h.x, z: h.z + (z0 + z1) / 2, w: halfW * 2, d: z1 - z0, top: y0, top1: y1, bottom: y + h.eave - .18, tag: 'hub-roof' }));
       for (const sx of [-1, 1]) beam(new THREE.Vector3(h.x + sx * halfW, y0 - .04, h.z + z0), new THREE.Vector3(h.x + sx * halfW, y1 - .04, h.z + z1), .065);
+    }
+    // Broad, low-contrast course lips break the smooth roof shell without a
+    // noisy tile grid. All trim stays within 3 cm of the authored roof surface.
+    for (let k = 2; k < steps; k += 2) {
+      const zz = -halfD + k / steps * halfD * 2;
+      const lip = new THREE.CylinderGeometry(.025, .025, halfW * 2 - .08, 6);
+      const transform = new THREE.Matrix4().compose(
+        new THREE.Vector3(h.x, height(zz), h.z + zz),
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2),
+        new THREE.Vector3(1, 1, 1),
+      );
+      b.roof.add(lip, transform, roof.clone().multiplyScalar(.86)); lip.dispose();
     }
     // Close the narrow gap between the wall plate and bowed roof at front/back.
     const plateHeight = height(h.d / 2) - (y + h.eave);
@@ -146,19 +180,19 @@ export function createLanternhollow(
   ] as const) {
     const y = ground(x, z), yaw = Math.atan2(-(tz - z), tx - x);
     beam(new THREE.Vector3(x, y - .15, z), new THREE.Vector3(x, y + 1.9, z), .09);
-    const board = new THREE.BoxGeometry(1.9, .36, .12);
+    const board = new THREE.BoxGeometry(2.3, .42, .12);
     b.wood.add(board, trs(x, y + 1.65, z, yaw), PAL.wood); board.dispose();
     for (const back of [false, true]) {
       const faceYaw = yaw + (back ? Math.PI : 0);
       const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 96;
       const ctx = canvas.getContext('2d')!;
       ctx.fillStyle = '#6a4a32'; ctx.fillRect(0, 0, 512, 96);
-      ctx.fillStyle = '#dac39a'; ctx.font = '36px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ead7b3'; ctx.font = 'bold 42px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(back ? '←  ' + name : name + '  →', 256, 49);
       const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 4;
       const mat = new THREE.MeshStandardMaterial({ name: 'hub-sign', map: texture, roughness: .95 });
       labelMaterials.push(mat);
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.8, .32), mat);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.2, .38), mat);
       sign.position.set(x + Math.sin(faceYaw) * .067, y + 1.65, z + Math.cos(faceYaw) * .067); sign.rotation.y = faceYaw;
       parent.add(sign);
     }

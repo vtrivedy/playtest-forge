@@ -220,7 +220,7 @@ const AMBER_TREES: Array<[number, number, number, number]> = [
 ];
 
 const MEADOW_TREES: Array<[number, number, number, number]> = [
-  [-14, 86, 9, 1],
+  [-19, 82, 9, 1],
   [16, 82, 8, 2],
   [-34, 76, 10, 0],
   [30, 70, 9, 3],
@@ -280,7 +280,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     hubPlaster: mk({ name: 'rv-hub-plaster', roughness: 0.96 }),
     hubRoof: mk({ name: 'rv-hub-roof', roughness: 0.9 }),
     hubDark: mk({ name: 'rv-hub-dark', roughness: 0.94 }),
-    hubLamp: mk({ name: 'rv-hub-lamp', roughness: 0.85, emissive: 0xe4b777, emissiveIntensity: 0.16 }),
+    hubLamp: mk({ name: 'rv-hub-lamp', roughness: 0.85, emissive: 0xe4b777, emissiveIntensity: 0.5 }),
     terrain: mk({ name: 'rv-terrain', roughness: 0.95 }),
     ground: mk({ name: 'rv-ground', roughness: 0.95 }),
     rock: mk({ name: 'rv-rock', roughness: 0.93 }),
@@ -323,7 +323,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       diffuseColor.rgb *= 1.0 - max(sailRib, sailWarp) * 0.48;
       diffuseColor.rgb *= 0.93 + 0.07 * sin(sailAlong * 44.0);`);
   };
-  const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
+  // Small practical light apertures retain amber emission in the pressed world.
+  const patchable: THREE.MeshStandardMaterial[] = Object.values(M).filter(m => m !== M.hubLamp);
   const [nature, rubble, lanternColumn] = await Promise.all([loadNatureKit(), loadRubbleKit(), loadLanternColumn()]);
   // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
   // yaw picked to keep foliage out of the route's jump arcs
@@ -594,6 +595,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         // worn path: packed earth, few leaves, soft verge
         const pathK = smooth01(2.6, 0.9, pd);
         c.lerp(PAL.pathEarth, pathK * 0.85);
+        // Hub trails need a value cue even while all world colour is pressed.
+        const hubWear = smooth01(2.1, .7, hubPathDistance(x, z));
+        c.lerp(PAL.soilUmber, hubWear * .65);
+        c.multiplyScalar(1 - hubWear * .2);
         leafy = THREE.MathUtils.lerp(leafy, 0.06, pathK * 0.9) + smooth01(1.6, 3.2, pd) * smooth01(4.5, 3.0, pd) * 0.35; // leaves banked at the verge
         // damp dark banks at the pond and marsh
         const bank = Math.max(smooth01(1.25, 0.85, me), smooth01(1.5, 0.95, pe));
@@ -2480,7 +2485,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       wsLight.intensity = k * 60 + pulse * 8;
     },
     update(dt, t, fox, feetY, colorAt) {
-      M.hubLamp.emissiveIntensity = 0.15 + Math.sin(t * 1.3) * 0.01;
+      M.hubLamp.emissiveIntensity = 0.5 + Math.sin(t * 1.3) * 0.025;
       for (const water of waterVisuals) water.update(t);
       inkTime.value = t;
       const ev: RealmEvent[] = [];
