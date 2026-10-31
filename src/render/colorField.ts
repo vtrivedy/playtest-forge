@@ -81,6 +81,7 @@ export class ColorField {
   private stampStrength: THREE.InstancedBufferAttribute | null = null;
   private stampNoise: THREE.InstancedBufferAttribute | null = null;
   private stampInner: THREE.InstancedBufferAttribute | null = null;
+  private stampRestore: THREE.InstancedBufferAttribute | null = null;
   private static readonly MAX_STAMPS = 128;
   private readonly _stampMatrix = new THREE.Matrix4();
   private maskSize: number;
@@ -241,9 +242,7 @@ export class ColorField {
 
     // All stamps (restores + fox + trail) go out as one instanced draw per frame
     this.stampMat = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },
-      },
+      uniforms: {},
       transparent: true,
       // Sources combine by strongest contribution, exactly as sample() does.
       // Summing overlapping trail stamps turned their soft edges into a hard disc.
@@ -258,6 +257,9 @@ export class ColorField {
         attribute float aStrength;
         attribute float aNoise;
         attribute float aInner;
+        attribute vec2 aRestore;
+        varying vec2 vRestore;
+        varying vec2 vCenter;
         varying vec2 vUv;
         varying float vStrength;
         varying float vNoise;
@@ -269,14 +271,17 @@ export class ColorField {
           vStrength = aStrength;
           vNoise = aNoise;
           vInner = aInner;
+          vRestore = aRestore;
+          vCenter = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */ `
-        uniform float uTime;
         varying vec2 vUv;
         varying float vStrength;
         varying float vNoise;
         varying float vInner;
+        varying vec2 vRestore;
+        varying vec2 vCenter;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
         float noise(vec2 p){
           vec2 i = floor(p); vec2 f = fract(p);
@@ -287,12 +292,22 @@ export class ColorField {
         varying vec2 vWorld;
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
-          // world-space brush noise (two octaves, slow drift): neighbouring stamps share one ragged,
-          // organic edge instead of each repeating the same disc outline
-          float n = ((noise(vWorld * 0.55 + uTime * 0.07) - 0.5) * 1.6 + (noise(vWorld * 2.1 - uTime * 0.05) - 0.5) * 0.7) * (vNoise + 0.12);
-          float d = length(p) + n;
-          float soft = 1.0 - smoothstep(vInner * 0.8, 1.0, d);
-          float ink = soft * soft * (3.0 - 2.0 * soft) * vStrength;
+          float ink;
+          if (vRestore.y > 0.0) {
+            // Same metres, stationary noise and feather as the analytic material front.
+            // Leaves sampling this RT must not see a larger circular restore halo.
+            float edge = vRestore.y;
+            float brush = ((noise(vWorld * 0.35) - 0.5) * 0.8 + (noise(vWorld * 1.7) - 0.5) * 0.35) * edge * 1.6;
+            ink = 1.0 - smoothstep(vRestore.x - edge + brush, vRestore.x + edge * 0.5 + brush, distance(vWorld, vCenter));
+          } else {
+            // Stationary world-space brush noise makes neighbouring stains coherent.
+            float n = ((noise(vWorld * 0.55) - 0.5) * 1.6 + (noise(vWorld * 2.1) - 0.5) * 0.7) * vNoise;
+            float d = length(p) + n;
+            float soft = 1.0 - smoothstep(vInner, 0.88, d);
+            // Fade before the square boundary so outward bleed cannot make rectangles.
+            soft *= 1.0 - smoothstep(0.82, 1.0, length(p));
+            ink = soft * soft * (3.0 - 2.0 * soft) * vStrength;
+          }
           gl_FragColor = vec4(ink, ink, ink, 1.0);
         }`,
     });
@@ -302,12 +317,15 @@ export class ColorField {
     this.stampStrength = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
     this.stampNoise = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
     this.stampInner = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+    this.stampRestore = new THREE.InstancedBufferAttribute(new Float32Array(N * 2), 2);
     this.stampStrength.setUsage(THREE.DynamicDrawUsage);
     this.stampNoise.setUsage(THREE.DynamicDrawUsage);
     this.stampInner.setUsage(THREE.DynamicDrawUsage);
+    this.stampRestore.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aStrength', this.stampStrength);
     geo.setAttribute('aNoise', this.stampNoise);
     geo.setAttribute('aInner', this.stampInner);
+    geo.setAttribute('aRestore', this.stampRestore);
     this.stampMesh = new THREE.InstancedMesh(geo, this.stampMat, N);
     this.stampMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.stampMesh.frustumCulled = false;
@@ -347,18 +365,20 @@ export class ColorField {
     renderer.clear();
     renderer.autoClear = false;
 
-    const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number; inner: number }> = [];
+    const stamps: Array<{ x: number; z: number; size: number; strength: number; noise: number; inner: number; restore?: RestoreRegion }> = [];
 
     for (const r of this.restores) {
       if (r.radius > 0.01) {
-        // full strength inside radius - edge, fading to 0 by radius + edge (matches the analytic front)
-        const edge = Math.max(0.3, ColorField.edgeOf(r));
-        const outer = r.radius + edge;
+        // Extra support around the analytic front keeps brush bleed inside the stamp quad.
+        const edge = Math.max(0.001, ColorField.edgeOf(r));
+        // Noise can extend the analytic feather to R + 1.42e; keep it inside the quad.
+        const outer = r.radius + edge * 1.5;
         stamps.push({
           x: r.center.x,
           z: r.center.z,
           size: outer * 2,
           strength: 1,
+          restore: r,
           noise: Math.min(0.12, (edge * 0.5) / outer),
           inner: Math.max(0, (r.radius - edge) / outer),
         });
@@ -418,13 +438,14 @@ export class ColorField {
       this.stampStrength!.setX(i, s.strength);
       this.stampNoise!.setX(i, s.noise);
       this.stampInner!.setX(i, s.inner);
+      this.stampRestore!.setXY(i, s.restore?.radius ?? 0, s.restore ? Math.max(0.001, ColorField.edgeOf(s.restore)) : 0);
     }
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
     this.stampStrength!.needsUpdate = true;
     this.stampNoise!.needsUpdate = true;
     this.stampInner!.needsUpdate = true;
-    this.stampMat.uniforms.uTime!.value = this.time;
+    this.stampRestore!.needsUpdate = true;
     renderer.render(this.maskScene, this.maskCam);
 
     renderer.setRenderTarget(prevTarget);
@@ -464,7 +485,6 @@ export class ColorField {
       shader.uniforms.uBounds = {
         value: new THREE.Vector4(field.bounds.minX, field.bounds.maxX, field.bounds.minZ, field.bounds.maxZ),
       };
-      shader.uniforms.uTime = { value: 0 };
       shader.uniforms.uRestoredChroma = { value: (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1 };
 
       (mat.userData as { colorFieldShader?: typeof shader }).colorFieldShader = shader;
@@ -509,7 +529,6 @@ export class ColorField {
           uniform sampler2D uMaskMap;
           uniform float uUseMaskMap;
           uniform vec4 uBounds;
-          uniform float uTime;
 
           float hash21(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -542,9 +561,9 @@ export class ColorField {
               if (rad < 0.001) continue;
               vec3 c = uRestorePos[i];
               float d = distance(p.xz, c.xz);
-              float edge = min(rad * 0.18, uRestoreEdge[i]);
+              float edge = max(0.001, uRestoreEdge[i]);
               // painterly ragged front: two octaves so a crisp front still reads as brushwork
-              float n = ((noise21(p.xz * 0.35 + uTime * 0.15) - 0.5) * 0.8 + (noise21(p.xz * 1.7 - uTime * 0.1) - 0.5) * 0.35) * edge * 1.6;
+              float n = ((noise21(p.xz * 0.35) - 0.5) * 0.8 + (noise21(p.xz * 1.7) - 0.5) * 0.35) * edge * 1.6;
               float local = 1.0 - smoothstep(rad - edge + n, rad + edge * 0.5 + n, d);
               s = max(s, local);
               cfPermanent = max(cfPermanent, local);
@@ -553,7 +572,7 @@ export class ColorField {
               cfRim = max(cfRim, uRestoreRim[i] * smoothstep(-edge * 0.4, edge * 0.3, behind) * (1.0 - smoothstep(edge * 0.4, edge * 2.6, behind)));
             }
             // aura: feathered and brush-broken, not a clean sphere
-            float an = (noise21(p.xz * 0.6 + uTime * 0.08) - 0.5) * 0.35 + (noise21(p.xz * 2.3) - 0.5) * 0.15;
+            float an = (noise21(p.xz * 0.6) - 0.5) * 0.35 + (noise21(p.xz * 2.3) - 0.5) * 0.15;
             float ad = distance(p, uFox) / uAura + an;
             float af = 1.0 - smoothstep(0.15, 1.0, ad);
             s = max(s, af * af);
@@ -633,7 +652,6 @@ export class ColorField {
     u.uTrailLife!.value = this.trailLife;
     u.uGlobalColor!.value = this.globalColor;
     if (u.uRestoredChroma) u.uRestoredChroma.value = (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1;
-    u.uTime!.value = this.time;
     (u.uBounds!.value as THREE.Vector4).set(
       this.bounds.minX,
       this.bounds.maxX,
@@ -666,7 +684,7 @@ export class ColorField {
       const r = this.restores[i]!;
       posArr[i]!.copy(r.center);
       radArr[i] = r.radius;
-      edgeArr[i] = Number.isFinite(r.edgeMax) ? r.edgeMax : 1e6;
+      edgeArr[i] = ColorField.edgeOf(r);
       rimArr[i] = r.rim;
     }
   }
