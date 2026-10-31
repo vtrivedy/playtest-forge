@@ -10,7 +10,7 @@ export const FOX_LOOK = {
   furSaturation: 0.85,
   furValue: 0.95,
   /** painterly value strokes (object-space clumps laid along the body) */
-  strokeStrength: 0.12,
+  strokeStrength: 0.18,
   strokeScale: 1.0,
   /** broken amber rim at grazing angles = the spirit glow at the silhouette */
   rimStrength: 0.22,
@@ -84,7 +84,7 @@ ${NOISE_GLSL}`,
         '#include <map_fragment>',
         `#ifdef USE_MAP
   // Prefer broad painted values over the baked fine fur speckle.
-  diffuseColor = vec4(diffuse, opacity) * texture2D(map, vMapUv, 1.0);
+  diffuseColor = vec4(diffuse, opacity) * texture2D(map, vMapUv, 0.4);
 #endif
 {
   // clumps elongated along the body (+Z forward in rest space) and down the legs
@@ -160,17 +160,19 @@ function patchEye(mat: THREE.MeshStandardMaterial, geo: THREE.BufferGeometry) {
   vec3 c = vRest.x > 0.0 ? uEyeL : uEyeR;
   vec2 q = (vRest.zy - c.zy) / uEyeR0;          // forward, up in units of the eye radius
   float d = length(q);
-  float aperture = length(q / vec2(1.0, 0.62));
-  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.2, 0.78)));
+  float aperture = length(q / vec2(1.0, 0.5));
+  float pupil = 1.0 - smoothstep(0.85, 1.0, length(q / vec2(0.13, 0.39)));
   vec3 iris = mix(vec3(0.48, 0.23, 0.055), vec3(0.22, 0.075, 0.018), smoothstep(0.15, 0.85, d));
-  iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.7, 0.95, d));   // limbal ring + lid shadow
+  iris = mix(iris, vec3(0.05, 0.025, 0.015), smoothstep(0.62, 0.74, aperture));   // fine umber iris boundary
   iris = mix(iris, vec3(0.02, 0.01, 0.008), pupil);
-  float glint = 1.0 - smoothstep(0.08, 0.14, length(q - vec2(0.3, 0.32)));
-  // Warm lid rim encloses an almond aperture; no white sclera ring.
-  float lid = smoothstep(0.72, 0.98, aperture);
-  iris = mix(iris, vec3(0.045, 0.019, 0.009), lid);
+  float glint = 1.0 - smoothstep(0.045, 0.085, length(q - vec2(0.22, 0.14)));
+  // A fine lid line gives way to rust fur, rather than filling the large authored disc with black.
+  float lid = smoothstep(0.70, 0.79, aperture);
+  iris = mix(iris, vec3(0.055, 0.024, 0.012), lid);
+  float coat = smoothstep(0.82, 1.08, aperture);
+  iris = mix(iris, vec3(0.32, 0.09, 0.025), coat);
   vec2 tearCorner = q - vec2(0.8, -0.25);
-  float tear = exp(-40.0 * dot(tearCorner, tearCorner)) * lid;
+  float tear = exp(-40.0 * dot(tearCorner, tearCorner)) * lid * (1.0 - coat);
   iris = mix(iris, vec3(0.095, 0.038, 0.016), tear * 0.45);
   diffuseColor.rgb = mix(iris, vec3(1.0, 0.88, 0.62), glint * (1.0 - lid));
   eyeLid = lid; eyeGlint = glint * (1.0 - lid);
@@ -234,7 +236,7 @@ export function applyFoxLook(root: THREE.Object3D) {
         }
         mat.color.setHex(0xffffff);
         mat.roughness = 0.85;
-        mat.normalScale.setScalar(0.2);
+        mat.normalScale.setScalar(0.35);
         mat.emissive.setHex(0x000000);
         mat.emissiveIntensity = 0;
         patchFur(mat);
