@@ -51,7 +51,11 @@ type ShadeActor = {
 };
 
 /** Bake the licensed library animal in one authored gallop pose. No live skeleton or hero code. */
-async function animalGeometry(): Promise<THREE.BufferGeometry> {
+let preparedAnimal: Promise<THREE.BufferGeometry> | undefined;
+function animalGeometry(): Promise<THREE.BufferGeometry> {
+  return preparedAnimal ??= bakeAnimalGeometry();
+}
+async function bakeAnimalGeometry(): Promise<THREE.BufferGeometry> {
   const gltf = await new GLTFLoader().loadAsync('/assets/library/animals/quaternius_stag.glb');
   const mixer = new THREE.AnimationMixer(gltf.scene);
   const headLow = gltf.animations.find(c => c.name === 'Idle_Headlow')!;
@@ -96,9 +100,52 @@ async function animalGeometry(): Promise<THREE.BufferGeometry> {
   g.scale(scale * 0.82, scale, scale * 0.82);
   g.computeVertexNormals();
   g.computeBoundingBox();
+  bakeInkMass(g);
   mixer.stopAllAction();
   mixer.uncacheRoot(gltf.scene);
   return g;
+}
+
+/** Surface thickness, not a hollow interior mask: the chest remains ink against bright stone. */
+function bakeInkMass(g: THREE.BufferGeometry): void {
+  const started = performance.now(), positions = g.getAttribute('position'), normals = g.getAttribute('normal');
+  const mass = new Float32Array(positions.count), tip = new Float32Array(positions.count), weight = new Float32Array(positions.count);
+  const probe = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  const ray = new THREE.Raycaster(), p = new THREE.Vector3(), n = new THREE.Vector3(), origin = new THREE.Vector3();
+  const hits: THREE.Intersection[] = [], neighbors = Array.from({length:positions.count},()=>new Set<number>());
+  let misses = 0;
+  ray.near = .002; ray.far = 3.5;
+  for(let i=0;i<positions.count;i++){
+    p.fromBufferAttribute(positions,i); n.fromBufferAttribute(normals,i).normalize();
+    ray.set(origin.copy(p).addScaledVector(n,-.003),n.negate()); hits.length=0;
+    ray.intersectObject(probe,false,hits);
+    const thickness=hits.find(hit=>hit.distance>.005)?.distance;
+    if(thickness===undefined)misses++;
+    mass[i]=THREE.MathUtils.smoothstep((thickness??0)+.003,.10,.42);
+  }
+  const index=g.getIndex()!;
+  for(let i=0;i<index.count;i+=3){const a=index.getX(i),b=index.getX(i+1),c=index.getX(i+2);neighbors[a]!.add(b).add(c);neighbors[b]!.add(a).add(c);neighbors[c]!.add(a).add(b);}
+  for(let pass=0;pass<2;pass++){
+    const previous=mass.slice();
+    for(let i=0;i<mass.length;i++){let sum=previous[i]!*2;for(const j of neighbors[i]!)sum+=previous[j]!;mass[i]=sum/(neighbors[i]!.size+2);}
+  }
+  const antlerBase=new THREE.Vector3(0,2.2,.75); let reach=0;
+  for(let i=0;i<mass.length;i++){p.fromBufferAttribute(positions,i);if(p.y>2.2&&p.z>.05)reach=Math.max(reach,p.distanceTo(antlerBase));}
+  const histogram=Array(5).fill(0);
+  for(let i=0;i<mass.length;i++){
+    p.fromBufferAttribute(positions,i);
+    // Taper-end normals can point down the shaft; those rays overestimate local limb thickness.
+    if(p.y<.65||p.y>2.65)mass[i]=Math.min(mass[i]!, .1);
+    if(p.y<1.6&&mass[i]!<.15)tip[i]=1-THREE.MathUtils.smoothstep(p.y,.02,.45);
+    else if(p.y>2.2&&p.z>.05&&mass[i]!<.35)tip[i]=THREE.MathUtils.smoothstep(p.distanceTo(antlerBase)/Math.max(.01,reach),.6,1);
+    weight[i]=.6+20*tip[i]!;
+    histogram[Math.min(4,Math.floor(mass[i]!*5))]++;
+  }
+  g.setAttribute('aMass',new THREE.BufferAttribute(mass,1));
+  g.setAttribute('aTip',new THREE.BufferAttribute(tip,1));
+  g.setAttribute('aWispWeight',new THREE.BufferAttribute(weight,1));
+  g.userData.shadeInk={bakeMs:Number((performance.now()-started).toFixed(2)),vertices:positions.count,thicknessMisses:misses,massHistogram:histogram};
+  probe.material.dispose();
 }
 
 const NOISE = /* glsl */ `
@@ -114,7 +161,8 @@ function inkMaterial(): THREE.ShaderMaterial {
     uniforms: { uTime: { value: 0 }, uPresence: { value: 1 }, uSeed: { value: 0 }, uNoticeYaw: { value: 0 }, uLayer: { value: 0 }, uDensity: { value: 3 }, uReleaseAge: { value: -1 } },
     vertexShader: /* glsl */ `
       uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer;
-      varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
+      attribute float aMass, aTip;
+      varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying vec3 vRest; varying float vMass; varying float vTip;
       ${NOISE}
       void main() {
         vec3 p = position;
@@ -124,13 +172,14 @@ function inkMaterial(): THREE.ShaderMaterial {
         vec3 q = p - pivot;
         q.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * q.xz;
         p = pivot + q;
+        vRest=p; vMass=aMass; vTip=aTip;
         // wavering: the ink never quite holds still; it boils more toward the feet
         float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.015 + 0.025;
         p += normal * (n3(p * 3.0 + vec3(0.0, uTime * 1.3, uSeed)) - 0.5) * w * 2.0;
         p.x += sin(uTime * 1.7 + p.y * 2.0 + uSeed) * 0.075;
         // freeing: the body lifts and spreads as it comes apart
         p += normal * ((1.0 - uPresence) * 0.035 + uLayer * 0.025);
-        vP = p; vY = p.y;
+        vP = p;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         vN = normalize(normalMatrix * normal);
         vWorldN = normalize(mat3(modelMatrix) * normal);
@@ -139,25 +188,30 @@ function inkMaterial(): THREE.ShaderMaterial {
       }`,
     fragmentShader: /* glsl */ `
       uniform float uTime, uPresence, uSeed, uNoticeYaw, uLayer, uDensity, uReleaseAge;
-      varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying float vY;
+      varying vec3 vWorldN; varying vec3 vN; varying vec3 vV; varying vec3 vP; varying vec3 vRest; varying float vMass; varying float vTip;
       ${NOISE}
       void main() {
         float n = n3(vP * 2.4 + vec3(uLayer * 0.37, -uTime * 0.32, uSeed));
-        float billow = n3(vP * 5.0 + vec3(uTime * 0.14, uLayer, 0.0));
+        vec3 bq=vRest*.85+vec3(uSeed,-uTime*.08,0.0);
+        bq.xz+=(n3(bq*1.3)-.5)*.9;
+        float billow=n3(bq);
         float rim = pow(1.0 - abs(dot(vN, vV)), 2.2);
         // Density varies through separate shells: broad translucent wash, never a black plate.
-        float legFade = smoothstep(0.02, 0.45, vY);
-        float density = mix(0.2, 1.0, smoothstep(0.12, 0.76, n * 0.75 + billow * 0.25));
-        float dissolve = smoothstep(1.0 - uPresence - 0.12, 1.0 - uPresence + 0.24, n);
+        float density=mix(.6,1.6,vMass)*mix(.65,1.0,billow);
+        float fray=smoothstep(.25,.85,vTip+(n-.5)*.5);
+        float erosion=smoothstep(1.0-uPresence-.12,1.0-uPresence+.24,n);
+        float dissolve=mix(1.0,erosion,smoothstep(0.0,.12,uReleaseAge));
         vec3 core = vec3(0.035, 0.024, 0.016);
         vec3 light = vec3(0.15, 0.10, 0.065);
         float wrap = dot(normalize(vWorldN), normalize(vec3(-0.4, 0.8, 0.5))) * 0.5 + 0.5;
-        vec3 col = mix(core, light, wrap * 0.45 + n * 0.25 + rim * 0.18);
+        float lift=(wrap*.45+n*.25+rim*.18)*mix(.7,.35,vMass);
+        vec3 col=mix(core,light,lift)*mix(.8,1.2,billow);
         // The remaining animal warms briefly before its ink unspools into motes.
         float releaseWarmth = smoothstep(0.08, 0.32, uReleaseAge);
         vec3 amber = mix(vec3(0.25, 0.09, 0.025), vec3(0.65, 0.30, 0.075), wrap * 0.6 + n * 0.25);
         col = mix(col, amber, releaseWarmth);
-        float alpha = (uLayer < 0.5 ? 1.0-exp(-uDensity*density) : 0.11*density) * legFade;
+        float shellEdge=.3+.7*smoothstep(.05,.55,rim);
+        float alpha=(uLayer<.5?1.0-exp(-uDensity*density):.11*density*shellEdge)*(1.0-fray);
         alpha *= (1.0 - smoothstep(0.42, 1.0, rim)) * dissolve * uPresence;
         gl_FragColor = vec4(col, alpha);
         #include <colorspace_fragment>
@@ -175,7 +229,9 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
   // Sample the real animal surface, pulling inward to populate its depth instead of a halo plane.
   const count = 144;
   const points = new Float32Array(count * 3);
+  const masses=new Float32Array(count),tips=new Float32Array(count);
   const vertex = new THREE.Vector3();
+  const candidate=new THREE.Vector3(),positions=source.getAttribute('position'),sourceMass=source.getAttribute('aMass'),sourceTip=source.getAttribute('aTip');
   let randomState=31+seed*167;
   // Runtime Three includes the seeded RNG setter; the installed declaration predates it.
   const sampler=new MeshSurfaceSampler(new THREE.Mesh(source)) as MeshSurfaceSampler & {setRandomGenerator(random:()=>number):MeshSurfaceSampler};
@@ -183,19 +239,27 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
     randomState=(Math.imul(randomState,1664525)+1013904223)>>>0;
     return randomState/4294967296;
   });
+  sampler.setWeightAttribute('aWispWeight');
   sampler.build();
   for (let k = 0; k < count; k++) {
     sampler.sample(vertex);
-    vertex.x *= 0.65 + (k % 7) * 0.05;
-    vertex.z *= 0.8;
+    let nearest=0,best=Infinity;
+    for(let j=0;j<positions.count;j++){const d=candidate.fromBufferAttribute(positions,j).distanceToSquared(vertex);if(d<best){best=d;nearest=j;}}
+    masses[k]=sourceMass.getX(nearest);tips[k]=sourceTip.getX(nearest);
+    vertex.x *= THREE.MathUtils.lerp(1,.65+(k%7)*.05,masses[k]!);
+    vertex.z *= THREE.MathUtils.lerp(1,.8,masses[k]!);
     vertex.toArray(points, k * 3);
   }
   g.setAttribute('position', new THREE.BufferAttribute(points, 3));
+  g.setAttribute('aMass',new THREE.BufferAttribute(masses,1));
+  g.setAttribute('aTip',new THREE.BufferAttribute(tips,1));
+  g.userData.shadeInk={wisps:count,tipWisps:Array.from(tips).filter(v=>v>.25).length,meanWispMass:Number((masses.reduce((a,b)=>a+b,0)/count).toFixed(3)),meanWispTip:Number((tips.reduce((a,b)=>a+b,0)/count).toFixed(3))};
   g.setAttribute('aPhase', new THREE.BufferAttribute(Float32Array.from({length:count}, (_,k)=>(k*.618+seed*.13)%1),1));
   const mat=new THREE.ShaderMaterial({
     uniforms:{uTime:{value:0},uPresence:{value:1},uOpacity:{value:.16},uSize:{value:.65},uPixelScale:{value:540},uReleased:{value:0},uReleaseAge:{value:0},uReleaseStart:{value:0}},
-    vertexShader:`attribute float aPhase; uniform float uTime,uPresence,uSize,uPixelScale,uReleased,uReleaseAge,uReleaseStart; varying float vAge; varying float vPhase;
+    vertexShader:`attribute float aPhase,aMass,aTip; uniform float uTime,uPresence,uSize,uPixelScale,uReleased,uReleaseAge,uReleaseStart; varying float vAge; varying float vPhase; varying float vMass; varying float vTip;
       void main(){
+        vMass=aMass;vTip=aTip;
         float clock=uReleased>.5?uReleaseStart:uTime;
         float age=fract(aPhase+clock*.22);vAge=age;vPhase=aPhase;
         vec3 p=position; p.y+=age*.55;
@@ -208,19 +272,20 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
         }
         vec4 mv=modelViewMatrix*vec4(p,1.);
         gl_Position=projectionMatrix*mv;
-        gl_PointSize=clamp(uSize*(.55+age)*projectionMatrix[1][1]*uPixelScale/max(.1,-mv.z),1.,180.);
+        gl_PointSize=clamp(uSize*mix(1.,.6,aTip*(1.-uReleased))*(.55+age)*projectionMatrix[1][1]*uPixelScale/max(.1,-mv.z),1.,180.);
       }`,
-    fragmentShader:`uniform float uTime,uPresence,uOpacity,uReleased,uReleaseAge; varying float vAge; varying float vPhase;
+    fragmentShader:`uniform float uTime,uPresence,uOpacity,uReleased,uReleaseAge; varying float vAge; varying float vPhase; varying float vMass; varying float vTip;
       ${NOISE}
       void main(){
         vec2 q=(gl_PointCoord-.5)*2.;q.x+=sin(q.y*3.+vPhase*23.+uTime*.6)*.15;
         float edge=1.-smoothstep(.2,1.,length(q*vec2(1.1,.85)));
         float grain=n3(vec3(q*3.,vPhase*13.+uTime*.2));
-        float life=sin(vAge*3.14159265);
+        float life=mix(sin(vAge*3.14159265),pow(1.-vAge,1.6),vTip*(1.-uReleased));
         if(uReleased>.5) life=mix(life,.8,smoothstep(0.,.25,uReleaseAge))*(1.-smoothstep(.6+vPhase*.4,2.+vPhase*.4,uReleaseAge));
         float presence=uReleased>.5?1.:uPresence;
-        float a=edge*edge*(.35+grain*.65)*life*uOpacity*presence;
-        vec3 color=mix(vec3(.16,.12,.09),vec3(.42,.23,.095),uReleased*smoothstep(.15,1.8,uReleaseAge));
+        float a=edge*edge*(.35+grain*.65)*life*uOpacity*presence*mix(1.,1.8,vTip*(1.-uReleased));
+        vec3 base=mix(vec3(.16,.12,.09),vec3(.05,.036,.024),max(vTip,.6*vMass)*(1.-uReleased));
+        vec3 color=mix(base,vec3(.42,.23,.095),uReleased*smoothstep(.15,1.8,uReleaseAge));
         gl_FragColor=vec4(color,a);
         #include <colorspace_fragment>
       }`,
@@ -335,6 +400,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
       layers.push(material);
     }
     const smoke=inkWisps(i, geo);
+    group.userData.shadeInk={...geo.userData.shadeInk,...smoke.geometry.userData.shadeInk};
     smoke.renderOrder=4;
     group.add(smoke);
     scene.add(group);
