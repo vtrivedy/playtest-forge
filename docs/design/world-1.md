@@ -223,7 +223,7 @@ As game-design §8: −1 wisp per hit or hard landing, fall to the cloud sea →
 
 ## 4. HUB — Lanternhollow (continuous opening slice)
 
-Sprint 3 builds Lanternhollow into the realm's opening clearing around natural spawn (0, 90), with the dry Great Well at (−8, 85), cottages and branch paths. The authored route continues from this village through H-a, Windmill Rise and the Kiln without a scene change or teleport. Current layout and GPU corrections: [Lanternhollow design](sprint3/lanternhollow-r2-DESIGN.md); continuous capture contract: [route-clear design](sprint3-route-clear.md). A built layout is not proof of the continuous clear; that still requires inspected gameplay and state evidence.
+Sprint 3 builds Lanternhollow into the realm's opening clearing around natural spawn (−6, 92), with the dry Great Well at (−8, 85), cottages and branch paths. The authored route continues from this village through H-a, Windmill Rise and the Kiln without a scene change or teleport. Current layout and GPU corrections: [Lanternhollow design](sprint3/lanternhollow-DESIGN.md); continuous capture contract: [route-clear design](sprint3-route-clear.md). A built layout is not proof of the continuous clear; that still requires inspected gameplay and state evidence.
 
 The longer NPC/gate tutorial below remains a future design, not shipped progression or a separate playable chapter. Its intended lessons are:
 
