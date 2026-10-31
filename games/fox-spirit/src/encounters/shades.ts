@@ -29,6 +29,7 @@ type ShadeActor = {
   layers: THREE.ShaderMaterial[];
   mode: 'patrol' | 'chase' | 'return' | 'released';
   nearTime: number;
+  returnStall: number;
   smoke: THREE.Points<THREE.BufferGeometry, THREE.ShaderMaterial>;
   pool: THREE.Mesh;
   /** 1 = present, falls to 0 while freed */
@@ -316,7 +317,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
     debug.add(ring);
     debug.visible = false;
     scene.add(debug);
-    return { layers, mode: 'patrol', nearTime: 0, notice: 0, noticeYaw: 0, active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, releaseStart: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, smoke, pool, presence: 1, freed: false };
+    return { layers, mode: 'patrol', nearTime: 0, returnStall: 0, notice: 0, noticeYaw: 0, active: !s.afterLatch, afterLatch: s.afterLatch, poolSampleAt: new THREE.Vector3(Infinity, Infinity, Infinity), poolRadius: 0, leaves, leafSeeds, releaseAge: 0, releaseStart: 0, debug, id: s.id, curve, length: curve.getLength(), u: 0, speed: s.speed, pos: curve.getPointAt(0), heading: 0, group, mat, smoke, pool, presence: 1, freed: false };
   });
   const tmp = new THREE.Vector3();
   let previousFox: THREE.Vector3 | null = null;
@@ -376,9 +377,9 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
           const distance = Math.hypot(fox.x-s.pos.x,fox.z-s.pos.z);
           const onLevel = Math.abs(fox.y-s.pos.y)<2;
           s.nearTime = distance < tun.chaseDistance && onLevel ? s.nearTime + dt : 0;
-          if (s.mode === 'chase' && (distance > 7 || !onLevel || s.pos.distanceTo(patrol)>tun.chaseLeash)) s.mode='return';
+          if (s.mode === 'chase' && (distance > 7 || !onLevel || Math.hypot(s.pos.x-patrol.x,s.pos.z-patrol.z)>tun.chaseLeash)) s.mode='return';
           if (s.mode === 'patrol' && s.nearTime > tun.chaseDelay) s.mode='chase';
-          if (s.mode === 'return' && s.pos.distanceTo(patrol)<.4) { s.mode='patrol'; s.nearTime=0; }
+          if (s.mode === 'return' && Math.hypot(s.pos.x-patrol.x,s.pos.z-patrol.z)<.4) { s.mode='patrol'; s.nearTime=0; }
           const target = s.mode === 'chase' ? fox : patrol;
           tmp.copy(target).sub(s.pos).setY(0);
           const remaining=tmp.length();
@@ -390,8 +391,18 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
             // Flow directly toward the target; visual yaw damps independently so a turn cannot orbit it.
             const nx=s.pos.x+tmp.x/remaining*step,nz=s.pos.z+tmp.z/remaining*step;
             const floor=groundAt(nx,nz,s.pos.y+1);
-            if(Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<.6&&!blocked(nx,nz,floor)) s.pos.set(nx,floor,nz);
-            else s.mode='return';
+            if(Number.isFinite(floor)&&Math.abs(floor-s.pos.y)<.6&&!blocked(nx,nz,floor)) {
+              s.pos.set(nx,floor,nz);
+              s.returnStall=0;
+            } else if(s.mode==='chase') {
+              s.mode='return';
+              s.returnStall=0;
+            } else if(s.mode==='return') {
+              // A prop can invalidate the straight route home. Resume the moving patrol target
+              // after a short pause rather than freezing forever or teleporting through scenery.
+              s.returnStall+=dt;
+              if(s.returnStall>1.5) { s.mode='patrol'; s.nearTime=0; s.returnStall=0; }
+            }
           }
           const near = Math.hypot(fox.x-s.pos.x,fox.z-s.pos.z)<tun.noticeDistance && Math.abs(fox.y-s.pos.y)<3;
           s.notice=THREE.MathUtils.damp(s.notice,near?1:0,3/tun.noticeTime,dt);
