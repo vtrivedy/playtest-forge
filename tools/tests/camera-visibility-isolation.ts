@@ -7,7 +7,7 @@ const field=new ColorField(),mat=new THREE.MeshStandardMaterial();field.patchMat
 const shader=()=>({vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader,uniforms:THREE.UniformsUtils.clone(THREE.ShaderLib.standard.uniforms)});
 const live=shader();mat.onBeforeCompile(live as any,{} as any);
 scene.add(new THREE.Mesh(new THREE.PlaneGeometry(),mat));const fox=new THREE.Group();fox.add(new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial()));scene.add(fox);
-let target=null;const compiled=new Set();
+let target: THREE.WebGLRenderTarget|null=null;const compiled=new Set();
 // API double ONLY invokes shader callbacks. No browser, canvas, WebGL context,
 // rasterization or real renderer is constructed or run. Pixel arrays are synthetic.
 const renderer:any={shadowMap:{autoUpdate:true,needsUpdate:false},autoClear:true,
