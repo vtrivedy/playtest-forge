@@ -41,7 +41,7 @@ export class AuthoredLocomotion {
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
     liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .09, liftHindTrot: .12, carpalFlex: .95, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, weightRoll: .05, spineSway: .045, breath: .022,
+    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, weightRoll: .05, spineSway: .045, breath: .022,
     runningGather: .45, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
@@ -759,10 +759,11 @@ export class AuthoredLocomotion {
     const walk=w('walk'), trot=w('trot');
     const mid=(g:Gait,leg:number)=>{const c=GAITS[g].contacts[leg];return c.phase+c.duty*this.stanceRatio[g]/2;};
     const wave=(leg:number,fn:(x:number)=>number)=>walk*fn(2*Math.PI*(this.phase-mid('walk',leg)))+trot*.6*fn(2*Math.PI*(this.phase-mid('trot',leg)));
-    // Lowest just after each footfall pair.
-    this.root.position.y-=this.params.strideBob*(walk*.6+trot)*Math.cos(4*Math.PI*(this.phase-.1));
     // Stance-side hip and shoulder ride up (+roll about forward raises the fox's left).
     const pelvisRoll=this.params.weightRoll*wave(2,Math.cos), chestRoll=this.params.weightRoll*wave(0,Math.cos);
+    // Bob and roll only ever lower the body: legs already near full reach can't follow a rise (floating pads).
+    // Lowest just after each footfall pair; the roll's raised side is paid back with a matching drop.
+    this.root.position.y-=this.params.strideBob*(walk*.6+trot)*(1+Math.cos(4*Math.PI*(this.phase-.1)))*.5+(Math.abs(pelvisRoll)+Math.abs(chestRoll))*.5*.09+this.params.rideDrop*(walk+trot);
     const sway=this.params.spineSway*wave(2,Math.sin);
     const idle=this.input.grounded ? this.weights.get('idle') ?? 0 : 0;
     const breath=Math.sin(2*Math.PI*.27*this.time), shift=Math.sin(2*Math.PI*.07*this.time+1);
