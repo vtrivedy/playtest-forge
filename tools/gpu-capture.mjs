@@ -2475,7 +2475,8 @@ try {
   }
   if(hipDiagnostic) {
     const {captureHipWeightAB}=await import(pathToFileURL(path.resolve(repo,'tools/hip-weight-capture.mjs')).href);
-    await captureHipWeightAB({repo,H,boot,video,save,getPage:()=>page,fps,quality});
+    report.captureHelperSha['hip-weight-capture.mjs']=createHash('sha256').update(fs.readFileSync(path.join(repo,'tools/hip-weight-capture.mjs'))).digest('hex');
+    await captureHipWeightAB({repo,H,boot,video,save,getPage:()=>page,fps,quality,out});
   }
   if (wants('turntable')) {
     // Character turntable: idle fox, camera orbits once at a fixed radius (restored grade).
