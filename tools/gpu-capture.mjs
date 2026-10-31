@@ -1269,7 +1269,7 @@ try {
       if (bounded) return st.auto.idx >= to && (!kilnRoute || st.seedwells.some(s => s.id === 'SW1' && s.lit)) || !st.auto.active;
       if (st.restored && restoredAt === undefined) restoredAt = i;
       return restoredAt !== undefined && i - restoredAt >= 11 * fps || !st.auto.active && !st.restored;
-    }, { sample: async (i, st) => {
+    }, { traceEveryFrame: budgetFrames <= 60 * fps, sample: async (i, st) => {
       const audit = {};
       if (kilnRoute) {
         const step = Math.hypot(...st.pos.map((v, axis) => v - previousPos[axis]));
