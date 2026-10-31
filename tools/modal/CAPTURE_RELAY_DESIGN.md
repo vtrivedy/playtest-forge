@@ -24,3 +24,6 @@ Opus review identified incomplete-download acceptance and cancellation cleanup b
 
 ### Final assembly
 The final-cut manifest can carry an optional continuous source (`continuous.path`, `seconds:60`, exact source/tool SHA). Copy its first60s without cuts/reordering/speed changes in the Modal GPU container and retain metadata. Trailer filename derives actual requested duration rather than a stale50s literal; final provenance covers both source types. Native hero PNGs are copied unchanged, not generated/painted.
+
+### Bounded priority dispatch
+Only submit up to worker capacity; do not put every historical/current stream into ThreadPoolExecutor's FIFO. Poll the live roster in declared order each round, skip completed/superseded jobs, and launch at most available slots. This lets newly requested main/feel jobs take priority on the next free slot and prevents a hidden FIFO from defeating roster priority. Archive request-specific feedback alongside the stream's latest pointer.
