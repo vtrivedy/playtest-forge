@@ -79,6 +79,11 @@ for (const eye of [new THREE.Vector3(4, 2, 3), new THREE.Vector3(-3, 8, 1)]) {
     assert.ok(Math.abs(camera.position.y - column.dot(viewPosition) - world.y) < 1e-9,
       'fragment height reconstruction must preserve floor height under pitch/roll');
   }
+  for (const worldNormal of [new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 2, 0).normalize(), new THREE.Vector3(0, 0, 1)]) {
+    const viewNormal = worldNormal.clone().transformDirection(camera.matrixWorldInverse);
+    assert.ok(Math.abs(column.dot(viewNormal) - worldNormal.y) < 1e-9,
+      'floor normal reconstruction must distinguish treads, slopes and walls under pitch/roll');
+  }
 }
 fader.update(1 / 60, camera, renderer, new THREE.Vector3(0, 7.25, 0), 0.55, 0);
 assert.equal(shader.uniforms.uOccFox.value.w, 7.25, 'floor protection follows current feet height');
@@ -93,6 +98,27 @@ step(); step();
 assert.equal(fader.detected, false, 'hidden ancestor must not trigger canopy ray');
 for (let i = 0; i < 120; i++) step();
 assert.ok(fader.strength < 0.01, 'cutout must restore after obstruction clears');
+
+// Photo/review cameras do not use the gameplay-boom blocked signal. Signs need
+// their own precise sight coverage, including a post whose render material is hidden.
+const signScene = new THREE.Scene();
+const postMaterial = new THREE.MeshBasicMaterial({ visible: false });
+const post = new THREE.Mesh(new THREE.CylinderGeometry(.09, .099, 1.59, 8), postMaterial);
+post.position.set(0, .645, 2); post.userData.isOccluder = true; signScene.add(post);
+signScene.updateMatrixWorld(true);
+const signFader = createOcclusionFader(signScene, { solidAt: () => -Infinity });
+const signStep = () => signFader.update(1 / 60, camera, renderer, new THREE.Vector3(), .55, 0);
+signStep();
+assert.equal(signFader.detected, true, 'query-only post must trigger fade without gameplay-boom signal');
+assert.equal(post.material, postMaterial); assert.equal(postMaterial.visible, false, 'sight query must not reveal its proxy');
+post.visible = false;
+const signFace = new THREE.Mesh(new THREE.PlaneGeometry(2.2, .38), new THREE.MeshStandardMaterial());
+signFace.position.set(0, .45, 2); signFace.userData.isOccluder = true; signScene.add(signFace);
+// Fader snapshots world builders once; construct the sign-face-only case after its builder.
+signScene.updateMatrixWorld(true);
+const faceFader = createOcclusionFader(signScene, { solidAt: () => -Infinity });
+faceFader.update(1 / 60, camera, renderer, new THREE.Vector3(), .55, 0);
+assert.equal(faceFader.detected, true, 'tagged sign face must independently trigger cutout');
 
 parent.visible = true;
 const crownMaterials = [crownMat];
@@ -158,7 +184,7 @@ for (const minDistance of [0, 2.2, 2.6, 3.0]) {
 console.log('Terrain boom CPU variations:', JSON.stringify(terrainVariations));
 
 // Predicting a lower landing should not crane above a fox that is still rising.
-// Descending keeps the same landing-preview lift and its damped transition.
+// Descending retains a restrained landing-preview lift and its damped transition.
 const ascentViews = [];
 for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
   const noLanding = createFollowCamera();
@@ -177,7 +203,7 @@ for (const verticalSpeed of [5, -0.5, -2.5, -4]) {
     - Math.hypot(noLanding.camera.position.x, noLanding.camera.position.z);
   const extraCrane = extraHeight - rangeDifference * lowLanding.params.height / lowLanding.params.distance;
   if (verticalSpeed > 0) assert.ok(Math.abs(extraCrane) < 0.05, 'rising fox gets no descent-only crane lift');
-  else if (verticalSpeed <= -4) assert.ok(extraCrane > 2, 'fast descent retains the landing-preview lift');
+  else if (verticalSpeed <= -4) assert.ok(extraCrane > 0.5 && extraCrane <= 0.85, 'fast descent keeps a restrained landing-preview lift');
   else assert.ok(extraCrane > 0, 'partial descent retains a weighted landing-preview lift');
   ascentViews.push({ verticalSpeed, extraHeight: +extraHeight.toFixed(3), extraCrane: +extraCrane.toFixed(3) });
 }
@@ -204,6 +230,30 @@ solidPostCamera.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vec
   gliding: false, dashing: false, airTime: 0, landing: null });
 assert.match(solidPostCamera.debug.internals(), /blocker=decorative-string-test/, 'solid scenery must still block');
 console.log('Decorative string / solid post camera distinction PASS');
+// Ground-only elevation must not leak into sustained flight. Compare two live
+// rigs with deliberately different ground tuning, not a copied height formula.
+for (const gliding of [false, true]) {
+  const groundLow = createFollowCamera({ params: { groundLift: 0 } });
+  const groundHigh = createFollowCamera({ params: { groundLift: 0.6 } });
+  const flight = { ...idleFrame, target: new THREE.Vector3(0, 10, 0), grounded: false,
+    gliding, airTime: 2, vel: new THREE.Vector3(0, -2.7, -8), landing: new THREE.Vector3(0, 0, -8) };
+  for (let i = 0; i < 180; i++) { groundLow.update(1 / 60, flight); groundHigh.update(1 / 60, flight); }
+  assert.ok(groundLow.camera.position.distanceTo(groundHigh.camera.position) < 1e-8,
+    'sustained air/glide camera must ignore ground-only elevation');
+  assert.ok(groundLow.camera.quaternion.angleTo(groundHigh.camera.quaternion) < 1e-7);
+}
+const rideViews = [];
+for (const [label, height, glideDistance] of [['previous ride proportions', 1.65, 5.5], ['restrained ride proportions', 1.4, 4.8]] as const) {
+  const follow = createFollowCamera({ params: { height, glideDistance } });
+  const frame = { ...idleFrame, target: new THREE.Vector3(0, 10, 0), grounded: false,
+    gliding: true, airTime: 2, vel: new THREE.Vector3(0, -2.7, -8), landing: new THREE.Vector3(0, 0, -8) };
+  for (let i = 0; i < 180; i++) follow.update(1 / 60, frame);
+  const direction = follow.camera.getWorldDirection(new THREE.Vector3());
+  rideViews.push({ label, viewPitchDeg: THREE.MathUtils.radToDeg(Math.asin(-direction.y)), range: follow.camera.position.distanceTo(frame.target) });
+}
+assert.ok(rideViews[1]!.viewPitchDeg <= rideViews[0]!.viewPitchDeg, 'closer ride must not also steepen the view');
+console.log('Flight tuning CPU poses (not image proof):', JSON.stringify(rideViews));
+
 // Geometry proxies for the image-driven composition pass. The .95m running
 // silhouette is an estimate, not an image measurement or substitute for GPU review.
 const composition = [];

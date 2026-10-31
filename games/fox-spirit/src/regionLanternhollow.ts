@@ -307,11 +307,20 @@ export function createLanternhollow(
   });
 
   // Three modest hand-lettered fingerposts; letters are generated locally, never downloaded.
+  const postSightGeometry = new THREE.CylinderGeometry(.09, .099, 1.59, 8);
+  const postSightMaterial = new THREE.MeshBasicMaterial({ visible: false });
   for (const [name, x, z, tx, tz] of [
     ['WINDMILL RISE', -10, 67, -34, 56], ['REEDMARSH', 25, 88, 57, 40], ['AMBERWOOD', -3, 78, 0, 12],
   ] as const) {
     const y = ground(x, z), yaw = Math.atan2(-(tz - z), tx - x);
     beam(new THREE.Vector3(x, y - .15, z), new THREE.Vector3(x, y + 1.44, z), .09);
+    // The rendered post is batched with house timber. Keep its sight query
+    // precise without drawing a second post or introducing a gameplay collider.
+    const postSight = new THREE.Mesh(postSightGeometry, postSightMaterial);
+    postSight.name = 'hub-sign-post-sight';
+    postSight.position.set(x, y + .645, z);
+    postSight.userData.isOccluder = true;
+    parent.add(postSight);
     const board = new THREE.BoxGeometry(2.3, .42, .12);
     b.wood.add(board, trs(x, y + 1.65, z, yaw), PAL.wood); board.dispose();
     for (const back of [false, true]) {
@@ -325,6 +334,7 @@ export function createLanternhollow(
       const mat = new THREE.MeshStandardMaterial({ name: 'hub-sign', map: texture, roughness: .95 });
       labelMaterials.push(mat);
       const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.2, .38), mat);
+      sign.userData.isOccluder = true;
       sign.position.set(x + Math.sin(faceYaw) * .067, y + 1.65, z + Math.cos(faceYaw) * .067); sign.rotation.y = faceYaw;
       parent.add(sign);
     }

@@ -178,7 +178,7 @@ try {
     if(frame%15===0){
       const actor=behavior.state()[0]!;
       if(modes.at(-1)!==actor.mode)modes.push(actor.mode);
-      stagedFox.fromArray(actor.pos).add(new THREE.Vector3(frame>=90&&frame<300?2.9:8,0,0));
+      stagedFox.fromArray(actor.pos).add(new THREE.Vector3(frame>=90&&frame<300?2.9:4.8,0,0));
     }
     const events=behavior.update(1/60,frame/60,stagedFox,false);
     assert.equal(events.length,0,'staged observer must stay outside contact');

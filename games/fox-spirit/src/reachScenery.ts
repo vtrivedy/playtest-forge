@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { Bucket, rng } from './russetKit';
 import { weatheredSurface } from './worldSurfaces';
 import { loadNatureKit, type NatureVariant } from './russetNature';
+import { cylCollider, type Collider } from './collision';
 
 /** Original Reach geometry, built in metres. No new asset downloads; bark reuses the existing CC0 surface library. */
 export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMaterial) => void) {
   const bark = new Bucket(), joints = new Bucket(), reeds = new Bucket(), leaves = new Bucket(), stone = new Bucket();
   const random = rng(73104);
   const nature=await loadNatureKit();
+  const trunks: Collider[]=[];
   const breeze = { value: 0 };
   const twigRadius=.025;
   bark.aux=[];joints.aux=[];reeds.aux=[];leaves.aux=[];
@@ -28,10 +30,12 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
     geo.computeVertexNormals(); bark.add(geo, undefined, barkColor); geo.dispose();
   }
   // Open crowns keep the ferry and bell readable; fine hanging twigs suggest willow/alder.
-  const trees=[[176,30,-131,8],[194,30,-104,10],[210,36,-125,9],[217,31,-140,7],[175,30,-106,6]];
+  const trees=[[176,30,-131,8],[187,30,-110.5,10],[210,36,-125,9],[217,31,-140,7],[175,30,-106,6]];
   for (const [index,[x, y, z, h]] of trees.entries()) {
     const variant: NatureVariant=index%2?'dead_1':'dead_2';
-    nature.place(variant,x,y,z,{scale:h/nature.height(variant),yaw:x*.31,hue:barkColor,bark:barkColor});
+    const scale=h/nature.height(variant);
+    nature.place(variant,x,y,z,{scale,yaw:x*.31,hue:barkColor,bark:barkColor});
+    trunks.push(cylCollider({x,z,r:nature.trunkR(variant)*scale+.15,top:y+h*.75,bottom:y-.5,tag:'reach-trunk'}));
   }
   const treeStart=group.children.length;
   for(const mat of nature.build(group))patch(mat);
@@ -117,13 +121,13 @@ export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStan
     const mesh=bucket.toMesh(mat,{cast:true,receive:true});if(mesh)group.add(mesh);
     if(bucket===bark){const knots=joints.toMesh(mat,{cast:true,receive:true});if(knots){knots.name='reach-twig-joints';group.add(knots);}}
   }
-  return {update(time:number){breeze.value=time;}};
+  return {trunks,update(time:number){breeze.value=time;}};
 }
 
 /** Local basin surface: quiet teal depth with restrained moving reflection, no pale foam disc. */
 export function createReachWater(group: THREE.Group) {
   const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
-    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),...{uTime:{value:0},uDeep:{value:new THREE.Color(0x223f40)},uSky:{value:new THREE.Color(0x9ba9a6)}}},
+    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),...{uTime:{value:0},uDeep:{value:new THREE.Color(0x1d3635)},uSky:{value:new THREE.Color(0x7f9690)}}},
     vertexShader:`#include <fog_pars_vertex>
       varying vec2 vUv; varying vec3 vWorld;
       void main(){vUv=uv;vec4 w=modelMatrix*vec4(position,1.);vWorld=w.xyz;vec4 mvPosition=viewMatrix*w;gl_Position=projectionMatrix*mvPosition;
@@ -133,25 +137,27 @@ export function createReachWater(group: THREE.Group) {
       uniform float uTime;uniform vec3 uDeep,uSky;varying vec2 vUv;varying vec3 vWorld;
       void main(){
         vec2 p=(vUv-.5)*2.;float r=length(p);
-        float edge=r+.018*sin(p.x*26.+sin(p.y*17.))+.012*sin(p.y*32.);
-        float alpha=1.-smoothstep(.94,1.,edge);
+        float edge=length(vec2(p.x*12./11.55,p.y*13./12.55))+.008*sin(p.x*26.+sin(p.y*17.))+.006*sin(p.y*32.);
+        float alpha=1.-smoothstep(.98,1.015,edge);
         vec2 bankP=vec2(p.x*12./11.35,-p.y*13./12.35);
         float bankAngle=atan(bankP.y,bankP.x);
         bool spillway=cos(bankAngle)<-.9||(sin(bankAngle)<-.45&&cos(bankAngle)<.55);
-        if(!spillway)alpha=1.-smoothstep(1.,1.025,length(bankP));
+        if(spillway)alpha=1.-smoothstep(.975,1.,length(vec2(p.x*12./11.55,p.y*13./12.55)));
+        else alpha=1.-smoothstep(1.,1.025,length(bankP));
         if(alpha<.005)discard;
         float a=vWorld.x*.6+vWorld.z*.83-uTime*.36;
         float b=vWorld.x*1.9-vWorld.z*.74+uTime*.45;
         vec3 n=normalize(vec3(cos(a)*.035+cos(b)*.018,1.,sin(a)*.04));
         vec3 view=normalize(cameraPosition-vWorld);float fres=pow(1.-max(dot(n,view),0.),3.);
-        float reflection=smoothstep(.35,.9,sin(a*.37+sin(b*.28)*.5))*.12;
-        vec3 color=mix(uDeep,uSky,.12+fres*.48+reflection);
+        float reflection=smoothstep(.35,.9,sin(a*.37+sin(b*.28)*.5))*.04;
+        vec3 color=mix(uDeep,uSky,.08+fres*.42+reflection);
         float ripple=pow(max(0.,sin(a*3.+sin(b))*.5+.5),18.);
-        color+=uSky*ripple*.045;
+        color+=uSky*ripple*.015;
         // Broken, thin tide edge, rather than a white filled ellipse.
         float shore=smoothstep(.85,.93,edge)*(1.-smoothstep(.94,.99,edge));
-        color=mix(color,vec3(.31,.36,.30),shore*.3);
-        gl_FragColor=vec4(color,alpha*(.83+fres*.12));
+        float shoreBreak=smoothstep(.2,.65,sin(vWorld.x*2.7+sin(vWorld.z*1.9))*.5+.5);
+        color=mix(color,vec3(.31,.36,.30),spillway?0.:shore*.2*shoreBreak);
+        gl_FragColor=vec4(color,alpha*(.95+fres*.04));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <fog_fragment>
@@ -167,20 +173,27 @@ export function createReachWater(group: THREE.Group) {
   }
   const curtainGeo=new THREE.BufferGeometry();curtainGeo.setAttribute('position',new THREE.Float32BufferAttribute(curtainPositions,3));curtainGeo.setAttribute('uv',new THREE.Float32BufferAttribute(curtainUV,2));curtainGeo.setIndex(curtainIndices);
   const curtainMat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:true,
-    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),uTime:mat.uniforms.uTime!},
+    uniforms:{...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),uTime:mat.uniforms.uTime!,uHeight:{value:0}},
     vertexShader:`#include <fog_pars_vertex>
       varying vec2 vUv;
       void main(){vUv=uv;vec4 mvPosition=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mvPosition;
         #include <fog_vertex>
       }`,
     fragmentShader:`#include <fog_pars_fragment>
-      uniform float uTime;varying vec2 vUv;
+      uniform float uTime,uHeight;varying vec2 vUv;
       void main(){
-        float strands=.5+.5*sin(vUv.x*97.+sin(vUv.x*31.)*2.+vUv.y*3.+uTime*.7);
-        float flow=.5+.5*sin(vUv.y*18.+uTime*2.8+sin(vUv.x*45.));
-        vec3 color=mix(vec3(.045,.095,.09),vec3(.23,.31,.28),strands*.45+flow*.12);
+        float metres=vUv.y*uHeight;
+        float strands=.5+.5*sin(vUv.x*97.+sin(vUv.x*31.)*2.+sin(metres*2.4+uTime*4.)*.5);
+        float flow=.5+.5*sin(metres*3.+uTime*5.+sin(vUv.x*45.));
+        float breakup=smoothstep(.12,.5,flow);
+        float sheet=smoothstep(.55,.85,strands)*mix(breakup,1.,smoothstep(0.,uHeight,metres)*.6);
+        float lip=smoothstep(max(0.,uHeight-.15),max(.001,uHeight),metres);
+        float foot=1.-smoothstep(0.,.22,metres);
+        vec3 color=mix(vec3(.035,.08,.075),vec3(.16,.24,.21),sheet*.5+flow*.12);
+        color=mix(color,vec3(.32,.43,.38),lip*.4+foot*.5);
         float edge=smoothstep(0.,.025,vUv.x)*(1.-smoothstep(.975,1.,vUv.x));
-        gl_FragColor=vec4(color,(.46+strands*.16)*edge*smoothstep(0.,.08,vUv.y));
+        // Opaque falling strands with open air between them, not an even glass wall.
+        gl_FragColor=vec4(color,edge*min(.92,.015+sheet*.76+lip*.18+foot*.2));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <fog_fragment>
@@ -193,5 +206,5 @@ export function createReachWater(group: THREE.Group) {
     const geo=new THREE.RingGeometry(.97,1,32,1,.15*Math.PI,.6*Math.PI);geo.scale(rx,rz,1);
     const wake=new THREE.Mesh(geo,wakeMat);wake.rotation.x=-Math.PI/2;wake.position.set(x,30,z);wake.renderOrder=1;group.add(wake);wakes.push(wake);
   }
-  return {mesh,update(time:number,fill:number,rise=6,fillRate=0){mat.uniforms.uTime!.value=time;mesh.position.y=29.8+rise*fill;curtain.visible=mesh.position.y>30.06;curtain.scale.y=Math.max(.001,mesh.position.y-30.02);wakeMat.opacity=.025+Math.min(.08,Math.abs(fillRate)*.16);for(const [i,w] of wakes.entries()){w.position.y=mesh.position.y+.025;w.scale.setScalar(1+Math.sin(time*.8+i)*.025);w.visible=fill>.035;}}};
+  return {mesh,update(time:number,fill:number,rise=6,fillRate=0){mat.uniforms.uTime!.value=time;mesh.position.y=29.8+rise*fill;curtain.visible=mesh.position.y>30.06;curtainMat.uniforms.uHeight!.value=Math.max(.001,mesh.position.y-30.02);curtain.scale.y=Math.max(.001,mesh.position.y-30.02);wakeMat.opacity=.025+Math.min(.08,Math.abs(fillRate)*.16);for(const [i,w] of wakes.entries()){w.position.y=mesh.position.y+.025;w.scale.setScalar(1+Math.sin(time*.8+i)*.025);w.visible=fill>.035;}}};
 }
