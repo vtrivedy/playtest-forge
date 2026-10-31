@@ -24,7 +24,7 @@ const center=scaled.getCenter(new THREE.Vector3());root.position.x-=center.x;roo
 const mixer=new THREE.AnimationMixer(root);const actions=new Map(gltf.animations.map(c=>[c.name,mixer.clipAction(c)]));
 const loco=new AuthoredLocomotion(root,group,actions);
 const solvedFeet=(loco as unknown as {feet:{planted:boolean;upper:THREE.Object3D;lower:THREE.Object3D;paw:THREE.Object3D;hock?:THREE.Object3D;padLocal:THREE.Vector3;anchor:THREE.Vector3}[]}).feet;
-for(const [i,[name,max]] of ([['swingEase',1],['releaseSwing',.4],['carpalCurl',.7]] as const).entries()) {
+for(const [i,[name,max]] of ([['swingEase',1],['releaseSwing',.4],['carpalFlex',2]] as const).entries()) {
  if(process.argv[i+2]===undefined)continue;
  const value=Number(process.argv[i+2]);
  if(!Number.isFinite(value)||value<0||value>max)throw new Error(`${name} must be between 0 and ${max}`);
@@ -88,5 +88,5 @@ for(const speed of [1.62,4.05,9]) {
   now.forEach((p,j)=>{if(solvedFeet[j].planted && !previousPlanted[j])plantVertices[j]=p.clone()});
   previousPlanted=solvedFeet.map(f=>f.planted);previous=now;
  }
- console.log(JSON.stringify({speed,dtJitter,swingEase:loco.params.swingEase,releaseSwing:loco.params.releaseSwing,carpalCurl:loco.params.carpalCurl,cadence:stats(cadence),noSupportFraction:noSupport/1499,maxResidual,contactOutliers:contactOutliers.sort((a,b)=>b.residual-a.residual).slice(0,12),persistentPlantSlide:stats(persistentSlide),persistentPlantDrift:stats(persistentDrift),nearFloorSlide:stats(near),flatNearFloorSlide:stats(flatNear),height:stats(height),phases:Object.fromEntries(Object.entries(phaseSamples).map(([name,p])=>[name,{height:stats(p.height),nearFloor:stats(p.near),verticalStep:stats(p.step)}])),landmarks:pads.map(p=>({mesh:p.mesh.name,index:p.index}))}));
+ console.log(JSON.stringify({speed,dtJitter,swingEase:loco.params.swingEase,releaseSwing:loco.params.releaseSwing,carpalFlex:loco.params.carpalFlex,cadence:stats(cadence),noSupportFraction:noSupport/1499,maxResidual,contactOutliers:contactOutliers.sort((a,b)=>b.residual-a.residual).slice(0,12),persistentPlantSlide:stats(persistentSlide),persistentPlantDrift:stats(persistentDrift),nearFloorSlide:stats(near),flatNearFloorSlide:stats(flatNear),height:stats(height),phases:Object.fromEntries(Object.entries(phaseSamples).map(([name,p])=>[name,{height:stats(p.height),nearFloor:stats(p.near),verticalStep:stats(p.step)}])),landmarks:pads.map(p=>({mesh:p.mesh.name,index:p.index}))}));
 }
