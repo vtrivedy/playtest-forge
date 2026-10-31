@@ -212,6 +212,8 @@ async function boot() {
       opacity: 0.85,
     });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), mat);
+    // GTAO's normal override ignores the radial alpha and would occlude as a solid card.
+    mesh.userData.forgeSkipAO = true;
     mesh.rotation.x = -Math.PI / 2;
     mesh.renderOrder = 1;
     scene.add(mesh);
@@ -536,6 +538,7 @@ async function boot() {
   fFox.add(FOX_LOOK, 'eyeGlow', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'eyeSocketLift', 0, 1, 0.01);
   fFox.add(FOX_LOOK, 'innerHeat', 0, 0.1, 0.005);
+  fFox.add(FOX_LOOK, 'bodyEmber', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'spineHeat', 0, 1.5, 0.05);
   fFox.add(FOX_LOOK, 'lickScale', 0, 3, 0.01);
   fFox.add(FOX_LOOK, 'lickIntensity', 0, 3, 0.01);
@@ -1493,9 +1496,7 @@ async function boot() {
       }
     }
 
-    colorField.visualDrains = shades.state().filter(actor => !actor.freed).map(actor => ({
-      center: new THREE.Vector3().fromArray(actor.pos), radius: shades.tun.drainRadius,
-    }));
+    shades.writeDrainVolumes(colorField.visualDrains);
 
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
     const speed = Math.hypot(vel.x, vel.z);
