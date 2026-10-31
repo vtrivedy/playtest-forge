@@ -45,3 +45,9 @@ GPU review order: (1) requested SHA/tool identity and no sampler warnings, (2) b
 ## Round16 — capture supply continuity
 
 Before code, 2026-10-31 05:43 UTC. Driver enabled reach-r2 polling at01:35ET; explicitly reissued current pushed tip. Feedback remains absent. Existing waypoint samples omit water loss between source departure and ferry arrival. Add half-second state samples to the real-input crossing acceptance report, using the existing crossingSample shape; include final sample. Keep transitions separately, retain all source/controls/timing/pass predicates. This provides supply continuity evidence without a local renderer or speculative game change. Node syntax and diff checks validate this capture-only edit; remote PNGs/window.__game remain required.
+
+## Round17: observed GPU image packaging failure
+
+The ac86a80 relay archive contains no PNGs or game report. Its capture.log identifies ERR_MODULE_NOT_FOUND for /opt/browser/projected-visibility-capture.mjs, statically imported by gpu-capture.mjs but absent from the Modal image. Repair: include the existing helper beside the runner, with no game or capture behavior changes. All nine relative runner imports must have image destinations; Python and helper syntax must pass. Remote recapture remains mandatory before visual/controller acceptance.
+
+Process correction: the intended pre-edit scoped design write used a nonexistent sprint3/reach directory and failed; that failure was missed before the one-line packaging commit. This records the rationale after that commit without rewriting branch history.
