@@ -957,6 +957,37 @@ try {
     const end=await H('state');
     save('feel-acceptance.json',{label:'60s scripted live-input movement loop, one staged start, no resets/forced poses; not human fun approval',seconds:60,initial,end,deaths:end.deaths-initial.deaths});
   }
+  if(wants('paint')) {
+    // Paint trail (DESIGN-paint-trail.md): sepia meadow, 32 s live-input figure-eight walk → trot → run;
+    // the same high lens before/after shows what the fox left behind.
+    await boot(quality,true);
+    await page.addStyleTag({content:'.lil-gui,#hud{visibility:hidden!important}'});
+    const c=[-2,77];
+    const yAt=(x,z)=>page.evaluate(([x,z])=>window.__gameHooks.debug.world.collision.highestAt(x,z),[x,z]);
+    const curve=u=>[c[0]+Math.sin(u)*8,c[1]+Math.sin(2*u)*4.5];
+    const [sx,sz]=curve(0),sy=await yAt(sx,sz),cy=await yAt(c[0],c[1]);
+    await H('teleport',sx,sy,sz,0);await H('photoOff');await advance(20);
+    const lens=[[c[0]+9,cy+15,c[1]+17],[c[0],cy,c[1]-1],52];
+    await H('photo',...lens);await advance(2);await shot('paint-before-overview');await H('photoOff');await advance(2);
+    const initial={state:await H('state'),game:await page.evaluate(()=>window.__game)};
+    let u=0;
+    const gaitAt=t=>t<8?{v:1.4,cap:.32}:t<18?{v:3.6,cap:.55}:{v:7,cap:1};
+    await video('paint-walk',32*fps,async i=>{
+      const st=await H('state'),t=i/fps,g=gaitAt(t);
+      // the target leads along the curve at the gait's speed (arc length ≈ |curve'| du)
+      const [ax,az]=curve(u),[bx,bz]=curve(u+.01),du=g.v/fps/(Math.hypot(bx-ax,bz-az)/.01||1);
+      u+=du;
+      const [tx,tz]=curve(u+.25);
+      const dx=tx-st.pos[0],dz=tz-st.pos[2],d=Math.hypot(dx,dz)||1;
+      const k=Math.min(g.cap,Math.max(.15,d/2.5));
+      await H('setStick',dx/d*k,dz/d*k);
+    },undefined,{traceEveryFrame:false,keyFrames:[0,75,150,300,600,900,1200,1500,1800].map(f=>Math.round(f*fps/60))});
+    await H('setStick',null);await advance(30);
+    await shot('paint-after-chase');
+    await H('photo',...lens);await advance(2);await shot('paint-after-overview');
+    const end={state:await H('state'),game:await page.evaluate(()=>window.__game)};
+    save('paint-acceptance.json',{label:'Staged sepia-meadow start; live-input figure-eight walk/trot/run, no forced poses. Same high lens before/after.',initial,end,laid:end.game.paint?.laid,areaM2:end.game.paint?.areaM2,deaths:end.state.deaths-initial.state.deaths});
+  }
   if (wants('showcase')) {
     if(fps!==60)throw Error('Showcase dense landing comparison requires60fps');
     await boot(quality,true);

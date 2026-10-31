@@ -2,6 +2,12 @@ import * as THREE from 'three';
 
 /** Visual drain shares the gameplay cylinder's height, with a soft painterly XZ boundary. */
 const MAX_VISUAL_DRAINS = 16;
+/** Uniforms for a field with no paint layer (paint disabled in the shader). */
+const NO_PAINT = {
+  uPaintMap: { value: null as THREE.Texture | null },
+  uPaintBounds: { value: new THREE.Vector4(0, 1, 0, 1) },
+  uPaintOn: { value: 0 },
+};
 export const VISUAL_DRAIN_GLSL = /* glsl */ `
   uniform vec4 uVisualDrains[16];
   uniform int uVisualDrainCount;
@@ -100,6 +106,8 @@ export class ColorField {
   globalColor = 0;
   /** Simulation clock (s) driving edge noise — advanced by update(), so captures are deterministic */
   time = 0;
+  /** Persistent fox paint (shared by regional fields). Assign before materials compile. */
+  paint: PaintLayer | null = null;
 
   /** Optional top-down mask RT (permanent + soft trail splat). Built lazily. */
   private maskRT: THREE.WebGLRenderTarget | null = null;
@@ -544,6 +552,9 @@ export class ColorField {
         value: new THREE.Vector4(field.bounds.minX, field.bounds.maxX, field.bounds.minZ, field.bounds.maxZ),
       };
       shader.uniforms.uRestoredChroma = { value: (mat.userData as { cfRestoredChroma?: number }).cfRestoredChroma ?? 1 };
+      Object.assign(shader.uniforms, field.paint?.uniforms ?? NO_PAINT);
+      // painted plants perk up: clumps swell a little along their (clump-outward) normals
+      if ((mat.userData as { foliage?: boolean }).foliage) shader.defines = { ...shader.defines, CF_PERK: '' };
 
       (mat.userData as { colorFieldShader?: typeof shader }).colorFieldShader = shader;
 
@@ -552,7 +563,27 @@ export class ColorField {
           '#include <common>',
           `#include <common>
           varying vec3 vWorldPosCF;
-          varying vec3 vWorldNormalCF;`,
+          varying vec3 vWorldNormalCF;
+          uniform sampler2D uPaintMap;
+          uniform vec4 uPaintBounds;
+          uniform float uPaintOn;`,
+        )
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+          #ifdef CF_PERK
+          if (uPaintOn > 0.5) {
+            vec4 perkW = vec4(transformed, 1.0);
+            #ifdef USE_INSTANCING
+            perkW = instanceMatrix * perkW;
+            #endif
+            perkW = modelMatrix * perkW;
+            vec2 perkUv = vec2((perkW.x - uPaintBounds.x) / (uPaintBounds.y - uPaintBounds.x),
+                               (perkW.z - uPaintBounds.z) / (uPaintBounds.w - uPaintBounds.z));
+            float perk = textureLod(uPaintMap, clamp(perkUv, 0.0, 1.0), 0.0).r;
+            transformed += objectNormal * perk * 0.08 + vec3(0.0, perk * 0.05, 0.0);
+          }
+          #endif`,
         )
         .replace(
           '#include <worldpos_vertex>',
@@ -588,6 +619,14 @@ export class ColorField {
           uniform sampler2D uMaskMap;
           uniform float uUseMaskMap;
           uniform vec4 uBounds;
+          uniform sampler2D uPaintMap;
+          uniform vec4 uPaintBounds;
+          uniform float uPaintOn;
+          // fox paint coverage here, and how much of the visible colour is that paint
+          float cfPaint;
+          float cfPaintLead;
+          // live aura/trail (the brush is still wet here)
+          float cfFresh;
 
           float hash21(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -605,6 +644,9 @@ export class ColorField {
             float s = uGlobalColor;
             cfRim = 0.0;
             cfPermanent = uGlobalColor;
+            cfPaint = 0.0;
+            cfPaintLead = 0.0;
+            cfFresh = 0.0;
             if (uUseMaskMap > 0.5) {
               vec2 uv = vec2(
                 (p.x - uBounds.x) / (uBounds.y - uBounds.x),
@@ -613,6 +655,19 @@ export class ColorField {
               if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
                 vec2 sources = texture2D(uMaskMap, uv).rg;
                 s = max(s, max(sources.r * temporaryVisibility, sources.g));
+                cfFresh = sources.r;
+              }
+            }
+            if (uPaintOn > 0.5) {
+              vec2 puv = vec2(
+                (p.x - uPaintBounds.x) / (uPaintBounds.y - uPaintBounds.x),
+                (p.z - uPaintBounds.z) / (uPaintBounds.w - uPaintBounds.z)
+              );
+              if (puv.x >= 0.0 && puv.x <= 1.0 && puv.y >= 0.0 && puv.y <= 1.0) {
+                // paint is the fox's: a Shade's drain blots it like the live aura
+                cfPaint = texture2D(uPaintMap, puv).r * temporaryVisibility;
+                cfPaintLead = clamp((cfPaint - s) * 4.0 + 0.5, 0.0, 1.0);
+                s = max(s, cfPaint);
               }
             }
             // analytic restores with ink-bleed edge
@@ -700,6 +755,11 @@ export class ColorField {
           float aliveGain = clamp(washedValue * 1.18 / max(restoredValue, 0.002), 1.0, mix(1.65, 4.0, uGroundSurface));
           chroma *= aliveGain;
           outgoingLight = mix(washed, chroma, brushed);
+          // watercolour: pigment pools at the drying edge of the fox's paint (burnt-sienna line),
+          // and paint the brush is still passing over glistens warm
+          float pigmentRim = smoothstep(0.1, 0.4, cfPaint) * (1.0 - smoothstep(0.45, 0.9, cfPaint)) * cfPaintLead;
+          outgoingLight *= mix(vec3(1.0), vec3(0.8, 0.66, 0.52), pigmentRim * 0.6);
+          outgoingLight *= 1.0 + cfPaint * cfFresh * vec3(0.14, 0.08, 0.02);
           // warm late-light band at a travelling restore front (#FFC98A): lifts what it crosses
           // without repainting it — stone stays stone, just sunlit
           float rimLuma = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
@@ -765,6 +825,261 @@ export class ColorField {
     this.fadeMat?.dispose();
     this.stampMat?.dispose();
     this.stampMesh?.geometry.dispose();
+  }
+}
+
+type Bloom = { x: number; z: number; radius: number; strength: number; age: number; life: number; seed: number };
+
+export type PaintTuning = {
+  /** Path ribbon bloom radius (m) at a run; walk scales it down a little */
+  ribbonRadius: number;
+  /** Metres travelled between ribbon blooms */
+  ribbonSpacing: number;
+  /** Pawfall bloom radius (m) */
+  pawRadius: number;
+  /** Metres travelled between side drips that bleed past the path */
+  dripSpacing: number;
+  dripRadius: number;
+  /** Seconds a bloom keeps spreading before it dries in place */
+  bloomLife: number;
+  strength: number;
+};
+
+/**
+ * Persistent watercolour paint laid by the fox. One render target over the whole valley,
+ * never cleared: wet blooms spread (MAX-blended, ragged world-space edge) for ~1 s, then dry
+ * in place forever. Visual only — gameplay probes (ColorField.sample) never read it.
+ * A coarse CPU grid mirrors coverage for the grade coupling and capture metrics.
+ */
+export class PaintLayer {
+  readonly bounds: { minX: number; maxX: number; minZ: number; maxZ: number };
+  readonly tun: PaintTuning = {
+    ribbonRadius: 1.55,
+    ribbonSpacing: 0.45,
+    pawRadius: 0.8,
+    dripSpacing: 5,
+    dripRadius: 2.6,
+    bloomLife: 1.3,
+    strength: 1,
+  };
+  blooms: Bloom[] = [];
+  /** Total blooms ever laid (metrics) */
+  laid = 0;
+  /** 1 m coverage grid (0..1) mirroring the RT for CPU queries */
+  readonly grid: Float32Array;
+  readonly gridW: number;
+  readonly gridH: number;
+  private painted = 0;
+  private rt: THREE.WebGLRenderTarget | null = null;
+  private renderer: THREE.WebGLRenderer | null = null;
+  private scene = new THREE.Scene();
+  private cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+  private mesh: THREE.InstancedMesh | null = null;
+  private aRadius: THREE.InstancedBufferAttribute | null = null;
+  private aStrength: THREE.InstancedBufferAttribute | null = null;
+  private readonly _m = new THREE.Matrix4();
+  private static readonly MAX = 256;
+  /** Uniform objects shared by every consumer material */
+  readonly uniforms = {
+    uPaintMap: { value: null as THREE.Texture | null },
+    uPaintBounds: { value: new THREE.Vector4() },
+    uPaintOn: { value: 0 },
+  };
+
+  constructor(bounds: { minX: number; maxX: number; minZ: number; maxZ: number }, private texelsPerMetre = 6.8) {
+    this.bounds = { ...bounds };
+    this.gridW = Math.ceil(bounds.maxX - bounds.minX);
+    this.gridH = Math.ceil(bounds.maxZ - bounds.minZ);
+    this.grid = new Float32Array(this.gridW * this.gridH);
+    this.uniforms.uPaintBounds.value.set(bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ);
+  }
+
+  init(renderer: THREE.WebGLRenderer): void {
+    this.renderer = renderer;
+    const { minX, maxX, minZ, maxZ } = this.bounds;
+    const cap = Math.min(4096, renderer.capabilities.maxTextureSize);
+    const w = Math.min(cap, Math.round((maxX - minX) * this.texelsPerMetre));
+    const h = Math.min(cap, Math.round((maxZ - minZ) * this.texelsPerMetre));
+    this.rt = new THREE.WebGLRenderTarget(w, h, {
+      type: THREE.UnsignedByteType,
+      format: THREE.RGBAFormat,
+      magFilter: THREE.LinearFilter,
+      minFilter: THREE.LinearFilter,
+      depthBuffer: false,
+    });
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(this.rt);
+    renderer.setClearColor(0x000000, 1);
+    renderer.clear();
+    renderer.setRenderTarget(prev);
+    // look up from below with up=+Z: u→+X, v→+Z (same convention as the colour mask)
+    Object.assign(this.cam, { left: minX, right: maxX, top: maxZ, bottom: minZ });
+    this.cam.position.set(0, -50, 0);
+    this.cam.up.set(0, 0, 1);
+    this.cam.lookAt(0, 0, 0);
+    this.cam.updateProjectionMatrix();
+
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    this.aRadius = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
+    this.aStrength = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aRadius', this.aRadius);
+    geo.setAttribute('aStrength', this.aStrength);
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.MaxEquation,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneFactor,
+      depthTest: false,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      vertexShader: /* glsl */ `
+        attribute float aRadius;
+        attribute float aStrength;
+        varying vec2 vWorld;
+        varying vec2 vCenter;
+        varying float vRadius;
+        varying float vStrength;
+        void main() {
+          vWorld = (instanceMatrix * vec4(position, 1.0)).xz;
+          vCenter = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;
+          vRadius = aRadius;
+          vStrength = aStrength;
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: /* glsl */ `
+        varying vec2 vWorld;
+        varying vec2 vCenter;
+        varying float vRadius;
+        varying float vStrength;
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+        float noise(vec2 p){
+          vec2 i = floor(p); vec2 f = fract(p);
+          float a = hash(i), b = hash(i+vec2(1.,0.)), c = hash(i+vec2(0.,1.)), d = hash(i+vec2(1.,1.));
+          vec2 u = f*f*(3.-2.*f);
+          return mix(a,b,u.x) + (c-a)*u.y*(1.-u.x) + (d-b)*u.x*u.y;
+        }
+        void main() {
+          // Stationary world-space noise: neighbouring blooms share one ragged coastline.
+          float n = (noise(vWorld * 0.55) - 0.5) * 0.55
+                  + (noise(vWorld * 1.9 + 7.0) - 0.5) * 0.3
+                  + (noise(vWorld * 6.5 + 3.0) - 0.5) * 0.12;
+          float d = distance(vWorld, vCenter) / max(vRadius, 0.01) + n;
+          // watercolour: a fairly decided edge, not an airbrush falloff
+          float ink = 1.0 - smoothstep(0.72, 0.86, d);
+          // paper granulation inside the wash
+          ink *= 0.88 + 0.12 * noise(vWorld * 9.0);
+          gl_FragColor = vec4(ink * vStrength, 0.0, 0.0, 1.0);
+        }`,
+    });
+    this.mesh = new THREE.InstancedMesh(geo, mat, PaintLayer.MAX);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.frustumCulled = false;
+    this.scene.add(this.mesh);
+    this.uniforms.uPaintMap.value = this.rt.texture;
+    this.uniforms.uPaintOn.value = 1;
+  }
+
+  /** Lay one wet bloom that spreads to `radius` over `life` seconds, then dries in place. */
+  bloom(x: number, z: number, radius: number, strength = this.tun.strength, life = this.tun.bloomLife): void {
+    const { minX, maxX, minZ, maxZ } = this.bounds;
+    if (x < minX || x > maxX || z < minZ || z > maxZ || strength < 0.02) return;
+    if (this.blooms.length >= PaintLayer.MAX) this.blooms.shift();
+    this.blooms.push({ x, z, radius, strength: Math.min(1, strength), age: 0, life, seed: Math.random() });
+    this.laid++;
+    this.markGrid(x, z, radius * 0.8, Math.min(1, strength));
+  }
+
+  /** A big wet splash: centre plus petal lobes, spreading slower than a pawfall. */
+  splash(x: number, z: number, radius: number, life = 2.2): void {
+    this.bloom(x, z, radius * 0.75, 1, life);
+    const lobes = 7;
+    const a0 = Math.random() * Math.PI * 2;
+    for (let i = 0; i < lobes; i++) {
+      const a = a0 + (i / lobes) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+      const d = radius * (0.45 + Math.random() * 0.35);
+      this.bloom(x + Math.cos(a) * d, z + Math.sin(a) * d, radius * (0.32 + Math.random() * 0.2), 0.95, life * (0.8 + Math.random() * 0.5));
+    }
+  }
+
+  private markGrid(x: number, z: number, r: number, k: number): void {
+    const gx0 = Math.max(0, Math.floor(x - r - this.bounds.minX));
+    const gx1 = Math.min(this.gridW - 1, Math.floor(x + r - this.bounds.minX));
+    const gz0 = Math.max(0, Math.floor(z - r - this.bounds.minZ));
+    const gz1 = Math.min(this.gridH - 1, Math.floor(z + r - this.bounds.minZ));
+    for (let gz = gz0; gz <= gz1; gz++)
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const cx = gx + 0.5 + this.bounds.minX;
+        const cz = gz + 0.5 + this.bounds.minZ;
+        if (Math.hypot(cx - x, cz - z) > r) continue;
+        const i = gz * this.gridW + gx;
+        if (this.grid[i]! < 0.5 && k >= 0.5) this.painted++;
+        this.grid[i] = Math.max(this.grid[i]!, k);
+      }
+  }
+
+  /** Painted fraction (0..1) of the ground within `r` metres. */
+  coverageAround(x: number, z: number, r: number): number {
+    let sum = 0;
+    let n = 0;
+    const gx0 = Math.max(0, Math.floor(x - r - this.bounds.minX));
+    const gx1 = Math.min(this.gridW - 1, Math.floor(x + r - this.bounds.minX));
+    const gz0 = Math.max(0, Math.floor(z - r - this.bounds.minZ));
+    const gz1 = Math.min(this.gridH - 1, Math.floor(z + r - this.bounds.minZ));
+    for (let gz = gz0; gz <= gz1; gz += 1)
+      for (let gx = gx0; gx <= gx1; gx += 1) {
+        if (Math.hypot(gx + 0.5 + this.bounds.minX - x, gz + 0.5 + this.bounds.minZ - z) > r) continue;
+        sum += this.grid[gz * this.gridW + gx]!;
+        n++;
+      }
+    return n ? sum / n : 0;
+  }
+
+  /** Painted ground area (m²) */
+  get paintedArea(): number {
+    return this.painted;
+  }
+
+  /** Advance wet blooms and stamp them into the persistent target. */
+  render(dt: number): void {
+    for (const b of this.blooms) b.age += dt;
+    if (!this.rt || !this.renderer || !this.mesh || !this.blooms.length) {
+      this.blooms = this.blooms.filter((b) => b.age < b.life);
+      return;
+    }
+    const mesh = this.mesh;
+    const n = this.blooms.length;
+    for (let i = 0; i < n; i++) {
+      const b = this.blooms[i]!;
+      const t = Math.min(1, b.age / b.life);
+      // wet spread: quick bloom out of the pawfall, slowing as the pigment settles
+      const r = b.radius * (0.35 + 0.65 * (1 - Math.pow(1 - t, 3)));
+      const size = r * 2.9; // quad support for the noise-bent edge
+      this._m.makeScale(size, 1, size).setPosition(b.x, 0, b.z);
+      mesh.setMatrixAt(i, this._m);
+      this.aRadius!.setX(i, r);
+      this.aStrength!.setX(i, b.strength);
+    }
+    mesh.count = n;
+    mesh.instanceMatrix.needsUpdate = true;
+    this.aRadius!.needsUpdate = true;
+    this.aStrength!.needsUpdate = true;
+    const renderer = this.renderer;
+    const prev = renderer.getRenderTarget();
+    const prevAuto = renderer.autoClear;
+    renderer.autoClear = false;
+    renderer.setRenderTarget(this.rt);
+    renderer.render(this.scene, this.cam);
+    renderer.setRenderTarget(prev);
+    renderer.autoClear = prevAuto;
+    this.blooms = this.blooms.filter((b) => b.age < b.life);
+  }
+
+  dispose(): void {
+    this.rt?.dispose();
+    this.mesh?.geometry.dispose();
+    (this.mesh?.material as THREE.Material | undefined)?.dispose();
   }
 }
 
