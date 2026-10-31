@@ -551,6 +551,8 @@ async function boot() {
   fDusk.add(HUB_DUSK, 'hemi', .2, .8, .01);
   fDusk.add(HUB_DUSK, 'rim', .4, 1.6, .01);
   fDusk.add(HUB_DUSK, 'skyScale', .5, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunScale', .1, 1, .01);
+  fDusk.add(HUB_DUSK, 'sunSize', .0001, .006, .0001);
   fDusk.add(HUB_DUSK, 'sunBloom', 0, .3, .01);
   fDusk.add(HUB_DUSK, 'godRays', 0, .5, .01);
   fDusk.add(HUB_DUSK, 'horizonGlow', 0, .6, .01);

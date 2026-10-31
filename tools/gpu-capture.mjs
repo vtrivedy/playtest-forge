@@ -1069,14 +1069,33 @@ try {
     }
     const y = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(0, 94));
     // Portrait staging only; natural spawn above is untouched. Real idle rig, no bone override.
-    const heroYaw = Math.atan2(3.1, .8) - Math.PI / 4;
+    const heroYaw = Math.atan2(4.2, 1.1) - Math.PI / 4;
     await H('teleport', 0, y, 94, heroYaw); await advance(30);
-    const heroLens = [3.1, y + 1.3, 94.8], heroLook = [-6.5, y + .9, 89.5];
+    const heroLens = [4.2, y + 1.5, 95.1], heroLook = [-6.5, y + .6, 89.5];
     const compositionBlocker = await H('photoBlocker', heroLens, heroLook);
     const foxSightBlocker = await H('photoBlocker', heroLens, [0, y + .35, 94]);
     await H('photo', heroLens, heroLook, 46); await advance(2);
     await shot('hub-hero-three-q');
     const heroState = await H('state');
+    const heroFraming = await page.evaluate(async () => {
+      const {Box3, Vector3} = await import('/gpu-three.js');
+      const {fox, camera} = window.__gameHooks.debug;
+      fox.updateWorldMatrix(true, true); camera.updateMatrixWorld(true);
+      const bounds = new Box3();
+      fox.traverse(o => { if (o.isSkinnedMesh && o.visible) {
+        o.computeBoundingBox(); bounds.union(o.boundingBox.clone().applyMatrix4(o.matrixWorld));
+      } });
+      if (bounds.isEmpty()) return null;
+      const projected = [];
+      for (const x of [bounds.min.x, bounds.max.x]) for (const y of [bounds.min.y, bounds.max.y])
+        for (const z of [bounds.min.z, bounds.max.z]) projected.push(new Vector3(x,y,z).project(camera).toArray());
+      return { label: 'Conservative posed skinned-mesh world bounds; all eight corners projected',
+        worldMin: bounds.min.toArray(), worldMax: bounds.max.toArray(), projected,
+        inFrame: projected.every(p => Math.abs(p[0]) < 1 && Math.abs(p[1]) < 1 && p[2] > -1 && p[2] < 1) };
+    });
+    save('hub-hero-framing.json', heroFraming);
+    if (!heroFraming?.inFrame) report.failures.push('Hub hero posed body bounds are cropped');
+
     save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
     if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
     const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
@@ -1113,7 +1132,7 @@ try {
     // Labelled review orbit: only the lens moves; the fox keeps its real idle pose.
     const orbitCameras = [];
     const targetGround = await page.evaluate(() => window.__gameHooks.debug.world.collision.highestAt(-10, 88));
-    const orbitTarget = [-10, targetGround + 2, 88];
+    const orbitTarget = [-10, targetGround + 4.8, 88];
     const orbitLens = (angle, height) => [-9 + Math.sin(angle) * 30, height, 88 + Math.cos(angle) * 24];
     // One fixed clearance height avoids frame-to-frame camera pops. The ellipse
     // stays >2m outside every cottage roof footprint; low close/chase shots above
@@ -1134,6 +1153,7 @@ try {
       await H('photo', lens, orbitTarget, 58);
     }, undefined, {keyFrames: [0, 3*fps, 6*fps, 9*fps, 12*fps, 15*fps, 18*fps-1]});
     save('hub-orbit-cameras.json', { label: 'Staged context orbit; no actor pose override; fixed checked height and per-frame blockers', height: orbitHeight, heightSearchClear: orbitHeightSearchClear, probeAngles: 36, blockedFrames: orbitBlocked, cameras: orbitCameras });
+    if (!orbitHeightSearchClear) report.failures.push('Hub context orbit found no clear fixed review height');
     if (orbitBlocked) report.failures.push(`Hub context orbit has ${orbitBlocked} blocked review frames`);
     await H('photoOff');
 
