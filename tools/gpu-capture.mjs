@@ -929,7 +929,9 @@ try {
     if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
     const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
     save('hub-festoon-clearance.json', festoon);
+    if (festoon?.pendants.length !== 12 || festoon?.cords?.length !== 3) report.failures.push('Hub must expose twelve pendants on three supported cords');
     if (festoon?.pendants.some(p => p.bottom < p.ground + 3)) report.failures.push('Hub pendant below 3m local clearance');
+    if (festoon?.cords?.some(c => c.cordClearance < 3)) report.failures.push('Hub cord below 3m local clearance');
     await H('teleport', 0, y, 94, Math.atan2(-8, -9));
     const hubViews = [
       ['arrival', [16, 10, 108], [-5, 2, 81], 52],
