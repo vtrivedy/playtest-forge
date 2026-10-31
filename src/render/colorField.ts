@@ -529,7 +529,7 @@ export class ColorField {
           uniform sampler2D uMaskMap;
           uniform float uUseMaskMap;
           uniform vec4 uBounds;
-  
+
           float hash21(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
           }
