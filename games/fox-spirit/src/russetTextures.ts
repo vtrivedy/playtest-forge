@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { rng } from './russetKit';
 
 /**
  * Procedural surface textures for Russetvale, generated once at load.
@@ -44,16 +45,6 @@ function pfbm(u: number, v: number, base: number, oct: number, seed: number): nu
     p *= 2;
   }
   return s / n;
-}
-
-function rng(seed: number) {
-  let s = seed >>> 0 || 1;
-  return () => {
-    s ^= s << 13;
-    s ^= s >>> 17;
-    s ^= s << 5;
-    return ((s >>> 0) % 1000003) / 1000003;
-  };
 }
 
 // ---------------------------------------------------------------- helpers

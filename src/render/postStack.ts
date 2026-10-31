@@ -57,8 +57,6 @@ export type PostStack = {
   bloom: UnrealBloomPass | null;
   gtao: GTAOPass | null;
   gradePass: ShaderPass;
-  /** @deprecated alias of gradePass (vignette + grain live in the grade pass) */
-  vignettePass: ShaderPass;
   params: {
     bloomStrength: number;
     bloomRadius: number;
@@ -335,7 +333,6 @@ export function createPostStack(
     bloom,
     gtao,
     gradePass,
-    vignettePass: gradePass,
     params,
     grade,
     setSize(w, h) {
