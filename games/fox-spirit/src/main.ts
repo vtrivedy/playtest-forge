@@ -1360,6 +1360,8 @@ async function boot() {
     for (const e of shades.update(dt, simClock, fox.position.clone().setY(fox.position.y - foxActor.feetOffset), dashing)) {
       if (e.type === 'freed') {
         shadeContact.frees++;
+        const wash = e.pos.clone().setY(e.pos.y - 1.4);
+        colorField.stroke(wash, wash.clone(), { life: 6, strength: 1.2, radius: shades.tun.drainRadius });
         hitstop = 0.08;
         cam.shake(0.12);
         audio.play('bridge');
