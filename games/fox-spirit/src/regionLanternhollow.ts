@@ -3,6 +3,9 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { Bucket, PAL, trs } from './russetKit';
 import { boxCollider, cylCollider, type CollisionWorld } from './collision';
 
+/** Development comparison control; default preserves authored practical intensities. */
+export const HUB_PRACTICAL = { strength: 1 };
+
 /** Domestic scale, kept outside the existing arrival/hearth route. Original geometry. */
 export const HUB_FESTOON_POSTS = [[-12, 86.4], [6.6, 89.4]] as const;
 
@@ -427,10 +430,10 @@ export function createLanternhollow(
     state: () => ({ well: wellLight.intensity, porch: porchLight.intensity, plaza: plazaLight.intensity, hearth: fireLight.intensity }),
     update(time: number, dusk: number) {
     const flicker = 1 + Math.sin(time * 1.3) * .04;
-    wellLight.intensity = 4 * dusk * flicker;
-    porchLight.intensity = 3 * dusk * flicker;
-    plazaLight.intensity = 3 * dusk * flicker;
-    fireLight.intensity = 4 * dusk * flicker;
+    wellLight.intensity = 4 * dusk * flicker * HUB_PRACTICAL.strength;
+    porchLight.intensity = 3 * dusk * flicker * HUB_PRACTICAL.strength;
+    plazaLight.intensity = 3 * dusk * flicker * HUB_PRACTICAL.strength;
+    fireLight.intensity = 4 * dusk * flicker * HUB_PRACTICAL.strength;
     for (const [i, flame] of flames.entries()) {
       const phase = time * 2.2 + i * 2.1;
       flame.position.set(hx + Math.cos(i * 2.1) * .16 + Math.sin(phase) * .018, hy + .12, hz + Math.sin(i * 2.1) * .16);

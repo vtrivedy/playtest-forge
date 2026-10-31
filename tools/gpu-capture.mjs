@@ -1116,6 +1116,51 @@ try {
     for (const [name, lens, target, fov] of hubViews) {
       hubViewCameras.push({ name, lens, target, fov, blocker: await H('photoBlocker', lens, target) });
       await H('photo', lens, target, fov); await advance(2); await shot(`hub-${name}`);
+      if (name === 'well') {
+        // Same camera and posed skeleton; zero simulation steps between variants.
+        await H('advance', 0, 1/60, true);
+        const snapshot = async () => {
+          const state = await H('state');
+          const pose = await page.evaluate(() => {
+            const {camera, fox, hubPractical} = window.__gameHooks.debug;
+            camera.updateMatrixWorld(true); fox.updateWorldMatrix(true,true);
+            const bones = [];
+            fox.traverse(o => { if (o.isBone) bones.push({name:o.name,matrix:o.matrixWorld.toArray()}); });
+            return {strength:hubPractical.strength, camera:{position:camera.position.toArray(),
+              quaternion:camera.quaternion.toArray(), projection:camera.projectionMatrix.toArray()},
+              fox:{position:fox.position.toArray(),quaternion:fox.quaternion.toArray(),scale:fox.scale.toArray()},bones};
+          });
+          const fixed = {camera:pose.camera,fox:pose.fox,bones:pose.bones,t:state.t,
+            anim:state.anim,grounded:state.grounded,deaths:state.deaths,assists:state.auto.assists,
+            restored:state.restored,seedwells:state.seedwells,restore:state.restore,grade:state.look.grade};
+          return {pose,state,fixedDigest:createHash('sha256').update(JSON.stringify(fixed)).digest('hex'),
+            game:await page.evaluate(() => window.__game)};
+        };
+        const entry = await snapshot(), variants = [];
+        if (entry.pose.strength !== 1) report.failures.push('Hub practical comparison default must remain one');
+        try {
+          for (const strength of [1,2.5,4]) {
+            await page.evaluate(value => { window.__gameHooks.debug.hubPractical.strength=value; }, strength);
+            await H('advance',0,1/60,true);
+            const sample = await snapshot();
+            const filename = `hub-practical-${String(strength).replace('.','p')}`;
+            await shot(filename);
+            variants.push({filename,strength,...sample});
+            if (sample.fixedDigest !== entry.fixedDigest) report.failures.push(`Hub practical ${strength} comparison camera/pose/state changed`);
+          }
+        } finally {
+          await page.evaluate(value => { window.__gameHooks.debug.hubPractical.strength=value; }, entry.pose.strength);
+          await H('advance',0,1/60,true);
+          const restored = await snapshot();
+          save('hub-practical-comparison.json',{label:'Staged well-camera light-strength comparison; zero simulation steps; shipped default unchanged',
+            requestedCamera:{lens,target,fov},entry,variants,restored});
+          if (restored.pose.strength !== entry.pose.strength || restored.fixedDigest !== entry.fixedDigest ||
+            JSON.stringify(restored.state.dusk.practical) !== JSON.stringify(entry.state.dusk.practical)) {
+            report.failures.push('Hub practical comparison failed exact strength/state/light restoration');
+          }
+        }
+      }
+
     }
     save('hub-view-cameras.json', hubViewCameras);
     const arrivalCamera = { lens: [8, 4.5, 101], target: [-8, 2, 86], fov: 55, blocker: await H('photoBlocker', [8, 4.5, 101], [-8, 2, 86]) };
