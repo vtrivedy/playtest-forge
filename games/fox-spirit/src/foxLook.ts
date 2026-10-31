@@ -77,7 +77,7 @@ float fxNoise(vec3 x) {
 function patchFur(mat: THREE.MeshStandardMaterial, fringeLength = 0, fringeAlpha = 0.22) {
   const shell = mat.name.toLowerCase().includes("shell");
   const tail = mat.name.toLowerCase().startsWith('foxtailfur');
-  const innerHeat = !shell && !tail;
+  const innerHeat = mat.name.toLowerCase() === 'foxfur';
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, furUniforms);
     shader.vertexShader = shader.vertexShader
