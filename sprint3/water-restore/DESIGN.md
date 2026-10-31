@@ -49,3 +49,7 @@ Continuous ribbon geometry gate caught a real inverted triangle at Reed's tight 
 Opus source review finds no blocking ribbon regression; preserve simulation path despite suggested rounding. Reduce over-conservative inner pinch by allowing65% of measured curvature radius, still below the fold radius and gated by actual upward-triangle checks. Initialize dry vertex colours before first update. Keep GPU attention on the tight Reed bend's slope/width; do not smooth the authored path and alter parcel length.
 
 The85% candidate failed the upward-triangle gate on Reed;65% passes while exposing less bed than45%. Keep65% for remote judgment.
+
+## Driver23:40: clean autumn restoration colour
+
+Newest driver note explicitly passes front shape but rejects muddy rust, requesting gold/russet/green. This supersedes the earlier no-new-green interpretation: use restrained pine/olive accents, never lime/spring green. Author visible autumn colour on Reed land rather than increasing mask brightness. Raise existing leaf coverage in deterministic bank drifts (exclude submerged floor), blend some muted gold into the bank vertex colour, and give Reed-local leaf hue a gold/russet/tan mix with sparse pine. Reed blade palette becomes gold/copper/russet with one pine accent among eight tones. Preserve most damp umber gaps, global palette elsewhere, terrain/collision, RNG draw count and mask/front semantics. Existing mask reveals authored colours outward. Capture the same source-centred before/mid/settled lens; no new discs or fake wave overlay.
