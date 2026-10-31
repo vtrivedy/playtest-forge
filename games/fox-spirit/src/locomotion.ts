@@ -40,13 +40,13 @@ export class AuthoredLocomotion {
     minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .92, headBob: .8,
     // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
     // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
-    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .65, carpalFlexRun: .25, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .02, idleRestLift: .018, idleRestFold: .35, idleHipShot: .07, idleLook: .16, gallopFlex: .2, gallopFlexPhase: .8, weightRoll: .04, spineSway: .08, breath: .022,
-    runningGather: .45, tailAir: .05, airTuck: 1.25, airForeSwing: .55, airHindSwing: .45, airReach: .25, airHindStream: .45, airArch: .12,
+    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .11, liftHindTrot: .13, carpalFlex: .65, carpalFlexRun: .6, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
+    carpalGive: .14, landCarpalGive: .5, strideBob: .012, rideDrop: .03, idleSettle: .02, idleRestLift: .04, idleRestFold: .6, idleForeUnder: .5, trackNarrow: .03, earTwitch: .5, idleHipShot: .07, idleLook: .16, gallopFlex: .2, gallopFlexPhase: .8, weightRoll: .04, spineSway: .08, breath: .04,
+    runningGather: .6, tailAir: .05, airTuck: 1.25, airForeSwing: .55, airHindSwing: .45, airReach: .25, airHindStream: .45, airArch: .12,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
-    takeoffCrouch: .09, takeoffPitch: .07,
+    takeoffCrouch: .12, takeoffPitch: .07,
     headHold: .8, gallopHeadHold: 1.5, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .16, landPitch: 1, landFrequency: 3, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .08, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .24, landPitch: 1, landFrequency: 3, landDamping: .9, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .08, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
     earlyTouches: 0, spineFlexCommand: 0, maxSwingLift: 0, airPose: 0, pelvisRoll: 0, spineSway: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
@@ -102,6 +102,7 @@ export class AuthoredLocomotion {
   private spines:THREE.Object3D[]=[];
   private necks:THREE.Object3D[]=[];
   private head?:THREE.Object3D;
+  private ears:THREE.Object3D[]=[];
   private lookSpring=new Spring();
   private nodSpring=new Spring();
   private tailLoadSpring=new Spring();
@@ -134,6 +135,7 @@ export class AuthoredLocomotion {
     this.bankRestUp=[this.spine!,this.spines[this.spines.length-1]].map(bone=>({bone,up:new THREE.Vector3(0,1,0).applyQuaternion(bone.getWorldQuaternion(q()).invert())}));
     this.necks=FOX_RIG.neck.map(n=>root.getObjectByName(n)).filter((b):b is THREE.Object3D=>!!b);
     this.head=root.getObjectByName(FOX_RIG.head);
+    this.ears=(['l','r'] as const).map(s=>root.getObjectByName(FOX_RIG.ear(s)[1])).filter((b):b is THREE.Object3D=>!!b);
     this.tailBone = root.getObjectByName(FOX_RIG.tail[0]);
     this.tails=FOX_RIG.tail.map(name=>root.getObjectByName(name)).filter((b): b is THREE.Object3D=>!!b);
     const floor = new THREE.Box3().setFromObject(root).min.y;
@@ -332,9 +334,20 @@ export class AuthoredLocomotion {
   private carriageReady=false;
   private ribbon=0;
   private supportDrop=0;
-  private contactAnchor(foot:{planted:boolean;anchor:THREE.Vector3;correction:THREE.Vector3;clearance:number},pad:THREE.Vector3,ground:number,active:string,dt:number) {
+  private contactAnchor(foot:{planted:boolean;anchor:THREE.Vector3;correction:THREE.Vector3;clearance:number;upper:THREE.Object3D;pole:number},pad:THREE.Vector3,ground:number,active:string,dt:number) {
     const anchor=foot.planted?foot.anchor.clone():pad.clone().add(foot.correction);
-    if(active==='idle')anchor.lerp(pad,1-Math.exp(-5*dt));
+    if(!foot.planted && ['run','walk','trot'].includes(active)) {
+      // Foxes track narrow: paws land in toward the midline, so elbows and hocks read from the front.
+      const centre=this.group.position, side=new THREE.Vector3(1,0,0).applyQuaternion(this.group.quaternion);
+      const offset=anchor.clone().sub(centre).dot(side);
+      anchor.addScaledVector(side,-Math.sign(offset)*Math.min(Math.abs(offset)*.5,this.params.trackNarrow));
+    }
+    if(active==='idle') {
+      // Standing square: forepaws settle under the shoulders instead of propping out in an A-frame.
+      const target=pad.clone();
+      if(foot.pole<0){const shoulder=foot.upper.getWorldPosition(v());target.x=THREE.MathUtils.lerp(target.x,shoulder.x,this.params.idleForeUnder);target.z=THREE.MathUtils.lerp(target.z,shoulder.z,this.params.idleForeUnder);}
+      anchor.lerp(target,1-Math.exp(-5*dt));
+    }
     anchor.y=ground+foot.clearance;
     return anchor;
   }
@@ -753,6 +766,11 @@ export class AuthoredLocomotion {
       // A forepaw folded up past its own elbow reads as a hook jabbing the chest: keep it below.
       const over=foot.paw.getWorldPosition(v()).y-(foot.lower.getWorldPosition(v()).y-.05);
       if(over>0){target.y-=over;this.placePaw(foot,target);}
+    } else for(let pass=0;pass<2;pass++) {
+      // A stifle lifted past the hip pushes the thigh skin out through the back: keep the knee under the hip.
+      const over=foot.lower.getWorldPosition(v()).y-(foot.upper.getWorldPosition(v()).y-.04);
+      if(over<=0)break;
+      target.y-=over*1.5;this.placePaw(foot,target);
     }
     if(floor!==null) {
       const under=floor+foot.clearance+.01-foot.paw.localToWorld(foot.padLocal.clone()).y;
@@ -805,14 +823,19 @@ export class AuthoredLocomotion {
       // The pelvis stays put: tucking it opens a seam at the haunch.
       for(const spine of this.spines)worldOverlay(spine,right.clone(),flex/this.spines.length*1.5);
       // Level eyeline: the head counter-pitches what the back does.
-      worldOverlay(this.head,right.clone(),-flex*1.2);
+      worldOverlay(this.head,right.clone(),-flex*2);
     }
     this.metrics.spineFlexCommand=flex;
     // Breath: ribcage lifts, withers ease, root rises a few mm.
     worldOverlay(chest,right.clone(),-idle*this.params.breath*breath);
     worldOverlay(withers,right.clone(),idle*this.params.breath*.6*breath);
     // Standing soft, not locked: hips and shoulders settle a little so elbows and hocks keep a bend.
-    this.root.position.y+=idle*(.004*breath-this.params.idleSettle);
+    this.root.position.y+=idle*(.006*breath-this.params.idleSettle);
+    worldOverlay(this.head,right.clone(),idle*.03*breath);
+    // Ear twitch: a quick flick every few seconds, alternating ears.
+    const cycle=this.time/3.1, flick=Math.max(0,Math.sin(Math.PI*Math.min(1,(cycle%1)/.06)))*(cycle%1<.06 ? 1 : 0);
+    const ear=this.ears[Math.floor(cycle)%2];
+    if(ear && flick>0)worldOverlay(ear,forward.clone(),(Math.floor(cycle)%2 ? -1 : 1)*this.params.earTwitch*flick*Math.max(idle,.3));
     // Idle attention: an unhurried look around, carried mostly by the neck.
     const gaze=idle*this.params.idleLook*(Math.sin(2*Math.PI*.09*this.time)+.5*Math.sin(2*Math.PI*.23*this.time+2));
     if(this.necks[1])worldOverlay(this.necks[1],up.clone(),gaze*.6);
