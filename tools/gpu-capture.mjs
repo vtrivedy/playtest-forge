@@ -272,9 +272,41 @@ try {
     if(rules.aura.raw<.9||rules.aura.supplied!==0||rules.strong.supplied!==1||rules.spent.supplied!==0||rules.gutter.holdLeft!==0||rules.gutter.state!=='guttering'||rules.restored.heat!==1||rules.restored.state!=='restored')throw Error(`Shade colour rules failed ${JSON.stringify(rules)}`);
     save('shade-colour-rules.json',rules);
 
+    // Isolate patrol observation from attraction; restore the authored tuning before pursuit.
+    const chaseDistance = await page.evaluate(() => {
+      const tun=window.__gameHooks.shades.tun, old=tun.chaseDistance;
+      if(typeof old==='number')tun.chaseDistance=0;
+      return old;
+    });
     await camera();
     await video('shade-patrol', 120, camera, undefined, { traceEveryFrame: true, keyFrames: [0, 30, 60, 90, 119] });
     if((await page.evaluate(()=>window.__gameHooks.shades.state())).hits!==0)throw Error('Patrol observer was hit');
+    await page.evaluate(value => { if(typeof value==='number')window.__gameHooks.shades.tun.chaseDistance=value; }, chaseDistance);
+    if(typeof chaseDistance==='number') {
+      save('shade-behavior-staging.json', {label:'10-second staged observer placement; live modes, terrain checks and attraction; no forced actor state', nearFrames:[90,390]});
+      await video('shade-behavior', 600, async frame => {
+        if(frame%15===0) {
+          const observer = await page.evaluate(near => {
+            const h=window.__gameHooks, actor=h.shades.state().actors[0];
+            const [x,y,z]=actor.pos, col=h.debug.world.collision;
+            const radius=near?2.9:8;
+            for(let k=0;k<64;k++) {
+              const a=k/64*Math.PI*2,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
+              const floor=col.groundAt(px,pz,y+.5).y;
+              if(Number.isFinite(floor)&&Math.abs(floor-y)<.3&&!col.blocked(px,pz,floor))
+                return [px,floor,pz,Math.atan2(x-px,z-pz)];
+            }
+            return null;
+          },frame>=90&&frame<390);
+          if(!observer)throw Error('No safe staged shade behavior observer');
+          await H('teleport',...observer);
+        }
+        await camera();
+      },undefined,{traceEveryFrame:true,keyFrames:[0,89,180,300,390,480,599]});
+      const behavior=await page.evaluate(()=>window.__gameHooks.shades.state());
+      save('shade-behavior-state.json',behavior);
+      if(behavior.hits!==0)throw Error('Staged behavior observer was hit');
+    }
     await H('photoOff');
     await advance(30);
     await shot('shade-chase');
