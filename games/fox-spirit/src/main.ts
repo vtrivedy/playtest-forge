@@ -466,7 +466,7 @@ async function boot() {
   // Patch only after every world builder has added its materials and shader
   // hooks. In particular the grotto roof is built by water outside world.group.
   const occlusion = createOcclusionFader(scene, {
-    blocked: () => !photo && cam.debug.blocked(),
+    blocked: (camera, focus) => photo ? cam.debug.viewBlocked(focus, camera.position) : cam.debug.blocked(),
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });

@@ -101,7 +101,8 @@ export type FollowCamera = {
    */
   getYaw: () => number;
   resize: (w: number, h: number) => void;
-  debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string; blocked: () => boolean };
+  debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string; blocked: () => boolean;
+    viewBlocked: (focus: THREE.Vector3, lens: THREE.Vector3) => boolean };
 };
 
 const TAU = Math.PI * 2;
@@ -181,6 +182,11 @@ export function createFollowCamera(opts: {
     fox: [0, 0] as [number, number],
     landing: null as [number, number] | null,
     blocked: () => terrainFade || relocatedSightBlocked || sceneryFade > 0.01 || sceneryT > sceneryLimit + 0.04,
+    viewBlocked(focus: THREE.Vector3, lens: THREE.Vector3) {
+      const name = sceneryName;
+      try { return sceneryFraction(focus, lens) < .999; }
+      finally { sceneryName = name; }
+    },
     internals: () =>
       `shot=${shotW.toFixed(2)} boomT=${boomT.toFixed(2)} lift=${boomLift.toFixed(2)} floorLift=${floorLift.toFixed(2)} focusY=${focusY.toFixed(2)} lock=${groundLock.toFixed(2)} dist=${dist.toFixed(2)} scenery=${sceneryT.toFixed(2)} limit=${sceneryLimit.toFixed(2)} fade=${sceneryFade.toFixed(2)} lensUnresolved=${lensUnresolved} blocker=${sceneryName}`,
   };

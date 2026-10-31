@@ -37,6 +37,18 @@ scenery.updateMatrixWorld(true);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
   gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=$/, 'moved wall must not leave a phantom blocker');
+const ordinaryDiagnostics = follow.debug.internals();
+wall.position.set(4, .7, 0);
+scenery.updateWorldMatrix(true, true);
+assert.equal(follow.debug.viewBlocked(new THREE.Vector3(0, .62, 0), new THREE.Vector3(0, .62, 4)), false, 'follow view remains clear');
+// Turn the decorative plane toward the photo lens; the gameplay lens is elsewhere.
+wall.rotation.y = Math.PI / 2;
+scenery.updateWorldMatrix(true, true);
+assert.equal(follow.debug.viewBlocked(new THREE.Vector3(0, .62, 0), new THREE.Vector3(8, .62, 0)), true, 'actual photo view catches decorative wall');
+assert.equal(follow.debug.internals(), ordinaryDiagnostics, 'photo query preserves gameplay diagnostics');
+assert.equal(wall.material, material, 'photo query preserves render material identity');
+wall.rotation.y = 0;
+wall.position.set(0, 0, 2);
 wall.position.x = 0;
 scenery.updateMatrixWorld(true);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
