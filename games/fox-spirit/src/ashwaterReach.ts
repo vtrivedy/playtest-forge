@@ -121,7 +121,7 @@ export async function createAshwaterReach(scene: THREE.Scene, world: Realm) {
       bucket.col[i]=tint.r*value;bucket.col[i+1]=tint.g*value;bucket.col[i+2]=tint.b*value;
     }
     const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.86});mat.name=`reach-${name}`;
-    if(name!=='rv-rock')weatheredSurface(mat,name==='rv-bark'); mat.userData.cfRestoredChroma=name==='rv-bark'?.45:.65; field.patchMaterial(mat); mats.push(mat);
+    weatheredSurface(mat,name==='rv-bark','world',name==='rv-rock'?'rock':'masonry'); mat.userData.cfRestoredChroma=name==='rv-bark'?.45:.65; field.patchMaterial(mat); mats.push(mat);
     const mesh=bucket.toMesh(mat,{cast:true,receive:true,boxUV:name==='rv-rock'?4:1.6}); if(mesh)group.add(mesh);
   }
   const scenery=await dressReach(group, mat => { field.patchMaterial(mat); mats.push(mat); });
