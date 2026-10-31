@@ -84,7 +84,13 @@ export function createStylizedWater(
         vec3 reflection = uSky * (0.75 + 0.10 * sin(a * 0.3 + b * 0.2));
         if (uReflectionOn > 0.5) {
           vec2 mirrorUV = vReflection.xy / vReflection.w + N.xz * 0.025;
-          reflection = texture2D(uReflectionMap, clamp(mirrorUV, vec2(0.001), vec2(0.999))).rgb;
+          vec2 mirrorStep = vec2(1.5 / 512.0);
+          vec2 mirrorCentre = clamp(mirrorUV, mirrorStep, vec2(1.0) - mirrorStep);
+          reflection = texture2D(uReflectionMap, mirrorCentre).rgb * 0.40
+            + texture2D(uReflectionMap, mirrorCentre + vec2(mirrorStep.x, 0.0)).rgb * 0.15
+            + texture2D(uReflectionMap, mirrorCentre - vec2(mirrorStep.x, 0.0)).rgb * 0.15
+            + texture2D(uReflectionMap, mirrorCentre + vec2(0.0, mirrorStep.y)).rgb * 0.15
+            + texture2D(uReflectionMap, mirrorCentre - vec2(0.0, mirrorStep.y)).rgb * 0.15;
         }
         vec3 col = mix(refracted, reflection, 0.02 + fres * 0.94);
         // Scene colour already contains the bed: avoid blending it a second time.
