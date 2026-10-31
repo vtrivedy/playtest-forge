@@ -174,6 +174,10 @@ function inkMaterial(): THREE.ShaderMaterial {
         vec3 q = p - pivot;
         q.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * q.xz;
         p = pivot + q;
+        float droop=(.10+.025*sin(uTime*.55+uSeed))*head;
+        q=p-pivot;
+        q.yz=mat2(cos(droop),sin(droop),-sin(droop),cos(droop))*q.yz;
+        p=pivot+q;
         vRest=p; vMass=aMass; vTip=aTip;
         // wavering: the ink never quite holds still; it boils more toward the feet
         float w = (1.0 - smoothstep(0.0, 1.6, p.y)) * 0.015 + 0.025;
@@ -262,15 +266,22 @@ function inkWisps(seed: number, source: THREE.BufferGeometry) {
   g.userData.shadeInk={wisps:count,tipWisps:Array.from(tips).filter(v=>v>.25).length,meanWispMass:Number((masses.reduce((a,b)=>a+b,0)/count).toFixed(3)),meanWispTip:Number((tips.reduce((a,b)=>a+b,0)/count).toFixed(3))};
   g.setAttribute('aPhase', new THREE.BufferAttribute(Float32Array.from({length:count}, (_,k)=>(k*.618+seed*.13)%1),1));
   const mat=new THREE.ShaderMaterial({
-    uniforms:{...heroSoftUniforms(),uTime:{value:0},uPresence:{value:1},uOpacity:{value:.16},uSize:{value:.65},uPixelScale:{value:540},uReleased:{value:0},uReleaseAge:{value:0},uReleaseStart:{value:0}},
+    uniforms:{...heroSoftUniforms(),uTime:{value:0},uPresence:{value:1},uOpacity:{value:.16},uSize:{value:.65},uPixelScale:{value:540},uReleased:{value:0},uReleaseAge:{value:0},uReleaseStart:{value:0},uNoticeYaw:{value:0},uSeed:{value:seed*7.3}},
     vertexShader:`${HERO_SOFT_VERTEX}
-      attribute float aPhase,aMass,aTip; uniform float uTime,uPresence,uSize,uPixelScale,uReleased,uReleaseAge,uReleaseStart; varying float vAge; varying float vPhase; varying float vMass; varying float vTip;
+      attribute float aPhase,aMass,aTip; uniform float uTime,uPresence,uSize,uPixelScale,uReleased,uReleaseAge,uReleaseStart,uNoticeYaw,uSeed; varying float vAge; varying float vPhase; varying float vMass; varying float vTip;
 
       void main(){
         vMass=aMass;vTip=aTip;
         float clock=uReleased>.5?uReleaseStart:uTime;
         float age=fract(aPhase+clock*.22);vAge=age;vPhase=aPhase;
-        vec3 p=position; p.y+=age*.55;
+        vec3 p=position;
+        float head=smoothstep(1.45,2.05,p.y)*smoothstep(.15,.55,p.z);
+        float yaw=uNoticeYaw*head;vec3 pivot=vec3(0.,1.45,.48),q=p-pivot;
+        q.xz=mat2(cos(yaw),-sin(yaw),sin(yaw),cos(yaw))*q.xz;
+        float droop=(.10+.025*sin(clock*.55+uSeed))*head;
+        q.yz=mat2(cos(droop),sin(droop),-sin(droop),cos(droop))*q.yz;
+        p=pivot+q;p.x+=sin(clock*1.7+p.y*2.+uSeed)*.075;
+        p.y+=age*.55;
         p.x+=sin(age*4.+aPhase*19.)*.12*age;
         p.z-=age*.25;
         if(uReleased>.5){
@@ -580,6 +591,7 @@ export async function createShades(scene: THREE.Scene, spots: ShadeSpot[], groun
         if (!s.freed) s.group.position.set(s.pos.x, s.pos.y + tun.bob + Math.sin(t * 1.3 + s.u * 20) * tun.bob - Math.sin(s.notice*Math.PI)*.07, s.pos.z);
         s.group.rotation.y = s.heading;
         s.mat.uniforms.uNoticeYaw!.value = s.noticeYaw;
+        s.smoke.material.uniforms.uNoticeYaw!.value=s.noticeYaw;
         s.mat.uniforms.uTime!.value = t;
         s.mat.uniforms.uPresence!.value = s.presence;
         s.mat.uniforms.uDensity!.value = tun.inkDensity;
