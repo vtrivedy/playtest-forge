@@ -363,6 +363,7 @@ try {
       return old;
     });
     await camera();
+    await page.addStyleTag({content:'#hud > :not(#vignette), .lil-gui { visibility: hidden !important; }'});
     const originalDensity=await page.evaluate(()=>window.__gameHooks.shades.tun.inkDensity);
     if(typeof originalDensity==='number'){
       await H('advance',1,0,true);
@@ -395,13 +396,14 @@ try {
     if(typeof chaseDistance==='number') {
       save('shade-behavior-staging.json', {label:'10-second staged observer placement; live modes, terrain checks and attraction; no forced actor state', nearFrames:[90,300]});
       const transitions=[];
+      let missingObserver=false;
       await video('shade-behavior', 600, async frame => {
         if(frame%15===0) {
           const observer = await page.evaluate(near => {
             const h=window.__gameHooks, actor=h.shades.state().actors[0];
             const [x,y,z]=actor.pos, col=h.debug.world.collision;
-            const radius=near?2.9:4.8;
-            for(let k=0;k<64;k++) {
+            const radii=near?[2.9]:[4.8,4.3,5.3,5.5];
+            for(const radius of radii)for(let k=0;k<64;k++) {
               const a=k/64*Math.PI*2,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
               const floor=col.groundAt(px,pz,y+.5).y;
               if(Number.isFinite(floor)&&Math.abs(floor-y)<.3&&!col.blocked(px,pz,floor))
@@ -409,9 +411,13 @@ try {
             }
             return null;
           },frame>=90&&frame<300);
-          if(!observer)throw Error('No safe staged shade behavior observer');
-          if(transitions.at(-1)?.mode!==observer.mode)transitions.push({frame,mode:observer.mode});
-          await H('teleport',...observer.pos);
+          if(!observer){
+            if(!missingObserver)report.failures.push('No safe staged shade behavior observer; release diagnostics continue');
+            missingObserver=true;
+          }else{
+            if(transitions.at(-1)?.mode!==observer.mode)transitions.push({frame,mode:observer.mode});
+            await H('teleport',...observer.pos);
+          }
         }
         await camera();
       },undefined,pairOptions('Behavior',actors[0].id,[0,89,180,299,390,480,599]));
@@ -421,8 +427,8 @@ try {
       const expected=['patrol','chase','return','patrol'];
       let observed=0;
       for(const transition of transitions)if(transition.mode===expected[observed])observed++;
-      if(observed!==expected.length)throw Error(`Missing ordered live shade behavior cycle ${JSON.stringify(transitions)}`);
-      if(behavior.hits!==0)throw Error('Staged behavior observer was hit');
+      if(observed!==expected.length)report.failures.push(`Missing ordered live shade behavior cycle ${JSON.stringify(transitions)}`);
+      if(behavior.hits!==0)report.failures.push('Staged behavior observer was hit');
     }
     await H('photoOff');
     await advance(30);
@@ -582,6 +588,7 @@ try {
       await H('teleport',...setup.pos,setup.yaw);
       const edgeControllerBefore=await H('state');
       await H('setStick',...setup.direction);await H('setKeys',['ShiftLeft']);
+      lens=null;
       const edgeControllerAfter=await video('shade-clear-free',120,async i=>{if(i===12){await H('setKeys',[]);await H('setStick',null);}await camera('shade-hill-high');},undefined,pairOptions('Hill release','shade-hill-high',[0,5,12,24,36,48,75,119]));
       validatePair('shade-clear-free');
       save('shade-edge-dash-controller.json',{before:edgeControllerBefore.dash,after:edgeControllerAfter.dash});
