@@ -10,29 +10,38 @@ export function createCameraVisibilityProbe(scene: THREE.Scene, renderer: THREE.
   const clones = new Map<THREE.Material, { white?: THREE.Material; black?: THREE.Material }>();
   const synced = new Set<THREE.Material>();
   const signatures = new WeakMap<THREE.Material, string>();
+  const sourceData = new Map<THREE.Material, { object: Record<string, unknown>; values: Record<string, unknown> }>();
   let last: { width: number; height: number } | null = null;
 
   function maskMaterial(original: THREE.Material, white: boolean) {
     let pair = clones.get(original);
     if (!pair) { pair = {}; clones.set(original, pair); }
     const key = white ? 'white' : 'black';
-    const clone = pair[key] ?? original.clone();
+    const Material = original.constructor as new () => THREE.Material;
+    const clone = pair[key] ?? new Material();
     if (synced.has(clone)) return clone;
-    clone.copy(original);
+    // Material.copy serializes userData; ColorField stores live shader/texture
+    // caches there. Read normal render fields through the prototype, not JSON.
+    const source = Object.create(original) as THREE.Material;
+    source.userData = {};
+    clone.copy(source);
+    const defines = (original as THREE.MeshStandardMaterial).defines;
+    if (defines) (clone as THREE.MeshStandardMaterial).defines = { ...defines };
+    if (!sourceData.has(original)) sourceData.set(original, { object: original.userData, values: { ...original.userData } });
     clone.toneMapped = false;
     // Coverage is binary after the original alpha-test/discard shader logic.
     clone.blending = THREE.NoBlending;
     clone.transparent = false;
     clone.depthWrite = true;
     clone.depthTest = true;
-    const signature = `${original.version}|${original.side}|${original.transparent}|${original.alphaTest}|${original.alphaHash}|${original.customProgramCacheKey()}`;
+    const signature = `${original.version}|${original.side}|${original.transparent}|${original.alphaTest}|${original.alphaHash}|${JSON.stringify(defines)}|${original.customProgramCacheKey()}`;
     if (signatures.get(clone) !== signature) { clone.needsUpdate = true; signatures.set(clone, signature); }
     const previous = original.onBeforeCompile;
     clone.onBeforeCompile = (shader, r) => {
       previous.call(original, shader, r);
       // Standard/Basic fragment main is the final block. Keep all alpha/discard
       // logic, including scenery cutout, but remove lighting/grade from the count.
-      shader.fragmentShader = shader.fragmentShader.replace(/}\s*$/, `gl_FragColor.rgb = vec3(${white ? '1.0' : '0.0'});\n}`);
+      shader.fragmentShader = shader.fragmentShader.replace(/}\s*$/, `gl_FragColor = vec4(vec3(${white ? '1.0' : '0.0'}), 1.0);\n}`);
     };
     clone.customProgramCacheKey = () => `${original.customProgramCacheKey()}|fox-visibility-${key}`;
     pair[key] = clone;
@@ -53,7 +62,12 @@ export function createCameraVisibilityProbe(scene: THREE.Scene, renderer: THREE.
   function png(bytes: Uint8Array, width: number, height: number) {
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
     const context = canvas.getContext('2d')!, pixels = context.createImageData(width, height);
-    for (let y = 0; y < height; y++) pixels.data.set(bytes.subarray((height - 1 - y) * width * 4, (height - y) * width * 4), y * width * 4);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const value = bytes[((height - 1 - y) * width + x) * 4]! > 127 ? 255 : 0;
+      const offset = (y * width + x) * 4;
+      pixels.data[offset] = pixels.data[offset + 1] = pixels.data[offset + 2] = value;
+      pixels.data[offset + 3] = 255;
+    }
     context.putImageData(pixels, 0, 0);
     return canvas.toDataURL('image/png');
   }
@@ -61,6 +75,7 @@ export function createCameraVisibilityProbe(scene: THREE.Scene, renderer: THREE.
     measure() {
       if (renderer.getRenderTarget()) throw Error('Visibility probe requires the default framebuffer between manual frames');
       synced.clear();
+      sourceData.clear();
       renderer.getDrawingBufferSize(size);
       const width = size.x, height = size.y;
       if (!target || target.width !== width || target.height !== height) {
@@ -104,6 +119,12 @@ export function createCameraVisibilityProbe(scene: THREE.Scene, renderer: THREE.
         renderer.clear(); renderer.render(scene, camera);
         renderer.readRenderTargetPixels(target, 0, 0, width, height, visible);
       } finally {
+        for (const [material, snapshot] of sourceData) {
+          material.userData = snapshot.object;
+          for (const key of Object.keys(snapshot.object)) if (!(key in snapshot.values)) delete snapshot.object[key];
+          Object.assign(snapshot.object, snapshot.values);
+        }
+        sourceData.clear();
         for (const r of records) r.object.material = r.original;
         scene.background = background; scene.overrideMaterial = override;
         renderer.autoClear = autoClear; renderer.setClearColor(clear, alpha);

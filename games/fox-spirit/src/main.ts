@@ -224,6 +224,7 @@ async function boot() {
   const cam = createFollowCamera({
     scenery: world.group,
     surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
+    lensBlocked: (x, y, z, radius) => col.cameraOccupied(x, y, z, radius),
   });
   cam.snapBehind(spawnYaw);
   cam.camera.far = quality.far;
@@ -466,7 +467,7 @@ async function boot() {
   // Patch only after every world builder has added its materials and shader
   // hooks. In particular the grotto roof is built by water outside world.group.
   const occlusion = createOcclusionFader(scene, {
-    blocked: () => !photo && cam.debug.blocked(),
+    blocked: (camera, focus) => photo ? cam.debug.viewBlocked(focus, camera.position) : cam.debug.blocked(),
     solidAt: (x, z) => col.highestAt(x, z),
     exclude: foxActor.group,
   });
