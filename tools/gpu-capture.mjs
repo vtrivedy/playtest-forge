@@ -239,6 +239,7 @@ try {
     return state;
   }
   if (wants('shade')) {
+    if(fps!==60)throw Error('Shade encounter review requires60fps for fixed-step contact and every-six-frame release strips');
     await boot(quality, true);
     const actors = await page.evaluate(() => window.__gameHooks.shades.state().actors);
     if (!actors.length) throw Error('No Shade encounter authored');
