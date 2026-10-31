@@ -20,7 +20,7 @@ Personally reviewed GPU stills and run report at 8a975c2 (artifacts in fox-ember
 
 First correction isolates spirit readability: modestly enlarge ear/nape plumes; increase low-state wisp emission above the brown background; use warm ember cores with soft irregular smoke edges; retain sparse world-space motes. Keep tail core solid through the proximal two thirds and dissolve only the outer third; reduce tail shell opacity to avoid stacked bands. Tail geometry and pose remain owned by the authored asset/locomotion. Review before further anatomy or coat changes. Require matching remote stills and Opus visual verdict.
 
-Opus visual critique independently confirms invisible wisps, transparent tail bands, black eye surround and over-smoothed coat (opus-visual-8a975c2.txt). Adopt its stronger tail fix: opaque brush core, terminal 18% cutoff with matching shadow, translucent fringe only. Add one extra wisp per ear (22 total) and lift roots 1.5cm from skin. First retest isolates plume/tail; eye/coat pass follows.
+Opus visual critique independently confirms invisible wisps, transparent tail bands, black eye surround and over-smoothed coat (opus-visual-8a975c2.txt). Adopt its stronger tail fix: opaque brush core, terminal 18% cutoff with matching shadow, translucent fringe only. Add one extra wisp per ear (21 total) and lift roots 1.5cm from skin. First retest isolates plume/tail; eye/coat pass follows.
 
 ## Round 2B — eye and coat follow-up
 
@@ -33,3 +33,7 @@ Asset audit: there are four authored tail shells but no body shells. Moderate bo
 Opus asset/code critique (opus-fringe-design.txt) found tail_col RGBA strand alpha perforating the intended opaque core; local pixel audit confirms 52% nearly transparent pixels. Core and shadow must ignore map alpha and use terminal mask alone (fade 70–90%, cut near 81%). Keep alpha only on fringe. Fringe masks move to smooth named-bone skin weights, excluding eyes/inner ears/tail stub/paws, with coarse tuft coverage, no normal map or repeated rim emission. Opus confirms head closed beneath eyes: safely discard outer eye disc beyond almond aperture instead of painting rust patches.
 
 Final code review: Three r186 overwrites custom depth material alphaTest/map from the source material each shadow pass. Match the terminal shadow with an explicit UV-based discard independent of material alphaTest. Also reset tail-core map alpha immediately after the color sample so the broken rim cannot reintroduce fine texture-alpha speckle. Other reviewed shader/skinning/mask items pass the code gate; GPU gate remains open.
+
+## Round 3 — idle crest placement
+
+015d6ce GPU stills show visible tail fire and no dapples, but ear/nape wisps disappear at idle and remain pale isolated curls at run. Source audit: ear_04 vertices span 2.3cm in world Y and random picks can put the visible flame below the silhouette. Current nape uses neck_01 at withers height rather than upper neck. Place ear wicks at the highest skinned tip points; nape at upper neck02/03 high-facing points. Retain random source points for free motes. Keep the smaller tail idle scale, but avoid shrinking the crest wisps by35% at rest. Preserve warm quiet breath and actual animation, no static glow stickers. Expected21wisps=3nape+12tail+6ear,170sources.
