@@ -104,7 +104,7 @@ try {
     page = await context.newPage();
     page.setDefaultTimeout(180000);
     page.on('pageerror', e => { errors.push(String(e)); console.error('PAGEERROR', String(e)); });
-    page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error') errors.push(m.text()); if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
+    page.on('console', m => { if (!m.text().includes('toNonIndexed')) console.log('BROWSER', m.type(), m.text()); if (m.type() === 'error' || m.text().includes('Mismatch between texture format and sampler type')) { if (!errors.includes(m.text())) errors.push(m.text()); } if (m.text().startsWith('[quality]')) { log.push(m.text()); console.log(m.text()); } });
     await page.goto(`http://127.0.0.1:5180/?q=${q}&fresh${query}`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { polling: 100 });
     await H('setManual', true);
@@ -935,12 +935,12 @@ try {
     const waterCapture = await page.evaluate(() => {
       const h = window.__gameHooks, d = h.debug.scene.userData.waterCapture;
       const buffer = h.debug.post.composer.readBuffer;
-      return {after:d ?? null,expected:{width:buffer.width,height:buffer.height,type:buffer.texture.type}};
+      return {after:d ?? null,expected:{width:buffer.width,height:buffer.height,type:buffer.texture.type,shadowType:h.debug.renderer.shadowMap.type}};
     });
     save('water-scene-capture.json', {before:pondCaptureStart,...waterCapture});
     const d = waterCapture.after, expected = waterCapture.expected;
     if (!d || !pondCaptureStart || d.copies <= pondCaptureStart.copies || d.reflections <= pondCaptureStart.reflections || d.checkedCopies <= pondCaptureStart.checkedCopies
-      || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.bootGlError || d.invalidTargets) {
+      || expected.shadowType !== 1 || d.type !== 1016 || d.type !== expected.type || d.width !== expected.width || d.height !== expected.height || d.glError || d.priorGlError || d.bootGlError || d.invalidTargets) {
       report.failures.push(`Water scene capture gate failed: ${JSON.stringify({before:pondCaptureStart,...waterCapture})}`);
     }
   }

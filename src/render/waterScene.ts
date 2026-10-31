@@ -23,11 +23,18 @@ export function sceneWaterSampler(scene: THREE.Scene): SceneWaterSampler {
     prepare(renderer: THREE.WebGLRenderer, camera: THREE.Camera) {
       captureArmed = false;
       scene.updateMatrixWorld(true); camera.updateMatrixWorld(true);
+      let shadowsReady = true;
+      if (renderer.shadowMap.enabled) scene.traverse(object => {
+        const light = object as THREE.Light & { shadow?: THREE.LightShadow };
+        let visible = light.visible;
+        for (let parent = light.parent; parent; parent = parent.parent) visible = visible && parent.visible;
+        if (light.isLight && visible && light.layers.test(camera.layers) && light.castShadow && light.shadow && !light.shadow.map) shadowsReady = false;
+      });
       const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
       for (const [skin, reflect] of reflections) {
         let visible = skin.visible;
         for (let parent = skin.parent; parent; parent = parent.parent) visible = visible && parent.visible;
-        if (visible && skin.layers.test(camera.layers) && skin instanceof THREE.Mesh && frustum.intersectsObject(skin)) { diagnostics.reflectionAttempts++; if (reflect(renderer, camera)) diagnostics.reflections++; }
+        if (shadowsReady && visible && skin.layers.test(camera.layers) && skin instanceof THREE.Mesh && frustum.intersectsObject(skin)) { diagnostics.reflectionAttempts++; if (reflect(renderer, camera)) diagnostics.reflections++; }
       }
       diagnostics.prepared++;
       captureArmed = true;
