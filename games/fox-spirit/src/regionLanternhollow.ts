@@ -111,9 +111,13 @@ export function createLanternhollow(
     }
     col.add(boxCollider({ x: pileX, z: pileZ, w: .8, d: .72, top: pileY + .52, bottom: pileY - .15, tag: 'hub-woodpile' }));
 
-    // Broad bowed roof, sampled once for BOTH mesh and collision (no floating roof collider).
+    // A gently rounded pitched roof: one profile feeds mesh, gables and collision.
     const halfD = h.d / 2 + .46, halfW = h.w / 2 + .45, steps = 12;
-    const height = (z: number) => y + h.eave + h.rise * Math.cos(z / halfD * Math.PI / 2);
+    const height = (z: number) => {
+      const t = Math.abs(z) / halfD, ridgeRound = .12;
+      const rise = 1 - (Math.hypot(t, ridgeRound) - ridgeRound) / (Math.hypot(1, ridgeRound) - ridgeRound);
+      return y + h.eave + h.rise * rise;
+    };
     for (let k = 0; k < steps; k++) {
       const z0 = -halfD + k / steps * halfD * 2, z1 = -halfD + (k + 1) / steps * halfD * 2;
       const y0 = height(z0), y1 = height(z1);

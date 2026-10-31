@@ -1752,7 +1752,7 @@ async function boot() {
       contactShadow.scale.set(1, 1, 1);
       (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.75;
       hubDusk.update(fox.position.x, fox.position.z);
-    world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
+      world.updateHubVisuals(elapsed, hubDuskWeight(fox.position.x, fox.position.z));
       sky.update(rawDt);
       post.render();
       requestAnimationFrame(tick);
