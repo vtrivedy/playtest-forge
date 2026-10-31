@@ -378,7 +378,7 @@ async function boot() {
   const lift: Lift = { k: 0, radialK: 0, ax: 0, az: 0, hearth: null };
   const summitHearth = updrafts.hearths.find((h) => h.spot.id === SUMMIT_REPAIR.hearthId);
   let summitSeal = 0;
-  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui);
+  const shades = await createShades(scene, world.shadeSpots, (x, z, y) => col.groundAt(x, z, y).y, gui, (x, z, y) => col.blocked(x, z, y));
   // growth (world-1.md §1.3): root knots → bridges/ramps that grow while lit
   let frontFxT = 0;
   const growth = createGrowth(scene, world.rootSpots, world.padSpots, world.collision, {
