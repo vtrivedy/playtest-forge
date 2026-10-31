@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { FOX_RIG } from './foxRig';
-import { carpusName } from './foxLimbRig';
 
 export type MotionInput = {
   lookYaw?: number; brake?: number;
@@ -37,20 +36,15 @@ export class AuthoredLocomotion {
   params = { trotSpeed: 2.6, gallopSpeed: 6.5,
     // Glide: designed stride frequency (Hz at the gait's reference speed); bodyBob keeps that share of the clip's pelvis bob.
     walkHz: 1.8, trotHz: 2.1, gallopHz: 2.4, cadenceExponent: .35,
-    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, releaseSwing: .25, earlyContact: .85, headBob: .35,
-    // Natural gait: swing paw lift (m, walk/trot; gallop keeps its authored arc), carpal flick / hock fold (rad),
-    // stance carpal give, footfall bob (m), pelvis+chest weight-shift roll and spine sway (rad), idle breath.
-    liftForeWalk: .02, liftForeTrot: 0, liftHindWalk: .09, liftHindTrot: .12, carpalFlex: .95, carpalFlexRun: .7, hockFold: .28, swingReach: .72, swingReachHind: .6, swingReachRun: .5,
-    carpalGive: .14, landCarpalGive: .5, strideBob: .012, weightRoll: .05, spineSway: .045, breath: .022,
-    runningGather: .45, airTuck: 1.25, airReach: .25, airHindStream: .45, airArch: .12,
+    minStanceRatio: .35, bodyBob: .45, spineFlex: .6, swingEase: 1, swingTuck: .35, releaseSwing: .25, carpalCurl: .25, earlyContact: .85, headBob: .35,
     // Glide carriage: share of per-stride head height / head pitch removed, tail streaming and ribbon wave.
     takeoffCrouch: .09, takeoffPitch: .07,
     headHold: 1.2, gallopHeadHold: .8, headLevel: .75, stationarySupport: 0, tailStream: .012, tailWave: .045, tailWaveLag: .7,
-    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .16, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
+    headLead: .24, headFrequency: 3, headDamping: .85, headStabilize: .65, tailLoad: .20, suspensionLift: .04, gatherLift: .09, brakeSquat: .04, brakePitch: .09, landSquash: .28, landPitch: 1, landFrequency: 3.5, plantStrength: 1, maxCorrection: .16, turnPlant: 1, turnLean: .055, bankMax: .2, rootBank: 1, pelvisBank: .45, headRollStabilize: .65, tailLag: .1, springFrequency: 3, springDamping: .8, debug: false };
   metrics = { supportEvaluated: false, supportRequested: 0, supportDrop: 0, supportLimited: false, supportConflict: false, supportLimitingFoot: '', supportUpperFoot: '', supportOverridden: false, supportUnreachableFeet: 0, landPitch: 0, fallPoseTime: 0, fallPoseHeld: false, bankCommand: 0, pelvisBankAngle: 0, chestBankAngle: 0, windupLoad: 0, windupActive: false, lastLandingImpact: 0, authoredFlight: false, noSupport: false, noSupportFrames: 0, noSupportSeconds: 0, contactReleaseFrames: 0, cadenceHz: 0, stanceRatio: 1, stanceRatioRate: 0, brakeLoad: 0, contactModel: 'weighted-mesh-pad', landOffset: 0, gait: 'idle', phase: 0, playback: 1, stanceFeet: 0, maxPlantError: 0, maxResidual: 0,
-    earlyTouches: 0, maxSwingLift: 0, airPose: 0, pelvisRoll: 0, spineSway: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
+    earlyTouches: 0, groundClampFeet: 0, maxSwingPenetration: 0, maxSwingResidual: 0, phaseReleaseFeet: 0, maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, maxTouchdownShift: 0, suspension: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
-  private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock: THREE.Object3D; pole: number;
+  private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
     padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; correction: THREE.Vector3; strength: number; replantTime: number; releaseCorrection: THREE.Vector3; releaseProgress: number; phaseRelease: boolean; dot: THREE.Mesh }[] = [];
   private debugGroup = new THREE.Group();
   private phase = 0;
@@ -115,12 +109,9 @@ export class AuthoredLocomotion {
   private stanceRatio: Record<Gait, number> = { walk: 1, trot: 1, run: 1 };
   /** Per-foot weighted swing progress 0..1 (0 while in stance). */
   private swingProgress = [0, 0, 0, 0];
-  /** Per-foot swing bell (0 at lift-off and touchdown) and early-swing distal fold, blended over gaits. */
-  private swingBell = [0, 0, 0, 0];
-  private swingFold = [0, 0, 0, 0];
-  private swingLift = [0, 0, 0, 0];
-  private time = 0;
-  private air = new Spring();
+  /** Per-foot swing tuck 0..1 (blended over gaits): folds the lower leg so a slowed swing clears the ground. */
+  private tuck = [0, 0, 0, 0];
+  private foreRecovery=[0,0];
   constructor(private root: THREE.Object3D, private group: THREE.Group,
     private actions: Map<string, THREE.AnimationAction>) {
     this.rootPosition=root.position.clone();
@@ -144,8 +135,7 @@ export class AuthoredLocomotion {
     const padHeights:number[]=[];
     for (const [upper, lower, paw] of chains) {
       const a=root.getObjectByName(upper), b=root.getObjectByName(lower), c=root.getObjectByName(paw);
-      const hock=root.getObjectByName(upper.startsWith('thigh') ? upper.replace('thigh','hind_foot') : carpusName(upper.endsWith('_l') ? 'l' : 'r'));
-      if (!a || !b || !c || !hock) throw new Error(`FOX rig is missing locomotion chain ${upper}/${lower}/${paw} (carpus needs applyFoxLimbRig)`);
+      if (!a || !b || !c) throw new Error(`FOX rig is missing locomotion chain ${upper}/${lower}/${paw}`);
       const padPoints:THREE.Vector3[]=[];
       root.traverse(object=>{
         const mesh=object as THREE.SkinnedMesh;
@@ -168,7 +158,7 @@ export class AuthoredLocomotion {
       padHeights.push(padWorld.y-floor);
       const dot = new THREE.Mesh(new THREE.SphereGeometry(.025,6,4), new THREE.MeshBasicMaterial({color:0xffcc44, depthTest:false}));
       this.debugGroup.add(dot);
-      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock,pole:upper.startsWith('thigh') ? 1 : -1,planted:false,anchor:v(),previousSolved:v(),correction:v(),strength:1,replantTime:0,releaseCorrection:v(),releaseProgress:0,phaseRelease:false,clearance:.005,dot});
+      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:upper.startsWith('thigh') ? root.getObjectByName(upper.replace('thigh','hind_foot')) : undefined,planted:false,anchor:v(),previousSolved:v(),correction:v(),strength:1,replantTime:0,releaseCorrection:v(),releaseProgress:0,phaseRelease:false,clearance:.005,dot});
     }
     root.position.y-=padHeights.reduce((a,b)=>a+b,0)/padHeights.length;
     this.rootPosition.copy(root.position);
@@ -264,7 +254,7 @@ export class AuthoredLocomotion {
       action.time=time;
       action.setEffectiveTimeScale(0);
     };
-    this.swingBell.fill(0);this.swingFold.fill(0);this.swingLift.fill(0);this.swingProgress.fill(0);
+    this.tuck.fill(0);this.foreRecovery.fill(0); this.swingProgress.fill(0);
     for(const [name,action] of this.actions) {
       const target=locomoting ? (weights[name as Gait] ?? 0) : name===active ? 1 : 0;
       const weight=THREE.MathUtils.lerp(this.weights.get(name) ?? 0,target,alpha);
@@ -286,14 +276,13 @@ export class AuthoredLocomotion {
           // keeps recovery monotone; capped cases retain a velocity mismatch. 0 = linear swing.
           const sw=(u-stance)/(1-stance), m=Math.min(3,1+(stance<duty ? (duty/stance)*(1-stance)/(1-duty)-1 : 0)*this.params.swingEase);
           local=duty+(1-duty)*(sw*sw*(3-2*sw)+m*(2*sw*sw*sw-3*sw*sw+sw));
+          // Tuck grows with the suspension the warp added (none at the authored cadence).
+          this.tuck[i]+=weight*Math.sin(Math.PI*sw)*(1-this.stanceRatio[gait]);
           this.swingProgress[i]+=weight*sw;
-          // Lift peaks early (the paw clears, then reaches); fold snaps up right after lift-off, unfolds to reach.
-          const bell=Math.sin(Math.PI*Math.pow(sw,.75));
-          this.swingBell[i]+=weight*bell;
-          const fold=i<2 ? THREE.MathUtils.smoothstep(sw,0,.28)*(1-THREE.MathUtils.smoothstep(sw,.5,.88)) : bell;
-          this.swingFold[i]+=weight*fold*(i<2 ? (gait==='run' ? this.params.carpalFlexRun : this.params.carpalFlex) : this.params.hockFold*(gait==='run' ? .5 : 1));
-          const lift=gait==='walk' ? (i<2 ? this.params.liftForeWalk : this.params.liftHindWalk) : gait==='trot' ? (i<2 ? this.params.liftForeTrot : this.params.liftHindTrot) : 0;
-          this.swingLift[i]+=weight*bell*lift;
+          if(gait!=='walk' && i<2) {
+            const recover=THREE.MathUtils.smoothstep(sw,0,.12)*(1-THREE.MathUtils.smoothstep(sw,.60,.84));
+            this.foreRecovery[i]+=weight*recover*(1-this.stanceRatio[gait]);
+          }
         }
         drive(parts.legs[i],weight,((contact.phase+local)%1)*duration);
       });
@@ -304,6 +293,21 @@ export class AuthoredLocomotion {
   }
   /** Float the body over the legs: pull the clip's root/pelvis bob toward its cycle mean. */
   private glideLayer() {
+    this.feet.forEach((foot,i)=>{
+      // Measured: negative rotation about the lower bone's local X folds forearm and shin.
+      const recovery=i<2 ? this.foreRecovery[i] : 0;
+      const angle=-this.tuck[i]*this.params.swingTuck;
+      if(Math.abs(angle)>1e-4) {
+        this.overlays.push({bone:foot.lower,rotation:foot.lower.quaternion.clone()});
+        foot.lower.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),angle));
+      }
+      // Measured on both front pads: negative local X raises the toe in recovery.
+      const curl=-recovery*this.params.carpalCurl;
+      if(Math.abs(curl)>1e-4) {
+        this.overlays.push({bone:foot.paw,rotation:foot.paw.quaternion.clone()});
+        foot.paw.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),curl));
+      }
+    });
     let total=0;
     for(const g of GAIT_NAMES) total+=this.weights.get(g) ?? 0;
     if(total<1e-3)return;
@@ -346,7 +350,7 @@ export class AuthoredLocomotion {
     let requested=0,upperDrop=Infinity;
     const limitDrop=(limit:number,name:string)=>{if(limit<upperDrop){upperDrop=Math.max(0,limit);this.metrics.supportUpperFoot=name;}};
     if(eligible)for(const foot of this.feet) {
-      const a=foot.upper.getWorldPosition(v()),b=foot.lower.getWorldPosition(v()),c=foot.hock.getWorldPosition(v());
+      const a=foot.upper.getWorldPosition(v()),b=foot.lower.getWorldPosition(v()),c=(foot.hock??foot.paw).getWorldPosition(v());
       const paw=foot.paw.getWorldPosition(v()),pad=foot.paw.localToWorld(foot.padLocal.clone());
       const sample=foot.planted?foot.anchor:pad;
       const ground=this.input.groundAt(sample.x,sample.z,this.group.position.y+.6);
@@ -356,7 +360,7 @@ export class AuthoredLocomotion {
       // Match contact entry, including correction carried through the land-to-idle blend.
       const anchor=this.contactAnchor(foot,pad,ground,active,dt);
       const target=anchor.sub(pad.clone().sub(paw));
-      target.sub(paw.clone().sub(c));
+      if(foot.hock)target.sub(paw.clone().sub(c));
       const first=a.distanceTo(b),second=b.distanceTo(c),reach=first+second-.0001,inner=Math.abs(first-second)+.0001;
       const horizontal=Math.hypot(target.x-a.x,target.z-a.z);
       if(horizontal>=reach){this.metrics.supportUnreachableFeet++;limitDrop(0,foot.paw.name);continue;}
@@ -479,8 +483,8 @@ export class AuthoredLocomotion {
     const terrainTarget=this.input.grounded && Number.isFinite(rigGround) && Number.isFinite(actorGround)
       ? THREE.MathUtils.clamp(rigGround-actorGround,-.3,.3) : 0;
     this.terrainOffset=THREE.MathUtils.damp(this.terrainOffset,terrainTarget,25,dt);
-    // Standing jumps load the haunches fully; a running leap keeps a shallower gather so the take-off still reads.
-    const crouch=THREE.MathUtils.smoothstep(this.input.crouch ?? 0,0,1)*THREE.MathUtils.lerp(1,this.params.runningGather,THREE.MathUtils.smoothstep(this.input.speed,1,3));
+    // Standing jumps load the haunches; a gallop carries its momentum straight into the leap.
+    const crouch=THREE.MathUtils.smoothstep(this.input.crouch ?? 0,0,1)*(1-THREE.MathUtils.smoothstep(this.input.speed,1,3));
     this.metrics.windupLoad=crouch;
     this.metrics.windupActive=this.input.grounded && active==='jump_up' && (this.input.crouch ?? 0)>0;
     const suspension=this.suspension();
@@ -505,7 +509,7 @@ export class AuthoredLocomotion {
     }
     overlay(this.spine,new THREE.Vector3(1,0,0),-this.brake*this.params.brakePitch);
     const lookDelta=this.input.lookYaw===undefined ? 0 : Math.atan2(Math.sin(this.input.lookYaw-this.input.yaw),Math.cos(this.input.lookYaw-this.input.yaw));
-    const look=this.lookSpring.step(THREE.MathUtils.clamp(lookDelta*this.params.headLead+this.turn*.06,-.32,.32),dt,this.params.headFrequency,this.params.headDamping);
+    const look=this.lookSpring.step(THREE.MathUtils.clamp(lookDelta*this.params.headLead+this.turn*.04,-.32,.32),dt,this.params.headFrequency,this.params.headDamping);
     const worldOverlay=(bone:THREE.Object3D|undefined,worldAxis:THREE.Vector3,angle:number)=>{
       if(!bone)return;
       bone.updateWorldMatrix(true,false);
@@ -520,7 +524,7 @@ export class AuthoredLocomotion {
     const headBank=-this.lean*this.params.headRollStabilize;
     for(const neck of this.necks)worldOverlay(neck,bankAxis.clone(),headBank*.5/this.necks.length);
     worldOverlay(this.head,bankAxis.clone(),headBank*.5);
-    const bend=THREE.MathUtils.clamp(this.turn*.05,-.2,.2);
+    const bend=THREE.MathUtils.clamp(this.turn*.035,-.14,.14);
     for(let i=0;i<this.spines.length;i++)worldOverlay(this.spines[i],new THREE.Vector3(0,1,0),bend/this.spines.length);
     for(const neck of this.necks)worldOverlay(neck,new THREE.Vector3(0,1,0),look*.22);
     worldOverlay(this.head,new THREE.Vector3(0,1,0),look*.34);
@@ -544,7 +548,6 @@ export class AuthoredLocomotion {
       tailTarget=angle*.9;
     }
 
-    this.naturalBody(dt,active,worldOverlay,bankAxis,right);
     this.root.updateWorldMatrix(true,true);
     this.stationarySupport(dt,active);
     if(this.tailBone && this.input.grounded) {
@@ -569,7 +572,7 @@ export class AuthoredLocomotion {
     this.metrics.fallPoseTime=active==='jump_fall' ? fallAction?.time ?? 0 : 0;
     this.metrics.fallPoseHeld=active==='jump_fall' && !!fallAction?.paused && !!fallAction?.clampWhenFinished;
     this.footfalls.length=0;
-    this.metrics.maxSwingLift=0;this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;this.metrics.maxTouchdownShift=0;this.metrics.groundClampFeet=0;this.metrics.maxSwingPenetration=0;this.metrics.maxSwingResidual=0;this.metrics.phaseReleaseFeet=0;
+    this.metrics.stanceFeet=0; this.metrics.maxPlantError=0; this.metrics.maxResidual=0; this.metrics.maxSlideMS=0; this.metrics.maxCorrection=0;this.metrics.maxTouchdownShift=0;this.metrics.groundClampFeet=0;this.metrics.maxSwingPenetration=0;this.metrics.maxSwingResidual=0;this.metrics.phaseReleaseFeet=0;
     const locomoting=['run','walk','trot'].includes(active);
     this.debugGroup.visible=this.params.debug;
     let authoredSupportFeet=0;
@@ -665,14 +668,8 @@ export class AuthoredLocomotion {
           }
         }
       }
-      const lift=this.swingLift[i]/Math.max(.001,gaitWeight), fold=this.swingFold[i]/Math.max(.001,gaitWeight);
-      const swinging=!stance && locomoting && this.input.grounded;
-      if(swinging) {
-        this.swingPose(foot,i,lift,fold,swingFloor);
-        foot.previousSolved.copy(foot.paw.localToWorld(foot.padLocal.clone()));
-      } else if(stance || foot.correction.lengthSq()>0) {
+      if(stance || foot.correction.lengthSq()>0) {
         this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,foot.correction.length());
-        if(stance && i<2)this.carpalGive(foot,dt);
         this.placePaw(foot,paw.add(foot.correction).sub(padOffset));
         const corrected=foot.paw.localToWorld(foot.padLocal.clone());
         if(stance && foot.planted)this.metrics.maxSlideMS=Math.max(this.metrics.maxSlideMS,corrected.distanceTo(foot.previousSolved)/step);
@@ -719,106 +716,17 @@ export class AuthoredLocomotion {
     return out.copy(pad).sub(pivot).applyAxisAngle(new THREE.Vector3(0,1,0),angle).add(pivot).sub(pad).setY(0).clampLength(0,this.params.maxCorrection);
   }
   /** Two-bone (fore) or hock-preserving (hind) solve that puts the paw bone at target, keeping pad orientation. */
-  private chainLength(foot:{upper:THREE.Object3D;lower:THREE.Object3D;hock:THREE.Object3D}) {
-    const b=foot.lower.getWorldPosition(v());
-    return foot.upper.getWorldPosition(v()).distanceTo(b)+b.distanceTo(foot.hock.getWorldPosition(v()));
-  }
-  /** Swing: fold the distal joint anatomically (carpal flick fore, hock fold hind), then lift the carpus/hock
-   * through the two-bone chain so elbow and stifle bend; the toes follow the fold. */
-  private swingPose(foot:{upper:THREE.Object3D;lower:THREE.Object3D;paw:THREE.Object3D;hock:THREE.Object3D;pole:number;padLocal:THREE.Vector3;correction:THREE.Vector3;clearance:number},i:number,lift:number,fold:number,floor:number|null) {
-    this.overlays.push({bone:foot.hock,rotation:foot.hock.quaternion.clone()});
-    // Measured: +local X on the carpus flexes the metacarpus back; -local X on the hind foot folds the hock.
-    foot.hock.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),i<2 ? fold : -fold));
-    foot.hock.updateWorldMatrix(false,true);
-    const target=foot.paw.getWorldPosition(v()).add(foot.correction).add(new THREE.Vector3(0,lift,0));
-    this.placePaw(foot,target);
-    if(floor!==null) {
-      const under=floor+foot.clearance+.01-foot.paw.localToWorld(foot.padLocal.clone()).y;
-      if(under>0){target.y+=under;this.placePaw(foot,target);}
-    }
-    this.metrics.maxSwingLift=Math.max(this.metrics.maxSwingLift,lift);
-  }
-  /** Stance: the pastern gives under load (more on landing / windup) instead of standing as a straight post. */
-  private carpalGive(foot:{hock:THREE.Object3D;paw:THREE.Object3D},dt:number) {
-    const load=THREE.MathUtils.clamp(-this.landSpring.value/.08,0,1)+(this.input.crouch ?? 0)*.5;
-    const give=this.params.carpalGive+this.params.landCarpalGive*Math.min(1,load);
-    this.overlays.push({bone:foot.hock,rotation:foot.hock.quaternion.clone()},{bone:foot.paw,rotation:foot.paw.quaternion.clone()});
-    foot.hock.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),-give));
-    foot.paw.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),give));
-    foot.hock.updateWorldMatrix(false,true);
-    void dt;
-  }
-  /** Living body over the legs: footfall bob, weight-shift roll, spine sway with shoulder counter-rotation,
-   * idle breath and the jump air pose. Runs before the leg solve so planted feet absorb every body motion. */
-  private naturalBody(dt:number,active:string,worldOverlay:(bone:THREE.Object3D|undefined,axis:THREE.Vector3,angle:number)=>void,forward:THREE.Vector3,right:THREE.Vector3) {
-    this.time+=dt;
-    const up=new THREE.Vector3(0,1,0);
-    const locomoting=this.input.grounded && ['run','walk','trot'].includes(active);
-    const w=(g:Gait)=>locomoting ? this.weights.get(g) ?? 0 : 0;
-    const walk=w('walk'), trot=w('trot');
-    const mid=(g:Gait,leg:number)=>{const c=GAITS[g].contacts[leg];return c.phase+c.duty*this.stanceRatio[g]/2;};
-    const wave=(leg:number,fn:(x:number)=>number)=>walk*fn(2*Math.PI*(this.phase-mid('walk',leg)))+trot*.6*fn(2*Math.PI*(this.phase-mid('trot',leg)));
-    // Lowest just after each footfall pair.
-    this.root.position.y-=this.params.strideBob*(walk*.6+trot)*Math.cos(4*Math.PI*(this.phase-.1));
-    // Stance-side hip and shoulder ride up (+roll about forward raises the fox's left).
-    const pelvisRoll=this.params.weightRoll*wave(2,Math.cos), chestRoll=this.params.weightRoll*wave(0,Math.cos);
-    const sway=this.params.spineSway*wave(2,Math.sin);
-    const idle=this.input.grounded ? this.weights.get('idle') ?? 0 : 0;
-    const breath=Math.sin(2*Math.PI*.27*this.time), shift=Math.sin(2*Math.PI*.07*this.time+1);
-    worldOverlay(this.spine,forward.clone(),pelvisRoll+idle*.012*shift);
-    worldOverlay(this.spine,up.clone(),sway);
-    const chest=this.spines[2], withers=this.spines[3];
-    worldOverlay(chest,forward.clone(),chestRoll-pelvisRoll-idle*.02*shift);
-    worldOverlay(chest,up.clone(),-2*sway);
-    if(this.necks[0])worldOverlay(this.necks[0],up.clone(),sway*.8);
-    // Breath: ribcage lifts, withers ease, root rises a few mm.
-    worldOverlay(chest,right.clone(),-idle*this.params.breath*breath);
-    worldOverlay(withers,right.clone(),idle*this.params.breath*.6*breath);
-    this.root.position.y+=idle*.004*breath;
-    // Air pose: forelegs tuck on the rise and reach on the fall, hind legs stream back off the push, body arcs.
-    const airborne=!this.input.grounded && /^jump_/.test(active);
-    const a=this.air.step(airborne ? THREE.MathUtils.clamp(this.input.verticalSpeed/6,-1,1) : 0,dt,3.2,.9);
-    const airW=airborne ? 1 : Math.max(0,1-Math.abs(a)*4) < 1 ? Math.abs(a) : 0;
-    this.metrics.airPose=a;
-    if(Math.abs(a)>1e-3 || airborne) {
-      const tuck=THREE.MathUtils.lerp(this.params.airReach,this.params.airTuck,THREE.MathUtils.smoothstep(a,-.6,.4));
-      const hind=this.params.airHindStream*(a>0 ? a : .6*a);
-      const k=airborne ? 1 : airW;
-      for(let i=0;i<4;i++){
-        const foot=this.feet[i];
-        this.overlays.push({bone:foot.hock,rotation:foot.hock.quaternion.clone()});
-        foot.hock.quaternion.multiply(q().setFromAxisAngle(new THREE.Vector3(1,0,0),k*(i<2 ? tuck : hind)));
-      }
-      this.overlays.push({bone:this.root,rotation:this.root.quaternion.clone()});
-      this.root.quaternion.premultiply(q().setFromEuler(new THREE.Euler(-k*a*this.params.airArch,0,0)));
-    }
-    this.metrics.pelvisRoll=pelvisRoll;this.metrics.spineSway=sway;
-  }
-  /** Three-joint leg: solve shoulder/hip -> elbow/stifle so the carpus/hock carries its metacarpus/metatarsus
-   * (world orientation kept) onto the target; the pad keeps its own orientation. */
-  private placePaw(foot:{upper:THREE.Object3D;lower:THREE.Object3D;paw:THREE.Object3D;hock:THREE.Object3D;pole:number},target:THREE.Vector3) {
+  private placePaw(foot:{upper:THREE.Object3D;lower:THREE.Object3D;paw:THREE.Object3D;hock?:THREE.Object3D},target:THREE.Vector3) {
     // Save every joint so correction cannot accumulate when a clip doesn't key that bone.
-    for (const bone of [foot.upper,foot.lower,foot.paw,foot.hock]) this.overlays.push({bone,rotation:bone.quaternion.clone()});
+    for (const bone of [foot.upper,foot.lower,foot.paw,foot.hock]) if(bone) this.overlays.push({bone,rotation:bone.quaternion.clone()});
     const padRotation=foot.paw.getWorldQuaternion(q());
-    const hockRotation=foot.hock.getWorldQuaternion(q());
-    const metatarsus=foot.paw.getWorldPosition(v()).sub(foot.hock.getWorldPosition(v()));
-    // Clips touch down with the hock / carpus tucked under the hip / shoulder, which folds the short upper bone
-    // flat. Tip the metatarsus / metacarpus about the paw (sagittal) until the limb is open enough.
-    const hip=foot.upper.getWorldPosition(v());
-    const minReach=this.chainLength(foot)*THREE.MathUtils.lerp(foot.pole<0 ? this.params.swingReach : this.params.swingReachHind,this.params.swingReachRun,this.metrics.clipWeights.run ?? 0);
-    const side=new THREE.Vector3(1,0,0).applyQuaternion(this.group.quaternion), tip=q();
-    if(target.clone().sub(metatarsus).distanceTo(hip)<minReach) {
-      const best={d:0,r:q()};
-      for(let k=1;k<=18 && best.d<minReach;k++)for(const sign of [-1,1]) {
-        const r=q().setFromAxisAngle(side,sign*k*.05), d=target.clone().sub(metatarsus.clone().applyQuaternion(r)).distanceTo(hip);
-        if(d>best.d){best.d=d;best.r.copy(r);}
-      }
-      tip.copy(best.r);
-      metatarsus.applyQuaternion(tip);
-    }
-    this.solve(foot.upper,foot.lower,foot.hock,target.clone().sub(metatarsus),foot.pole);
-    foot.hock.quaternion.copy(foot.hock.parent!.getWorldQuaternion(q()).invert().multiply(tip.multiply(hockRotation)));
-    foot.hock.updateWorldMatrix(false,true);
+    if(foot.hock) {
+      const hockRotation=foot.hock.getWorldQuaternion(q());
+      const metatarsus=foot.paw.getWorldPosition(v()).sub(foot.hock.getWorldPosition(v()));
+      this.solve(foot.upper,foot.lower,foot.hock,target.clone().sub(metatarsus),1);
+      foot.hock.quaternion.copy(foot.hock.parent!.getWorldQuaternion(q()).invert().multiply(hockRotation));
+      foot.hock.updateWorldMatrix(false,true);
+    } else this.solve(foot.upper,foot.lower,foot.paw,target,-1);
     foot.paw.quaternion.copy(foot.paw.parent!.getWorldQuaternion(q()).invert().multiply(padRotation));
     foot.paw.updateWorldMatrix(false,true);
   }

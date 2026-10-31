@@ -350,10 +350,9 @@ async function boot() {
     folder.add(params, 'bodyBob', 0, 1, .01);
     folder.add(params, 'swingEase', 0, 1, .05);
     folder.add(params, 'headBob', 0, 1, .05);
+    folder.add(params, 'swingTuck', 0, .8, .01);
     folder.add(params, 'releaseSwing', .12, .4, .01);
-    for (const key of ['liftForeWalk','liftForeTrot','liftHindWalk','liftHindTrot','strideBob'] as const) folder.add(params, key, 0, .25, .005);
-    for (const key of ['swingReach','swingReachHind','swingReachRun','carpalFlex','carpalFlexRun','hockFold','carpalGive','landCarpalGive','airTuck','airReach','airHindStream'] as const) folder.add(params, key, 0, 2, .01);
-    for (const key of ['weightRoll','spineSway','breath','airArch','runningGather'] as const) folder.add(params, key, 0, 1, .005);
+    folder.add(params, 'carpalCurl', 0, .7, .01);
     folder.add(params, 'earlyContact', .5, 1, .01);
     folder.add(params, 'spineFlex', 0, 1, .05);
     folder.add(params, 'takeoffCrouch', 0, .2, .005);
