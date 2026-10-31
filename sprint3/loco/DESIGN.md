@@ -16,3 +16,5 @@ Longer cadence can outpace authored stance sweep; bounded IK is only a small cor
 
 ## Opus code review follow-up
 Separate ground acceleration/turn tunables from inherited air parameters. Damped angular velocity turns the heading; scalar ground speed follows that heading to prevent lateral skating. Normalize contact votes, add stance hysteresis, and keep IK strength consistent through a stance. Blend head bob from evaluated run weight, never the gait label. CPU A/B found 8% extension increases trot reach residual; reduce to 3% until captured foot contact can justify more. Preserve fast authored landing/air exit fades.
+
+Second Opus review: retain incoming signed/lateral momentum on landing, transport existing ground velocity with the body's incremental yaw, and damp lateral recovery instead of redirecting its full magnitude. Ground dash faces its impulse. Fade cached foot correction briefly into swing so the authored pose does not receive the entire contact offset in one frame.

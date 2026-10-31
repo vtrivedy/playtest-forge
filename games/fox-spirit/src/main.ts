@@ -1224,6 +1224,7 @@ async function boot() {
       dashT = feel.dashDuration;
       vel.x = wish.x * feel.dashSpeed;
       vel.z = wish.z * feel.dashSpeed;
+      if(grounded) { fox.rotation.y=Math.atan2(wish.x,wish.z); groundYawRate=0; }
       if (!grounded) {
         airDashUsed = true;
         vel.y = Math.max(vel.y, 0);
@@ -1322,17 +1323,22 @@ async function boot() {
         const targetRate=3.2*Math.tanh(error*feel.groundTurnRate/3.2);
         groundYawRate=THREE.MathUtils.damp(groundYawRate,targetRate,10,dt);
         const turnStep=groundYawRate*dt;
-        fox.rotation.y+=Math.sign(turnStep)===Math.sign(error) && Math.abs(turnStep)>Math.abs(error) ? error : turnStep;
+        const yawStep=Math.sign(turnStep)===Math.sign(error) && Math.abs(turnStep)>Math.abs(error) ? error : turnStep;
+        fox.rotation.y+=yawStep;
+        cur.applyAxisAngle(new THREE.Vector3(0,1,0),yawStep);
         // Brake through a reversal; forward drive returns as the body points into the input.
         const drive=Math.max(0,Math.cos(error));
         desired.set(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y)).multiplyScalar(feel.moveSpeed*wish.length()*drive);
       }
       if(grounded) {
         if(wish.lengthSq()<=.001)groundYawRate=THREE.MathUtils.damp(groundYawRate,0,10,dt);
-        // Dampen speed, not the velocity direction: planted paws must travel
-        // along the sagittal plane of the turning body.
-        const groundSpeed=THREE.MathUtils.damp(cur.length(),desired.length(),feel.groundAccel,dt);
-        cur.set(Math.sin(fox.rotation.y)*groundSpeed,0,Math.cos(fox.rotation.y)*groundSpeed);
+        // Ground turns transport existing momentum with the body. Incoming
+        // landing/drift momentum keeps its sign and sheds lateral load smoothly.
+        const forward=new THREE.Vector3(Math.sin(fox.rotation.y),0,Math.cos(fox.rotation.y));
+        const along=cur.dot(forward);
+        const lateral=cur.clone().addScaledVector(forward,-along).multiplyScalar(Math.exp(-12*dt));
+        const groundSpeed=THREE.MathUtils.damp(along,desired.length(),feel.groundAccel,dt);
+        cur.copy(lateral).addScaledVector(forward,groundSpeed);
       } else {
         groundYawRate=0;
         cur.lerp(desired, 1 - Math.exp(-feel.accel * control * dt));

@@ -29,13 +29,13 @@ export class AuthoredLocomotion {
     maxCorrection: 0, maxSlideMS: 0, earlySteps: 0, turnRate: 0, clipWeights: {} as Record<string, number> };
   input: MotionInput = { speed: 0, grounded: true, yaw: 0, verticalSpeed: 0, groundAt: () => 0 };
   private feet: { upper: THREE.Object3D; lower: THREE.Object3D; paw: THREE.Object3D; hock?: THREE.Object3D;
-    padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; dot: THREE.Mesh }[] = [];
+    padLocal: THREE.Vector3; planted: boolean; anchor: THREE.Vector3; clearance: number; previousSolved: THREE.Vector3; correction: THREE.Vector3; dot: THREE.Mesh }[] = [];
   private debugGroup = new THREE.Group();
   private phase = 0;
   private lastActive = '';
   reset() {
     this.beforeMixer();
-    for (const foot of this.feet) foot.planted=false;
+    for (const foot of this.feet) { foot.planted=false; foot.correction.set(0,0,0); }
     this.nodSpring.value=0;this.nodSpring.velocity=0;
     this.tailLoadSpring.value=0;this.tailLoadSpring.velocity=0;
     this.lookSpring.value=0;this.lookSpring.velocity=0;
@@ -120,7 +120,7 @@ export class AuthoredLocomotion {
       padHeights.push(padWorld.y-floor);
       const dot = new THREE.Mesh(new THREE.SphereGeometry(.025,6,4), new THREE.MeshBasicMaterial({color:0xffcc44, depthTest:false}));
       this.debugGroup.add(dot);
-      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:upper.startsWith('thigh') ? root.getObjectByName(upper.replace('thigh','hind_foot')) : undefined,planted:false,anchor:v(),previousSolved:v(),clearance:.005,dot});
+      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:upper.startsWith('thigh') ? root.getObjectByName(upper.replace('thigh','hind_foot')) : undefined,planted:false,anchor:v(),previousSolved:v(),correction:v(),clearance:.005,dot});
     }
     root.position.y-=padHeights.reduce((a,b)=>a+b,0)/padHeights.length;
     this.rootPosition.copy(root.position);
@@ -311,11 +311,19 @@ export class AuthoredLocomotion {
         // another clip's touchdown cannot pop an already planted paw.
         const plantBlend=locomoting ? THREE.MathUtils.smoothstep(gaitWeight,0,.85) : 1;
         delta.clampLength(0,this.params.maxCorrection).multiplyScalar(this.params.plantStrength*plantBlend);
-        this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,delta.length());
+        foot.correction.copy(delta);
+      } else {
+        // Carry a decaying world correction into recovery; releasing an anchor
+        // must not pop the paw straight back to its uncorrected authored pose.
+        foot.correction.multiplyScalar(Math.exp(-dt/.04));
+        if(!this.input.grounded || foot.correction.lengthSq()<1e-8)foot.correction.set(0,0,0);
+      }
+      if(stance || foot.correction.lengthSq()>0) {
+        this.metrics.maxCorrection=Math.max(this.metrics.maxCorrection,foot.correction.length());
         // Save both joints so correction cannot accumulate when a clip doesn't key that bone.
         for (const bone of [foot.upper,foot.lower,foot.paw,foot.hock]) if(bone) this.overlays.push({bone,rotation:bone.quaternion.clone()});
         const padRotation=foot.paw.getWorldQuaternion(q());
-        const target=paw.add(delta).sub(padOffset);
+        const target=paw.add(foot.correction).sub(padOffset);
         if(foot.hock) {
           const hockRotation=foot.hock.getWorldQuaternion(q());
           const hockPosition=foot.hock.getWorldPosition(v());
@@ -328,10 +336,12 @@ export class AuthoredLocomotion {
         foot.paw.quaternion.copy(padParent.invert().multiply(padRotation));
         foot.paw.updateWorldMatrix(false,true);
         const corrected=foot.paw.localToWorld(foot.padLocal.clone());
-        if(foot.planted)this.metrics.maxSlideMS=Math.max(this.metrics.maxSlideMS,corrected.distanceTo(foot.previousSolved)/step);
+        if(stance && foot.planted)this.metrics.maxSlideMS=Math.max(this.metrics.maxSlideMS,corrected.distanceTo(foot.previousSolved)/step);
         foot.previousSolved.copy(corrected);
-        this.metrics.maxResidual=Math.max(this.metrics.maxResidual,corrected.distanceTo(foot.anchor));
-        this.metrics.stanceFeet++;
+        if(stance) {
+          this.metrics.maxResidual=Math.max(this.metrics.maxResidual,corrected.distanceTo(foot.anchor));
+          this.metrics.stanceFeet++;
+        }
       }
       foot.planted=stance;
       foot.dot.position.copy(this.group.worldToLocal(foot.anchor.clone()));
