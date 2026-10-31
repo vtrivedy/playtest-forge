@@ -189,7 +189,9 @@ async function boot() {
   scene.add(foxActor.group);
   foxActor.group.position.copy(gaitGym?.spawn ?? world.spawnPos);
   foxActor.group.position.y += foxActor.feetOffset;
-  foxActor.group.rotation.y = Math.PI; // face north: Wellspring Hill on frame 1
+  const firstWalk = world.route[1]!;
+  const spawnYaw = gaitGym ? Math.PI : Math.atan2(firstWalk.x - world.spawnPos.x, firstWalk.z - world.spawnPos.z);
+  foxActor.group.rotation.y = spawnYaw;
 
   // Soft contact shadow — grounds the hero without relying on shadow maps alone
   const contactShadow = (() => {
@@ -220,7 +222,7 @@ async function boot() {
     scenery: world.group,
     surfaceAt: (x, z, refY) => col.groundAt(x, z, refY).y,
   });
-  cam.snapBehind(Math.PI);
+  cam.snapBehind(spawnYaw);
   cam.camera.far = quality.far;
   cam.resize(innerWidth, innerHeight);
 
@@ -328,7 +330,8 @@ async function boot() {
     folder.add(params,'tailLoad',0,.4,.01);
     folder.add(params,'brakeSquat',0,.08,.002);
     folder.add(params,'brakePitch',0,.2,.005);
-    folder.add(params,'landSquash',0,.2,.005);
+    folder.add(params,'landSquash',0,.25,.005);
+    folder.add(params,'landPitch',0,2,.05).name('land pitch rad/m');
     folder.add(params,'landFrequency',2,6,.1);
     folder.add(params, 'walkHz', 1, 3, .05);
     folder.add(params, 'trotHz', 1.2, 4, .05);
@@ -551,6 +554,8 @@ async function boot() {
   fDusk.add(HUB_DUSK, 'skyScale', .5, 1, .01);
   fDusk.add(HUB_DUSK, 'sunBloom', 0, .3, .01);
   fDusk.add(HUB_DUSK, 'godRays', 0, .5, .01);
+  fDusk.add(HUB_DUSK, 'horizonGlow', 0, .6, .01);
+  fDusk.add(HUB_DUSK, 'cloudAmount', 0, 1, .01);
   fDusk.close();
   fLook.add(post.params, 'restore', 0, 1, 0.01).listen();
   fLook.add(post.params, 'bloomStrength', 0, 1, 0.01);
@@ -823,7 +828,10 @@ async function boot() {
     /** Read-only review-camera clearance, including scenery without gameplay colliders. */
     photoBlocker(pos: [number, number, number], look: [number, number, number]) {
       const origin = new THREE.Vector3(...look), delta = new THREE.Vector3(...pos).sub(origin);
-      const ray = new THREE.Raycaster(origin, delta.clone().normalize(), 0.15, delta.length() + 0.25);
+      const distance = delta.length();
+      if (distance < .2) return null;
+      // Both directions stop inside the camera-to-target segment; terrain behind the feet is not an occluder.
+      const ray = new THREE.Raycaster(origin, delta.clone().normalize(), 0.15, distance - .02);
       world.group.updateWorldMatrix(true, true);
       let hit = ray.intersectObject(world.group, true).find((h) => h.object.visible);
       if (!hit) {
@@ -1111,6 +1119,9 @@ async function boot() {
     const liftTop = liftWp?.rise !== undefined ? liftWp.y + liftWp.rise : wp.y + 0.5;
     if (prevLabel?.startsWith('lift:') && pos.y - foxActor.feetOffset >= liftTop) auto.liftReady = true;
     const waitLift = !!prevLabel?.startsWith('lift:') && !auto.liftReady;
+    // The final lift ends on a stand: release the real jump input once its rise
+    // is complete, rather than gliding at the column's equilibrium above it.
+    if (auto.act === 'glide' && liftWp?.rise !== undefined && auto.liftReady) auto.space = false;
     const waitFinale = prevLabel === 'wellspring' && !shrineOn;
     const waitWind = !!prevLabel?.startsWith('wind-ready:') && (wind.state().find(w => w.id === prevLabel.slice(11))?.heat ?? 0) < 0.98;
     const waitBridge = waitWind || waitLift || waitWash || waitFinale || (prevLabel === 'bridge-head' && world.bridgeGrown() < 1) || waitSeedwell || (!!prevLabel?.startsWith('grow:') && growth.grown(prevLabel.slice(5)) < 1);
@@ -1127,7 +1138,10 @@ async function boot() {
         const turnBrake = THREE.MathUtils.smoothstep(Math.abs(error), 0.12, 0.5);
         approach = THREE.MathUtils.lerp(1, Math.min(1, turnSpeed / feel.moveSpeed), turnBrake);
       }
-      auto.wish.set(dx / Math.max(d, 0.001) * approach, 0, dz / Math.max(d, 0.001) * approach);
+      // Authored stair pacing is a cap on the shared turn-aware approach input.
+      const pace = onGround && auto.phase === 'run' && !auto.dashQueued && !wp.act ? THREE.MathUtils.clamp(wp.pace ?? 1, 0.1, 1) : 1;
+      const scale = Math.min(approach, pace) / Math.max(d, 0.001);
+      auto.wish.set(dx * scale, 0, dz * scale);
     }
     if (auto.phase === 'run') auto.space = false;
     if (auto.dashQueued) {
@@ -1478,6 +1492,9 @@ async function boot() {
       }
     }
 
+    colorField.visualDrains = shades.state().filter(actor => !actor.freed).map(actor => ({
+      center: new THREE.Vector3().fromArray(actor.pos), radius: shades.tun.drainRadius,
+    }));
 
     // Animation state: airborne dash wins, then glide/jump arc; land plays briefly on contact
     const speed = Math.hypot(vel.x, vel.z);
