@@ -2,9 +2,23 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createFollowCamera } from '../../games/fox-spirit/src/camera';
 import { createOcclusionFader } from '../../games/fox-spirit/src/occlusion';
+import { CollisionWorld, boxCollider, cylCollider } from '../../games/fox-spirit/src/collision';
 
 // CPU geometry probes only; this never creates a renderer or browser.
 const scenery = new THREE.Group();
+const lensWorld = new CollisionWorld(() => -20);
+const lensBox = lensWorld.add(boxCollider({ x: 0, z: 0, w: 2, d: 4, yaw: .6, top: 3, bottom: 1 }));
+assert.equal(lensWorld.cameraOccupied(0, 2, 0), true);
+assert.equal(lensWorld.cameraOccupied(0, 3.21, 0), false, 'lens above a slab is clear');
+assert.equal(lensWorld.cameraOccupied(0, .79, 0), false, 'lens below a slab is clear');
+assert.equal(lensWorld.cameraOccupied(5, 2, 0), false);
+lensBox.enabled = false;
+assert.equal(lensWorld.cameraOccupied(0, 2, 0), false, 'disabled solid cannot occupy the lens');
+lensWorld.add(cylCollider({ x: 10, z: 0, r: 1, top: 5, bottom: 3 }));
+assert.equal(lensWorld.cameraOccupied(10, 4, 0), true);
+assert.equal(lensWorld.cameraOccupied(11.25, 4, 0), false);
+assert.equal(lensWorld.cameraOccupied(10, 2.75, 0), false);
+assert.equal(lensWorld.cameraOccupied(0, -20.1, 0), true, 'terrain remains solid below its surface');
 const material = new THREE.MeshStandardMaterial();
 const wall = new THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[]>(new THREE.PlaneGeometry(20, 20), material);
 wall.position.z = 2; // normal +Z: focus sees the back of this single-sided plane
@@ -285,3 +299,12 @@ for (let i = 0; i < 120; i++) wallCamera.update(1 / 60, { ...idleFrame, target: 
 assert.ok(wallCamera.camera.position.z < 2, 'compressed lens stays on the hero side of the wall');
 assert.ok(wallCamera.camera.position.distanceTo(new THREE.Vector3(0, wallCamera.params.lookHeight, 0)) < wallCamera.params.minDistance,
   'safe wall compression may take precedence over the open-ground minimum');
+
+const nearCliff = new THREE.Group();
+const overhang = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial());
+overhang.position.z = .16; overhang.name = 'close visual rock overhang'; nearCliff.add(overhang);
+const closeCliffCamera = createFollowCamera({ scenery: nearCliff });
+closeCliffCamera.resize(1280, 720);
+closeCliffCamera.update(1 / 60, { ...idleFrame, target: new THREE.Vector3() });
+assert.equal(closeCliffCamera.debug.blocked(), true, 'a 16cm visual overhang must not be skipped as footing');
+assert.match(closeCliffCamera.debug.internals(), /blocker=close visual rock overhang/);

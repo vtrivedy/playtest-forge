@@ -915,6 +915,7 @@ async function boot() {
           occlusion: occlusion.strength,
           sightBlocked: occlusion.detected,
           photo: !!photo,
+          lensTouchesCollider: col.cameraOccupied(cam.camera.position.x, cam.camera.position.y, cam.camera.position.z),
           foxNdc: cam.debug.fox,
           landingNdc: cam.debug.landing,
           internals: cam.debug.internals(),

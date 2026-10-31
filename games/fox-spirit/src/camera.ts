@@ -368,7 +368,9 @@ export function createFollowCamera(opts: {
     sightDir.multiplyScalar(1 / length);
     sightSide.set(sightDir.z, 0, -sightDir.x).normalize().multiplyScalar(0.18);
     let nearest = length + 0.45;
-    sight.near = 0.45; // ignore the fox's footing and surfaces immediately under its chest
+    // Rough cliff faces can overhang within centimetres of the fox's chest.
+    // The floor-aware cutout handles footing; do not skip these real blockers.
+    sight.near = 0.03;
     for (const side of [0, -1, 1]) {
       sightOrigin.copy(focus).addScaledVector(sightSide, side);
       sight.set(sightOrigin, sightDir);
