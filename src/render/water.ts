@@ -10,12 +10,14 @@ export type StylizedWater = {
 /** Soft stylized water plane — reflections approximated via sky tint + fresnel. */
 export function createStylizedWater(
   scene: THREE.Scene,
-  opts: { size?: number; y?: number; colorDeep?: number; colorShallow?: number } = {},
+  opts: { size?: number; y?: number; colorDeep?: number; colorShallow?: number; shoreRadius?: number } = {},
 ): StylizedWater {
   const size = opts.size ?? 80;
+  const shoreRadius = opts.shoreRadius ?? 1;
   const uniforms = {
     uTime: { value: 0 },
     uHalf: { value: size * 0.5 },
+    uShoreRadius: { value: shoreRadius },
     uDeep: { value: new THREE.Color(opts.colorDeep ?? 0x3a4038) },
     uShallow: { value: new THREE.Color(opts.colorShallow ?? 0x6a7860) },
     uSky: { value: new THREE.Color(0xe6bf98) },
@@ -45,6 +47,7 @@ export function createStylizedWater(
       }`,
     fragmentShader: /* glsl */ `
       uniform vec3 uDeep, uShallow, uSky;
+      uniform float uShoreRadius;
       uniform float uTime;
       varying vec3 vWorld;
       varying vec3 vN;
@@ -74,7 +77,7 @@ export function createStylizedWater(
         float glint = pow(max(0.0, sin(a * 2.1 + sin(b) * 0.6)), 24.0);
         glint *= smoothstep(0.25, 0.8, sin(b * 1.8) * 0.5 + 0.5);
         col += uSky * glint * (0.025 + fres * 0.065);
-        float shore = 1.0 - smoothstep(0.90, 1.0, r);
+        float shore = 1.0 - smoothstep(uShoreRadius * 0.90, uShoreRadius, r);
         float alpha = mix(0.72, 0.95, depth) + fres * 0.04;
         gl_FragColor = vec4(col, alpha * shore);
         #include <tonemapping_fragment>
@@ -82,7 +85,7 @@ export function createStylizedWater(
       }`,
   });
 
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size, 64, 64), material);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size * shoreRadius, size * shoreRadius, 64, 64), material);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = opts.y ?? -1.2;
   mesh.receiveShadow = true;
