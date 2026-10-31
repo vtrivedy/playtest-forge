@@ -114,6 +114,7 @@ export class Hearth {
 
     // frozen smoke curl: the breath the hearth is holding. Dissolves upward as it lights.
     this.smoke = shared.smoke.clone();
+    configureColdInk(this.smoke);
     this.smokeMesh = new THREE.Mesh(shared.smokeGeo, this.smoke);
     this.smokeMesh.position.y = BED_Y;
     this.smokeMesh.rotation.y = (spot.x * 7.1 + spot.z * 3.3) % (Math.PI * 2);
@@ -196,7 +197,8 @@ export class Hearth {
     this.ash.emissiveIntensity = 0.04 + vis * 2.6 + this.flare * 2;
     this.light.intensity = (vis * 26 + this.flare * 30) * (0.92 + 0.08 * Math.sin(t * 13.7));
     // the held breath: the frozen curl fades and lifts away as the hearth takes
-    this.smoke.opacity = 0.42 * (1 - Math.min(1, h * 1.6));
+    (this.smoke.userData.inkTime as {value:number}).value=t;
+    this.smoke.opacity = 0.32 * (1 - Math.min(1, h * 1.6));
     this.smokeMesh.visible = this.smoke.opacity > 0.01;
     this.smokeMesh.position.y = BED_Y + h * 1.4;
     this.smokeMesh.scale.setScalar(1 + h * 0.5);
@@ -289,6 +291,24 @@ function crackTexture(): THREE.CanvasTexture {
   return t;
 }
 
+function configureColdInk(smoke: THREE.MeshBasicMaterial): void {
+  smoke.userData.inkTime={value:0};
+  smoke.onBeforeCompile=shader=>{
+    shader.uniforms.uInkTime=smoke.userData.inkTime;
+    shader.vertexShader='varying vec3 vInkP; varying vec3 vInkN; varying vec3 vInkV; uniform float uInkTime;\n'+shader.vertexShader;
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+      transformed.x+=sin(position.y*2.1+uInkTime*.3)*.035;
+      vInkP=position; vInkN=normalize(normalMatrix*normal);
+      vInkV=normalize(-(modelViewMatrix*vec4(transformed,1.)).xyz);`);
+    shader.fragmentShader='varying vec3 vInkP; varying vec3 vInkN; varying vec3 vInkV; uniform float uInkTime;\n'+shader.fragmentShader;
+    shader.fragmentShader=shader.fragmentShader.replace('#include <alphamap_fragment>',`#include <alphamap_fragment>
+      float noise=.5+.5*sin(vInkP.y*6.0+sin(vInkP.x*9.0+uInkTime*.4)*1.3-uInkTime*.35);
+      float edge=smoothstep(.0,.55,abs(dot(normalize(vInkN),normalize(vInkV))));
+      diffuseColor.a*=edge*mix(.35,1.,noise)*(1.-smoothstep(.8,2.6,vInkP.y));`);
+  };
+  smoke.customProgramCacheKey=()=> 'hearth-cold-ink-smoke-v1';
+}
+
 function createShared(): HearthShared {
   const crack = crackTexture();
   const ash = new THREE.MeshStandardMaterial({
@@ -329,7 +349,8 @@ function createShared(): HearthShared {
     g.computeVertexNormals();
     return g;
   })();
-  const smoke = new THREE.MeshBasicMaterial({ color: 0xb9ad9c, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, fog: true });
+  const smoke = new THREE.MeshBasicMaterial({ name:'hearth-cold-ink-smoke', color:0x302720, transparent:true, opacity:.32, depthWrite:false, side:THREE.DoubleSide, fog:true });
+  configureColdInk(smoke);
 
   // rising embers + a few lifted leaves, animated entirely in the vertex shader
   const N_EMBER = 220;
