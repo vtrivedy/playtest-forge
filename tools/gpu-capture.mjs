@@ -229,6 +229,7 @@ try {
     });
     let lens = null;
     const releaseStagingFailures=[];
+    const latestReviewLens=new Map();
     const camera = async (actorId=actors[0].id) => {
       const framing=await page.evaluate(({previous,actorId})=>{
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===actorId),fox=h.debug.fox.position;
@@ -269,6 +270,7 @@ try {
         }
         return fallback||{pos:positions[1]||positions[0],look,fov:56,clear:false,noFit:true};
       },{previous:lens,actorId});
+      latestReviewLens.set(actorId,{clear:framing.clear,noFit:framing.noFit});
       lens=framing.pos;
       report.shadeReviewQuality??={};
       const counts=report.shadeReviewQuality[actorId]??={noFit:0,occluded:0};
@@ -664,7 +666,7 @@ try {
         const h=window.__gameHooks,actor=h.shades.state().actors.find(a=>a.id===id);
         if(!actor)return {failure:`Missing ${id}`};
         const [x,y,z]=actor.pos,col=h.debug.world.collision;
-        for(const radius of [3.1,2.8,3.4])for(let k=0;k<64;k++){
+        for(const radius of [4.3,4.8,3.4,3.1,2.8])for(let k=0;k<64;k++){
           const a=k*Math.PI*2/64,px=x+Math.cos(a)*radius,pz=z+Math.sin(a)*radius;
           const floor=col.groundAt(px,pz,y+.6).y;
           if(!Number.isFinite(floor)||Math.abs(floor-y)>.6||col.blocked(px,pz,floor))continue;
@@ -678,11 +680,25 @@ try {
       if(setup.failure){report.failures.push(setup.failure);continue;}
       await H('teleport',...setup.pos,setup.yaw);lens=null;
       await camera(id);
-      await video(id,frames,async()=>camera(id),undefined,pairOptions('Regional',id,keyFrames));
+      const lensTrace=[];
+      await video(id,frames,async frame=>{await camera(id);lensTrace.push({frame,...latestReviewLens.get(id)});},undefined,pairOptions('Regional',id,keyFrames));
       validatePair(id);
+      const take=report.videos[id],rows=take.trace.map(row=>row.state);
+      const support=await page.evaluate(positions=>positions.map(p=>{
+        const floor=window.__gameHooks.debug.world.collision.groundAt(p[0],p[2],p[1]+.2).y;
+        return {floor:Number.isFinite(floor)?floor:null,gap:Number.isFinite(floor)?p[1]-floor:null};
+      }),rows.map(row=>row.pos));
+      let airborne=0,longestAirborne=0;
+      for(const row of rows){airborne=row.grounded?0:airborne+1;longestAirborne=Math.max(longestAirborne,airborne);}
+      const failures=[];
+      if(lensTrace.some(row=>!row.clear||row.noFit))failures.push('no unobstructed fitted pair lens');
+      if(rows.some(row=>row.deaths>take.start.deaths))failures.push('observer died');
+      if(support.some(row=>row.gap===null||row.gap>.55)||longestAirborne>Math.ceil(fps*.2)||!take.end.grounded)failures.push('observer lost supporting floor');
+      save(`${id}-visibility-support.json`,{passed:!failures.length,failures,lensTrace,support,longestAirborneFrames:longestAirborne,label:'Actual regional lens decisions and traced floor support; no forced animal state'});
+      for(const failure of failures)report.failures.push(`${id}: ${failure}`);
       const actor=await page.evaluate(id=>window.__gameHooks.shades.state().actors.find(a=>a.id===id),id);
       if(id==='shade-flume'&&(actor.pos[1]<3.5||actor.pos[1]>7))report.failures.push('Flume Shade left elevated channel');
-      save(`${id}-acceptance.json`,{actor,setup,game:await page.evaluate(()=>window.__game)});
+      save(`${id}-acceptance.json`,{passed:!failures.length,failures,actor,setup,game:await page.evaluate(()=>window.__game)});
     }
 
     // Stored contact failures survive later exceptions and keep the final process result failed.
