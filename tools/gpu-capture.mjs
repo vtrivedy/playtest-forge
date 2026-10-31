@@ -203,6 +203,54 @@ try {
     save('hub-still-attempts.json',report.hubStillAttempts);
     if(!attempt.recovered || !attempt.invariantsMatch) report.failures.push(name+': black still recovery failed or changed pose/camera/state');
   }
+  async function capturePlasterComparison(label) {
+    await H('advance',0,1/60,true);
+    const entry=await page.evaluate(()=>{
+      const material=window.__gameHooks.debug.world.materials.find(m=>m.name==='rv-hub-plaster');
+      if(!material) throw Error('Plaster comparison material missing');
+      return {uuid:material.uuid,color:material.color.toArray()};
+    });
+    const invariant=async()=>{
+      const fixed=await hubStillInvariant();
+      const other=await page.evaluate(()=>window.__gameHooks.debug.world.materials
+        .filter(m=>m.name!=='rv-hub-plaster').map(m=>({name:m.name,color:m.color?.toArray(),
+          emissive:m.emissive?.toArray(),emissiveIntensity:m.emissiveIntensity})));
+      return {...fixed,otherMaterials:other,fullDigest:createHash('sha256')
+        .update(fixed.digest+JSON.stringify(other)).digest('hex')};
+    };
+    const before=await invariant(), variants=[];
+    try {
+      for(const variant of ['old','new']) {
+        const paint=await page.evaluate(async ({variant,entry})=>{
+          const {Color}=await import('/gpu-three.js');
+          const material=window.__gameHooks.debug.world.materials.find(m=>m.uuid===entry.uuid);
+          if(!material) throw Error('Plaster material identity changed');
+          const oldPaint=new Color(0xc0ac86),newPaint=new Color(0xd5c7ad);
+          const ratio=variant==='old'?[oldPaint.r/newPaint.r,oldPaint.g/newPaint.g,oldPaint.b/newPaint.b]:[1,1,1];
+          material.color.fromArray(entry.color.map((value,i)=>value*ratio[i]));
+          return {uuid:material.uuid,color:material.color.toArray(),ratio};
+        },{variant,entry});
+        await H('advance',0,1/60,true);
+        const filename='hub-plaster-'+label+'-'+variant;
+        await captureStill(filename);
+        const proof=await invariant();
+        variants.push({variant,filename,paint,proof,game:await page.evaluate(()=>window.__game)});
+        if(proof.fullDigest!==before.fullDigest) report.failures.push(filename+': plaster comparison changed pose/camera/state/other materials');
+      }
+    } finally {
+      await page.evaluate(entry=>{
+        const material=window.__gameHooks.debug.world.materials.find(m=>m.uuid===entry.uuid);
+        if(!material) throw Error('Cannot restore plaster material');
+        material.color.fromArray(entry.color);
+      },entry);
+      await H('advance',0,1/60,true);
+      const restored=await invariant();
+      const restoredColor=await page.evaluate(uuid=>window.__gameHooks.debug.world.materials.find(m=>m.uuid===uuid)?.color.toArray(),entry.uuid);
+      save('hub-plaster-'+label+'-comparison.json',{label:'Staged old/new plaster proof; fixed light, pose, camera and game state',entry,before,variants,restored,restoredColor});
+      if(restored.fullDigest!==before.fullDigest || JSON.stringify(restoredColor)!==JSON.stringify(entry.color))
+        report.failures.push('Plaster comparison failed exact restoration at '+label);
+    }
+  }
   async function shot(name) {
     await captureStill(name);
     report.shots[name] = { state: await H('state'), game: await page.evaluate(() => window.__game) };
@@ -1259,6 +1307,7 @@ try {
     // Natural spawn, gravity warm-up and untouched chase before any staging.
     await advance(60); await shot('hub-spawn-chase');
     save('hub-spawn-state.json', { staged: false, state: await H('state'), game: await page.evaluate(() => window.__game) });
+    await capturePlasterComparison('spawn');
     // Live player view from natural spawn, before any teleport or photo camera.
     const naturalInitial = await H('state');
     await video('hub-natural-arrive-chase', 15 * fps, async i => {
@@ -1306,6 +1355,7 @@ try {
 
     save('hub-hero-provenance.json', { staged: true, label: 'Close front-three-quarter idle portrait; facing out of village; no animation override', requestedYaw: heroYaw, actualYaw: heroState.foxYaw, camera: { lens: heroLens, look: heroLook, fov: 46 }, compositionBlocker, foxSightBlocker, state: heroState });
     if (foxSightBlocker) report.failures.push(`Hub hero fox sightline blocked by ${foxSightBlocker.name}`);
+    await capturePlasterComparison('hero');
     const festoon = await page.evaluate(() => window.__gameHooks.debug.world.group.userData.hubFestoon);
     save('hub-festoon-clearance.json', festoon);
     if (festoon?.pendants.length !== 12 || festoon?.cords?.length !== 3) report.failures.push('Hub must expose twelve pendants on three supported cords');
