@@ -1625,6 +1625,7 @@ async function boot() {
     cam.update(rawDt, {
       target: feetPos.set(fox.position.x, fox.position.y - foxActor.feetOffset, fox.position.z),
       vel,
+      facing: fox.rotation.y,
       grounded,
       gliding,
       dashing,

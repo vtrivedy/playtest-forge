@@ -27,7 +27,7 @@ scenery.add(wall);
 const follow = createFollowCamera({ scenery });
 follow.resize(1280, 720);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=single-sided-wall/);
 assert.equal(material.side, THREE.FrontSide, 'query must preserve rendered material side');
 
@@ -35,12 +35,12 @@ assert.equal(material.side, THREE.FrontSide, 'query must preserve rendered mater
 wall.position.x = 100;
 scenery.updateMatrixWorld(true);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=$/, 'moved wall must not leave a phantom blocker');
 wall.position.x = 0;
 scenery.updateMatrixWorld(true);
 follow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(follow.debug.internals(), /blocker=single-sided-wall/);
 
 // A multi-material mesh only draws geometry groups. Ungrouped triangles must
@@ -49,11 +49,11 @@ wall.material = [material];
 wall.geometry.clearGroups();
 const groupedFollow = createFollowCamera({ scenery });
 groupedFollow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(groupedFollow.debug.internals(), /blocker=$/, 'ungrouped solid triangles are not drawn');
 wall.geometry.addGroup(0, wall.geometry.index!.count, 0);
 groupedFollow.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(groupedFollow.debug.internals(), /blocker=single-sided-wall/);
 
 const scene = new THREE.Scene();
@@ -152,7 +152,7 @@ const celebration = createFollowCamera();
 celebration.resize(1280, 720);
 const hero = new THREE.Vector3();
 const idleFrame = { target: hero, vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null };
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null };
 celebration.update(1 / 60, idleFrame);
 celebration.playShot({ subjects: [hero.clone(), new THREE.Vector3(100, 20, -70)], holdS: 1.7 });
 for (let i = 0; i < 60; i++) celebration.update(1 / 60, idleFrame);
@@ -235,13 +235,13 @@ stringScene.add(stringPlane);
 const stringCamera = createFollowCamera({ scenery: stringScene });
 stringCamera.resize(1280, 720);
 stringCamera.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(stringCamera.debug.internals(), /blocker=$/, 'decorations must not compress the solid boom');
 stringPlane.userData.cameraDecoration = false;
 const solidPostCamera = createFollowCamera({ scenery: stringScene });
 solidPostCamera.resize(1280, 720);
 solidPostCamera.update(1 / 60, { target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null });
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null });
 assert.match(solidPostCamera.debug.internals(), /blocker=decorative-string-test/, 'solid scenery must still block');
 console.log('Decorative string / solid post camera distinction PASS');
 // Ground-only elevation must not leak into sustained flight. Compare two live
@@ -289,6 +289,27 @@ for (const runDistance of [3.0, 3.3]) for (const speed of [0, 3.8, 9]) {
   composition.push({ runDistance, speed, chestNdcY: +centre.y.toFixed(3), proxyHeightPx: +((head.y-foot.y)*360).toFixed(1), rearAngleDeg: +angle.toFixed(1) });
 }
 console.log('Chase composition CPU proxies:', JSON.stringify(composition));
+
+// A downhill fox moving toward the lens extends beyond its root-line guard.
+// This proxy is deliberately below the root to reserve the pitched snout.
+const descentCamera = createFollowCamera();
+descentCamera.resize(1280, 720);
+const descentTarget = new THREE.Vector3(0, 20, 0);
+let lowestNose = 1, highestEars = -1, steepestView = 0;
+for (let i = 0; i < 240; i++) {
+  descentTarget.z = i * 4.5 / 60;
+  descentTarget.y = 20 - descentTarget.z * .5;
+  descentCamera.update(1 / 60, { ...idleFrame, target: descentTarget, facing: 0, vel: new THREE.Vector3(0, 0, 4.5) });
+  const nose = descentTarget.clone().add(new THREE.Vector3(0, -.1, .85)).project(descentCamera.camera);
+  const ears = descentTarget.clone().add(new THREE.Vector3(0, 1.25, 0)).project(descentCamera.camera);
+  const view = descentCamera.camera.getWorldDirection(new THREE.Vector3());
+  lowestNose = Math.min(lowestNose, nose.y); highestEars = Math.max(highestEars, ears.y);
+  steepestView = Math.max(steepestView, THREE.MathUtils.radToDeg(Math.asin(-view.y)));
+}
+assert.ok(lowestNose > -.9, `descending front silhouette stays above viewport edge: ${lowestNose}`);
+assert.ok(highestEars < .9, 'nose protection retains the ears');
+assert.ok(steepestView < 40, `nose protection avoids top-down framing: ${steepestView}`);
+console.log('Downhill front proxy:', JSON.stringify({ lowestNose, highestEars, steepestView }));
 
 for (const velocity of [new THREE.Vector3(0, 0, 9), new THREE.Vector3(4.5, 0, -7.8)]) {
   const follow = createFollowCamera();

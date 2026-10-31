@@ -9,7 +9,7 @@ import type { CameraFrame } from '../../games/fox-spirit/src/camera';
 
 const frame = (): CameraFrame => ({
   target: new THREE.Vector3(), vel: new THREE.Vector3(), grounded: true,
-  gliding: false, dashing: false, airTime: 0, landing: null,
+  gliding: false, dashing: false, facing: Math.PI, airTime: 0, landing: null,
 });
 const tick = (cam: ReturnType<typeof createFollowCamera>, f: CameraFrame, count = 120, hz = 60) => {
   for (let i = 0; i < count; i++) cam.update(1 / hz, f);

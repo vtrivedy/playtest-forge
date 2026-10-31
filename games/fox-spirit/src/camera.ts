@@ -5,6 +5,8 @@ export type CameraFrame = {
   /** Fox root (feet) position */
   target: THREE.Vector3;
   vel: THREE.Vector3;
+  /** Actual creature facing; velocity differs while braking or turning. */
+  facing: number;
   grounded: boolean;
   gliding: boolean;
   dashing: boolean;
@@ -417,13 +419,19 @@ export function createFollowCamera(opts: {
    * Hard framing guard: keep the fox (chest/feet) inside a safe angular window from the lens.
    * Ground-locked framing + a boom pulled in against a wall can otherwise lose the fox off the top.
    */
-  function guardFraming(p: THREE.Vector3, lens: THREE.Vector3, lookAt = look) {
+  function guardFraming(p: THREE.Vector3, lens: THREE.Vector3, facing: number, lookAt = look) {
     const halfV = THREE.MathUtils.degToRad(camera.fov * 0.5);
     const dh = Math.max(0.5, Math.hypot(lookAt.x - lens.x, lookAt.z - lens.z));
     const fh = Math.max(0.3, Math.hypot(p.x - lens.x, p.z - lens.z));
     const lookA = Math.atan2(lookAt.y - lens.y, dh);
     const top = Math.atan2(p.y + 1.25 - lens.y, fh);
-    const feet = Math.atan2(p.y - lens.y, fh);
+    let feet = Math.atan2(p.y - lens.y, fh);
+    const fx = Math.sin(facing), fz = Math.cos(facing);
+    if (fx * (lens.x - p.x) + fz * (lens.z - p.z) > 0) {
+      // Descending toward the lens pitches the snout below the root line.
+      const noseRange = Math.max(.3, Math.hypot(p.x + fx * .85 - lens.x, p.z + fz * .85 - lens.z));
+      feet = Math.min(feet, Math.atan2(p.y - .1 - lens.y, noseRange));
+    }
     const up = halfV * 0.6;
     const down = halfV * 0.78;
     let a = lookA;
@@ -650,7 +658,7 @@ export function createFollowCamera(opts: {
       safeLens.lerpVectors(boomFocus, safeLens, sceneryT);
       // Keep the spring independent of compression: release returns along the same
       // boom smoothly, rather than feeding a new collision impulse into its velocity.
-      guardFraming(p, safeLens);
+      guardFraming(p, safeLens, f.facing);
 
       // ---- landing dip (spring back), FOV
       dipVel += (-dip * 160 - dipVel * 18) * dt;
@@ -745,7 +753,7 @@ export function createFollowCamera(opts: {
 
       // The final floor guarantee can raise the lens after compression / landing dip.
       // Guard the actual rendered pose too; authored cinematics keep their own composition.
-      if (shotW === 0) guardFraming(p, outPos, outLook);
+      if (shotW === 0) guardFraming(p, outPos, f.facing, outLook);
       camera.position.copy(outPos);
       camera.lookAt(outLook);
       // ---- trauma shake: small rotational wobble, squared falloff
