@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { Bucket, rng } from './russetKit';
 import { weatheredSurface } from './worldSurfaces';
+import { loadNatureKit, type NatureVariant } from './russetNature';
 
 /** Original Reach geometry, built in metres. No new asset downloads; bark reuses the existing CC0 surface library. */
-export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMaterial) => void) {
+export async function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMaterial) => void) {
   const bark = new Bucket(), reeds = new Bucket(), leaves = new Bucket(), stone = new Bucket();
   const random = rng(73104);
+  const nature=await loadNatureKit();
   const breeze = { value: 0 };
   bark.aux=[];reeds.aux=[];leaves.aux=[];
   const barkColor = new THREE.Color(0x505754), reedColor = new THREE.Color(0x777c69);
@@ -26,8 +28,9 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
   }
   // Open crowns keep the ferry and bell readable; fine hanging twigs suggest willow/alder.
   const trees=[[176,30,-131,8],[194,30,-104,10],[210,36,-125,9],[217,31,-140,7],[175,30,-106,6]];
-  for (const [x, y, z, h] of trees) {
-    branch([[x,y,z],[x+.3,y+h*.4,z-.2],[x-.5,y+h*.78,z+.4],[x+.2,y+h,z]], .28);
+  for (const [index,[x, y, z, h]] of trees.entries()) {
+    const variant: NatureVariant=index%2?'dead_1':'dead_2';
+    nature.place(variant,x,y,z,{scale:h/nature.height(variant),yaw:x*.31,hue:barkColor,bark:barkColor});
     for (let j = 0; j < 5; j++) {
       const a = j * 2.4 + x, reach = 1.5 + random() * 1.7;
       const dx = Math.cos(a) * reach, dz = Math.sin(a) * reach, by = y+h*(.52+j*.065);
@@ -35,14 +38,13 @@ export function dressReach(group: THREE.Group, patch: (mat: THREE.MeshStandardMa
       // Sparse, slender copper leaves, never a maple canopy mass.
       for (let k = 0; k < 7; k++) {
         const t = k/7, ly = by+.2-t*1.7;
-        const geo = new THREE.SphereGeometry(.12, 5, 3);
-        const matrix = new THREE.Matrix4().compose(new THREE.Vector3(x+dx*(1+t*.15),ly,z+dz*(1+t*.15)),new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,a,.3)),new THREE.Vector3(.55,2.3,.35));
+        const geo = new THREE.SphereGeometry(.035, 5, 3);
+        const matrix = new THREE.Matrix4().compose(new THREE.Vector3(x+dx*(1+t*.15),ly,z+dz*(1+t*.15)),new THREE.Quaternion().setFromEuler(new THREE.Euler(.1,a,.3)),new THREE.Vector3(.55,1.8,.35));
         leaves.auxDefault=1;leaves.add(geo, matrix, new THREE.Color(k%3 ? 0x987346 : 0x8b583c)); geo.dispose();
       }
     }
-    // Exposed root knees around the flooded trunk, rather than lush ground-cover.
-    for (let j=0;j<4;j++) { const a=j*Math.PI/2; branch([[x,y+1,z],[x+Math.cos(a)*.55,y+.5,z+Math.sin(a)*.55],[x+Math.cos(a)*1.2,y,z+Math.sin(a)*1.2]],.14); }
   }
+  for(const mat of nature.build(group))patch(mat);
   // Bank clusters stay clear of the source, handles, ferry and low-lane line.
   for (const [cx,cz] of [[176,-106.5],[183,-104.5],[193,-104],[198,-132],[189,-132],[174,-133]]) {
     for (let i=0;i<16;i++) {
