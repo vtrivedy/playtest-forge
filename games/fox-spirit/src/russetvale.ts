@@ -1,3 +1,4 @@
+import { createLanternhollow, hubPathDistance, hubClearance, HUB_HOUSES } from './regionLanternhollow';
 import { loadRubbleKit, loadLanternColumn } from './russetRubble';
 import { createSummitRepair, type SummitRepair } from './regionSummit';
 import { routeRemnant } from './routeRemnants';
@@ -84,6 +85,8 @@ export type RealmEvent =
 
 export type Realm = {
   group: THREE.Group;
+  updateHubVisuals: (time: number, dusk: number) => void;
+  hubState: () => { well: number; porch: number };
   materials: THREE.MeshStandardMaterial[];
   collision: CollisionWorld;
   terrainY: (x: number, z: number) => number;
@@ -219,7 +222,7 @@ const AMBER_TREES: Array<[number, number, number, number]> = [
 ];
 
 const MEADOW_TREES: Array<[number, number, number, number]> = [
-  [-14, 86, 9, 1],
+  [-19, 82, 9, 1],
   [16, 82, 8, 2],
   [-34, 76, 10, 0],
   [30, 70, 9, 3],
@@ -276,6 +279,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const mk = (o: THREE.MeshStandardMaterialParameters & { name: string }) =>
     new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, ...o });
   const M = {
+    hubPlaster: mk({ name: 'rv-hub-plaster', roughness: 0.96 }),
+    hubRoof: mk({ name: 'rv-hub-roof', roughness: 0.9 }),
+    hubDark: mk({ name: 'rv-hub-dark', roughness: 0.94 }),
+    hubLamp: mk({ name: 'rv-hub-lamp', roughness: 0.85, emissive: 0xe4b777, emissiveIntensity: 0.5 }),
     terrain: mk({ name: 'rv-terrain', roughness: 0.95 }),
     ground: mk({ name: 'rv-ground', roughness: 0.95 }),
     rock: mk({ name: 'rv-rock', roughness: 0.93 }),
@@ -318,7 +325,8 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       diffuseColor.rgb *= 1.0 - max(sailRib, sailWarp) * 0.48;
       diffuseColor.rgb *= 0.93 + 0.07 * sin(sailAlong * 44.0);`);
   };
-  const patchable: THREE.MeshStandardMaterial[] = Object.values(M);
+  // Small practical light apertures retain amber emission in the pressed world.
+  const patchable: THREE.MeshStandardMaterial[] = Object.values(M).filter(m => m !== M.hubLamp);
   const [nature, rubble, lanternColumn] = await Promise.all([loadNatureKit(), loadRubbleKit(), loadLanternColumn()]);
   // CC0 kit tree at a spot: twisted maples for big trees, a mix of rounder trees below 12 m;
   // yaw picked to keep foliage out of the route's jump arcs
@@ -531,7 +539,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       .map((p, i) => [p, route[i + 1]] as const)
       .filter(([a, b]) => b && a.ground && b.ground) as Array<readonly [Waypoint, Waypoint]>;
     const pathDist = (x: number, z: number) => {
-      let best = 1e9;
+      let best = hubPathDistance(x, z);
       for (const [a, b] of groundSegs) {
         const abx = b.x - a.x;
         const abz = b.z - a.z;
@@ -589,6 +597,10 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         // worn path: packed earth, few leaves, soft verge
         const pathK = smooth01(2.6, 0.9, pd);
         c.lerp(PAL.pathEarth, pathK * 0.85);
+        // Hub trails need a value cue even while all world colour is pressed.
+        const hubWear = smooth01(2.1, .7, hubPathDistance(x, z)) * smooth01(72, 80, z);
+        c.lerp(PAL.soilUmber, hubWear * .65);
+        c.multiplyScalar(1 - hubWear * .2);
         leafy = THREE.MathUtils.lerp(leafy, 0.06, pathK * 0.9) + smooth01(1.6, 3.2, pd) * smooth01(4.5, 3.0, pd) * 0.35; // leaves banked at the verge
         // damp dark banks at the pond and marsh
         const bank = Math.max(smooth01(1.25, 0.85, me), smooth01(1.5, 0.95, pe));
@@ -1157,15 +1169,15 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
-  const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xe6cfa8, transparent: true, depthWrite: false, opacity: 0.55 });
+  const mistMat = new THREE.MeshBasicMaterial({ map: mistTex, color: 0xe6cfa8, transparent: true, depthWrite: false, opacity: 0.12 });
   const mists: THREE.Mesh[] = [];
   for (let i = 0; i < 14; i++) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mistMat);
     const a = r() * Math.PI * 2;
     const d = Math.sqrt(r()) * 0.9;
     m.position.set(MARSH.x + Math.cos(a) * MARSH.rx * d, -1.32 + r() * 0.2, MARSH.z + Math.sin(a) * MARSH.rz * d);
-    m.scale.setScalar(12 + r() * 12);
-    m.rotation.x = -Math.PI / 2 + 0.06; // hugs the ink: never veils the tussocks or boardwalk
+    m.scale.setScalar(8 + r() * 8);
+    m.rotation.x = -Math.PI / 2; // stays above the ink instead of clipping into straight bands
     m.userData.phase = r() * 6.28;
     mists.push(m);
     group.add(m);
@@ -1951,6 +1963,31 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   const lanternMesh = lanternB.toMesh(lanternMat, { cast: false });
   if (lanternMesh) group.add(lanternMesh);
 
+  // Lanternhollow shares the realm, terrain paint and material buckets; no chapter transition.
+  const lanternhollow = createLanternhollow(group, col, groundRaw, {
+    stone: bk('stone', -8, 85), wood: bk('wood', -8, 85),
+    plaster: bk('hubPlaster', -8, 85), roof: bk('hubRoof', -8, 85),
+    lamp: bk('hubLamp', -8, 85, false), dark: bk('hubDark', -8, 85),
+  }, patchable);
+
+  // Curated domestic edge groups, kept low enough to preserve paws and path edges.
+  for (const [hi, house] of HUB_HOUSES.entries()) {
+    const plants = rng(8200 + hi);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (let k = 0; k < 4; k++) {
+      if (sx === 1 && sz === -1) continue; // solid winter-store corner
+      if (sz === 1) continue; // keep front door approaches open
+      const x = house.x + sx * (house.w / 2 + .5 + plants() * .65);
+      const z = house.z + sz * (house.d / 2 + .3 + plants() * .6);
+      if (Math.abs(x) < 6 && z > 72) continue;
+      if (hubPathDistance(x, z) < 2.3 || Math.hypot(x + 8, z - 85) < 3.4) continue;
+      const kind = k % 2 ? 'fern' : 'grass_wispy';
+      nature.place(kind, x, groundRaw(x, z) - .03, z, {
+        yaw: plants() * Math.PI * 2, scale: (.18 + plants() * .06) / nature.height(kind),
+        hue: new THREE.Color(0x795638), hue2: new THREE.Color(0xa27a49), cast: false,
+      });
+    }
+  }
+
   // ==================================================================== MEADOW + PORTAL
   // portal ring of standing stones (0,92) and the first arch framing the Wellspring
   for (let k = 0; k < 7; k++) {
@@ -1970,7 +2007,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     archAt(bk('stone', -8, 42), -9, y3 - 0.1, 44, -0.3, { span: 3.2, pillarH: 3.8, seed: 252, broken: 0.25 });
   }
   // Wen's pond
-  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x393c30, colorShallow: 0x827657 });
+  const pond = createStylizedWater(scene, { size: 36, y: POND.water, colorDeep: 0x293730, colorShallow: 0x5b604b, shoreRadius: 1.18 });
   waterVisuals.push(pond);
   pond.mesh.position.set(POND.x, POND.water, POND.z);
   pond.mesh.scale.set(POND.rx / 18, POND.rz / 18, 1);
@@ -1999,7 +2036,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     // rock outcrops in three scales: a half-buried anchor, medium stones leaning on it, pebble spill
     const br = rng(606);
     const clear = (x: number, z: number, m: number) =>
-      insideIsland(x, z, 8) && !routeNear(route, x, z, m) && marshE(x, z) >= 1.15 && !inTerraces(x, z, 4) && Math.hypot(x, z + 58) >= 20 && !(z < -66 && Math.abs(x) < 24);
+      insideIsland(x, z, 8) && !hubClearance(x, z) && !routeNear(route, x, z, m) && marshE(x, z) >= 1.15 && !inTerraces(x, z, 4) && Math.hypot(x, z + 58) >= 20 && !(z < -66 && Math.abs(x) < 24);
     let seed = 0;
     for (let i = 0; i < 60; i++) {
       const x = (br() * 2 - 1) * 120;
@@ -2064,6 +2101,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     const BRACKEN: [THREE.Color, THREE.Color] = [new THREE.Color(0x9a4a1e), new THREE.Color(0xc07a34)];
     const TUSSOCK: [THREE.Color, THREE.Color] = [new THREE.Color(0xc9a45a), new THREE.Color(0x9a8452)];
     const plant = (x: number, g: number, z: number, size: number, hue: THREE.Color, kind = lr()) => {
+      if (hubClearance(x, z)) return;
       // the arrival clearing (spawn → fox review stage (6, 78) → meadow still (6, 70)) stays open meadow
       const ct = THREE.MathUtils.clamp(((x - 0) * 6 + (z - 90) * -22) / (6 * 6 + 22 * 22), 0, 1);
       if (Math.hypot(x - 6 * ct, z - 90 + 22 * ct) < 9) return;
@@ -2147,7 +2185,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
     for (let i = 0; i < 1400; i++) {
       const x = (lr() * 2 - 1) * 128;
       const z = (lr() * 2 - 1) * 100;
-      if (!insideIsland(x, z, 4) || routeNear(route, x, z, 1.6) || marshE(x, z) < 1.05) continue;
+      if (!insideIsland(x, z, 4) || hubClearance(x, z) || routeNear(route, x, z, 1.6) || marshE(x, z) < 1.05) continue;
       if (Math.hypot(x - POND.x, (z - POND.z) * 1.6) < 16 || Math.hypot(x, z + 58) < 17 || (z < -66 && Math.abs(x) < 24)) continue;
       const g = groundAtCover(x, z);
       if (!Number.isFinite(g) || Math.abs(g - groundRaw(x, z)) > 0.3) continue;
@@ -2400,6 +2438,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   let flood = 0;
 
   const zoneAt = (x: number, z: number) => {
+    if (z > 78 && Math.abs(x) < 36) return 'Lanternhollow';
     if (z < -42) return 'E · Wellspring Hill';
     if (marshE(x, z) < 1.15) return 'C · Reedmarsh';
     if (inTerraces(x, z, 0) || x < -95) return 'B · Windmill Rise';
@@ -2409,6 +2448,11 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
 
   const realm: Realm = {
     group,
+    updateHubVisuals(time, dusk) {
+      lanternhollow.update(time, dusk);
+      M.hubLamp.emissiveIntensity = .5 + Math.sin(time * 1.3) * .025;
+    },
+    hubState: lanternhollow.state,
     materials: patchable,
     collision: col,
     terrainY,
@@ -2520,7 +2564,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
       for (const m of mists) {
         const ph = m.userData.phase as number;
         m.position.x += Math.sin(t * 0.07 + ph) * dt * 0.4;
-        (m.material as THREE.MeshBasicMaterial).opacity = inkActive ? 0.55 : 0.3;
+        (m.material as THREE.MeshBasicMaterial).opacity = inkActive ? 0.12 : 0.04;
       }
 
       if (!wellLit) wsGlow.emissiveIntensity = 0.06 + flood;

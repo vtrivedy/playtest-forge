@@ -13,3 +13,29 @@ Missing checkout references: sprint3/briefs/_style-update-1105.md, COMMON.md, sp
 ## R2 evidence coverage
 
 The baseline water/stills suite lacks close mask-front evidence. Add a remote-only `restoration` capture group: fixed oblique meadow camera, idle aura, actual dash input with wake decay, then staged existing `lightSeedwells` event at expanding and settled times. Record window.__game and public state beside each PNG. The harness must label staged latches, retain the same lens, and never mutate read-only debug handles. This changes review coverage only, not gameplay.
+
+Relay compatibility: run the restoration coverage as part of the already supported `water` shot group as well as the explicit `restoration` group, so the running relay requires no restart or whitelist change.
+
+## R2 grotto outlet continuity
+
+Baseline PNG water-pond-100 shows a dry gap. Independent raw-terrain probes (Sol and Opus) confirm the first ~2 m of the visual path is buried by up to 0.9 m. For `channel:false` only, lift the rendered ribbon to the maximum raw terrain across its visible width +0.08 m; retain original sample positions, arc distances, parcel path and collision. Use a non-increasing downstream visual grade. Tilt each cell to its neighbouring visual heights and stretch its local length by sec(pitch) so its horizontal footprint/overlap remains unchanged. End the flowing fall at the visual inlet height. Do not use highestAt (roof collider) or carve terrain. GPU review must check continuous dark flow, no stepped cracks, downhill-edge floating, unchanged __game lengths/arrival. Other water sources remain unchanged.
+
+## R2 channel highlight correction
+
+Personal matched GPU review of 894193c confirms the flowing channel still reads as a cream plastic strip despite darker instance tint. The PBR light/specular and bright synthetic sky dominate the dark body. Give channel water dielectric water IOR (1.333), restrained specular intensity and a local luminance shoulder before the approximate sky reflection; lower that reflection's radiance. Keep bright accents sparse in the existing flow foam shader. Do not alter global lighting, stone, simulation, or pond shader in this pass. Recapture the same water-120 and crossing-90 views; channel must show a dark body between small warm reflections, not a uniformly pale plank.
+
+## R2 matched-image critique follow-up
+
+Opus independently rejects candidate894193c: channel overlap/ripple grid, muddy pond with haze rim, falls too faint. Preserve tiny cell overlap for geometric continuity but raise channel opacity to0.92 to reduce double-blend contrast; reduce transverse normal amplitude and broaden side feather. For pond, use muted dark pine/slate body, stronger grazing sky response, less bed bleed and a narrow0.90–1 shoreline fade. These are water-local values, no global palette/lighting changes. Raise flowing fall alpha floor0.36→0.55 so falling water remains visible against stone. Review all four matched frames again; no acceptance from source review alone.
+
+Opus source follow-up warns against compressing all radiance and reducing specular twice. Keep physical water IOR1.333 with specularIntensity1; apply a soft knee only to wet diffuse light above0.12, preserving real specular and dry cells. Add restrained foam radiance after the knee. This supersedes the initial all-light shoulder; it should retain small highlights rather than make a muddy ribbon.
+
+Pond geometry follow-up: Opus calculates that the authored basin waterline lies beyond normalized radius1. Add optional shoreRadius (default1) so Wen's pond can cover radius1.18 with matching enlarged plane and proportional edge feather, avoiding a bare underwater ring. Add remote low-angle pond and creek stills because shared water-shader changes affect the creek too. No terrain or collision edits.
+
+## R2 Reed fog blanket and restore framing
+
+Integrated GPU restoration frames expose an opaque-looking cream basin before and after latch. Source audit finds14 overlapping12–24m mist planes at material opacity0.55 (0.3 after latch), above the ink. Reduce plane span to8–16m and opacity to0.12 while active/0.04 after latch, retaining their count/random draws and slow drift so scene placement remains deterministic. Preserve ink hazard and terrain. This targets the visible fog blanket instead of darkening all ground materials.
+
+Opus image review passes soft mask edges but rejects readability/framing. Move the staged fox to the safe Reed Seedwell island and use a southwest lens that includes origin and south front; tighten aura lens. Keep the same lens before/early/mid/settled. Do not adopt suggested green restore hues (ART LOCK forbids spring-green W1); judge the existing rust/gold wash after fog clears.
+
+Opus follow-up finds a concrete mist clipping bug: tilt0.06 drops large planes through opaque ink, cutting horizontal stripes. Flatten mist to -PI/2; existing y=-1.32..-1.12 remains above ink=-1.45. Save photoBlocker sightline evidence for the staged restore lens to distinguish occlusion from weak colour progression in the next capture.
