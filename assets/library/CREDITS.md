@@ -111,3 +111,10 @@ for the metre-scaled stone value/relief layer, replacing uniform fine rock grain
 with readable eroded masonry. Source color is reduced to value before restyling.
 The Quaternius column also replaces Seedwell glyph supports within their existing
 envelopes. No new gameplay geometry or collision is introduced.
+
+## Sprint 3 Lanternhollow
+Cottage walls, bowed roofs, domestic well/pulley, bench, lamps and fingerposts are
+original procedural geometry. Sign lettering is generated at runtime with the
+local serif font; no external art or service. Reuses the existing CC0 Bricks085 /
+Rock035 masonry and bark_brown_02 timber surfaces listed above. No paid assets,
+new downloads or API keys.

@@ -52,3 +52,8 @@ Ratio-response-8 trial rejected: ramp residual .064m vs .057m and slide 3.37 vs 
 
 ## Gather fix selected from parallel Opus pass
 Dense personally inspected GPU frames show the gathered gallop pinching the back and crowding the thigh against the flank. The parallel Opus pass c5f96dd independently identifies the same failure, damps authored spine flex toward the cycle mean, and removes the body-lift experiment after it caused reach slip. Our merged-main lift also worsened steady turning/slope residuals. Adopt that scoped fix with Opus attribution; retain existing Sol contact/controller fixes and full swing tangents. Evaluate lower-leg recovery tuck separately only after the spine pass. Exact old ed80e9c capture remains useful as BEFORE for this correction; request a fresh combined capture for the new candidate.
+
+## Driver 22:35 ownership — bank, jump, suspension
+Merge current main (5986881) including the selected Opus cadence/spine/recovery tuck. Preserve 1.8/2.1/2.4Hz design targets. This stream owns body banking, jump/landing weight, and suspension on top.
+
+Turn-bank trial: the current lean is distributed only through the spine, leaving the pelvis/hip mass upright. Try sharing 0 / .45 / .65 of the same bounded bank with the pelvis, with the remainder through spine; preserve total chest angle, head roll partly stabilizes, and IK maintains contact. Expose actual bank angle, windup load, landing impulse and no-support frames in __game. Choose a conservative share only if CPU turn/reverse and slope contacts do not regress materially, then require side/chase captures for visible weight. No speed/cadence or physics reach changes.
