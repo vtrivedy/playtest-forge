@@ -1,8 +1,14 @@
 """Poll Modal agent requests and relay GPU evidence. No local browser."""
-import argparse, concurrent.futures, hashlib, io, json, os, re, subprocess, tarfile, tempfile, time
+import argparse, concurrent.futures, hashlib, io, json, os, re, signal, subprocess, tarfile, tempfile, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+STOP_REQUESTED = False
+
+def request_stop(*_):
+    global STOP_REQUESTED
+    STOP_REQUESTED = True
+
 DEADLINE = 1793439600  # 2026-10-31 05:40 ET; final packaging is separate.
 SHOTS = set('probe perf route kilnroute hub orbit fox gait stills water shade turntable updraft wind growth levels windgap marshmouth reed crown flow showcase reach reachview reachsafe finale feel'.split())
 
@@ -111,11 +117,29 @@ def main():
     ap.add_argument('--out',type=Path,required=True)
     ap.add_argument('--streams',default='loco,loco-glide,fox-ember,hub,reach,route-clear,camera,water-restore,shade')
     ap.add_argument('--once',action='store_true')
+    ap.add_argument('--workers',type=int,default=2,choices=[1,2])
     args=ap.parse_args();args.out=args.out.resolve();args.out.mkdir(parents=True,exist_ok=True)
-    pool=concurrent.futures.ThreadPoolExecutor(max_workers=2);pending={}
+    pool=concurrent.futures.ThreadPoolExecutor(max_workers=args.workers);pending={}
     active=set()
-    while time.time()<DEADLINE:
-        for stream in args.streams.split(','):
+    def enqueue(stream,request):
+        key=hashlib.sha256(json.dumps(request,sort_keys=True).encode()).hexdigest()[:12]
+        folder=args.out/stream/key
+        if folder in active:return
+        if (folder/'result.json').exists():
+            republish_safe(stream,folder)
+            return
+        if (folder/'modal.log').exists():
+            republish_safe(stream,folder,{'status':'interrupted','reason':'Prior client interrupted; recover printed durable run ID instead of duplicating GPU work'})
+            return
+        folder.mkdir(parents=True,exist_ok=True);active.add(folder);(folder/'queued.json').write_text(json.dumps(request,indent=2))
+        print(f'queued {stream} {key}',flush=True)
+        pending[pool.submit(process,stream,request,folder)]=folder
+    signal.signal(signal.SIGTERM,request_stop);signal.signal(signal.SIGINT,request_stop)
+    while time.time()<DEADLINE and not STOP_REQUESTED:
+        roster=args.out/'streams.txt'
+        names=roster.read_text().replace(',',' ').split() if roster.exists() else args.streams.split(',')
+        for stream in names:
+            if not re.fullmatch(r'[a-z0-9-]+',stream):continue
             target=args.out/f'{stream}-request.json'
             try:got=cli(['modal','volume','get','fox-agent-streams',f'{stream}/capture-request.json',str(target),'--force'])
             except (subprocess.TimeoutExpired,OSError) as exc:
@@ -123,18 +147,13 @@ def main():
             if got.returncode:continue
             try:request=json.loads(target.read_text())
             except (ValueError,OSError):continue
-            key=hashlib.sha256(json.dumps(request,sort_keys=True).encode()).hexdigest()[:12]
-            folder=args.out/stream/key
-            if folder in active:continue
-            if (folder/'result.json').exists():
-                republish_safe(stream,folder)
-                continue
-            if (folder/'modal.log').exists():
-                republish_safe(stream,folder,{'status':'interrupted','reason':'Prior client interrupted; recover printed durable run ID instead of duplicating GPU work'})
-                continue
-            folder.mkdir(parents=True,exist_ok=True);active.add(folder);(folder/'queued.json').write_text(json.dumps(request,indent=2))
-            print(f'queued {stream} {key}',flush=True)
-            pending[pool.submit(process,stream,request,folder)]=folder
+            enqueue(stream,request)
+            if isinstance(request,dict):
+                for shot in request.get('followup_shots',[]):
+                    follow={k:request[k] for k in ['ref','size','fps','quality'] if k in request}
+                    follow.update(shots=shot,reason=f'Follow-up {shot} for {request.get("ref")}')
+                    enqueue(stream,follow)
+                if isinstance(request.get('also'),dict):enqueue(stream,request['also'])
         for task,folder in list(pending.items()):
             if task.done():
                 try:task.result()
