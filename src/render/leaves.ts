@@ -194,7 +194,7 @@ function makeLeafMaterial(atlas: THREE.Texture, field?: ColorField) {
           vec2 lpuv = vec2((leafCenter.x - uPaintBounds.x) / (uPaintBounds.y - uPaintBounds.x),
                            (leafCenter.z - uPaintBounds.z) / (uPaintBounds.w - uPaintBounds.z));
           float lp = textureLod(uPaintMap, clamp(lpuv, 0.0, 1.0), 0.0).r;
-          float keep = step(fract(sin(float(gl_InstanceID) * 12.9898) * 43758.5453), 0.18);
+          float keep = step(fract(sin(float(gl_InstanceID) * 12.9898) * 43758.5453), 0.1);
           transformed *= mix(1.0, keep, smoothstep(0.3, 0.7, lp));
         }
         // keep leaves from filling the lens: shrink inside ~1.6 m of the camera

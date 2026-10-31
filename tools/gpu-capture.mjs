@@ -990,7 +990,7 @@ try {
     // high 3/4 lens beside the route (on the +Z side), looking at its midpoint
     let [nx,nz]=[-uz,ux];if(nz<0){nx=-nx;nz=-nz;}
     const my=await yAt(...M);
-    const lens=[[M[0]+nx*22-ux*3,my+21,M[1]+nz*22-uz*3],[M[0],my,M[1]],55];
+    const lens=[[M[0]+nx*19-ux*6,my+19,M[1]+nz*19-uz*6],[M[0]-ux*3,my,M[1]-uz*3],55];
     await H('photo',...lens);await advance(2);await shot('paint-before-overview');await H('photoOff');await advance(2);
     const initial={state:await H('state'),game:await page.evaluate(()=>window.__game)};
     // progress u along S→E (m); pause 1.6 s at 45 %; walk the first 4 s, then trot
@@ -1016,7 +1016,8 @@ try {
     await H('setStick',null);await H('setKeys',[]);await advance(30);
     await shot('paint-after-chase');
     await H('photo',...lens);await advance(2);await shot('paint-after-overview');
-    await H('photo',[hx+nx*13-ux*4,hy+11,hz+nz*13-uz*4],[hx+ux*2,hy,hz+uz*2],55);await advance(2);await shot('paint-burst-hearth');
+    // from beyond the hearth looking back down the path: burst in front, ribbon receding
+    await H('photo',[hx-ux*9+nx*4,hy+13,hz-uz*9+nz*4],[hx+ux*6,hy,hz+uz*6],55);await advance(2);await shot('paint-burst-hearth');
     const end={state:await H('state'),game:await page.evaluate(()=>window.__game)};
     save('paint-acceptance.json',{label:'Staged sepia start; live-input straight walk→pause→trot to cold H-a hearth, stand until lit (dash fallback); same high lens before/after.',route:{S,E,L,dir:route.dir},arriveFrame:arriveI,litFrame:litI,dashFrame:dashI,initial,end,laid:end.game.paint?.laid,areaM2:end.game.paint?.areaM2,deaths:end.state.deaths-initial.state.deaths});
   }

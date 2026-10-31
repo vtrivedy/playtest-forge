@@ -633,6 +633,8 @@ export class ColorField {
           // fox paint coverage here, and how much of the visible colour is that paint
           float cfPaint;
           float cfPaintLead;
+          // which wash (bloom) the pigment here came from, 0..1
+          float cfWash;
           // live aura/trail (the brush is still wet here)
           float cfFresh;
 
@@ -655,6 +657,7 @@ export class ColorField {
             cfPaint = 0.0;
             cfWet = 0.0;
             cfPaintLead = 0.0;
+            cfWash = 0.0;
             cfFresh = 0.0;
             if (uUseMaskMap > 0.5) {
               vec2 uv = vec2(
@@ -674,7 +677,9 @@ export class ColorField {
               );
               if (puv.x >= 0.0 && puv.x <= 1.0 && puv.y >= 0.0 && puv.y <= 1.0) {
                 // paint is the fox's: a Shade's drain blots it like the live aura
-                cfPaint = texture2D(uPaintMap, puv).r;
+                vec2 paintRG = texture2D(uPaintMap, puv).rg;
+                cfPaint = paintRG.r;
+                cfWash = paintRG.g;
                 if (uPaintKind > 0.5 && uPaintKind < 2.5) {
                   // walls, pillars and posts beside the path soak paint up from a wider footprint
                   vec2 texM = 1.0 / vec2(uPaintBounds.y - uPaintBounds.x, uPaintBounds.w - uPaintBounds.z);
@@ -803,7 +808,11 @@ export class ColorField {
             float hueC = noise21(wp.xz * 0.23 + 47.0);
             float chromaLuma = dot(chroma, vec3(0.2126, 0.7152, 0.0722));
             // pigment density: settled pools and thin paper-lit passages at two scales
-            float dens = mix(0.8, 1.24, noise21(wp.xz * 0.38 + 11.0) * 0.55 + noise21(wp.xz * 1.9 + 2.0) * 0.45);
+            float dens = mix(0.74, 1.28, noise21(wp.xz * 0.38 + 11.0) * 0.55 + noise21(wp.xz * 1.9 + 2.0) * 0.45);
+            // each wash dried at its own strength: overlapping blooms read as separate passes
+            float wash = clamp((cfWash - 0.15) / 0.85, 0.0, 1.0);
+            dens *= mix(0.86, 1.14, wash);
+            hueA = clamp(hueA + (wash - 0.5) * 0.35, 0.0, 1.0);
             // fresh (still wet) paint sits lighter on the paper; it darkens as it dries
             dens *= 1.0 + cfWet * 0.12;
             // unit-luma hues: yellow-green / sage / moss wet-in-wet, gold-ochre and madder accents
@@ -816,16 +825,17 @@ export class ColorField {
             vec3 own = max(mix(vec3(chromaLuma), chroma, 1.1), 0.0);
             vec3 groundPaint = mix(own, chromaLuma * meadow * 1.26, 0.9) * dens * (1.0 - backrun * 0.1);
             float up = clamp(normalize(vWorldNormalCF).y, 0.0, 1.0);
-            float lichen = smoothstep(0.5, 0.7, noise21(wp.xz * 1.3 + wp.y * vec2(1.1, 0.7) + 3.0));
-            vec3 stone = chromaLuma * mix(vec3(0.8, 0.93, 1.2), vec3(0.92, 0.97, 1.07), noise21(wp.xz * 0.5 + wp.y * 0.4)) * 1.12;
-            vec3 lichenC = chromaLuma * vec3(1.22, 1.08, 0.45) * 1.1;
+            // lichen patches follow the surface (gp folds height in), not horizontal bands
+            float lichen = smoothstep(0.55, 0.75, noise21(gp * 0.9 + 3.0) * 0.7 + noise21(gp * 3.1) * 0.3);
+            vec3 stone = chromaLuma * mix(vec3(0.86, 0.95, 1.1), vec3(0.95, 0.98, 1.03), noise21(gp * 0.5)) * 1.1;
+            vec3 lichenC = chromaLuma * vec3(1.16, 1.06, 0.6) * 1.08;
             vec3 moss = chromaLuma * vec3(0.6, 1.2, 0.42) * 1.15;
             float mossK = smoothstep(0.55, 0.9, up) * smoothstep(0.45, 0.7, noise21(wp.xz * 0.8 + 6.0));
-            vec3 stonePaint = mix(mix(stone, lichenC, lichen * 0.7), moss, mossK);
+            vec3 stonePaint = mix(mix(stone, lichenC, lichen * 0.55), moss, mossK);
             // natural colour comes back richer than it was authored, never meadow-green
             vec3 ownPaint = own * mix(0.95, 1.08, dens - 0.8);
             // litter: mostly blends into the meadow, a few warm leaf clusters stay as accents
-            vec3 litterPaint = mix(groundPaint * 0.92, ownPaint, smoothstep(0.72, 0.84, noise21(wp.xz * 0.7 + 13.0)) * 0.8);
+            vec3 litterPaint = mix(groundPaint * 0.8, ownPaint, smoothstep(0.8, 0.9, noise21(wp.xz * 0.7 + 13.0)) * 0.45);
             vec3 paintC = uPaintKind < 0.5 ? groundPaint : uPaintKind < 1.5 ? stonePaint : uPaintKind < 2.5 ? ownPaint : litterPaint;
             // the dried tide mark is the pigment itself, pooled darker — never a brown outline
             paintC *= 1.0 - tide * 0.24;
@@ -953,6 +963,7 @@ export class PaintLayer {
   private wetDirty = false;
   private mat: THREE.ShaderMaterial | null = null;
   private aWet: THREE.InstancedBufferAttribute | null = null;
+  private aSeed: THREE.InstancedBufferAttribute | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
   private scene = new THREE.Scene();
   private cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
@@ -1016,7 +1027,9 @@ export class PaintLayer {
     this.aRadius = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
     this.aStrength = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
     this.aWet = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
+    this.aSeed = new THREE.InstancedBufferAttribute(new Float32Array(PaintLayer.MAX), 1).setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aWet', this.aWet);
+    geo.setAttribute('aSeed', this.aSeed);
     geo.setAttribute('aRadius', this.aRadius);
     geo.setAttribute('aStrength', this.aStrength);
     const mat = new THREE.ShaderMaterial({
@@ -1033,6 +1046,8 @@ export class PaintLayer {
         attribute float aRadius;
         attribute float aStrength;
         attribute float aWet;
+        attribute float aSeed;
+        varying float vSeed;
         varying vec2 vWorld;
         varying vec2 vCenter;
         varying float vRadius;
@@ -1040,6 +1055,7 @@ export class PaintLayer {
         varying float vWet;
         void main() {
           vWet = aWet;
+          vSeed = aSeed;
           vWorld = (instanceMatrix * vec4(position, 1.0)).xz;
           vCenter = (instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz;
           vRadius = aRadius;
@@ -1052,6 +1068,7 @@ export class PaintLayer {
         varying float vRadius;
         varying float vStrength;
         varying float vWet;
+        varying float vSeed;
         uniform float uWetPass;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
         float noise(vec2 p){
@@ -1080,7 +1097,8 @@ export class PaintLayer {
           float ink = max(core, fringe);
           // paper granulation inside the wash
           ink *= 0.9 + 0.1 * noise(vWorld * 9.0);
-          gl_FragColor = vec4(ink * vStrength, 0.0, 0.0, 1.0);
+          // G: this wash's pigment id (MAX-blended → overlapping washes keep their own shapes)
+          gl_FragColor = vec4(ink * vStrength, core * (0.15 + 0.85 * vSeed), 0.0, 1.0);
         }`,
     });
     this.mat = mat;
@@ -1187,12 +1205,14 @@ export class PaintLayer {
       this.aRadius!.setX(i, r);
       this.aStrength!.setX(i, b.strength);
       this.aWet!.setX(i, 1 - t * t);
+      this.aSeed!.setX(i, b.seed);
     }
     mesh.count = n;
     mesh.instanceMatrix.needsUpdate = true;
     this.aRadius!.needsUpdate = true;
     this.aStrength!.needsUpdate = true;
     this.aWet!.needsUpdate = true;
+    this.aSeed!.needsUpdate = true;
     const renderer = this.renderer;
     const prev = renderer.getRenderTarget();
     const prevAuto = renderer.autoClear;

@@ -591,7 +591,11 @@ async function boot() {
     if (paintDist >= T.ribbonSpacing) {
       paintDist = 0;
       const r = T.ribbonRadius * THREE.MathUtils.lerp(0.85, 1, Math.min(1, speed / 8)) * (dashing ? 1.3 : 1);
-      if (nearK > 0.02) paint.bloom(fox.position.x + (Math.random() - 0.5) * 0.5, fox.position.z + (Math.random() - 0.5) * 0.5, r, T.strength * nearK);
+      // the wash leads the fox a little: colour blooms out under its chest, not only behind it
+      const lead = Math.min(0.9, speed * 0.18);
+      const fx = fox.position.x + Math.sin(fox.rotation.y) * lead;
+      const fz = fox.position.z + Math.cos(fox.rotation.y) * lead;
+      if (nearK > 0.02) paint.bloom(fx + (Math.random() - 0.5) * 0.5, fz + (Math.random() - 0.5) * 0.5, r, T.strength * nearK);
       // life springs up in the fresh wash
       if (nearK > 0.8 && grounded) sprouts.sprout(fox.position.x, fox.position.z, r * 0.85, 2, soilAt);
     }
