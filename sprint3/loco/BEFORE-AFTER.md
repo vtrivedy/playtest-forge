@@ -34,3 +34,7 @@ Independent Sol visual review agrees this is a clear improvement but withholds f
 This comparison matches camera, inputs and tooling, but is not an isolated animation-parameter experiment: buildings and character appearance also differ between SHAs. Teleport preserves gait phase, so corresponding frame numbers need not show the same pose. Compare temporal progression and cadence. No ordinary gameplay-camera or continuous-route claim is made.
 
 The latest 14582be west-lens capture separately verifies clearer composition. A current-main ten-segment fixture adds turns and jumps, pushed as bd9e5e6; it still needs GPU review. The primary 14582be landing A/B capture request remains pending.
+
+## Separate matched gait-gym action metrics
+
+The retained baseline and b9 gait-gym captures share a different frozen module, `3a1b7a91d2a4b51293c67524d9ffc877e5a17387d70ce86791d77745639214c4`. Their completed `window.__game` reports both record jump apex1.198m, time to apex0.217s, airtime0.450s, dash distance4.00m, one jump, one dash and zero deaths. Jump travel differs1.86→1.79m, consistent with the changed launch approach; do not claim identical trajectories. These are scripted action measurements, not a60-second human-fun or route-clear test. See `FEEL-GAIT-REPORT.json`; do not attribute these action metrics to the straight-only World1 clips.
