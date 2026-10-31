@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import assert from 'node:assert/strict';
 import { createLanternhollow, HUB_HOUSES, HUB_PATHS } from '../../games/fox-spirit/src/regionLanternhollow.ts';
 import { Bucket } from '../../games/fox-spirit/src/russetKit.ts';
 import { CollisionWorld, colliderTopAt } from '../../games/fox-spirit/src/collision.ts';
@@ -12,12 +13,24 @@ globalThis.document = { createElement: () => ({
 }) } as unknown as Document;
 const b = {stone:new Bucket(),wood:new Bucket(),plaster:new Bucket(),roof:new Bucket(),lamp:new Bucket(),dark:new Bucket()};
 const col = new CollisionWorld(()=>0), group = new THREE.Group();
+let hub!: ReturnType<typeof createLanternhollow>;
 try {
-  createLanternhollow(group, col, () => 0, b, []);
+  hub = createLanternhollow(group, col, () => 0, b, []);
 } finally {
   if (originalDocument === undefined) Reflect.deleteProperty(globalThis, 'document');
   else globalThis.document = originalDocument;
 }
+// Practical lights stay allocated while the spatial mood fades their intensity.
+const practicals = group.children.filter((o): o is THREE.PointLight => (o as THREE.PointLight).isPointLight);
+assert.equal(practicals.length, 2);
+hub.update(1, 1);
+assert.ok(hub.state().well > 0 && hub.state().porch > 0);
+assert.equal(hub.state().well, practicals[0].intensity);
+assert.equal(hub.state().porch, practicals[1].intensity);
+hub.update(2, 0);
+assert.equal(hub.state().well, 0);
+assert.equal(hub.state().porch, 0);
+assert.ok(practicals.every(light => light.visible), 'fading must not change shader light count');
 const spriteHits: THREE.Intersection[] = [];
 const probe = new THREE.Raycaster();
 let smokeProbes = 0;
