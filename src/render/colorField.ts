@@ -6,6 +6,7 @@ export const VISUAL_DRAIN_GLSL = /* glsl */ `
   uniform vec4 uVisualDrains[16];
   uniform int uVisualDrainCount;
   float temporaryVisibilityAt(vec3 p) {
+    if (uVisualDrainCount == 0) return 1.0;
     float visibility = 1.0;
     float brush = sin(p.x * 1.7 + sin(p.z * 1.3)) * 0.065
                 + sin(p.z * 3.1 + p.x * 0.7) * 0.035;
