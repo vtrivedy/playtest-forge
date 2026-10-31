@@ -38,8 +38,17 @@ try {
   assert.ok(Math.hypot(state().pos[0]!-near.x,state().pos[2]!-near.z)>=sys.tun.hitRadius+.6, 'stationary fox keeps contact clearance');
   step(1/60, new THREE.Vector3(30,0,30));
   assert.equal(state().mode, 'return');
-  step(8, new THREE.Vector3(30,0,30));
+  for(let k=0;k<480&&state().mode!=='patrol';k++)step(1/60,new THREE.Vector3(30,0,30));
   assert.equal(state().mode, 'patrol', 'must reach fixed return target');
+  assert.ok(Math.abs(state().attractionRest-sys.tun.chaseRest)<.02,'successful return starts full authored rest');
+  for(let k=0;k<Math.floor((sys.tun.chaseRest+sys.tun.chaseDelay-.05)*60);k++){
+    const waiting=new THREE.Vector3().fromArray(state().pos).add(new THREE.Vector3(2.8,0,0));
+    step(1/60,waiting);
+    assert.equal(state().mode,'patrol','successful return requires rest plus fresh notice delay');
+  }
+  for(let k=0;k<12;k++)step(1/60,new THREE.Vector3().fromArray(state().pos).add(new THREE.Vector3(2.8,0,0)));
+  assert.equal(state().mode,'chase','successful-return attraction resumes after fresh notice');
+  step(8,new THREE.Vector3(30,0,30));
   sys.resetSweep();
   const target = new THREE.Vector3().fromArray(state().pos);
   assert.equal(sys.drains(target), true);
@@ -105,9 +114,23 @@ try {
   let recovered=false;
   for(let k=0;k<120;k++){
     recovery.update(1/60,2+k/60,new THREE.Vector3(30,0,30),false);
-    recovered ||= recovery.state()[0]!.mode==='patrol';
+    if(recovery.state()[0]!.mode==='patrol'){recovered=true;break;}
   }
   assert.equal(recovered,true,'blocked return must resume patrol after its timeout');
+  const restSeconds=recovery.state()[0]!.attractionRest;
+  assert.ok(Math.abs(restSeconds-recovery.tun.chaseRest)<.02,'blocked return starts full authored rest');
+  chaseWall=false;
+  for(let k=0;k<Math.floor((recovery.tun.chaseRest+recovery.tun.chaseDelay-.05)*60);k++){
+    const nearby=new THREE.Vector3().fromArray(recovery.state()[0]!.pos).add(new THREE.Vector3(2.8,0,0));
+    recovery.update(1/60,4+k/60,nearby,false);
+    assert.equal(recovery.state()[0]!.mode,'patrol','blocked return requires rest plus fresh notice delay');
+  }
+  for(let k=0;k<12;k++){
+    const nearby=new THREE.Vector3().fromArray(recovery.state()[0]!.pos).add(new THREE.Vector3(2.8,0,0));
+    recovery.update(1/60,7+k/60,nearby,false);
+  }
+  assert.equal(recovery.state()[0]!.mode,'chase','attraction resumes after rest plus notice delay');
+
   // Mirror the capture's ten-second observer schedule on a controlled loop.
   // Actual authored terrain still belongs to the remote GPU playtest.
   const behavior=await createShades(new THREE.Scene(),[{id:'behavior',patrol:[[0,0,0],[4,0,0],[4,0,4],[0,0,4]]}],()=>0);
@@ -126,5 +149,5 @@ try {
   let observedModes=0;
   for(const mode of modes)if(mode===expectedModes[observedModes])observedModes++;
   assert.equal(observedModes,expectedModes.length,`capture observer schedule must show complete cycle: ${modes}`);
-  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery', 'latch activation', 'dash during chase', 'blocked chase retreats', 'return stall recovery', 'ten-second ordered observer cycle'], final: state() }, null, 2));
+  console.log(JSON.stringify({ result: 'PASS', checks: ['real GLB load', 'patrol', 'delayed chase', 'attraction stops outside contact', 'return completes', 'dash frees once', 'drain ends', 'motes outlive body', 'one-shots end', 'completed leaves stop uploads', 'terrain-height mismatch return', 'blocked patrol recovery', 'latch activation', 'dash during chase', 'blocked chase retreats', 'return stall recovery', 'quiet patrol after return', 'ten-second ordered observer cycle'], final: state() }, null, 2));
 } finally { globalThis.fetch = originalFetch; THREE.DefaultLoadingManager.setURLModifier(url => url); }
