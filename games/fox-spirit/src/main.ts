@@ -327,7 +327,8 @@ async function boot() {
     folder.add(params,'tailLoad',0,.4,.01);
     folder.add(params,'brakeSquat',0,.08,.002);
     folder.add(params,'brakePitch',0,.2,.005);
-    folder.add(params,'landSquash',0,.2,.005);
+    folder.add(params,'landSquash',0,.25,.005);
+    folder.add(params,'landPitch',0,2,.05).name('land pitch rad/m');
     folder.add(params,'landFrequency',2,6,.1);
     folder.add(params, 'walkHz', 1, 3, .05);
     folder.add(params, 'trotHz', 1.2, 4, .05);
@@ -821,7 +822,10 @@ async function boot() {
     /** Read-only review-camera clearance, including scenery without gameplay colliders. */
     photoBlocker(pos: [number, number, number], look: [number, number, number]) {
       const origin = new THREE.Vector3(...look), delta = new THREE.Vector3(...pos).sub(origin);
-      const ray = new THREE.Raycaster(origin, delta.clone().normalize(), 0.15, delta.length() + 0.25);
+      const distance = delta.length();
+      if (distance < .2) return null;
+      // Both directions stop inside the camera-to-target segment; terrain behind the feet is not an occluder.
+      const ray = new THREE.Raycaster(origin, delta.clone().normalize(), 0.15, distance - .02);
       world.group.updateWorldMatrix(true, true);
       let hit = ray.intersectObject(world.group, true).find((h) => h.object.visible);
       if (!hit) {
