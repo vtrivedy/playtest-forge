@@ -4,6 +4,8 @@ import path from 'node:path';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 const { AuthoredLocomotion } = await import(path.resolve('games/fox-spirit/src/locomotion.ts'));
+// Refs since the natural-gait pass add the carpus at load; older refs have no limb rig.
+const limbRig = fs.existsSync(path.resolve('games/fox-spirit/src/foxLimbRig.ts')) ? await import(path.resolve('games/fox-spirit/src/foxLimbRig.ts')) : null;
 Object.assign(globalThis, { self: globalThis, ProgressEvent: class extends Event { constructor(type: string, init: Record<string, unknown>) { super(type); Object.assign(this, init); } } });
 const bytes = fs.readFileSync('assets/hero/spirit_fox.glb'); const jl = bytes.readUInt32LE(12);
 const doc = JSON.parse(bytes.subarray(20, 20 + jl).toString());
@@ -15,6 +17,7 @@ const root = gltf.scene, group = new THREE.Group(); group.add(root);
 const box = new THREE.Box3().setFromObject(root); root.scale.setScalar(1.25 / (box.max.y - box.min.y));
 const sc = new THREE.Box3().setFromObject(root); root.position.y -= sc.min.y;
 const mixer = new THREE.AnimationMixer(root);
+limbRig?.applyFoxLimbRig(root, gltf.animations);
 const loco = new AuthoredLocomotion(root, group, new Map(gltf.animations.map(c => [c.name, mixer.clipAction(c)])));
 loco.params.suspensionLift = Number(process.argv[2] ?? loco.params.suspensionLift);
 const pelvis = root.getObjectByName('pelvis')!;

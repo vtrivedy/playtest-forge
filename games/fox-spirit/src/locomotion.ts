@@ -144,7 +144,8 @@ export class AuthoredLocomotion {
     const padHeights:number[]=[];
     for (const [upper, lower, paw] of chains) {
       const a=root.getObjectByName(upper), b=root.getObjectByName(lower), c=root.getObjectByName(paw);
-      if (!a || !b || !c) throw new Error(`FOX rig is missing locomotion chain ${upper}/${lower}/${paw}`);
+      const hock=root.getObjectByName(upper.startsWith('thigh') ? upper.replace('thigh','hind_foot') : carpusName(upper.endsWith('_l') ? 'l' : 'r'));
+      if (!a || !b || !c || !hock) throw new Error(`FOX rig is missing locomotion chain ${upper}/${lower}/${paw} (carpus needs applyFoxLimbRig)`);
       const padPoints:THREE.Vector3[]=[];
       root.traverse(object=>{
         const mesh=object as THREE.SkinnedMesh;
@@ -167,7 +168,7 @@ export class AuthoredLocomotion {
       padHeights.push(padWorld.y-floor);
       const dot = new THREE.Mesh(new THREE.SphereGeometry(.025,6,4), new THREE.MeshBasicMaterial({color:0xffcc44, depthTest:false}));
       this.debugGroup.add(dot);
-      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock:root.getObjectByName(upper.startsWith('thigh') ? upper.replace('thigh','hind_foot') : carpusName(upper.endsWith('_l') ? 'l' : 'r'))!,pole:upper.startsWith('thigh') ? 1 : -1,planted:false,anchor:v(),previousSolved:v(),correction:v(),strength:1,replantTime:0,releaseCorrection:v(),releaseProgress:0,phaseRelease:false,clearance:.005,dot});
+      this.feet.push({padLocal,upper:a,lower:b,paw:c,hock,pole:upper.startsWith('thigh') ? 1 : -1,planted:false,anchor:v(),previousSolved:v(),correction:v(),strength:1,replantTime:0,releaseCorrection:v(),releaseProgress:0,phaseRelease:false,clearance:.005,dot});
     }
     root.position.y-=padHeights.reduce((a,b)=>a+b,0)/padHeights.length;
     this.rootPosition.copy(root.position);
