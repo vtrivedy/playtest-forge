@@ -985,7 +985,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
   group.add(ink);
   let inkActive = true;
   // Restoring Reed clears the ink into ankle-deep water, with the same safe floor.
-  const reedWater = createStylizedWater(scene, { size: 60, y: MARSH.floor + 0.18, colorDeep: 0x247b74, colorShallow: 0x668779, reflection: true, reflectionDistance: 70, depthTint: 0.22 });
+  const reedWater = createStylizedWater(scene, { size: 60, y: MARSH.floor + 0.18, colorDeep: 0x247b74, colorShallow: 0x668779, reflection: true, reflectionDistance: 70, depthTint: 0.22, shoreRadius: 0.94 });
   reedWater.mesh.position.set(MARSH.x, MARSH.floor + 0.18, MARSH.z);
   reedWater.mesh.scale.set(MARSH.rx / 30, MARSH.rz / 30, 1);
   reedWater.mesh.visible = false;
@@ -1124,6 +1124,9 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
         const d = Math.sqrt(rr()) * spread;
         const px = x + Math.cos(a) * d;
         const pz = z + Math.sin(a) * d;
+        // The drained water sits below the old ink level. Extend roots into
+        // the bed while retaining original tips/heads and random placement.
+        const rootY = e < 0.85 ? Math.min(base, groundRaw(px, pz) - 0.08) : base;
         const cattail = rr() < 0.18;
         const h = (cattail ? 1.9 : 1.1) + rr() * 1.4;
         const bendA = a + (rr() - 0.5) * 1.2;
@@ -1144,7 +1147,7 @@ export async function createRussetvale(scene: THREE.Scene): Promise<Realm> {
           const off = bend * t * t * h;
           const cx = px + Math.cos(bendA) * off;
           const cz = pz + Math.sin(bendA) * off;
-          const cy = base + h * t - off * 0.35;
+          const cy = base + h * t - off * 0.35 + (rootY - base) * (1 - t) ** 2;
           const tw = 1 - t * 0.92;
           const L = new THREE.Vector3(cx - wx * tw, cy, cz - wz * tw);
           const R = new THREE.Vector3(cx + wx * tw, cy, cz + wz * tw);
