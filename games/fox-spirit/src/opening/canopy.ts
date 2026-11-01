@@ -52,6 +52,8 @@ export function buildCanopy(ctx: OpeningCtx) {
       line(new THREE.Vector3(0, 0.12, z - 0.22), new THREE.Vector3(side * (0.95 - Math.abs(z) * 0.42), 0.12, z + 0.15), 0.018);
     }
     root.add(veins);
+    // Fade blade, ink and veins together when a leaf masks the chase-camera fox.
+    ctx.occluders.push(root);
     const stemMat = toon(0x675c3b);
     const curve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(a.x + 0.75, ctx.groundH(a.x + 0.75, a.z - 1), a.z - 1),
@@ -61,7 +63,7 @@ export function buildCanopy(ctx: OpeningCtx) {
     const stem = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.055, 6, false), stemMat);
     stem.castShadow = true;
     ctx.scene.add(stem);
-    return { ...a, top, root, blade, veins, contact: false, latched: false, dwell: 0, compression: 0, pulse: 0 };
+    return { ...a, top, root, blade, veins, contact: false, latched: false, dwell: 0, compression: 0, pulse: 0, lensScale: 1 };
   });
   let launches = 0, contacts = 0, retries = 0, roostVisits = 0;
   let lastLeaf: string | null = null;
@@ -95,7 +97,13 @@ export function buildCanopy(ctx: OpeningCtx) {
   ctx.onUpdate((dt) => {
     const state = ctx.player?.state() as { grounded: boolean } | undefined;
     const p = ctx.fox.root.position;
+    const lens = ctx.player?.cam.camera.position;
     for (const leaf of leaves) {
+      // A blade can sit over the lens without crossing the fox sight rays.
+      // Tuck only its visual width near the lens; top support never changes.
+      const lensNear = lens && Math.hypot(lens.x - leaf.x, lens.z - leaf.z) < 1.75 && Math.abs(lens.y - leaf.top) < 0.65;
+      leaf.lensScale = THREE.MathUtils.damp(leaf.lensScale, lensNear ? 0.12 : 1, lensNear ? 18 : 8, dt);
+      leaf.root.scale.set(leaf.lensScale, 1, leaf.lensScale);
       const near = Math.abs(p.x - leaf.x) < 1.05 && Math.abs(p.z - leaf.z) < 0.96 && Math.abs(p.y - leaf.top) < 0.22;
       if (!near) { leaf.contact = false; leaf.latched = false; leaf.dwell = 0; }
       const loading = leaf.dwell > 0 && !leaf.latched ? Math.min(1, leaf.dwell / CANOPY_FEEL.loadTime) : 0;
@@ -122,5 +130,5 @@ export function buildCanopy(ctx: OpeningCtx) {
     gui.add(CANOPY_FEEL, 'bow', 0.05, 0.3, 0.01);
     gui.close();
   });
-  return { contact, feel: CANOPY_FEEL, state: () => ({ launches, contacts, retries, roostVisits, lastLeaf, lastFlight, activeFlight: flight, profile: { ...CANOPY_FEEL }, leaves: leaves.map(({ id, x, z, top }) => ({ id, x, z, top })) }) };
+  return { contact, feel: CANOPY_FEEL, state: () => ({ launches, contacts, retries, roostVisits, lastLeaf, lastFlight, activeFlight: flight, lensTucked: leaves.filter(l => l.lensScale < 0.95).length, profile: { ...CANOPY_FEEL }, leaves: leaves.map(({ id, x, z, top }) => ({ id, x, z, top })) }) };
 }
