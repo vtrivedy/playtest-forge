@@ -27,7 +27,7 @@ const C = {
   slateDark: 0x4a4952,
   amber: 0xe6a65a,
   door: 0x6b4a32,
-  flag: 0x9b917d,
+  flag: 0x8d8471,
   bloom: [0x9a4f3c, 0xa8834a, 0x7d5a6a],
   leaf: 0x5d6040,
   rope: 0x8a7357,
@@ -340,28 +340,48 @@ function firePit(k: Kit, ctx: OpeningCtx, x: number, z: number): void {
   });
 }
 
-function flagstones(ctx: OpeningCtx): THREE.InstancedMesh {
+/** worn flagstones set flush in the lanes: a few irregular slab shapes, barely proud of the earth */
+function flagstones(ctx: OpeningCtx): THREE.Group {
   const { rand } = ctx;
-  const stone = hewn(new THREE.CylinderGeometry(0.32, 0.36, 0.12, 7), rand, 0.06);
-  const pts: THREE.Matrix4[] = [];
+  const shapes = Array.from({ length: 4 }, (_, v) => {
+    const g = new THREE.CylinderGeometry(0.3, 0.33, 0.1, 5 + v, 1);
+    const p = g.getAttribute('position') as THREE.BufferAttribute;
+    const lobes = Array.from({ length: 5 + v }, () => 0.75 + rand() * 0.4);
+    for (let i = 0; i < p.count; i++) {
+      const a = Math.atan2(p.getZ(i), p.getX(i));
+      const k = lobes[Math.round(((a + Math.PI) / (Math.PI * 2)) * (5 + v)) % (5 + v)]!;
+      p.setX(i, p.getX(i) * k);
+      p.setZ(i, p.getZ(i) * k);
+    }
+    return hewn(g, rand, 0.04);
+  });
+  const placed: THREE.Matrix4[][] = shapes.map(() => []);
   for (const [ax, az, bx, bz] of PATHS) {
     if (Math.min(az, bz) < 78) continue; // meadow tracks are worn earth, not flagged
     const len = Math.hypot(bx - ax, bz - az);
     const nx = -(bz - az) / len;
     const nz = (bx - ax) / len;
-    for (let s = 0.4; s < len; s += 0.55 + rand() * 0.25) {
+    for (let s = 0.3; s < len; s += 0.62 + rand() * 0.3) {
+      if (rand() < 0.18) continue; // missing stones: worn gaps
       const t = s / len;
-      const side = (rand() - 0.5) * 1.0;
+      const side = (rand() - 0.5) * 1.1;
       const x = ax + (bx - ax) * t + nx * side;
       const z = az + (bz - az) * t + nz * side;
-      const sc = 0.75 + rand() * 0.5;
-      pts.push(new THREE.Matrix4().compose(new THREE.Vector3(x, ctx.groundH(x, z) - 0.03, z), tmpQ.setFromEuler(tmpE.set(0, rand() * 6, 0)), new THREE.Vector3(sc, 1, sc * (0.8 + rand() * 0.3))));
+      const sc = 0.8 + rand() * 0.45;
+      placed[Math.floor(rand() * shapes.length)]!.push(
+        new THREE.Matrix4().compose(new THREE.Vector3(x, ctx.groundH(x, z) - 0.035, z), tmpQ.setFromEuler(tmpE.set((rand() - 0.5) * 0.06, rand() * 6, (rand() - 0.5) * 0.06)), new THREE.Vector3(sc, 1, sc)),
+      );
     }
   }
-  const mesh = new THREE.InstancedMesh(stone, toon(C.flag, { hatchWeight: 0.5 }), pts.length);
-  pts.forEach((m, i) => mesh.setMatrixAt(i, m));
-  mesh.receiveShadow = true;
-  return mesh;
+  const g = new THREE.Group();
+  const mat = toon(C.flag, { hatchWeight: 0.6 });
+  shapes.forEach((geo, v) => {
+    const mesh = new THREE.InstancedMesh(geo, mat, placed[v]!.length);
+    placed[v]!.forEach((m, i) => mesh.setMatrixAt(i, m));
+    mesh.receiveShadow = true;
+    g.add(mesh);
+  });
+  return g;
 }
 
 function lanternPost(k: Kit, ctx: OpeningCtx, x: number, z: number, yaw: number): THREE.Vector3 {
