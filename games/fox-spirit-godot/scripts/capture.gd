@@ -5,6 +5,7 @@ extends Node
 ##   --route=hero          drive the fox village → meadow → hearth → updraft → shelf with real inputs
 ##   --shots=a,b[:full]    render fixed review shots (Opening.SHOTS) and quit
 ##   --poses=a,b           chase-cam stills at three.js opening-stills poses (fox teleported) and quit
+##   --probe               feel probe (same inputs as tools/threejs-feel-probe.mjs); headless is fine
 ##   --out=DIR             where PNGs + state.jsonl go
 ## Run under the movie maker for video: godot --path . --write-movie out.avi --fixed-fps 30 -- --route=hero
 
@@ -39,6 +40,8 @@ func _ready() -> void:
 		_run_shots.call_deferred()
 	elif args.has("poses"):
 		_run_poses.call_deferred()
+	elif args.has("probe"):
+		_run_probe.call_deferred()
 	elif args.has("route"):
 		_route = _hero_route()
 
@@ -77,6 +80,42 @@ func _run_poses() -> void:
 		opening.fox.teleport(p[0], p[1], p[2])
 		await _settle(90)
 		await _save("pose-" + name + ("-paint" if paint else ""))
+	get_tree().quit()
+
+
+func _ticks(n: int) -> Dictionary:
+	for i in n:
+		await get_tree().physics_frame
+	return opening.fox.state()
+
+
+## gait bands at fixed stick magnitudes + one full jump: stance-paw slide, speed, apex / air
+func _run_probe() -> void:
+	var fox := opening.fox
+	var out := {}
+	await _ticks(2)
+	for b in [["walk", 0.15, 3.0], ["trot", 0.35, 3.0], ["run", 1.0, 2.5]]:
+		fox.teleport(-1.5, 80.0, PI)
+		fox.scripted = {stick = Vector2(0, -b[1])}
+		await _ticks(60)
+		var slides: Array[float] = []
+		var s := {}
+		for i in int(b[2] * 60):
+			s = await _ticks(1)
+			if s.stance_feet > 0:
+				slides.append(s.max_slide)
+		slides.sort()
+		out[b[0]] = {gait = s.gait, speed = s.speed, playback = s.playback, slide_p50 = slides[slides.size() / 2], slide_p95 = slides[int(slides.size() * 0.95)]}
+	fox.teleport(-1.5, 80.0, PI)
+	fox.scripted = {stick = Vector2(0, -1)}
+	await _ticks(60)
+	fox.scripted = {stick = Vector2(0, -1), jump = true}
+	await _ticks(20)
+	fox.scripted = {stick = Vector2(0, -1)}
+	var s2 := await _ticks(120)
+	out.jump = s2.last_jump
+	print("[probe] ", JSON.stringify(out))
+	_log.store_line(JSON.stringify({probe = out}))
 	get_tree().quit()
 
 

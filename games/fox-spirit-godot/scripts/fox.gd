@@ -28,6 +28,7 @@ var _lean := Vector3.ZERO
 var _time := 0.0
 var _tail_light: OmniLight3D
 var _puffs: CPUParticles3D
+var foot_ik: FootIK
 
 
 func _ready() -> void:
@@ -51,6 +52,9 @@ func _ready() -> void:
 		m.extra_cull_margin = 1.0
 	for n in ["idle", "walk", "trot", "lope", "run", "fall"]:
 		player.get_animation(n).loop_mode = Animation.LOOP_LINEAR
+	skeleton.modifier_callback_mode_process = Skeleton3D.MODIFIER_CALLBACK_MODE_PROCESS_PHYSICS
+	foot_ik = FootIK.new()
+	skeleton.add_child(foot_ik)
 	_build_tree()
 	_build_fx()
 
@@ -86,10 +90,14 @@ func _build_tree() -> void:
 			root.connect_node("state", i, s)
 	root.connect_node("output", 0, "state")
 	tree = AnimationTree.new()
+	# advance with the controller's physics tick: deterministic captures, paws sampled on the same clock
+	tree.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
 	tree.tree_root = root
 	add_child(tree)
 	tree.anim_player = tree.get_path_to(player)
 	tree.active = true
+	tree.set("parameters/state/transition_request", "idle")
+	tree.set("parameters/gait/transition_request", "walk")
 
 
 func _build_fx() -> void:

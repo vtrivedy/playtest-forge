@@ -84,6 +84,7 @@ func _ready() -> void:
 	floor_constant_speed = true
 	visual = FoxVisual.new()
 	add_child(visual)
+	visual.foot_ik.body = get_rid()
 
 
 func teleport(x: float, z: float, facing: float) -> void:
@@ -264,6 +265,9 @@ func _physics_process(dt: float) -> void:
 	else:
 		st = "loco" if speed > 0.06 or _want > 0.05 else "idle"
 	visual.drive(dt, speed, st, gait_hysteresis, min_rate, max_rate)
+	visual.foot_ik.grounded = grounded
+	visual.foot_ik.moving = st == "loco"
+	visual.foot_ik.base = pos
 
 	# additives: turn bank (grounded), nose up rising / down falling, slope pitch
 	_bank = lerpf(_bank, clampf(-yaw_rate * speed * turn_bank, -bank_max, bank_max) if grounded else 0.0, 1.0 - exp(-6.0 * dt))
@@ -285,5 +289,5 @@ func state() -> Dictionary:
 		speed = snappedf(speed, 0.001), yaw = snappedf(yaw, 0.001), grounded = grounded, gliding = gliding,
 		dashing = dashing, dashes_used = dashes_used, air_time = snappedf(air_t, 0.001),
 		last_jump = last_jump, anim = visual.state, gait = visual.gait_name(), playback = snappedf(visual.rate, 0.001),
-		lift = snappedf(lift.k, 0.001),
+		lift = snappedf(lift.k, 0.001), stance_feet = visual.foot_ik.stance_feet, max_slide = snappedf(visual.foot_ik.slide, 0.001),
 	}
