@@ -20,7 +20,7 @@ const TREES: Array<[number, number, number, TreeKind, number]> = [
   [-16, 77, 1.0, 'grove', 2],
   [-10.5, 66.5, 1.05, 'grove', 5],
   [-18, 68.5, 1.15, 'lean', 0],
-  [-22, 74, 1.1, 'grove', 3],
+  [-19.2, 70.6, 1.1, 'grove', 3], // stands back from the pop-up ruin's entry so the chase cam there isn't inside its crown
   // south, past the hearth: the backdrop as the fox runs down the meadow
   [4.5, 63.5, 1.2, 'tall', 4],
   [-7.5, 61.5, 1.1, 'grove', 1],
