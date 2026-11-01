@@ -18,6 +18,7 @@ import { buildVillage } from './village';
 import { createOpeningHearth } from './hearth';
 import { createOpeningPaint } from './paint';
 import { createOpeningOcclusion } from './occlusion';
+import { createCrown } from './crown';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -86,6 +87,7 @@ export async function runOpening(): Promise<void> {
 
   buildMeadow(ctx);
   buildVillage(ctx);
+  const crown = createCrown(ctx, sky.mist);
 
   const contact = buildContactShadow();
   contact.position.set(0, 0.03, -0.15);
@@ -147,7 +149,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length } });
+  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, crown: crown.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -191,6 +193,8 @@ export async function runOpening(): Promise<void> {
       view.updateProjectionMatrix();
       frame(0);
     },
+    /** dev: play the Crown's Keeping response (the Keeping latch calls this) */
+    crownRespond: crown.respond,
     params: PLAY,
     camera: player.cam.params,
   };
