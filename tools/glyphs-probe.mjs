@@ -57,11 +57,12 @@ try {
   await shot('06-solved');
   // to the open shrine, dash the kit page
   log.push(['to shrine', await walk([[31.0, 89.6]])]);
-  await page.evaluate(() => window.__gameHooks.teleport(31.0, 89.6, Math.PI / 2));
+  // face the open door by stick (no teleport), then a real Shift dash at the page
+  await page.evaluate(() => { const h = window.__gameHooks; h.setStick(1, 0); h.advance(12, 1 / 60, false); });
   await page.keyboard.down('ShiftLeft');
   await page.evaluate(() => window.__gameHooks.advance(4, 1 / 60, false));
   await page.keyboard.up('ShiftLeft');
-  await page.evaluate(() => window.__gameHooks.advance(50, 1 / 60, false));
+  await page.evaluate(() => { window.__gameHooks.setStick(0, 0); window.__gameHooks.advance(50, 1 / 60, false); });
   await shot('07-kit-pop');
   const end = await page.evaluate(() => { const s = window.__gameHooks.advance(1500, 1 / 60, true); return s.opening.unpressed.creatures.find((c) => c.id === 'kit'); });
   log.push(['kit after 25 s', end]);
