@@ -85,7 +85,8 @@ export function createKeepingRoute() {
     { beat: 'the tree finishes falling', hold: 7, until: (s) => op(s).keeping?.phase === 'bridge', min: 4.5 },
     { beat: 'onto the bridge', to: [27.8, 72.6], mag: 0.35 },
     { beat: 'cross the bridge', to: [26.2, 66.2], mag: 0.45 },
-    { beat: 'the Crown answers', hold: Infinity },
+    { beat: 'the Crown answers', hold: 4 },
+    { beat: 'a leaf comes down', hold: Infinity },
   ];
   return (t, state) => {
     since += Math.max(0, t - last);
