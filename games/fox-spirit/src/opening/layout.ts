@@ -13,6 +13,22 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 /** rock shelf the H-a updraft lifts onto: 9 × 9, top = ground + 5 */
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
+/**
+ * Runaway Page flight loops, one per stage: [x, height above base terrain (groundH), z]. Stage 1 starts east of the well (the hedgehog has the well's face), in the wake view, and
+ * circles the plaza; stages 2–3 circle over the canopy chain and the pop-up ruin high enough that only those reach it. `payoff` = the permanent wash when the page is kept.
+ */
+export const PAGE = {
+  stages: [
+    [[-1.8, 1.3, 88.2], [-2, 1.1, 91], [-1, 1.2, 95.5], [-5, 1.1, 97.2], [-10.5, 1.2, 95.5], [-13.2, 1.2, 90.2], [-12.5, 1.2, 86.8], [-10.5, 1.1, 82.8], [-5.2, 1.1, 84.2]],
+    // stage 2 shuttles 1.6 m above the canopy's roost and high leaf (Tallow CANOPY rise 3.5 / 3.0): landing on a leaf
+    // can't reach it, a spring launch through it can; hops arc out wide so it never flies into the fox
+    [[-1, 5.1, 64.7], [2.6, 6.4, 64.6], [0.9, 4.6, 67.1], [-3, 6.2, 67.4]],
+    // stage 3 shuttles 1 m above the pop-up ruin's overlook and second leaf (Rook POP_UP_RUIN tops 1.02 / 0.47 abs): a jump reaches it
+    [[-24.4, 3.0, 71], [-26.4, 4.2, 68.6], [-28.4, 2.1, 71], [-26.4, 4.0, 73.4]],
+  ] as ReadonlyArray<ReadonlyArray<readonly [number, number, number]>>,
+  payoff: { x: -4, z: 80, r: 45 },
+} as const;
+
 /** The Still Crown on the Summit: far down the vista gap past the bridge, low enough to sit inside the chase frame */
 export const CROWN = { x: 2, y: -70, z: -112, yaw: 0, scale: 1.6 } as const;
 
@@ -144,6 +160,13 @@ export const KEEPING = (() => {
   };
 })();
 
+/** Optional canopy route; broad one-way leaf tops above the meadow retry floor. */
+export const CANOPY = [
+  { id: 'entry', x: -0.2, z: 71.5, rise: 0.42 },
+  { id: 'middle', x: -0.2, z: 69.3, rise: 1.9 },
+  { id: 'high', x: 0.9, z: 67.1, rise: 3.0 },
+  { id: 'roost', x: -1, z: 64.7, rise: 3.5 },
+] as const;
 /** West-grove paper ruin: permanent dash folds, then a southern return to meadow. */
 export const POP_UP_RUIN = {
   entry: { x: -24, z: 75 },
@@ -156,3 +179,37 @@ export const POP_UP_RUIN = {
   overlook: { x: -24.4, z: 71, top: 1.02, width: 3.4, depth: 3.6 },
   returnEnd: { x: -24.4, z: 75.7 },
 } as const;
+/**
+ * Unpressed creatures (DESIGN-unpressed.md): where each pressed drawing sits. `yaw` orients the creature's
+ * profile plane on the surface (its local +z = the surface's outward normal); `y` is the drawing's foot line;
+ * `settle` is where the creature ends up living after its performance.
+ */
+export const UNPRESSED = (() => {
+  // the Great Well's stone ring, on the side that faces the lane mouth (seen head-on from the spawn and the plaza)
+  const wd = { x: 0.8, z: 0.6 };
+  const hog = { x: WELL.x + wd.x * 1.58, z: WELL.z + wd.z * 1.58 };
+  // the shelf's west cliff, between the lz 0 / −3 columns, facing H-a
+  const sc = Math.cos(SHELF.yaw);
+  const ss = Math.sin(SHELF.yaw);
+  const shelfAt = (lx: number, lz: number) => ({ x: SHELF.x + lx * sc + lz * ss, z: SHELF.z - lx * ss + lz * sc });
+  const heron = shelfAt(-5.45, -1.4);
+  // the far crag: a standing page-stone near its far-left corner, its face toward the bridge
+  const K = KEEPING;
+  const cc = Math.cos(K.crag.yaw);
+  const cs = Math.sin(K.crag.yaw);
+  const cragAt = (lx: number, lz: number) => ({ x: K.crag.x + lx * cc + lz * cs, z: K.crag.z - lx * cs + lz * cc });
+  const stone = cragAt(1.35, 1.2);
+  return {
+    hedgehog: { ...hog, y: groundH(hog.x, hog.z) + 0.1, yaw: Math.atan2(wd.x, wd.z), settle: { x: WELL.x + wd.x * 2.5 - wd.z * 1.3, z: WELL.z + wd.z * 2.5 + wd.x * 1.3 } },
+    heron: {
+      ...heron, y: groundH(heron.x, heron.z) + 0.7, yaw: Math.atan2(-sc, ss),
+      /** it lives at the cliff foot, back to the rock: land on it and it flings you up onto the shelf */
+      settle: { ...shelfAt(-6.1, 1.5), y: groundH(shelfAt(-6.1, 1.5).x, shelfAt(-6.1, 1.5).z) },
+      /** its facing once settled (away from the cliff, out over the meadow) */
+      out: { x: -sc, z: ss },
+    },
+    deer: { x: stone.x - K.fall.x * 0.2, z: stone.z - K.fall.z * 0.2, y: K.crag.top, yaw: Math.atan2(-K.fall.x, -K.fall.z), stone: { ...stone, yaw: K.crag.yaw }, settle: { ...cragAt(-0.7, 2.1), y: K.crag.top },
+      /** out of the stone toward the bridge, round its left end, to the far edge facing the Crown */
+      path: [cragAt(1.35, 0.25), cragAt(0.0, 0.5), cragAt(-0.7, 2.1)] },
+  };
+})();

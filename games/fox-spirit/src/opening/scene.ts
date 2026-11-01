@@ -8,7 +8,7 @@
  */
 import * as THREE from 'three';
 import { createForgeRenderer, createColorField, createPostStack, applyLookdevLights, applyHeightFog, matchFogToSky, type ColorField } from '../../../../src/render';
-import { buildSky, inkMaterial, paintU, rng } from '../lookdevKit';
+import { buildSky, inkMaterial, paintU, RESTORE_SLOTS, rng } from '../lookdevKit';
 import { buildContactShadow } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import { createPlay, PLAY, type Collider, type PlayController } from '../lookdevPlay';
@@ -22,7 +22,10 @@ import { createCrown } from './crown';
 import { CARRY, createCarry } from './carry';
 import { createKeepingChemistry } from './chemistry';
 import { createKeeping } from './keeping';
+import { buildUnpressed } from './unpressed';
 import { createHearthHum } from './hum';
+import { buildRunawayPage } from './page';
+import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
@@ -95,9 +98,12 @@ export async function runOpening(): Promise<void> {
 
   buildMeadow(ctx);
   buildVillage(ctx);
+  const canopy = buildCanopy(ctx);
   const keeping = createKeeping(ctx);
   const popUpRuin = buildPopUpRuin(ctx);
+  const unpressed = buildUnpressed(ctx);
   const crown = createCrown(ctx, sky.mist);
+  const runaway = buildRunawayPage(ctx);
 
   const contact = buildContactShadow();
   contact.position.set(0, 0.03, -0.15);
@@ -121,6 +127,7 @@ export async function runOpening(): Promise<void> {
     groundH,
     colliders: ctx.colliders,
     start: SPAWN,
+    onGroundContact: (at, speed, jumpHeld, dt) => canopy.contact(at, speed, jumpHeld, dt) ?? unpressed.contact(at, speed, jumpHeld, dt),
     updrafts: hearth.updrafts,
     onInteract: () => carry?.interact(),
     onDash: (lastGrounded) => carry?.beforeDash(lastGrounded),
@@ -145,7 +152,7 @@ export async function runOpening(): Promise<void> {
       keeping.release();
     },
   });
-  const hum = createHearthHum({ hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position });
+  const hum = createHearthHum({ hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position, page: runaway.voice });
   // the far Crown answers once the near tree has finished falling: attractor ladder resolves near → far
   // near → far: the settle swells the hum; the Crown answers when the fox steps out onto the far crag
   // and faces the vista gap (or after a while, so the response is never missed)
@@ -163,8 +170,8 @@ export async function runOpening(): Promise<void> {
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
   function syncPaint(): void {
-    paintU.uRestoreCount.value = Math.min(4, field.restores.length);
-    field.restores.slice(0, 4).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
+    paintU.uRestoreCount.value = Math.min(RESTORE_SLOTS, field.restores.length);
+    field.restores.slice(0, RESTORE_SLOTS).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
   }
 
   let time = 0;
@@ -198,12 +205,23 @@ export async function runOpening(): Promise<void> {
     forge.setSize(innerWidth, innerHeight);
     post.setSize(innerWidth, innerHeight);
   }
+  // mouse look: drag to swing the chase camera round the fox (it resumes auto-recentring after a pause)
+  let dragging = false;
+  addEventListener('pointerdown', (e) => {
+    dragging = true;
+    (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
+  });
+  addEventListener('pointerup', () => void (dragging = false));
+  addEventListener('pointercancel', () => void (dragging = false));
+  addEventListener('pointermove', (e) => {
+    if (dragging) player.cam.orbit(-e.movementX * 0.006, e.movementY * 0.003);
+  });
   addEventListener('resize', resize);
   resize();
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), hum: hum.state(), popUpRuin: popUpRuin.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), hum: hum.state(), page: runaway.state(), popUpRuin: popUpRuin.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -251,8 +269,12 @@ export async function runOpening(): Promise<void> {
     crownRespond: crown.respond,
     /** dev: play the Hearthtree settle without the root-hearth latch */
     keepingRelease: keeping.release,
+    pageStage: runaway.toStage,
+    /** dev: pop a pressed creature without the dash (hedgehog | heron | deer) */
+    unpress: unpressed.unpress,
     /** dev: unfold the steam stair without the steam latch */
     keepingSteam: keeping.reconnectSteam,
+    canopy: canopy.feel,
     params: PLAY,
     carry: CARRY,
     camera: player.cam.params,
