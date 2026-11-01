@@ -1,4 +1,4 @@
-// Smoke for the playable P0 clearing (?lookdev=p0&play=1): boot, drive a short route, jump, stills + state.
+// BASELINE BRANCH: smoke of the old main boot (/) with the same beats as the opening quick capture: boot, drive a short route, jump, stills + state.
 //
 //   node tools/lookdev-play-smoke.mjs --out /path/to/dir
 //
@@ -50,8 +50,10 @@ const ROUTE = [
 ];
 const trace = [];
 try {
-  await page.goto(`http://127.0.0.1:${port}/?lookdev=p0&play=1`, { waitUntil: 'domcontentloaded', timeout: 180000 });
-  await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 300000 });
+  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+  // old main boot (baseline for the opening verdict): no ready flag — wait for the hooks, then settle
+  await page.waitForFunction(() => typeof window.__gameHooks?.advance === 'function', null, { timeout: 300000 });
+  await page.waitForTimeout(3000);
   await page.evaluate(() => window.__gameHooks.setManual(true));
   let n = 0;
   if (hero) {
