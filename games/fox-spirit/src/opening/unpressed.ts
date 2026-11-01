@@ -738,7 +738,10 @@ export function buildUnpressed(ctx: OpeningCtx) {
       homed.add('heron');
     }
     if (heronBack) heronBack.top = u < 1 ? -1000 : s.y + HERON_FLING.backTop;
-    return t > F.secs + 0.4;
+    if (t <= F.secs + 0.4) return false;
+    // back at its post exactly as before, so its back lines up with the fling collider again
+    if (heronBack) c.holder.rotation.y = heronBack.yaw;
+    return true;
   }
 
   perform.hare = (c, t, dt) => {
