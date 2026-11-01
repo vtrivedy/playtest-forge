@@ -44,6 +44,13 @@ export const PLAY = {
   turnBank: 0.05,
   bankMax: 0.18,
   airPitch: 0.06,
+  slopeTilt: 1,
+  /** foot IK: 0 = clip only */
+  footIK: 1,
+  /** clip paw height (m above the root plane) that counts as stance */
+  stanceHeight: 0.035,
+  maxLock: 0.06,
+  maxPelvisDrop: 0.12,
 };
 
 const TAU = Math.PI * 2;
@@ -245,6 +252,133 @@ class FoxAnimator {
   }
 }
 
+const UP = new THREE.Vector3(0, 1, 0);
+const v3 = () => new THREE.Vector3();
+const qt = () => new THREE.Quaternion();
+
+/**
+ * Light foot IK on top of the clip (port of main's AuthoredLocomotion foot pass to the hearth rig):
+ * a paw the clip has on its ground plane is in stance → it latches where it landed (bounded lock),
+ * every paw follows the terrain under it, the pelvis drops so the lowest stance paw reaches, and
+ * a two-bone solve (shoulder/hip → elbow/stifle → pastern/meta) carries the paw; pastern/meta and
+ * paw keep their clip world orientation.
+ */
+class FootIK {
+  private feet: {
+    upper: THREE.Object3D; lower: THREE.Object3D; hock: THREE.Object3D; paw: THREE.Object3D; pole: number;
+    planted: boolean; anchor: THREE.Vector3; lock: THREE.Vector3; prev: THREE.Vector3 | null;
+  }[] = [];
+  private pelvis = 0;
+  /** worst stance-paw XZ speed this frame (m/s) — skate metric */
+  slide = 0;
+  stanceFeet = 0;
+
+  constructor(private root: THREE.Object3D, private model: THREE.Object3D) {
+    const find = (n: string) => {
+      const o = model.getObjectByName(n);
+      if (!o) throw new Error(`hearth fox rig: missing ${n}`);
+      return o;
+    };
+    for (const sd of ['L', 'R']) {
+      this.feet.push({ upper: find(`upperarm${sd}`), lower: find(`forearm${sd}`), hock: find(`pastern${sd}`), paw: find(`fpaw${sd}`), pole: -1, planted: false, anchor: v3(), lock: v3(), prev: null });
+      this.feet.push({ upper: find(`thigh${sd}`), lower: find(`shin${sd}`), hock: find(`meta${sd}`), paw: find(`hpaw${sd}`), pole: 1, planted: false, anchor: v3(), lock: v3(), prev: null });
+    }
+  }
+
+  apply(dt: number, ground: (x: number, z: number) => number, grounded: boolean, moving: boolean) {
+    const { root, model } = this;
+    const P = PLAY;
+    model.position.y = 0;
+    root.updateMatrixWorld(true);
+    const baseY = root.position.y;
+    this.slide = 0;
+    this.stanceFeet = 0;
+    if (!grounded || P.footIK <= 0) {
+      for (const f of this.feet) [f.planted, f.prev] = [false, null];
+      this.pelvis = THREE.MathUtils.damp(this.pelvis, 0, 18, dt);
+      model.position.y = this.pelvis;
+      return;
+    }
+    const plans = this.feet.map((f) => {
+      const pad = f.paw.getWorldPosition(v3());
+      const stance = pad.y - baseY < P.stanceHeight;
+      const g = ground(pad.x, pad.z);
+      if (stance && !f.planted) [f.planted, f.anchor] = [true, pad.clone()];
+      else if (!stance) f.planted = false;
+      if (f.planted && moving) {
+        const want = f.anchor.clone().sub(pad).setY(0);
+        if (want.length() > P.maxLock) {
+          want.setLength(P.maxLock);
+          f.anchor.copy(pad).add(want);
+        }
+        f.lock.copy(want);
+      } else f.lock.multiplyScalar(Math.exp(-dt / 0.06));
+      // the clip's paw height rides on the terrain under the paw (never below it)
+      const target = pad.clone().add(f.lock);
+      target.y = Math.max(pad.y + (g - baseY), g);
+      return { target, stance, need: target.y - pad.y };
+    });
+    let need = Infinity;
+    for (const p of plans) if (p.stance) need = Math.min(need, p.need);
+    this.pelvis = THREE.MathUtils.damp(this.pelvis, Number.isFinite(need) ? THREE.MathUtils.clamp(need, -P.maxPelvisDrop, 0.02) : 0, 18, dt);
+    model.position.y = this.pelvis;
+    model.updateMatrixWorld(true);
+    this.feet.forEach((f, i) => {
+      const { target, stance } = plans[i]!;
+      const pad = f.paw.getWorldPosition(v3());
+      if (pad.distanceToSquared(target) > 1e-8) this.place(f, target);
+      const solved = f.paw.getWorldPosition(v3());
+      if (stance) {
+        this.stanceFeet++;
+        if (f.prev) this.slide = Math.max(this.slide, Math.hypot(solved.x - f.prev.x, solved.z - f.prev.z) / Math.max(dt, 1e-5));
+        f.prev = solved;
+      } else f.prev = null;
+    });
+  }
+
+  private place(f: FootIK['feet'][number], target: THREE.Vector3) {
+    const hockRot = f.hock.getWorldQuaternion(qt());
+    const pawRot = f.paw.getWorldQuaternion(qt());
+    const metatarsus = f.paw.getWorldPosition(v3()).sub(f.hock.getWorldPosition(v3()));
+    this.solve(f.upper, f.lower, f.hock, target.clone().sub(metatarsus), f.pole);
+    f.hock.quaternion.copy(f.hock.parent!.getWorldQuaternion(qt()).invert().multiply(hockRot));
+    f.hock.updateWorldMatrix(false, true);
+    f.paw.quaternion.copy(f.paw.parent!.getWorldQuaternion(qt()).invert().multiply(pawRot));
+    f.paw.updateWorldMatrix(false, true);
+  }
+
+  private solve(upper: THREE.Object3D, lower: THREE.Object3D, end: THREE.Object3D, target: THREE.Vector3, pole: number) {
+    const a = upper.getWorldPosition(v3());
+    const b = lower.getWorldPosition(v3());
+    const c = end.getWorldPosition(v3());
+    const l1 = a.distanceTo(b);
+    const l2 = b.distanceTo(c);
+    if (l1 < 1e-3 || l2 < 1e-3) return;
+    const dir = target.clone().sub(a).normalize();
+    const dist = THREE.MathUtils.clamp(a.distanceTo(target), Math.abs(l1 - l2) + 1e-4, l1 + l2 - 1e-4);
+    // keep the clip's bend plane; fall back to the anatomical pole (elbow back, stifle forward)
+    const bend = b.clone().sub(a);
+    bend.addScaledVector(dir, -bend.dot(dir));
+    if (bend.lengthSq() < (0.05 * l1) ** 2) {
+      bend.set(0, 0, pole).applyQuaternion(this.root.quaternion);
+      bend.addScaledVector(dir, -bend.dot(dir));
+    }
+    if (bend.lengthSq() < 1e-8) return;
+    bend.normalize();
+    const along = (l1 * l1 + dist * dist - l2 * l2) / (2 * dist);
+    const joint = a.clone().addScaledVector(dir, along).addScaledVector(bend, Math.sqrt(Math.max(0, l1 * l1 - along * along)));
+    const aim = (bone: THREE.Object3D, from: THREE.Vector3, to: THREE.Vector3) => {
+      const world = bone.getWorldQuaternion(qt());
+      const fix = qt().setFromUnitVectors(from.normalize(), to.normalize());
+      bone.quaternion.copy(bone.parent!.getWorldQuaternion(qt()).invert().multiply(fix.multiply(world)));
+      bone.updateWorldMatrix(false, true);
+    };
+    aim(upper, b.clone().sub(a), joint.clone().sub(a));
+    const elbow = lower.getWorldPosition(v3());
+    aim(lower, end.getWorldPosition(v3()).sub(elbow), target.clone().sub(elbow));
+  }
+}
+
 export interface PlayController {
   cam: FollowCamera;
   step: (dt: number) => void;
@@ -263,6 +397,7 @@ export function createPlay(opts: {
   const { fox, groundH, colliders } = opts;
   const P = PLAY;
   const anim = new FoxAnimator(fox);
+  const ik = new FootIK(fox.root, fox.model);
 
   /** walkable surface (posts excluded unless `solid`) */
   const surface = (x: number, z: number, solid = true) => {
@@ -287,6 +422,37 @@ export function createPlay(opts: {
       clearance: 0.35,
     },
   });
+
+  if (new URLSearchParams(location.search).has('gui')) {
+    void import('lil-gui').then(({ default: GUI }) => {
+      const gui = new GUI({ title: 'hearth-fox feel' });
+      const move = gui.addFolder('move');
+      move.add(P, 'runSpeed', 1.5, 6, 0.05);
+      move.add(P, 'walkSpeed', 0.3, 1.5, 0.05);
+      move.add(P, 'accel', 1, 10, 0.1);
+      move.add(P, 'decel', 1, 12, 0.1);
+      move.add(P, 'turnSlow', 2, 12, 0.1);
+      move.add(P, 'turnFast', 1, 8, 0.1);
+      const jump = gui.addFolder('jump');
+      jump.add(P, 'jumpVelocity', 2, 9, 0.05);
+      jump.add(P, 'gravity', 6, 30, 0.5);
+      jump.add(P, 'fallGravity', 1, 2.5, 0.05);
+      jump.add(P, 'jumpCut', 0.2, 1, 0.05);
+      jump.add(P, 'airControl', 0, 5, 0.1);
+      const clip = gui.addFolder('clips + IK');
+      clip.add(P, 'minRate', 0.3, 1, 0.05);
+      clip.add(P, 'maxRate', 1, 2.5, 0.05);
+      clip.add(P, 'gaitFade', 0.05, 0.5, 0.01);
+      clip.add(P, 'turnBank', 0, 0.15, 0.005);
+      clip.add(P, 'footIK', 0, 1, 1);
+      clip.add(P, 'maxLock', 0, 0.15, 0.005);
+      const c = gui.addFolder('camera');
+      c.add(cam.params, 'distance', 1.5, 7, 0.05);
+      c.add(cam.params, 'height', 0.3, 3, 0.05);
+      c.add(cam.params, 'lag', 0, 0.5, 0.01);
+      c.add(cam.params, 'sideBias', -1, 1, 0.01);
+    });
+  }
 
   const keys = new Set<string>();
   let stick: THREE.Vector2 | null = null;
@@ -460,11 +626,18 @@ export function createPlay(opts: {
 
     // additives: turn bank (grounded), nose up rising / down falling
     bank = THREE.MathUtils.damp(bank, grounded ? THREE.MathUtils.clamp(-yawRate * speed * P.turnBank, -P.bankMax, P.bankMax) : 0, 6, dt);
-    pitch = THREE.MathUtils.damp(pitch, grounded ? 0 : THREE.MathUtils.clamp(-vel.y * P.airPitch, -0.3, 0.3), 8, dt);
+    let slope = 0;
+    if (grounded) {
+      const fx = Math.sin(yaw) * 0.3;
+      const fz = Math.cos(yaw) * 0.3;
+      slope = -Math.atan2(surface(pos.x + fx, pos.z + fz, false) - surface(pos.x - fx, pos.z - fz, false), 0.6) * P.slopeTilt;
+    }
+    pitch = THREE.MathUtils.damp(pitch, THREE.MathUtils.clamp(grounded ? slope : -vel.y * P.airPitch, -0.35, 0.35), 8, dt);
     fox.root.position.copy(pos);
     fox.root.rotation.set(0, yaw, 0);
     fox.model.rotation.set(pitch, 0, bank);
     fox.update(dt);
+    ik.apply(dt, (x, z) => surface(x, z, false), grounded, anim.state === 'loco');
 
     cam.update(dt, {
       target: pos,
@@ -504,6 +677,8 @@ export function createPlay(opts: {
       anim: anim.state,
       gait: anim.gaitName,
       playback: +anim.rate.toFixed(3),
+      stanceFeet: ik.stanceFeet,
+      maxSlide: +ik.slide.toFixed(3),
       paws: fox.paws(),
       camera: { pos: cam.camera.position.toArray().map((v) => +v.toFixed(3)) },
     }),
