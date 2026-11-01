@@ -7,7 +7,7 @@
 //
 // Beats: settle in sepia → walk out → run → jump onto the mossy rock (paint bloom) → run to the arch →
 // jump the plinth (bloom) → through the arch, loop back across the clearing → open-ground leap (bloom)
-// → ease to a walk → stop and look.
+// → wide run round the west side → last leap (bloom) → ease to a walk → stop and look at the arch.
 
 export const HERO_START = { x: 0.6, z: 7.2, yaw: Math.PI };
 
@@ -21,11 +21,14 @@ const LEGS = [
   { beat: 'run to arch', to: [-0.3, -5.4], mag: 1 },
   { beat: 'jump the plinth', to: [-0.3, -8.0], mag: 1, jumpAt: 2.2, arrive: 0.6 },
   { beat: 'through the arch', to: [-0.2, -10.6], mag: 0.45 },
-  { beat: 'loop back', to: [2.6, -11.0], mag: 1 },
-  { beat: 'loop back', to: [4.6, -6.0], mag: 1 },
-  { beat: 'loop back', to: [4.4, -0.5], mag: 1 },
+  { beat: 'loop back', to: [2.4, -10.8], mag: 1 },
+  { beat: 'loop back', to: [3.9, -6.0], mag: 1 },
+  { beat: 'loop back', to: [3.8, -0.5], mag: 1 },
   { beat: 'leap', to: [1.6, 2.4], mag: 1, jumpAt: 2.4, arrive: 0.8 },
-  { beat: 'ease', to: [0.9, 4.6], mag: 0.2 },
+  { beat: 'wide run', to: [-3.4, 4.4], mag: 1 },
+  { beat: 'wide run', to: [-4.9, 0.2], mag: 1 },
+  { beat: 'last leap', to: [-3.6, -2.6], mag: 1, jumpAt: 2.3, arrive: 0.8 },
+  { beat: 'ease', to: [-1.4, -3.4], mag: 0.2 },
   { beat: 'stop and look', hold: 99 },
 ];
 

@@ -49,6 +49,8 @@ export const PLAY = {
   footIK: 1,
   /** clip paw height (m above the root plane) that counts as stance */
   stanceHeight: 0.035,
+  /** pre-IK paw world speed (m/s) below which a low paw counts as planted */
+  stanceSpeed: 0.6,
   maxLock: 0.06,
   maxPelvisDrop: 0.12,
 };
@@ -266,7 +268,7 @@ const qt = () => new THREE.Quaternion();
 class FootIK {
   private feet: {
     upper: THREE.Object3D; lower: THREE.Object3D; hock: THREE.Object3D; paw: THREE.Object3D; pole: number;
-    planted: boolean; anchor: THREE.Vector3; lock: THREE.Vector3; prev: THREE.Vector3 | null;
+    planted: boolean; anchor: THREE.Vector3; lock: THREE.Vector3; prev: THREE.Vector3 | null; raw: THREE.Vector3 | null;
   }[] = [];
   private pelvis = 0;
   /** worst stance-paw XZ speed this frame (m/s) — skate metric */
@@ -280,8 +282,8 @@ class FootIK {
       return o;
     };
     for (const sd of ['L', 'R']) {
-      this.feet.push({ upper: find(`upperarm${sd}`), lower: find(`forearm${sd}`), hock: find(`pastern${sd}`), paw: find(`fpaw${sd}`), pole: -1, planted: false, anchor: v3(), lock: v3(), prev: null });
-      this.feet.push({ upper: find(`thigh${sd}`), lower: find(`shin${sd}`), hock: find(`meta${sd}`), paw: find(`hpaw${sd}`), pole: 1, planted: false, anchor: v3(), lock: v3(), prev: null });
+      this.feet.push({ upper: find(`upperarm${sd}`), lower: find(`forearm${sd}`), hock: find(`pastern${sd}`), paw: find(`fpaw${sd}`), pole: -1, planted: false, anchor: v3(), lock: v3(), prev: null, raw: null });
+      this.feet.push({ upper: find(`thigh${sd}`), lower: find(`shin${sd}`), hock: find(`meta${sd}`), paw: find(`hpaw${sd}`), pole: 1, planted: false, anchor: v3(), lock: v3(), prev: null, raw: null });
     }
   }
 
@@ -294,14 +296,17 @@ class FootIK {
     this.slide = 0;
     this.stanceFeet = 0;
     if (!grounded || P.footIK <= 0) {
-      for (const f of this.feet) [f.planted, f.prev] = [false, null];
+      for (const f of this.feet) [f.planted, f.prev, f.raw] = [false, null, null];
       this.pelvis = THREE.MathUtils.damp(this.pelvis, 0, 18, dt);
       model.position.y = this.pelvis;
       return;
     }
     const plans = this.feet.map((f) => {
       const pad = f.paw.getWorldPosition(v3());
-      const stance = pad.y - baseY < P.stanceHeight;
+      // stance = the clip has the paw on its ground plane AND (nearly) still in the world
+      const rawSpeed = f.raw ? Math.hypot(pad.x - f.raw.x, pad.z - f.raw.z) / Math.max(dt, 1e-5) : 0;
+      f.raw = pad.clone();
+      const stance = pad.y - baseY < P.stanceHeight && rawSpeed < P.stanceSpeed;
       const g = ground(pad.x, pad.z);
       if (stance && !f.planted) [f.planted, f.anchor] = [true, pad.clone()];
       else if (!stance) f.planted = false;
@@ -408,8 +413,15 @@ export function createPlay(opts: {
     return y;
   };
 
+  /** lens sphere inside a pier / block / rock / trunk */
+  const lensBlocked = (x: number, y: number, z: number, r: number) =>
+    colliders.some((c) => {
+      for (const [ox, oz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]] as const) if (colliderTop(c, x + ox, z + oz) > y - r) return true;
+      return false;
+    });
   const cam = createFollowCamera({
     surfaceAt: (x, z) => surface(x, z, false),
+    lensBlocked,
     params: {
       distance: 3.1,
       runDistance: 2.9,
