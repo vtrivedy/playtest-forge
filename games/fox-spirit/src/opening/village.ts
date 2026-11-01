@@ -20,7 +20,7 @@ const C = {
   stoneDark: 0x6b6358,
   stoneCool: 0x6e6d69,
   stoneField: 0x5f584f,
-  moss: 0x55583a,
+  cloth: [0xb9ab90, 0x8d6f62, 0x7d8088],
   thatch: 0x8d7a52,
   thatchDark: 0x6c5d40,
   slate: 0x5d5c66,
@@ -237,11 +237,6 @@ function cottage(k: Kit, ctx: OpeningCtx, h: House, index: number): number {
           const wide = w + over * 2 - (2 - c) * 0.06;
           k.add(thatchCourse(wide, thick, run * (t1 - t0), sz, rand), c % 2 ? C.thatchDark : tone, [0, ySurf(tm) + thick / 2 + c * 0.07, zAt(tm)], [sz * slope, 0, 0], c === 2 ? 0.022 : 0.016);
         });
-        // moss on the shaded courses (old roofs nobody re-thatched)
-        for (let m = 0; m < 3; m++) {
-          const t = 0.25 + rand() * 0.6;
-          k.add(jitter(new THREE.IcosahedronGeometry(0.28, 1), 0.25, rand), C.moss, [(rand() - 0.5) * w, ySurf(t) + thick + 0.08, zAt(t)], [sz * slope, rand() * 6, 0], 0.012, [1.4, 0.35, 1]);
-        }
       }
     }
     k.add(jitter(cyl(slate ? 0.17 : 0.36, slate ? 0.17 : 0.36, w + over * 2 + 0.15, 10, 'x'), slate ? 0.01 : 0.05, rand), toneDark, [0, ySurf(0) + thick + (slate ? 0.02 : 0.08), 0], [0, 0, 0], 0.024);
@@ -418,6 +413,59 @@ function fence(k: Kit, ctx: OpeningCtx, ax: number, az: number, bx: number, bz: 
   return { x: mx, z: mz, yaw, hx: 0.12, hz: len / 2, top: y + 0.8 };
 }
 
+/** two-wheeled hand cart, tipped onto its shafts */
+function handCart(k: Kit, ctx: OpeningCtx, x: number, z: number, yaw: number): void {
+  const { rand } = ctx;
+  k.at(x, ctx.groundH(x, z), z, yaw, () => {
+    k.add(hewn(box(1.2, 0.12, 1.6), rand, 0.02), C.timber, [0, 0.62, 0], [0.12, 0, 0], 0.016);
+    for (const s of [-1, 1]) {
+      k.add(box(0.08, 0.36, 1.6), C.timberDark, [s * 0.6, 0.82, 0], [0.12, 0, 0]);
+      k.add(cyl(0.48, 0.48, 0.1, 12, 'x'), C.timber, [s * 0.68, 0.48, 0.1], [0, 0, 0], 0.016);
+      k.add(cyl(0.12, 0.12, 0.14, 8, 'x'), C.timberDark, [s * 0.7, 0.48, 0.1]);
+      k.add(box(0.07, 0.07, 1.4), C.timber, [s * 0.4, 0.3, -1.25], [-0.3, 0, 0]);
+    }
+    k.add(cyl(0.3, 0.26, 0.6, 9), C.timber, [0.2, 1.0, 0.25], [0.12, 0, 0], 0.014);
+    k.add(jitter(new THREE.IcosahedronGeometry(0.32, 1), 0.2, rand), C.thatch, [-0.25, 0.85, -0.3], [0, 0, 0], 0.014, [1.2, 0.7, 1]);
+  });
+}
+
+/** washing line between two crooked poles, a few cloths hanging */
+function washingLine(k: Kit, ctx: OpeningCtx, ax: number, az: number, bx: number, bz: number): void {
+  const a = new THREE.Vector3(ax, ctx.groundH(ax, az) + 2.1, az);
+  const b = new THREE.Vector3(bx, ctx.groundH(bx, bz) + 2.1, bz);
+  for (const p of [a, b]) k.add(cyl(0.06, 0.08, 2.2, 6), C.timber, [p.x, p.y - 1.05, p.z], [(ctx.rand() - 0.5) * 0.1, 0, (ctx.rand() - 0.5) * 0.1], 0.012);
+  const yaw = Math.atan2(b.x - a.x, b.z - a.z);
+  const sag = (t: number) => a.clone().lerp(b, t).setY(THREE.MathUtils.lerp(a.y, b.y, t) - 0.3 * 4 * t * (1 - t));
+  k.add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(Array.from({ length: 9 }, (_, i) => sag(i / 8))), 12, 0.015, 4), C.rope, [0, 0, 0], [0, 0, 0], 0.005);
+  [0.2, 0.42, 0.66, 0.84].forEach((t, i) => {
+    const p = sag(t);
+    const w = 0.5 + (i % 2) * 0.25;
+    const h = 0.6 + (i % 3) * 0.15;
+    k.add(jitter(new THREE.BoxGeometry(0.03, h, w, 1, 3, 3), 0.04, ctx.rand), C.cloth[i % 3]!, [p.x, p.y - h / 2, p.z], [0, yaw, (i % 2 ? 1 : -1) * 0.05], 0.01);
+  });
+}
+
+/** slow chimney smoke: a column of ink-wash puffs that swell, drift and fade (one hearth still kept) */
+function chimneySmoke(ctx: OpeningCtx, x: number, y: number, z: number): void {
+  const puffs: THREE.Mesh[] = [];
+  const mat = toon(0xc9bfb2);
+  const geo = jitter(new THREE.IcosahedronGeometry(0.3, 1), 0.15, ctx.rand);
+  for (let i = 0; i < 7; i++) {
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = false;
+    ctx.scene.add(m);
+    puffs.push(m);
+  }
+  ctx.onUpdate((_dt, t) => {
+    puffs.forEach((m, i) => {
+      const life = (t * 0.16 + i / puffs.length) % 1;
+      const s = Math.sin(Math.PI * Math.min(1, life * 1.4)) * (0.5 + life * 1.3);
+      m.scale.setScalar(Math.max(0.001, s));
+      m.position.set(x + life * 1.6 + Math.sin(t * 0.7 + i) * 0.12, y + life * 3.2, z - life * 0.5);
+    });
+  });
+}
+
 export function buildVillage(ctx: OpeningCtx): void {
   const { scene, colliders } = ctx;
   HOUSES.forEach((h, i) => {
@@ -430,12 +478,16 @@ export function buildVillage(ctx: OpeningCtx): void {
     colliders.push({ kind: 'box', x: h.x, z: h.z, yaw: 0, hx: h.w / 2 + 0.45, hz: h.d / 2 + 0.45, top: y0 + 0.55 + h.eave + h.rise });
     colliders.push({ kind: 'post', x: h.x - h.w * 0.2 - 1.0, z: h.z + h.d / 2 + 0.6, r: 0.36 });
     colliders.push({ kind: 'post', x: h.x + h.w * 0.42, z: h.z + h.d / 2 + 0.65, r: 0.38 });
-    if (h.chimney) colliders.push({ kind: 'post', x: h.x - h.w / 2 - 0.35, z: h.z - h.d * 0.18, r: 0.5 });
+    if (h.chimney) {
+      colliders.push({ kind: 'post', x: h.x - h.w / 2 - 0.35, z: h.z - h.d * 0.18, r: 0.5 });
+      // only the cottage nearest the waking fox still keeps a fire
+      if (i === 0) chimneySmoke(ctx, h.x - h.w / 2 - 0.35, y0 + 0.55 + h.eave + h.rise + 1.6, h.z - h.d * 0.18);
+    }
   });
 
   const props = new Kit();
   greatWell(props, ctx);
-  colliders.push({ kind: 'post', x: WELL.x, z: WELL.z, r: 1.6 });
+  colliders.push({ kind: 'post', x: WELL.x, z: WELL.z, r: 1.8 });
   firePit(props, ctx, -11.5, 93.6);
   colliders.push({ kind: 'cap', x: -11.5, z: 93.6, r: 1.1, base: ctx.groundH(-11.5, 93.6), h: 0.25 });
   const posts: Record<string, THREE.Vector3> = {};
@@ -451,6 +503,15 @@ export function buildVillage(ctx: OpeningCtx): void {
   // back-garden fences
   for (const [ax, az, bx, bz] of [[-21, 81.8, -15, 81.8], [-31.5, 81.2, -25.5, 81.2], [8.6, 92.2, 15.4, 92.2], [-12, 97.2, -6.2, 97.2]] as const)
     colliders.push({ kind: 'box', ...fence(props, ctx, ax, az, bx, bz) });
+  handCart(props, ctx, -11.2, 81.8, 0.7);
+  colliders.push({ kind: 'box', x: -11.2, z: 81.8, yaw: 0.7, hx: 0.75, hz: 1.2, top: ctx.groundH(-11.2, 81.8) + 0.9 });
+  for (const [x, z, yaw] of [[-23.2, 90.4, 0.3], [-22.0, 90.9, 1.2], [-22.7, 90.6, 0.8]] as const) {
+    const y = ctx.groundH(x, z);
+    props.add(hewn(new THREE.BoxGeometry(1.0, 0.55, 0.6, 2, 1, 1), ctx.rand, 0.05), C.thatch, [x, y + 0.26 + (x === -22.7 ? 0.55 : 0), z], [0, yaw, 0], 0.016);
+  }
+  colliders.push({ kind: 'box', x: -22.6, z: 90.6, yaw: 0.6, hx: 1.1, hz: 0.7, top: ctx.groundH(-22.6, 90.6) + 1.1 });
+  washingLine(props, ctx, -33.5, 91.2, -29.2, 91.8);
+  for (const [x, z] of [[-33.5, 91.2], [-29.2, 91.8]] as const) colliders.push({ kind: 'post', x, z, r: 0.12 });
   const pg = props.build();
   pg.name = 'village-props';
   scene.add(pg);
@@ -458,7 +519,7 @@ export function buildVillage(ctx: OpeningCtx): void {
   scene.add(flagstones(ctx));
 
   // a few village maples between the cottages (meadow trees are meadow.ts)
-  for (const [x, z, s, pal] of [[-23.5, 95.5, 1.0, 1], [-1.5, 104, 1.15, 2], [3.5, 96.5, 0.85, 3], [-33, 92, 1.1, 0]] as const) {
+  for (const [x, z, s, pal] of [[-23.5, 95.5, 1.0, 1], [-1.5, 104, 1.15, 2], [3.5, 96.5, 0.85, 3], [-35.5, 94.5, 1.1, 0]] as const) {
     const y = ctx.groundH(x, z);
     const t = buildMaple(ctx.rand, s, 'grove', pal, y);
     t.position.set(x, y - 0.1, z);
