@@ -23,7 +23,6 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
 
   const stone = toon(0x827263, { contour: 0.5, hatchWeight: 0.35 });
   const paper = toon(0xa99672, { contour: 0.4, hatchWeight: 0.15 });
-  const brass = toon(0xb67a43, { contour: 0.5 });
   const undercroft = toon(0x464d50, { contour: 0.7, hatchWeight: 0.4 });
   const ink = toon(0x48382b);
   // Original ink illustration. Transparent paper print takes the same light/fog as the world.
@@ -79,16 +78,17 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   function spindle(x: number, y: number, z: number): THREE.Group {
     const g = new THREE.Group();
     g.position.set(x, y, z);
-    const axle = inked(new THREE.CylinderGeometry(0.16, 0.16, 1.4, 8), brass, 0.018, true);
-    axle.rotation.x = Math.PI / 2;
-    axle.position.y = 0.18;
-    g.add(axle);
-    // A split brass leaf, held shut by the spindle; it spreads when the route is restored.
+    // A folded parchment pull-tab, stitched across the crease.
     for (const side of [-1, 1]) {
-      const leaf = box(0.32, 0.045, 0.42, brass);
-      leaf.position.set(0, 0.38, side * 0.2);
-      leaf.rotation.x = side * 0.35;
-      g.add(leaf);
+      const tab = box(0.42, 0.035, 0.66, paper, 0.025);
+      tab.position.set(0, 0.17, side * 0.29);
+      tab.rotation.x = side * 0.32;
+      g.add(tab);
+    }
+    for (const z of [-0.48, -0.24, 0, 0.24, 0.48]) {
+      const stitch = box(0.2, 0.018, 0.025, ink, 0);
+      stitch.position.set(0, 0.21 - Math.abs(z) * 0.14, z);
+      g.add(stitch);
     }
     g.scale.setScalar(0.55);
     root.add(g);

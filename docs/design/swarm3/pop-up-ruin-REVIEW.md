@@ -44,3 +44,8 @@ Verdict: NEEDS REVISION
 
 
 Paper revision WIP: first full route10/10 PASS/errors[] at /captures/rook/ruin-paper-wip. Chase review found the large illustration rotated90° relative to the closed page; corrected its print orientation, then replaced chunky jamb stacks with tapered broken piers and dark undercroft. Final revised pass pending. All physics, top heights and route colliders remain the previous tested layout. System ffmpeg absent: recovered c442403 route.mp4 from saved PNGs with imageio-ffmpeg and uploaded to /reviews/rook-ruin-c442403-motion. Probe now accepts FFMPEG_PATH. Teammate FUN/BEAUTIFUL still NOT YET; no integration land authorized by these checks.
+
+
+700b3ab final full route10/10 PASS/errors[] at /captures/rook/ruin-paper-700b3ab; exact TypeScript/Vite PASS. Upright print, torn edges and stitches reviewed in01/02/04/06. Flint573 independently rates FUN MARGINALLY with integrated Page target; BEAUTIFUL MARGINALLY: print reads as book page, unfolded flaps remain table-like and orange hinge resembles toy log. Replaced the round brass marker with a folded parchment tab and dark stitches per that critique; full route replay pending. Higher climb remains a separate spatial decision.
+
+Independent db7f6e3 Canopy+Page staged climb3/3 twice, errors[]. Both physical return attempts missed high leaf and reached safe meadow; no catch verification and no unfamiliar-player claim. Page flits before reaching roost, so turnaround consumes its rest window. Submitted evidence and NOT YET FUN verdict to Flint586; Page tuning stays Flint-owned.
