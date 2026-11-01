@@ -169,7 +169,8 @@ export function createCarry(opts: {
       fire.emissiveIntensity = CARRY.glow * (1 + 0.08 * Math.sin(t * 4) + pulse * 0.4);
       sync(t);
       glyph.textContent = carried ? 'E · set warmth down' : 'E · carry warmth';
-      glyph.style.opacity = grounded && !dashing && (carried || canPickup()) ? '1' : '0';
+      const teach = carried ? placements === 0 : pickups === 0 && canPickup();
+      glyph.style.opacity = grounded && !dashing && teach ? '1' : '0';
     },
     heatSource(): CoalHeatSource {
       return { position: position.clone(), carried, heat: 1 };
