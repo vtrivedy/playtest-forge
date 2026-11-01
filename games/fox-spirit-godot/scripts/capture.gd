@@ -6,6 +6,7 @@ extends Node
 ##   --shots=a,b[:full]    render fixed review shots (Opening.SHOTS) and quit
 ##   --poses=a,b           chase-cam stills at three.js opening-stills poses (fox teleported) and quit
 ##   --probe               feel probe (same inputs as tools/threejs-feel-probe.mjs); headless is fine
+##   --panel               show the F1 feel panel in the stills
 ##   --out=DIR             where PNGs + state.jsonl go
 ## Run under the movie maker for video: godot --path . --write-movie out.avi --fixed-fps 30 -- --route=hero
 
@@ -38,6 +39,9 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(out)
 	opening = get_parent() as Opening
 	_log = FileAccess.open(out.path_join("state.jsonl"), FileAccess.WRITE)
+	if args.has("panel"):
+		for t in opening.find_children("*", "Tunables", false, false):
+			(t as CanvasLayer).visible = true
 	if args.has("shots"):
 		_run_shots.call_deferred()
 	elif args.has("poses"):

@@ -110,6 +110,16 @@ What still differs, looking at those pairs:
 - GDScript builtin `smoothstep(from, to, x)` silently shadows a same-named class static.
 - Procedural geometry in GDScript is ~10× slower than JS (6.6 s build vs ~1 s in three.js).
 
+## Captures (all under `/captures/results/`)
+
+| what | path |
+|---|---|
+| real-input hero route, movie maker 30 fps + stills + per-tick state | `godot-oak-hero-route-04/` (final; `-03` same build, earlier cold-hearth framing; `-01/-02` superseded) |
+| side-by-side stills vs three.js (paper + painted, 6 views) + occluder fade | `godot-oak-side-by-side-01/sbs-*.png`, `godot-occlusion-wellblock.png` |
+| three.js reference stills (`tools/opening-stills.mjs`) | `threejs-ref/{paper,paint}/` |
+| feel probe, both engines | `godot-oak-feel-probe-01/` |
+| web export booted in headless Chromium (keyboard run + jump) | `godot-oak-web-smoke-02/` |
+
 ## Verdict
 
 For this slice Godot is at **look parity** at the matched stills and **feel parity** on every probe
