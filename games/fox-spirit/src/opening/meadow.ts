@@ -73,7 +73,9 @@ function column(rand: () => number, x: number, z: number, r: number, y0: number,
     const b = joints[i + 1]!;
     const k = (a - y0) / Math.max(1, stoneTop - y0);
     const rr = r * (1 - k * 0.14) * (0.95 + rand() * 0.1);
-    const geo = hewn(new THREE.CylinderGeometry(rr * 0.94, rr, b - a - 0.04, sides, 1), rand, 0.07);
+    // bare columns weather to a chamfered crown so the ridge line breaks instead of stepping like a wall
+    const crown = !moss && i === joints.length - 2 ? 0.55 + rand() * 0.2 : 0.94;
+    const geo = hewn(new THREE.CylinderGeometry(rr * crown, rr, b - a - 0.04, sides, 1), rand, 0.07);
     const tone = new THREE.Color(STRATA[(i + Math.floor(x * 3 + z)) & 3]!).multiplyScalar(0.88 + rand() * 0.2);
     const m = inked(geo, toon(tone, { contour: 0.5 }), 0.028, true);
     m.position.set((rand() - 0.5) * 0.24, (a + b) / 2, (rand() - 0.5) * 0.24);
@@ -164,7 +166,7 @@ function buildShelf(ctx: OpeningCtx): void {
     [-4.6, hd + 1.8, 1.9, 4.2], [hw + 10.5, 1, 3, 11.5],
   ];
   for (const [lx, lz, r, h] of RIDGE) {
-    root.add(column(rand, lx, lz, r, g0 - 2, g0 + h, true));
+    root.add(column(rand, lx, lz, r, g0 - 2, g0 + h + (h > 8 ? 1 : 0), h < 8.5 && rand() < 0.6));
     const [wx, wz] = world(lx, lz);
     colliders.push({ kind: 'post', x: wx, z: wz, r: r * 0.95 });
   }
@@ -225,6 +227,18 @@ export function buildMeadow(ctx: OpeningCtx): void {
     const y = groundH(x, z);
     const t = buildMaple(rand, 1.4 + rand() * 0.5, rand() < 0.4 ? 'tall' : 'grove', rand() < 0.6 ? 4 + (i & 1) : i & 3, y);
     t.position.set(x, y - 0.1, z);
+    t.rotation.y = rand() * 6;
+    scene.add(t);
+  }
+  // a second, deeper row of crowns up the slope, offset between the first
+  for (let i = 0; i < RIM_N; i++) {
+    const a = ((i + 0.5) / RIM_N) * Math.PI * 2 + (rand() - 0.5) * 0.15;
+    const k2 = 1.32 + rand() * 0.18;
+    const x2 = BOUNDS.cx + Math.cos(a) * BOUNDS.rx * k2;
+    const z2 = BOUNDS.cz + Math.sin(a) * BOUNDS.rz * k2;
+    const y2 = groundH(x2, z2);
+    const t = buildMaple(rand, 1.6 + rand() * 0.5, 'grove', 4 + (i & 1), y2);
+    t.position.set(x2, y2 - 0.1, z2);
     t.rotation.y = rand() * 6;
     scene.add(t);
   }
