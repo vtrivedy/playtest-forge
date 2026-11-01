@@ -1,6 +1,7 @@
 /** Permanent paper-stone folds. Design: docs/design/swarm3/pop-up-ruin-DESIGN.md. */
 import * as THREE from 'three';
 import { hewn, inked, toon } from '../lookdevKit';
+import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { POP_UP_RUIN as R } from './layout';
 
@@ -11,13 +12,15 @@ type Fold = {
   x: number; z: number; y: number;
   elapsed: number; phase: 'folded' | 'opening' | 'open';
   land: () => void;
+  guard?: Collider;
+  housing?: THREE.Object3D;
 };
 
 export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unknown> } {
   const root = new THREE.Group();
   root.name = 'pop-up ruin';
   ctx.scene.add(root);
-  ctx.occluders.push(root);
+
   const stone = toon(0x827263, { contour: 0.5, hatchWeight: 0.35 });
   const paper = toon(0xa99672, { contour: 0.4, hatchWeight: 0.15 });
   const brass = toon(0xb67a43, { contour: 0.5 });
@@ -54,6 +57,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   const terrace = box(O.width, 0.24, O.depth, paper);
   terrace.position.set(O.x, O.top - 0.12, O.z);
   root.add(terrace);
+  ctx.occluders.push(terrace);
   ctx.colliders.push({ kind: 'box', x: O.x, z: O.z, yaw: 0, hx: O.width / 2, hz: O.depth / 2, top: O.top });
   for (const dz of [-1.2, 0, 1.2]) {
     const base = ctx.groundH(O.x, O.z + dz);
@@ -77,6 +81,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
     pivot.position.set(p.x - R.width / 2, p.top - 0.12, p.z);
     pivot.rotation.z = Math.PI / 2;
     root.add(pivot);
+    ctx.occluders.push(pivot);
     const slab = box(R.width, 0.24, R.depth, paper);
     slab.position.x = R.width / 2;
     pivot.add(slab);
@@ -92,9 +97,16 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
       pivot.add(crease);
     }
     const marker = spindle(p.x + R.width / 2 + 0.06, p.top, p.z);
+    const gx = p.x + R.width / 2 + 0.2;
+    const base = ctx.groundH(gx, p.z);
+    const guard: Collider = { kind: 'cap', x: gx, z: p.z, r: 0.65, base, h: p.top + 0.18 - base };
+    ctx.colliders.push(guard);
+    const housing = inked(new THREE.CylinderGeometry(0.28, 0.65, guard.h, 6), stone, 0.02, true);
+    housing.position.set(gx, base + guard.h / 2, p.z);
+    root.add(housing);
     folds.push({
       pivot, spindle: marker, x: marker.position.x, y: p.top, z: p.z,
-      elapsed: 0, phase: 'folded',
+      elapsed: 0, phase: 'folded', guard, housing,
       land: () => ctx.colliders.push({ kind: 'box', x: p.x, z: p.z, yaw: 0, hx: R.width / 2, hz: R.depth / 2, top: p.top }),
     });
   });
@@ -158,7 +170,11 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
         const angle = Math.PI / 2 * (1 - eased) + Math.sin(u * Math.PI * 2) * 0.035 * Math.sin(u * Math.PI);
         if (i < 2) f.pivot.rotation.z = angle;
         else f.pivot.rotation.x = angle;
-        if (u >= 1) {
+        if (f.housing) f.housing.scale.y = 1 - eased * 0.85;
+        const under = i < 2 && Math.abs(p.x - R.leaves[i]!.x) < R.width / 2 + 0.1 && Math.abs(p.z - f.z) < R.depth / 2 + 0.1 && p.y < R.leaves[i]!.top - 0.05;
+        if (u >= 1 && !under) {
+          if (f.guard) { const n = ctx.colliders.indexOf(f.guard); if (n >= 0) ctx.colliders.splice(n, 1); }
+          if (f.housing) f.housing.visible = false;
           f.phase = 'open'; f.land();
           if (i === 2) {
             returns++;
