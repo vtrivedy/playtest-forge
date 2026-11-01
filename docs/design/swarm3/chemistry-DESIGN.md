@@ -49,6 +49,11 @@ slightly lighter, stronger paper vapor for readability against the ochre cliff.
 
 ## Retire the first heat teach
 
+Before the first successful ride, show H-a guidance only within 6 m of its
+base in three dimensions. Players visiting canopy or ruin first should see those
+places without the hearth lesson following them. Preserve the permanent retirement
+after a successful ride. Verify near/far/overhead positions and real movement.
+
 After H-a records its first successful elevated landing, retire its tutorial HUD
 permanently. The landing is the handoff to Carry; a completed-hearth message must
 not overlap the nearby coal interaction prompt. Keep incomplete hearth guidance

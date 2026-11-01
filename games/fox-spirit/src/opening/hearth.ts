@@ -53,7 +53,8 @@ export function createOpeningHearth(opts: {
         const aura = 1 - THREE.MathUtils.smoothstep(distance, dashing ? 2 : 1.5, dashing ? 3.2 : 2.5);
         return Math.max(aura, opts.supplyAt?.(p) ?? 0);
       }, false);
-      const near = Math.hypot(fox.x - OPENING_HEARTH.x, fox.z - OPENING_HEARTH.z) < 12;
+      const base = updrafts.hearths[0]!.base;
+      const near = fox.distanceToSquared(base) < 6 * 6;
       const ride = updrafts.lastRide;
       if (ride?.hearth === 'H-a' && ride.landFeetY !== null && ride.landFeetY > ride.baseY + 2) complete = true;
       hud.textContent = latched ? 'Space · jump and hold to ride the warm air' : 'Bring your colour to the cold hearth · run close or Shift dash';
