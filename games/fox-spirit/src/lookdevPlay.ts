@@ -421,9 +421,31 @@ export function createPlay(opts: {
       for (const [ox, oz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]] as const) if (colliderTop(c, x + ox, z + oz) > y - r) return true;
       return false;
     });
+  /**
+   * Sight blockers for the follow camera's scenery occlusion (it pulls the boom in front of anything
+   * between lens and fox): unrendered solid proxies of piers, blocks and trunks built from the colliders.
+   */
+  const sightProxies = new THREE.Group();
+  const proxyMat = new THREE.MeshStandardMaterial();
+  for (const c of colliders) {
+    const base = groundH(c.x, c.z) - 0.2;
+    if (c.kind === 'box' && c.top - base > 1) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(c.hx * 2, c.top - base, c.hz * 2), proxyMat);
+      m.position.set(c.x, (base + c.top) / 2, c.z);
+      m.rotation.y = c.yaw;
+      m.name = 'pier';
+      sightProxies.add(m);
+    } else if (c.kind === 'post') {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(c.r * 0.7, c.r, 3, 10), proxyMat);
+      m.position.set(c.x, base + 1.5, c.z);
+      m.name = 'trunk';
+      sightProxies.add(m);
+    }
+  }
   const cam = createFollowCamera({
     surfaceAt: (x, z) => surface(x, z, false),
     lensBlocked,
+    scenery: sightProxies,
     params: {
       distance: 3.1,
       runDistance: 2.9,

@@ -7,7 +7,8 @@
 //
 // Beats: settle in sepia → walk out → run → jump onto the mossy rock (paint bloom) → run to the arch →
 // jump the plinth (bloom) → through the arch, loop back across the clearing → open-ground leap (bloom)
-// → wide run round the west side → last leap (bloom) → ease to a walk → stop and look at the arch.
+// → wide run round the west side → last leap (bloom) → trot back across the painted clearing → ease to a
+// walk → stop and look at the arch.
 
 export const HERO_START = { x: 0.6, z: 7.2, yaw: Math.PI };
 
@@ -28,7 +29,9 @@ const LEGS = [
   { beat: 'wide run', to: [-3.4, 4.4], mag: 1 },
   { beat: 'wide run', to: [-4.9, 0.2], mag: 1 },
   { beat: 'last leap', to: [-3.6, -2.6], mag: 1, jumpAt: 2.3, arrive: 0.8 },
-  { beat: 'ease', to: [-1.4, -3.4], mag: 0.2 },
+  { beat: 'trot back', to: [-1.5, -1.2], mag: 0.45 },
+  { beat: 'trot back', to: [0.6, -2.0], mag: 0.45 },
+  { beat: 'ease', to: [0.2, -4.6], mag: 0.18 },
   { beat: 'stop and look', hold: 99 },
 ];
 
