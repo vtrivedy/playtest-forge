@@ -4,12 +4,12 @@ import * as THREE from 'three';
 interface GroundContext {
   groundH: (x: number, z: number) => number;
   pathDist: (x: number, z: number) => number;
-  toon: (color: THREE.ColorRepresentation, opts?: { vertexColors?: boolean }) => THREE.MeshToonMaterial;
+  toon: (color: THREE.ColorRepresentation, opts?: { vertexColors?: boolean; hatchWeight?: number }) => THREE.MeshToonMaterial;
   mapleLeafGeometry: (size: number) => THREE.BufferGeometry;
 }
 const LITTER = [0x603a2d, 0x786044, 0x897354, 0x493d34];
 
-export function buildGround(scene: THREE.Scene, ctx: GroundContext): void {
+export function buildGround(scene: THREE.Scene, ctx: GroundContext): THREE.Mesh {
   const { groundH, pathDist, toon } = ctx;
   const geo = new THREE.PlaneGeometry(180, 180, 150, 150);
   geo.rotateX(-Math.PI / 2);
@@ -19,8 +19,10 @@ export function buildGround(scene: THREE.Scene, ctx: GroundContext): void {
   const sage = new THREE.Color(0x414739);
   const ochre = new THREE.Color(0x655d45);
   const umber = new THREE.Color(0x503c31);
-  const dirt = new THREE.Color(0xa99b7d);
+  const dirt = new THREE.Color(0x92856a);
+  const wornEarth = new THREE.Color(0x7f755c);
   const c = new THREE.Color();
+  const pathColor = new THREE.Color();
   const band = (v: number, at: number) => THREE.MathUtils.smoothstep(v, at - 0.05, at + 0.05);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -32,14 +34,18 @@ export function buildGround(scene: THREE.Scene, ctx: GroundContext): void {
     const litter = Math.max(0, Math.sin(x * 0.5 + 1.3) * Math.sin(z * 0.43 - 0.4));
     c.lerp(umber, band(litter, 0.3) * 0.75);
     const pd = pathDist(x, z);
-    c.lerp(dirt, 1 - THREE.MathUtils.smoothstep(pd + Math.sin(z * 2.3 + x) * 0.14, 0.65, 1.6));
+    // Broad worn patches interrupt the bright ribbon without adding fine ground noise.
+    const wear = Math.sin(z * 0.37 + Math.sin(x * 0.31) * 1.8) * 0.5 + 0.5;
+    pathColor.copy(dirt).lerp(wornEarth, band(wear, 0.58) * 0.38);
+    c.lerp(pathColor, 1 - THREE.MathUtils.smoothstep(pd + Math.sin(z * 2.3 + x) * 0.14, 0.65, 1.6));
     col.set([c.r, c.g, c.b], i * 3);
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.computeVertexNormals();
-  const ground = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true }));
+  const ground = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true, hatchWeight: 0.22 }));
   ground.receiveShadow = true;
   scene.add(ground);
+  return ground;
 }
 
 

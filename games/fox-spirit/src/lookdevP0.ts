@@ -88,10 +88,11 @@ const NOISE_GLSL = /* glsl */ `
  * `contour` adds a brushy ink line where the surface turns away (smooth-normal props only);
  * `climbBase` makes the front climb from that height so canopies paint bottom-up, never speckled.
  */
-function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBase: number | null): void {
+function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBase: number | null, hatchWeight = 1): void {
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, paintU);
     shader.uniforms.uLkContour = { value: contour };
+    shader.uniforms.uLkHatchWeight = { value: hatchWeight };
     shader.uniforms.uLkClimb = { value: new THREE.Vector2(climbBase ?? 0, climbBase === null ? 0 : 0.35) };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vLkWorld;')
@@ -114,6 +115,7 @@ function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBase: num
         uniform vec3 uPaper;
         uniform vec3 uPaperInk;
         uniform float uLkContour;
+        uniform float uLkHatchWeight;
         uniform vec2 uLkClimb;
         ${NOISE_GLSL}`,
       )
@@ -159,7 +161,7 @@ function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBase: num
           float h2 = fract((fc.x - fc.y + wob) * 0.17);
           float l1 = smoothstep(sh * 0.5 + 0.12, sh * 0.5, h1) * smoothstep(0.0, 0.15, sh);
           float l2 = smoothstep(sh2 * 0.45 + 0.12, sh2 * 0.45, h2) * smoothstep(0.0, 0.2, sh2);
-          sepia = mix(sepia, uPaperInk * 1.25, max(l1 * 0.6, l2 * 0.65));
+          sepia = mix(sepia, uPaperInk * 1.25, max(l1 * 0.6, l2 * 0.65) * uLkHatchWeight);
           // painted cel on the same paper, wet sienna pigment bleeding at the front + dried tide-line inside it
           vec3 cel = outgoingLight * (0.95 + 0.08 * tooth) * (0.96 + 0.08 * lkNoise(xz * 2.3));
           vec3 pigment = vec3(0.42, 0.18, 0.08) * (0.55 + 0.6 * t);
@@ -182,10 +184,10 @@ function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBase: num
 
 function toon(
   color: THREE.ColorRepresentation,
-  opts: { vertexColors?: boolean; contour?: number; climbBase?: number; ramp?: THREE.Texture } = {},
+  opts: { vertexColors?: boolean; contour?: number; climbBase?: number; ramp?: THREE.Texture; hatchWeight?: number } = {},
 ): THREE.MeshToonMaterial {
   const m = new THREE.MeshToonMaterial({ color, gradientMap: opts.ramp ?? RAMP_WORLD, vertexColors: !!opts.vertexColors });
-  patchPaint(m, opts.contour ?? 0, opts.climbBase ?? null);
+  patchPaint(m, opts.contour ?? 0, opts.climbBase ?? null, opts.hatchWeight ?? 1);
   return m;
 }
 
