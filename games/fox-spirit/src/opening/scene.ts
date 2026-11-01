@@ -104,8 +104,8 @@ export async function runOpening(): Promise<void> {
     scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p),
     onIgnite: (at) => field.restore(at, 12, 1.8, { edgeMax: 1.4 }),
     extraSpots: [
-      { id: 'steam', ...KEEPING.steam, height: 9, medium: 'steam' },
-      { id: 'root', ...KEEPING.root, height: 7 },
+      { id: 'steam', ...KEEPING.steam, height: 9, medium: 'steam', bedOffset: 0.03 },
+      { id: 'root', ...KEEPING.root, height: 7, bedOffset: 0.03 },
     ],
   });
   // the controller exists only after every build; its callbacks reach the carry through this binding

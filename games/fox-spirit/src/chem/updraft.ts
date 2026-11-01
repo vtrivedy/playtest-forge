@@ -41,10 +41,10 @@ export const UPDRAFT_DEFAULTS: UpdraftTunables = {
   probeRing: 0.9,
 };
 
-export type HearthSpot = { id: string; x: number; y: number; z: number; height?: number; medium?: 'steam' };
+export type HearthSpot = { id: string; x: number; y: number; z: number; height?: number; medium?: 'steam'; bedOffset?: number };
 
 /** Height of the hearth's ash bed above its ground point — the column starts here */
-const BED_Y = 0.92;
+const DEFAULT_BED_OFFSET = 0.92;
 
 export type Lift = {
   /** heat × radialK × topK */
@@ -87,6 +87,7 @@ export class Hearth {
   readonly probeMat: THREE.MeshBasicMaterial;
   /** Ignite flare 1 → 0 */
   flare = 0;
+  private readonly bedY: number;
 
   constructor(
     readonly spot: HearthSpot,
@@ -94,7 +95,8 @@ export class Hearth {
     shared: HearthShared,
   ) {
     this.height = spot.height ?? 9;
-    this.base = new THREE.Vector3(spot.x, spot.y + BED_Y, spot.z);
+    this.bedY = spot.bedOffset ?? DEFAULT_BED_OFFSET;
+    this.base = new THREE.Vector3(spot.x, spot.y + this.bedY, spot.z);
     const probes = [new THREE.Vector3(spot.x, spot.y + 0.7, spot.z)];
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + 0.4;
@@ -109,28 +111,28 @@ export class Hearth {
     this.ash = shared.ash.clone();
     const bed = new THREE.Mesh(shared.bedGeo, this.ash);
     bed.rotation.x = -Math.PI / 2;
-    bed.position.y = BED_Y;
+    bed.position.y = this.bedY;
     this.group.add(bed);
 
     // frozen smoke curl: the breath the hearth is holding. Dissolves upward as it lights.
     this.smoke = shared.smoke.clone();
     configureColdInk(this.smoke);
     this.smokeMesh = new THREE.Mesh(shared.smokeGeo, this.smoke);
-    this.smokeMesh.position.y = BED_Y;
+    this.smokeMesh.position.y = this.bedY;
     this.smokeMesh.rotation.y = (spot.x * 7.1 + spot.z * 3.3) % (Math.PI * 2);
     this.group.add(this.smokeMesh);
 
     // flame tongues in the bowl
     this.flame = shared.flame.clone();
     const flame = new THREE.Mesh(shared.flameGeo, this.flame);
-    flame.position.y = BED_Y - 0.05;
+    flame.position.y = this.bedY - 0.05;
     flame.frustumCulled = false;
     this.group.add(flame);
 
     // Rising embers and lifted leaves; separate feathered warm-air body (no shell).
     this.embers = shared.embers.clone();
     const pts = new THREE.Points(shared.emberGeo, this.embers);
-    pts.position.y = BED_Y;
+    pts.position.y = this.bedY;
     pts.frustumCulled = false;
     this.group.add(pts);
     // Rust leaves keep their body color; only the ember points add light.
@@ -138,22 +140,22 @@ export class Hearth {
     leafMaterial.uniforms = this.embers.uniforms;
     leafMaterial.blending = THREE.NormalBlending;
     const leaves = new THREE.Points(shared.leafGeo, leafMaterial);
-    leaves.position.y = BED_Y;
+    leaves.position.y = this.bedY;
     leaves.frustumCulled = false;
     this.group.add(leaves);
     this.glow = shared.glow.clone();
     if (spot.medium === 'steam') {
-      this.glow.uniforms.uBodyColor!.value.set(0xc6bfa2);
-      this.glow.uniforms.uOpacity!.value = 0.25;
+      this.glow.uniforms.uBodyColor!.value.set(0xe5e0ca);
+      this.glow.uniforms.uOpacity!.value = 0.42;
     }
     const haze = new THREE.Mesh(shared.glowGeo, this.glow);
-    haze.position.y = BED_Y;
+    haze.position.y = this.bedY;
     haze.frustumCulled = false;
     haze.renderOrder = 2;
     this.group.add(haze);
 
     this.light = new THREE.PointLight(0xff8a3a, 0, 16, 1.6);
-    this.light.position.y = BED_Y + 1.2;
+    this.light.position.y = this.bedY + 1.2;
     this.group.add(this.light);
 
     // debug: column wireframe (coloured by heat) + probes
@@ -178,7 +180,7 @@ export class Hearth {
   layout(tun: UpdraftTunables): void {
     const wire = this.debug.getObjectByName('column')!;
     wire.scale.set(tun.radius, this.height, tun.radius);
-    wire.position.y = BED_Y + this.height / 2;
+    wire.position.y = this.bedY + this.height / 2;
     this.embers.uniforms.uHeight!.value = this.height;
     this.embers.uniforms.uRadius!.value = tun.radius;
     this.glow.uniforms.uHeight!.value = this.height;
@@ -204,7 +206,7 @@ export class Hearth {
     (this.smoke.userData.inkTime as {value:number}).value=t;
     this.smoke.opacity = 0.32 * (1 - Math.min(1, h * 1.6));
     this.smokeMesh.visible = this.smoke.opacity > 0.01;
-    this.smokeMesh.position.y = BED_Y + h * 1.4;
+    this.smokeMesh.position.y = this.bedY + h * 1.4;
     this.smokeMesh.scale.setScalar(1 + h * 0.5);
     if (this.spot.medium === 'steam') {
       // Wet heat uses the same lift/reactor, but reads as paper-pale vapor.
