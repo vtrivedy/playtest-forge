@@ -926,7 +926,7 @@ export async function runLookdevP0(): Promise<void> {
 
   // irregular grove: a hero maple framing the arch, a leaning pair, loners and low shrubs — no grid
   const trees: Array<[number, number, number, TreeKind, number]> = [
-    [-3.4, -5.6, 1.1, 'lean', 2],
+    [-2.5, -6.5, 1.1, 'lean', 2],
     [7.2, -6.6, 1.3, 'hero', 0],
     [-4.9, -10.2, 1.15, 'grove', 2],
     [-6.9, -7.4, 0.9, 'grove', 1],
@@ -943,8 +943,8 @@ export async function runLookdevP0(): Promise<void> {
     const t = buildMaple(rand, sc, kind, pal, y);
     t.position.set(x, y - 0.1, z);
     const spin = rand() * 6;
-    // the bent maple stands front-left of the arch and reaches out over the path
-    t.rotation.y = kind === 'lean' ? 0.42 : spin;
+    // the bent maple grows from the arch's left foot and leans out over the fallen pier, framing (not hiding) the arch
+    t.rotation.y = kind === 'lean' ? -2.95 : spin;
     scene.add(t);
   }
   const rocks: Array<[number, number, number]> = [
