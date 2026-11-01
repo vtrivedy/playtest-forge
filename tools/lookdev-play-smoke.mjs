@@ -59,9 +59,14 @@ try {
       return h.advance(1, 1 / 60, false);
     }, HERO_START);
     let beat = '';
+    let touchdownF = -1;
     for (let f = 0; f < 1800; f++) {
       const input = route(f / 60, state);
-      const shot = input.beat !== beat;
+      const prev = state;
+      // extra stills: jump apex, 2 frames after touchdown
+      const apex = !prev.grounded && prev.vel[1] > 0 && prev.vel[1] - 15 / 60 <= 0;
+      const touch = touchdownF >= 0 && f === touchdownF + 2;
+      const shot = input.beat !== beat || apex || touch;
       beat = input.beat;
       state = await page.evaluate(
         ({ input, shot }) => {
@@ -73,8 +78,10 @@ try {
         { input, shot },
       );
       trace.push({ f, beat, input, ...state, paws: undefined });
+      if (!prev.grounded && state.grounded) touchdownF = f;
       if (shot) {
-        await page.screenshot({ path: path.join(out, `${String(++n).padStart(2, '0')}-${beat.replace(/ /g, '-')}.png`) });
+        const tag = apex ? 'apex' : touch ? 'touchdown+2' : beat.replace(/ /g, '-');
+        await page.screenshot({ path: path.join(out, `${String(++n).padStart(2, '0')}-${tag}.png`) });
         console.log(f, beat.padEnd(18), JSON.stringify({ pos: state.pos, speed: state.speed, anim: state.anim, gait: state.gait, lastJump: state.lastJump }));
       }
     }
