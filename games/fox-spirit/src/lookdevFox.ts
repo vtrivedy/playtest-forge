@@ -3,13 +3,15 @@
  *
  * Authored in Blender (tools/blender/scripts/hearth_fox_*.py) → assets/hero/hearth_fox.glb:
  * `fox_coat` (skinned, vertex-coloured coat; TEXCOORD_0.x = ember mask) + `fox_face` (eyes, nose),
- * clips idle / walk / run (in place; the rig's glTF extras carry each clip's ground speed).
- * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, ember tail glow + drifting ember motes.
+ * clips idle / walk / trot / run / jumpUp / fall / land (in place; the rig's glTF extras carry each clip's ground speed).
+ * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-export type FoxClip = 'idle' | 'walk' | 'run';
+export type FoxClip = 'idle' | 'walk' | 'trot' | 'run' | 'jumpUp' | 'fall' | 'land';
+/** play once and hold the last frame; the rest loop */
+const ONE_SHOT: ReadonlySet<string> = new Set(['jumpUp', 'land']);
 
 export interface HearthFox {
   root: THREE.Group;
@@ -53,7 +55,9 @@ function coatMaterial(emberGain: number): THREE.MeshToonMaterial {
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-        totalEmissiveRadiance += diffuseColor.rgb * vEmber * ${emberGain.toFixed(2)};`,
+        // ember burns in two flat cel steps (no airbrushed gradient along the tail)
+        float emberStep = 0.45 * step(0.2, vEmber) + 0.55 * step(0.62, vEmber);
+        totalEmissiveRadiance += diffuseColor.rgb * emberStep * ${emberGain.toFixed(2)};`,
       )
       .replace(
         '#include <opaque_fragment>',
@@ -63,10 +67,10 @@ function coatMaterial(emberGain: number): THREE.MeshToonMaterial {
           vec3 lit = outgoingLight - totalEmissiveRadiance;
           float L = dot(lit, vec3(0.2126, 0.7152, 0.0722)) / max(1e-3, dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)));
           // lit step kept close to mid so band edges read as paint, not a lacquer highlight
-          float shade = smoothstep(0.41, 0.49, L);
+          float shade = smoothstep(0.43, 0.47, L);
           float band = mix(0.44, 0.84, shade);
-          band = mix(band, 1.0, smoothstep(0.9, 1.0, L));
-          vec3 tint = mix(vec3(0.82, 0.58, 0.66), vec3(1.0), smoothstep(0.43, 0.97, L));
+          band = mix(band, 0.96, step(0.92, L));
+          vec3 tint = mix(vec3(0.82, 0.58, 0.66), vec3(1.0), shade);
           // pressed-ink hatching in the shadow step: the fox shares the world's printed medium
           float hatch = step(0.66, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.16));
           outgoingLight = diffuseColor.rgb * band * tint * (1.0 - 0.18 * hatch * (1.0 - shade)) + totalEmissiveRadiance;
@@ -79,6 +83,54 @@ function coatMaterial(emberGain: number): THREE.MeshToonMaterial {
   };
   m.customProgramCacheKey = () => `lk-hearth-fox-${emberGain}`;
   return m;
+}
+
+/**
+ * Living-cel flame tongue: a world-up billboard (vertex shader) anchored on a bone. Hard-edged
+ * 3-tone cel flame (rust rim → ember → amber core), licking upward and leaning against motion.
+ * Opaque-cut, not a soft glow: it has to read as painted fire at 05 distance.
+ */
+function flameMaterial(size: [number, number], seed: number, uLean: { value: THREE.Vector3 }, uTime: { value: number }): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { uTime, uLean, uSize: { value: new THREE.Vector2(...size) }, uSeed: { value: seed } },
+    vertexShader: /* glsl */ `
+      uniform vec2 uSize; uniform vec3 uLean;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        vec3 c = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+        float y = uv.y;
+        // tongue bends with the lean (motion trail) more toward its tip
+        vec3 p = c + right * (uv.x - 0.5) * uSize.x + vec3(0.0, 1.0, 0.0) * y * uSize.y + uLean * y * y * uSize.y;
+        gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uTime; uniform float uSeed;
+      varying vec2 vUv;
+      void main() {
+        float y = vUv.y;
+        float t = uTime * 1.0 + uSeed * 7.0;
+        // licking sway, stronger toward the tip; two tongues split near the top
+        float x = vUv.x - 0.5 + sin(y * 6.0 - t * 5.0) * 0.09 * y + sin(y * 13.0 - t * 9.0 + uSeed) * 0.03 * y;
+        float w = 0.5 * pow(max(0.0, 1.0 - y), 0.75) * smoothstep(0.0, 0.18, y + 0.04);
+        // flicker the height
+        float h = 0.82 + 0.18 * sin(t * 3.1 + uSeed * 3.0) * sin(t * 1.7);
+        w *= step(y, h) * (1.0 - smoothstep(h - 0.3, h, y) * 0.6);
+        float split = smoothstep(0.55, 0.9, y) * 0.22 * (0.5 + 0.5 * sin(t * 2.3));
+        float d = min(abs(x - split * 0.5), abs(x + split * 0.5) + 0.04 * step(0.6, y));
+        float f = d / max(w, 1e-3);
+        if (f > 1.0) discard;
+        vec3 rust = vec3(0.42, 0.09, 0.03);
+        vec3 ember = vec3(0.92, 0.3, 0.06);
+        vec3 core = vec3(1.0, 0.56, 0.16);
+        vec3 col = f > 0.78 ? rust : (f > 0.45 || y > h * 0.65 ? ember : core);
+        gl_FragColor = vec4(col * 1.1, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+    side: THREE.DoubleSide,
+  });
 }
 
 export async function loadHearthFox(inkMaterial: (width: number) => THREE.Material, inkWidth = 0.024): Promise<HearthFox> {
@@ -163,9 +215,40 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
   (tailTip ?? root).add(tailLight);
   tailLight.position.set(0, 0.08, 0);
 
+  // spirit signal: cel flame tongues along the tail's burn-out third (the brush becomes fire), tallest at the point
+  const uTime = { value: 0 };
+  const uLean = { value: new THREE.Vector3() };
+  const flameGeo = new THREE.PlaneGeometry(1, 1);
+  const tail5 = model.getObjectByName('tail5') as THREE.Bone | undefined;
+  const tongues: [THREE.Bone | undefined, [number, number, number], [number, number], number][] = [
+    [tailTip, [0, 0.06, 0], [0.13, 0.27], 0.1],
+    [tailTip, [0.03, 0.0, 0.02], [0.09, 0.18], 0.55],
+    [tailTip, [-0.035, -0.03, -0.01], [0.08, 0.15], 0.85],
+    [tail5, [0.02, 0.03, 0.03], [0.07, 0.12], 0.35],
+    [tail5, [-0.03, -0.02, 0.02], [0.06, 0.09], 0.7],
+  ];
+  for (const [bone, off, size, seed] of tongues) {
+    if (!bone) continue;
+    const m = new THREE.Mesh(flameGeo, flameMaterial(size, seed, uLean, uTime));
+    m.position.set(...off);
+    m.frustumCulled = false;
+    m.renderOrder = 2;
+    bone.add(m);
+  }
+  const tipNow = new THREE.Vector3();
+  const tipPrev = new THREE.Vector3();
+  let tipInit = false;
+
   const mixer = new THREE.AnimationMixer(model);
   const actions = new Map<string, THREE.AnimationAction>();
-  for (const clip of gltf.animations) actions.set(clip.name, mixer.clipAction(clip));
+  for (const clip of gltf.animations) {
+    const action = mixer.clipAction(clip);
+    if (ONE_SHOT.has(clip.name)) {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+    }
+    actions.set(clip.name, action);
+  }
   let current: FoxClip = 'idle';
   let travel = false;
   actions.get('idle')?.play();
@@ -243,6 +326,18 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       moteGeo.attributes.position!.needsUpdate = true;
       moteGeo.attributes.color!.needsUpdate = true;
       tailLight.intensity = 1.3 + Math.sin(time * 9) * 0.2;
+      // flames lean away from the tip's motion (eased), so a running fox trails fire
+      uTime.value = time;
+      if (tailTip) {
+        tailTip.getWorldPosition(tipNow);
+        if (tipInit && dt > 0) {
+          spawn.subVectors(tipPrev, tipNow).divideScalar(dt).multiplyScalar(0.25).clampLength(0, 1.2);
+          spawn.y = 0;
+          uLean.value.lerp(spawn, Math.min(1, dt * 8));
+        }
+        tipPrev.copy(tipNow);
+        tipInit = true;
+      }
     },
   };
   return fox;

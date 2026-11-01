@@ -1,4 +1,4 @@
-"""Hearth-fox clips: idle / walk / run, authored on IK paw controls then baked to FK deform keys.
+"""Hearth-fox clips: idle / walk / trot / run / jumpUp / fall / land, authored on IK paw controls then baked to FK deform keys.
 
 Exec'd after hearth_fox_rig.py (uses rig, BONES, ...). 30 fps. Clips are in-place; the walk/run
 stance phase moves each planted paw backward at exactly CLIP_SPEED so the game/lookdev can drive
@@ -132,7 +132,7 @@ def ease(x):
     return x * x * (3 - 2 * x)
 
 
-def foot_path(ph, duty, stride, lift, reach=0.0):
+def foot_path(ph, duty, stride, lift, reach=0.0, fold=0.6):
     """in-place paw: stance slides back linearly (no skate), swing arcs forward. Returns (fwd, up, tilt)."""
     ph %= 1.0
     if ph < duty:
@@ -146,7 +146,7 @@ def foot_path(ph, duty, stride, lift, reach=0.0):
     f = stride * (-0.5 + ease(q)) + reach * math.sin(math.pi * q) ** 2
     up = lift * math.sin(math.pi * q) ** 0.8
     # fold the pastern / metatarsus through the swing, unfold before contact
-    tilt = 0.55 + 0.6 * math.sin(math.pi * min(1.0, q * 1.15)) - 0.55 * ease(min(1.0, q * 1.6))
+    tilt = 0.55 + fold * math.sin(math.pi * min(1.0, q * 1.15)) - 0.55 * ease(min(1.0, q * 1.6))
     return f, up, max(0.0, tilt)
 
 
@@ -166,7 +166,11 @@ def key_all(f):
 GAITS = {
     # name: frames, stride per cycle (m), duty, phase offsets LH LF RH RF, lifts (front, hind)
     "walk": dict(frames=34, stride=0.6, duty=0.64, off=dict(LH=0.0, LF=0.27, RH=0.5, RF=0.77), lift=(0.06, 0.05)),
-    "run": dict(frames=16, stride=1.3, duty=0.3, off=dict(LH=0.0, RH=0.09, LF=0.45, RF=0.55), lift=(0.11, 0.09), centre=(0.03, 0.07)),
+    # trot: diagonal pairs, closes the walk → run gap (~1.3 m/s)
+    "trot": dict(frames=18, stride=0.78, duty=0.46, off=dict(LH=0.0, RF=0.02, RH=0.5, LF=0.52), lift=(0.09, 0.07)),
+    # run: long gallop stride (most distance in suspension), ~3.5 m/s gameplay top speed
+    "run": dict(frames=14, stride=1.63, duty=0.27, off=dict(LH=0.0, RH=0.09, LF=0.45, RF=0.55), lift=(0.15, 0.12), centre=(0.03, 0.07),
+                reach=(0.14, 0.08), fold=(0.75, 0.3)),
 }
 
 
@@ -182,7 +186,9 @@ def author_gait(name):
         for leg in ("LF", "RF", "LH", "RH"):
             front = leg[1] == "F"
             s = leg[0]
-            f, up, tilt = foot_path(ph + 1 - g["off"][leg], g["duty"], g["stride"] * g["duty"], g["lift"][0 if front else 1], reach=0.1 if run else 0.0)
+            i = 0 if front else 1
+            f, up, tilt = foot_path(ph + 1 - g["off"][leg], g["duty"], g["stride"] * g["duty"], g["lift"][i],
+                                    reach=g.get("reach", (0.0, 0.0))[i], fold=g.get("fold", (0.6, 0.6))[i])
             c = g.get("centre", (0.0, 0.0))[0 if front else 1]
             paw(f"ctl_{'f' if front else 'h'}paw.{s}", f + c, up, tilt)
         w = TAU * ph
@@ -221,7 +227,8 @@ def author_gait(name):
             rot("head", pitch=0.04 - 0.08 * flex)
             for i in range(1, 7):
                 k = 0.4 + 0.6 * i / 6
-                rot(f"tail{i}", pitch=(-0.12 if i == 1 else 0.04) + 0.1 * k * math.sin(w - i * 0.8), yaw=0.05 * k * math.sin(w - i * 0.6))
+                # tail: each joint lags its parent ~1 frame and swings wider toward the tip (streams, never a plank)
+                rot(f"tail{i}", pitch=(-0.12 if i == 1 else 0.03) + 0.16 * k * math.sin(w - i * 0.45 - 0.9), yaw=0.07 * k * math.sin(w - i * 0.5))
             rot("ear.L", pitch=-0.45)
             rot("ear.R", pitch=-0.45)
         key_all(fr)
@@ -262,9 +269,93 @@ def author_idle():
     return act, N
 
 
+# ------------------------------------------------------------------ jump: key poses, eased, tail/head lag
+# A pose is a dict of channels; missing channels = idle rest. F/H = (fwd, up, tilt) for front/hind paws.
+REST = dict(hip_up=-0.012, hip_fwd=0.0, hips=0.0, spine=0.0, chest=0.0, neck=0.0, head=0.08, tail=0.0, curl=0.0, ear=0.0,
+            F=(0.0, 0.0, 0.0), H=(0.0, 0.0, 0.0))
+
+
+def pose_at(keys, f):
+    """keys: [(frame, pose)] ascending. Smoothstep between neighbours per channel; clamps outside."""
+    def chan(k):
+        pts = [(fr, {**REST, **p}[k]) for fr, p in keys]
+        if f <= pts[0][0]:
+            return pts[0][1]
+        for (f0, a), (f1, b) in zip(pts, pts[1:]):
+            if f <= f1:
+                t = ease((f - f0) / (f1 - f0))
+                return tuple(x + (y - x) * t for x, y in zip(a, b)) if isinstance(a, tuple) else a + (b - a) * t
+        return pts[-1][1]
+    return {k: chan(k) for k in REST}
+
+
+def apply_pose(keys, f, loop=0):
+    """body at f; head lags ~1 frame, ears ~2, each tail joint ~1.2 frames more than its parent (overlap)"""
+    lagged = (lambda d: (f - d) % loop) if loop else (lambda d: max(0.0, f - d))
+    p = pose_at(keys, f)
+    hip_offset(up=p["hip_up"], fwd=p["hip_fwd"])
+    rot("hips", pitch=p["hips"])
+    rot("spine", pitch=p["spine"])
+    rot("chest", pitch=p["chest"])
+    rot("neck", pitch=pose_at(keys, lagged(1))["neck"])
+    rot("head", pitch=pose_at(keys, lagged(1.5))["head"])
+    for e in ("ear.L", "ear.R"):
+        rot(e, pitch=pose_at(keys, lagged(2))["ear"])
+    for i in range(1, 7):
+        q = pose_at(keys, lagged(1.2 * i))
+        k = 0.4 + 0.6 * i / 6
+        rot(f"tail{i}", pitch=(q["tail"] if i == 1 else 0.0) + q["curl"] * k, yaw=0.03 * k * math.sin(f * 0.4 - i * 0.6))
+    for s, side in (("L", 1.0), ("R", -1.0)):
+        # left paws lead by a hair so the pair never moves as one plank
+        lead = 0.012 * side
+        for leg, (fw, up, tilt) in (("f", p["F"]), ("h", p["H"])):
+            paw(f"ctl_{leg}paw.{s}", fw + (lead if fw or up else 0.0), up, tilt)
+
+
+def author_keys(name, keys, frames, loop=False):
+    act = bpy.data.actions.new(f"src_{name}")
+    rig.animation_data_create().action = act
+    for fr in range(frames + 1):
+        clear_pose()
+        apply_pose(keys, fr, frames if loop else 0)
+        key_all(fr)
+    return act, frames
+
+
+# Root never moves in these clips; the game owns the arc. jumpUp: tiny load (f0-2), hind push with paws
+# reaching *below* the root so contact holds while the game lifts it (f2-5), then the tucked rise pose.
+RISE = dict(hip_up=0.03, hips=-0.08, spine=0.02, chest=-0.04, neck=0.06, head=0.14, tail=-0.08, curl=-0.08, ear=-0.4,
+            F=(0.04, 0.3, 1.7), H=(-0.26, 0.12, 1.25))
+JUMP_UP = [
+    (0, dict(hip_up=-0.04, hips=0.06, chest=0.05, neck=0.06, head=0.12, tail=-0.05, ear=-0.1)),
+    (2, dict(hip_up=-0.06, hips=0.1, spine=0.02, chest=0.08, neck=0.08, head=0.14, tail=-0.12, ear=-0.2, F=(0.0, 0.0, 0.3), H=(0.0, 0.0, 0.2))),
+    (5, dict(hip_up=0.05, hips=-0.14, spine=-0.03, chest=-0.06, neck=-0.02, head=0.18, tail=0.1, ear=-0.35, F=(0.1, 0.2, 1.3), H=(-0.14, -0.05, 1.0))),
+    (10, RISE),
+]
+# fall: front paws drift down to reach for the ground, hind tucks, tail floats up
+HANG = dict(hip_up=0.01, hips=0.04, spine=0.03, chest=0.03, neck=0.0, head=0.12, tail=-0.18, curl=-0.1, ear=-0.3,
+            F=(0.17, 0.1, 0.5), H=(0.05, 0.19, 1.15))
+FALL = [
+    (0, HANG),
+    (12, {**HANG, "hips": 0.07, "tail": -0.24, "curl": -0.16, "ear": -0.35, "F": (0.19, 0.06, 0.4), "H": (0.07, 0.17, 1.05)}),
+    (24, HANG),
+]
+# land: front paws plant at f0, hind a beat later (f2); absorb peaks f4-5; settle into idle frame 0 by f14
+LAND = [
+    (0, dict(hip_up=0.0, hips=0.1, spine=0.03, chest=0.04, neck=0.0, head=0.1, tail=-0.18, curl=-0.1, ear=-0.25,
+             H=(0.03, 0.07, 0.6))),
+    (2, dict(hip_up=-0.05, hips=0.06, spine=0.05, chest=0.1, neck=0.1, head=0.14, tail=-0.05, curl=-0.04, ear=-0.15)),
+    (5, dict(hip_up=-0.1, hips=-0.04, spine=0.05, chest=0.12, neck=0.18, head=0.18, tail=0.14, curl=0.06, ear=0.1)),
+    (9, dict(hip_up=-0.03, chest=0.02, neck=0.03, head=0.1, tail=0.04, curl=0.02, ear=0.05)),
+    (14, dict()),
+]
+
 # clear old actions from previous runs
+CLIPS = ("idle", "walk", "trot", "run", "jumpUp", "fall", "land")
 for a in list(bpy.data.actions):
-    if a.name.split(".")[0] in ("src_idle", "src_walk", "src_run", "idle", "walk", "run"):
+    if a.name.split(".")[0] in CLIPS + tuple(f"src_{c}" for c in CLIPS):
         bpy.data.actions.remove(a)
-SRC = {"idle": author_idle(), "walk": author_gait("walk"), "run": author_gait("run")}
+SRC = {"idle": author_idle(), "walk": author_gait("walk"), "trot": author_gait("trot"), "run": author_gait("run"),
+       "jumpUp": author_keys("jumpUp", JUMP_UP, 10), "fall": author_keys("fall", FALL, 24, loop=True),
+       "land": author_keys("land", LAND, 14)}
 print("authored", {k: v[1] for k, v in SRC.items()})

@@ -17,8 +17,8 @@ def bone(name, h, t, parent=None):
 bone("root", (0, 0, 0), (0, -0.12, 0))
 bone("hips", P(-0.27, 0.43), P(-0.08, 0.425), "root")
 bone("spine", P(-0.08, 0.425), P(0.12, 0.42), "hips")
-bone("chest", P(0.12, 0.42), P(0.27, 0.5), "spine")
-bone("neck", P(0.27, 0.5), P(0.36, 0.575), "chest")
+bone("chest", P(0.12, 0.42), P(0.27, 0.51), "spine")
+bone("neck", P(0.27, 0.51), P(0.34, 0.615), "chest")
 bone("head", HEAD_PIVOT, HEAD_PIVOT + Vector((0, -0.16, -0.012)), "neck")
 for e in EARS:
     zs = sorted(e.data.vertices, key=lambda v: v.co.z)
