@@ -20,7 +20,7 @@ const dash = arg('dash', '0') === '1';
 const SHOTS = {
   hedgehog: { pose: [-5.28, 87.04, -2.214], cam: [[-4.6, 1.4, 87.9], [-6.8, 0.4, 85.9]], alive: [[-5.0, 1.2, 88.9], [-6.78, 0.2, 87.54]] },
   heron: { pose: [5.6, 77.0, 2.0], cam: [[5.2, 2.2, 77.6], [8.0, 2.4, 75.2]], alive: [[7.0, 6.3, 77.4], [9.25, 5.6, 75.35]] },
-  deer: { pose: [26.8, 67.6, -2.49], cam: [[28.6, 11.4, 69.6], [25.3, 10.0, 64.6]], alive: [[27.6, 10.6, 64.6], [26.18, 10.1, 63.05]] },
+  deer: { pose: [26.8, 67.6, -2.49], cam: [[28.6, 11.4, 69.6], [25.3, 10.0, 64.6]], alive: [[28.6, 10.9, 65.6], [26.18, 10.25, 63.05]] },
 };
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5195, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });

@@ -99,6 +99,8 @@ const SPECS: Spec[] = [
       { k: 'ell', bone: 'body', c: [0, 0.97], r: [0.5, 0.26, 0.22], col: 0x8e6a4a },
       { k: 'ell', bone: 'body', c: [-0.36, 0.99], r: [0.21, 0.22, 0.19], col: 0x86624a },
       { k: 'ell', bone: 'body', c: [0.02, 0.86], r: [0.38, 0.1, 0.17], col: 0xd8b48a },
+      { k: 'ell', bone: 'body', c: [-0.3, 0.86], r: [0.17, 0.2, 0.2], col: 0x86624a },
+      { k: 'ell', bone: 'body', c: [0.3, 0.88], r: [0.13, 0.17, 0.17], col: 0x8e6a4a },
       { k: 'ell', bone: 'tail', c: [-0.56, 1.06], r: [0.06, 0.1, 0.05], col: 0xf0e2c8, rot: 0.5 },
       { k: 'tube', bone: 'neck', pts: [[0.36, 1.05], [0.48, 1.28], [0.58, 1.5]], r: [0.13, 0.085], col: 0x8e6a4a },
       { k: 'ell', bone: 'head', c: [0.68, 1.55], r: [0.16, 0.09, 0.08], col: 0x8e6a4a, rot: -0.35 },
@@ -109,13 +111,13 @@ const SPECS: Spec[] = [
       { k: 'tube', bone: 'head', pts: [[0.61, 1.8], [0.72, 1.94]], r: [0.016, 0.008], col: 0xe6d6b0, z: 0.06 },
       { k: 'tube', bone: 'head', pts: [[0.63, 1.63], [0.61, 1.86], [0.52, 2.02]], r: [0.026, 0.012], col: 0xe6d6b0, z: -0.06 },
       { k: 'tube', bone: 'head', pts: [[0.61, 1.8], [0.72, 1.94]], r: [0.016, 0.008], col: 0xe6d6b0, z: -0.06 },
-      { k: 'tube', bone: 'legFL', pts: [[0.32, 0.84], [0.35, 0.44], [0.33, 0.06]], r: [0.075, 0.034], col: 0x6e5240, z: 0.09 },
+      { k: 'tube', bone: 'legFL', pts: [[0.32, 0.86], [0.36, 0.56], [0.33, 0.36], [0.34, 0.06]], r: [0.09, 0.032], col: 0x6e5240, z: 0.09 },
       { k: 'cone', bone: 'legFL', from: [0.33, 0.07], to: [0.35, 0.0], r: 0.04, col: 0x2a1a12, z: 0.09 },
-      { k: 'tube', bone: 'legFR', pts: [[0.32, 0.84], [0.35, 0.44], [0.33, 0.06]], r: [0.075, 0.034], col: 0x6e5240, z: -0.09 },
+      { k: 'tube', bone: 'legFR', pts: [[0.32, 0.86], [0.36, 0.56], [0.33, 0.36], [0.34, 0.06]], r: [0.09, 0.032], col: 0x6e5240, z: -0.09 },
       { k: 'cone', bone: 'legFR', from: [0.33, 0.07], to: [0.35, 0.0], r: 0.04, col: 0x2a1a12, z: -0.09 },
-      { k: 'tube', bone: 'legBL', pts: [[-0.34, 0.86], [-0.43, 0.46], [-0.36, 0.06]], r: [0.09, 0.034], col: 0x6e5240, z: 0.09 },
+      { k: 'tube', bone: 'legBL', pts: [[-0.32, 0.9], [-0.44, 0.6], [-0.48, 0.42], [-0.38, 0.06]], r: [0.13, 0.032], col: 0x6e5240, z: 0.09 },
       { k: 'cone', bone: 'legBL', from: [-0.36, 0.07], to: [-0.35, 0.0], r: 0.04, col: 0x2a1a12, z: 0.09 },
-      { k: 'tube', bone: 'legBR', pts: [[-0.34, 0.86], [-0.43, 0.46], [-0.36, 0.06]], r: [0.09, 0.034], col: 0x6e5240, z: -0.09 },
+      { k: 'tube', bone: 'legBR', pts: [[-0.32, 0.9], [-0.44, 0.6], [-0.48, 0.42], [-0.38, 0.06]], r: [0.13, 0.032], col: 0x6e5240, z: -0.09 },
       { k: 'cone', bone: 'legBR', from: [-0.36, 0.07], to: [-0.35, 0.0], r: 0.04, col: 0x2a1a12, z: -0.09 },
     ],
     eye: { at: [0.71, 1.58], r: 0.018, bone: 'head' },
@@ -614,8 +616,8 @@ export function buildUnpressed(ctx: OpeningCtx) {
         const crouch = Math.sin(Math.min(1, u / 0.35) * Math.PI);
         B(c, 'body').position.y = 1.0 - c.bow * 0.38 - crouch * 0.1;
         const stroke = smooth(0, 0.12, u) * (1 - smooth(0.25, 0.8, u));
-        B(c, 'wingL').rotation.x = -(0.15 + 1.6 * stroke);
-        B(c, 'wingR').rotation.x = 0.15 + 1.6 * stroke;
+        B(c, 'wingL').rotation.x = -(0.15 + c.bow * 1.3 + 0.9 * stroke);
+        B(c, 'wingR').rotation.x = 0.15 + c.bow * 1.3 + 0.9 * stroke;
         B(c, 'neck').rotation.z = -crouch * 0.3;
         return;
       }
@@ -628,8 +630,9 @@ export function buildUnpressed(ctx: OpeningCtx) {
       if (c.bow > 0.05) {
         B(c, 'neck').rotation.z = -c.bow * 0.55;
         B(c, 'head').rotation.z = c.bow * 0.5;
-        B(c, 'wingL').rotation.x = -(0.15 + c.bow * 0.35);
-        B(c, 'wingR').rotation.x = 0.15 + c.bow * 0.35;
+        // wings spread flat to either side: a feathered step under the fox's paws
+        B(c, 'wingL').rotation.x = -(0.15 + c.bow * 1.3);
+        B(c, 'wingR').rotation.x = 0.15 + c.bow * 1.3;
         return;
       }
       // still as a heron: slow neck sway, a preen every few seconds, a weight shift
