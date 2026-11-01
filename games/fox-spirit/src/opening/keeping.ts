@@ -58,6 +58,19 @@ function stoneRing(rand: () => number, rOut: number, rIn: number, h: number, bed
   return g;
 }
 
+/**
+ * A bowl's lip: a closed ring of low boxes on the rim stones. Too high to walk over (the fox stops at the
+ * rim and sets the coal in from there), low enough to hop, and no ceiling — a fox riding the bowl's
+ * column passes over it freely.
+ */
+function bowlLip(x: number, z: number, r: number, base: number): Collider[] {
+  const n = 14;
+  return Array.from({ length: n }, (_, i): Collider => {
+    const a = (i / n) * Math.PI * 2;
+    return { kind: 'box', x: x + Math.cos(a) * r, z: z + Math.sin(a) * r, yaw: -a, hx: 0.12, hz: (Math.PI * r) / n + 0.08, top: base + 0.42 };
+  });
+}
+
 /** Column cluster under an oriented box (terrace / crag / pad): moss-capped turf is the walk surface */
 function plinth(ctx: OpeningCtx, box: { x: number; z: number; hx: number; hz: number; yaw: number; top: number }, r: number, n: number): void {
   const root = new THREE.Group();
@@ -295,6 +308,7 @@ export function createKeeping(ctx: OpeningCtx) {
     const g = stoneRing(rand, K.steam.r + 0.25, K.steam.r - 0.05, 0.2, 0x8c9a94);
     g.position.set(K.steam.x, SHELF_TOP, K.steam.z);
     scene.add(g);
+    colliders.push(...bowlLip(K.steam.x, K.steam.z, K.steam.r + 0.1, SHELF_TOP));
   }
 
   // ---- coal cradle on the shelf: a small lit ring the coal rests in
@@ -383,12 +397,12 @@ export function createKeeping(ctx: OpeningCtx) {
 
   // ---- root-hearth bowl among the roots
   {
-    // a raised rim the fox stops at: warmth is set down at the bowl's edge, not stood in; the chase
-    // cam looks down past the rim onto the bed
+    // a raised rim the fox stops at (bowlLip): warmth is set down from the edge, never stood in; the
+    // chase cam looks down past the rim onto the bed
     const g = stoneRing(rand, K.root.r + 0.3, K.root.r + 0.02, 0.28, ASH, 9);
     g.position.set(K.root.x, K.terrace.top, K.root.z);
     scene.add(g);
-    colliders.push({ kind: 'post', x: K.root.x, z: K.root.z, r: K.root.r + 0.3 });
+    colliders.push(...bowlLip(K.root.x, K.root.z, K.root.r + 0.18, K.terrace.top));
   }
 
   // ---- the Hearthtree
