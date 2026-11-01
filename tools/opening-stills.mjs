@@ -29,8 +29,12 @@ const CAMS = {
   hearthclose: [[0.5, 2.4, 80.5], [7, 1.2, 72.5]],
   ridge: [[-2, 3, 64], [16, 5, 78]],
   village: [[6, 7, 66], [-10, 1, 92]],
+  crown: [[14, 7.5, 76], [135, 50, 40]],
+  crownwide: [[-2, 4, 86], [60, 12, 60]],
 };
 const paint = arg('paint', '0') === '1';
+// --respond S: play the Crown's Keeping response for S seconds before the stills
+const respond = Number(arg('respond', '0'));
 const pick = arg('poses', [...Object.keys(POSES), ...Object.keys(CAMS)].join(',')).split(',');
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5193, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
@@ -49,6 +53,7 @@ try {
     const { ctx } = window.__opening;
     ctx.field.restore(ctx.fox.root.position.clone().set(-4, 0, 80), 90, 0.01, { edgeMax: 2.5 });
   }, paint);
+  if (respond > 0) await page.evaluate((s) => { window.__gameHooks.crownRespond(); window.__gameHooks.advance(Math.round(s * 60), 1 / 60, false); }, respond);
   for (const name of pick) {
     const t0 = Date.now();
     const cam = CAMS[name];

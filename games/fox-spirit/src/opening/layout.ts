@@ -13,6 +13,16 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 /** rock shelf the H-a updraft lifts onto: 9 × 9, top = ground + 5 */
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
+/** First Keeping (Moss's place plan, #swarm :32): coal cradle on the shelf, ledge to the steam spring, root-hearth on the upper terrace */
+export const KEEPING = {
+  coal: { x: 15.8, z: 78.2 },
+  steam: { x: 27.6, y: 5, z: 79.4 },
+  root: { x: 31.2, y: 9.5, z: 76.8 },
+} as const;
+
+/** The Still Crown on the Summit: far east-southeast, beyond the ridge, backlit by the low sun */
+export const CROWN = { x: 135, y: -14, z: 40, yaw: -0.4, scale: 2.1 } as const;
+
 /** Cottages (all face +z: door on the z + d/2 wall) */
 export const HOUSES = [
   { x: -18, z: 92, w: 5.2, d: 4.2, eave: 2.6, rise: 1.4, chimney: true },
