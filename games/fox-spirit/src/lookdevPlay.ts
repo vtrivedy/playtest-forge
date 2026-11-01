@@ -17,7 +17,7 @@ export type Collider =
   | { kind: 'post'; x: number; z: number; r: number };
 
 export const PLAY = {
-  runSpeed: 3.6,
+  runSpeed: 3.2,
   walkSpeed: 0.85,
   /** ground speed ease (1/s) up / down */
   accel: 3.2,
@@ -54,7 +54,7 @@ export const PLAY = {
   /** pre-IK paw world speed (m/s) below which a low paw counts as planted */
   stanceSpeed: 0.6,
   maxLock: 0.06,
-  maxPelvisDrop: 0.12,
+  maxPelvisDrop: 0.08,
 };
 
 const TAU = Math.PI * 2;
@@ -447,19 +447,19 @@ export function createPlay(opts: {
     lensBlocked,
     scenery: sightProxies,
     params: {
-      distance: 3.1,
-      runDistance: 2.9,
+      distance: 2.9,
+      runDistance: 2.7,
       minDistance: 2.0,
-      height: 1.25,
+      height: 1.15,
       groundLift: 0.2,
-      lookHeight: 0.45,
-      framingHeight: 0.5,
-      airDistance: 3.3,
+      lookHeight: 0.33,
+      framingHeight: 0.38,
+      airDistance: 3.1,
       lookAhead: 1.2,
       fov: 50,
       clearance: 0.35,
-      // main's recentre scales with speed / 7.5 m/s (its fox runs 9); ours tops out at 3.6, so match the rate
-      recenterRate: 2.6,
+      // main's recentre scales with speed / 7.5 m/s (its fox runs 9); ours tops out at 3.2, so match the rate
+      recenterRate: 2.9,
     },
   });
 
