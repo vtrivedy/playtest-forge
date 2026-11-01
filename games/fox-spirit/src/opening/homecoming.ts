@@ -12,8 +12,9 @@ import { HOMECOMING } from './layout';
 type Page = { art: THREE.Texture; settled: () => boolean };
 type Unpressed = { goHome: (id: 'hare' | 'heron') => boolean; home: () => string[]; state: () => { creatures: { id: string; phase: string }[] } };
 
-const PAPER = new THREE.Color(0xe8d6b0);
-const AMBER = new THREE.Color(0xe0803a);
+/** unlit: dull, unoiled paper in the hood's shade, so each kindling reads as a step */
+const PAPER = new THREE.Color(0x7a6a58);
+const AMBER = new THREE.Color(0xc8601c);
 
 export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpressed) {
   const { scene } = ctx;
@@ -55,7 +56,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       body.add(cap);
     }
     // the flame-glow inside: a warm core that blooms through the paper when lit
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.155, 12, 8).scale(1, 1.2, 1), new THREE.MeshBasicMaterial({ color: 0xffb35a, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.155, 12, 8).scale(1, 1.2, 1), new THREE.MeshBasicMaterial({ color: 0xff7a1e, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
     body.add(core);
     frame.add(g);
     return { g, body, paper, core, lit: -1, seed: i * 1.7 };
@@ -146,10 +147,10 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       l.lit += dt;
       const k = THREE.MathUtils.smoothstep(l.lit, 0, 0.6);
       const flick = 0.92 + 0.08 * Math.sin(clock * 9 + l.seed) * Math.sin(clock * 5.3 + l.seed * 2);
-      (l.core.material as THREE.MeshBasicMaterial).opacity = 0.75 * k * flick;
+      (l.core.material as THREE.MeshBasicMaterial).opacity = 0.5 * k * flick;
       // lit paper glows amber, not white: the paper tints warm and the flame shows through as an orange bloom
       l.paper.color.copy(PAPER).lerp(AMBER, k);
-      l.paper.emissive.setHex(0x8a3a0c).multiplyScalar(k * flick);
+      l.paper.emissive.setHex(0x8a3204).multiplyScalar(k * flick);
       // a kindling swell, then a slow sway on its cord
       l.body.scale.setScalar(1 + 0.18 * Math.sin(Math.min(1, l.lit / 0.5) * Math.PI));
       l.g.rotation.z = Math.sin(clock * 1.1 + l.seed) * 0.05;
