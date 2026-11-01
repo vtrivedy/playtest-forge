@@ -165,13 +165,13 @@ function buildShelf(ctx: OpeningCtx): void {
     }
   }
   colliders.push({ kind: 'box', x: SHELF.x, z: SHELF.z, yaw: SHELF.yaw, hx: hw, hz: hd, top });
-  // the ridge: the shelf is its lowest step; taller columns climb behind it (east) and wrap south.
+  // the ridge: the shelf is its lowest step; taller columns climb behind it (east) and wrap south,
+  // away from the village so it backs the glide without walling the meadow (+lz faces the village).
   // [lx, lz, r, height above g0] — blockers only, never a climb route
   const RIDGE: Array<[number, number, number, number]> = [
-    [hw + 2.2, -3.2, 2.4, 7.4], [hw + 2.6, 1.2, 2.6, 8.3], [hw + 2.0, 5.4, 2.3, 7.0],
-    [hw + 6.4, -1.5, 2.8, 10.2], [hw + 6.8, 3.6, 2.7, 9.4], [hw + 5.6, -6.6, 2.5, 8.6],
-    [hw + 1.2, -hd - 2.2, 2.3, 6.6], [-1.2, hd + 2.4, 2.4, 6.2], [2.8, hd + 2.8, 2.2, 7.1],
-    [-4.6, hd + 1.8, 1.9, 4.2], [hw + 10.5, 1, 3, 11.5],
+    [hw + 2.2, -3.2, 2.4, 7.4], [hw + 2.6, 1.2, 2.6, 8.3], [hw + 2.0, 5.0, 2.2, 6.4],
+    [hw + 6.4, -1.5, 2.8, 10.2],
+    [hw + 1.2, -hd - 2.2, 2.3, 6.6], [-1.5, -hd - 2.0, 2.3, 5.6], [hw + 4.8, -hd - 3.5, 2.5, 8.4],
   ];
   for (const [lx, lz, r, h] of RIDGE) {
     root.add(occluder(ctx, column(rand, lx, lz, r, g0 - 2, g0 + h + (h > 8 ? 1 : 0), h < 8.5 && rand() < 0.6)));

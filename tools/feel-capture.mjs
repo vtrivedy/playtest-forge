@@ -45,7 +45,7 @@ page.on('pageerror', (e) => { errors.push(String(e)); console.log('PAGEERROR', S
 page.on('console', (m) => { if (m.type() === 'error') { errors.push(m.text()); console.log('CONSERR', m.text()); } });
 
 async function boot(feel = preset) {
-  await page.goto(`http://127.0.0.1:${port}/?feel=${feel}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+  await page.goto(`http://127.0.0.1:${port}/?world=russetvale&feel=${feel}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { timeout: 300000 });
   await page.evaluate(() => window.__gameHooks.setManual(true));
 }

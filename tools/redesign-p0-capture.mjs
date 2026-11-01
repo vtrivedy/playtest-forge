@@ -64,7 +64,7 @@ try {
 
   if (!skipBefore && !only) {
     try {
-      await page.goto(`http://127.0.0.1:${port}/?fresh=1`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+      await page.goto(`http://127.0.0.1:${port}/?world=russetvale&fresh=1`, { waitUntil: 'domcontentloaded', timeout: 180000 });
       await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { timeout: 300000 });
       await page.evaluate(() => {
         window.__gameHooks.setManual?.(true);

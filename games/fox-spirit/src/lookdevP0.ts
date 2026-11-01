@@ -8,7 +8,7 @@
  * (lookdevFox.ts) and is never graded (it carries the colour). Ink = inverted hulls.
  *
  * window.__lookdevHooks: setPaint('none'|'half'|'full'), setCamera(Shot), setFoxClip(clip, travel), advance(frames, dt), ready.
- * `&play=1` boots the playable opening instead (opening/scene.ts).
+ * The playable opening is the default boot (opening/scene.ts).
  */
 import * as THREE from 'three';
 import { buildGround, buildGrass, buildLeaves, buildContactShadow } from './lookdevGround';

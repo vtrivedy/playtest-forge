@@ -1,4 +1,4 @@
-// Smoke for the playable P0 clearing (?lookdev=p0&play=1): boot, drive a short route, jump, stills + state.
+// Smoke for the playable opening (default boot `/`): boot, drive a short route, jump, stills + state.
 //
 //   node tools/lookdev-play-smoke.mjs --out /path/to/dir
 //
@@ -51,7 +51,7 @@ const ROUTE = [
 ];
 const trace = [];
 try {
-  await page.goto(`http://127.0.0.1:${port}/?lookdev=p0&play=1`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+  await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 300000 });
   await page.evaluate(() => window.__gameHooks.setManual(true));
   let n = 0;
@@ -127,7 +127,7 @@ try {
     if (video) {
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, opening ? 'opening-75s.mp4' : 'hero-30s.mp4')]);
       const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
-      fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/?lookdev=p0&play=1', route: opening ? 'tools/opening-hero-route.mjs' : 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: totalFrames / 2, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
+      fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/', route: opening ? 'tools/opening-hero-route.mjs' : 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: totalFrames / 2, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
     }
     if (!video && clipF >= 0)
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'run-clip/f%03d.jpg'), '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', path.join(out, 'run-clip.mp4')]);

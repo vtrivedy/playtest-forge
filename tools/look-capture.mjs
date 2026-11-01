@@ -62,7 +62,7 @@ const H = (fn, ...a) => page.evaluate(([f, args]) => window.__gameHooks[f](...ar
 const advance = (frames, render = true) => H('advance', frames, 1 / 60, render);
 
 async function boot() {
-  await page.goto(`http://127.0.0.1:${port}/${q ? `?q=${q}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+  await page.goto(`http://127.0.0.1:${port}/?world=russetvale${q ? `&q=${q}` : ''}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
   await page.waitForFunction(() => !!(window.__game && window.__gameHooks?.advance), null, { timeout: 300000 });
   await H('setManual', true);
   await advance(30);

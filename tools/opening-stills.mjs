@@ -41,7 +41,7 @@ page.setDefaultTimeout(600000);
 page.on('pageerror', (e) => console.log('PAGEERROR', String(e)));
 page.on('console', (m) => m.type() === 'error' && console.log('CONSERR', m.text()));
 try {
-  await page.goto('http://127.0.0.1:5193/?lookdev=p0&play=1', { waitUntil: 'domcontentloaded', timeout: 300000 });
+  await page.goto('http://127.0.0.1:5193/', { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
   await page.evaluate((paint) => {
     window.__gameHooks.setManual(true);
