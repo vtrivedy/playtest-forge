@@ -5,7 +5,7 @@
  * lets go — it settles into a relaxed arc and sheds a stream of warm leaves; one leaf drifts down by the fox.
  */
 import * as THREE from 'three';
-import { canopyPad, jitter, mapleLeafGeometry, plumeGeometry } from '../lookdevKit';
+import { canopyPad, inked, jitter, mapleLeafGeometry, plumeGeometry } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import { CROWN } from './layout';
 
@@ -37,46 +37,52 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
   };
 
   // the Summit: a stack of weathered columns (same language as the shelf ridge) narrowing to a crag
-  const stone = mat(STONE, 0.5);
+  const stone = mat(STONE, 0.36);
   const COLS: Array<[number, number, number, number]> = [
-    [0, 0, 7, 30], [-6, 3, 5.5, 22], [5.5, -2, 5, 25], [2, 5, 4, 34], [-3, -4, 4.2, 28], [9, 3, 4, 14], [-10, -1, 4.5, 12],
+    [0, 0, 9, 44], [-7, 3, 8, 34], [6.5, -2, 7.5, 38], [2, 6, 6, 47], [-3, -5, 6.5, 40], [12, 3, 7, 26], [-13, -1, 7.5, 22], [19, -3, 8, 14], [-21, 2, 8.5, 12], [0, -10, 9, 18], [3, 11, 8, 20],
   ];
   for (const [x, z, r, h] of COLS) {
     const g = jitter(new THREE.CylinderGeometry(r * 0.55, r, h, 7, 4), 0.06 * r, rand, 0.4);
     g.translate(x, h / 2 - 2, z);
-    root.add(new THREE.Mesh(g, stone));
+    root.add(inked(g, stone, 0.03));
   }
-  const crag = 33;
+  const crag = 44;
 
-  // the Crown tree: a gnarled trunk off the crag, a tiered canopy, and the one arrested limb
+  // the Crown tree: a gnarled trunk off the crag, flat tiered lobes, bare limbs past the crown,
+  // and the one arrested limb (local −x = screen-left from the shelf, so it swings in the picture plane)
   const bark = mat(BARK, 0.38);
-  const trunk = new THREE.CatmullRomCurve3([V(1, crag - 2, 2), V(2.5, crag + 6, 1), V(0.5, crag + 13, 2.5), V(1.5, crag + 18, 1.5)]);
-  root.add(new THREE.Mesh(plumeGeometry(trunk, (t) => THREE.MathUtils.lerp(2.2, 0.8, t) + (1 - THREE.MathUtils.smoothstep(t, 0, 0.15)) * 1.6, 20, 9, 0), bark));
+  const trunk = new THREE.CatmullRomCurve3([V(1, crag - 2, 2), V(2.8, crag + 6, 1), V(0.2, crag + 12, 1.5), V(1.8, crag + 17, 1)]);
+  root.add(inked(plumeGeometry(trunk, (t) => THREE.MathUtils.lerp(2.0, 0.7, t) + (1 - THREE.MathUtils.smoothstep(t, 0, 0.15)) * 1.6, 20, 9, 0), bark, 0.03, true));
   const canopy = mat(0xffffff, 0.42, true);
+  const branch = (from: THREE.Vector3, to: THREE.Vector3, r0: number, r1: number) =>
+    root.add(inked(plumeGeometry(new THREE.CatmullRomCurve3([from, from.clone().lerp(to, 0.5).add(V(0, -0.8, 0)), to]), (t) => THREE.MathUtils.lerp(r0, r1, t), 8, 6, 0), bark, 0.024, true));
   const PADS: Array<[number, number, number, number]> = [
-    [1.5, crag + 21, 1.5, 7.5], [-5, crag + 17, 3, 5], [7.5, crag + 16.5, 0, 4.5], [2, crag + 15, -5, 4.2], [-1, crag + 14, 5.5, 4],
+    [2.5, crag + 20.5, 0.5, 4.6], [-1.5, crag + 19, 2, 3.4], [7.5, crag + 18.5, -1, 3.6], [10.5, crag + 14.5, 0.5, 3.2], [-3.5, crag + 14, 1, 3], [5, crag + 12, 2.5, 2.8], [6, crag + 22.5, 1, 2.4],
   ];
   for (const [x, y, z, r] of PADS) {
-    const pad = new THREE.Mesh(canopyPad(rand, r, r * 0.7, PRESSED), canopy);
+    const pad = inked(canopyPad(rand, r, r * 0.42, PRESSED), canopy, 0.03, true);
     pad.position.set(x, y, z);
     pad.rotation.y = rand() * 6.28;
     root.add(pad);
-    // limbs feeding each lobe
-    const from = trunk.getPointAt(0.45 + rand() * 0.3);
-    root.add(new THREE.Mesh(plumeGeometry(new THREE.CatmullRomCurve3([from, from.clone().lerp(V(x, y - r * 0.4, z), 0.5).add(V(0, -1, 0)), V(x, y - r * 0.4, z)]), (t) => THREE.MathUtils.lerp(0.7, 0.25, t), 8, 6, 0), bark));
+    branch(trunk.getPointAt(0.45 + rand() * 0.3), V(x, y - r * 0.3, z), 0.7, 0.25);
   }
-  // the arrested limb pivots at its fork; pressed = rigid, reaching straight up out of the crown
+  // bare limbs reach past the lobes so the crown's outline breaks against the sky
+  branch(trunk.getPointAt(0.85), V(12.5, crag + 23, -0.5), 0.5, 0.06);
+  branch(trunk.getPointAt(0.95), V(5, crag + 27, 1), 0.4, 0.05);
   const limb = new THREE.Group();
-  const fork = trunk.getPointAt(0.7);
+  const fork = trunk.getPointAt(0.42);
   limb.position.copy(fork);
   root.add(limb);
-  const limbCurve = new THREE.CatmullRomCurve3([V(0, 0, 0), V(-3.5, 4, 0.5), V(-8, 7.5, 0.5), V(-12.5, 9, 0)]);
-  limb.add(new THREE.Mesh(plumeGeometry(limbCurve, (t) => THREE.MathUtils.lerp(0.9, 0.12, t), 14, 6, 0), bark));
-  const limbPad = new THREE.Mesh(canopyPad(rand, 3.2, 2.2, PRESSED), canopy);
-  const tip = limbCurve.getPointAt(0.92);
+  // a long bare reach with one held cluster of leaves at its hand: the leaves the Scribe would not let fall
+  const limbCurve = new THREE.CatmullRomCurve3([V(0, 0, 0), V(-5, 2.4, 0.4), V(-11, 3.6, 0.4), V(-17, 3, 0)]);
+  limb.add(inked(plumeGeometry(limbCurve, (t) => THREE.MathUtils.lerp(0.9, 0.1, t), 16, 6, 0), bark, 0.024, true));
+  const held = mat(0xffffff, 0.3, true);
+  const limbPad = inked(canopyPad(rand, 2.2, 1.1, [0xc29068, 0xa87452, 0x8a5e46]), held, 0.03, true);
+  const tip = limbCurve.getPointAt(0.9);
   limbPad.position.copy(tip);
   limb.add(limbPad);
-  const POSE = { pressed: 0.62, released: -0.32 };
+  // pressed: held stiffly up and out like a hand raised against the wind; released: hangs and breathes
+  const POSE = { pressed: -0.62, released: 0.42 };
   limb.rotation.z = POSE.pressed;
 
   // shed leaves: crown-scale maple leaves that leave the limb pad and drift down the mountain face

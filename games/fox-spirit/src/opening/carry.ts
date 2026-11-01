@@ -7,6 +7,10 @@ export const CARRY = {
   pickupHeight: 0.85,
   emberSize: 0.115,
   glow: 0.7,
+  /** Mouth-corner offset keeps the coal visible beside the head from chase view. */
+  mouthSide: 0.2,
+  mouthForward: 0.2,
+  mouthLower: 0.11,
 };
 
 type CarryPlayer = { grounded: boolean; dashing?: boolean };
@@ -20,6 +24,18 @@ export function createCarry(opts: {
   /** Actual walkable floor, including shelf and route; Infinity rejects a blocker. */
   surfaceAt: (x: number, z: number) => number;
 }) {
+  if (new URLSearchParams(location.search).has('gui')) {
+    void import('lil-gui').then(({ default: GUI }) => {
+      const gui = new GUI({ title: 'Carry feel' });
+      gui.add(CARRY, 'pickupRadius', 0.6, 2, 0.05);
+      gui.add(CARRY, 'emberSize', 0.07, 0.18, 0.005);
+      gui.add(CARRY, 'glow', 0.2, 1.5, 0.05);
+      gui.add(CARRY, 'mouthSide', 0, 0.3, 0.01);
+      gui.add(CARRY, 'mouthForward', 0, 0.35, 0.01);
+      gui.add(CARRY, 'mouthLower', 0, 0.2, 0.01);
+      gui.close();
+    });
+  }
   const ember = new THREE.Group();
   ember.name = 'keeping-coal';
   const crust = new THREE.MeshToonMaterial({ color: 0x382b2a, gradientMap: RAMP_WORLD });
@@ -72,6 +88,7 @@ export function createCarry(opts: {
   const head = opts.fox.getObjectByName('head');
   const held = new THREE.Vector3();
   const forward = new THREE.Vector3();
+  const side = new THREE.Vector3();
 
   function canPickup(): boolean {
     const p = opts.fox.position;
@@ -94,8 +111,9 @@ export function createCarry(opts: {
       if (head) head.getWorldPosition(held);
       else held.copy(opts.fox.position).add(new THREE.Vector3(0, 0.45, 0));
       forward.set(0, 0, 1).applyQuaternion(opts.fox.quaternion);
-      position.copy(held).addScaledVector(forward, 0.17);
-      position.y -= 0.035;
+      side.set(1, 0, 0).applyQuaternion(opts.fox.quaternion);
+      position.copy(held).addScaledVector(forward, CARRY.mouthForward).addScaledVector(side, CARRY.mouthSide);
+      position.y -= CARRY.mouthLower;
       ember.position.copy(position);
     } else {
       ember.position.copy(position);

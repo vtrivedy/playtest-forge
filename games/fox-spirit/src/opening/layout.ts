@@ -14,7 +14,7 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
 /** The Still Crown on the Summit: far east-southeast, beyond the ridge, backlit by the low sun */
-export const CROWN = { x: 135, y: -14, z: 40, yaw: -0.4, scale: 2.1 } as const;
+export const CROWN = { x: 135, y: -16, z: 40, yaw: -Math.PI / 2, scale: 1.6 } as const;
 
 /** Cottages (all face +z: door on the z + d/2 wall) */
 export const HOUSES = [
@@ -95,7 +95,7 @@ export const KEEPING = (() => {
   const steam = { ...local(4.3, -2.2), y: SHELF_TOP, r: 1.0 };
   return {
     /** lit cradle on the shelf where the coal rests (feet height) */
-    coal: { x: 15.8, z: 78.2, y: SHELF_TOP },
+    coal: { x: 15.1, z: 77.4, y: SHELF_TOP },
     /** ledge centre line at SHELF_TOP: shelf → bend → spring pad; `ledgeWidth` walkable */
     ledge: [[15.2, 79.0], [19.6, 85.0], [steam.x - 0.3, steam.z + 1.5]] as ReadonlyArray<readonly [number, number]>,
     ledgeWidth: 3.2,
