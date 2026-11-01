@@ -9,3 +9,5 @@ The optional `?gui` panel exposes jump buffering/coyote time, glide sink, dash s
 Verification: drive the real input hooks from village to H-a to shelf; record jump apex/air, dash count, heat and ride peak/landing in window.__game. Capture cold/lit/shelf chase views and review against before. Keep default boot flip until full slice passes team gates.
 
 Route probe gate: terrain must remain continuous across the village/meadow boundary. The first actual-input trace stuck at z≈84 because the meadow's reversed smoothstep edges made a 0.6 m step; use ascending edges and invert the interpolation for a gentle southward dip.
+
+Capture pacing: the 75-second chase route should spend its time showing the wake, path and cold/lit contrast rather than idling for forty seconds after the shelf. Use a measured walk through the village, a trot into the meadow, and longer cold/lit observation beats. Keep the proven lift and shelf traversal inputs unchanged; do not stage the camera or teleport during the route.

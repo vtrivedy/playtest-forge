@@ -7,17 +7,17 @@ export function createOpeningRoute() {
   let last = 0;
   let launchY = null;
   const path = [
-    { beat: 'wake in paper', hold: 3 },
-    { beat: 'first colour', to: [-7.2, 88], mag: 0.28 },
-    { beat: 'well path', to: [-4, 88], mag: 0.5 },
-    { beat: 'village to meadow', to: [0, 80], mag: 0.75 },
-    { beat: 'cold hearth', to: [5.6, 77.5], mag: 0.5 },
-    { beat: 'cold hearth pause', hold: 2 },
-    { beat: 'bring the warmth', to: [5.6, 74.2], mag: 0.45 },
-    { beat: 'hearth lit', hold: 2 },
+    { beat: 'wake in paper', hold: 5 },
+    { beat: 'first colour', to: [-7.2, 88], mag: 0.2 },
+    { beat: 'well path', to: [-4, 88], mag: 0.28 },
+    { beat: 'village to meadow', to: [0, 80], mag: 0.4 },
+    { beat: 'cold hearth', to: [5.6, 77.5], mag: 0.28 },
+    { beat: 'cold hearth pause', hold: 5 },
+    { beat: 'bring the warmth', to: [5.6, 74.2], mag: 0.3 },
+    { beat: 'hearth lit', hold: 5 },
     { beat: 'ride the warm air', lift: true },
     { beat: 'glide to shelf', to: [13, 75.5], mag: 1, glide: true },
-    { beat: 'shelf landing', hold: 4 },
+    { beat: 'shelf landing', hold: 6 },
     { beat: 'shelf overlook', to: [14, 73], mag: 0.25 },
     { beat: 'warmth carries on', hold: Infinity },
   ];
