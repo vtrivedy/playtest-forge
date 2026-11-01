@@ -497,6 +497,17 @@ export function createPlay(opts: {
       jump.add(P, 'fallGravity', 1, 2.5, 0.05);
       jump.add(P, 'jumpCut', 0.2, 1, 0.05);
       jump.add(P, 'airControl', 0, 5, 0.1);
+      jump.add(P, 'coyote', 0, 0.25, 0.01);
+      jump.add(P, 'buffer', 0, 0.25, 0.01);
+      const glideDash = gui.addFolder('glide + dash');
+      glideDash.add(P, 'glideSink', 0.5, 3, 0.05);
+      glideDash.add(P, 'dashSpeed', 4, 12, 0.1);
+      glideDash.add(P, 'dashDuration', 0.1, 0.4, 0.01);
+      glideDash.add(P, 'dashCooldown', 0.2, 1.5, 0.05);
+      if (opts.updrafts) {
+        glideDash.add(opts.updrafts.tun, 'maxRise', 2, 12, 0.1);
+        glideDash.add(opts.updrafts.tun, 'liftResponse', 1, 12, 0.1);
+      }
       const clip = gui.addFolder('clips + IK');
       clip.add(P, 'minRate', 0.3, 1, 0.05);
       clip.add(P, 'maxRate', 1, 2.5, 0.05);
