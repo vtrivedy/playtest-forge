@@ -79,13 +79,14 @@ export function createKeepingRoute() {
     { beat: 'take the coal again', interact: true, until: (s) => op(s).carry?.carried, hold: 1 },
     { beat: 'ride the steam', lift: [24.95, 79.36], rise: 6.5 },
     { beat: 'glide to the terrace', to: [28.6, 76.6], mag: 0.8, glide: true },
-    { beat: 'to the root-hearth', to: [28.5, 75.6], mag: 0.3 },
+    { beat: 'to the root-hearth', to: [28.45, 75.85], mag: 0.3 },
     { beat: 'set warmth at the roots', interact: true, until: (s) => !op(s).carry?.carried, hold: 1 },
     { beat: 'the roots take it', hold: 10, until: (s) => op(s).chemistry?.completed, min: 1 },
     { beat: 'the tree finishes falling', hold: 7, until: (s) => op(s).keeping?.phase === 'bridge', min: 4.5 },
     { beat: 'onto the bridge', to: [27.8, 72.6], mag: 0.35 },
     { beat: 'cross the bridge', to: [26.2, 66.2], mag: 0.45 },
-    { beat: 'the Crown answers', hold: Infinity },
+    { beat: 'the Crown answers', hold: 4 },
+    { beat: 'a leaf comes down', hold: Infinity },
   ];
   return (t, state) => {
     since += Math.max(0, t - last);

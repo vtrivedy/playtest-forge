@@ -15,7 +15,7 @@ import { column } from './meadow';
 /** Authored settle timing (s from release) and shape */
 export const SETTLE = {
   shiver: 0.9,
-  fall: 1.6,
+  fall: 1.3,
   bounce: 0.9,
   /** fall curve exponent: > 1 accelerates like a toppling mass */
   ease: 2.3,
@@ -160,18 +160,25 @@ export function createKeeping(ctx: OpeningCtx) {
   // ---- ledge: shelf → bend → steam pad, moss-capped columns under walk boxes, a low curb on the drop side
   const W = K.ledgeWidth;
   const pts = K.ledge;
+  const rubble: THREE.Object3D[] = [];
   // curb: one low continuous blocker per run (the fox needs a jump to leave), drawn as a row of mossy rubble
   const curb = (ax: number, az: number, bx: number, bz: number) => {
     const len = Math.hypot(bx - ax, bz - az);
     colliders.push({ kind: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, yaw: Math.atan2(bx - ax, bz - az), hx: 0.2, hz: len / 2, top: SHELF_TOP + 0.34 });
-    const m = Math.max(2, Math.round(len / 0.62));
+    const m = Math.max(2, Math.round(len / 0.45));
+    // one fade unit per run: the chase cam sees through the rubble instead of sinking behind it
+    const run = new THREE.Group();
+    scene.add(run);
+    ctx.occluders.push(run);
     for (let k = 0; k <= m; k++) {
       const t = k / m;
-      const sz = 0.2 + rand() * 0.14;
+      const sz = 0.15 + rand() * 0.1;
       const r = buildRock(rand, sz);
       r.scale.y = 1.25;
       r.position.set(ax + (bx - ax) * t + (rand() - 0.5) * 0.12, SHELF_TOP + sz * 0.3, az + (bz - az) * t + (rand() - 0.5) * 0.12);
-      scene.add(r);
+      r.userData.scale = r.scale.clone();
+      run.add(r);
+      rubble.push(r);
     }
   };
   const bendOuter: Array<[number, number]> = [];
@@ -218,6 +225,20 @@ export function createKeeping(ctx: OpeningCtx) {
     const corner: [number, number] = [bx + ox * k, bz + oz * k];
     curb(a[0], a[1], corner[0], corner[1]);
     curb(corner[0], corner[1], b[0], b[1]);
+  }
+  // the bend's inside shoulder: fills the slot between B and the ridge so a step off B near the corner
+  // lands on turf instead of in a pit the fox could never leave
+  {
+    const [bx, bz] = pts[1]!;
+    const [cx, cz] = pts[2]!;
+    const yaw = Math.atan2(cx - bx, cz - bz);
+    const len = Math.hypot(cx - bx, cz - bz);
+    const t = 0.3;
+    const nIn = { x: -(cz - bz) / len, z: (cx - bx) / len };
+    const side = Math.sign((pts[0]![0] - bx) * nIn.x + (pts[0]![1] - bz) * nIn.z) || 1;
+    const x = bx + (cx - bx) * t + nIn.x * side * 1.9;
+    const z = bz + (cz - bz) * t + nIn.z * side * 1.9;
+    plinth(ctx, { x, z, hx: 1.5, hz: 2.0, yaw, top: SHELF_TOP }, 1.5, 2);
   }
   // steam pad under the spring, a little wider than the ledge
   plinth(ctx, { x: K.steam.x, z: K.steam.z, hx: 1.9, hz: 1.9, yaw: K.terrace.yaw, top: SHELF_TOP }, 1.7, 2);
@@ -315,7 +336,8 @@ export function createKeeping(ctx: OpeningCtx) {
 
   // ---- root-hearth bowl among the roots
   {
-    const g = stoneRing(rand, K.root.r + 0.22, K.root.r - 0.08, 0.26, ASH);
+    // a low rim: the placed coal on the bed stays in view from the chase cam
+    const g = stoneRing(rand, K.root.r + 0.3, K.root.r + 0.02, 0.13, ASH, 9);
     g.position.set(K.root.x, K.terrace.top, K.root.z);
     scene.add(g);
   }
@@ -371,9 +393,15 @@ export function createKeeping(ctx: OpeningCtx) {
   }
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
-  const one = new THREE.Vector3(1, 1, 1);
+  const one = new THREE.Vector3();
+  const near = new THREE.Vector3();
   const syncLeaves = () => {
-    leaf.forEach((l, i) => leaves.setMatrixAt(i, m4.compose(l.p, q.setFromEuler(l.rot), one)));
+    // leaves shrink away inside ~2.5 m of the lens so none fills the chase frame as a flat card
+    const lens = ctx.player?.cam.camera.position;
+    leaf.forEach((l, i) => {
+      const k = lens ? THREE.MathUtils.smoothstep(near.copy(l.p).distanceTo(lens), 0.9, 2.6) : 1;
+      leaves.setMatrixAt(i, m4.compose(l.p, q.setFromEuler(l.rot), one.setScalar(Math.max(0.001, k))));
+    });
     leaves.instanceMatrix.needsUpdate = true;
   };
   syncLeaves();
@@ -383,11 +411,11 @@ export function createKeeping(ctx: OpeningCtx) {
   };
 
   // ---- landing dust: soft paper-dust puffs along where the trunk comes down
-  const PUFFS = 14;
+  const PUFFS = 10;
   const puffMat = new THREE.MeshBasicMaterial({ color: 0xe2cfb2, transparent: true, opacity: 0, depthWrite: false, fog: true });
   const puffs = Array.from({ length: PUFFS }, (_, i) => {
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), puffMat.clone());
-    const s = 2.5 + (i / (PUFFS - 1)) * 10 + (rand() - 0.5) * 0.8;
+    const s = 5.5 + (i / (PUFFS - 1)) * 7 + (rand() - 0.5) * 0.8;
     m.position.set(K.hinge.x + K.fall.x * s + (rand() - 0.5) * 1.2, K.terrace.top - 0.2 + rand() * 0.4, K.hinge.z + K.fall.z * s + (rand() - 0.5) * 1.2);
     m.visible = false;
     m.userData.delay = Math.abs(s - 8) * 0.025 + rand() * 0.08;
@@ -435,6 +463,22 @@ export function createKeeping(ctx: OpeningCtx) {
     t = 0;
   }
 
+  // rubble right under the lens shrinks away: the chase cam behind the fox at a curb (after a dash
+  // or at the bend) would otherwise frame a wall of boulders over the fox's legs
+  const lensAt = new THREE.Vector3();
+  ctx.onUpdate(() => {
+    const cam = ctx.player?.cam.camera;
+    if (!cam) return;
+    cam.getWorldPosition(lensAt);
+    // off the ledge storey the lens is never inside the rubble: every rock is whole again
+    const level = Math.abs(lensAt.y - SHELF_TOP) <= 4;
+    for (const r of rubble) {
+      const d = Math.hypot(r.position.x - lensAt.x, r.position.z - lensAt.z);
+      const k = level ? THREE.MathUtils.smoothstep(d, 0.9, 2.2) : 1;
+      r.scale.copy(r.userData.scale as THREE.Vector3).multiplyScalar(Math.max(0.001, k));
+      r.visible = k > 0.01;
+    }
+  });
   ctx.onUpdate((dt) => {
     if (stair === 'unfolding') {
       stairT += dt;
@@ -476,7 +520,7 @@ export function createKeeping(ctx: OpeningCtx) {
       const u = (sinceImpact() - (m.userData.delay as number)) / 1.1;
       m.visible = u > 0 && u < 1;
       if (!m.visible) continue;
-      const r = 0.3 + Math.sqrt(u) * 1.2;
+      const r = 0.25 + Math.sqrt(u) * 0.85;
       m.scale.set(r * 1.4, r * 0.6, r * 1.4);
       m.position.y += dt * 0.25;
       (m.material as THREE.MeshBasicMaterial).opacity = 0.26 * (1 - u) * Math.min(1, u * 8);
@@ -531,7 +575,7 @@ export function createKeeping(ctx: OpeningCtx) {
         l.state = 'rest';
       }
     }
-    if (phase !== 'arrested') syncLeaves();
+    syncLeaves();
     lastImpact = impact;
   });
 

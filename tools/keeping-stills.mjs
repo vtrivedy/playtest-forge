@@ -17,14 +17,20 @@ const [W, H] = arg('size', '960x540').split('x').map(Number);
 // fox pose [x, z, yaw]
 const POSES = {
   cradle: [14.2, 76.8, 0.9],
+  // the shelf landing looking east to the arrested tree over the ridge
+  landing: [11.2, 75.6, 1.62],
+  // terrace top, looking at the lean
+  lean: [29.4, 78.2, -2.75],
   bend: [17.4, 81.6, 0.6],
+  // just past the bend after the dash toward the spring (chase cam behind, over the outer curb)
+  dash: [21.4, 83.4, 2.26],
   ledge: [21.2, 84.2, 2.2],
   spring: [23.6, 80.6, 2.4],
   terrace: [29.6, 77.4, -2.9],
   bridge: [27.4, 71.0, -2.9],
   crag: [26.2, 66.6, -2.9],
   // at the root-hearth facing the lean (where the coal is set down)
-  root: [28.45, 75.5, -2.9],
+  root: [28.35, 76.6, -2.9],
   // on the steam pad facing the stair
   stair: [25.6, 80.6, 1.75],
   // halfway up the stair

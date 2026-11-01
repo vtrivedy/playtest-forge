@@ -33,6 +33,9 @@ const SHOTS: Record<string, { pos: [number, number, number]; look: [number, numb
   meadow: { pos: [-4.5, 3.2, 91], look: [6, 1, 74] },
   gate: { pos: [-4.9, 1.3, 88.6], look: [-2.9, 1.5, 81] },
   aerial: { pos: [-4, 46, 122], look: [-4, 0, 82], fov: 45 },
+  // the first Keeping: the arrested Hearthtree over the ridge, and the gorge it falls across
+  hearthtree: { pos: [14, 15, 80], look: [27.5, 13, 70.5] },
+  gorge: { pos: [38, 16, 71], look: [26, 11, 70] },
 };
 
 export interface OpeningCtx {
@@ -141,9 +144,17 @@ export async function runOpening(): Promise<void> {
   });
   const hum = createHearthHum({ hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position });
   // the far Crown answers once the near tree has finished falling: attractor ladder resolves near → far
+  // near → far: the settle swells the hum; the Crown answers when the fox steps out onto the far crag
+  // and faces the vista gap (or after a while, so the response is never missed)
+  let settledAt = -1;
   keeping.onSettled(() => {
-    crown.respond();
+    settledAt = time;
     hum.swell();
+  });
+  ctx.onUpdate((_dt, t) => {
+    if (settledAt < 0) return;
+    const f = fox.root.position;
+    if (Math.hypot(f.x - KEEPING.crag.x, f.z - KEEPING.crag.z) < 3.2 || t - settledAt > 25) crown.respond();
   });
   const view = player.cam.camera;
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });

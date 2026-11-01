@@ -15,7 +15,9 @@ const STONE = 0x8a776a;
 const BARK = 0x5a4438;
 const PRESSED: [number, number, number] = [0xb09878, 0x9c8468, 0x84705e];
 const EMBER = 0xd8743a;
-const SHED = 48;
+/** shed leaves glow a step hotter than the coat so the far response reads at chase distance */
+const SHED_EMBER = 0xf2954a;
+const SHED = 90;
 
 function silhouette(color: number, vertexColors = false): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color, vertexColors, fog: false });
@@ -100,12 +102,32 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
 
   // shed leaves: crown-scale maple leaves that leave the limb pad and drift down the mountain face
   const leafGeo = mapleLeafGeometry(1).rotateX(Math.PI / 2);
-  const leafMat = new THREE.MeshBasicMaterial({ color: EMBER, side: THREE.DoubleSide, transparent: true, fog: false });
+  const leafMat = new THREE.MeshBasicMaterial({ color: SHED_EMBER, side: THREE.DoubleSide, transparent: true, fog: false });
   const leaves = new THREE.InstancedMesh(leafGeo, leafMat, SHED);
   leaves.frustumCulled = false;
   leaves.count = 0;
   root.add(leaves);
   const shed = Array.from({ length: SHED }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), spin: rand() * 6, age: -1, delay: 0, life: 9 + rand() * 6 }));
+
+  // a warm wash blooms behind the Crown as it lets go: the far response must read at a glance
+  const washTex = (() => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const g = cv.getContext('2d')!;
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,190,120,1)');
+    grad.addColorStop(0.45, 'rgba(240,150,80,0.35)');
+    grad.addColorStop(1, 'rgba(240,150,80,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(cv);
+  })();
+  const wash = new THREE.Sprite(new THREE.SpriteMaterial({ map: washTex, color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  wash.position.set(0, crag + 16, -6);
+  wash.scale.setScalar(70);
+  root.add(wash);
+  const heldEntry = mats.find((x) => x.m === held)!;
+  const heldBase = heldEntry.base.clone();
 
   // the hero leaf: one real-scale leaf that finds the fox, so the response is felt up close too
   const hero = new THREE.Mesh(mapleLeafGeometry(0.22).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: EMBER, side: THREE.DoubleSide, transparent: true }));
@@ -127,7 +149,7 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
     release = 0;
     shed.forEach((l, i) => {
       l.age = 0;
-      l.delay = 0.6 + (i / SHED) * 5 + rand() * 0.8;
+      l.delay = 0.3 + (i / SHED) * 4 + rand() * 0.6;
     });
     const f = ctx.fox.root.position;
     heroState.age = 0;
@@ -146,6 +168,10 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
     const k = 1 - Math.exp(-release * 0.9);
     const rebound = Math.sin(release * 2.2) * Math.exp(-release * 0.7) * 0.08;
     limb.rotation.z = THREE.MathUtils.lerp(POSE.pressed, POSE.released, k) + rebound + Math.sin(t * 0.7) * 0.02 * k;
+    // the held cluster warms and the wash swells, then settles to an afterglow
+    (wash.material as THREE.SpriteMaterial).opacity = 0.55 * THREE.MathUtils.smoothstep(release, 0, 1.5) * (0.45 + 0.55 * Math.exp(-release * 0.25));
+    heldEntry.base.copy(heldBase).lerp(new THREE.Color(SHED_EMBER), THREE.MathUtils.smoothstep(release, 0, 2) * 0.8);
+    heldEntry.mistK = 0.3 * (1 - THREE.MathUtils.smoothstep(release, 0, 2));
     limb.updateMatrixWorld(true);
     let n = 0;
     for (const l of shed) {
@@ -161,7 +187,7 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
       l.p.addScaledVector(l.v, dt);
       l.p.x += Math.sin(a * 1.3 + l.spin) * dt * 2.2;
       e.set(a * 1.7 + l.spin, a * 0.9, Math.sin(a * 2 + l.spin) * 0.8);
-      s.setScalar(1.6 * Math.min(1, a * 2) * (1 - THREE.MathUtils.smoothstep(a, l.life - 2, l.life)));
+      s.setScalar(3 * Math.min(1, a * 2) * (1 - THREE.MathUtils.smoothstep(a, l.life - 2, l.life)));
       leaves.setMatrixAt(n++, m4.compose(l.p, q.setFromEuler(e), s));
     }
     leaves.count = n;
