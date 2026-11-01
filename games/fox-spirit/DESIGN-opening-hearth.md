@@ -15,3 +15,5 @@ Capture pacing: the 75-second chase route should spend its time showing the wake
 Cold-hearth framing: approach the observation point from the south along the hearth axis so the fox and chase camera face the cold target before the five-second pause. Use movement only; retain the same ignition and lift positions.
 
 With the stone bowl art, ignite and launch beside its rim at (4.3, 74.8), within the strong updraft. The bowl has physical collision, so the route must not require standing on its axis. Keep the shelf destination and seven-metre launch threshold.
+
+Village wake framing: start the capture at the scene's authored spawn (-5.2, 92.5), facing toward (-3, 81). Match the controller's `(sin yaw, cos yaw)` convention so the opening hold shows the same view in free play and the capture.

@@ -1,5 +1,5 @@
 // 75 s opening beat, driven entirely through player input. No mid-route teleports or camera overrides.
-export const OPENING_START = { x: -6, z: 92, yaw: Math.PI };
+export const OPENING_START = { x: -5.2, z: 92.5, yaw: Math.atan2(2.2, -11.5) };
 
 export function createOpeningRoute() {
   let phase = 0;
