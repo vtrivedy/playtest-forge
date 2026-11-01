@@ -230,6 +230,18 @@ export function buildMeadow(ctx: OpeningCtx): void {
     t.rotation.y = rand() * 6;
     scene.add(t);
   }
+  // a second, deeper row of crowns up the slope, offset between the first
+  for (let i = 0; i < RIM_N; i++) {
+    const a = ((i + 0.5) / RIM_N) * Math.PI * 2 + (rand() - 0.5) * 0.15;
+    const k2 = 1.32 + rand() * 0.18;
+    const x2 = BOUNDS.cx + Math.cos(a) * BOUNDS.rx * k2;
+    const z2 = BOUNDS.cz + Math.sin(a) * BOUNDS.rz * k2;
+    const y2 = groundH(x2, z2);
+    const t = buildMaple(rand, 1.6 + rand() * 0.5, 'grove', 4 + (i & 1), y2);
+    t.position.set(x2, y2 - 0.1, z2);
+    t.rotation.y = rand() * 6;
+    scene.add(t);
+  }
   for (const [x, z, sc, kind, pal] of TREES) {
     const y = groundH(x, z);
     const t = buildMaple(rand, sc, kind, pal, y);
