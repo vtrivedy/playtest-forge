@@ -167,8 +167,14 @@ export const UNPRESSED = (() => {
   const cragAt = (lx: number, lz: number) => ({ x: K.crag.x + lx * cc + lz * cs, z: K.crag.z - lx * cs + lz * cc });
   const stone = cragAt(1.35, 1.2);
   return {
-    hedgehog: { ...hog, y: groundH(hog.x, hog.z) + 0.12, yaw: Math.atan2(-n.x, -n.z), settle: { x: hog.x - n.x * 1.6 - d.x * 0.9, z: hog.z - n.z * 1.6 - d.z * 0.9 } },
-    heron: { ...heron, y: groundH(heron.x, heron.z) + 0.7, yaw: Math.atan2(-sc, ss), settle: { ...shelfAt(-3.7, -0.6), y: SHELF_TOP } },
+    hedgehog: { ...hog, y: groundH(hog.x, hog.z) + 0.1, yaw: Math.atan2(-n.x, -n.z), settle: { x: hog.x - n.x * 1.6 - d.x * 0.9, z: hog.z - n.z * 1.6 - d.z * 0.9 } },
+    heron: {
+      ...heron, y: groundH(heron.x, heron.z) + 0.7, yaw: Math.atan2(-sc, ss),
+      /** it lives at the cliff foot, back to the rock: land on it and it flings you up onto the shelf */
+      settle: { ...shelfAt(-6.1, 1.5), y: groundH(shelfAt(-6.1, 1.5).x, shelfAt(-6.1, 1.5).z) },
+      /** its facing once settled (away from the cliff, out over the meadow) */
+      out: { x: -sc, z: ss },
+    },
     deer: { x: stone.x - K.fall.x * 0.2, z: stone.z - K.fall.z * 0.2, y: K.crag.top, yaw: Math.atan2(-K.fall.x, -K.fall.z), stone: { ...stone, yaw: K.crag.yaw }, settle: { ...cragAt(-0.7, 2.1), y: K.crag.top },
       /** out of the stone toward the bridge, round its left end, to the far edge facing the Crown */
       path: [cragAt(1.35, 0.25), cragAt(0.0, 0.5), cragAt(-0.7, 2.1)] },

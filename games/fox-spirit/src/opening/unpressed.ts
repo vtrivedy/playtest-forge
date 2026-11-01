@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { RAMP_WORLD, inkMaterial, hullGeometry, plumeGeometry, hewn, toon, inked } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
+import type { Collider } from '../lookdevPlay';
 import { UNPRESSED } from './layout';
 
 type P2 = readonly [number, number];
@@ -39,7 +40,7 @@ const INK_HEX = '#2a1a10';
 const SPECS: Spec[] = [
   {
     id: 'hedgehog',
-    scale: 1,
+    scale: 1.45,
     bones: { body: { at: [0, 0.16] }, head: { at: [0.15, 0.16], parent: 'body' }, legF: { at: [0.11, 0.08], parent: 'body' }, legB: { at: [-0.12, 0.08], parent: 'body' } },
     parts: [
       { k: 'ell', bone: 'body', c: [0, 0.17], r: [0.24, 0.15, 0.17], col: 0x7a5638 },
@@ -95,26 +96,26 @@ const SPECS: Spec[] = [
       tail: { at: [-0.52, 1.08], parent: 'body' },
     },
     parts: [
-      { k: 'ell', bone: 'body', c: [0, 0.97], r: [0.5, 0.26, 0.22], col: 0xa8683c },
-      { k: 'ell', bone: 'body', c: [-0.36, 0.99], r: [0.21, 0.22, 0.19], col: 0xa0603a },
+      { k: 'ell', bone: 'body', c: [0, 0.97], r: [0.5, 0.26, 0.22], col: 0x8e6a4a },
+      { k: 'ell', bone: 'body', c: [-0.36, 0.99], r: [0.21, 0.22, 0.19], col: 0x86624a },
       { k: 'ell', bone: 'body', c: [0.02, 0.86], r: [0.38, 0.1, 0.17], col: 0xd8b48a },
       { k: 'ell', bone: 'tail', c: [-0.56, 1.06], r: [0.06, 0.1, 0.05], col: 0xf0e2c8, rot: 0.5 },
-      { k: 'tube', bone: 'neck', pts: [[0.36, 1.05], [0.48, 1.28], [0.58, 1.5]], r: [0.13, 0.085], col: 0xa8683c },
-      { k: 'ell', bone: 'head', c: [0.68, 1.55], r: [0.16, 0.09, 0.08], col: 0xa8683c, rot: -0.35 },
+      { k: 'tube', bone: 'neck', pts: [[0.36, 1.05], [0.48, 1.28], [0.58, 1.5]], r: [0.13, 0.085], col: 0x8e6a4a },
+      { k: 'ell', bone: 'head', c: [0.68, 1.55], r: [0.16, 0.09, 0.08], col: 0x8e6a4a, rot: -0.35 },
       { k: 'cone', bone: 'head', from: [0.74, 1.52], to: [0.88, 1.44], r: 0.055, col: 0x5a3a26 },
-      { k: 'ell', bone: 'head', c: [0.57, 1.66], r: [0.08, 0.035, 0.02], col: 0x9a5c36, rot: 0.7, z: 0.08 },
-      { k: 'ell', bone: 'head', c: [0.57, 1.66], r: [0.08, 0.035, 0.02], col: 0x9a5c36, rot: 0.7, z: -0.08 },
+      { k: 'ell', bone: 'head', c: [0.57, 1.66], r: [0.08, 0.035, 0.02], col: 0x7c5a42, rot: 0.7, z: 0.08 },
+      { k: 'ell', bone: 'head', c: [0.57, 1.66], r: [0.08, 0.035, 0.02], col: 0x7c5a42, rot: 0.7, z: -0.08 },
       { k: 'tube', bone: 'head', pts: [[0.63, 1.63], [0.61, 1.86], [0.52, 2.02]], r: [0.026, 0.012], col: 0xe6d6b0, z: 0.06 },
       { k: 'tube', bone: 'head', pts: [[0.61, 1.8], [0.72, 1.94]], r: [0.016, 0.008], col: 0xe6d6b0, z: 0.06 },
       { k: 'tube', bone: 'head', pts: [[0.63, 1.63], [0.61, 1.86], [0.52, 2.02]], r: [0.026, 0.012], col: 0xe6d6b0, z: -0.06 },
       { k: 'tube', bone: 'head', pts: [[0.61, 1.8], [0.72, 1.94]], r: [0.016, 0.008], col: 0xe6d6b0, z: -0.06 },
-      { k: 'tube', bone: 'legFL', pts: [[0.32, 0.84], [0.35, 0.44], [0.33, 0.06]], r: [0.075, 0.034], col: 0x8a5432, z: 0.09 },
+      { k: 'tube', bone: 'legFL', pts: [[0.32, 0.84], [0.35, 0.44], [0.33, 0.06]], r: [0.075, 0.034], col: 0x6e5240, z: 0.09 },
       { k: 'cone', bone: 'legFL', from: [0.33, 0.07], to: [0.35, 0.0], r: 0.04, col: 0x2a1a12, z: 0.09 },
-      { k: 'tube', bone: 'legFR', pts: [[0.32, 0.84], [0.35, 0.44], [0.33, 0.06]], r: [0.075, 0.034], col: 0x8a5432, z: -0.09 },
+      { k: 'tube', bone: 'legFR', pts: [[0.32, 0.84], [0.35, 0.44], [0.33, 0.06]], r: [0.075, 0.034], col: 0x6e5240, z: -0.09 },
       { k: 'cone', bone: 'legFR', from: [0.33, 0.07], to: [0.35, 0.0], r: 0.04, col: 0x2a1a12, z: -0.09 },
-      { k: 'tube', bone: 'legBL', pts: [[-0.34, 0.86], [-0.43, 0.46], [-0.36, 0.06]], r: [0.09, 0.034], col: 0x8a5432, z: 0.09 },
+      { k: 'tube', bone: 'legBL', pts: [[-0.34, 0.86], [-0.43, 0.46], [-0.36, 0.06]], r: [0.09, 0.034], col: 0x6e5240, z: 0.09 },
       { k: 'cone', bone: 'legBL', from: [-0.36, 0.07], to: [-0.35, 0.0], r: 0.04, col: 0x2a1a12, z: 0.09 },
-      { k: 'tube', bone: 'legBR', pts: [[-0.34, 0.86], [-0.43, 0.46], [-0.36, 0.06]], r: [0.09, 0.034], col: 0x8a5432, z: -0.09 },
+      { k: 'tube', bone: 'legBR', pts: [[-0.34, 0.86], [-0.43, 0.46], [-0.36, 0.06]], r: [0.09, 0.034], col: 0x6e5240, z: -0.09 },
       { k: 'cone', bone: 'legBR', from: [-0.36, 0.07], to: [-0.35, 0.0], r: 0.04, col: 0x2a1a12, z: -0.09 },
     ],
     eye: { at: [0.71, 1.58], r: 0.018, bone: 'head' },
@@ -123,6 +124,8 @@ const SPECS: Spec[] = [
 
 /** dash within this horizontal distance of a drawing's foot point unpresses it */
 export const UNPRESS = { trigger: 2.0, pop: 0.85 };
+/** the heron's lasting gift: land on its back and it flings you up the shelf cliff (vy, m/s; dwell, s) */
+export const HERON_FLING = { launch: 13.4, dwell: 0.05, backTop: 0.64, hx: 0.48, hz: 0.3, bowNear: 2.6 };
 
 const creatureMat = (col: number) => new THREE.MeshToonMaterial({ color: col, gradientMap: RAMP_WORLD });
 
@@ -474,7 +477,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       holder.add(f);
       return { m: f, v: new THREE.Vector3(), s: new THREE.Vector3() };
     });
-    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0 };
+    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0 };
   });
 
   const world = new THREE.Vector3();
@@ -532,29 +535,31 @@ export function buildUnpressed(ctx: OpeningCtx) {
     },
     heron(c, t, dt) {
       const s = UNPRESSED.heron.settle;
+      const o = UNPRESSED.heron.out;
       const head = B(c, 'head');
       const wl = B(c, 'wingL');
       const wr = B(c, 'wingR');
-      // 0–0.8 shake the head free; 0.8–1.3 wings open; 1.3–3.6 flap up onto the shelf; land, fold
+      // 0–0.8 shake the head free; 0.8–1.2 wings open; 1.2–2.6 one flapping hop down to the cliff foot;
+      // 2.6–3.2 fold; turn to face out over the meadow
       head.rotation.z = t < 0.8 ? Math.sin(t * 22) * 0.25 * (1 - t / 0.8) : 0;
-      const open = smooth(0.8, 1.3, t) * (1 - smooth(3.6, 4.2, t));
-      const flap = t > 1.3 && t < 3.7 ? Math.sin((t - 1.3) * 11) : 0;
+      const open = smooth(0.8, 1.2, t) * (1 - smooth(2.6, 3.2, t));
+      const flap = t > 1.2 && t < 2.7 ? Math.sin((t - 1.2) * 11) : 0;
       wl.rotation.x = -(0.15 + 1.25 * open + flap * 0.75 * open);
       wr.rotation.x = 0.15 + 1.25 * open + flap * 0.75 * open;
-      B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = smooth(1.4, 1.8, t) * (1 - smooth(3.3, 3.6, t)) * 1.1;
-      if (t < 1.3) return false;
-      const u = smooth(1.3, 3.6, t);
+      B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = smooth(1.3, 1.6, t) * (1 - smooth(2.3, 2.6, t)) * 0.9;
+      if (t < 1.2) return false;
+      const u = smooth(1.2, 2.6, t);
       const from = c.userFrom ?? (c.userFrom = c.holder.position.clone());
       const to = new THREE.Vector3(s.x, s.y, s.z);
-      const mid = from.clone().lerp(to, 0.5).add(new THREE.Vector3(0, 2.4, 0));
-      // quadratic arc
+      const mid = from.clone().lerp(to, 0.5).add(new THREE.Vector3(0, 1.2, 0));
       const a = from.clone().lerp(mid, u);
       const b = mid.clone().lerp(to, u);
       c.holder.position.copy(a.lerp(b, u));
-      c.holder.position.y += flap * 0.06;
-      if (t < 3.6) face(c, to.x - from.x, to.z - from.z, Math.min(1, dt * 3));
-      B(c, 'body').rotation.z = (1 - smooth(3.3, 3.8, t)) * smooth(1.3, 1.6, t) * -0.25;
-      return t > 4.4;
+      c.holder.position.y += flap * 0.04 * (1 - u);
+      if (t < 2.6) face(c, to.x - from.x, to.z - from.z, Math.min(1, dt * 4));
+      else face(c, o.x, o.z, Math.min(1, dt * 3));
+      B(c, 'body').rotation.z = (1 - smooth(2.3, 2.7, t)) * smooth(1.2, 1.5, t) * -0.2;
+      return t > 3.8;
     },
     deer(c, t, dt) {
       const path = UNPRESSED.deer.path;
@@ -603,6 +608,30 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'body').scale.y = 1 + Math.sin(t * 3.1) * 0.02;
     },
     heron(c, t) {
+      if (fling >= 0) {
+        // the fling: crouch under the fox, then a great downstroke as it throws you up
+        const u = fling;
+        const crouch = Math.sin(Math.min(1, u / 0.35) * Math.PI);
+        B(c, 'body').position.y = 1.0 - c.bow * 0.38 - crouch * 0.1;
+        const stroke = smooth(0, 0.12, u) * (1 - smooth(0.25, 0.8, u));
+        B(c, 'wingL').rotation.x = -(0.15 + 1.6 * stroke);
+        B(c, 'wingR').rotation.x = 0.15 + 1.6 * stroke;
+        B(c, 'neck').rotation.z = -crouch * 0.3;
+        return;
+      }
+      // the fox comes close: the heron bows low and spreads its back, offering the lift
+      const fx = ctx.fox.root.position;
+      const near = 1 - THREE.MathUtils.smoothstep(Math.hypot(fx.x - c.holder.position.x, fx.z - c.holder.position.z), 1.2, HERON_FLING.bowNear);
+      c.bow = THREE.MathUtils.damp(c.bow, near, 5, 1 / 60);
+      B(c, 'body').position.y = 1.0 - c.bow * 0.38;
+      B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = -c.bow * 0.5;
+      if (c.bow > 0.05) {
+        B(c, 'neck').rotation.z = -c.bow * 0.55;
+        B(c, 'head').rotation.z = c.bow * 0.5;
+        B(c, 'wingL').rotation.x = -(0.15 + c.bow * 0.35);
+        B(c, 'wingR').rotation.x = 0.15 + c.bow * 0.35;
+        return;
+      }
       // still as a heron: slow neck sway, a preen every few seconds, a weight shift
       const preen = smooth(0, 0.3, Math.sin(t * 0.45 + c.idleSeed));
       B(c, 'neck').rotation.z = Math.sin(t * 0.6) * 0.05 - preen * 0.9;
@@ -612,12 +641,44 @@ export function buildUnpressed(ctx: OpeningCtx) {
     },
     deer(c, t) {
       // graze, lift the head, chew, ear flicks and tail flicks
-      const up = smooth(0.2, 0.8, Math.sin(t * 0.35 + c.idleSeed));
+      // when the fox is near it stops grazing and watches it, head turned (a companion, not scenery)
+      const fx = ctx.fox.root.position;
+      const dx = fx.x - c.holder.position.x;
+      const dz = fx.z - c.holder.position.z;
+      const watch = 1 - THREE.MathUtils.smoothstep(Math.hypot(dx, dz), 3.5, 7);
+      const rel = Math.atan2(-dz, dx) - c.holder.rotation.y;
+      const turn = THREE.MathUtils.clamp(Math.atan2(Math.sin(rel), Math.cos(rel)), -1.1, 1.1);
+      c.bow = THREE.MathUtils.damp(c.bow, watch, 3, 1 / 60);
+      B(c, 'neck').rotation.y = turn * 0.6 * c.bow;
+      B(c, 'head').rotation.y = turn * 0.4 * c.bow;
+      const up = Math.max(c.bow, smooth(0.2, 0.8, Math.sin(t * 0.35 + c.idleSeed)));
       B(c, 'neck').rotation.z = -0.95 + up * 1.05;
       B(c, 'head').rotation.z = Math.sin(t * 5) * 0.04 * (1 - up);
       B(c, 'tail').rotation.z = Math.max(0, Math.sin(t * 2.3 + 1)) * 0.5;
     },
   };
+
+  let heronBack: Collider | null = null;
+  let onBack = 0;
+  let fling = -1;
+  let flings = 0;
+  /** onGroundContact hook (controller's supported-top spring): the heron's back flings the fox up */
+  function contact(at: THREE.Vector3, _arrival: number, _held: boolean, dt: number): number | null {
+    const h = creatures.find((k) => k.spec.id === 'heron')!;
+    if (!heronBack || h.phase !== 'alive') return null;
+    local.copy(at).sub(h.holder.position).applyAxisAngle(new THREE.Vector3(0, 1, 0), -h.holder.rotation.y);
+    const on = Math.abs(local.x) < HERON_FLING.hx && Math.abs(local.z) < HERON_FLING.hz && Math.abs(at.y - (h.holder.position.y + HERON_FLING.backTop)) < 0.15;
+    if (!on) {
+      onBack = 0;
+      return null;
+    }
+    onBack += dt;
+    if (onBack < HERON_FLING.dwell) return null;
+    onBack = 0;
+    fling = 0;
+    flings++;
+    return HERON_FLING.launch;
+  }
 
   let clock = 0;
   ctx.onUpdate((dt) => {
@@ -670,17 +731,26 @@ export function buildUnpressed(ctx: OpeningCtx) {
         if (perform[c.spec.id](c, c.t, dt)) {
           c.phase = 'alive';
           c.t = 0;
+          if (c.spec.id === 'heron') {
+            // its back: a one-way top (hop up onto it from any side; walking under it never snags)
+            const back = { kind: 'box' as const, x: c.holder.position.x, z: c.holder.position.z, yaw: c.holder.rotation.y, hx: HERON_FLING.hx, hz: HERON_FLING.hz, top: c.holder.position.y + HERON_FLING.backTop, oneWay: true };
+            heronBack = back;
+            ctx.colliders.push(back);
+          }
         }
         continue;
       }
       idle[c.spec.id](c, clock);
     }
+    if (fling >= 0 && (fling += dt) > 0.9) fling = -1;
   });
 
   return {
     unpress,
+    contact,
     state() {
       return {
+        flings,
         found: creatures.filter((c) => c.phase !== 'pressed').map((c) => c.spec.id),
         creatures: creatures.map((c) => ({ id: c.spec.id, phase: c.phase, t: +c.t.toFixed(2), at: c.holder.position.toArray().map((v) => +v.toFixed(2)) })),
       };

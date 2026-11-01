@@ -14,17 +14,18 @@ Phase-2 "make it fun" sprint, feature C (Moss). Three animals the Scribe pressed
 | | where | drawing | after the pop |
 |---|---|---|---|
 | Hedgehog | village, the dry-stone wall along the hub lane | curled ball on the wall face | uncurls, sniffs, trundles a short arc, settles by the lane and snuffles |
-| Heron | meadow, the H-a shelf's west cliff face | standing heron, neck in an S | opens wings, flaps up and lands on the shelf rim; preens, shifts weight |
-| Deer | Keeping place, a page-stone on the far crag | young stag in profile | steps out of the stone, turns to the Crown, walks to the edge and lowers its head |
+| Heron | meadow, the H-a shelf's west cliff face | standing heron, neck in an S | opens wings, hops down to the cliff foot and stays. **Lasting gift:** come close and it bows; hop onto its back and it flings you up onto the shelf — a permanent shortcut past the H-a ride |
+| Deer | Keeping place, a page-stone on the far crag | young stag in profile | steps out of the stone, walks round it to the vista edge, faces the Crown and grazes; when the fox comes near it stops and watches it |
 
 ## Rules
 
 - **Trigger:** fox dashing within the trigger radius of the drawing (horizontal). Aura alone never triggers it (no accidental finds while walking past).
 - **One-shot, permanent:** unpressed stays unpressed for the session.
-- **No colliders on creatures;** they never block the route. Perches/paths are authored, not AI.
+- **No blocking colliders on creatures** except the heron's back (a one-way top, so walking under/past never snags). Perches/paths are authored, not AI.
+- **Heron fling** uses the controller's supported-top spring hook (`onGroundContact`, from the canopy work): `unpressed.contact()` returns the launch speed (13.4 m/s ≈ 6 m) after a 0.05 s dwell on its back. Scene chains it after the canopy: `canopy.contact(...) ?? unpressed.contact(...)`.
 - **Colour:** creatures use plain toon materials (not the paint-field patch) so they are coloured even in unpainted sepia — that contrast is the reveal. No `field.restore` calls (the shared 4-slot restore budget belongs to the Keeping and the ruin).
 - **Drawing = the model:** each creature is authored once as a side-profile spec (ellipsoids, tubes, cones in an x-forward / y-up plane); the same spec draws the canvas ink drawing and builds the 3D model, so the pop reads as the drawing gaining depth.
 
 ## Hooks
 
-`state().opening.unpressed` = `{ found: string[], creatures: { id, phase: 'pressed'|'popping'|'performing'|'alive', t } [] }`; dev `__gameHooks.unpress(id)`.
+`state().opening.unpressed` = `{ flings, found: string[], creatures: { id, phase: 'pressed'|'popping'|'performing'|'alive', t } [] }`; dev `__gameHooks.unpress(id)`.
