@@ -219,17 +219,18 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
   (tailTip ?? root).add(tailLight);
   tailLight.position.set(0, 0.08, 0);
 
-  // spirit signal: cel flame tongues along the tail's burn-out third (the brush becomes fire), tallest at the point
+  // spirit signal: cel flame tongues along the tail's burn-out third (the brush becomes fire), tallest at the point;
+  // sized to read from the chase cam, not just in close-up
   const uTime = { value: 0 };
   const uLean = { value: new THREE.Vector3() };
   const flameGeo = new THREE.PlaneGeometry(1, 1);
   const tail5 = model.getObjectByName('tail5') as THREE.Bone | undefined;
   const tongues: [THREE.Bone | undefined, [number, number, number], [number, number], number][] = [
-    [tailTip, [0, 0.06, 0], [0.13, 0.27], 0.1],
-    [tailTip, [0.03, 0.0, 0.02], [0.09, 0.18], 0.55],
-    [tailTip, [-0.035, -0.03, -0.01], [0.08, 0.15], 0.85],
-    [tail5, [0.02, 0.03, 0.03], [0.07, 0.12], 0.35],
-    [tail5, [-0.03, -0.02, 0.02], [0.06, 0.09], 0.7],
+    [tailTip, [0, 0.06, 0], [0.19, 0.4], 0.1],
+    [tailTip, [0.04, 0.0, 0.02], [0.13, 0.27], 0.55],
+    [tailTip, [-0.045, -0.03, -0.01], [0.12, 0.22], 0.85],
+    [tail5, [0.03, 0.03, 0.03], [0.1, 0.18], 0.35],
+    [tail5, [-0.04, -0.02, 0.02], [0.09, 0.14], 0.7],
   ];
   for (const [bone, off, size, seed] of tongues) {
     if (!bone) continue;

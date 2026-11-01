@@ -324,12 +324,13 @@ def author_keys(name, keys, frames, loop=False):
 
 # Root never moves in these clips; the game owns the arc. jumpUp: tiny load (f0-2), hind push with paws
 # reaching *below* the root so contact holds while the game lifts it (f2-5), then the tucked rise pose.
-RISE = dict(hip_up=0.03, hips=-0.08, spine=0.02, chest=-0.04, neck=0.06, head=0.14, tail=-0.08, curl=-0.08, ear=-0.4,
+# Body stays near level through the leap: any nose-up pitch reads as rearing from the chase cam.
+RISE = dict(hip_up=0.03, hips=-0.02, spine=0.02, chest=-0.04, neck=0.06, head=0.14, tail=-0.08, curl=-0.08, ear=-0.4,
             F=(0.04, 0.3, 1.7), H=(-0.26, 0.12, 1.25))
 JUMP_UP = [
     (0, dict(hip_up=-0.04, hips=0.06, chest=0.05, neck=0.06, head=0.12, tail=-0.05, ear=-0.1)),
     (2, dict(hip_up=-0.06, hips=0.1, spine=0.02, chest=0.08, neck=0.08, head=0.14, tail=-0.12, ear=-0.2, F=(0.0, 0.0, 0.3), H=(0.0, 0.0, 0.2))),
-    (5, dict(hip_up=0.05, hips=-0.14, spine=-0.03, chest=-0.06, neck=-0.02, head=0.18, tail=0.1, ear=-0.35, F=(0.1, 0.2, 1.3), H=(-0.14, -0.05, 1.0))),
+    (5, dict(hip_up=0.05, hips=-0.06, spine=-0.03, chest=-0.06, neck=-0.02, head=0.18, tail=0.1, ear=-0.35, F=(0.1, 0.2, 1.3), H=(-0.14, -0.05, 1.0))),
     (10, RISE),
 ]
 # fall: front paws drift down to reach for the ground, hind tucks, tail floats up
