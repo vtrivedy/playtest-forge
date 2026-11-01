@@ -64,6 +64,7 @@ func _ready() -> void:
 	add_child(occlusion)
 	occlusion.setup(ctx.occluders, self)
 	_build_overlay()
+	add_child(Tunables.new(fox, hearth, cam))
 	# art debugging: -- --off=glow,fog,post
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--off="):

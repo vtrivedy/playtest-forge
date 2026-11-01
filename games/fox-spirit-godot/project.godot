@@ -48,6 +48,5 @@ trail_bounds={"type": "vec4", "value": Vector4(-60, 40, 110, 85)}
 trail_on={"type": "float", "value": 0.0}
 paper={"type": "vec3", "value": Vector3(0.8, 0.66, 0.47)}
 paper_ink={"type": "vec3", "value": Vector3(0.2, 0.13, 0.08)}
-world_paint={"type": "float", "value": 0.0}
 fog_color={"type": "vec3", "value": Vector3(0.6867, 0.5457, 0.3515)}
 fog_density={"type": "float", "value": 0.012}

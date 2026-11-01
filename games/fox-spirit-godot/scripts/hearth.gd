@@ -37,7 +37,9 @@ var _ash: StandardMaterial3D
 var _light: OmniLight3D
 var _embers: CPUParticles3D
 var _flames: Array[ShaderMaterial] = []
+var _flame_meshes: Array[MeshInstance3D] = []
 var _smoke: MeshInstance3D
+var _air: ShaderMaterial
 
 
 func setup(ground_y: float) -> void:
@@ -95,6 +97,7 @@ func setup(ground_y: float) -> void:
 		m.visible = false
 		add_child(m)
 		_flames.append(mat)
+		_flame_meshes.append(m)
 	# rising embers up the column
 	_embers = CPUParticles3D.new()
 	_embers.amount = 90
@@ -114,6 +117,35 @@ func setup(ground_y: float) -> void:
 	_embers.color_ramp = FoxVisual._ember_ramp()
 	_embers.position.y = BED_Y
 	add_child(_embers)
+	# warm air: soft parcels rising through the column (a body of air, never a tube)
+	var air := MeshInstance3D.new()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	var pos := PackedVector3Array()
+	var uv := PackedVector2Array()
+	var seeds := PackedFloat32Array()
+	var rnd := Rng.new(7)
+	for i in 28:
+		var seed := [rnd.f(), rnd.f(), rnd.f(), rnd.f()]
+		for c in [[-1, -1], [1, 1], [1, -1], [-1, -1], [-1, 1], [1, 1]]:
+			pos.append(Vector3(c[0], c[1], 0))
+			uv.append(Vector2(c[0] * 0.5 + 0.5, 0.5 - c[1] * 0.5))
+			seeds.append_array(seed)
+	arrays[Mesh.ARRAY_VERTEX] = pos
+	arrays[Mesh.ARRAY_TEX_UV] = uv
+	arrays[Mesh.ARRAY_CUSTOM0] = seeds
+	var am := ArrayMesh.new()
+	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+	air.mesh = am
+	_air = ShaderMaterial.new()
+	_air.shader = preload("res://shaders/hearth_air.gdshader")
+	_air.set_shader_parameter("height", column_height)
+	_air.set_shader_parameter("radius", tun.radius * 0.85)
+	air.material_override = _air
+	air.position.y = BED_Y
+	air.extra_cull_margin = 12.0
+	air.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(air)
 	_light = OmniLight3D.new()
 	_light.light_color = Color(1.0, 0.54, 0.23)
 	_light.light_energy = 0.0
@@ -133,15 +165,16 @@ func update(dt: float, t: float, supply_at: Callable, fox_pos: Vector3, dashing:
 	var gutter := 0.55 + 0.45 * sin(t * 31.0) * sin(t * 17.3) if reactor_state == "guttering" else 1.0
 	var vis := heat * gutter
 	_ash.emission_energy_multiplier = 0.04 + vis * 2.6 + flare * 2.0
-	_light.light_energy = (vis * 3.2 + flare * 3.6) * (0.92 + 0.08 * sin(t * 13.7))
+	_light.light_energy = (vis * 1.3 + flare * 1.5) * (0.92 + 0.08 * sin(t * 13.7))
 	_embers.emitting = vis > 0.05
 	_embers.speed_scale = 0.6 + 0.6 * minf(1.4, vis * 1.1 + flare * 0.7)
 	for m in _flames:
 		m.set_shader_parameter("time", t)
-	for c in get_children():
-		if c is MeshInstance3D and (c as MeshInstance3D).material_override is ShaderMaterial:
-			c.visible = vis > 0.05
-			c.scale = Vector3.ONE * clampf(vis + flare * 0.8, 0.2, 1.4)
+	_air.set_shader_parameter("time", t)
+	_air.set_shader_parameter("heat", minf(1.35, vis * 1.15 + flare * 0.65))
+	for m in _flame_meshes:
+		m.visible = vis > 0.05
+		m.scale = Vector3.ONE * clampf(vis + flare * 0.8, 0.2, 1.4)
 	var sm := _smoke.material_override as StandardMaterial3D
 	sm.albedo_color.a = 0.32 * (1.0 - minf(1.0, heat * 1.6))
 	_smoke.visible = sm.albedo_color.a > 0.01

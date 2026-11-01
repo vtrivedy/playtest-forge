@@ -5,11 +5,15 @@ extends Node3D
 ## Look: cel coat + skinned ink hull (next_pass), tail flame tongues, ember motes, tail light.
 ##
 ## Animation: root BlendTree → Transition "state" {idle, loco, jumpUp, fall, land}; loco = Transition
-## "gait" {walk, trot, lope, run} → TimeScale "rate" (stride-matched cadence, as FoxAnimator).
+## "gait" {walk, trot, lope, run}. As FoxAnimator, gaits are time-driven from their own phase
+## (TimeSeek every tick, TimeScale 0) at a stride-matched rate; a gait change enters the new clip at
+## the phase whose paw layout best matches the old one (table built from the animation tracks).
 
 const GLB := preload("res://assets/hero/hearth_fox.glb")
 const GAITS := ["walk", "trot", "lope", "run"]
 const STATE_FADE := {idle = 0.3, loco = 0.2, jumpUp = 0.06, fall = 0.16, land = 0.06}
+const BINS := 32
+const GAIT_FADE := 0.2
 
 var model: Node3D
 var skeleton: Skeleton3D
@@ -20,7 +24,13 @@ var clip_speed := {}
 var state := "idle"
 var gait := 0
 var rate := 1.0
-var _was_loco := false
+## per gait: phase 0..1 and cross-fade share
+var _phase: Array[float] = [0.0, 0.0, 0.0, 0.0]
+var _share: Array[float] = [1.0, 0.0, 0.0, 0.0]
+var _loco_w := 0.0
+## "from>to" → PackedFloat32Array(BINS) of entry phases; gait → entry phase from idle
+var _match := {}
+var _entry := {}
 var _flames: Array[ShaderMaterial] = []
 var _tip: Node3D
 var _tip_prev := Vector3.ZERO
@@ -63,18 +73,19 @@ func _build_tree() -> void:
 	var root := AnimationNodeBlendTree.new()
 	var st := AnimationNodeTransition.new()
 	var gt := AnimationNodeTransition.new()
-	gt.xfade_time = 0.2
-	for g in GAITS:
+	gt.xfade_time = GAIT_FADE
+	root.add_node("gait", gt)
+	for i in GAITS.size():
+		var g: String = GAITS[i]
 		gt.add_input(g)
 		var a := AnimationNodeAnimation.new()
 		a.animation = g
 		root.add_node(g, a)
-	root.add_node("gait", gt)
-	var ts := AnimationNodeTimeScale.new()
-	root.add_node("rate", ts)
-	for i in GAITS.size():
-		root.connect_node("gait", i, GAITS[i])
-	root.connect_node("rate", 0, "gait")
+		root.add_node(g + "_seek", AnimationNodeTimeSeek.new())
+		root.add_node(g + "_hold", AnimationNodeTimeScale.new())
+		root.connect_node(g + "_seek", 0, g)
+		root.connect_node(g + "_hold", 0, g + "_seek")
+		root.connect_node("gait", i, g + "_hold")
 	var states := ["idle", "loco", "jumpUp", "fall", "land"]
 	for s in states:
 		st.add_input(s)
@@ -82,7 +93,7 @@ func _build_tree() -> void:
 	for i in states.size():
 		var s: String = states[i]
 		if s == "loco":
-			root.connect_node("state", i, "rate")
+			root.connect_node("state", i, "gait")
 		else:
 			var a := AnimationNodeAnimation.new()
 			a.animation = s
@@ -98,6 +109,83 @@ func _build_tree() -> void:
 	tree.active = true
 	tree.set("parameters/state/transition_request", "idle")
 	tree.set("parameters/gait/transition_request", "walk")
+	for g in GAITS:
+		tree.set("parameters/%s_hold/scale" % g, 0.0)
+	_build_pose_match()
+
+
+## paw layout (4 paws, skeleton space) of a clip at time t, composed from its tracks over the rest pose
+func _paws_at(anim: Animation, t: float) -> PackedFloat32Array:
+	var cache := {}
+	var out := PackedFloat32Array()
+	for n in ["fpaw.L", "fpaw.R", "hpaw.L", "hpaw.R"]:
+		var o := _bone_at(anim, t, skeleton.find_bone(n), cache).origin
+		out.append_array([o.x, o.y, o.z])
+	return out
+
+
+func _bone_at(anim: Animation, t: float, b: int, cache: Dictionary) -> Transform3D:
+	if cache.has(b):
+		return cache[b]
+	var rest := skeleton.get_bone_rest(b)
+	var pos := rest.origin
+	var rot := rest.basis.get_rotation_quaternion()
+	var scl := rest.basis.get_scale()
+	var path := NodePath("fox_rig/Skeleton3D:" + skeleton.get_bone_name(b))
+	var ti := anim.find_track(path, Animation.TYPE_POSITION_3D)
+	if ti >= 0: pos = anim.position_track_interpolate(ti, t)
+	ti = anim.find_track(path, Animation.TYPE_ROTATION_3D)
+	if ti >= 0: rot = anim.rotation_track_interpolate(ti, t)
+	ti = anim.find_track(path, Animation.TYPE_SCALE_3D)
+	if ti >= 0: scl = anim.scale_track_interpolate(ti, t)
+	var local := Transform3D(Basis(rot) * Basis.from_scale(scl), pos)
+	var parent := skeleton.get_bone_parent(b)
+	var g := _bone_at(anim, t, parent, cache) * local if parent >= 0 else local
+	cache[b] = g
+	return g
+
+
+static func _d2(a: PackedFloat32Array, b: PackedFloat32Array) -> float:
+	var s := 0.0
+	for k in a.size():
+		s += (a[k] - b[k]) * (a[k] - b[k])
+	return s
+
+
+## FoxAnimator.buildPoseMatch: best entry phase per (from gait bin → to gait), and from idle
+func _build_pose_match() -> void:
+	var poses := []
+	for g in GAITS:
+		var anim := player.get_animation(g)
+		var row := []
+		for i in BINS:
+			row.append(_paws_at(anim, float(i) / BINS * anim.length))
+		poses.append(row)
+	var idle := _paws_at(player.get_animation("idle"), 0.0)
+	for fi in GAITS.size():
+		for ti in GAITS.size():
+			if fi == ti:
+				continue
+			var table := PackedFloat32Array()
+			for i in BINS:
+				var best := 0
+				var best_d := INF
+				for j in BINS:
+					var d := _d2(poses[fi][i], poses[ti][j]) + _d2(poses[fi][(i + 2) % BINS], poses[ti][(j + 2) % BINS])
+					if d < best_d:
+						best = j
+						best_d = d
+				table.append(float(best) / BINS)
+			_match["%s>%s" % [GAITS[fi], GAITS[ti]]] = table
+	for gi in GAITS.size():
+		var best := 0
+		var best_d := INF
+		for j in BINS:
+			var d := _d2(idle, poses[gi][j])
+			if d < best_d:
+				best = j
+				best_d = d
+		_entry[GAITS[gi]] = float(best) / BINS
 
 
 func _build_fx() -> void:
@@ -216,19 +304,34 @@ func drive(dt: float, speed: float, next_state: String, hysteresis := 0.12, min_
 		tree.set("parameters/state/transition_request", next_state)
 		state = next_state
 	# gait tree: pick by speed with hysteresis around the geometric mean of neighbouring clip speeds
-	var h := hysteresis if _was_loco else 0.0
-	_was_loco = state == "loco"
+	var entering := _loco_w < 1e-3
+	var h := 0.0 if entering else hysteresis
+	var prev := gait
 	var g := gait
 	while g < GAITS.size() - 1 and speed > sqrt(clip_speed[GAITS[g]] * clip_speed[GAITS[g + 1]]) * (1.0 + h):
 		g += 1
 	while g > 0 and speed < sqrt(clip_speed[GAITS[g - 1]] * clip_speed[GAITS[g]]) * (1.0 - h):
 		g -= 1
-	if g != gait:
+	gait = g
+	if entering and state == "loco":
+		_phase[g] = _entry[GAITS[g]]
+		for i in GAITS.size():
+			_share[i] = 1.0 if i == g else 0.0
+	elif g != prev:
+		_phase[g] = _match["%s>%s" % [GAITS[prev], GAITS[g]]][int(_phase[prev] * BINS) % BINS]
+	if g != prev or entering:
 		tree.set("parameters/gait/transition_request", GAITS[g])
-		gait = g
-	# stride-matched cadence: the paws travel with the ground (bounded around the authored rate)
-	rate = clampf(speed / clip_speed[GAITS[gait]], min_rate, max_rate)
-	tree.set("parameters/rate/scale", rate)
+	_loco_w = move_toward(_loco_w, 1.0 if state == "loco" else 0.0, dt / GAIT_FADE)
+	for i in GAITS.size():
+		var name: String = GAITS[i]
+		_share[i] = move_toward(_share[i], 1.0 if i == g else 0.0, dt / GAIT_FADE)
+		# stride-matched cadence: the paws travel with the ground (bounded around the authored rate)
+		var r := clampf(speed / clip_speed[name], min_rate, max_rate)
+		if i == g:
+			rate = r
+		if _share[i] > 0.0:
+			_phase[i] = fmod(_phase[i] + dt * r / player.get_animation(name).length, 1.0)
+		tree.set("parameters/%s_seek/seek_request" % name, _phase[i] * player.get_animation(name).length)
 	_fx(dt)
 
 

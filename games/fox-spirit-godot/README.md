@@ -8,7 +8,8 @@ Wake in the sepia village of Lanternhollow, carry the paint down the hub lane th
 into Arrival Meadow, light the cold hearth H-a by running close (or dashing past), then jump and hold
 to ride its warm air onto the rock shelf.
 
-**Controls:** WASD / arrows move (camera-relative) · Space jump, hold to glide · Shift dash · Ctrl walk.
+**Controls:** WASD / arrows move (camera-relative) · Space jump, hold to glide · Shift dash · Ctrl walk ·
+F1 feel panel (live sliders for move / jump / glide / dash / updraft / IK / camera tunables).
 
 ## Run
 
