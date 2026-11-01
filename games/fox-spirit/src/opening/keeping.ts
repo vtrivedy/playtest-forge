@@ -6,7 +6,7 @@
  * Leaves pressed in mid-air around the crown resume falling with the tree and keep falling after.
  */
 import * as THREE from 'three';
-import { canopyPad, hewn, inked, jitter, mapleLeafGeometry, plumeGeometry, RAMP_CANOPY, toon, CANOPY, buildRock, contactInk } from '../lookdevKit';
+import { INK, canopyPad, hewn, inked, jitter, mapleLeafGeometry, plumeGeometry, RAMP_CANOPY, toon, CANOPY, buildRock, contactInk } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { KEEPING, SHELF_TOP } from './layout';
@@ -88,7 +88,54 @@ function buildHearthtree(rand: () => number, baseY: number) {
   // a near-straight trunk (it must lie flat as a walk), a little S so it never reads as a pole
   const trunk = new THREE.CatmullRomCurve3([V(0, -0.5, 0), V(0.12, L * 0.35, -0.08), V(-0.1, L * 0.7, 0.1), V(0.05, L, 0.18)]);
   const radius = (t: number) => THREE.MathUtils.lerp(0.72, 0.3, t) + (1 - THREE.MathUtils.smoothstep(t, 0, 0.1)) * 0.14;
-  tree.add(inked(jitter(plumeGeometry(trunk, radius, 28, 11, 0), 0.04, rand, 2.0), bark, 0.026, true));
+  // bark: inked fissures run the length of the trunk (vertex colour), so the fallen log reads as bark
+  // underfoot, not a brown tube
+  const trunkGeo = jitter(plumeGeometry(trunk, radius, 40, 22, 0), 0.03, rand, 2.0);
+  {
+    const p = trunkGeo.getAttribute('position') as THREE.BufferAttribute;
+    const col = new Float32Array(p.count * 3);
+    const c = new THREE.Color();
+    const ridge = new THREE.Color(0x7c5a42);
+    const body = new THREE.Color(0x5a3e2c);
+    const fissure = new THREE.Color(0x24160e);
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i);
+      const a = Math.atan2(p.getZ(i), p.getX(i));
+      const wave = Math.sin(a * 9 + Math.sin(y * 1.1) * 1.4 + Math.sin(y * 3.7 + a * 2) * 0.35);
+      // plates broken across by short checks, so the fissures never read as stripes
+      const check = 0.5 + 0.5 * Math.sin(y * 2.3 + a * 5.0);
+      c.copy(body).lerp(ridge, THREE.MathUtils.smoothstep(wave, 0.1, 0.6) * 0.8);
+      c.lerp(fissure, (1 - THREE.MathUtils.smoothstep(wave, -0.9, -0.62)) * (0.55 + 0.45 * check));
+      col.set([c.r, c.g, c.b], i * 3);
+    }
+    trunkGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  }
+  tree.add(inked(trunkGeo, toon(0xffffff, { vertexColors: true, contour: 0.8, climbBase }), 0.026, true));
+  // ink bark strokes: broken lines along the grain, drawn on the trunk the way the kit inks rock strata
+  const strokeMat = new THREE.MeshBasicMaterial({ color: INK, fog: true });
+  for (let k = 0; k < 30; k++) {
+    const a = (k / 30) * Math.PI * 2 + (rand() - 0.5) * 0.25;
+    const t0 = rand() * 0.55;
+    const t1 = Math.min(0.97, t0 + 0.12 + rand() * 0.3);
+    const pts: THREE.Vector3[] = [];
+    for (let j = 0; j <= 8; j++) {
+      const t = t0 + ((t1 - t0) * j) / 8;
+      const aa = a + Math.sin(t * 23 + k) * 0.06;
+      const r = radius(t) * 1.04 + 0.02;
+      pts.push(trunk.getPointAt(t).add(V(Math.cos(aa) * r, 0, Math.sin(aa) * r)));
+    }
+    const w = 0.018 + rand() * 0.014;
+    const stroke = new THREE.Mesh(plumeGeometry(new THREE.CatmullRomCurve3(pts), (u) => w * Math.sin(Math.PI * Math.min(1, u * 1.15 + 0.04)), 16, 4, 0), strokeMat);
+    tree.add(stroke);
+  }
+  // broken limb stubs low on the trunk, to the sides only: the fallen bridge keeps a branch silhouette
+  // along its edges without anything rising into the walk
+  for (const [t, side, reach] of [[0.2, 1, 1.0], [0.31, -1, 1.25], [0.43, 1, 0.85], [0.52, -1, 1.05]] as const) {
+    const from = trunk.getPointAt(t);
+    const end = from.clone().add(V(side * reach, reach * 0.45, (rand() - 0.2) * 0.35));
+    const mid = from.clone().lerp(end, 0.5).add(V(0, -0.08, 0));
+    tree.add(inked(plumeGeometry(new THREE.CatmullRomCurve3([from, mid, end]), (u) => THREE.MathUtils.lerp(0.2, 0.09, u), 8, 7, 0), bark, 0.018, true));
+  }
   const pads: Array<{ at: THREE.Vector3; r: number }> = [];
   // limbs: sideways (±x) and forward (+z, they hang under the bridge once fallen); never back (−z → up)
   const LIMBS: Array<[number, number, number, number]> = [
@@ -336,10 +383,12 @@ export function createKeeping(ctx: OpeningCtx) {
 
   // ---- root-hearth bowl among the roots
   {
-    // a low rim: the placed coal on the bed stays in view from the chase cam
-    const g = stoneRing(rand, K.root.r + 0.3, K.root.r + 0.02, 0.13, ASH, 9);
+    // a raised rim the fox stops at: warmth is set down at the bowl's edge, not stood in; the chase
+    // cam looks down past the rim onto the bed
+    const g = stoneRing(rand, K.root.r + 0.3, K.root.r + 0.02, 0.28, ASH, 9);
     g.position.set(K.root.x, K.terrace.top, K.root.z);
     scene.add(g);
+    colliders.push({ kind: 'post', x: K.root.x, z: K.root.z, r: K.root.r + 0.3 });
   }
 
   // ---- the Hearthtree
