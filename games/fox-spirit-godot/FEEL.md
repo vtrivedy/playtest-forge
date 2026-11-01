@@ -19,8 +19,9 @@ fox teleported to (−1.5, 80) facing the meadow, world-relative stick, 60 Hz fi
 - **Movement maths is a 1:1 port** (same PLAY tunables, same accel/decel/turn-rate/coyote/buffer/jump-cut/
   glide/dash code), so speeds, cadence and the jump arc match to the millimetre. Collision is not the
   same code: three.js samples a hand-rolled heightfield + collider list per axis; Godot uses
-  `CharacterBody3D.move_and_slide` on Jolt against a trimesh ground and box/cylinder shapes. Walls slide
-  more smoothly in Godot and the fox no longer "treadmills" into a wall (speed follows real velocity).
+  `CharacterBody3D.move_and_slide` on Jolt against a trimesh ground and box/cylinder shapes. One
+  deliberate change: when blocked, Godot's run speed follows the real velocity, so the fox stops
+  running in place against a wall (three keeps the commanded speed). Not measured beyond the route.
 - **Skating:** the first Godot pass (AnimationTree only) skated — run p95 2.2 m/s. Porting three's
   FootIK as a `SkeletonModifier3D` (stance latch, 6 cm bounded lock, ground rays, pelvis drop,
   two-bone solve keeping pastern/paw world orientation) brought it to three's level. Bug worth
@@ -46,10 +47,18 @@ Side-by-side stills at identical poses, unpainted and painted (`sbs-*.png` in
 (`tools/opening-stills.mjs` POSES) and the overview / village art cameras.
 
 What still differs, looking at those pairs:
-- Distant ink reads **bolder** in Godot (rim groves in the overview/village views) although the hull
-  maths is the same; three's SMAA + its thinner far lines look softer. Not resolved.
-- The hearth's point-light pool is brighter and yellower in Godot; flames are larger, harder cel
-  shapes; the column has fewer airborne embers than three's points.
+- **Far ink** first read much bolder in Godot. Zoomed crops showed the same line *width* but three's
+  lines past ~5 m are 40–60 % lighter than its fog formula predicts (near lines match exactly). I
+  could not attribute the cause inside three.js (best guess: SMAA blending thin dark lines into the
+  paper), so Godot adds an explicit, shared `ink_air()` term (hull ink, contour band, hatching settle
+  into the mist from 3 m to 22 m) calibrated against the captures. That is a look-match, not a port.
+- **Sky:** in the Compatibility renderer the sky behaved as if it skipped the scene tonemap/sRGB step
+  (sampled output ≈ linear × exposure), so the paper sky came out darker and more saturated
+  (143,117,75 vs three's 182,169,144 in the same region). The sky shader now applies three's
+  ACESFilmic + sRGB itself: 198,185,159 — within ~16 units, the rest is cloud placement.
+- Hearth: first pass used the fox's hard cel flame billboards (too big, too graphic); now a direct
+  port of three's crossed additive teardrop quads. The column still has fewer airborne embers than
+  three's point cloud; the hearth light was toned down twice to stop flooding the restore.
 - Painted grade is a touch warmer/yellower in Godot (canvas grade after tonemapping vs three's linear
   grade before ACES); three keeps more plum in the shadow band.
 - Canopy palettes drift on the rim: the RNG is bit-exact, but call counts diverge where my primitive
@@ -59,7 +68,7 @@ What still differs, looking at those pairs:
 - **Pressed ink → living cel** ports almost verbatim: the paper/cel shader body (ragged watercolour
   front, tide line, pigment bleed, paper tooth/fibre/foxing, pressed-ink hatching, trail wake with the
   fibrous wet front) is the same GLSL with Godot names. At the spawn pose the two builds are hard to tell
-  apart once three things were fixed (see "Harder").
+  apart once the colour-space traps were fixed (see "Harder").
 - **The one structural change:** three.js grades *after* lighting (`outgoingLight`) in
   `onBeforeCompile`. Godot's `fragment()` runs before lighting, so the paper/cel mix moved into
   `light()` for the single directional key; hemi/fill/rim became analytic terms (three never shadowed
@@ -82,13 +91,14 @@ What still differs, looking at those pairs:
 
 ## Iteration speed
 
-- **three.js:** vite hot reload, sub-second turn-around; captures need Playwright + SwiftShader and
-  manual-clock hooks to be deterministic.
+- **three.js:** vite hot reload (not timed here); captures need Playwright + SwiftShader and the
+  manual-clock hooks to be deterministic — the reference stills took 3–9 s each on this box.
 - **Godot:** no hot reload for this procedural world from the CLI — every look check is a fresh run:
   ~6.6 s world build (GDScript procedural geometry; 9.8 s in wasm) + render. Typical "change shader →
   side-by-side still" loop on this 1-CPU box: ~45 s. Exports: 4 s each for Web and Linux.
 - **Movie maker** (`--write-movie --fixed-fps 30`) is the big win: frame-exact, deterministic route
-  video from real inputs with zero harness code. On llvmpipe it renders ~35 frames/min.
+  video from real inputs with zero harness code. On llvmpipe it rendered the 1425-frame route in ~33 min
+  (~43 frames/min).
 - GDScript's static inference caught a class of bugs at parse time; the dynamic-Dictionary-heavy layout
   code needed explicit types in ~10 places.
 
@@ -105,18 +115,21 @@ What still differs, looking at those pairs:
 - **Colour space traps (cost the most time):** `source_color` vec3 uniforms set from GDScript are not
   linearised in Compatibility → every albedo ~3× too bright; Godot's ACES normalises to
   `tonemap_white = 1` (three's ACESFilmic doesn't) → lifted mids; Godot depth fog at three's density is
-  far denser → ported three's height-fog formula into the shaders.
+  far denser → ported three's height-fog formula into the shaders; the Compatibility sky skips the
+  scene tonemap/sRGB → the sky shader does its own. Each was pinned down by measurement (shader
+  debug output read back from the frame, feature toggles, pixel averages of matched stills).
 - No post-lighting hook in spatial shaders (see Look).
 - No MAX blend for the paint stamp mask → one canvas pass loops ≤ 128 stamps instead.
 - Instance uniforms come from a small fixed buffer (4096 slots on llvmpipe) → per-material uniforms.
 - GDScript builtin `smoothstep(from, to, x)` silently shadows a same-named class static.
-- Procedural geometry in GDScript is ~10× slower than JS (6.6 s build vs ~1 s in three.js).
+- Procedural geometry in GDScript is slow: 6.6 s world build natively, 9.8 s in wasm (the three.js
+  build time was not measured here).
 
 ## Captures (all under `/captures/results/`)
 
 | what | path |
 |---|---|
-| real-input hero route, movie maker 30 fps (49 s, `route.mp4`) + stills + contact sheet + per-tick state | `godot-oak-hero-route-04/` (final; `-03` earlier cold-hearth framing; `-01/-02` superseded) |
+| real-input hero route, movie maker 30 fps (49 s, `route.mp4`) + stills + contact sheet + per-tick state | `godot-oak-hero-route-05/` (final look; `-04` same route before the sky/ink fixes; `-01…-03` superseded) |
 | side-by-side stills vs three.js (paper + painted, 6 views) + occluder fade | `godot-oak-side-by-side-01/sbs-*.png`, `godot-occlusion-wellblock.png` |
 | three.js reference stills (`tools/opening-stills.mjs`) | `threejs-ref/{paper,paint}/` |
 | feel probe, both engines | `godot-oak-feel-probe-01/` |
@@ -124,7 +137,10 @@ What still differs, looking at those pairs:
 
 ## Verdict
 
-For this slice Godot is at **look parity** at the matched stills and **feel parity** on every probe
-metric. Godot wins on engine plumbing (physics, animation graph, IK home, exports, capture); three.js
-wins on iteration speed and shader freedom (post-lighting grade, blend modes, real transparency).
-Remaining gaps are listed in NOTES.md.
+For this slice Godot reaches **near look parity** at the matched stills (close, not identical — see
+the deltas above, one of them matched by an explicit look term rather than ported) and **feel parity**
+on every probe metric (speed, cadence, jump arc, stance slide). Godot wins on engine plumbing
+(physics, animation graph, a proper home for IK, exports, deterministic capture); three.js wins on
+iteration speed and shader freedom (post-lighting grade, blend modes, real transparency, no renderer
+colour-space surprises). Open items: painted-grade warmth, rim palette drift, ember density in the
+column, occluder speckle vs true translucency.

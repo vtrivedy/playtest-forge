@@ -37,8 +37,7 @@ var _ash: StandardMaterial3D
 var _light: OmniLight3D
 var _embers: CPUParticles3D
 var _leaves: CPUParticles3D
-var _flames: Array[ShaderMaterial] = []
-var _flame_meshes: Array[MeshInstance3D] = []
+var _flame: ShaderMaterial
 var _smoke: MeshInstance3D
 var _air: ShaderMaterial
 
@@ -82,23 +81,39 @@ func setup(ground_y: float) -> void:
 	_smoke.position.y = BED_Y
 	_smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_smoke)
-	# cel flame tongues in the bowl
-	var quad := QuadMesh.new()
-	for f in [[0.0, 0.0, 0.9, 0.55, 0.1], [0.28, 0.12, 0.6, 0.4, 0.5], [-0.25, -0.15, 0.7, 0.42, 0.8], [0.05, -0.3, 0.5, 0.35, 0.3], [-0.2, 0.25, 0.55, 0.36, 0.65]]:
-		var m := MeshInstance3D.new()
-		m.mesh = quad
-		var mat := ShaderMaterial.new()
-		mat.shader = preload("res://shaders/fox_flame.gdshader")
-		mat.set_shader_parameter("size", Vector2(f[3], f[2]))
-		mat.set_shader_parameter("seed", f[4])
-		m.material_override = mat
-		m.position = Vector3(f[0], BED_Y - 0.05, f[1])
-		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		m.extra_cull_margin = 3.0
-		m.visible = false
-		add_child(m)
-		_flames.append(mat)
-		_flame_meshes.append(m)
+	# flame tongues in the bowl: crossed quads with an animated teardrop (x, z, height, width)
+	var fpos := PackedVector3Array()
+	var fuv := PackedVector2Array()
+	var ph := PackedFloat32Array()
+	var tongues := [[0.0, 0.0, 0.95, 0.7], [0.26, 0.1, 0.62, 0.5], [-0.2, 0.22, 0.7, 0.5], [-0.12, -0.26, 0.55, 0.45], [0.18, -0.2, 0.5, 0.42]]
+	for ti in tongues.size():
+		var tg: Array = tongues[ti]
+		for rot in [0.3 + ti, 0.3 + ti + PI / 2.0]:
+			var c: float = cos(rot) * tg[3] * 0.5
+			var sn: float = sin(rot) * tg[3] * 0.5
+			var h: float = tg[2]
+			var corners := [[tg[0] - c, 0.0, tg[1] - sn, 0.0, 1.0], [tg[0] + c, 0.0, tg[1] + sn, 1.0, 1.0], [tg[0] + c, h, tg[1] + sn, 1.0, 0.0],
+				[tg[0] - c, 0.0, tg[1] - sn, 0.0, 1.0], [tg[0] + c, h, tg[1] + sn, 1.0, 0.0], [tg[0] - c, h, tg[1] - sn, 0.0, 0.0]]
+			for q in corners:
+				fpos.append(Vector3(q[0], q[1], q[2]))
+				fuv.append(Vector2(q[3], q[4]))
+				ph.append_array([ti * 1.7, 0.0, 0.0, 0.0])
+	var farr := []
+	farr.resize(Mesh.ARRAY_MAX)
+	farr[Mesh.ARRAY_VERTEX] = fpos
+	farr[Mesh.ARRAY_TEX_UV] = fuv
+	farr[Mesh.ARRAY_CUSTOM0] = ph
+	var fmesh := ArrayMesh.new()
+	fmesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, farr, [], {}, Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT)
+	var flame := MeshInstance3D.new()
+	flame.mesh = fmesh
+	_flame = ShaderMaterial.new()
+	_flame.shader = preload("res://shaders/hearth_flame.gdshader")
+	flame.material_override = _flame
+	flame.position.y = BED_Y - 0.05
+	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	flame.extra_cull_margin = 2.0
+	add_child(flame)
 	# rising embers up the column
 	_embers = CPUParticles3D.new()
 	_embers.amount = 90
@@ -201,13 +216,10 @@ func update(dt: float, t: float, supply_at: Callable, fox_pos: Vector3, dashing:
 	_embers.emitting = vis > 0.05
 	_leaves.emitting = vis > 0.05
 	_embers.speed_scale = 0.6 + 0.6 * minf(1.4, vis * 1.1 + flare * 0.7)
-	for m in _flames:
-		m.set_shader_parameter("time", t)
+	_flame.set_shader_parameter("time", t)
+	_flame.set_shader_parameter("heat", minf(1.4, vis + flare * 0.8))
 	_air.set_shader_parameter("time", t)
 	_air.set_shader_parameter("heat", minf(1.35, vis * 1.15 + flare * 0.65))
-	for m in _flame_meshes:
-		m.visible = vis > 0.05
-		m.scale = Vector3.ONE * clampf(vis + flare * 0.8, 0.2, 1.4)
 	var sm := _smoke.material_override as StandardMaterial3D
 	sm.albedo_color.a = 0.32 * (1.0 - minf(1.0, heat * 1.6))
 	_smoke.visible = sm.albedo_color.a > 0.01
