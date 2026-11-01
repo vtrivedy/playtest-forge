@@ -74,3 +74,15 @@ Capture lesson: `/captures` is already remote-backed. Never download a Modal
 volume into it to refresh a stale view: use an existing directory under `/tmp`.
 An attempted download damaged only Tallow's own earlier quick8ca889a result;
 it was replaced by the successful8bd34af capture above.
+
+## Stair integration regression — f2fdac8
+
+Merged Moss 5b028e5 (curb + reconnectSteam stair) into the approved Carry branch.
+TypeScript and Vite production build pass. Live browser probe passes all ten
+Carry checks, no page errors; actual W-key speed is 2.099 m/s both carrying and
+empty-handed. Screenshots, video and window.__game snapshots retained under
+`/captures/tallow/carry-stair-07/`. Reviewed 02-carried chase still: charcoal body
+still clear beside cheek, fox silhouette preserved. Initial/per-comparison
+teleports and the front inspection lens remain disclosed staging; this probe
+checks Carry regression, not stair traversal or continuous route completion.
+Rook owns stair ascent/descent verification; Flint owns full-route capture.
