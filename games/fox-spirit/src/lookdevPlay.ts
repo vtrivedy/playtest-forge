@@ -411,14 +411,14 @@ export function createPlay(opts: {
   const cam = createFollowCamera({
     surfaceAt: (x, z) => surface(x, z, false),
     params: {
-      distance: 3.7,
-      runDistance: 3.5,
+      distance: 3.1,
+      runDistance: 2.9,
       minDistance: 2.0,
-      height: 1.2,
+      height: 1.0,
       groundLift: 0.2,
       lookHeight: 0.45,
       framingHeight: 0.5,
-      airDistance: 3.9,
+      airDistance: 3.3,
       lookAhead: 1.2,
       fov: 50,
       clearance: 0.35,
@@ -601,6 +601,7 @@ export function createPlay(opts: {
         lastJump.air = airT;
         landT = 0;
         cam.land(impact * 0.6);
+        fox.land(impact);
         if (lastJump.apex > 0.2) opts.onLand?.(pos, impact);
         vel.y = 0;
         // horizontal momentum carries into the ground run along the new facing
@@ -639,6 +640,7 @@ export function createPlay(opts: {
     fox.root.position.copy(pos);
     fox.root.rotation.set(0, yaw, 0);
     fox.model.rotation.set(pitch, 0, bank);
+    fox.striding = grounded && anim.state === 'loco' && anim.gaitName !== 'walk';
     fox.update(dt);
     ik.apply(dt, (x, z) => surface(x, z, false), grounded, anim.state === 'loco');
 
