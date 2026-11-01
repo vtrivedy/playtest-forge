@@ -21,6 +21,10 @@ export interface HearthFox {
   play: (clip: FoxClip, travel?: boolean) => void;
   readonly clip: FoxClip;
   readonly speed: number;
+  /** ember ring kicked up at the paws on touchdown (impact 0..1) */
+  land: (impact: number) => void;
+  /** paw strikes kick sparks while true (trot/run); play() sets it for posed shots */
+  striding: boolean;
   /** world positions of the four paw contact points (skate metrics) */
   paws: () => Record<string, [number, number, number]>;
 }
@@ -307,6 +311,11 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       const v = new THREE.Vector3();
       return Object.fromEntries(pawBones.map((b) => [b.name, b.getWorldPosition(v).toArray()])) as Record<string, [number, number, number]>;
     },
+    land(impact) {
+      const n = Math.round(1 + 3 * Math.min(1, Math.max(0, impact)));
+      for (const pawBone of pawBones) kick(pawBone.getWorldPosition(pawAt), n, 0.2 + 0.3 * impact);
+    },
+    striding: false,
     setHeadYaw(y) {
       headYaw = y;
     },
@@ -319,9 +328,8 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       next.reset().play();
       if (prev) next.crossFadeFrom(prev, 0.25, true);
       current = clip;
-      if (clip === 'land') {
-        for (const pawBone of pawBones) kick(pawBone.getWorldPosition(pawAt), 4, 0.5);
-      }
+      fox.striding = clip === 'trot' || clip === 'run';
+      if (clip === 'land') fox.land(1);
     },
     update(dt) {
       time += dt;
@@ -352,13 +360,12 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       moteGeo.attributes.position!.needsUpdate = true;
       moteGeo.attributes.color!.needsUpdate = true;
       tailLight.intensity = 1.3 + Math.sin(time * 9) * 0.2;
-      // footfalls: a paw crossing down to the root's ground plane at trot/run speed kicks two sparks
-      const striding = current === 'trot' || current === 'run';
+      // footfalls: a paw crossing down to the fox's ground plane while striding kicks two sparks
       pawBones.forEach((pawBone, i) => {
         pawBone.getWorldPosition(pawAt);
         // paw height in the fox's own frame, so slopes under the root don't fake a strike
         const down = root.worldToLocal(pawLocal.copy(pawAt)).y < 0.03;
-        if (down && !pawDown[i] && striding) kick(pawAt, 2, 0.18);
+        if (down && !pawDown[i] && fox.striding) kick(pawAt, 2, 0.18);
         pawDown[i] = down;
       });
       for (let i = 0; i < PUFFS; i++) {
