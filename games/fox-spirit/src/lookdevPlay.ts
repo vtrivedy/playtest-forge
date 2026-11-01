@@ -45,7 +45,7 @@ export const PLAY = {
   bankMax: 0.18,
   airPitch: 0.06,
   /** above this ground speed a touchdown keeps the gait instead of the (planted) land clip */
-  landMaxSpeed: 1.1,
+  landMaxSpeed: 0.35,
   slopeTilt: 1,
   /** foot IK: 0 = clip only */
   footIK: 1,
