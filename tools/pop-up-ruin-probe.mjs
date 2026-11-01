@@ -5,10 +5,12 @@ import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
 const out=process.argv[2]||'/captures/rook/ruin-greybox'; fs.mkdirSync(out,{recursive:true});
 const server=await createServer({configFile:'games/fox-spirit/vite.config.ts',server:{port:5197,host:'127.0.0.1',strictPort:true},logLevel:'error'});await server.listen();
+const motion=process.argv.includes('--motion');
+const viewport=motion?{width:640,height:360}:{width:960,height:540};
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader']});
-const page=await browser.newPage({viewport:{width:960,height:540},recordVideo:{dir:out,size:{width:960,height:540}}});page.setDefaultTimeout(120000);
-const evidence={staging:'Only entry staged. Real keyboard jump/dash; controller world stick movement. No direct fold/restore/physics edits. Manual 60Hz clock.',samples:[],trace:[],errors:[]};page.on('pageerror',e=>evidence.errors.push(String(e)));
-const motion=process.argv.includes('--motion');let simFrame=0,movieFrame=0;
+const page=await browser.newPage({viewport,recordVideo:{dir:out,size:viewport}});page.setDefaultTimeout(120000);
+const evidence={sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),staging:'Only entry staged. Real keyboard jump/dash; controller world stick movement. No direct fold/restore/physics edits. Manual 60Hz clock.',samples:[],trace:[],errors:[]};page.on('pageerror',e=>evidence.errors.push(String(e)));
+let simFrame=0,movieFrame=0;
 if(motion)fs.mkdirSync(`${out}/frames`,{recursive:true});
 async function advance(n=1,render=false){let state;for(let remaining=n;remaining>0;){const count=motion?Math.min(remaining,6-(simFrame%6)):remaining;remaining-=count;simFrame+=count;const draw=render||(motion&&simFrame%6===0);state=await page.evaluate(([n,r])=>window.__gameHooks.advance(n,1/60,r),[count,draw]);if(motion&&simFrame%6===0)await page.screenshot({path:`${out}/frames/${String(movieFrame++).padStart(5,'0')}.png`});}return state;}
 const stick=async(x,z)=>page.evaluate(([x,z])=>window.__gameHooks.setStick(x,z),[x,z]);
@@ -33,9 +35,9 @@ await walk(-28.4,75.7);await face(0,-1);await runJumpNorth(73.9,-28.4,71.2);awai
 await walk(-29.4,71);await face(1,0);await runJumpEast(-27.7,-24.6,71);await sample('06-overlook');
 await walk(-24.4,71.1);await face(0,1);await stick(0,1);await dash();await stick(0,0);await sample('07-return-unfold');
 await walk(-24.4,75.7);await sample('08-return-ground');
-await walk(-23,77);await walk(-24,75);await sample('09-retry-entry');
+await walk(-23,77);await sample('08b-meadow-ground');await walk(-24,75);await sample('09-retry-entry');
 const at=l=>evidence.samples.find(s=>s.label===l).state;
-evidence.assertions=[['first opens',at('02-first-unfold').opening.popUpRuin.folds[0].phase==='open'],['first landing',Math.abs(at('03-first-land').pos[1]+.08)<.1],['safe miss and retry',at('03b-safe-miss').grounded&&at('03b-safe-miss').opening.popUpRuin.misses>0&&Math.abs(at('03c-first-retry').pos[1]+.08)<.1],['second opens',at('04-second-unfold').opening.popUpRuin.folds[1].phase==='open'],['second landing',Math.abs(at('05-second-land').pos[1]-.47)<.1],['overlook reached',at('06-overlook').opening.popUpRuin.reached],['return opens',at('07-return-unfold').opening.popUpRuin.returns===1],['ground retry',at('09-retry-entry').grounded&&Math.hypot(at('09-retry-entry').pos[0]+24,at('09-retry-entry').pos[2]-75)<.4],['no page errors',!evidence.errors.length]].map(([name,pass])=>({name,pass}));
+evidence.assertions=[['first opens',at('02-first-unfold').opening.popUpRuin.folds[0].phase==='open'],['first landing',Math.abs(at('03-first-land').pos[1]+.08)<.1],['safe miss and retry',at('03b-safe-miss').grounded&&at('03b-safe-miss').opening.popUpRuin.misses>0&&Math.abs(at('03c-first-retry').pos[1]+.08)<.1],['second opens',at('04-second-unfold').opening.popUpRuin.folds[1].phase==='open'],['second landing',Math.abs(at('05-second-land').pos[1]-.47)<.1],['overlook reached',at('06-overlook').opening.popUpRuin.reached],['return opens',at('07-return-unfold').opening.popUpRuin.returns===1],['entry loop returns',at('09-retry-entry').grounded&&Math.hypot(at('09-retry-entry').pos[0]+24,at('09-retry-entry').pos[2]-75)<.4],['meadow ground reached',Math.abs(at('08b-meadow-ground').pos[1]-(await page.evaluate(([x,z])=>window.__opening.ctx.groundH(x,z),[at('08b-meadow-ground').pos[0],at('08b-meadow-ground').pos[2]])))<.03],['no page errors',!evidence.errors.length]].map(([name,pass])=>({name,pass}));
 fs.writeFileSync(`${out}/evidence.json`,JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence.assertions));
 if(evidence.assertions.some(a=>!a.pass))throw Error('Ruin route failed; inspect evidence.json');
 }finally{await browser.close();await server.close();}

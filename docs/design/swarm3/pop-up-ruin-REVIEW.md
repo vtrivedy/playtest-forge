@@ -1,36 +1,43 @@
-# Pop-up ruin — WIP play review
+# Pop-up ruin — WIP review
 
-Current candidate: df1382a (sw3-rook), not approved for integration.
+Current runtime:84c40ee on sw3-rook. Exact tsc + vite build PASS. Not approved for integration.
 
-First two physical greybox attempts are NOT YET. Evidence in `/captures/rook/ruin-greybox-055` and `ruin-greybox-055-r2`; these are failures, not completion clips. Controller inputs used real keyboard Space/Shift and world-relative movement stick, manual60Hz; entry staged only. R1 was invalidated late by editing under Vite HMR; retain observations only. R2 ran through all samples: first trigger opened, later traversal failed. Real held jump measured apex0.792m, time-to-apex0.317s, air1.1s after missed landing.
+## Mechanical play
 
-Fixes before R3: lower tops0.16m to account for lower approach floor; compare running approaches instead of a reversed stationary takeoff; keep dash outside sweep with a retracting spindle housing; defer collider addition under occupied feet; split camera fading by architectural leaf rather than fading the whole ruin. Retry route passes south of tree(−31,79) through z81; no scenery moves.
+`/captures/rook/ruin-turn-84c40ee/evidence.json` retains __game, errors[], full trace and9/9 checks: first fold, first landing, deliberate ground miss + running recovery, north fold/landing, east overlook reached, return fold, entry loop, no page errors. Eleven checkpoint PNGs and browser webm retained. Only entry staged; real keyboard Space/Shift, world-relative movement stick, manual60Hz clock. Not an unfamiliar-human fun gate and video is checkpoint-heavy. Deterministic rendered-motion capture pending.
 
-R3 and0.9s comparison pending. Current mesh is a traversal greybox, with two slate/paper folds and a broken overlook; beauty, readable spatial puzzle, and FUN require two independent teammate verdicts. No controller/rig/camera tuning or new action key.
+First held jump apex0.792m/time-to-apex0.317s/air0.517s; retry0.483s; north and east jump air0.683s. One safe miss counted; three dashes; no locomotion retune. Ground catch visible03b at(−26.507,−0.458,78.091), then03c returns tofirstleaf. Return path08/09 walks on the low restored stairs near entry, so it is an entry loop, not a claim that those checkpoint feet are on base terrain. Next probe explicitly samples meadow floor outside the ramp.
 
-## Feel critique — df1382a
+Prior straight df1382a route .55 and .9 both passed8/8. Keep.55 provisionally: identical landings with.35s less waiting/hinge. Superseded833158d moving-frame capture was intentionally stopped aftersafe miss, not a full pass. Failed R1/R2 remain NOT YET.
+
+## Visual and spatial review
+
+Tallow495: NOT YET FUN/BEAUTIFUL on straight layout: blank rim reward, two similar dash/jump beats, huge brass spindle, blank panels. Applied: west→north→east route, final pad moved to(−24.4,71), return loops south toentry; spindle55% scale; approach-edge hinges expose etched faces; engraved arch/veins and broken jamb tops.84c stills01/04/06 reviewed: printed fold clearly readable, north landing broad, fox clear, brass no longer dominates. Final camera still faces old rim because baseline camera recentres only within35deg; Page soft-interest integration must be played before claiming an automatic meadow vista. No competing ruin camera orbit.
+
+## Feel critique —84c40ee
 Verdict: NEEDS REVISION
 
 ### Concrete failures
-1. R2 first unfold — collider lifted fox from under its leaf — added physical dash stop and clear-feet completion guard; R3 must prove it.
-2. R2 first jump — reversed stationary approach failed landing — test the intended run-up and judge whether it is naturally readable.
-3. R1/R2 entry still — whole-ruin fade hid the spatial target — split fade units; R3 must show the folding leaves clearly.
+1.06 overlook: camera reward still unresolved; coordinate Page framing and replay integrated route.
+2. Video is checkpoint-heavy; retain rendered-motion route before a feel verdict.
+3. Independent FUN/BEAUTIFUL reviewers pending after route revision; do not land.
 
 ### What works
-- Existing held-jump apex/time measurements are consistent; no movement retune.
-- Permanent unfold state is externally readable through `__game.state().opening.popUpRuin`.
+- Visible pressed-ink target, immediate permanent dash fold, broad safe turning jumps.
+- Deliberate miss catches meadow floor and retries without resetting any hinge.
+- Existing fox gait/land/dash parameters preserved; no upward support pop observed in new route.
 
 ### Checklist
 | Item | Pass? |
 |------|-------|
-| Feet plant / gait cycles | Prior Keeping approved; ruin route review pending |
-| Body + tail follow-through on turns | Ruin route review pending |
-| Jump anticipation + land squash | Landing failed R2; pending correction |
-| Dash has weight | Spindle stop pending R3 |
-| No skating / rigid language fits | Ruin clip pending review |
-| Retained capture present | Failed R1/R2 PNG, JSON, webm retained |
+| Feet plant / gait cycles | Still-only bounded; motion review pending |
+| Body + tail follow-through | Turning stills readable; motion review pending |
+| Jump anticipation + land squash | Real landings pass; motion review pending |
+| Dash has weight | Physical spindle stops; unfolding response.55s |
+| No skating / rigid language fits | Motion review pending |
+| Retained capture present | PNG + __game/trace + checkpoint webm |
 
 ### Next patch
-- Prove physical route with running takeoffs and a safe deliberate miss.
-- Compare0.55/0.9s fold response.
-- Review visual target/readability before any decoration.
+- Play Page-guided integrated camera framing.
+- Review continuous rendered-motion route.
+- Two independent FUN + BEAUTIFUL verdicts before integration.
