@@ -481,6 +481,7 @@ export function createPlay(opts: {
       minDistance: 1.2,
       sideBias: 0.35,
       height: 1.15,
+      fallLag: 0.07,
       groundLift: 0.2,
       lookHeight: 0.33,
       framingHeight: 0.38,
@@ -531,6 +532,7 @@ export function createPlay(opts: {
       c.add(cam.params, 'distance', 1.5, 7, 0.05);
       c.add(cam.params, 'height', 0.3, 3, 0.05);
       c.add(cam.params, 'lag', 0, 0.5, 0.01);
+      c.add(cam.params, 'fallLag', 0.02, 0.14, 0.005);
       c.add(cam.params, 'sideBias', -1, 1, 0.01);
     });
   }
