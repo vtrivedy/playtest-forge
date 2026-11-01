@@ -7,7 +7,7 @@ import { CANOPY } from './layout';
 export const CANOPY_FEEL = { launchSpeed: 8.66, loadTime: 0.12, bow: 0.19 };
 
 export function buildCanopy(ctx: OpeningCtx) {
-  const leaves = CANOPY.map((a, i) => {
+  const leaves = CANOPY.map((a) => {
     const top = ctx.groundH(a.x, a.z) + a.rise;
     ctx.colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx: 0.94, hz: 0.85, top, oneWay: true });
     const root = new THREE.Group();
@@ -16,24 +16,18 @@ export function buildCanopy(ctx: OpeningCtx) {
     ctx.scene.add(root);
     const shape = new THREE.Shape();
     shape.moveTo(0, -1.4);
-    for (const side of [-1, 1]) {
-      for (let j = 1; j <= 24; j++) {
-        const t = side < 0 ? j / 24 : 1 - j / 24;
-        const width = Math.pow(Math.sin(Math.PI * t), 0.72) * 1.35 * (j % 2 ? 0.96 : 1);
-        shape.lineTo(side * width, -1.4 + t * 2.8);
-      }
-    }
+    for (const [x, z] of [[-.28,-.8],[-.85,-1.02],[-.72,-.42],[-1.4,-.28],[-1.03,.12],[-1.23,.69],[-.58,.53],[-.5,1.05],[-.22,.84],[0,1.48],[.22,.84],[.5,1.05],[.58,.53],[1.23,.69],[1.03,.12],[1.4,-.28],[.72,-.42],[.85,-1.02],[.28,-.8]]) shape.lineTo(x!, z!);
     shape.closePath();
     const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.065, bevelEnabled: true, bevelSize: 0.045, bevelThickness: 0.025, bevelSegments: 1, steps: 1, curveSegments: 14 });
     geo.rotateX(-Math.PI / 2);
     const points = geo.getAttribute('position');
     for (let j = 0; j < points.count; j++) {
       const x = points.getX(j), z = points.getZ(j);
-      const curl = Math.pow(Math.max(0, Math.abs(x) - 0.7), 2) * 0.32 + Math.pow(Math.max(0, Math.abs(z) - 0.95), 2) * 0.6;
+      const curl = Math.pow(Math.max(0, Math.abs(x) - 0.7), 2) * 0.7 + Math.pow(Math.max(0, Math.abs(z) - 0.95), 2) * 0.6;
       points.setY(j, points.getY(j) - 0.09 + curl);
     }
     geo.computeVertexNormals();
-    const material = toon(i === 3 ? 0xcbb56d : [0xb9a366, 0xbfa46a, 0xc0ad72][i]!, { contour: 0.16, hatchWeight: 0.5 });
+    const material = new THREE.MeshToonMaterial({ color: 0xc6bda4 });
     const blade = inked(geo, material, 0.009, true);
     blade.castShadow = blade.receiveShadow = true;
     root.add(blade);
@@ -42,14 +36,14 @@ export function buildCanopy(ctx: OpeningCtx) {
     const veinMat = new THREE.MeshToonMaterial({ color: 0x68573b });
     const line = (from: THREE.Vector3, to: THREE.Vector3, radius: number) => {
       const d = to.clone().sub(from);
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, d.length(), 5), veinMat);
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.15, radius, d.length(), 5), veinMat);
       m.position.copy(from).addScaledVector(d, 0.5);
       m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
       veins.add(m);
     };
-    line(new THREE.Vector3(0, 0.12, -1.18), new THREE.Vector3(0, 0.12, 1.25), 0.024);
+    line(new THREE.Vector3(0, 0.12, -1.18), new THREE.Vector3(0, 0.12, 1.25), 0.022);
     for (const z of [-0.65, -0.15, 0.35, 0.75]) for (const side of [-1, 1]) {
-      line(new THREE.Vector3(0, 0.12, z - 0.22), new THREE.Vector3(side * (0.95 - Math.abs(z) * 0.42), 0.12, z + 0.15), 0.018);
+      line(new THREE.Vector3(0, 0.12, z - 0.22), new THREE.Vector3(side * (0.95 - Math.abs(z) * 0.42), 0.12, z + 0.15), 0.009);
     }
     root.add(veins);
     // Fade blade, ink and veins together when a leaf masks the chase-camera fox.
@@ -60,10 +54,10 @@ export function buildCanopy(ctx: OpeningCtx) {
       new THREE.Vector3(a.x + 0.5, top - a.rise * 0.45, a.z - 0.6),
       new THREE.Vector3(a.x, top - 0.06, a.z),
     ]);
-    const stem = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.055, 6, false), stemMat);
+    const stem = inked(new THREE.TubeGeometry(curve, 16, 0.19, 8, false), stemMat, 0.012, true);
     stem.castShadow = true;
     ctx.scene.add(stem);
-    return { ...a, top, root, blade, veins, contact: false, latched: false, dwell: 0, compression: 0, pulse: 0, lensScale: 1 };
+    return { ...a, top, root, blade, veins, material, touched: false, contact: false, latched: false, dwell: 0, compression: 0, pulse: 0, lensScale: 1 };
   });
   let launches = 0, contacts = 0, retries = 0, roostVisits = 0;
   let lastLeaf: string | null = null;
@@ -79,6 +73,8 @@ export function buildCanopy(ctx: OpeningCtx) {
         flight = null;
       }
       contacts++;
+      leaf.touched = true;
+      leaf.material.color.setHex(0xdca34f);
       leaf.contact = true;
       leaf.pulse = 0.12;
       lastLeaf = leaf.id;
@@ -130,5 +126,5 @@ export function buildCanopy(ctx: OpeningCtx) {
     gui.add(CANOPY_FEEL, 'bow', 0.05, 0.3, 0.01);
     gui.close();
   });
-  return { contact, feel: CANOPY_FEEL, state: () => ({ launches, contacts, retries, roostVisits, lastLeaf, lastFlight, activeFlight: flight, lensTucked: leaves.filter(l => l.lensScale < 0.95).length, profile: { ...CANOPY_FEEL }, leaves: leaves.map(({ id, x, z, top }) => ({ id, x, z, top })) }) };
+  return { contact, feel: CANOPY_FEEL, state: () => ({ launches, contacts, retries, roostVisits, lastLeaf, lastFlight, activeFlight: flight, lensTucked: leaves.filter(l => l.lensScale < 0.95).length, profile: { ...CANOPY_FEEL }, leaves: leaves.map(({ id, x, z, top, touched }) => ({ id, x, z, top, touched })) }) };
 }
