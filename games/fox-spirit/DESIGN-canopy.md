@@ -38,6 +38,29 @@ launches, active profile, last apex gain, airtime, landing leaf, roost visit, re
 Rook's hidden bud may permanently reveal an alternate first entry; it must use
 this same route and spring interface. Discovery is optional and cannot gate play.
 
+### Proposed controller contract (not implemented)
+The controller asks the module for a spring request only after its ordinary
+top-surface landing test succeeds. Supply leaf ID, grounded contact position,
+vertical arrival speed and current jump-held input. A request returns a vertical
+launch speed and leaf ID; only the controller changes velocity, grounded state,
+jump animation and jump/apex telemetry. Preserve horizontal velocity, air steering,
+dash-drop and camera behavior. Do not inject lift into the updraft system.
+
+Use a contact latch per leaf: one release per arrival, rearmed only after leaving
+that leaf's top footprint and contact-height band. Compression is visual; collision
+stays on a stable authored surface during the first greybox. A held-jump arrival
+may request the strong release; a walking contact must remain walkable. Test this
+against the proposed small passive rebound and remove the passive rebound if it
+causes repeated hops or makes walking unreliable. Underside/side contacts never
+launch. A dash crossing must not trigger without a valid top landing.
+
+Current lookdevPlay gravity is 15m/s²: ballistic starting speeds are 8.66m/s for
+2.5m gain and 10.25m/s for 3.5m gain (sqrt(2*g*h)). These are starting candidates,
+not measured results: held-jump glide, jump-cut and updraft overlap affect the arc.
+Measure actual apex/reach with spring leaves outside existing updraft volumes
+before choosing anchors. Include held/released jump, stationary walk-on, underside
+jump, repeated landing and dash-through in the focused probe.
+
 ## Animation and visual gate
 Leaf stem carries the loading motion: downward bow, asymmetric curl, quick release,
 then damped settle. Fox uses its existing landing and jump poses with a readable
