@@ -36,6 +36,7 @@ var _ride_t := 0.0
 var _ash: StandardMaterial3D
 var _light: OmniLight3D
 var _embers: CPUParticles3D
+var _leaves: CPUParticles3D
 var _flames: Array[ShaderMaterial] = []
 var _flame_meshes: Array[MeshInstance3D] = []
 var _smoke: MeshInstance3D
@@ -117,6 +118,37 @@ func setup(ground_y: float) -> void:
 	_embers.color_ramp = FoxVisual._ember_ramp()
 	_embers.position.y = BED_Y
 	add_child(_embers)
+	# rust leaves lifted and turned over by the warm air (they keep their body colour, unlike embers)
+	_leaves = CPUParticles3D.new()
+	_leaves.amount = 16
+	_leaves.lifetime = 3.4
+	_leaves.emitting = false
+	_leaves.local_coords = false
+	var leaf := Kit.new()
+	leaf.add_geo(Props.maple_leaf_geometry(0.11).rotate_x(PI / 2.0), Color(1, 1, 1), 0.0)
+	_leaves.mesh = leaf.build_mesh()
+	_leaves.material_override = Props.leaf_cards_material(0.0)
+	_leaves.material_override.set_shader_parameter("leaf_card", false)
+	_leaves.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_leaves.emission_sphere_radius = 0.9
+	_leaves.direction = Vector3.UP
+	_leaves.spread = 20.0
+	_leaves.initial_velocity_min = 1.4
+	_leaves.initial_velocity_max = 2.4
+	_leaves.gravity = Vector3(0, -0.2, 0)
+	_leaves.tangential_accel_min = 0.6
+	_leaves.tangential_accel_max = 1.4
+	_leaves.angular_velocity_min = -180.0
+	_leaves.angular_velocity_max = 180.0
+	_leaves.particle_flag_rotate_y = true
+	_leaves.scale_amount_min = 1.2
+	_leaves.scale_amount_max = 1.8
+	var tones := Gradient.new()
+	tones.set_color(0, Kit.lin(0xa4603e))
+	tones.set_color(1, Kit.lin(0xa88550))
+	_leaves.color_initial_ramp = tones
+	_leaves.position.y = BED_Y
+	add_child(_leaves)
 	# warm air: soft parcels rising through the column (a body of air, never a tube)
 	var air := MeshInstance3D.new()
 	var arrays := []
@@ -167,6 +199,7 @@ func update(dt: float, t: float, supply_at: Callable, fox_pos: Vector3, dashing:
 	_ash.emission_energy_multiplier = 0.04 + vis * 2.6 + flare * 2.0
 	_light.light_energy = (vis * 1.3 + flare * 1.5) * (0.92 + 0.08 * sin(t * 13.7))
 	_embers.emitting = vis > 0.05
+	_leaves.emitting = vis > 0.05
 	_embers.speed_scale = 0.6 + 0.6 * minf(1.4, vis * 1.1 + flare * 0.7)
 	for m in _flames:
 		m.set_shader_parameter("time", t)
