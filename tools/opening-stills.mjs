@@ -20,6 +20,7 @@ const POSES = {
   hearth: [2.6, 77.5, Math.PI * 0.75],
   shelf: [3.4, 71.5, Math.PI * 0.55],
   back: [9, 66, -0.2],
+  dashstop: [4.3, 72.95, Math.PI * 0.95],
 };
 // free cameras: [camera xyz, look xyz] (fox parked at spawn)
 const CAMS = {

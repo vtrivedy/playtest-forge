@@ -33,15 +33,20 @@ export const TRAIL_BLEND = /* glsl */ `
                  * step(trailUv.x, 1.0) * step(trailUv.y, 1.0);
     // The same ragged mask supplies gameplay and paint. A small tooth displacement breaks
     // the perimeter without turning the wake into isolated spots or a hard ribbon.
-    vec2 bleed = vec2(lkNoise(xz * 2.1), lkNoise(xz * 2.1 + 8.7)) - 0.5;
-    vec2 uv = clamp(trailUv + bleed * 0.11 / uTrailBounds.zw, 0.0, 1.0);
+    vec2 bleed = vec2(lkFbm(xz * 1.2), lkFbm(xz * 1.2 + 8.7)) - 0.5;
+    vec2 uv = clamp(trailUv + bleed * 0.65 / uTrailBounds.zw, 0.0, 1.0);
     float source = texture2D(uTrailMap, uv).r * inside;
     // Trees and walls wake from their feet; crowns require stronger nearby pigment.
     source = max(0.0, source - lift * 0.15);
-    float wake = smoothstep(0.04, 0.7, source);
-    float rim = exp(-pow((source - 0.25) / 0.11, 2.0)) * inside;
-    tide = max(tide, rim * 0.32 * (1.0 - paint));
-    bloom = max(bloom, exp(-pow((source - 0.08) / 0.055, 2.0)) * inside * 0.32 * (1.0 - paint));
+    // Gameplay needs a soft supply falloff. Pigment needs a full cel interior and
+    // a narrow, fibrous wet front, rather than tinting the entire aura like airbrush.
+    float fibre = (lkFbm(xz * 1.8 + 3.7) - 0.5) * 0.3
+                + (lkNoise(xz * 8.0) - 0.5) * 0.055;
+    float front = source + fibre * smoothstep(0.03, 0.15, source);
+    float wake = smoothstep(0.19, 0.31, front) * inside;
+    float rim = exp(-pow((front - 0.29) / 0.045, 2.0)) * inside;
+    tide = max(tide, rim * 0.58 * (1.0 - paint));
+    bloom = max(bloom, exp(-pow((front - 0.15) / 0.04, 2.0)) * inside * 0.38 * (1.0 - paint));
     paint = max(paint, wake);
   }
 `;
