@@ -18,6 +18,7 @@ await server?.listen();
 const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
 const context = await browser.newContext({ viewport: { width: 960, height: 540 }, recordVideo: { dir: out, size: { width: 960, height: 540 } } });
 const page = await context.newPage();
+page.setDefaultTimeout(120000);
 const evidence = { staging: 'Initial and per-comparison teleports to authored coal source; keys/stick drive every action; no heat/latch state forced.', samples: [], assertions: [] };
 page.on('pageerror', e => evidence.samples.push({ pageerror: String(e) }));
 async function advance(frames = 1) {
@@ -60,6 +61,22 @@ try {
   await page.keyboard.down('e');
   const picked = await sample('02-carried', 30, true);
   check('Held E picks up exactly once', coal(picked).carried && coal(picked).pickups === 1 && coal(picked).placements === 0);
+  // Disclosed inspection lens for mouth contact; the action still above uses normal chase cam.
+  await page.evaluate(() => {
+    const { camera, ctx } = window.__opening;
+    window.__carrySavedCamera = { pos: camera.position.clone(), quat: camera.quaternion.clone() };
+    const p = ctx.fox.root.position;
+    camera.position.set(p.x + 1.3, p.y + 0.8, p.z + 1.6);
+    camera.lookAt(p.x, p.y + 0.35, p.z + 0.15);
+    window.__gameHooks.advance(0);
+  });
+  await page.screenshot({ path: path.join(out, '02b-carried-contact-staged-lens.png') });
+  await page.evaluate(() => {
+    const { camera } = window.__opening;
+    camera.position.copy(window.__carrySavedCamera.pos);
+    camera.quaternion.copy(window.__carrySavedCamera.quat);
+    window.__gameHooks.advance(0);
+  });
   await page.keyboard.up('e'); await advance(1);
   await press('Space', 12);
   const air = await sample('03-carried-jump', 5, true);
