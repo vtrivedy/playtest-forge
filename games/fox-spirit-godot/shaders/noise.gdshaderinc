@@ -17,3 +17,16 @@ float bayer4(vec2 fc) {
 	int m[16] = int[](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
 	return (float(m[i]) + 0.5) / 16.0;
 }
+
+// three's height fog (src/render/atmosphere.ts applyHeightFog: height 1, falloff 0.06), applied in
+// linear before tonemapping like three; Godot's depth fog reads far denser at the same density.
+global uniform vec3 fog_color;
+global uniform float fog_density;
+float height_fog(vec3 world, vec3 cam) {
+	float k = 0.06;
+	float h_cam = clamp(cam.y - 1.0, -60.0, 400.0);
+	float dy = clamp(world.y - cam.y, -400.0, 400.0);
+	float line = abs(dy) > 0.01 ? (1.0 - exp(-k * dy)) / (k * dy) : 1.0;
+	float o = fog_density * exp(-k * h_cam) * line * length(world - cam);
+	return clamp(1.0 - exp(-o * o * 0.5 - o * 0.5), 0.0, 1.0);
+}

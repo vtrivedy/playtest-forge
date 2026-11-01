@@ -102,7 +102,7 @@ func _build_fx() -> void:
 	skeleton.add_child(tail5)
 	_tail_light = OmniLight3D.new()
 	_tail_light.light_color = Color(1.0, 0.478, 0.188)
-	_tail_light.light_energy = 0.5
+	_tail_light.light_energy = 0.22
 	_tail_light.omni_range = 2.0
 	_tail_light.position = Vector3(0, 0.08, 0)
 	tail6.add_child(_tail_light)
@@ -235,7 +235,7 @@ func one_shot_length(s: String) -> float:
 
 func _fx(dt: float) -> void:
 	_time += dt
-	_tail_light.light_energy = 0.45 + sin(_time * 9.0) * 0.07
+	_tail_light.light_energy = 0.2 + sin(_time * 9.0) * 0.03
 	var tip := _tip.global_position
 	if dt > 0.0:
 		var v := (_tip_prev - tip) / dt * 0.25

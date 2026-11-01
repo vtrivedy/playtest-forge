@@ -5,7 +5,8 @@
 // there in fragment(), so the single directional key light builds the final colour in light().
 #include "res://shaders/noise.gdshaderinc"
 
-uniform vec3 albedo : source_color = vec3(1.0);
+/** linear (Kit.toon converts three hex colours) */
+uniform vec3 albedo = vec3(1.0);
 uniform bool vertex_colors = false;
 /** brushy ink contour where the surface turns away (smooth-normal props) */
 uniform float contour = 0.0;
@@ -37,6 +38,7 @@ varying vec3 v_amb;
 varying vec4 v_paint; // paint, tide, bloom, tooth
 varying vec3 v_paper;
 varying vec2 v_misc; // contour amount, cel noise
+varying float v_fog;
 
 void vertex() {
 	v_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -104,6 +106,7 @@ void fragment() {
 	float ndv = abs(dot(normalize(NORMAL), normalize(VIEW)));
 	float brush = 0.65 + 0.7 * lk_noise(xz * 2.0 + v_world.y * 3.0);
 	v_misc = vec2((1.0 - smoothstep(0.1, 0.1 + 0.22 * brush, ndv)) * contour, lk_noise(xz * 2.3));
+	v_fog = height_fog(v_world, CAMERA_POSITION_WORLD);
 	ALBEDO = vec3(1.0);
 }
 
@@ -137,10 +140,10 @@ void light() {
 		vec3 o = mix(sepia, cel, paint);
 		o = mix(o, pigment, wet * 0.4);
 		o = mix(o, paper_ink * 0.8, v_misc.x);
-		DIFFUSE_LIGHT += o;
+		DIFFUSE_LIGHT += mix(o, fog_color, v_fog);
 	} else {
 		// hearth / tail glow: banded warmth, full on paint, a paper-warm lift on sepia
 		vec3 tint = mix(v_paper * 0.7, v_albedo, v_paint.x);
-		DIFFUSE_LIGHT += tint * band3(ndl) * ATTENUATION * col;
+		DIFFUSE_LIGHT += tint * band3(ndl) * ATTENUATION * col * (1.0 - v_fog);
 	}
 }

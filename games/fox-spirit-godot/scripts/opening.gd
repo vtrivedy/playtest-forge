@@ -69,7 +69,8 @@ func _ready() -> void:
 		if a.begins_with("--off="):
 			var off := a.trim_prefix("--off=").split(",")
 			env.glow_enabled = env.glow_enabled and not off.has("glow")
-			env.fog_enabled = env.fog_enabled and not off.has("fog")
+			if off.has("fog"):
+				RenderingServer.global_shader_parameter_set("fog_density", 0.0)
 			(post.get_meta("rect") as CanvasItem).visible = not off.has("post")
 	if not OS.get_cmdline_user_args().is_empty():
 		add_child(Capture.new())
@@ -97,13 +98,6 @@ func _build_environment() -> void:
 	env.glow_bloom = 0.0
 	env.glow_hdr_threshold = 1.2
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
-	env.fog_enabled = true
-	env.fog_mode = Environment.FOG_MODE_EXPONENTIAL
-	env.fog_light_color = PAPER_MIST
-	env.fog_density = 0.0065
-	env.fog_height = 1.0
-	env.fog_height_density = 0.0
-	env.fog_sky_affect = 0.0
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -202,7 +196,8 @@ func _physics_process(dt: float) -> void:
 func _grade(k: float) -> void:
 	sky_mat.set_shader_parameter("paint", k)
 	sky_mat.set_shader_parameter("time", time)
-	env.fog_light_color = PAPER_MIST.lerp(AUTUMN_MIST, k)
+	var mist := PAPER_MIST.lerp(AUTUMN_MIST, k).srgb_to_linear()
+	RenderingServer.global_shader_parameter_set("fog_color", Vector3(mist.r, mist.g, mist.b))
 	key.light_color = Color(1.0, 0.902, 0.769).lerp(Color(1.0, 0.839, 0.69), k)
 	post.set_shader_parameter("restore", k)
 	post.set_shader_parameter("time", time)

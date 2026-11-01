@@ -1,19 +1,20 @@
 // Paper sky with sepia ink-wash clouds ↔ painted melancholy dusk with cel-banded clouds
 // (lookdevKit.buildSky). `paint` sweeps a ragged front across the dome toward `paint_dir`.
 shader_type sky;
+// colours are linear (three hex → linear), no source_color hints
 #include "res://shaders/noise.gdshaderinc"
 
-uniform vec3 paper_top : source_color = vec3(0.749, 0.663, 0.522);
-uniform vec3 paper_hor : source_color = vec3(0.894, 0.824, 0.682);
-uniform vec3 ink : source_color = vec3(0.141, 0.086, 0.055);
-uniform vec3 top : source_color = vec3(0.478, 0.439, 0.525);
-uniform vec3 mid : source_color = vec3(0.71, 0.525, 0.431);
-uniform vec3 hor : source_color = vec3(0.863, 0.682, 0.525);
-uniform vec3 mist : source_color = vec3(0.847, 0.765, 0.627);
-uniform vec3 lit : source_color = vec3(0.894, 0.749, 0.596);
-uniform vec3 cmid : source_color = vec3(0.78, 0.604, 0.502);
-uniform vec3 shade : source_color = vec3(0.659, 0.518, 0.478);
-uniform vec3 sun : source_color = vec3(1.0, 0.761, 0.478);
+uniform vec3 paper_top = vec3(0.5210, 0.3971, 0.2350);
+uniform vec3 paper_hor = vec3(0.7756, 0.6453, 0.4228);
+uniform vec3 ink = vec3(0.0176, 0.0080, 0.0044);
+uniform vec3 top = vec3(0.1942, 0.1619, 0.2379);
+uniform vec3 mid = vec3(0.4624, 0.2379, 0.1556);
+uniform vec3 hor = vec3(0.7162, 0.4228, 0.2379);
+uniform vec3 mist = vec3(0.6866, 0.5462, 0.3510);
+uniform vec3 lit = vec3(0.7756, 0.5210, 0.3139);
+uniform vec3 cmid = vec3(0.5705, 0.3232, 0.2159);
+uniform vec3 shade = vec3(0.3918, 0.2311, 0.1942);
+uniform vec3 sun = vec3(1.0000, 0.5398, 0.1942);
 uniform vec3 sun_dir = vec3(0.7, 0.32, 0.25);
 uniform vec2 paint_dir = vec2(0.8, -0.6);
 uniform float paint = 0.0;

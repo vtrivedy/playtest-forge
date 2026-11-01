@@ -3,11 +3,13 @@
 // the tail's burn-out third (UV.x = ember mask). The fox never takes the paper grade.
 shader_type spatial;
 render_mode ambient_light_disabled, specular_disabled;
+#include "res://shaders/noise.gdshaderinc"
 
 uniform float ember_gain = 1.7;
 varying float v_ember;
 varying vec3 v_amb;
 varying vec3 v_base;
+varying float v_fog;
 
 void vertex() {
 	v_ember = UV.x;
@@ -25,6 +27,7 @@ void fragment() {
 	vec3 fill = vec3(0.5271, 0.2159, 0.0802) * 0.45 / PI * ramp_fox(dot(wn, normalize(vec3(-12.0, 7.0, -6.0))));
 	vec3 rimc = vec3(1.0, 0.5647, 0.2789) * 1.3 / PI * ramp_fox(dot(wn, normalize(vec3(-2.0, 5.0, -14.0))));
 	v_amb = hemi + fill + rimc;
+	v_fog = height_fog((INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz, CAMERA_POSITION_WORLD);
 	ALBEDO = vec3(1.0);
 	float ember_step = 0.35 * step(0.45, v_ember) + 0.65 * step(0.8, v_ember);
 	float rim = 1.0 - clamp(dot(normalize(NORMAL), vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
@@ -41,7 +44,7 @@ void light() {
 		float band = mix(0.6, 1.0, shade);
 		vec3 tint = mix(vec3(0.82, 0.58, 0.66), vec3(1.0), shade);
 		float hatch = step(0.66, fract((FRAGCOORD.x + FRAGCOORD.y) * 0.16));
-		DIFFUSE_LIGHT += v_base * band * tint * (1.0 - 0.18 * hatch * (1.0 - shade));
+		DIFFUSE_LIGHT += mix(v_base * band * tint * (1.0 - 0.18 * hatch * (1.0 - shade)), fog_color, v_fog);
 	} else {
 		DIFFUSE_LIGHT += v_base * ramp_fox(ndl) * ATTENUATION * col * 0.5;
 	}

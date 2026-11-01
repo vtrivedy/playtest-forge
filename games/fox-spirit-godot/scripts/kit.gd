@@ -33,9 +33,9 @@ static func euler(r: Vector3) -> Basis:
 static func toon(color: Variant = 0xffffff, opts := {}) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = WORLD_SHADER
-	# hex = sRGB (three hex); a Color is linear (three Color maths, e.g. tone.multiplyScalar)
-	var c: Color = (color as Color).linear_to_srgb() if color is Color else Color.hex((int(color) << 8) | 0xFF)
-	m.set_shader_parameter("albedo", c)
+	# hex = sRGB (three hex) → linear; a Color is already linear (three Color maths, e.g. tone.multiplyScalar)
+	var c: Color = color if color is Color else lin(int(color))
+	m.set_shader_parameter("albedo", Vector3(c.r, c.g, c.b))
 	m.set_shader_parameter("vertex_colors", opts.get("vertex_colors", false))
 	m.set_shader_parameter("contour", opts.get("contour", 0.0))
 	m.set_shader_parameter("hatch_weight", opts.get("hatch_weight", 1.0))
