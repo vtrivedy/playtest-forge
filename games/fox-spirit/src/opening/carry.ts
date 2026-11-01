@@ -8,9 +8,9 @@ export const CARRY = {
   emberSize: 0.115,
   glow: 0.7,
   /** Mouth-corner offset keeps the coal visible beside the head from chase view. */
-  mouthSide: 0.2,
-  mouthForward: 0.2,
-  mouthLower: 0.11,
+  mouthSide: 0.27,
+  mouthForward: 0.18,
+  mouthLower: 0.07,
 };
 
 type CarryPlayer = { grounded: boolean; dashing?: boolean };

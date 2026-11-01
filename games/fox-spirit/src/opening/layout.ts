@@ -13,8 +13,8 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 /** rock shelf the H-a updraft lifts onto: 9 × 9, top = ground + 5 */
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
-/** The Still Crown on the Summit: due south past the bridge, so crossing it walks straight at the Crown (and it stands over the meadow from the wake spot) */
-export const CROWN = { x: 4, y: -24, z: -42, yaw: 0, scale: 1.6 } as const;
+/** The Still Crown on the Summit: far down the vista gap past the bridge, low enough to sit inside the chase frame */
+export const CROWN = { x: 2, y: -70, z: -112, yaw: 0, scale: 1.6 } as const;
 
 /** Cottages (all face +z: door on the z + d/2 wall) */
 export const HOUSES = [
@@ -55,6 +55,35 @@ export function rimK(x: number, z: number): number {
   return Math.hypot((x - BOUNDS.cx) / BOUNDS.rx, (z - BOUNDS.cz) / BOUNDS.rz);
 }
 
+/** The Hearthtree's hinge and the far crag it falls onto (KEEPING derives its frame from these) */
+const HINGE = { x: 28.0, z: 73.6 } as const;
+const CRAG = { x: 26.0, z: 65.2 } as const;
+/**
+ * The vista notch: past the far crag the rim opens into a saddle that drops into a valley, so the
+ * bridge ends on an overlook with the Still Crown framed in the gap instead of facing the rim wall.
+ * `a` runs on along the fall line beyond the crag, `c` across it.
+ */
+export const VISTA = (() => {
+  const len = Math.hypot(CRAG.x - HINGE.x, CRAG.z - HINGE.z);
+  return { x: CRAG.x, z: CRAG.z, dx: (CRAG.x - HINGE.x) / len, dz: (CRAG.z - HINGE.z) / len, start: 2.4, half: 6, edge: 7, drop: 0.75, floor: -11 };
+})();
+/** true inside the vista gap (plus `margin` across): nothing tall may stand here */
+export function inVista(x: number, z: number, margin = 0): boolean {
+  const V = VISTA;
+  const a = (x - V.x) * V.dx + (z - V.z) * V.dz;
+  const c = Math.abs((x - V.x) * V.dz - (z - V.z) * V.dx);
+  return a > V.start - 1 && c < V.half + V.edge * 0.5 + a * 0.4 + margin;
+}
+function vistaCut(x: number, z: number, h: number): number {
+  const V = VISTA;
+  const a = (x - V.x) * V.dx + (z - V.z) * V.dz;
+  const c = Math.abs((x - V.x) * V.dz - (z - V.z) * V.dx);
+  // widen as it runs out: a gap, not a corridor
+  const open = (1 - THREE.MathUtils.smoothstep(c, V.half + a * 0.35, V.half + V.edge + a * 0.5)) * THREE.MathUtils.smoothstep(a, V.start - 1.5, V.start + 1.5);
+  const valley = Math.max(V.floor, 5 - Math.max(0, a - V.start) * V.drop) + Math.sin(x * 0.21) * Math.cos(z * 0.17) * 0.8;
+  return THREE.MathUtils.lerp(h, Math.min(h, valley), open);
+}
+
 /** Base terrain (no props): gentle swells, flattened lanes and house pads, cliffed rim */
 export function groundH(x: number, z: number): number {
   const swell = Math.sin(x * 0.11) * Math.cos(z * 0.09) * 0.7 + Math.sin(x * 0.31 + z * 0.17) * 0.18;
@@ -67,7 +96,7 @@ export function groundH(x: number, z: number): number {
   const meadow = -0.6 * (1 - THREE.MathUtils.smoothstep(z, 70, 84));
   const r = rimK(x, z);
   const rim = THREE.MathUtils.smoothstep(r, 0.92, 1.08) * 7 + Math.max(0, r - 1.08) * 14;
-  return swell * flat * 0.8 + meadow + rim;
+  return vistaCut(x, z, swell * flat * 0.8 + meadow + rim);
 }
 
 /** shelf walk height (the H-a updraft's landing) */
@@ -80,8 +109,8 @@ export const SHELF_TOP = groundH(SHELF.x, SHELF.z) + SHELF.rise;
  * Boxes use the collider yaw convention: local +z = (sin yaw, cos yaw), local +x = (cos yaw, −sin yaw).
  */
 export const KEEPING = (() => {
-  const hinge = { x: 28.0, z: 73.6 };
-  const crag = { x: 26.0, z: 65.2 };
+  const hinge = HINGE;
+  const crag = CRAG;
   const span = Math.hypot(crag.x - hinge.x, crag.z - hinge.z);
   const fall = { x: (crag.x - hinge.x) / span, z: (crag.z - hinge.z) / span };
   const yaw = Math.atan2(fall.x, fall.z);
