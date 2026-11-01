@@ -6,7 +6,7 @@ import bpy, os
 
 OUT = os.path.normpath(HERE + "../../../assets/hero/hearth_fox.glb")
 DEFORM = [b.name for b in rig.data.bones if b.use_deform]
-CLIP_SPEED = {k: g["stride"] * FPS / g["frames"] for k, g in GAITS.items()}
+CLIP_SPEED = {k: K * g["stride"] * FPS / g["frames"] for k, g in GAITS.items()}
 CLIP_SPEED.update(idle=0.0, jumpUp=0.0, fall=0.0, land=0.0)
 
 bpy.context.view_layer.objects.active = rig

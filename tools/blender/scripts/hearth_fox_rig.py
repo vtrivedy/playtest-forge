@@ -14,12 +14,13 @@ def bone(name, h, t, parent=None):
     BONES[name] = (Vector(h), Vector(t), parent)
 
 
+# trunk follows the body nodes: rump → loin (hips), loin → chest (spine), chest → withers, withers → neck top
 bone("root", (0, 0, 0), (0, -0.12, 0))
-bone("hips", P(-0.27, 0.43), P(-0.08, 0.425), "root")
-bone("spine", P(-0.08, 0.425), P(0.12, 0.42), "hips")
-bone("chest", P(0.12, 0.42), P(0.27, 0.51), "spine")
-bone("neck", P(0.27, 0.51), P(0.34, 0.615), "chest")
-bone("head", HEAD_PIVOT, HEAD_PIVOT + Vector((0, -0.16, -0.012)), "neck")
+bone("hips", NODES["rump"][0], NODES["loin"][0], "root")
+bone("spine", NODES["loin"][0], NODES["chest"][0] + Vector((0, 0, 0.02)), "hips")
+bone("chest", NODES["chest"][0] + Vector((0, 0, 0.02)), NODES["withers"][0], "spine")
+bone("neck", NODES["withers"][0], NODES["neck2"][0], "chest")
+bone("head", HEAD_PIVOT, HEAD_PIVOT + Vector((0, -0.1, -0.01)), "neck")
 for e in EARS:
     zs = sorted(e.data.vertices, key=lambda v: v.co.z)
     base = sum((v.co for v in zs[:10]), Vector()) / 10
@@ -38,12 +39,12 @@ for side, sx in (("L", 1), ("R", -1)):
     for i, p in enumerate(H):
         p.x = LEG_X["H"] * sx * (1.0 if i == 0 else 0.9)
     # front: shoulder → elbow → wrist → paw(ground) → toe
-    bone(f"upperarm.{side}", F[0] + Vector((0, 0, 0.04)), F[1], "chest")
+    bone(f"upperarm.{side}", F[0] + Vector((0, 0, 0.03)), F[1], "chest")
     bone(f"forearm.{side}", F[1], F[2], f"upperarm.{side}")
     bone(f"pastern.{side}", F[2], F[3], f"forearm.{side}")
     bone(f"fpaw.{side}", F[3], F[4], f"pastern.{side}")
     # hind: hip → stifle → hock → paw → toe (H[2] is a mid-shin fullness node)
-    bone(f"thigh.{side}", H[0] + Vector((0, 0, 0.03)), H[1], "hips")
+    bone(f"thigh.{side}", H[0] + Vector((0, 0, 0.025)), H[1], "hips")
     bone(f"shin.{side}", H[1], H[3], f"thigh.{side}")
     bone(f"meta.{side}", H[3], H[4], f"shin.{side}")
     bone(f"hpaw.{side}", H[4], H[5], f"meta.{side}")
@@ -109,14 +110,14 @@ def body_w(co):
     return out
 
 
-RADIUS = {"tail1": 0.045, "upperarm": 0.05, "thigh": 0.065, "forearm": 0.025, "shin": 0.035,
-          "pastern": 0.018, "meta": 0.018, "fpaw": 0.016, "hpaw": 0.016}
+RADIUS = {"tail1": 0.045, "upperarm": 0.045, "thigh": 0.055, "forearm": 0.032, "shin": 0.035,
+          "pastern": 0.026, "meta": 0.026, "fpaw": 0.024, "hpaw": 0.024}
 
 
 def head_w(co):
     rel = co - HEAD_PIVOT
     u = -rel.y
-    k = smooth01(-0.085, -0.03, u)
+    k = smooth01(-0.11, -0.06, u)
     return {"head": k, "neck": 1 - k}
 
 
