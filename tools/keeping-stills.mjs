@@ -1,6 +1,7 @@
 // Local stills of the first Keeping's place (ledge, steam spring, terrace, Hearthtree, crag; SwiftShader).
 //   node tools/keeping-stills.mjs --out /tmp/ks [--poses a,b] [--paint 1] [--settle 0|<seconds after release>]
 // Chase poses teleport the fox (the chase cam settles behind it); free poses frame the art camera directly.
+// --steam 1 unfolds the steam stair through the dev hook first.
 // --settle N releases the Hearthtree through the dev hook and advances N seconds before every pose.
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
@@ -22,6 +23,10 @@ const POSES = {
   terrace: [29.6, 77.4, -2.9],
   bridge: [27.4, 71.0, -2.9],
   crag: [26.2, 66.6, -2.9],
+  // on the steam pad facing the stair
+  stair: [25.6, 80.6, 1.75],
+  // halfway up the stair
+  stairup: [29.4, 79.9, 1.75],
 };
 const CAMS = {
   // the reveal from the shelf landing
@@ -31,6 +36,8 @@ const CAMS = {
   // side-on across the gorge: tree, terrace and crag in one frame
   gorge: [[10, 12, 66], [27, 11, 70.5]],
   aerial: [[2, 34, 102], [22, 4, 72]],
+  // the stair along the terrace's north cliff, from the ledge
+  stairside: [[22.5, 7.4, 84.5], [29.5, 7.2, 79]],
   // the tree itself, from over the ridge
   tree: [[14, 15, 80], [27.5, 13, 70.5]],
   // looking back along the fallen trunk from the crag
@@ -38,6 +45,7 @@ const CAMS = {
 };
 const paint = arg('paint', '0') === '1';
 const settle = Number(arg('settle', '0'));
+const steam = arg('steam', '0') === '1';
 const pick = arg('poses', [...Object.keys(POSES), ...Object.keys(CAMS)].join(',')).split(',');
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5194, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
@@ -50,19 +58,23 @@ page.on('console', (m) => m.type() === 'error' && console.log('CONSERR', m.text(
 try {
   await page.goto('http://127.0.0.1:5194/', { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
-  const st = await page.evaluate(({ paint, settle }) => {
+  const st = await page.evaluate(({ paint, settle, steam }) => {
     const h = window.__gameHooks;
     h.setManual(true);
     if (paint) {
       const { ctx } = window.__opening;
       ctx.field.restore(ctx.fox.root.position.clone().set(16, 0, 74), 90, 0.01, { edgeMax: 2.5 });
     }
+    if (steam) {
+      h.keepingSteam();
+      h.advance(150, 1 / 60, false);
+    }
     if (settle > 0) {
       h.keepingRelease();
       h.advance(Math.round(settle * 60), 1 / 60, false);
     }
     return h.state().opening.keeping;
-  }, { paint, settle });
+  }, { paint, settle, steam });
   console.log('keeping', JSON.stringify(st));
   for (const name of pick) {
     const t0 = Date.now();
