@@ -46,3 +46,10 @@ The Keeping spring and root bowls are ground-level art. Give HearthSpot an optio
 bedOffset (default 0.92) and author these two at 0.03 m, so disk, fire, vapor and
 lift agree with the actual bowl. Keep spot.y as the placement floor. Steam uses
 slightly lighter, stronger paper vapor for readability against the ochre cliff.
+
+## Retire the first heat teach
+
+After H-a records its first successful elevated landing, retire its tutorial HUD
+permanently. The landing is the handoff to Carry; a completed-hearth message must
+not overlap the nearby coal interaction prompt. Keep incomplete hearth guidance
+and the existing successful-ride telemetry unchanged.

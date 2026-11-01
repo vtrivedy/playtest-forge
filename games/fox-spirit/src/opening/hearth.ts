@@ -56,8 +56,8 @@ export function createOpeningHearth(opts: {
       const near = Math.hypot(fox.x - OPENING_HEARTH.x, fox.z - OPENING_HEARTH.z) < 12;
       const ride = updrafts.lastRide;
       if (ride?.hearth === 'H-a' && ride.landFeetY !== null && ride.landFeetY > ride.baseY + 2) complete = true;
-      hud.textContent = complete ? 'The warmth carries on.' : latched ? 'Space · jump and hold to ride the warm air' : 'Bring your colour to the cold hearth · run close or Shift dash';
-      hud.style.opacity = near && elapsed > 2 ? '1' : '0';
+      hud.textContent = latched ? 'Space · jump and hold to ride the warm air' : 'Bring your colour to the cold hearth · run close or Shift dash';
+      hud.style.opacity = !complete && near && elapsed > 2 ? '1' : '0';
     },
     state() {
       return { ...updrafts.state(), latched, ignition, complete };
