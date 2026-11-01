@@ -70,7 +70,7 @@ try {
   await page.keyboard.down('ShiftLeft');
   await page.evaluate(() => window.__gameHooks.advance(4, 1 / 60, false));
   await page.keyboard.up('ShiftLeft');
-  await page.evaluate(() => { window.__gameHooks.setStick(0, 0); window.__gameHooks.advance(50, 1 / 60, false); });
+  await page.evaluate(() => { window.__gameHooks.setStick(0, 0); window.__gameHooks.advance(130, 1 / 60, false); });
   await shot('07-kit-pop');
   const end = await page.evaluate(() => { const s = window.__gameHooks.advance(1500, 1 / 60, true); return s.opening.unpressed.creatures.find((c) => c.id === 'kit'); });
   log.push(['kit after 25 s', end]);

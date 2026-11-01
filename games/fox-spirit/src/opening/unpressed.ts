@@ -632,9 +632,10 @@ export function buildUnpressed(ctx: OpeningCtx) {
 
   perform.kit = (c, t, dt) => {
     // shake free, look at the fox, then trot home across the meadow and curl up by the well
-    B(c, 'head').rotation.z = t < 0.7 ? Math.sin(t * 24) * 0.25 * (1 - t / 0.7) : 0;
+    // a quick shake, then a bound out through the door into open ground before it looks back at the fox
+    B(c, 'head').rotation.z = t < 0.35 ? Math.sin(t * 40) * 0.25 * (1 - t / 0.35) : 0;
     B(c, 'tail').rotation.z = Math.sin(t * 7) * 0.35;
-    if (t < 1.2) return false;
+    if (t < 0.35) return false;
     const path = KIT.path;
     const s = path[Math.min(c.leg, path.length - 1)]!;
     const dx = s.x - c.holder.position.x;
