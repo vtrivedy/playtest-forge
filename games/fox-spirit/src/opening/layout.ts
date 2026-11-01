@@ -247,6 +247,27 @@ export const UNPRESSED = (() => {
 })();
 
 /**
+ * Homecoming at the well (DESIGN-homecoming.md). Well-local frame = the Great Well's build frame (village.ts
+ * greatWell: yaw 0.3, +z = the lane side). `lanterns` hang under the hood's eaves (local x, z, cord top y);
+ * `pin` is the kept page on the west post's lane face; the hare walks `harePath` home from the ruin entry.
+ */
+export const HOMECOMING = (() => {
+  const yaw = 0.3;
+  const y = groundH(WELL.x, WELL.z);
+  return {
+    well: { x: WELL.x, z: WELL.z, y, yaw },
+    pin: { lx: -1.38, ly: 1.45, lz: 0.13 },
+    lanterns: [[-1.1, 1.12], [0, 1.12], [1.1, 1.12], [-0.55, -1.12], [0.55, -1.12]] as ReadonlyArray<readonly [number, number]>,
+    eave: 2.2,
+    harePath: [{ x: -16.8, z: 79.9 }, { x: -12.6, z: 81.8 }, { x: -11.6, z: 86.0 }, { x: -9.9, z: 87.5 }],
+    /** the heron's wheel over the well: centre, height, radius, seconds out-round-back */
+    flyover: { x: WELL.x, z: WELL.z, y: y + 6, r: 4.5, secs: 11 },
+    /** min seconds between two lanterns kindling */
+    gap: 0.8,
+  };
+})();
+
+/**
  * Ink glyph stones (DESIGN-glyphs.md): three standing stones in the east meadow whose glyphs only show while
  * freshly painted by the aura, and a sealed paper-door shrine at the rim foot whose lintel (also paint-read)
  * gives the order. `yaw` turns each slab; the shrine faces west, back into the rim slope.

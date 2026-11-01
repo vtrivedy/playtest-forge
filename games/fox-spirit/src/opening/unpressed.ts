@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { RAMP_WORLD, inkMaterial, hullGeometry, plumeGeometry, hewn, toon, inked } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import type { Collider } from '../lookdevPlay';
-import { JOGS, KIT, UNPRESSED } from './layout';
+import { HOMECOMING, JOGS, KIT, UNPRESSED } from './layout';
 
 type P2 = readonly [number, number];
 type Part =
@@ -547,7 +547,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       });
     // the kit's page is sealed behind the glyph shrine's door until it opens
     paper.visible = spec.id !== 'kit';
-    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0 };
+    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false };
   });
 
   const world = new THREE.Vector3();
@@ -604,6 +604,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       return d <= 0.05 && t > 2.5;
     },
     heron(c, t, dt) {
+      if (c.homing) return flyover(c, t, dt);
       const s = UNPRESSED.heron.settle;
       const o = UNPRESSED.heron.out;
       const head = B(c, 'head');
@@ -698,13 +699,55 @@ export function buildUnpressed(ctx: OpeningCtx) {
     return !moving;
   };
 
+  /**
+   * the heron's homecoming: up off the cliff foot, one slow wheel round the well's hood, and back to its post
+   * (its back stays the fling shortcut). `passed` marks the moment it is over the well.
+   */
+  let heronPassed = false;
+  function flyover(c: (typeof creatures)[number], t: number, dt: number): boolean {
+    const s = UNPRESSED.heron.settle;
+    const o = UNPRESSED.heron.out;
+    const F = HOMECOMING.flyover;
+    const wl = B(c, 'wingL');
+    const wr = B(c, 'wingR');
+    const open = smooth(0, 0.5, t) * (1 - smooth(F.secs - 0.6, F.secs, t));
+    const flap = Math.sin(t * 7) * (0.5 + 0.5 * (1 - smooth(1.5, 3, t)) + 0.5 * smooth(F.secs - 2.5, F.secs - 1, t));
+    wl.rotation.x = -(0.15 + 1.25 * open + flap * 0.6 * open);
+    wr.rotation.x = 0.15 + 1.25 * open + flap * 0.6 * open;
+    B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = open * 1.1;
+    B(c, 'neck').rotation.z = open * 0.35;
+    // out → round the well (one turn, counter-clockwise from the side facing the cliff) → back
+    const u = THREE.MathUtils.clamp(t / F.secs, 0, 1);
+    const wellA = Math.atan2(s.z - F.z, s.x - F.x);
+    const loop = (a: number) => new THREE.Vector3(F.x + Math.cos(a) * F.r, F.y, F.z + Math.sin(a) * F.r);
+    const home = new THREE.Vector3(s.x, s.y, s.z);
+    const goA = smooth(0, 0.3, u);
+    const backA = smooth(0.7, 1, u);
+    const a = wellA + smooth(0.25, 0.75, u) * Math.PI * 2;
+    const p = backA > 0 ? loop(a).lerp(home, backA) : home.clone().lerp(loop(a), goA);
+    p.y += Math.sin(t * 7) * 0.05 * open;
+    const prev = c.holder.position.clone();
+    c.holder.position.copy(p);
+    const vx = p.x - prev.x;
+    const vz = p.z - prev.z;
+    if (Math.hypot(vx, vz) > 1e-4 && u < 0.97) face(c, vx, vz, Math.min(1, dt * 4));
+    else face(c, o.x, o.z, Math.min(1, dt * 3));
+    B(c, 'body').rotation.z = -0.25 * open;
+    if (!heronPassed && u > 0.5) {
+      heronPassed = true;
+      homed.add('heron');
+    }
+    if (heronBack) heronBack.top = u < 1 ? -1000 : s.y + HERON_FLING.backTop;
+    return t > F.secs + 0.4;
+  }
+
   perform.hare = (c, t, dt) => {
     // shake off the page, sit up and look at the fox, then lope ahead along the jog; lag and it sits up and
     // looks back for you; at the end it sits at the ruin's entry facing the paper
     B(c, 'head').rotation.z = t < 0.5 ? Math.sin(t * 34) * 0.22 * (1 - t / 0.5) : 0;
     B(c, 'earL').rotation.x = B(c, 'earR').rotation.x = t < 0.5 ? Math.sin(t * 40) * 0.3 : 0;
     const fox = ctx.fox.root.position;
-    const path = UNPRESSED.hare.path;
+    const path = c.homing ? HOMECOMING.harePath : UNPRESSED.hare.path;
     const s = path[Math.min(c.leg, path.length - 1)]!;
     const dx = s.x - c.holder.position.x;
     const dz = s.z - c.holder.position.z;
@@ -712,7 +755,8 @@ export function buildUnpressed(ctx: OpeningCtx) {
     const advanced = d <= 0.2 && c.leg < path.length - 1;
     if (advanced) c.leg++;
     const end = c.leg === path.length - 1 && d <= 0.2;
-    const near = Math.hypot(fox.x - c.holder.position.x, fox.z - c.holder.position.z) < JOGS.lead;
+    // homing it needs no one to follow
+    const near = c.homing || Math.hypot(fox.x - c.holder.position.x, fox.z - c.holder.position.z) < JOGS.lead;
     // it goes once it has seen you (1.1 s), keeps a lead, and holds while you lag
     const moving = t > 1.1 && !end && (near || c.gait % (Math.PI * 2) > 0.4);
     if (moving && d > 0.001) {
@@ -732,7 +776,8 @@ export function buildUnpressed(ctx: OpeningCtx) {
     B(c, 'body').position.y = 0.2 + air * 0.12;
     B(c, 'body').rotation.z = (moving ? Math.cos(g) * 0.16 : 0) + c.bow * 0.5;
     B(c, 'head').rotation.z -= c.bow * 0.42;
-    const look = end ? JOGS.look : fox;
+    const sitTo = c.homing ? HOMECOMING.well : JOGS.look;
+    const look = end ? sitTo : fox;
     const rel = Math.atan2(-(look.z - c.holder.position.z), look.x - c.holder.position.x) - c.holder.rotation.y;
     B(c, 'head').rotation.y = THREE.MathUtils.clamp(Math.atan2(Math.sin(rel), Math.cos(rel)), -1.3, 1.3) * c.bow;
     // the scut flashes white on every bound: what you follow at range
@@ -740,7 +785,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     B(c, 'tail').scale.setScalar(1 + air * 0.9);
     c.holder.position.y = THREE.MathUtils.damp(c.holder.position.y, floorAt(c.holder.position.x, c.holder.position.z), 12, dt);
     if (!end) return false;
-    face(c, JOGS.look.x - c.holder.position.x, JOGS.look.z - c.holder.position.z, Math.min(1, dt * 3));
+    face(c, sitTo.x - c.holder.position.x, sitTo.z - c.holder.position.z, Math.min(1, dt * 3));
     c.arrived = c.arrived ?? t;
     return t - c.arrived > 1.2;
   };
@@ -837,7 +882,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     },
   };
 
-  let heronBack: Collider | null = null;
+  let heronBack: Extract<Collider, { kind: 'box' }> | null = null;
   let onBack = 0;
   let fling = -1;
   let flings = 0;
@@ -911,7 +956,9 @@ export function buildUnpressed(ctx: OpeningCtx) {
         if (perform[c.spec.id]!(c, c.t, dt)) {
           c.phase = 'alive';
           c.t = 0;
-          if (c.spec.id === 'heron') {
+          // the hedgehog and kit live by the well already; the hare is home when its walk home ends
+          if (c.spec.id === 'hedgehog' || c.spec.id === 'kit' || (c.spec.id === 'hare' && c.homing)) homed.add(c.spec.id);
+          if (c.spec.id === 'heron' && !heronBack) {
             // its back: a one-way top (hop up onto it from any side; walking under it never snags)
             const back = { kind: 'box' as const, x: c.holder.position.x, z: c.holder.position.z, yaw: c.holder.rotation.y, hx: HERON_FLING.hx, hz: HERON_FLING.hz, top: c.holder.position.y + HERON_FLING.backTop, oneWay: true };
             heronBack = back;
@@ -925,6 +972,20 @@ export function buildUnpressed(ctx: OpeningCtx) {
     if (fling >= 0 && (fling += dt) > 0.9) fling = -1;
   });
 
+  const homed = new Set<string>();
+  /** the homecoming (DESIGN-homecoming.md): send a freed creature home to the well (hare walks, heron wheels over) */
+  function goHome(id: 'hare' | 'heron'): boolean {
+    const c = creatures.find((k) => k.spec.id === id);
+    if (!c || c.phase !== 'alive' || c.homing) return false;
+    c.homing = true;
+    c.phase = 'performing';
+    c.t = 0;
+    c.leg = 0;
+    c.arrived = null;
+    c.gait = 0;
+    return true;
+  }
+
   /** the glyph shrine opened: its sealed page fades in and becomes findable */
   function unlock(id: string): void {
     const c = creatures.find((k) => k.spec.id === id);
@@ -936,6 +997,9 @@ export function buildUnpressed(ctx: OpeningCtx) {
     unpress,
     unlock,
     contact,
+    goHome,
+    /** creatures home at the well, in arrival order */
+    home: () => [...homed],
     state() {
       return {
         flings,
