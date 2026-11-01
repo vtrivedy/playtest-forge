@@ -1,5 +1,5 @@
 // Camera regression: full-slice input, chase stills and per-frame lens metrics.
-// node tools/camera-drop-probe.mjs <out> [fallLag=0.07] [seconds=62] [port=5198] [--clip]
+// node tools/camera-drop-probe.mjs <out> [fallLag=0.07] [seconds=62] [port=5198] [--clip|--encode-only]
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import { createSliceRoute, SLICE_START } from './opening-hero-route.mjs';
@@ -12,6 +12,16 @@ const seconds = Number(process.argv[4] ?? '62');
 const port = Number(process.argv[5] ?? '5198');
 const clip = process.argv.includes('--clip');
 if (clip) fs.mkdirSync(path.join(out,'drop-frames'), {recursive:true});
+function encodeDrop() {
+  // Playwright ships a VP9 encoder with Chromium; no system ffmpeg install needed.
+  const cache=path.dirname(path.dirname(path.dirname(chromium.executablePath())));
+  const version=fs.readdirSync(cache).filter(n=>n.startsWith('ffmpeg-')).sort().at(-1);
+  if(!version)throw new Error('Playwright ffmpeg bundle missing');
+  const frames=fs.readdirSync(path.join(out,'drop-frames')).filter(n=>/^f\d{3}\.jpg$/.test(n)).sort();
+  if(frames.length!==90)throw new Error(`Expected 90 drop frames; found ${frames.length}`);
+  execFileSync(path.join(cache,version,'ffmpeg-linux'),['-y','-v','error','-f','image2pipe','-framerate','30','-vcodec','mjpeg','-i','pipe:0','-c:v','libvpx-vp9','-b:v','0','-crf','18','-deadline','realtime','-cpu-used','4','-pix_fmt','yuv420p',path.join(out,'drop.webm')],{input:Buffer.concat(frames.map(n=>fs.readFileSync(path.join(out,'drop-frames',n))))});
+}
+if(process.argv.includes('--encode-only')){encodeDrop();process.exit(0);}
 fs.mkdirSync(out, {recursive:true});
 const server = await createServer({configFile:'games/fox-spirit/vite.config.ts',server:{port,host:'127.0.0.1',strictPort:true},logLevel:'error'});
 await server.listen();
@@ -71,6 +81,6 @@ try {
   const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,game:{mode:window.__game.mode,state:window.__game.state()}}));
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
   fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,seconds,sha},null,2));
-  if(clip)execFileSync('ffmpeg',['-y','-v','error','-framerate','30','-i',path.join(out,'drop-frames/f%03d.jpg'),'-c:v','libx264','-crf','18','-pix_fmt','yuv420p',path.join(out,'drop.mp4')]);
+  if(clip)encodeDrop();
   console.log('DONE',JSON.stringify({errors,final:evidence.game.state.opening.page}));
 }finally{await browser.close();await server.close();}
