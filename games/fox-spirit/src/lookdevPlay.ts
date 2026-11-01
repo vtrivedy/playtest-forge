@@ -44,6 +44,8 @@ export const PLAY = {
   turnBank: 0.05,
   bankMax: 0.18,
   airPitch: 0.06,
+  /** above this ground speed a touchdown keeps the gait instead of the (planted) land clip */
+  landMaxSpeed: 1.1,
   slopeTilt: 1,
   /** foot IK: 0 = clip only */
   footIK: 1,
@@ -78,7 +80,7 @@ const STATE_FADE: Record<Exclude<AnimState, 'loco' | 'idle'>, number> = { jumpUp
 const BINS = 32;
 
 /**
- * Clip driver on the fox's mixer. Gaits (walk / trot / run, whichever are authored) are time-driven
+ * Clip driver on the fox's mixer. Gaits (walk / trot / lope / run, whichever are authored) are time-driven
  * from their own phase at a stride-matched rate; a gait change enters the new clip at the phase whose
  * paw layout best matches the old one. Other states are ordinary crossfaded actions.
  */
@@ -94,7 +96,7 @@ class FoxAnimator {
 
   constructor(private fox: HearthFox) {
     const { actions, clipSpeed } = fox;
-    this.gaits = ['walk', 'trot', 'run']
+    this.gaits = ['walk', 'trot', 'lope', 'run']
       .filter((n) => actions.has(n) && (clipSpeed[n] ?? 0) > 0)
       .map((name) => {
         const action = actions.get(name)!;
@@ -636,7 +638,8 @@ export function createPlay(opts: {
     // clip state
     let state: AnimState;
     if (!grounded) state = jumpT < anim.oneShotLength('jumpUp') && !anim.done('jumpUp') && vel.y > 0 ? 'jumpUp' : 'fall';
-    else if (landT < anim.oneShotLength('land') * (speed > 1.5 ? 0.6 : 1) && !anim.done('land')) state = 'land';
+    // the land clip plants its paws at rest: only a slow touchdown absorbs in it; a running landing stays in the gait
+    else if (speed < P.landMaxSpeed && landT < anim.oneShotLength('land') && !anim.done('land')) state = 'land';
     else state = speed > 0.06 || want > 0.05 ? 'loco' : 'idle';
     anim.update(dt, speed, state);
 
