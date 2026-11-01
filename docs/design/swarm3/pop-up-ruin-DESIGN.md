@@ -50,3 +50,6 @@ Pacing: curious folded silhouette (entry) → immediate dash response → two ri
 ## Status
 
 Design approved for greybox allocation; not FUN/BEAUTIFUL vetted or played. Previous proposal: Not FUN/BEAUTIFUL vetted, implemented, or played. Shared activity selection and anchors pending. Proposal deliberately uses permanent unfolding first; rhythm refolding is excluded unless later separately approved and proven fun.
+
+## Greybox play correction 1
+First physical play measured apex0.792m but approach ground at x−24.5 is below the centre sample; first top0.08 was too high. Lower all tops0.16m: −0.08 /0.47 /1.02, keeping0.55m rises. Trigger vertical range1.1m covers the ground-level first spindle. First test input also held run after dash for45frames, obscuring stop feedback; release movement immediately after dash in the comparison. Use one final ruin restore centered(−31,75), radius7, rather than three restores: opening renderer has four permanent-region shader slots, and Keeping uses three. No capacity/controller changes.

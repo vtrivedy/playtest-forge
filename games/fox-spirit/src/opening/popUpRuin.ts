@@ -144,7 +144,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
     if (s.grounded && Math.abs(p.x - O.x) < 1.5 && Math.abs(p.z - O.z) < 1.6 && Math.abs(p.y - O.top) < 0.12) reached = true;
     folds.forEach((f, i) => {
       const eligible = i === 0 || (i === 1 ? folds[0]!.phase === 'open' : reached);
-      const within = Math.hypot(p.x - f.x, p.z - f.z) < RUIN_FEEL.hitRadius && Math.abs(p.y - f.y) < 0.75;
+      const within = Math.hypot(p.x - f.x, p.z - f.z) < RUIN_FEEL.hitRadius && Math.abs(p.y - f.y) < 1.1;
       // Only east-side approaches activate leaves: the slab's sweep stays clear of the fox.
       const clear = i === 2 ? p.z < O.z + O.depth / 2 - 0.3 : p.x > R.leaves[i]!.x + R.width / 2 + 0.32;
       if (f.phase === 'folded' && eligible && within && clear && s.dashing && dash !== lastDash) {
@@ -160,8 +160,10 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
         else f.pivot.rotation.x = angle;
         if (u >= 1) {
           f.phase = 'open'; f.land();
-          ctx.field.restore(new THREE.Vector3(f.x, f.y, f.z), 3.0, 1.3, { edgeMax: 0.6 });
-          if (i === 2) returns++;
+          if (i === 2) {
+            returns++;
+            ctx.field.restore(new THREE.Vector3(-31, O.top, O.z), 7, 1.3, { edgeMax: 0.8 });
+          }
         }
       }
       f.spindle.scale.setScalar(f.phase === 'folded' && eligible ? 1 + Math.sin(t * 3.2) * 0.06 : 1);
