@@ -197,7 +197,7 @@ func update(dt: float, t: float, supply_at: Callable, fox_pos: Vector3, dashing:
 	var gutter := 0.55 + 0.45 * sin(t * 31.0) * sin(t * 17.3) if reactor_state == "guttering" else 1.0
 	var vis := heat * gutter
 	_ash.emission_energy_multiplier = 0.04 + vis * 2.6 + flare * 2.0
-	_light.light_energy = (vis * 1.3 + flare * 1.5) * (0.92 + 0.08 * sin(t * 13.7))
+	_light.light_energy = (vis * 0.8 + flare * 1.2) * (0.92 + 0.08 * sin(t * 13.7))
 	_embers.emitting = vis > 0.05
 	_leaves.emitting = vis > 0.05
 	_embers.speed_scale = 0.6 + 0.6 * minf(1.4, vis * 1.1 + flare * 0.7)

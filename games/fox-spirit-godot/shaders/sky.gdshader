@@ -20,6 +20,21 @@ uniform vec2 paint_dir = vec2(0.8, -0.6);
 uniform float paint = 0.0;
 uniform float time = 0.0;
 
+// Compatibility draws the sky after the scene's tonemap/sRGB step (measured: output ≈ linear × exposure),
+// so the sky applies three's ACESFilmic (exposure 1.1) and the sRGB encode itself.
+vec3 rrt_odt(vec3 v) {
+	vec3 a = v * (v + 0.0245786) - 0.000090537;
+	vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+	return a / b;
+}
+vec3 display(vec3 c) {
+	c *= 1.1 / 0.6;
+	c = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777)) * c;
+	c = rrt_odt(c);
+	c = clamp(mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602)) * c, 0.0, 1.0);
+	return mix(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, step(c, vec3(0.0031308))) / 1.1;
+}
+
 float cloud(vec2 p) {
 	vec2 q = vec2(p.x * 1.5, p.y * 5.0) + vec2(time * 0.004, 0.0);
 	q += (vec2(lk_noise(q * 0.6 + 3.1), lk_noise(q * 0.6 - 7.7)) - 0.5) * vec2(0.9, 0.5);
@@ -81,5 +96,5 @@ void sky() {
 	vec3 col = mix(unpainted, painted, pm);
 	col = mix(col, col * vec3(0.72, 0.56, 0.44), pm * (1.0 - pm) * 4.0 * 0.5);
 	col = mix(col, mist, 1.0 - smoothstep(-0.01, 0.09 + 0.03 * wash, h));
-	COLOR = col;
+	COLOR = display(col);
 }

@@ -29,3 +29,9 @@ float height_fog(vec3 world, vec3 cam) {
 	float o = fog_density * exp(-k * h_cam) * line * length(world - cam);
 	return clamp(1.0 - exp(-o * o * 0.5 - o * 0.5), 0.0, 1.0);
 }
+
+// ink aerial perspective: printed lines and hatching settle into the mist with distance. Matches the
+// three.js captures, where ink past ~5 m reads far lighter than its fog alone predicts (FEEL.md).
+float ink_air(float dist) {
+	return smoothstep(3.0, 22.0, dist) * 0.6;
+}

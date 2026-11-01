@@ -39,6 +39,7 @@ varying vec4 v_paint; // paint, tide, bloom, tooth
 varying vec3 v_paper;
 varying vec2 v_misc; // contour amount, cel noise
 varying float v_fog;
+varying float v_hatch;
 
 void vertex() {
 	v_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -105,7 +106,9 @@ void fragment() {
 	v_paper = pap;
 	float ndv = abs(dot(normalize(NORMAL), normalize(VIEW)));
 	float brush = 0.65 + 0.7 * lk_noise(xz * 2.0 + v_world.y * 3.0);
-	v_misc = vec2((1.0 - smoothstep(0.1, 0.1 + 0.22 * brush, ndv)) * contour, lk_noise(xz * 2.3));
+	float air = 1.0 - ink_air(distance(v_world, CAMERA_POSITION_WORLD));
+	v_misc = vec2((1.0 - smoothstep(0.1, 0.1 + 0.22 * brush, ndv)) * contour * air, lk_noise(xz * 2.3));
+	v_hatch = hatch_weight * air;
 	v_fog = height_fog(v_world, CAMERA_POSITION_WORLD);
 	ALBEDO = vec3(1.0);
 }
@@ -131,7 +134,7 @@ void light() {
 		float h2 = fract((fc.x - fc.y + wob) * 0.17);
 		float l1 = smoothstep(sh * 0.5 + 0.12, sh * 0.5, h1) * smoothstep(0.0, 0.15, sh);
 		float l2 = smoothstep(sh2 * 0.45 + 0.12, sh2 * 0.45, h2) * smoothstep(0.0, 0.2, sh2);
-		sepia = mix(sepia, paper_ink * 1.25, max(l1 * 0.6, l2 * 0.65) * hatch_weight);
+		sepia = mix(sepia, paper_ink * 1.25, max(l1 * 0.6, l2 * 0.65) * v_hatch);
 		vec3 cel = lit * (0.95 + 0.08 * tooth) * (0.96 + 0.08 * v_misc.y);
 		vec3 pigment = vec3(0.42, 0.18, 0.08) * (0.55 + 0.6 * t);
 		cel = mix(cel, pigment, tide * 0.7);

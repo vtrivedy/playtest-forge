@@ -20,7 +20,7 @@ void vertex() {
 	float d = distance(wp, CAMERA_POSITION_WORLD);
 	float b = brush ? 0.55 + 0.9 * (0.5 + 0.5 * sin(wp.x * 3.1 + sin(wp.y * 2.3 + wp.z * 1.7) * 2.0)) : 1.0;
 	VERTEX += normalize(nrm) * w * b * clamp(d * 0.09, 0.45, 5.0);
-	v_fog = height_fog((MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz, CAMERA_POSITION_WORLD);
+	v_fog = max(height_fog((MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz, CAMERA_POSITION_WORLD), ink_air(d));
 }
 
 void fragment() {
