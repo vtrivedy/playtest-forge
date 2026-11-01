@@ -1,6 +1,6 @@
 /** First heat teach. Art comes from the existing chemistry kit; no second reactor implementation. */
 import * as THREE from 'three';
-import { createUpdrafts } from '../chem/updraft';
+import { createUpdrafts, type HearthSpot } from '../chem/updraft';
 import type { SupplyFn } from '../chem/reactor';
 
 export const OPENING_HEARTH = { x: 5.6, z: 74.2 };
@@ -12,6 +12,8 @@ export function createOpeningHearth(opts: {
   /** ColorField's temporary paint supply. The local aura guarantees run-past ignition too. */
   supplyAt?: SupplyFn;
   onIgnite?: (at: THREE.Vector3) => void;
+  /** Additional coal-only volumes; opening/chemistry updates these separately. */
+  extraSpots?: HearthSpot[];
 }) {
   let latched = false;
   let complete = false;
@@ -20,8 +22,9 @@ export function createOpeningHearth(opts: {
   const updrafts = createUpdrafts(opts.scene, [{
     id: 'H-a', ...OPENING_HEARTH,
     y: opts.groundH(OPENING_HEARTH.x, OPENING_HEARTH.z), height: 9,
-  }], {
+  }, ...(opts.extraSpots ?? [])], {
     onIgnite(h) {
+      if (h.spot.id !== 'H-a') return;
       latched = true;
       ignition = dashing ? 'dash' : 'aura';
       // Reactor.update finishes this ignition frame; next update takes its restored branch.
@@ -45,14 +48,14 @@ export function createOpeningHearth(opts: {
       elapsed += dt;
       dashing = player?.dashing ?? false;
       const fox = opts.fox.position;
-      updrafts.update(dt, t, p => {
+      updrafts.hearths[0]!.update(dt, t, p => {
         const distance = Math.hypot(p.x - fox.x, p.z - fox.z);
         const aura = 1 - THREE.MathUtils.smoothstep(distance, dashing ? 2 : 1.5, dashing ? 3.2 : 2.5);
         return Math.max(aura, opts.supplyAt?.(p) ?? 0);
       }, false);
       const near = Math.hypot(fox.x - OPENING_HEARTH.x, fox.z - OPENING_HEARTH.z) < 12;
       const ride = updrafts.lastRide;
-      if (ride?.landFeetY !== null && ride?.landFeetY !== undefined && ride.landFeetY > ride.baseY + 2) complete = true;
+      if (ride?.hearth === 'H-a' && ride.landFeetY !== null && ride.landFeetY > ride.baseY + 2) complete = true;
       hud.textContent = complete ? 'The warmth carries on.' : latched ? 'Space · jump and hold to ride the warm air' : 'Bring your colour to the cold hearth · run close or Shift dash';
       hud.style.opacity = near && elapsed > 2 ? '1' : '0';
     },
