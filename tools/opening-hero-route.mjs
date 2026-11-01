@@ -10,6 +10,8 @@ export function createOpeningRoute() {
     { beat: 'wake in paper', hold: 5 },
     { beat: 'first colour', to: [-7.2, 88], mag: 0.2 },
     { beat: 'well path', to: [-4, 88], mag: 0.28 },
+    { beat: 'gate approach', to: [-3.2, 86.5], mag: 0.28 },
+    { beat: 'through the gate', to: [-3.2, 80.5], mag: 0.4 },
     { beat: 'village to meadow', to: [0, 80], mag: 0.4 },
     { beat: 'turn toward hearth', to: [5.6, 81], mag: 0.28 },
     { beat: 'cold hearth', to: [5.6, 77.5], mag: 0.28 },

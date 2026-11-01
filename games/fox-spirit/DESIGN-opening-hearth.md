@@ -17,3 +17,5 @@ Cold-hearth framing: approach the observation point from the south along the hea
 With the stone bowl art, ignite and launch beside its rim at (4.3, 74.8), within the strong updraft. The bowl has physical collision, so the route must not require standing on its axis. Keep the shelf destination and seven-metre launch threshold.
 
 Village wake framing: start the capture at the scene's authored spawn (-5.2, 92.5), facing toward (-3, 81). Match the controller's `(sin yaw, cos yaw)` convention so the opening hold shows the same view in free play and the capture.
+
+Gate approach: follow the authored lane centre x=-3.2 through the lych-gate at z=82.4. Add a north approach at z=86.5 and a south exit at z=80.5 before turning into the meadow so the capture threads the opening and avoids the dry-stone walls.
