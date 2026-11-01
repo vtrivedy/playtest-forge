@@ -150,11 +150,9 @@ export const KEEPING = (() => {
  * `settle` is where the creature ends up living after its performance.
  */
 export const UNPRESSED = (() => {
-  // hub-lane dry-stone wall, lane side, two metres up the lane from the lych-gate (village.ts laneGate/laneWalls)
-  const d = { x: 1 / Math.hypot(1, 7), z: -7 / Math.hypot(1, 7) };
-  const n = { x: -d.z, z: d.x };
-  const wall = { x: -3.2 + n.x * 1.5 - d.x * 2.0, z: 82.4 + n.z * 1.5 - d.z * 2.0 };
-  const hog = { x: wall.x - n.x * 0.31, z: wall.z - n.z * 0.31 };
+  // the Great Well's stone ring, on the side that faces the lane mouth (seen head-on from the spawn and the plaza)
+  const wd = { x: 0.8, z: 0.6 };
+  const hog = { x: WELL.x + wd.x * 1.58, z: WELL.z + wd.z * 1.58 };
   // the shelf's west cliff, between the lz 0 / −3 columns, facing H-a
   const sc = Math.cos(SHELF.yaw);
   const ss = Math.sin(SHELF.yaw);
@@ -167,7 +165,7 @@ export const UNPRESSED = (() => {
   const cragAt = (lx: number, lz: number) => ({ x: K.crag.x + lx * cc + lz * cs, z: K.crag.z - lx * cs + lz * cc });
   const stone = cragAt(1.35, 1.2);
   return {
-    hedgehog: { ...hog, y: groundH(hog.x, hog.z) + 0.1, yaw: Math.atan2(-n.x, -n.z), settle: { x: hog.x - n.x * 1.6 - d.x * 0.9, z: hog.z - n.z * 1.6 - d.z * 0.9 } },
+    hedgehog: { ...hog, y: groundH(hog.x, hog.z) + 0.1, yaw: Math.atan2(wd.x, wd.z), settle: { x: WELL.x + wd.x * 2.5 - wd.z * 1.3, z: WELL.z + wd.z * 2.5 + wd.x * 1.3 } },
     heron: {
       ...heron, y: groundH(heron.x, heron.z) + 0.7, yaw: Math.atan2(-sc, ss),
       /** it lives at the cliff foot, back to the rock: land on it and it flings you up onto the shelf */

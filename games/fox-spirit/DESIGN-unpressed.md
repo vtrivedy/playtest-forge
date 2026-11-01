@@ -4,7 +4,7 @@ Phase-2 "make it fun" sprint, feature C (Moss). Three animals the Scribe pressed
 
 ## Why it is fun
 
-- **Spotting:** the drawings are on surfaces you already pass (a lane wall, the shelf cliff, a stone on the far crag). They read as decoration until you notice one breathing — a slow warm pulse in the wash, a little ember glint at the eye.
+- **Spotting:** the drawings are on surfaces you already pass (the well, the shelf cliff, a stone on the far crag). They read as decoration until you notice one breathing — a slow warm pulse in the wash, a little ember glint at the eye.
 - **Verb you have:** dash is the key. No new button; the dash you already love gets a second meaning (dash *through* paper).
 - **Surprise payoff:** the drawing peels, the creature inflates from flat to round with a squash/stretch pop, shakes off the page, and does something characterful. It is the only full-colour thing in a sepia place besides the fox.
 - **Leaves a mark:** each one stays where it settled and keeps idling (preens, sniffs, grazes), so the world is a little more alive every time you come back.
@@ -13,7 +13,7 @@ Phase-2 "make it fun" sprint, feature C (Moss). Three animals the Scribe pressed
 
 | | where | drawing | after the pop |
 |---|---|---|---|
-| Hedgehog | village, the dry-stone wall along the hub lane | curled ball on the wall face | uncurls, sniffs, trundles a short arc, settles by the lane and snuffles |
+| Hedgehog | village, the Great Well's stone ring, on the side facing the lane mouth (seen head-on from spawn and plaza) | hedgehog on a torn page | uncurls, sniffs, trundles a short arc, settles by the lane and snuffles |
 | Heron | meadow, the H-a shelf's west cliff face | standing heron, neck in an S | opens wings, hops down to the cliff foot and stays. **Lasting gift:** come close and it bows; hop onto its back and it flings you up onto the shelf — a permanent shortcut past the H-a ride |
 | Deer | Keeping place, a page-stone on the far crag | young stag in profile | steps out of the stone, walks round it to the vista edge, faces the Crown and grazes; when the fox comes near it stops and watches it |
 

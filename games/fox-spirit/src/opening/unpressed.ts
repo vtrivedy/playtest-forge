@@ -40,7 +40,7 @@ const INK_HEX = '#2a1a10';
 const SPECS: Spec[] = [
   {
     id: 'hedgehog',
-    scale: 1.45,
+    scale: 1.25,
     bones: { body: { at: [0, 0.16] }, head: { at: [0.15, 0.16], parent: 'body' }, legF: { at: [0.11, 0.08], parent: 'body' }, legB: { at: [-0.12, 0.08], parent: 'body' } },
     parts: [
       { k: 'ell', bone: 'body', c: [0, 0.17], r: [0.24, 0.15, 0.17], col: 0x7a5638 },
