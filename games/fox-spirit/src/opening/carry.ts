@@ -7,11 +7,12 @@ export const CARRY = {
   pickupHeight: 0.85,
   bowlReach: 1.6,
   emberSize: 0.115,
+  heldSize: 0.075,
   glow: 0.7,
-  /** Mouth-corner offset keeps the coal visible beside the head from chase view. */
-  mouthSide: 0.27,
-  mouthForward: 0.18,
-  mouthLower: 0.07,
+  /** Lower muzzle contact; the head carries this socket through its authored motion. */
+  mouthSide: 0.045,
+  mouthForward: 0.13,
+  mouthLower: 0.065,
 };
 
 type CarryPlayer = { grounded: boolean; dashing?: boolean };
@@ -33,6 +34,7 @@ export function createCarry(opts: {
       gui.add(CARRY, 'pickupRadius', 0.6, 2, 0.05);
       gui.add(CARRY, 'bowlReach', 1.2, 1.8, 0.05);
       gui.add(CARRY, 'emberSize', 0.07, 0.18, 0.005);
+      gui.add(CARRY, 'heldSize', 0.055, 0.12, 0.005);
       gui.add(CARRY, 'glow', 0.2, 1.5, 0.05);
       gui.add(CARRY, 'mouthSide', 0, 0.3, 0.01);
       gui.add(CARRY, 'mouthForward', 0, 0.35, 0.01);
@@ -93,8 +95,16 @@ export function createCarry(opts: {
   let rollTime = 0;
   const head = opts.fox.getObjectByName('head');
   const held = new THREE.Vector3();
-  const forward = new THREE.Vector3();
-  const side = new THREE.Vector3();
+  const offset = new THREE.Vector3();
+  const socketRotation = new THREE.Quaternion();
+  // Convert a root-space muzzle offset into the head's bind frame once, then
+  // follow the actual animated head instead of leaving the coal beside its cheek.
+  opts.fox.updateWorldMatrix(true, true);
+  const headBindInverse = new THREE.Quaternion();
+  if (head) {
+    const rootRotation = opts.fox.getWorldQuaternion(new THREE.Quaternion());
+    headBindInverse.copy(rootRotation.invert().multiply(head.getWorldQuaternion(new THREE.Quaternion()))).invert();
+  }
 
   function canPickup(): boolean {
     const p = opts.fox.position;
@@ -118,17 +128,17 @@ export function createCarry(opts: {
       opts.fox.updateWorldMatrix(true, true);
       if (head) head.getWorldPosition(held);
       else held.copy(opts.fox.position).add(new THREE.Vector3(0, 0.45, 0));
-      forward.set(0, 0, 1).applyQuaternion(opts.fox.quaternion);
-      side.set(1, 0, 0).applyQuaternion(opts.fox.quaternion);
-      position.copy(held).addScaledVector(forward, CARRY.mouthForward).addScaledVector(side, CARRY.mouthSide);
-      position.y -= CARRY.mouthLower;
+      if (head) head.getWorldQuaternion(socketRotation).multiply(headBindInverse);
+      else opts.fox.getWorldQuaternion(socketRotation);
+      offset.set(CARRY.mouthSide, -CARRY.mouthLower, CARRY.mouthForward).applyQuaternion(socketRotation);
+      position.copy(held).add(offset);
       ember.position.copy(position);
     } else {
       const progress = 1 - rollTime / 0.35;
       ember.position.lerpVectors(rollFrom, position, progress * progress * (3 - 2 * progress));
       ember.position.y += CARRY.emberSize * 0.8;
     }
-    ember.scale.setScalar(CARRY.emberSize * (1 + 0.12 * pulse));
+    ember.scale.setScalar((carried ? CARRY.heldSize : CARRY.emberSize) * (1 + 0.12 * pulse));
     halo.visible = !carried;
     halo.position.copy(position).add(new THREE.Vector3(0, 0.022, 0));
     for (let i = 0; i < sparks.length; i++) {

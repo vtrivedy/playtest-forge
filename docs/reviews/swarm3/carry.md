@@ -101,3 +101,22 @@ limbs and falling leaves preserve the autumn mood. Staged Keeping snapshot:
 phase bridge, bridgeTop9.577, crownLobes0, stair open. The separate `across`
 free-camera still catches a near-camera leaf card; normal root/bridge chase
 views stay clear. Rook owns physical stairs, Flint full-route/hero evidence.
+
+## Rim placement and muzzle contact — Kit337/348 follow-up
+
+Bowl placement8b92dff: explicit E within1.6m on the same floor rolls the coal
+into the steam/root bed over0.35s. Same-rim pickup reaches1.75m only for coal
+in a bowl. Reviewed07-steam/root in `/captures/tallow/carry-bowl-rim-11`:
+coal centred and fox outside the fire; spring pose upright at the staged1.4m
+approach. All16 real-input checks pass, including existing ten Carry checks.
+
+Compared lower-muzzle variants A(.09side/.13forward/.055lower/.085size) and
+B(.045/.13/.065/.075) in `/captures/tallow/carry-mouth-variants-12`.
+Selected B; actual final also follows animated head orientation. Placed size
+stays.115 for basin readability. Final close-up shows jaw contact with both
+eyes visible, replacing the detached cheek coal. Direct rear visibility is
+reduced; continuous-route side/turn readability requires Flint's integration
+review. Final `/captures/tallow/carry-mouth-final-13` passes16/16, no page
+errors, with screenshots, webm and __game states. Staged starts/inspection lens
+remain disclosed; no continuous-route or unfamiliar-human claim. No gait edit:
+the spring's original hunched/post collision still needs route-context review.

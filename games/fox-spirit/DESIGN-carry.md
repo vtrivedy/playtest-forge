@@ -20,7 +20,10 @@ Recovery relocates an unreachable placed coal alongside the fox; normal walking
 away never recalls it. No quest text or objective prose is introduced: a short
 contextual pickup/place glyph, persistent ember glow, and a small settling spark
 communicate the action. Warm amber with a charcoal crust fits the paper/cel art.
-The coal rides beside the muzzle without hiding the face or authored gait.
+The coal seats against the lower muzzle: its inner edge meets the jaw, both
+eyes stay visible, and head motion carries the contact. Review a smaller coal
+and reduced sideways reach in chase and close three-quarter views; prioritize
+contact over a detached cheek silhouette. Authored gait stays unchanged.
 
 Runtime lives in opening/carry.ts. Controller exposes onInteract/onDash/onRecover
 callbacks plus surfaceAt, so scene wiring remains owned by integration. Chemistry
