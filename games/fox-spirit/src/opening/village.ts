@@ -621,7 +621,7 @@ export function buildVillage(ctx: OpeningCtx): void {
   const posts: Record<string, THREE.Vector3> = {};
   group('village-props', (props) => {
     firePit(props, ctx, -11.5, 93.6);
-    for (const [name, x, z, yaw] of [['plaza', -12, 86.4, 0.4], ['east', 6.6, 89.4, Math.PI], ['north', -4.2, 96.5, 2.4]] as const) {
+    for (const [name, x, z, yaw] of [['plaza', -12, 86.4, 0.4], ['east', 6.6, 89.4, Math.PI]] as const) {
       posts[name] = lanternPost(props, ctx, x, z, yaw);
       colliders.push({ kind: 'post', x, z, r: 0.2 });
     }
