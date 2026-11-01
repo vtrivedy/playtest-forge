@@ -1,4 +1,4 @@
-"""Hearth-fox clips: idle / walk / trot / run / jumpUp / fall / land, authored on IK paw controls then baked to FK deform keys.
+"""Hearth-fox clips: idle / walk / trot / lope / run / jumpUp / fall / land, authored on IK paw controls then baked to FK deform keys.
 
 Exec'd after hearth_fox_rig.py (uses rig, BONES, ...). 30 fps. Clips are in-place; the walk/run
 stance phase moves each planted paw backward at exactly CLIP_SPEED so the game/lookdev can drive
@@ -167,7 +167,12 @@ GAITS = {
     # name: frames, stride per cycle (m), duty, phase offsets LH LF RH RF, lifts (front, hind)
     "walk": dict(frames=34, stride=0.6, duty=0.64, off=dict(LH=0.0, LF=0.27, RH=0.5, RF=0.77), lift=(0.06, 0.05)),
     # trot: diagonal pairs, closes the walk → run gap (~1.3 m/s)
-    "trot": dict(frames=18, stride=0.78, duty=0.46, off=dict(LH=0.0, RF=0.02, RH=0.5, LF=0.52), lift=(0.09, 0.07)),
+    # speeds form an even ladder (each ≈2× the last) so the game's stride-matched rate stays within ~0.6–1.6
+    # at every gait switch; a big gap forces rate clamps and the planted paws slide
+    "trot": dict(frames=18, stride=0.66, duty=0.46, off=dict(LH=0.0, RF=0.02, RH=0.5, LF=0.52), lift=(0.09, 0.07)),
+    # lope: 3-beat canter (hind, diagonal pair, lead fore), half the gallop's spine flex, ~2.0 m/s
+    "lope": dict(frames=16, stride=1.07, duty=0.36, off=dict(LH=0.0, RH=0.27, LF=0.31, RF=0.58), lift=(0.12, 0.1), centre=(0.02, 0.04),
+                 reach=(0.08, 0.04), fold=(0.7, 0.4), flex=0.55),
     # run: long gallop stride (most distance in suspension), ~3.5 m/s gameplay top speed
     "run": dict(frames=14, stride=1.63, duty=0.27, off=dict(LH=0.0, RH=0.09, LF=0.45, RF=0.55), lift=(0.15, 0.12), centre=(0.03, 0.07),
                 reach=(0.14, 0.08), fold=(0.75, 0.3)),
@@ -179,7 +184,8 @@ def author_gait(name):
     N = g["frames"]
     act = bpy.data.actions.new(f"src_{name}")
     rig.animation_data_create().action = act
-    run = name == "run"
+    run = name in ("run", "lope")
+    fx = g.get("flex", 1.0)
     for fr in range(N + 1):
         ph = fr / N
         clear_pose()
@@ -219,18 +225,18 @@ def author_gait(name):
             # flex > 0: gathered (rump tucked, back arched) as the hind paws swing under; < 0: extended
             flex = math.sin(w + 0.9)
             # (+pitch = bone tip down: an arch is hips tip UP, spine/chest tips DOWN)
-            rot("hips", pitch=-0.22 * flex, roll=0.02 * math.sin(w))
-            hip_offset(up=0.035 * math.sin(w - 0.6) - 0.01)
-            rot("spine", pitch=0.16 * flex)
-            rot("chest", pitch=0.1 * flex + 0.03)
-            rot("neck", pitch=0.06 - 0.12 * flex)
-            rot("head", pitch=0.04 - 0.08 * flex)
+            rot("hips", pitch=-0.22 * fx * flex, roll=0.02 * math.sin(w))
+            hip_offset(up=0.035 * fx * math.sin(w - 0.6) - 0.01)
+            rot("spine", pitch=0.16 * fx * flex)
+            rot("chest", pitch=0.1 * fx * flex + 0.03)
+            rot("neck", pitch=0.06 - 0.12 * fx * flex)
+            rot("head", pitch=0.04 - 0.08 * fx * flex)
             for i in range(1, 7):
                 k = 0.4 + 0.6 * i / 6
                 # tail: each joint lags its parent ~1 frame and swings wider toward the tip (streams, never a plank)
                 rot(f"tail{i}", pitch=(-0.12 if i == 1 else 0.03) + 0.16 * k * math.sin(w - i * 0.45 - 0.9), yaw=0.07 * k * math.sin(w - i * 0.5))
-            rot("ear.L", pitch=-0.45)
-            rot("ear.R", pitch=-0.45)
+            rot("ear.L", pitch=-0.45 * fx)
+            rot("ear.R", pitch=-0.45 * fx)
         key_all(fr)
     return act, N
 
@@ -352,11 +358,11 @@ LAND = [
 ]
 
 # clear old actions from previous runs
-CLIPS = ("idle", "walk", "trot", "run", "jumpUp", "fall", "land")
+CLIPS = ("idle", "walk", "trot", "lope", "run", "jumpUp", "fall", "land")
 for a in list(bpy.data.actions):
     if a.name.split(".")[0] in CLIPS + tuple(f"src_{c}" for c in CLIPS):
         bpy.data.actions.remove(a)
-SRC = {"idle": author_idle(), "walk": author_gait("walk"), "trot": author_gait("trot"), "run": author_gait("run"),
+SRC = {"idle": author_idle(), "walk": author_gait("walk"), "trot": author_gait("trot"), "lope": author_gait("lope"), "run": author_gait("run"),
        "jumpUp": author_keys("jumpUp", JUMP_UP, 10), "fall": author_keys("fall", FALL, 24, loop=True),
        "land": author_keys("land", LAND, 14)}
 print("authored", {k: v[1] for k, v in SRC.items()})

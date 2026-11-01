@@ -3,13 +3,13 @@
  *
  * Authored in Blender (tools/blender/scripts/hearth_fox_*.py) → assets/hero/hearth_fox.glb:
  * `fox_coat` (skinned, vertex-coloured coat; TEXCOORD_0.x = ember mask) + `fox_face` (eyes, nose),
- * clips idle / walk / trot / run / jumpUp / fall / land (in place; the rig's glTF extras carry each clip's ground speed).
+ * clips idle / walk / trot / lope / run / jumpUp / fall / land (in place; the rig's glTF extras carry each clip's ground speed).
  * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes, ember kick-up at footfalls and landings.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-export type FoxClip = 'idle' | 'walk' | 'trot' | 'run' | 'jumpUp' | 'fall' | 'land';
+export type FoxClip = 'idle' | 'walk' | 'trot' | 'lope' | 'run' | 'jumpUp' | 'fall' | 'land';
 /** play once and hold the last frame; the rest loop */
 const ONE_SHOT: ReadonlySet<string> = new Set(['jumpUp', 'land']);
 
@@ -120,8 +120,9 @@ function flameMaterial(size: [number, number], seed: number, uLean: { value: THR
         float f = d / max(w, 1e-3);
         if (f > 1.0) discard;
         vec3 rust = vec3(0.42, 0.09, 0.03);
-        vec3 ember = vec3(0.92, 0.3, 0.06);
-        vec3 core = vec3(1.0, 0.56, 0.16);
+        // core stays amber under bloom + ACES (a hotter core washed to cream at chase distance)
+        vec3 ember = vec3(0.86, 0.24, 0.04);
+        vec3 core = vec3(1.0, 0.46, 0.1);
         vec3 col = f > 0.78 ? rust : (f > 0.45 || y > h * 0.65 ? ember : core);
         gl_FragColor = vec4(col * 1.1, 1.0);
         #include <tonemapping_fragment>
@@ -329,7 +330,7 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       next.reset().play();
       if (prev) next.crossFadeFrom(prev, 0.25, true);
       current = clip;
-      fox.striding = clip === 'trot' || clip === 'run';
+      fox.striding = clip === 'trot' || clip === 'lope' || clip === 'run';
       if (clip === 'land') fox.land(1);
     },
     update(dt) {
