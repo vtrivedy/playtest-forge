@@ -16,6 +16,9 @@ export type Collider =
   /** trunk: always blocks */
   | { kind: 'post'; x: number; z: number; r: number };
 
+/** lens volume samples: centre + 8 around the rim (unit radius) */
+const LENS_RING = [[0, 0], ...Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4), Math.sin((i * Math.PI) / 4)])] as const;
+
 export const PLAY = {
   runSpeed: 3.2,
   walkSpeed: 0.85,
@@ -418,7 +421,7 @@ export function createPlay(opts: {
   /** lens sphere inside a pier / block / rock / trunk */
   const lensBlocked = (x: number, y: number, z: number, r: number) =>
     colliders.some((c) => {
-      for (const [ox, oz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]] as const) if (colliderTop(c, x + ox, z + oz) > y - r) return true;
+      for (const [ox, oz] of LENS_RING.map(([u, w]) => [u * r, w * r])) if (colliderTop(c, x + ox, z + oz) > y - r) return true;
       return false;
     });
   /**

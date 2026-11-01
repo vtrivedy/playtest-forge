@@ -984,7 +984,8 @@ export async function runLookdevP0(): Promise<void> {
   };
   archBox(0, 2.9, 1.3, 0.25);
   archBox(0, 2.45, 1.0, 0.55);
-  for (const sx of [-1, 1]) archBox(sx * 1.75, 0.6, 0.55, 4);
+  // piers: half-extents cover the cap (1.25 × 1.1) plus course jitter
+  for (const sx of [-1, 1]) archBox(sx * 1.75, 0.72, 0.66, 4);
   const stubBase = groundH(-4.4, -6.2) - 0.1;
   colliders.push({ kind: 'box', x: -4.4, z: -6.2, yaw: 0.5, hx: 0.5, hz: 0.48, top: stubBase + 1.14 });
   colliders.push({ kind: 'box', x: -4.4 + 0.9 * Math.cos(0.5) + 0.6 * Math.sin(0.5), z: -6.2 - 0.9 * Math.sin(0.5) + 0.6 * Math.cos(0.5), yaw: 1.1, hx: 0.5, hz: 0.45, top: stubBase + 0.5 });
