@@ -84,7 +84,7 @@ function buildHearthtree(rand: () => number, baseY: number) {
   const tree = new THREE.Group();
   const climbBase = baseY + 0.4;
   const bark = toon(BARK, { contour: 0.8, climbBase });
-  const L = 10.5;
+  const L = 11.5;
   // a near-straight trunk (it must lie flat as a walk), a little S so it never reads as a pole
   const trunk = new THREE.CatmullRomCurve3([V(0, -0.5, 0), V(0.12, L * 0.35, -0.08), V(-0.1, L * 0.7, 0.1), V(0.05, L, 0.18)]);
   const radius = (t: number) => THREE.MathUtils.lerp(0.72, 0.3, t) + (1 - THREE.MathUtils.smoothstep(t, 0, 0.1)) * 0.14;
@@ -93,8 +93,9 @@ function buildHearthtree(rand: () => number, baseY: number) {
   // limbs: sideways (±x) and forward (+z, they hang under the bridge once fallen); never back (−z → up)
   const LIMBS: Array<[number, number, number, number]> = [
     // [t along trunk, azimuth (0 = +x, π/2 = +z), reach, rise]
-    [0.64, 0.15, 2.6, 1.6], [0.7, Math.PI - 0.2, 2.4, 1.9], [0.76, Math.PI / 2 + 0.3, 2.0, 1.6],
-    [0.82, -0.25, 2.2, 2.0], [0.86, Math.PI + 0.35, 2.0, 2.0], [0.9, Math.PI / 2 - 0.5, 1.8, 2.2],
+    // all past t ≈ 0.72 so, fallen, the crown lies beyond the far crag and the bridge stays open
+    [0.72, 0.15, 2.4, 1.8], [0.77, Math.PI - 0.2, 2.2, 2.0], [0.81, Math.PI / 2 + 0.3, 1.9, 1.8],
+    [0.85, -0.25, 2.0, 2.1], [0.89, Math.PI + 0.35, 1.9, 2.1], [0.93, Math.PI / 2 - 0.5, 1.7, 2.3],
   ];
   LIMBS.forEach(([t, a, reach, rise], i) => {
     const from = trunk.getPointAt(t);
@@ -259,7 +260,7 @@ export function createKeeping(ctx: OpeningCtx) {
   stairRoot.position.set(K.terrace.x, 0, K.terrace.z);
   stairRoot.rotation.y = K.terrace.yaw;
   scene.add(stairRoot);
-  const STAIR = { x0: 2.5, x1: -2.4, z: -K.terrace.hz - 0.68, depth: 1.36, steps: 12 };
+  const STAIR = { x0: 2.5, x1: -2.55, z: -K.terrace.hz - 0.68, depth: 1.36, steps: 12 };
   const rise = (K.terrace.top - SHELF_TOP) / STAIR.steps;
   const tread = (STAIR.x0 - STAIR.x1) / STAIR.steps;
   const stairMat = toon(0x8a7864, { contour: 0.5 });
@@ -271,23 +272,46 @@ export function createKeeping(ctx: OpeningCtx) {
     const slab = inked(hewn(new THREE.BoxGeometry(tread + 0.06, 0.3 + rise, STAIR.depth, 1, 1, 2), rand, 0.05), stairMat, 0.02, true);
     slab.position.set(0, -(0.3 + rise) / 2, -STAIR.depth / 2);
     hinge.add(slab);
+    // a raised lip on the drop edge (the curb the colliders draw)
+    const lip = inked(hewn(new THREE.BoxGeometry(tread + 0.04, 0.34, 0.2, 1, 1, 1), rand, 0.04), stairMat, 0.016, true);
+    lip.position.set(0, 0.17, -STAIR.depth + 0.1);
+    hinge.add(lip);
     hinge.rotation.x = Math.PI / 2;
     stairRoot.add(hinge);
     stairSteps.push(hinge);
   }
-  /** fine sub-steps under the drawn ones so the fox walks the flight without a jump (step ≤ PLAY.step) */
+  /**
+   * Fine sub-steps under the drawn ones so the fox walks the flight without a jump: each riser stays
+   * under PLAY.step, and the controller's 0.28 m forward probe never sees more than step + 0.15.
+   */
   const stairColliders = (): Collider[] => {
-    const n = STAIR.steps * 3;
+    const n = STAIR.steps * 6;
     const c = Math.cos(K.terrace.yaw);
     const sn = Math.sin(K.terrace.yaw);
-    return Array.from({ length: n }, (_, j) => {
-      const lx = STAIR.x0 - (j + 0.5) * ((STAIR.x0 - STAIR.x1) / n);
-      return {
-        kind: 'box' as const, x: K.terrace.x + lx * c + STAIR.z * sn, z: K.terrace.z - lx * sn + STAIR.z * c,
-        yaw: K.terrace.yaw, hx: (STAIR.x0 - STAIR.x1) / n / 2 + 0.02, hz: STAIR.depth / 2, top: SHELF_TOP + (j + 1) * ((K.terrace.top - SHELF_TOP) / n),
-      };
-    });
+    const at = (lx: number, lz: number) => ({ x: K.terrace.x + lx * c + lz * sn, z: K.terrace.z - lx * sn + lz * c });
+    const steps = Array.from({ length: n }, (_, j): Collider => ({
+      kind: 'box', ...at(STAIR.x0 - (j + 0.5) * ((STAIR.x0 - STAIR.x1) / n), STAIR.z),
+      yaw: K.terrace.yaw, hx: (STAIR.x0 - STAIR.x1) / n / 2 + 0.02, hz: STAIR.depth / 2, top: SHELF_TOP + (j + 1) * ((K.terrace.top - SHELF_TOP) / n),
+    }));
+    // the drop-edge lip, one per drawn step: always ≥ step + 0.15 above the tread beside it
+    const lips = Array.from({ length: STAIR.steps }, (_, i): Collider => ({
+      kind: 'box', ...at(STAIR.x0 - (i + 0.5) * tread, -K.terrace.hz - STAIR.depth + 0.1),
+      yaw: K.terrace.yaw, hx: tread / 2 + 0.02, hz: 0.1, top: SHELF_TOP + (i + 1) * rise + 0.34,
+    }));
+    return [...steps, ...lips];
   };
+  // the stair ends at the terrace corner against a standing stone (it blocks before and after the unfold)
+  {
+    const c = Math.cos(K.terrace.yaw);
+    const sn = Math.sin(K.terrace.yaw);
+    const lx = STAIR.x1 - 0.62;
+    const x = K.terrace.x + lx * c + STAIR.z * sn;
+    const z = K.terrace.z - lx * sn + STAIR.z * c;
+    const post = column(rand, x, z, 0.62, groundH(x, z) - 2, K.terrace.top + 1.1, false);
+    scene.add(post);
+    ctx.occluders.push(post);
+    colliders.push({ kind: 'post', x, z, r: 0.58 });
+  }
 
   // ---- root-hearth bowl among the roots
   {
