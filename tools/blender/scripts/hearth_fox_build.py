@@ -38,21 +38,22 @@ def link(ob):
 # ------------------------------------------------------------------ body skeleton (skin modifier)
 # (name, point, radius_side, radius_up)
 NODES = {
-    "dock": (P(-0.42, 0.45), 0.042, 0.048),
-    "rump": (P(-0.31, 0.43), 0.074, 0.084),
-    "loin": (P(-0.18, 0.44), 0.068, 0.068),
-    "waist": (P(-0.04, 0.44), 0.07, 0.066),
-    "chest": (P(0.12, 0.395), 0.097, 0.152),
-    "withers": (P(0.22, 0.44), 0.088, 0.11),
-    "neck0": (P(0.285, 0.51), 0.078, 0.086),
-    "neck1": (P(0.33, 0.555), 0.064, 0.068),
-    "neck2": (P(0.365, 0.585), 0.048, 0.052),
+    # back line: rump → slight loin rise → tucked waist → deep chest → withers; neck carried upright (alert, wary)
+    "dock": (P(-0.42, 0.455), 0.042, 0.048),
+    "rump": (P(-0.31, 0.435), 0.076, 0.086),
+    "loin": (P(-0.18, 0.452), 0.066, 0.062),
+    "waist": (P(-0.04, 0.458), 0.064, 0.054),
+    "chest": (P(0.12, 0.39), 0.1, 0.16),
+    "withers": (P(0.22, 0.45), 0.088, 0.11),
+    "neck0": (P(0.275, 0.525), 0.078, 0.086),
+    "neck1": (P(0.31, 0.58), 0.063, 0.066),
+    "neck2": (P(0.335, 0.618), 0.048, 0.052),
 }
 LEGS = {
-    # front: shoulder → elbow → wrist → paw → toe
-    "F": [(P(0.19, 0.35), 0.060, 0.072), (P(0.15, 0.23), 0.037, 0.040), (P(0.17, 0.075), 0.020, 0.020), (P(0.18, 0.02), 0.019, 0.017), (P(0.215, 0.014), 0.017, 0.012)],
+    # front: shoulder → elbow → wrist → paw → toe (round sections, full elbow tapering to a slim sloped pastern)
+    "F": [(P(0.19, 0.35), 0.064, 0.074), (P(0.15, 0.23), 0.043, 0.044), (P(0.165, 0.08), 0.021, 0.022), (P(0.185, 0.02), 0.021, 0.018), (P(0.22, 0.014), 0.018, 0.012)],
     # hind: hip → stifle → mid-shin → hock → paw → toe  (digitigrade: hock pulled back)
-    "H": [(P(-0.25, 0.385), 0.072, 0.089), (P(-0.185, 0.25), 0.054, 0.058), (P(-0.22, 0.19), 0.038, 0.038), (P(-0.3, 0.11), 0.022, 0.024), (P(-0.28, 0.02), 0.019, 0.017), (P(-0.245, 0.014), 0.017, 0.012)],
+    "H": [(P(-0.25, 0.385), 0.076, 0.09), (P(-0.185, 0.25), 0.056, 0.06), (P(-0.22, 0.19), 0.039, 0.04), (P(-0.3, 0.11), 0.022, 0.024), (P(-0.28, 0.02), 0.02, 0.018), (P(-0.245, 0.014), 0.018, 0.012)],
 }
 LEG_X = {"F": 0.055, "H": 0.06}
 
@@ -144,8 +145,8 @@ def lerp_table(tab, u):
 
 
 # ------------------------------------------------------------------ head: wedge skull, cheek ruff, long tapered muzzle
-HEAD_PIVOT = P(0.39, 0.6)
-HEAD_PITCH = math.radians(-6)  # nose slightly down: wary, not perky
+HEAD_PIVOT = P(0.365, 0.64)
+HEAD_PITCH = math.radians(-9)  # nose slightly down: wary, not perky
 #        u      halfw  top    bot    zc
 HEAD = [(-0.09, 0.024, 0.024, 0.024, 0.0),
         (-0.075, 0.054, 0.052, 0.05, 0.0),
@@ -167,7 +168,7 @@ def cheek(u):
     def shape(a):
         # a measured from +side; lower cheek ≈ -25°
         d = min(abs(((a - (-0.45)) + math.pi) % (2 * math.pi) - math.pi), abs(((a - (math.pi + 0.45)) + math.pi) % (2 * math.pi) - math.pi))
-        return 1 + 0.55 * amt * max(0.0, 1 - d / 0.55) ** 1.4
+        return 1 + 0.75 * amt * max(0.0, 1 - d / 0.55) ** 1.4
     return shape
 
 
@@ -275,7 +276,8 @@ def catmull(pts, n):
     return out
 
 
-TAIL_PTS = [P(-0.25, 0.46), P(-0.38, 0.42), P(-0.53, 0.33), P(-0.72, 0.27), P(-0.91, 0.28), P(-1.06, 0.33), P(-1.18, 0.41)]
+# carried J: leaves the rump level, sags through the brush, flame point sweeps up (reads as a rising flame)
+TAIL_PTS = [P(-0.25, 0.465), P(-0.39, 0.44), P(-0.55, 0.38), P(-0.73, 0.36), P(-0.89, 0.41), P(-1.0, 0.5), P(-1.07, 0.62)]
 TAIL_N = 34
 
 
@@ -285,7 +287,7 @@ def tail_radius(t):
     bloom = 0.5 + 0.5 * smooth_(0.05, 0.28, t)
     body = math.sin(min(1.0, 0.1 + t * 0.9) * math.pi) ** 0.5
     tip = (1 - smooth_(0.5, 1.0, t)) ** 0.9  # long flame taper to a point, no scoop end
-    return 0.128 * bloom * body * (1 - 0.15 * t) * (0.2 + 0.8 * tip) + 0.002
+    return 0.14 * bloom * body * (1 - 0.15 * t) * (0.2 + 0.8 * tip) + 0.002
 
 
 def smooth_(e0, e1, x):
@@ -300,11 +302,14 @@ for i, c in enumerate(cs):
     fwd = (cs[min(i + 1, TAIL_N)] - cs[max(i - 1, 0)]).normalized()
     up = Vector((0, 0, 1))
     r = tail_radius(t)
-    lob = 0.22 * max(0.0, min(1.0, (t - 0.45) / 0.4))
+    # flame lobes on the burn-out third: sharp crests twisting along the tail
+    lob = 0.36 * max(0.0, min(1.0, (t - 0.5) / 0.35))
+    # fur locks along the brush: low, sharp, many
+    fur = 0.07 * smooth_(0.1, 0.3, t) * (1 - smooth_(0.55, 0.75, t))
 
-    def shape(a, t=t, lob=lob):
-        return 1 + lob * (0.5 + 0.5 * math.sin(a * 3 + t * 11)) ** 3 - lob * 0.25
-    rings.append(ring_pts(c, fwd, up, r * 1.0, r * 1.08, r * 0.95, n=14, shape=shape, ex=2.0))
+    def shape(a, t=t, lob=lob, fur=fur):
+        return 1 + lob * (0.5 + 0.5 * math.sin(a * 3 + t * 13)) ** 4 - lob * 0.2 + fur * (0.5 + 0.5 * math.sin(a * 7 - t * 30)) ** 6
+    rings.append(ring_pts(c, fwd, up, r * 1.0, r * 1.08, r * 0.95, n=21, shape=shape, ex=2.0))
 tail = loft("fox_tail", rings)
 print("ears+tail ok")
 
@@ -390,7 +395,7 @@ def tufts(ob, region, amp, freq):
 
 TAU = math.pi * 2
 # chest/neck ruff: front + sides of the throat down to the brisket, not the back
-tufts(body, lambda co: smooth01(0.16, 0.24, -co.y) * smooth01(0.42, 0.36, -co.y) * smooth01(0.36, 0.44, co.z) * smooth01(0.66, 0.58, co.z), 0.022, 9)
+tufts(body, lambda co: smooth01(0.16, 0.24, -co.y) * smooth01(0.42, 0.36, -co.y) * smooth01(0.36, 0.44, co.z) * smooth01(0.7, 0.6, co.z), 0.03, 11)
 for p in body.data.polygons:
     p.use_smooth = True
 for e in EARS:
@@ -406,7 +411,7 @@ def body_col(co, n):
     # saddle: darker rust over the dorsal line, feathered by fur noise
     c = mix(c, SADDLE, 0.55 * smooth01(0.35, 0.85, n.z + 0.08 * fur_noise(f, x)) * smooth01(0.3, 0.38, z))
     # cream bib: front of throat + chest, ragged fur edge, narrows down the brisket
-    width = 0.012 + 0.03 * smooth01(0.3, 0.56, z) + 0.006 * fur_noise(z * 3, f)
+    width = 0.016 + 0.036 * smooth01(0.3, 0.56, z) + 0.006 * fur_noise(z * 3, f)
     bib = smooth01(width + 0.012, width - 0.004, abs(x)) * smooth01(0.08, 0.2, f) * smooth01(0.3, 0.36, z) * smooth01(0.0, 0.5, -n.y)
     bib = max(bib, smooth01(-0.55, -0.85, n.z) * smooth01(0.06, 0.16, f) * smooth01(0.31, 0.29, z) * smooth01(0.045, 0.02, abs(x)) * 0.6)  # brisket wisp
     c = mix(c, CREAM, bib)
