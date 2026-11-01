@@ -123,3 +123,92 @@ export function createKeepingRoute() {
     return { x: dx / d * mag, z: dz / d * mag, jump: !!(leg.lift || leg.glide), dash: false, interact, beat: leg.beat };
   };
 }
+
+// Full-slice deliverable for phase 2 (~100 s): wake, chase the Runaway Page round the well, climb the canopy chain
+// to catch it again, cross to the west grove, unfold the pop-up ruin and catch it on the overlook — the meadow paints.
+// Input only (stick, Space, Shift); every step waits on __game state. No teleports after the wake spot.
+export const SLICE_START = OPENING_START;
+
+export function createSliceRoute() {
+  let step = 0;
+  let since = 0;
+  let last = 0;
+  let mark = null;
+  const page = (s) => s.opening?.page ?? {};
+  const canopy = (s) => s.opening?.canopy ?? {};
+  const steer = (s, to, mag = 1, lead = 0) => {
+    const dx = to[0] - s.pos[0] - (s.vel?.[0] ?? 0) * lead, dz = to[1] - s.pos[2] - (s.vel?.[2] ?? 0) * lead;
+    const d = Math.hypot(dx, dz);
+    return d > 0.05 ? { x: (dx / d) * mag, z: (dz / d) * mag } : { x: 0, z: 0 };
+  };
+  const near = (s, to, r) => Math.hypot(s.pos[0] - to[0], s.pos[2] - to[1]) < r;
+  const walk = (beat, to, r = 0.5, mag = 1) => ({ beat, run: (s) => ({ ...steer(s, to, mag), done: near(s, to, r) }) });
+  const hold = (beat, secs) => ({ beat, run: () => ({ x: 0, z: 0, done: since >= secs }) });
+  const S = [
+    hold('wake in paper', 3),
+    { beat: 'the page bolts', run: (s, f) => {
+      const p = page(s), d = Math.hypot(p.pos[0] - s.pos[0], p.pos[2] - s.pos[2]);
+      return { ...steer(s, [p.pos[0], p.pos[2]]), dash: d < 2.2 && Math.floor(since * 60) % 12 === 0, done: p.catches >= 1 };
+    } },
+    hold('it flings away', 2.5),
+    walk('to the gate', [-3.2, 86.5], 0.4),
+    walk('through the gate', [-3.2, 80.5]),
+    walk('to the canopy', [-0.2, 74.4]),
+    { beat: 'onto the first leaf', run: (s) => ({ ...steer(s, [-0.2, 71.5]), jump: since > 0.25, done: (canopy(s).launches ?? 0) > 0 }) },
+    ...['middle', 'high', 'roost'].map((id) => ({ beat: `spring to ${id}`, run: (s) => {
+      const l = (canopy(s).leaves ?? []).find((q) => q.id === id) ?? { x: 0, z: 0 };
+      return { ...steer(s, [l.x, l.z], 1, 0.3), jump: true, done: canopy(s).lastLeaf === id || page(s).catches >= 2 };
+    } })),
+    { beat: 'caught on the roost', run: (s) => ({ x: 0, z: 0, jump: page(s).catches < 2, done: page(s).catches >= 2 && since > 1.5 }) },
+    walk('off the canopy', [-4.5, 66.5]),
+    walk('across the meadow', [-6, 77.5]),
+    walk('toward the grove', [-14, 80]),
+    walk('grove edge', [-20, 79]),
+    walk('to the folded ruin', [-23.6, 75], 0.15),
+    { beat: 'dash the first fold', run: (s) => ({ x: since < 0.6 ? -0.08 : since < 1.0 ? -1 : 0, z: 0, dash: since > 0.75 && since < 0.95, done: since > 1.8 }) },
+    walk('back to the run-up', [-22.5, 75], 0.15),
+    { beat: 'leap to the first page', run: (s) => {
+      if (s.pos[0] > -24.3 && mark === null) return { x: -1, z: 0, done: false };
+      mark ??= since;
+      return { ...steer(s, [-26.7, 75]), jump: true, done: since - mark > 0.4 && s.grounded };
+    } },
+    walk('to the second fold', [-28.2, 74.8], 0.15),
+    { beat: 'dash the second fold', run: (s) => ({ x: 0, z: since < 0.6 ? -0.08 : since < 1.0 ? -1 : 0, dash: since > 0.75 && since < 0.95, done: since > 1.8 }) },
+    walk('back for the climb', [-28.4, 75.7], 0.15),
+    { beat: 'leap north', run: (s) => {
+      if (s.pos[2] > 73.9 && mark === null) return { x: 0, z: -1, done: false };
+      mark ??= since;
+      return { ...steer(s, [-28.4, 71.2]), jump: true, done: since - mark > 0.4 && s.grounded };
+    } },
+    walk('to the edge', [-29.4, 71], 0.15),
+    { beat: 'leap to the overlook', run: (s) => {
+      if (s.pos[0] < -27.7 && mark === null) return { x: 1, z: 0, done: false };
+      mark ??= since;
+      return { ...steer(s, [-24.6, 71]), jump: true, done: page(s).phase === 'kept' || (since - mark > 0.4 && s.grounded) };
+    } },
+    { beat: 'catch it on the overlook', run: (s) => {
+      const p = page(s);
+      if (p.phase === 'kept') return { x: 0, z: 0, done: true };
+      // rests winded on the other perch: leap at it
+      const go = p.phase === 'perched' && p.winded;
+      return { ...(go ? steer(s, [p.pos[0], p.pos[2]]) : { x: 0, z: 0 }), jump: go, done: false };
+    } },
+    hold('the page opens', 1.8),
+    hold('colour rolls out', 2.6),
+    hold('the meadow paints', Infinity),
+  ];
+  return (t, state) => {
+    since += Math.max(0, t - last);
+    last = t;
+    let st = S[step];
+    let r = st.run(state);
+    if (r.done && step < S.length - 1) {
+      step++;
+      since = 0;
+      mark = null;
+      st = S[step];
+      r = st.run(state);
+    }
+    return { x: r.x ?? 0, z: r.z ?? 0, jump: !!r.jump, dash: !!r.dash, interact: false, beat: st.beat };
+  };
+}

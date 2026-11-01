@@ -80,3 +80,6 @@ A1.2m rise cannot be jumped by the existing0.792m held jump. Do not silently cha
 
 ## Fine ink correction (Moss579)
 The filled jamb silhouettes read as dark slots at chase distance. Remove their solid fill, reduce the heavy arch outline, and articulate masonry with thin broken hatch marks so warm paper remains visible inside each pier. Keep the image placement, route, unfolding timing and collisions unchanged. Inspect closed and unfolded faces in the existing real-input miss/retry replay; a mechanical pass alone cannot establish BEAUTIFUL.
+
+## Landed-build housing polish
+The closed safety housing is a large blank tapered lump in the entry chase view. Articulate it as three tapered ashlar courses with narrow dark mortar joints and staggered vertical seams. Preserve its existing silhouette and retract animation, the cap collider, and every route/timing parameter. Use original code-authored geometry and the existing stone/undercroft materials. Compare the entry and second-fold chase views, replay the complete real-input miss/retry/return route, fix the worst visual issue and retest before seeking an independent BEAUTIFUL verdict. Leave the pale overlook and larger rises for a separately scoped spatial pass.

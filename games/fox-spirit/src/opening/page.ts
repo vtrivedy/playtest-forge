@@ -111,7 +111,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const SEG = 10;
   const geo = new THREE.PlaneGeometry(W, H, SEG, 1);
   const base = Float32Array.from(geo.getAttribute('position').array);
-  const page = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: pageTexture(), side: THREE.DoubleSide, transparent: true, alphaTest: 0.5, fog: false }));
+  const page = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: pageTexture(), side: THREE.DoubleSide, transparent: true, alphaTest: 0.02, fog: false }));
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.6, H * 1.45), new THREE.MeshBasicMaterial({ color: 0xffb066, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   glow.position.z = -0.01;
   const body = new THREE.Group();
@@ -171,7 +171,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     if (catches >= PAGE.stages.length) {
       phase = 'kept';
       keptAt = 0;
-      ctx.field.restore(new THREE.Vector3(PAGE.payoff.x, 0, PAGE.payoff.z), PAGE.payoff.r, 6, { edgeMax: 3 });
+      // the colour comes back from where you caught it, rolling out over the whole slice
+      ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.r, 4, { edgeMax: 3 });
       return;
     }
     stage = catches;
@@ -219,7 +220,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     }
     // high stages: a leap at it from the next leaf startles it — it jerks up, then sags winded on the same perch,
     // so landing beneath it and springing straight up is the catch; dawdle under it and it flits to the other perch
-    if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 3.8 && windedT <= 0) {
+    if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 4.6 && windedT <= 0) {
       windedT = TUNE.hopRest + 0.6;
       dodges++;
       side.set(0, 0.9, 0);
@@ -263,12 +264,13 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     } else if (keptAt >= 0) {
       keptAt += dt;
       // the page rises over the fox, opens wide, then sinks into the ground as the wash spreads
-      const k = Math.min(1, keptAt / 3);
-      pos.set(fox.x, fox.y + 1.2 + 2.2 * Math.sin(Math.min(1, keptAt / 1.5) * Math.PI * 0.5) - Math.max(0, keptAt - 3) * 1.5, fox.z);
-      body.scale.setScalar(1 + k * 5);
-      (page.material as THREE.MeshBasicMaterial).opacity = 1 - THREE.MathUtils.smoothstep(keptAt, 4, 6);
-      (glow.material as THREE.MeshBasicMaterial).opacity = 0.35 * (1 - THREE.MathUtils.smoothstep(keptAt, 3, 5));
-      holder.visible = keptAt < 6.5;
+      const k = Math.min(1, keptAt / 2.5);
+      // rises well clear of the fox and opens, then lets go
+      pos.set(fox.x, fox.y + 1.4 + 4 * Math.sin(Math.min(1, keptAt / 2) * Math.PI * 0.5), fox.z);
+      body.scale.setScalar(1 + k * 4);
+      (page.material as THREE.MeshBasicMaterial).opacity = 1 - THREE.MathUtils.smoothstep(keptAt, 2.5, 4.5);
+      (glow.material as THREE.MeshBasicMaterial).opacity = 0.35 * (1 - THREE.MathUtils.smoothstep(keptAt, 2, 4));
+      holder.visible = keptAt < 4.6;
     }
     // camera interest: while the chase is on, ease the lens round behind the fox so the page stays in frame
     // (a soft Z-target: the chase cam alone recentres on the run direction, which loses a jinking page)

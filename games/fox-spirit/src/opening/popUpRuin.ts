@@ -169,7 +169,29 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
     const base = ctx.groundH(gx, gz);
     const guard: Collider = { kind: 'cap', x: gx, z: gz, r: 0.65, base, h: p.top + 0.18 - base };
     ctx.colliders.push(guard);
-    const housing = inked(new THREE.CylinderGeometry(0.28, 0.65, guard.h, 6), stone, 0.02, true);
+    const housing = new THREE.Group();
+    // Three ashlar courses keep the safety stop readable as a ruined pier.
+    const mortar = new THREE.Mesh(new THREE.CylinderGeometry(0.265, 0.635, guard.h - 0.018, 6), undercroft);
+    housing.add(mortar);
+    for (let course = 0; course < 3; course++) {
+      const lo = course / 3, hi = (course + 1) / 3;
+      const radius = (t: number) => THREE.MathUtils.lerp(0.65, 0.28, t);
+      const block = inked(new THREE.CylinderGeometry(radius(hi), radius(lo), guard.h / 3 - 0.022, 6), stone, 0.012, true);
+      block.position.y = guard.h * ((lo + hi) / 2 - 0.5);
+      housing.add(block);
+      // Stagger the fine joints on each exposed facet without adding a heavy grid.
+      for (let face = 0; face < 6; face++) {
+        const angle = (face + 0.5) * Math.PI / 3;
+        const offset = course % 2 ? 0.065 : -0.065;
+        const points = [lo + 0.024 / guard.h, hi - 0.024 / guard.h].map(t => {
+          const r = radius(t) * Math.cos(Math.PI / 6) + 0.003;
+          return new THREE.Vector3(Math.sin(angle) * r + Math.cos(angle) * offset,
+            guard.h * (t - 0.5), Math.cos(angle) * r - Math.sin(angle) * offset);
+        });
+        const joint = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0x46413b, fog: true }));
+        housing.add(joint);
+      }
+    }
     housing.position.set(gx, base + guard.h / 2, gz);
     root.add(housing);
     folds.push({

@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHeroRoute, HERO_START } from './lookdev-hero-route.mjs';
-import { createKeepingRoute, createOpeningRoute, KEEPING_START, OPENING_START } from './opening-hero-route.mjs';
+import { createKeepingRoute, createOpeningRoute, createSliceRoute, KEEPING_START, OPENING_START, SLICE_START } from './opening-hero-route.mjs';
 
 const arg = (k, d) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -58,15 +58,17 @@ try {
   if (hero) {
     const opening = await page.evaluate(() => window.__game?.mode === 'opening');
     // opening default = the first Keeping (shelf → Carry → steam → root-hearth → bridge); --route opening = village → shelf
-    const keeping = opening && arg('route', 'keeping') === 'keeping';
-    const seconds = Number(arg('route-seconds', keeping ? '88' : opening ? '75' : '30'));
+    const routeName = opening ? arg('route', 'slice') : 'hero';
+    const keeping = routeName === 'keeping';
+    const slice = routeName === 'slice';
+    const seconds = Number(arg('route-seconds', slice ? '110' : keeping ? '88' : opening ? '75' : '30'));
     const totalFrames = Math.round(seconds * 60);
-    const route = keeping ? createKeepingRoute() : opening ? createOpeningRoute() : createHeroRoute();
+    const route = slice ? createSliceRoute() : keeping ? createKeepingRoute() : opening ? createOpeningRoute() : createHeroRoute();
     let state = await page.evaluate((s) => {
       const h = window.__gameHooks;
       h.teleport(s.x, s.z, s.yaw);
       return h.advance(1, 1 / 60, false);
-    }, keeping ? KEEPING_START : opening ? OPENING_START : HERO_START);
+    }, slice ? SLICE_START : keeping ? KEEPING_START : opening ? OPENING_START : HERO_START);
     let beat = '';
     let touchdownF = -1;
     let apexCaptured = false;
@@ -138,7 +140,7 @@ try {
       console.log('OPENING_SUMMARY', JSON.stringify(summary));
     }
     if (video) {
-      execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, keeping ? 'keeping.mp4' : opening ? 'opening-75s.mp4' : 'hero-30s.mp4')]);
+      execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, slice ? 'slice.mp4' : keeping ? 'keeping.mp4' : opening ? 'opening-75s.mp4' : 'hero-30s.mp4')]);
       const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
       fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/', route: keeping ? 'tools/opening-hero-route.mjs#keeping' : opening ? 'tools/opening-hero-route.mjs' : 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: totalFrames / 2, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
     }
