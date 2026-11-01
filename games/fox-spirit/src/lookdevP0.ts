@@ -13,7 +13,6 @@
 import * as THREE from 'three';
 import { buildGround, buildGrass, buildLeaves, buildContactShadow } from './lookdevGround';
 import {
-  INK,
   rng,
   paintU,
   toon,
@@ -25,6 +24,7 @@ import {
   mapleLeafGeometry,
   buildDistance,
   buildSky,
+  contactInk,
   type TreeKind,
 } from './lookdevKit';
 import {
@@ -116,7 +116,8 @@ export async function runLookdevP0(): Promise<void> {
     return contactRay.intersectObject(ground, false)[0]!.point.y;
   };
   buildDistance(scene, rand);
-  buildGrass(scene, rand, groundContext);
+  // keep the hero-shot foreground clear
+  buildGrass(scene, rand, groundContext, { cx: 0, cz: -2, w: 44, d: 44, n: 900, keep: (x, z) => Math.hypot(x + 1.6, z - 7.2) >= 3.5 });
   buildLeaves(scene, rand, groundContext);
 
   const ARCH = new THREE.Vector3(-0.3, 0, -8);
@@ -165,33 +166,7 @@ export async function runLookdevP0(): Promise<void> {
     const r = buildRock(rand, s);
     r.position.set(x, groundH(x, z) + s * 0.25, z);
     scene.add(r);
-    r.updateMatrixWorld(true);
-    const vertices = r.geometry.getAttribute('position');
-    const indices = r.geometry.index;
-    const contacts: THREE.Vector3[] = [];
-    for (let i = 0; i < (indices?.count ?? vertices.count); i += 3) {
-      const triangle = [0, 1, 2].map((j) => new THREE.Vector3()
-        .fromBufferAttribute(vertices, indices ? indices.getX(i + j) : i + j).applyMatrix4(r.matrixWorld));
-      const heights = triangle.map((v) => v.y - surfaceHeight(v.x, v.z));
-      const crossings: THREE.Vector3[] = [];
-      for (let j = 0; j < 3; j++) {
-        const k = (j + 1) % 3;
-        if (heights[j]! * heights[k]! >= 0) continue;
-        let lo = 0;
-        let hi = 1;
-        const point = new THREE.Vector3();
-        for (let step = 0; step < 12; step++) {
-          const t = (lo + hi) / 2;
-          point.copy(triangle[j]!).lerp(triangle[k]!, t);
-          if ((point.y - surfaceHeight(point.x, point.z)) * heights[j]! > 0) lo = t;
-          else hi = t;
-        }
-        point.y = surfaceHeight(point.x, point.z) + 0.025;
-        crossings.push(point);
-      }
-      if (crossings.length === 2) contacts.push(...crossings);
-    }
-    scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(contacts), new THREE.LineBasicMaterial({ color: INK })));
+    scene.add(contactInk(r, surfaceHeight));
   }
 
   const fox = await loadHearthFox((w) => inkMaterial(w));
