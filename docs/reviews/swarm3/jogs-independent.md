@@ -32,3 +32,19 @@ Independent verification on the exact candidate, isolated detached worktree:
 This is a bounded candidate review, not a blind discovery test, full Keeping
 route replay, continuous motion critique, or approval to land. Moss owns the
 revision; no runtime source was changed by this review.
+
+## Polish candidate 2ae30c0
+
+Reviewed actual downloaded `2-off-canopy.png`, `h6b-waits.png`, and matched
+`4-turn-west.png` from `moss-jogs-2ae30c0`. Verdict versus `207cc86`:
+**BEAUTIFUL CLEARLY BETTER; FUN MARGINALLY** (stills only).
+
+The hare page is immediately identifiable to the right of the fox in the
+landing chase view. The pale scut separates the waiting hare from sepia ground.
+The bend cairn has more varied sizes and offsets. These resolve the visual
+readability objections above. Roost-top body occlusion remains disclosed by
+Moss; the landing view establishes visibility after the drop, not before it.
+
+Downloaded evidence: `/tmp/tallow-jogs-polish/`. Swarm verdict message `883`.
+No fresh runtime, build, motion or blind discovery claim for this candidate;
+Moss retains ownership of the pending full-route verification.
