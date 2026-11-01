@@ -4,7 +4,8 @@
  */
 import * as THREE from 'three';
 
-export const SPAWN = { x: -6, z: 92, yaw: Math.PI * 0.92 } as const;
+/** wake spot by the plaza, facing down the hub lane toward the meadow (−3, 81) */
+export const SPAWN = { x: -5.2, z: 92.5, yaw: Math.atan2(2.2, -11.5) } as const;
 /** the Great Well (village heart) */
 export const WELL = { x: -8, z: 85 } as const;
 /** H-a: cold hearth at the foot of the meadow shelf */
