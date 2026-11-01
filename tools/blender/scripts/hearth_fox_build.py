@@ -434,8 +434,10 @@ def head_col(co, n):
     # cream: underjaw + muzzle sides below a line from cheek ruff to nose, plus the cheek ruff itself
     line = zc + 0.004 - 0.012 * smooth01(0.05, -0.03, u) + 0.003 * fur_noise(u, side)
     cream = smooth01(line + 0.004, line - 0.006, h)
-    ruff = smooth01(0.055, 0.075, side) * smooth01(0.0, -0.02, h + 0.0)
+    ruff = smooth01(0.055, 0.075, side) * smooth01(0.0, -0.02, h)
     cream = max(cream, ruff)
+    # fade out behind the jaw hinge so the cream never wraps the nape into a collar (chase-cam view)
+    cream *= smooth01(-0.07, -0.02, u)
     cream *= smooth01(0.172, 0.15, u)  # keep the tip of the nose coat-dark
     c = mix(COAT, CREAM, cream)
     # forehead slightly deeper, muzzle bridge saddle
