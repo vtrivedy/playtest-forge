@@ -227,7 +227,7 @@ export const GLYPHS = {
   ],
   /** the lintel's order */
   order: ['moon', 'leaf', 'flame'] as const,
-  shrine: { x: 33.4, z: 89.6, yaw: -Math.PI / 2 },
+  shrine: { x: 32.0, z: 88.6, yaw: -Math.PI / 2 },
   /** seconds a lit stone holds before guttering; painting a stone out of turn gutters them all */
   window: 16,
 } as const;

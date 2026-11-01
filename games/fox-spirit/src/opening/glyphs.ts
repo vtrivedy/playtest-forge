@@ -17,30 +17,38 @@ export const GLYPH_FEEL = { reveal: 0.16, touch: 0.22, open: 1.8 };
 const INK = '#2a1a10';
 
 /** a glyph drawn in brush ink on transparent paper, 256² */
-function glyphTexture(id: GlyphId | 'seal'): THREE.CanvasTexture {
+function glyphTexture(id: GlyphId | 'seal', fill = false): THREE.CanvasTexture {
   const S = 256;
   const cv = document.createElement('canvas');
   cv.width = cv.height = S;
   const g = cv.getContext('2d')!;
-  g.strokeStyle = INK;
-  g.fillStyle = INK;
+  // the outline is ink; the filled version is white so its material colour tints it (the lit ember)
+  g.strokeStyle = fill ? '#ffffff' : INK;
+  g.fillStyle = fill ? '#ffffff' : INK;
   g.lineCap = 'round';
   g.lineJoin = 'round';
   g.lineWidth = 14;
   g.beginPath();
   if (id === 'leaf') {
-    // a five-lobed maple with its stem and a midrib
-    for (let i = 0; i <= 10; i++) {
-      const a = -Math.PI / 2 + (i / 10) * Math.PI * 2;
-      const r = i % 2 ? 46 : i === 0 || i === 10 ? 104 : 92;
-      const x = 128 + Math.cos(a) * r;
-      const y = 120 + Math.sin(a) * r;
+    // a maple: five pointed lobes with deep sinuses (the two by the stem smaller), stem and midrib
+    for (let i = 0; i <= 120; i++) {
+      const a = (i / 120) * Math.PI * 2;
+      const u = (((a * 5) / (Math.PI * 2) + 0.5) % 1 + 1) % 1;
+      const tri = 1 - Math.abs(u - 0.5) * 2;
+      const down = Math.abs(Math.atan2(Math.sin(a), -Math.cos(a)));
+      const lower = 1 - 0.45 * THREE.MathUtils.smoothstep(down, 1.9, 2.8);
+      const r = (34 + 70 * Math.pow(tri, 1.6) * lower) * (1 + 0.05 * Math.abs(Math.sin(a * 24)));
+      const x = 128 + Math.sin(a) * r;
+      const y = 124 - Math.cos(a) * r;
       if (i === 0) g.moveTo(x, y);
       else g.lineTo(x, y);
     }
     g.closePath();
-    g.moveTo(128, 120);
-    g.lineTo(128, 236);
+    if (fill) g.fill();
+    g.moveTo(128, 124);
+    g.lineTo(128, 240);
+    g.moveTo(128, 124);
+    g.lineTo(128, 40);
   } else if (id === 'flame') {
     g.moveTo(128, 22);
     g.bezierCurveTo(196, 96, 214, 150, 186, 196);
@@ -48,10 +56,12 @@ function glyphTexture(id: GlyphId | 'seal'): THREE.CanvasTexture {
     g.bezierCurveTo(44, 150, 70, 110, 104, 84);
     g.bezierCurveTo(100, 118, 116, 140, 132, 146);
     g.bezierCurveTo(118, 104, 126, 60, 128, 22);
+    if (fill) g.fill();
   } else if (id === 'moon') {
     g.arc(128, 128, 96, Math.PI * 0.35, Math.PI * 1.65, false);
     g.arc(160, 128, 74, Math.PI * 1.55, Math.PI * 0.45, true);
     g.closePath();
+    if (fill) g.fill();
   } else {
     // the shrine's seal: a fox-eared ring with a knot
     g.arc(128, 136, 80, 0, Math.PI * 2);
@@ -160,11 +170,15 @@ export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {
     g.position.set(s.x, y, s.z);
     g.rotation.y = s.yaw;
     scene.add(g);
-    const slab = inked(hewn(new THREE.BoxGeometry(1.0, 1.75, 0.36, 2, 3, 1), rand, 0.06), stoneMat, 0.022, true);
+    const mat = stoneMat.clone();
+    mat.onBeforeCompile = stoneMat.onBeforeCompile;
+    mat.customProgramCacheKey = stoneMat.customProgramCacheKey;
+    const slab = inked(hewn(new THREE.BoxGeometry(1.0, 1.75, 0.36, 2, 3, 1), rand, 0.06), mat, 0.022, true);
     slab.position.y = 0.82;
     slab.rotation.z = (rand() - 0.5) * 0.08;
     g.add(slab);
-    ctx.occluders.push(g);
+    // only the slab fades for the chase cam: the fade clones materials, and the decals' must stay ours
+    ctx.occluders.push(slab);
     colliders.push({ kind: 'post', x: s.x, z: s.z, r: 0.55 });
     const tex = glyphTexture(s.id);
     // the glyph on both faces: ink when painted, an ember fill + glow once lit in turn
@@ -172,13 +186,13 @@ export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {
       const ink = decal(tex, 0.78, 0xffffff);
       ink.position.set(0, 1.0, side * 0.19);
       if (side < 0) ink.rotation.y = Math.PI;
-      const glow = decal(tex, 0.95, 0xff9a3c, true);
-      glow.position.set(0, 1.0, side * 0.2);
+      const glow = decal(glyphTexture(s.id, true), 0.8, 0xffa040);
+      glow.position.set(0, 1.0, side * 0.186);
       if (side < 0) glow.rotation.y = Math.PI;
       g.add(ink, glow);
       return { ink, glow };
     });
-    return { ...s, y, faces, reveal: 0, painted: false, lit: false, litPulse: 0 };
+    return { ...s, y, faces, mat, reveal: 0, painted: false, lit: false, litPulse: 0, warm: 0 };
   });
 
   // ---- the shrine: two posts, a lintel with the order, a back slab, a two-leaf paper door
@@ -188,18 +202,20 @@ export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {
   shrine.position.set(sh.x, shY, sh.z);
   shrine.rotation.y = sh.yaw;
   scene.add(shrine);
-  ctx.occluders.push(shrine);
   for (const s of [-1, 1]) {
     const post = inked(hewn(new THREE.BoxGeometry(0.42, 2.5, 0.42, 1, 3, 1), rand, 0.06), stoneMat, 0.022, true);
     post.position.set(s * 0.95, 1.2, 0);
     shrine.add(post);
+    ctx.occluders.push(post);
   }
   const lintel = inked(hewn(new THREE.BoxGeometry(2.6, 0.5, 0.5, 3, 1, 1), rand, 0.05), stoneMat, 0.022, true);
   lintel.position.set(0, 2.62, 0);
   shrine.add(lintel);
+  ctx.occluders.push(lintel);
   const back = inked(hewn(new THREE.BoxGeometry(1.6, 2.4, 0.3, 2, 2, 1), rand, 0.05), toon(0x6e6254, { contour: 0.5 }), 0.022, true);
   back.position.set(0, 1.2, -0.75);
   shrine.add(back);
+  ctx.occluders.push(back);
   {
     const cs = Math.cos(sh.yaw);
     const sn = Math.sin(sh.yaw);
@@ -208,11 +224,15 @@ export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {
     colliders.push({ kind: 'box', ...at(0, -0.75), yaw: sh.yaw, hx: 0.8, hz: 0.2, top: shY + 2.4 });
   }
   // the order: three small glyphs on the lintel's face, read by painting the shrine
-  const lintelGlyphs = GLYPHS.order.map((id, i) => {
+  // the order is inked twice: small on the lintel, and at the fox's eye-line across the closed door
+  const lintelGlyphs = GLYPHS.order.flatMap((id, i) => {
     const d = decal(glyphTexture(id), 0.42, 0xffffff);
     d.position.set((i - 1) * 0.72, 2.62, 0.27);
-    shrine.add(d);
-    return d;
+    const e = decal(glyphTexture(id), 0.44, 0xffffff);
+    e.position.set((i - 1) * 0.48, 0.95, 0.09);
+    e.userData.door = true;
+    shrine.add(d, e);
+    return [d, e];
   });
   // the door: two parchment leaves hinged on the posts, sealed with the fox mark
   const doorMat = new THREE.MeshToonMaterial({ map: doorTexture(), side: THREE.DoubleSide });
@@ -227,7 +247,7 @@ export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {
     return hinge;
   });
   const seal = decal(glyphTexture('seal'), 0.5, 0x8a2a14);
-  seal.position.set(0, 1.35, 0.08);
+  seal.position.set(0, 1.85, 0.08);
   (seal.material as THREE.MeshBasicMaterial).opacity = 0.9;
   shrine.add(seal);
   const doorBlock = { kind: 'box' as const, x: sh.x, z: sh.z, yaw: sh.yaw, hx: 0.8, hz: 0.06, top: shY + 2.3 };
@@ -283,20 +303,26 @@ export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {
     for (const s of stones) {
       s.litPulse = Math.max(0, s.litPulse - dt * 1.5);
       const breath = 0.75 + 0.25 * Math.sin(clock * 2.4 + s.x);
+      // a lit stone warms from inside: its whole face glows ember, readable from across the meadow
+      s.warm = THREE.MathUtils.damp(s.warm, s.lit ? 1 : 0, 4, dt);
+      s.mat.emissive.setRGB(0.55 * s.warm * breath, 0.2 * s.warm * breath, 0.04 * s.warm);
       for (const f of s.faces) {
         (f.ink.material as THREE.MeshBasicMaterial).opacity = s.reveal;
-        (f.ink.material as THREE.MeshBasicMaterial).color.set(s.lit ? 0xff6a1a : 0xffffff);
-        (f.glow.material as THREE.MeshBasicMaterial).opacity = s.lit ? (0.55 + 0.45 * s.litPulse) * breath : 0;
-        f.glow.scale.setScalar(1 + s.litPulse * 0.35);
+        
+        (f.glow.material as THREE.MeshBasicMaterial).opacity = s.warm;
+        f.glow.scale.setScalar(1 + s.litPulse * 0.25);
       }
     }
     // the lintel reads by the shrine's own paint
     probe.set(sh.x + 1.2 * Math.sin(sh.yaw), shY, sh.z + 1.2 * Math.cos(sh.yaw));
     const lp = solved ? 1 : THREE.MathUtils.smoothstep(field.sample(probe), GLYPH_FEEL.reveal * 0.5, GLYPH_FEEL.touch);
-    lintelGlyphs.forEach((d, i) => {
+    lintelGlyphs.forEach((d, j) => {
+      const i = j >> 1;
       const m = d.material as THREE.MeshBasicMaterial;
-      m.opacity = THREE.MathUtils.damp(m.opacity, Math.max(lp, progress > i ? 1 : 0), 6, dt);
-      m.color.set(progress > i || solved ? 0xb8501c : 0xffffff);
+      // the door copy leaves with the door
+      const gone = d.userData.door && openT >= 0 ? 0 : 1;
+      m.opacity = THREE.MathUtils.damp(m.opacity, Math.max(lp, progress > i ? 1 : 0) * gone, 6, dt);
+      m.color.set(progress > i || solved ? 0xd8601c : 0xffffff);
     });
     // the door unfolds: a pop-up flap swing with one overshoot, the seal fading
     if (openT >= 0) {

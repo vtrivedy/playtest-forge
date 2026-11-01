@@ -45,7 +45,7 @@ try {
   // wait for the trail to dry
   await page.evaluate(() => window.__gameHooks.advance(720, 1 / 60, false));
   // the lintel: read it
-  log.push(['read lintel', await walk([[31.4, 89.6]])]);
+  log.push(['read lintel', await walk([[30.0, 88.6]])]);
   await shot('04-lintel-read');
   await page.evaluate(() => window.__gameHooks.advance(720, 1 / 60, false));
   // the order: moon → leaf → flame
@@ -55,8 +55,14 @@ try {
   log.push(['order: flame', await walk([[25.5, 91.2], [28.6, 91.0]])]);
   await page.evaluate(() => window.__gameHooks.advance(150, 1 / 60, false));
   await shot('06-solved');
+  // review lenses: the lit flame stone, and the open shrine from the meadow
+  // (review stills only: the fox is parked by the lens so the chase-cam fade never hides the subject)
+  const lens = async (name, cam, look) => { await page.evaluate(([cam, look]) => { const h = window.__gameHooks; h.teleport(cam[0] + (look[0] - cam[0]) * 0.35, cam[2] + (look[2] - cam[2]) * 0.35, 0); h.advance(20, 1 / 60, false); const c = window.__opening.camera; c.position.set(...cam); c.lookAt(...look); c.updateMatrixWorld(); window.__gameHooks.advance(0, 1 / 60, true); }, [cam, look]); await page.screenshot({ path: path.join(out, `${name}.png`) }); };
+  log.push(['after solve', await page.evaluate(() => window.__gameHooks.state().opening.glyphs)]);
+  await lens('06b-flame-lit', [28.0, 1.5, 95.0], [29.4, 1.0, 91.6]);
+  await lens('06c-shrine', [27.6, 1.7, 89.4], [32.0, 1.2, 88.6]);
   // to the open shrine, dash the kit page
-  log.push(['to shrine', await walk([[31.0, 89.6]])]);
+  log.push(['to shrine', await walk([[29.8, 88.6]])]);
   // face the open door by stick (no teleport), then a real Shift dash at the page
   await page.evaluate(() => { const h = window.__gameHooks; h.setStick(1, 0); h.advance(12, 1 / 60, false); });
   await page.keyboard.down('ShiftLeft');
