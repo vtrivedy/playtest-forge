@@ -143,7 +143,7 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
   })();
   const motes = new THREE.Points(
     moteGeo,
-    new THREE.PointsMaterial({ size: 0.03, map: moteTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+    new THREE.PointsMaterial({ size: 0.04, map: moteTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
   );
   motes.frustumCulled = false;
   motes.matrixAutoUpdate = false;

@@ -239,7 +239,7 @@ def author_idle():
         for leg in ("LF", "RF", "LH", "RH"):
             paw(f"ctl_{'f' if leg[1] == 'F' else 'h'}paw.{leg[0]}", 0.0, 0.0, 0.0)
         breath = math.sin(2 * w)
-        hip_offset(side=0.004 * math.sin(w), up=-0.022 + 0.0025 * breath)
+        hip_offset(side=0.004 * math.sin(w), up=-0.012 + 0.0025 * breath)
         rot("hips", roll=0.015 * math.sin(w))
         rot("spine", pitch=-0.012 * breath)
         rot("chest", pitch=0.015 * breath)

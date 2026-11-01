@@ -275,7 +275,7 @@ def catmull(pts, n):
     return out
 
 
-TAIL_PTS = [P(-0.25, 0.46), P(-0.38, 0.42), P(-0.53, 0.33), P(-0.72, 0.27), P(-0.91, 0.28), P(-1.05, 0.35), P(-1.14, 0.46)]
+TAIL_PTS = [P(-0.25, 0.46), P(-0.38, 0.42), P(-0.53, 0.33), P(-0.72, 0.27), P(-0.91, 0.28), P(-1.06, 0.33), P(-1.18, 0.41)]
 TAIL_N = 34
 
 
@@ -283,9 +283,9 @@ def tail_radius(t):
     # root sits inside the rump at body girth so the back line flows into the plume; fullest ~50%
     # narrow-ish dock leaving the rump, fur blooms after it, long taper to the flame point
     bloom = 0.5 + 0.5 * smooth_(0.05, 0.28, t)
-    body = math.sin(min(1.0, 0.1 + t * 1.0) * math.pi) ** 0.5
-    tip = (1 - smooth_(0.62, 1.0, t)) ** 0.7
-    return 0.128 * bloom * body * (1 - 0.15 * t) * (0.35 + 0.65 * tip) + 0.003
+    body = math.sin(min(1.0, 0.1 + t * 0.9) * math.pi) ** 0.5
+    tip = (1 - smooth_(0.5, 1.0, t)) ** 0.9  # long flame taper to a point, no scoop end
+    return 0.128 * bloom * body * (1 - 0.15 * t) * (0.2 + 0.8 * tip) + 0.002
 
 
 def smooth_(e0, e1, x):
