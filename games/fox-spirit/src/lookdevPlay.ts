@@ -450,7 +450,7 @@ export function createPlay(opts: {
       distance: 3.1,
       runDistance: 2.9,
       minDistance: 2.0,
-      height: 1.0,
+      height: 1.25,
       groundLift: 0.2,
       lookHeight: 0.45,
       framingHeight: 0.5,
