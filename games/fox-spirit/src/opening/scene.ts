@@ -141,9 +141,17 @@ export async function runOpening(): Promise<void> {
   });
   const hum = createHearthHum({ hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position });
   // the far Crown answers once the near tree has finished falling: attractor ladder resolves near → far
+  // near → far: the settle swells the hum; the Crown answers when the fox steps out onto the far crag
+  // and faces the vista gap (or after a while, so the response is never missed)
+  let settledAt = -1;
   keeping.onSettled(() => {
-    crown.respond();
+    settledAt = time;
     hum.swell();
+  });
+  ctx.onUpdate((_dt, t) => {
+    if (settledAt < 0) return;
+    const f = fox.root.position;
+    if (Math.hypot(f.x - KEEPING.crag.x, f.z - KEEPING.crag.z) < 3.2 || t - settledAt > 25) crown.respond();
   });
   const view = player.cam.camera;
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
