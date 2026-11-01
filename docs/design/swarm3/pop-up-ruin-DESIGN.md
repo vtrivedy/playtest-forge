@@ -77,3 +77,6 @@ A1.2m rise cannot be jumped by the existing0.792m held jump. Do not silently cha
 
 ## Parchment hinge correction (Flint573)
 700b3ab reads as a printed page, but the orange spindle still looks like a toy log. Replace its round brass axle and split leaves with a low folded parchment pull-tab, dark stitched seam and irregular torn ends. Retain its trigger position, scale pulse, guard collider and unfold timing. Verify the existing full miss/retry route and inspect the entry/second unfolding chase stills before requesting a new verdict.
+
+## Fine ink correction (Moss579)
+The filled jamb silhouettes read as dark slots at chase distance. Remove their solid fill, reduce the heavy arch outline, and articulate masonry with thin broken hatch marks so warm paper remains visible inside each pier. Keep the image placement, route, unfolding timing and collisions unchanged. Inspect closed and unfolded faces in the existing real-input miss/retry replay; a mechanical pass alone cannot establish BEAUTIFUL.
