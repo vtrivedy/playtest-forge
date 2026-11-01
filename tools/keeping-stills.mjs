@@ -28,7 +28,7 @@ const POSES = {
   bridge: [27.4, 71.0, -2.9],
   crag: [26.2, 66.6, -2.9],
   // at the root-hearth facing the lean (where the coal is set down)
-  root: [28.45, 75.5, -2.9],
+  root: [28.35, 76.6, -2.9],
   // on the steam pad facing the stair
   stair: [25.6, 80.6, 1.75],
   // halfway up the stair

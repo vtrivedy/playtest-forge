@@ -333,7 +333,8 @@ export function createKeeping(ctx: OpeningCtx) {
 
   // ---- root-hearth bowl among the roots
   {
-    const g = stoneRing(rand, K.root.r + 0.22, K.root.r - 0.08, 0.26, ASH);
+    // a low rim: the placed coal on the bed stays in view from the chase cam
+    const g = stoneRing(rand, K.root.r + 0.3, K.root.r + 0.02, 0.13, ASH, 9);
     g.position.set(K.root.x, K.terrace.top, K.root.z);
     scene.add(g);
   }
