@@ -21,7 +21,7 @@ export const KEEPING = {
 } as const;
 
 /** The Still Crown on the Summit: far east-southeast, beyond the ridge, backlit by the low sun */
-export const CROWN = { x: 135, y: -14, z: 40, yaw: -0.4, scale: 2.1 } as const;
+export const CROWN = { x: 135, y: -16, z: 40, yaw: -Math.PI / 2, scale: 1.6 } as const;
 
 /** Cottages (all face +z: door on the z + d/2 wall) */
 export const HOUSES = [
