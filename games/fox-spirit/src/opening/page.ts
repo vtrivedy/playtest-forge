@@ -111,7 +111,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const SEG = 10;
   const geo = new THREE.PlaneGeometry(W, H, SEG, 1);
   const base = Float32Array.from(geo.getAttribute('position').array);
-  const page = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: pageTexture(), side: THREE.DoubleSide, transparent: true, alphaTest: 0.02, fog: false }));
+  const art = pageTexture();
+  const page = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: art, side: THREE.DoubleSide, transparent: true, alphaTest: 0.02, fog: false }));
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.6, H * 1.45), new THREE.MeshBasicMaterial({ color: 0xffb066, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   glow.position.z = -0.01;
   const body = new THREE.Group();
@@ -340,6 +341,10 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       phase = 'perched';
       place(stage, 0, pos);
     },
+    /** the page's inked scene (for the homecoming album page pinned at the well) */
+    art,
+    /** true once the third catch keeps it and its rise-and-fade has finished */
+    settled: () => phase === 'kept' && keptAt > 4.6,
     /** for the hum: where it is, whether it's in flight, how many times it's been caught */
     voice: () => ({ pos, fleeing: phase === 'fleeing' || phase === 'flung', catches, kept: phase === 'kept' }),
     state: () => ({ stage, phase, catches, skips, dodges, winded: windedT > 0, s: +s.toFixed(2), pos: pos.toArray().map((v) => +v.toFixed(2)) }),
