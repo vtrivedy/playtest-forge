@@ -5,7 +5,8 @@ Source of truth: `/swarm/seed/DESIGN.md` v1 and locked sprint TASK.md.
 One ember coal supports the first Keeping. It never cools in ambient air, never
 slows the fox, never disappears, and continues burning when set down. Existing
 jump, glide, dash, gait and camera tuning stay fixed. Pickup/place uses a
-contextual E press (pending team control review); Space and Shift keep their
+contextual E press (provisional exception to the two-action convention;
+team control review pending); Space and Shift keep their
 shipped behavior. Placement is grounded, at the fox's feet, so water/hearth
 chemistry can read the same physical heat source. Pickup works within a short,
 forgiving radius. Holding a button never repeatedly toggles the coal.
