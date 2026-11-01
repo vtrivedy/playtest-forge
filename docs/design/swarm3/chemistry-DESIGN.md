@@ -64,3 +64,10 @@ breathes over time. The original teaching hearth and steam appearance keep their
 current profiles. Chemistry, ignition, lift and completion timing stay unchanged.
 Verify the same real-input stair/placement probe before/after, including screenshots
 and __game; continuous chase review belongs to the integrated hero route.
+
+## Raised root rim probe approach
+
+The root bowl centre is solid after Moss3861382. Stage chemistry and stair
+regressions at (29.0,77.35), facing the bowl, to verify placement from outside
+the raised rim. Retain real E placement and one-shot bridge assertions; add a
+check that the fox stays outside the bowl. Staged starts remain disclosed.

@@ -28,7 +28,7 @@ await stage(top.x,top.z);await sample('stair-top-staged',true);
 await walkTo(bottom,'stair-descent');
 await walkTo(top,'stair-reascent');
 
-await stage(K.root.x,K.root.z);await key('e');await advance(480);await sample('06-root-bridge',true);
+await stage(29.0,77.35,Math.atan2(K.root.x-29.0,K.root.z-77.35));await key('e');await advance(480);await sample('06-root-bridge',true);
 await stage(K.hinge.x+K.fall.x*K.span*.5,K.hinge.z+K.fall.z*K.span*.5,Math.atan2(K.fall.x,K.fall.z));await advance(30);await sample('07-bridge-collision',true);
 evidence.expected={terraceTop:K.terrace.top,bridgeTop:K.terrace.top+.12};
 const at=label=>evidence.samples.find(s=>s.label===label).state;
@@ -40,6 +40,7 @@ evidence.assertions=[
 ['stair reascent reaches terrace',Math.abs(at('stair-reascent').pos[1]-K.terrace.top)<.2],
 ['coal retained throughout traversal',['stair-bottom','stair-ascent','stair-descent','stair-reascent'].every(label=>at(label).opening.carry.carried)],
 ['recovery preserves steam',at('stair-coal-recovered').opening.carry.carried&&C(at('stair-coal-recovered')).steamLatched],
+['root placement keeps fox outside bowl',Math.hypot(at('06-root-bridge').pos[0]-K.root.x,at('06-root-bridge').pos[2]-K.root.z)>1.05],
 ['root releases bridge exactly once',C(at('06-root-bridge')).releases===1&&at('06-root-bridge').opening.keeping.impacts===1],
 ['bridge supports player',at('07-bridge-collision').grounded&&Math.abs(at('07-bridge-collision').pos[1]-evidence.expected.bridgeTop)<.03],
 ['no page errors',evidence.errors.length===0]
