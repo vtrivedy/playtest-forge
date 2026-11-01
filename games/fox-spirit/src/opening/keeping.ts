@@ -23,6 +23,9 @@ export const SETTLE = {
   rebound: 0.045,
 };
 
+/** the Hearthtree is drawn at this scale over the kit maple proportions: the slice's tallest crown */
+const TREE_SCALE = 1.45;
+
 type Phase = 'arrested' | 'settling' | 'bridge';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -103,13 +106,13 @@ function buildHearthtree(rand: () => number, baseY: number) {
       tree.add(inked(plumeGeometry(new THREE.CatmullRomCurve3([end, end.clone().lerp(tip, 0.5).add(V(0, -0.1, 0)), tip]), (u) => THREE.MathUtils.lerp(lr * 0.28, lr * 0.05, u), 6, 5, 0), bark, 0.014, true));
       return;
     }
-    pads.push({ at: end.clone().lerp(from, 0.15), r: 1.25 + rand() * 0.5 });
+    pads.push({ at: end.clone().lerp(from, 0.15), r: 1.5 + rand() * 0.6 });
   });
   const top = trunk.getPointAt(1);
-  pads.push({ at: top.clone().add(V(0, 1.3, 0)), r: 2.3 });
+  pads.push({ at: top.clone().add(V(0, 1.6, 0)), r: 2.8 });
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + rand() * 0.6;
-    pads.push({ at: top.clone().add(V(Math.cos(a) * 1.7, (rand() - 0.4) * 1.2, Math.sin(a) * 1.7)), r: 1.2 + rand() * 0.5 });
+    pads.push({ at: top.clone().add(V(Math.cos(a) * 2.1, (rand() - 0.4) * 1.4, Math.sin(a) * 2.1)), r: 1.5 + rand() * 0.6 });
   }
   // ember crimson → rust crowns: the brightest canopy in the slice once it is painted
   const TONES = [CANOPY[2]!, CANOPY[0]!, [0xb4583a, 0x8a3a2a, 0x52262a] as [number, number, number]];
@@ -149,15 +152,21 @@ export function createKeeping(ctx: OpeningCtx) {
   // ---- ledge: shelf → bend → steam pad, moss-capped columns under walk boxes, a low curb on the drop side
   const W = K.ledgeWidth;
   const pts = K.ledge;
-  const curbMat = toon(0x7a6a58, { contour: 0.5 });
-  const curb = (x: number, z: number, yaw: number, len: number) => {
-    const h = 0.42 + rand() * 0.12;
-    const m = inked(hewn(new THREE.BoxGeometry(0.42, h, len, 1, 1, 2), rand, 0.06), curbMat, 0.02, true);
-    m.position.set(x, SHELF_TOP + h / 2 - 0.12, z);
-    m.rotation.y = yaw + (rand() - 0.5) * 0.12;
-    scene.add(m);
-    colliders.push({ kind: 'box', x, z, yaw, hx: 0.24, hz: len / 2 + 0.05, top: SHELF_TOP + h - 0.12 });
+  // curb: one low continuous blocker per run (the fox needs a jump to leave), drawn as a row of mossy rubble
+  const curb = (ax: number, az: number, bx: number, bz: number) => {
+    const len = Math.hypot(bx - ax, bz - az);
+    colliders.push({ kind: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, yaw: Math.atan2(bx - ax, bz - az), hx: 0.2, hz: len / 2, top: SHELF_TOP + 0.34 });
+    const m = Math.max(2, Math.round(len / 0.62));
+    for (let k = 0; k <= m; k++) {
+      const t = k / m;
+      const sz = 0.2 + rand() * 0.14;
+      const r = buildRock(rand, sz);
+      r.scale.y = 1.25;
+      r.position.set(ax + (bx - ax) * t + (rand() - 0.5) * 0.12, SHELF_TOP + sz * 0.3, az + (bz - az) * t + (rand() - 0.5) * 0.12);
+      scene.add(r);
+    }
   };
+  const bendOuter: Array<[number, number]> = [];
   for (let i = 0; i < pts.length - 1; i++) {
     const [ax, az] = pts[i]!;
     const [bx, bz] = pts[i + 1]!;
@@ -183,19 +192,24 @@ export function createKeeping(ctx: OpeningCtx) {
     const sides = i === 0 ? [-inside] : [-inside, inside];
     for (const sd of sides) {
       const off = (W / 2 - 0.2) * sd;
-      const t0 = i === 0 ? 0.35 : 0;
+      // A's start is on the shelf; B's inside starts past the corner so the turn stays open
+      const t0 = i === 0 || sd === inside ? 0.35 : 0;
       const t1 = i === pts.length - 2 ? 0.88 : 1;
-      const m = Math.max(1, Math.round(((t1 - t0) * len) / 1.25));
-      for (let k = 0; k < m; k++) {
-        const t = t0 + ((k + 0.5) / m) * (t1 - t0);
-        curb(ax + (bx - ax) * t + n.x * off, az + (bz - az) * t + n.z * off, yaw, ((t1 - t0) * len) / m - 0.1);
-      }
+      if (sd === -inside) bendOuter.push([ax + (bx - ax) * (i === 0 ? t1 : t0) + n.x * off, az + (bz - az) * (i === 0 ? t1 : t0) + n.z * off]);
+      curb(ax + (bx - ax) * t0 + n.x * off, az + (bz - az) * t0 + n.z * off, ax + (bx - ax) * t1 + n.x * off, az + (bz - az) * t1 + n.z * off);
     }
   }
   // the bend itself: a square pad so the corner has no seam, curbed round the outside
   {
     const [bx, bz] = pts[1]!;
     colliders.push({ kind: 'box', x: bx, z: bz, yaw: 0.35, hx: W / 2, hz: W / 2, top: SHELF_TOP });
+    const [a, b] = bendOuter as [[number, number], [number, number]];
+    const ox = (a[0] + b[0]) / 2 - bx;
+    const oz = (a[1] + b[1]) / 2 - bz;
+    const k = (W / 2 - 0.2) / Math.max(0.01, Math.hypot(ox, oz));
+    const corner: [number, number] = [bx + ox * k, bz + oz * k];
+    curb(a[0], a[1], corner[0], corner[1]);
+    curb(corner[0], corner[1], b[0], b[1]);
   }
   // steam pad under the spring, a little wider than the ledge
   plinth(ctx, { x: K.steam.x, z: K.steam.z, hx: 1.9, hz: 1.9, yaw: K.terrace.yaw, top: SHELF_TOP }, 1.7, 2);
@@ -232,6 +246,42 @@ export function createKeeping(ctx: OpeningCtx) {
     }
   }
 
+  // ---- the steam stair: stones pressed flat into the terrace's north cliff, a pop-up page that the
+  // steam unfolds into a walkable stair from the steam pad to the terrace (the reconnected walk route)
+  const stairRoot = new THREE.Group();
+  stairRoot.position.set(K.terrace.x, 0, K.terrace.z);
+  stairRoot.rotation.y = K.terrace.yaw;
+  scene.add(stairRoot);
+  const STAIR = { x0: 2.5, x1: -2.4, z: -K.terrace.hz - 0.68, depth: 1.36, steps: 12 };
+  const rise = (K.terrace.top - SHELF_TOP) / STAIR.steps;
+  const tread = (STAIR.x0 - STAIR.x1) / STAIR.steps;
+  const stairMat = toon(0x8a7864, { contour: 0.5 });
+  const stairSteps: THREE.Object3D[] = [];
+  for (let i = 0; i < STAIR.steps; i++) {
+    // hinge at the cliff-side edge: folded = standing flat against the cliff, open = level tread
+    const hinge = new THREE.Group();
+    hinge.position.set(STAIR.x0 - (i + 0.5) * tread, SHELF_TOP + (i + 1) * rise, -K.terrace.hz);
+    const slab = inked(hewn(new THREE.BoxGeometry(tread + 0.06, 0.3 + rise, STAIR.depth, 1, 1, 2), rand, 0.05), stairMat, 0.02, true);
+    slab.position.set(0, -(0.3 + rise) / 2, -STAIR.depth / 2);
+    hinge.add(slab);
+    hinge.rotation.x = Math.PI / 2;
+    stairRoot.add(hinge);
+    stairSteps.push(hinge);
+  }
+  /** fine sub-steps under the drawn ones so the fox walks the flight without a jump (step ≤ PLAY.step) */
+  const stairColliders = (): Collider[] => {
+    const n = STAIR.steps * 3;
+    const c = Math.cos(K.terrace.yaw);
+    const sn = Math.sin(K.terrace.yaw);
+    return Array.from({ length: n }, (_, j) => {
+      const lx = STAIR.x0 - (j + 0.5) * ((STAIR.x0 - STAIR.x1) / n);
+      return {
+        kind: 'box' as const, x: K.terrace.x + lx * c + STAIR.z * sn, z: K.terrace.z - lx * sn + STAIR.z * c,
+        yaw: K.terrace.yaw, hx: (STAIR.x0 - STAIR.x1) / n / 2 + 0.02, hz: STAIR.depth / 2, top: SHELF_TOP + (j + 1) * ((K.terrace.top - SHELF_TOP) / n),
+      };
+    });
+  };
+
   // ---- root-hearth bowl among the roots
   {
     const g = stoneRing(rand, K.root.r + 0.22, K.root.r - 0.08, 0.26, ASH);
@@ -246,16 +296,17 @@ export function createKeeping(ctx: OpeningCtx) {
   scene.add(pivot);
   pivot.add(buildRoots(rand, K.terrace.top + 0.4));
   const { tree, pads, crown } = buildHearthtree(rand, K.terrace.top);
+  tree.scale.setScalar(TREE_SCALE);
   pivot.add(tree);
   ctx.occluders.push(tree);
   const settled = Math.PI / 2 - 0.035;
   tree.rotation.x = K.leanArrested;
 
   // ---- leaves pressed in mid-air under the crown; they resume with the tree
-  const LEAVES = 170;
+  const LEAVES = 240;
   const leafMat = toon(0xffffff, { contour: 0.3, climbBase: K.terrace.top, ramp: RAMP_CANOPY });
   leafMat.side = THREE.DoubleSide;
-  const leaves = new THREE.InstancedMesh(mapleLeafGeometry(0.11), leafMat, LEAVES);
+  const leaves = new THREE.InstancedMesh(mapleLeafGeometry(0.17), leafMat, LEAVES);
   leaves.castShadow = false;
   leaves.frustumCulled = false;
   scene.add(leaves);
@@ -268,6 +319,7 @@ export function createKeeping(ctx: OpeningCtx) {
   const crownWorld = (out: THREE.Vector3) => {
     const c = crown[Math.floor(rand() * crown.length)]!;
     out.set((rand() - 0.5) * c.r * 1.4, (rand() - 0.6) * c.r, (rand() - 0.5) * c.r * 1.4).add(c.at);
+    tree.updateWorldMatrix(true, false);
     return tree.localToWorld(out);
   };
   scene.updateMatrixWorld(true);
@@ -310,12 +362,39 @@ export function createKeeping(ctx: OpeningCtx) {
     return settled - S.rebound * Math.exp(-5 * v) * Math.abs(Math.sin(v * Math.PI * 2.4));
   };
 
+  let stair: 'pressed' | 'unfolding' | 'open' = 'pressed';
+  let stairT = 0;
+  /** Steam latched: unfold the stair bottom → top; it bears weight once the top step is level */
+  function reconnectSteam(): void {
+    if (stair !== 'pressed') return;
+    stair = 'unfolding';
+    stairT = 0;
+  }
+  const STAIR_STAGGER = 0.11;
+  const STAIR_STEPS = stairSteps.length;
+  const STAIR_FLIP = 0.45;
+
   function release(): void {
     if (phase !== 'arrested') return;
     phase = 'settling';
     t = 0;
   }
 
+  ctx.onUpdate((dt) => {
+    if (stair === 'unfolding') {
+      stairT += dt;
+      stairSteps.forEach((h, i) => {
+        const u = THREE.MathUtils.clamp((stairT - i * STAIR_STAGGER) / STAIR_FLIP, 0, 1);
+        // a paper flap's flip: quick out of the page, a small overshoot, settled
+        const k = u < 1 ? 1 - Math.pow(1 - u, 3) + Math.sin(u * Math.PI) * 0.12 : 1;
+        h.rotation.x = (Math.PI / 2) * (1 - k);
+      });
+      if (stairT >= (STAIR_STEPS - 1) * STAIR_STAGGER + STAIR_FLIP) {
+        stair = 'open';
+        colliders.push(...stairColliders());
+      }
+    }
+  });
   ctx.onUpdate((dt) => {
     const S = SETTLE;
     let impact = false;
@@ -388,6 +467,7 @@ export function createKeeping(ctx: OpeningCtx) {
 
   return {
     release,
+    reconnectSteam,
     /** Called once when the tree has finished settling (the bridge is already walkable at impact) */
     onSettled(fn: () => void) {
       onSettled = fn;
@@ -401,6 +481,7 @@ export function createKeeping(ctx: OpeningCtx) {
         impact: lastImpact,
         impacts,
         bridgeTop: +(K.terrace.top + 0.12).toFixed(3),
+        stair,
       };
     },
   };

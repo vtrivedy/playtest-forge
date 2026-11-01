@@ -130,7 +130,10 @@ export async function runOpening(): Promise<void> {
   const chemistry = createKeepingChemistry({
     updrafts: hearth.updrafts, steamId: 'steam', rootId: 'root',
     coal: () => coal.heatSource(),
-    onSteam: (at) => field.restore(at, 7, 1.6, { edgeMax: 1.2 }),
+    onSteam: (at) => {
+      field.restore(at, 7, 1.6, { edgeMax: 1.2 });
+      keeping.reconnectSteam();
+    },
     onComplete: (at) => {
       field.restore(at, 14, 1.4, { edgeMax: 1.6 });
       keeping.release();
@@ -234,6 +237,8 @@ export async function runOpening(): Promise<void> {
     crownRespond: crown.respond,
     /** dev: play the Hearthtree settle without the root-hearth latch */
     keepingRelease: keeping.release,
+    /** dev: unfold the steam stair without the steam latch */
+    keepingSteam: keeping.reconnectSteam,
     params: PLAY,
     carry: CARRY,
     camera: player.cam.params,
