@@ -19,8 +19,9 @@ import { createOpeningHearth } from './hearth';
 import { createOpeningPaint } from './paint';
 import { createOpeningOcclusion } from './occlusion';
 import { createCrown } from './crown';
-import { createCarry } from './carry';
+import { CARRY, createCarry } from './carry';
 import { createKeepingChemistry } from './chemistry';
+import { createKeeping } from './keeping';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -89,6 +90,7 @@ export async function runOpening(): Promise<void> {
 
   buildMeadow(ctx);
   buildVillage(ctx);
+  const keeping = createKeeping(ctx);
   const crown = createCrown(ctx, sky.mist);
 
   const contact = buildContactShadow();
@@ -102,7 +104,7 @@ export async function runOpening(): Promise<void> {
     scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p),
     onIgnite: (at) => field.restore(at, 12, 1.8, { edgeMax: 1.4 }),
     extraSpots: [
-      { id: 'steam', ...KEEPING.steam, height: 6, medium: 'steam' },
+      { id: 'steam', ...KEEPING.steam, height: 9, medium: 'steam' },
       { id: 'root', ...KEEPING.root, height: 7 },
     ],
   });
@@ -131,6 +133,7 @@ export async function runOpening(): Promise<void> {
     onComplete: (at) => {
       field.restore(at, 14, 1.4, { edgeMax: 1.6 });
       crown.respond();
+      keeping.release();
     },
   });
   const view = player.cam.camera;
@@ -176,7 +179,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state() } });
+  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -222,7 +225,10 @@ export async function runOpening(): Promise<void> {
     },
     /** dev: play the Crown's Keeping response (the Keeping latch calls this) */
     crownRespond: crown.respond,
+    /** dev: play the Hearthtree settle without the root-hearth latch */
+    keepingRelease: keeping.release,
     params: PLAY,
+    carry: CARRY,
     camera: player.cam.params,
   };
   const w = window as unknown as Record<string, unknown>;

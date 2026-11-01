@@ -13,15 +13,8 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 /** rock shelf the H-a updraft lifts onto: 9 × 9, top = ground + 5 */
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
-/** First Keeping (Moss's place plan, #swarm :32): coal cradle on the shelf, ledge to the steam spring, root-hearth on the upper terrace */
-export const KEEPING = {
-  coal: { x: 15.8, z: 78.2 },
-  steam: { x: 27.6, y: 5, z: 79.4 },
-  root: { x: 31.2, y: 9.5, z: 76.8 },
-} as const;
-
 /** The Still Crown on the Summit: far east-southeast, beyond the ridge, backlit by the low sun */
-export const CROWN = { x: 135, y: -14, z: 40, yaw: -0.4, scale: 2.1 } as const;
+export const CROWN = { x: 135, y: -16, z: 40, yaw: -Math.PI / 2, scale: 1.6 } as const;
 
 /** Cottages (all face +z: door on the z + d/2 wall) */
 export const HOUSES = [
@@ -76,3 +69,48 @@ export function groundH(x: number, z: number): number {
   const rim = THREE.MathUtils.smoothstep(r, 0.92, 1.08) * 7 + Math.max(0, r - 1.08) * 14;
   return swell * flat * 0.8 + meadow + rim;
 }
+
+/** shelf walk height (the H-a updraft's landing) */
+export const SHELF_TOP = groundH(SHELF.x, SHELF.z) + SHELF.rise;
+
+/**
+ * The first Keeping (DESIGN-keeping-place.md), east of the shelf at two storeys above the meadow:
+ * shelf → ledge with one safe bend → steam spring against the terrace cliff → root-hearth terrace →
+ * the arrested Hearthtree falls along `fall` (unit xz) onto the far crag and becomes the bridge.
+ * Boxes use the collider yaw convention: local +z = (sin yaw, cos yaw), local +x = (cos yaw, −sin yaw).
+ */
+export const KEEPING = (() => {
+  const hinge = { x: 28.0, z: 73.6 };
+  const crag = { x: 26.0, z: 65.2 };
+  const span = Math.hypot(crag.x - hinge.x, crag.z - hinge.z);
+  const fall = { x: (crag.x - hinge.x) / span, z: (crag.z - hinge.z) / span };
+  const yaw = Math.atan2(fall.x, fall.z);
+  const terraceTop = SHELF_TOP + 4.5;
+  const terrace = { x: hinge.x - fall.x * 2.7, z: hinge.z - fall.z * 2.7, hx: 2.9, hz: 2.9, yaw, top: terraceTop };
+  /** terrace-local → world */
+  const local = (lx: number, lz: number) => ({
+    x: terrace.x + lx * Math.cos(yaw) + lz * Math.sin(yaw),
+    z: terrace.z - lx * Math.sin(yaw) + lz * Math.cos(yaw),
+  });
+  const steam = { ...local(4.3, -2.2), y: SHELF_TOP, r: 1.0 };
+  return {
+    /** lit cradle on the shelf where the coal rests (feet height) */
+    coal: { x: 15.1, z: 77.4, y: SHELF_TOP },
+    /** ledge centre line at SHELF_TOP: shelf → bend → spring pad; `ledgeWidth` walkable */
+    ledge: [[15.2, 79.0], [19.6, 85.0], [steam.x - 0.3, steam.z + 1.5]] as ReadonlyArray<readonly [number, number]>,
+    ledgeWidth: 3.2,
+    /** steam spring basin (coal → water → steam) at the ledge end, 1.4 m off the terrace cliff */
+    steam,
+    /** root-hearth terrace: box behind the hinge along −fall */
+    terrace,
+    /** dark root-hearth bowl among the roots, just behind the hinge */
+    root: { ...local(0, 1.35), y: terraceTop, r: 0.75 },
+    /** Hearthtree pivot (root crown) and fall direction; arrested lean from vertical (rad) */
+    hinge: { ...hinge, y: terraceTop - 0.6 },
+    fall,
+    leanArrested: 0.52,
+    /** far crag the crown lands across: walkable top = terraceTop */
+    crag: { ...crag, hx: 2.5, hz: 2.7, yaw, top: terraceTop },
+    span,
+  };
+})();
