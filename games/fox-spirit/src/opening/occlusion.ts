@@ -58,11 +58,12 @@ export function createOpeningOcclusion(roots: THREE.Object3D[]) {
       direction.subVectors(target, lens);
       const distance = direction.length();
       if (distance > 0.5) {
-        right.crossVectors(direction, camera.up).normalize().multiplyScalar(0.16);
-        // A narrow three-ray bundle protects the head and ears without fading nearby houses.
-        for (const offset of [-1, 0, 1]) {
+        right.crossVectors(direction, camera.up).normalize().multiplyScalar(0.42);
+        // Cover the body and ears, including a wall grazing the outer silhouette.
+        for (const height of [0.2, 0.72]) for (const offset of [-1, 0, 1]) {
           from.copy(lens).addScaledVector(right, offset);
           to.copy(target).addScaledVector(right, offset);
+          to.y = feet.y + height;
           direction.subVectors(to, from).normalize();
           // Cast both ways so a camera inside a closed cottage still sees its outward-facing wall.
           for (let side = 0; side < 2; side++) {
