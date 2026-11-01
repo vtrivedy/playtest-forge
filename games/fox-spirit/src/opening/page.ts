@@ -90,8 +90,8 @@ function pageTexture(): THREE.CanvasTexture {
 
 export function buildRunawayPage(ctx: OpeningCtx) {
   const stages = PAGE.stages.map(loop);
-  const W = 0.46;
-  const H = 0.6;
+  const W = 0.62;
+  const H = 0.8;
   const SEG = 10;
   const geo = new THREE.PlaneGeometry(W, H, SEG, 1);
   const base = Float32Array.from(geo.getAttribute('position').array);
@@ -127,6 +127,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   let lastSkip = -1;
   let dodges = 0;
   let windedT = 0;
+  let beat = 0;
   let wasDashing = false;
   /** sideways jink offset (world xz), eased back to the flight line */
   const side = new THREE.Vector3();
@@ -137,14 +138,10 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const flingFrom = new THREE.Vector3();
   const flingTo = new THREE.Vector3();
   const tmp = new THREE.Vector3();
-  const floor = (x: number, z: number) => {
-    const f = ctx.player?.surfaceAt(x, z) ?? ctx.groundH(x, z);
-    return Number.isFinite(f) ? f : ctx.groundH(x, z);
-  };
-  /** flight points carry height above the floor beneath them */
+  /** flight points carry height above the base terrain (props and raised places are authored into the height) */
   const place = (st: number, sv: number, out: THREE.Vector3) => {
     stages[st]!.at(sv, out);
-    out.y += floor(out.x, out.z);
+    out.y += ctx.groundH(out.x, out.z);
     return out;
   };
   place(0, 0, pos);
@@ -237,12 +234,19 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       const w = 1 - THREE.MathUtils.smoothstep(d, 8, 12);
       cam.orbit(THREE.MathUtils.clamp(dYaw, -1, 1) * Math.min(1, dt * 2.2) * w);
     }
-    // flutter: the sheet bends along its width, faster when it's nervous
+    // it flies like a moth: the sheet folds along its spine and beats its two halves, slow and shallow
+    // while it watches, quick and deep in flight; a ripple runs out along each half
     const nerve = phase === 'fleeing' || phase === 'flung' ? 1 : 1 - THREE.MathUtils.smoothstep(d, 3, 10) * 0.7;
+    beat += dt * (phase === 'kept' ? 1 : 2.2 + nerve * 9 + (windedT > 0 ? -4 : 0));
+    const fold = phase === 'kept' ? 0.05 : (0.25 + 0.75 * nerve) * (0.55 + 0.45 * Math.sin(beat * Math.PI * 2));
     const arr = geo.getAttribute('position') as THREE.BufferAttribute;
     for (let i = 0; i < arr.count; i++) {
       const x = base[i * 3]!;
-      arr.setZ(i, Math.sin(x * 9 + t * (6 + nerve * 10)) * 0.04 * (0.5 + nerve) * (x / W + 0.5));
+      const ax = Math.abs(x);
+      const a = fold * 1.1;
+      const ripple = Math.sin(ax * 14 - beat * 9) * 0.015 * (ax / (W / 2));
+      arr.setX(i, Math.sign(x) * ax * Math.cos(a));
+      arr.setZ(i, ax * Math.sin(a) + ripple);
     }
     arr.needsUpdate = true;
     holder.position.copy(pos);
@@ -250,11 +254,13 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     // perched it faces the fox; in flight it faces where it is going, rolled into the turn
     const look = phase === 'perched' ? Math.atan2(fox.x - pos.x, fox.z - pos.z) : Math.atan2(pos.x - prev.x, pos.z - prev.z) || holder.rotation.y;
     holder.rotation.y = phase === 'kept' ? holder.rotation.y : look;
+    glow.scale.x = Math.cos(fold * 1.1);
     body.rotation.z = Math.sin(t * 3.1) * 0.15 * nerve;
     // winded: the glow gutters and the sheet droops — the window to catch it
     if (phase !== 'kept') (glow.material as THREE.MeshBasicMaterial).opacity = windedT > 0 ? 0.12 + 0.08 * Math.sin(t * 20) : 0.35;
     body.position.y = windedT > 0 ? -0.25 * Math.min(1, windedT) : 0;
-    body.rotation.x = phase === 'fleeing' ? -0.35 : 0;
+    // upright and facing you while it watches; tipped forward into its flight like a moth when it runs
+    body.rotation.x = THREE.MathUtils.damp(body.rotation.x, phase === 'fleeing' || phase === 'flung' ? -1.0 : 0, 6, dt);
     if (phase === 'fleeing' && Math.random() < dt * 14) emit(pos, 1.2, 0.5);
     // flecks
     const m = new THREE.Matrix4();
