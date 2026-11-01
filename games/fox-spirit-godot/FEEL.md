@@ -71,9 +71,11 @@ What still differs, looking at those pairs:
 - **Occluder fade:** Godot version screen-door dithers (opaque pipeline, no sorting, no material
   cloning) and drops the ink pass; sight rays hit exact trimesh shapes (faces baked to world space,
   backface collision on so a lens inside the well ring still sees the ring) on a dedicated physics
-  layer. three.js uses real transparency, which looks softer; Godot's 4×4 Bayer dither is plainly
-  visible as a dot pattern on the faded Great Well at 960×540 (`pose-wellblock` capture). A blue-noise
-  threshold or TAA would hide it; not done.
+  layer. three.js uses real transparency, which looks softer. The first Godot pass used a 4×4 Bayer
+  threshold and read as a plain dot grid on the faded Great Well
+  (`godot-occlusion-wellblock-bayer-before.png`); interleaved-gradient noise mixed with paper-fibre
+  value noise turns it into a faint paper-grain speckle (`godot-occlusion-wellblock.png`). Still a
+  speckle, not a true translucency.
 - **Post:** Godot Environment glow + ACES (with `tonemap_white` raised — see below) + a small canvas
   grade (vignette, grain, sepia↔restored split tone). three's grade runs in linear before ACES; Godot's
   canvas grade sees the tonemapped frame, so it is a gentler approximation.
@@ -114,7 +116,7 @@ What still differs, looking at those pairs:
 
 | what | path |
 |---|---|
-| real-input hero route, movie maker 30 fps + stills + per-tick state | `godot-oak-hero-route-04/` (final; `-03` same build, earlier cold-hearth framing; `-01/-02` superseded) |
+| real-input hero route, movie maker 30 fps (49 s, `route.mp4`) + stills + contact sheet + per-tick state | `godot-oak-hero-route-04/` (final; `-03` earlier cold-hearth framing; `-01/-02` superseded) |
 | side-by-side stills vs three.js (paper + painted, 6 views) + occluder fade | `godot-oak-side-by-side-01/sbs-*.png`, `godot-occlusion-wellblock.png` |
 | three.js reference stills (`tools/opening-stills.mjs`) | `threejs-ref/{paper,paint}/` |
 | feel probe, both engines | `godot-oak-feel-probe-01/` |

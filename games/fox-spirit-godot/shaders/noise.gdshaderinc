@@ -10,12 +10,11 @@ float lk_fbm(vec2 p) {
 	for (int i = 0; i < 5; i++) { s += a * lk_noise(p); p = p * 2.03 + 17.1; a *= 0.5; }
 	return s;
 }
-// ordered 4×4 Bayer threshold for screen-door occluder fades (opaque pipeline, no sorting)
-float bayer4(vec2 fc) {
-	ivec2 p = ivec2(mod(fc, 4.0));
-	int i = p.x + p.y * 4;
-	int m[16] = int[](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
-	return (float(m[i]) + 0.5) / 16.0;
+// screen-door threshold for occluder fades (opaque pipeline, no sorting): interleaved gradient noise
+// broken up by paper-fibre value noise, so a fading wall dissolves like wet paper rather than a grid
+float fade_threshold(vec2 fc) {
+	float ign = fract(52.9829189 * fract(dot(fc, vec2(0.06711056, 0.00583715))));
+	return clamp(ign * 0.7 + lk_noise(fc * 0.35) * 0.3, 0.0, 1.0);
 }
 
 // three's height fog (src/render/atmosphere.ts applyHeightFog: height 1, falloff 0.06), applied in

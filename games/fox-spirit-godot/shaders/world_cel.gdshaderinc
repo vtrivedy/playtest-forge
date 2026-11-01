@@ -51,7 +51,7 @@ float band3(float ndl) {
 }
 
 void fragment() {
-	if (fade > 0.0 && bayer4(FRAGCOORD.xy) < fade * 0.88) discard;
+	if (fade > 0.0 && fade_threshold(FRAGCOORD.xy) < fade * 0.88) discard;
 	if (leaf_card && abs(dot(v_leaf_out, normalize(CAMERA_POSITION_WORLD - v_world))) > 0.32) discard;
 	vec2 xz = v_world.xz;
 	// ragged watercolour front: large lobes + fine fibre bite

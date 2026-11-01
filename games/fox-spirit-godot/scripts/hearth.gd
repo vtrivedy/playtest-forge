@@ -141,8 +141,8 @@ func setup(ground_y: float) -> void:
 	_leaves.angular_velocity_min = -180.0
 	_leaves.angular_velocity_max = 180.0
 	_leaves.particle_flag_rotate_y = true
-	_leaves.scale_amount_min = 1.2
-	_leaves.scale_amount_max = 1.8
+	_leaves.scale_amount_min = 0.8
+	_leaves.scale_amount_max = 1.2
 	var tones := Gradient.new()
 	tones.set_color(0, Kit.lin(0xa4603e))
 	tones.set_color(1, Kit.lin(0xa88550))
