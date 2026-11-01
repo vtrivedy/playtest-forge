@@ -13,6 +13,20 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 /** rock shelf the H-a updraft lifts onto: 9 × 9, top = ground + 5 */
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
+/**
+ * Runaway Page flight loops, one per stage: [x, height above the floor, z]. Stage 1 circles the well
+ * plaza; stages 2–3 are greybox loops on the canopy (Tallow) and pop-up ruin (Rook) footprints, to be
+ * re-threaded over their leaves / flaps. `payoff` = the permanent wash when the page is kept.
+ */
+export const PAGE = {
+  stages: [
+    [[-8, 2.7, 85], [-5.2, 1.1, 87.6], [-2, 1.1, 91], [-1, 1.2, 95.5], [-5, 1.1, 97.2], [-10.5, 1.2, 95.5], [-13.5, 1.1, 90], [-12.5, 1.2, 86.8], [-10.5, 1.1, 82.8]],
+    [[2, 1.3, 70], [5.5, 1.1, 66.5], [2, 1.4, 63.5], [-2.5, 1.2, 66], [-3, 1.3, 70.5]],
+    [[-27, 1.3, 72], [-31, 1.2, 76.5], [-35, 1.3, 71.5], [-30.5, 1.2, 67], [-25, 1.2, 68]],
+  ] as ReadonlyArray<ReadonlyArray<readonly [number, number, number]>>,
+  payoff: { x: -4, z: 80, r: 45 },
+} as const;
+
 /** The Still Crown on the Summit: far down the vista gap past the bridge, low enough to sit inside the chase frame */
 export const CROWN = { x: 2, y: -70, z: -112, yaw: 0, scale: 1.6 } as const;
 
