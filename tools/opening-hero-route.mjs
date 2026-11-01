@@ -64,7 +64,7 @@ export function createKeepingRoute() {
     { beat: 'ride the warm air', lift: [4.3, 74.8], rise: 7.1 },
     { beat: 'glide to shelf', to: [13, 75.5], mag: 1, glide: true },
     { beat: 'shelf reveal', hold: 3 },
-    { beat: 'to the coal', to: [14.4, 76.7], mag: 0.35 },
+    { beat: 'to the coal', to: [14.6, 76.95], mag: 0.35 },
     { beat: 'pick up the coal', interact: true, until: (s) => op(s).carry?.carried, hold: 1 },
     { beat: 'carry along the ledge', to: [15.4, 79.6], mag: 0.6 },
     { beat: 'round the bend', to: [19.4, 84.3], mag: 0.75 },
