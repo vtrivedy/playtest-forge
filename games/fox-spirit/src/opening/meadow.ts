@@ -1,59 +1,258 @@
 /**
- * Arrival Meadow: ground, the H-a rock shelf, trees and rocks. (Skeleton stand-in — @ember owns the art.)
+ * Arrival Meadow (DESIGN-opening-meadow.md): the slice ground, the H-a rock shelf at the foot of a
+ * stratified cliff ridge, framing groves, boulders with ink contact lines, grass and leaf litter.
+ * The village (village.ts) sits on this ground; everything here is kit toon + paint patch + ink hull.
  */
 import * as THREE from 'three';
-import { buildDistance, buildMaple, buildRock, hewn, inked, toon } from '../lookdevKit';
+import { buildDistance, buildMaple, buildRock, contactInk, hewn, inked, mapleLeafGeometry, toon, type TreeKind } from '../lookdevKit';
+import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import type { OpeningCtx } from './scene';
-import { BOUNDS, pathDist, SHELF } from './layout';
+import { BOUNDS, HEARTH_A, HOUSES, pathDist, rimK, SHELF, WELL } from './layout';
+
+/** Stone strata, base → cap: warm grey-ochre bands so the shelf reads as layered rock, not a crate */
+const STRATA = [0x6e5c4c, 0x8a7560, 0x7a6754, 0x93806a];
+const MOSS = 0x5e5c3a;
+
+/** Groves [x, z, scale, kind, palette]; palette ≥ 4 = moss/olive (kit CANOPY_MOSS), kept behind the fox's read line */
+const TREES: Array<[number, number, number, TreeKind, number]> = [
+  // west grove framing the route out of the plaza
+  [-12.5, 72.5, 1.25, 'hero', 4],
+  [-16, 77, 1.0, 'grove', 2],
+  [-10.5, 66.5, 1.05, 'grove', 5],
+  [-18, 68.5, 1.15, 'lean', 0],
+  [-22, 74, 1.1, 'grove', 3],
+  // south, past the hearth: the backdrop as the fox runs down the meadow
+  [4.5, 63.5, 1.2, 'tall', 4],
+  [-7.5, 61.5, 1.1, 'grove', 1],
+  [10, 62.5, 1.0, 'grove', 5],
+  [0.5, 59, 1.3, 'grove', 3],
+  // east: rust crowns off-axis, beyond the shelf
+  [21.5, 67, 1.3, 'hero', 0],
+  [23, 84, 1.05, 'grove', 2],
+  [18.5, 90.5, 0.95, 'grove', 5],
+  // between the village and the meadow
+  [8, 81.5, 0.9, 'grove', 4],
+  [-23, 92, 1.0, 'grove', 1],
+  [-31, 79, 1.2, 'tall', 5],
+  [3, 101.5, 1.1, 'grove', 3],
+  [-15, 101, 1.0, 'lean', 4],
+  [-33, 93, 1.05, 'grove', 0],
+];
+
+/** Boulders [x, z, size]: pairs/trios at grove feet, one marker by the hearth apron */
+const ROCKS: Array<[number, number, number]> = [
+  [-11, 74.5, 0.65],
+  [-14.3, 70.2, 0.95],
+  [-9.2, 68.8, 0.45],
+  [2.4, 70.5, 0.75],
+  [3.6, 69.3, 0.45],
+  [8.2, 71, 0.55],
+  [19.5, 69.5, 1.1],
+  [6.2, 84.5, 0.5],
+  [-20, 80.5, 0.7],
+  [11.5, 87, 0.6],
+];
+
+/**
+ * A stone column: a 6–7-sided tapered prism stacked from 1.3–2.2 m drums, each drum a strata tone,
+ * a little turned and offset from the one below. Many columns side by side read as a jointed rock
+ * outcrop (chunky, Arceus-style), never a building. `moss` caps the top with a turf drum whose top is y1.
+ */
+function column(rand: () => number, x: number, z: number, r: number, y0: number, y1: number, moss: boolean): THREE.Group {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  const sides = rand() < 0.5 ? 6 : 7;
+  const stoneTop = moss ? y1 - 0.3 : y1;
+  // uneven drum heights: joints never line up across neighbouring columns
+  const cuts: number[] = [];
+  for (let y = y0; y < stoneTop - 0.6; ) cuts.push((y += 1.1 + rand() * 1.3));
+  const joints = [y0, ...cuts.filter((y) => y < stoneTop - 0.6), stoneTop];
+  const spin = rand() * Math.PI;
+  for (let i = 0; i < joints.length - 1; i++) {
+    const a = joints[i]!;
+    const b = joints[i + 1]!;
+    const k = (a - y0) / Math.max(1, stoneTop - y0);
+    const rr = r * (1 - k * 0.14) * (0.95 + rand() * 0.1);
+    const geo = hewn(new THREE.CylinderGeometry(rr * 0.94, rr, b - a - 0.04, sides, 1), rand, 0.07);
+    const tone = new THREE.Color(STRATA[(i + Math.floor(x * 3 + z)) & 3]!).multiplyScalar(0.88 + rand() * 0.2);
+    const m = inked(geo, toon(tone, { contour: 0.5 }), 0.028, true);
+    m.position.set((rand() - 0.5) * 0.24, (a + b) / 2, (rand() - 0.5) * 0.24);
+    m.rotation.y = spin + (rand() - 0.5) * 0.4;
+    g.add(m);
+  }
+  if (moss) {
+    const rr = r * 0.86 * 1.04;
+    const cap = inked(hewn(new THREE.CylinderGeometry(rr, rr * 0.97, 0.36, sides, 1), rand, 0.03), toon(MOSS, { hatchWeight: 0.4 }), 0.024, true);
+    cap.position.y = y1 - 0.18;
+    cap.rotation.y = spin;
+    g.add(cap);
+  }
+  return g;
+}
+
+/**
+ * H-a, the cold hearth: a two-step stone plinth carrying a ring of seven fire-blackened bowl stones
+ * (rim ≈ ground + 1, around the reactor's ash bed at +0.92). It blocks like a low wall; the fox lights it
+ * from beside it and rides the column from there.
+ */
+function buildHearth(ctx: OpeningCtx): void {
+  const { scene, groundH, rand, colliders } = ctx;
+  const y = groundH(HEARTH_A.x, HEARTH_A.z);
+  const g = new THREE.Group();
+  g.position.set(HEARTH_A.x, y, HEARTH_A.z);
+  scene.add(g);
+  const plinth = [
+    [2.0, 0.34, -0.06, 0x7e7465],
+    [1.5, 0.28, 0.28, 0x8e8577],
+  ] as const;
+  for (const [w, h, y0, tone] of plinth) {
+    const m = inked(hewn(new THREE.BoxGeometry(w, h, w, 2, 1, 2), rand, 0.05), toon(tone, { contour: 0.5 }), 0.022, true);
+    m.position.y = y0 + h / 2;
+    m.rotation.y = rand() * 0.5;
+    g.add(m);
+  }
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * Math.PI * 2 + 0.05;
+    const a1 = ((i + 1) / n) * Math.PI * 2 - 0.05;
+    const s = new THREE.Shape();
+    s.absarc(0, 0, 1.0, a0, a1, false);
+    s.absarc(0, 0, 0.66, a1, a0, true);
+    s.closePath();
+    const h = 0.5 + rand() * 0.14;
+    const geo = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 3 });
+    geo.rotateX(-Math.PI / 2);
+    const stone = inked(hewn(geo, rand, 0.03), toon(new THREE.Color(0x5a4f46).multiplyScalar(0.85 + rand() * 0.25), { contour: 0.5 }), 0.022, true);
+    stone.position.y = 0.5;
+    g.add(stone);
+  }
+  colliders.push({ kind: 'cap', x: HEARTH_A.x, z: HEARTH_A.z, r: 1.05, base: y, h: 1.05 });
+}
+
+/**
+ * The H-a shelf and the cliff ridge it steps up into. Shelf-local frame (x east, z south, yaw SHELF.yaw);
+ * the shelf top is exactly ground + SHELF.rise (the updraft's landing), the ridge blocks climb behind it.
+ */
+function buildShelf(ctx: OpeningCtx): void {
+  const { scene, groundH, rand, colliders } = ctx;
+  const g0 = groundH(SHELF.x, SHELF.z);
+  const top = g0 + SHELF.rise;
+  const root = new THREE.Group();
+  root.position.set(SHELF.x, 0, SHELF.z);
+  root.rotation.y = SHELF.yaw;
+  scene.add(root);
+  const c = Math.cos(SHELF.yaw);
+  const s = Math.sin(SHELF.yaw);
+  const world = (lx: number, lz: number) => [SHELF.x + lx * c + lz * s, SHELF.z - lx * s + lz * c] as const;
+
+  const hw = SHELF.w / 2;
+  const hd = SHELF.d / 2;
+  // shelf: a 3 × 3 cluster of moss-capped columns whose turf is the walk surface (box collider)
+  for (const lx of [-3, 0, 3]) {
+    for (const lz of [-3, 0, 3]) {
+      const edge = Math.abs(lx) + Math.abs(lz) > 0;
+      root.add(column(rand, lx + (rand() - 0.5) * 0.4, lz + (rand() - 0.5) * 0.4, edge ? 2.25 : 2.0, g0 - 2, top, true));
+    }
+  }
+  colliders.push({ kind: 'box', x: SHELF.x, z: SHELF.z, yaw: SHELF.yaw, hx: hw, hz: hd, top });
+  // the ridge: the shelf is its lowest step; taller columns climb behind it (east) and wrap south.
+  // [lx, lz, r, height above g0] — blockers only, never a climb route
+  const RIDGE: Array<[number, number, number, number]> = [
+    [hw + 2.2, -3.2, 2.4, 7.4], [hw + 2.6, 1.2, 2.6, 8.3], [hw + 2.0, 5.4, 2.3, 7.0],
+    [hw + 6.4, -1.5, 2.8, 10.2], [hw + 6.8, 3.6, 2.7, 9.4], [hw + 5.6, -6.6, 2.5, 8.6],
+    [hw + 1.2, -hd - 2.2, 2.3, 6.6], [-1.2, hd + 2.4, 2.4, 6.2], [2.8, hd + 2.8, 2.2, 7.1],
+    [-4.6, hd + 1.8, 1.9, 4.2], [hw + 10.5, 1, 3, 11.5],
+  ];
+  for (const [lx, lz, r, h] of RIDGE) {
+    root.add(column(rand, lx, lz, r, g0 - 2, g0 + h, true));
+    const [wx, wz] = world(lx, lz);
+    colliders.push({ kind: 'post', x: wx, z: wz, r: r * 0.95 });
+  }
+  // talus at the cliff feet (north and south faces; the west face toward the hearth stays clean)
+  for (const [lx, lz, sz] of [[-2.6, -hd - 1.3, 0.7], [-0.8, -hd - 1.9, 0.45], [-6.2, hd + 1.2, 0.8], [-6.9, hd + 2.6, 0.5], [hw + 4.8, -hd - 4.7, 0.9]] as const) {
+    const [rx, rz] = world(lx, lz);
+    const r = buildRock(rand, sz);
+    r.position.set(rx, groundH(rx, rz) + sz * 0.2, rz);
+    scene.add(r);
+    scene.add(contactInk(r, groundH));
+    colliders.push({ kind: 'cap', x: rx, z: rz, r: sz * 1.1, base: groundH(rx, rz), h: sz * 0.95 });
+  }
+
+  // the beacon: one olive maple on the far corner of the shelf, visible from the well
+  const [tx, tz] = world(hw - 1.6, -hd + 1.7);
+  const beacon = buildMaple(rand, 1.05, 'hero', 4, top);
+  beacon.position.set(tx, top - 0.1, tz);
+  beacon.rotation.y = 2.2;
+  scene.add(beacon);
+  colliders.push({ kind: 'post', x: tx, z: tz, r: 0.45 * 1.05 * 1.5 });
+  // a boulder pair on the shelf so the landing has a foreground
+  for (const [lx, lz, sz] of [[hw - 1.2, hd - 1.4, 0.55], [hw - 2.3, hd - 0.9, 0.35]] as const) {
+    const [rx, rz] = world(lx, lz);
+    const r = buildRock(rand, sz);
+    r.position.set(rx, top + sz * 0.2, rz);
+    scene.add(r);
+    colliders.push({ kind: 'cap', x: rx, z: rz, r: sz * 1.1, base: top, h: sz * 0.95 });
+  }
+}
 
 export function buildMeadow(ctx: OpeningCtx): void {
   const { scene, groundH, rand, colliders } = ctx;
-  const geo = new THREE.PlaneGeometry(BOUNDS.rx * 3, BOUNDS.rz * 3.4, 160, 130);
-  geo.rotateX(-Math.PI / 2);
-  geo.translate(BOUNDS.cx, 0, BOUNDS.cz);
-  const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-  const col = new Float32Array(pos.count * 3);
-  const sage = new THREE.Color(0x414739);
-  const ochre = new THREE.Color(0x655d45);
-  const dirt = new THREE.Color(0x92856a);
-  const c = new THREE.Color();
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    pos.setY(i, groundH(x, z));
-    const n = Math.sin(x * 0.23 + Math.cos(z * 0.19) * 2) * 0.5 + 0.5;
-    c.copy(sage).lerp(ochre, THREE.MathUtils.smoothstep(n, 0.5, 0.6) * 0.65);
-    c.lerp(dirt, 1 - THREE.MathUtils.smoothstep(pathDist(x, z) + Math.sin(z * 2.3 + x) * 0.14, 0.65, 1.6));
-    col.set([c.r, c.g, c.b], i * 3);
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  geo.computeVertexNormals();
-  const ground = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true, hatchWeight: 0.22 }));
-  ground.receiveShadow = true;
-  scene.add(ground);
+  // umber litter pools under the crowns (no global pattern: it read as leopard spots on the rim)
+  const litter = (x: number, z: number) => {
+    let k = 0;
+    for (const [tx, tz, sc] of TREES) k = Math.max(k, 1 - THREE.MathUtils.smoothstep(Math.hypot(x - tx, z - tz), 1.6 * sc, 3.6 * sc));
+    return k * (0.75 + 0.25 * Math.sin(x * 1.3 + Math.sin(z * 0.9) * 2));
+  };
+  const groundCtx = { groundH, pathDist, toon, mapleLeafGeometry, litter };
+  buildGround(scene, groundCtx, { cx: BOUNDS.cx, cz: BOUNDS.cz, w: BOUNDS.rx * 3, d: BOUNDS.rz * 3.4, seg: 170 });
 
-  // H-a shelf: a 5 m stone step with no ramp; the hearth at its foot is the way up
-  const g0 = groundH(SHELF.x, SHELF.z);
-  const shelf = inked(hewn(new THREE.BoxGeometry(SHELF.w, SHELF.rise + 2, SHELF.d, 3, 3, 3), rand, 0.04), toon(0x8a7a66), 0.03);
-  shelf.position.set(SHELF.x, g0 + SHELF.rise / 2 - 1, SHELF.z);
-  shelf.rotation.y = SHELF.yaw;
-  scene.add(shelf);
-  colliders.push({ kind: 'box', x: SHELF.x, z: SHELF.z, yaw: SHELF.yaw, hx: SHELF.w / 2, hz: SHELF.d / 2, top: g0 + SHELF.rise });
+  buildShelf(ctx);
+  buildHearth(ctx);
 
-  const trees: Array<[number, number, number, 'hero' | 'grove']> = [[-12, 72, 1.2, 'hero'], [20, 66, 1.3, 'grove'], [-4, 66, 1.0, 'grove'], [22, 84, 1.1, 'grove']];
-  for (const [x, z, s, kind] of trees) {
+  // nothing grows on lanes, house pads, the well plaza or the hearth apron
+  const clear = (x: number, z: number, r: number) =>
+    pathDist(x, z) > r &&
+    Math.hypot(x - WELL.x, z - WELL.z) > 4 + r &&
+    Math.hypot(x - HEARTH_A.x, z - HEARTH_A.z) > 2.5 + r &&
+    HOUSES.every((h) => Math.max(Math.abs(x - h.x) - h.w / 2, Math.abs(z - h.z) - h.d / 2) > r);
+  // the rim: a ring of big crowns on the bowl's lip closes the slice (no colliders: the slope blocks)
+  const RIM_N = 16;
+  for (let i = 0; i < RIM_N; i++) {
+    const a = (i / RIM_N) * Math.PI * 2 + rand() * 0.25;
+    const k = 1.06 + rand() * 0.14;
+    const x = BOUNDS.cx + Math.cos(a) * BOUNDS.rx * k;
+    const z = BOUNDS.cz + Math.sin(a) * BOUNDS.rz * k;
     const y = groundH(x, z);
-    const t = buildMaple(rand, s, kind, Math.floor(rand() * 4), y);
+    const t = buildMaple(rand, 1.4 + rand() * 0.5, rand() < 0.4 ? 'tall' : 'grove', rand() < 0.6 ? 4 + (i & 1) : i & 3, y);
     t.position.set(x, y - 0.1, z);
     t.rotation.y = rand() * 6;
     scene.add(t);
-    colliders.push({ kind: 'post', x, z, r: 0.45 * s });
   }
-  for (const [x, z, s] of [[2, 70, 0.7], [-8, 76, 0.55], [8, 82, 0.6]] as const) {
+  for (const [x, z, sc, kind, pal] of TREES) {
+    const y = groundH(x, z);
+    const t = buildMaple(rand, sc, kind, pal, y);
+    t.position.set(x, y - 0.1, z);
+    t.rotation.y = rand() * 6;
+    scene.add(t);
+    colliders.push({ kind: 'post', x, z, r: (kind === 'hero' ? 0.42 : kind === 'lean' ? 0.38 : 0.3) * sc * 1.5 });
+  }
+  for (const [x, z, s] of ROCKS) {
     const r = buildRock(rand, s);
     r.position.set(x, groundH(x, z) + s * 0.25, z);
     scene.add(r);
     colliders.push({ kind: 'cap', x, z, r: s * 1.1, base: groundH(x, z), h: s * 0.95 });
+    scene.add(contactInk(r, (px, pz) => groundH(px, pz)));
   }
-  buildDistance(scene, rand);
+
+  // tufts over the play ellipse, thinning toward the rim; litter drifts under every crown
+  buildGrass(scene, rand, groundCtx, {
+    cx: BOUNDS.cx, cz: BOUNDS.cz, w: BOUNDS.rx * 2, d: BOUNDS.rz * 2, n: 2600,
+    keep: (x, z) => clear(x, z, 0.6) && rimK(x, z) < 1 - rand() * 0.15,
+  });
+  buildLeaves(scene, rand, groundCtx, {
+    cx: BOUNDS.cx, cz: BOUNDS.cz, r: 30, n: 2600,
+    drifts: TREES.map(([x, z, sc]) => [x, z, 1.6 + sc * 1.4] as const),
+    keep: (x, z) => clear(x, z, 0.2),
+  });
+  buildDistance(scene, rand, { cx: BOUNDS.cx, cz: BOUNDS.cz, dir: -Math.PI / 2, arc: Math.PI * 1.9, count: 16, y: 2 });
 }
