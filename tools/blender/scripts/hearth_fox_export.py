@@ -1,6 +1,6 @@
 """Hearth-fox export: bake IK-authored clips to FK deform keys, strip controls, write GLB.
 
-Exec'd after hearth_fox_anim.py. Output: assets/hero/hearth_fox.glb with clips idle / walk / trot / run / jumpUp / fall / land.
+Exec'd after hearth_fox_anim.py. Output: assets/hero/hearth_fox.glb with clips idle / walk / trot / lope / run / jumpUp / fall / land.
 """
 import bpy, os
 
