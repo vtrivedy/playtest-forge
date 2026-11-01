@@ -18,7 +18,9 @@ const C = {
   timberDark: 0x3d2a20,
   stone: 0x8a8274,
   stoneDark: 0x6b6358,
-  stoneCool: 0x7b7a76,
+  stoneCool: 0x6e6d69,
+  stoneField: 0x5f584f,
+  moss: 0x55583a,
   thatch: 0x8d7a52,
   thatchDark: 0x6c5d40,
   slate: 0x5d5c66,
@@ -146,10 +148,11 @@ function cottage(k: Kit, ctx: OpeningCtx, h: House, index: number): number {
       const n = Math.max(2, Math.round(len / 0.75));
       for (let i = 0; i < n; i++) fn((i + 0.5) / n - 0.5, len / n);
     };
-    for (const sz of [-1, 1])
-      per(w + 0.4, (t, s) => k.add(hewn(box(s * 0.95, 0.42 + rand() * 0.18, 0.4), rand, 0.07), rand() < 0.5 ? C.stone : C.stoneCool, [t * (w + 0.4), base - 0.2, sz * (d / 2 + 0.2)], [0, (rand() - 0.5) * 0.1, 0], 0.02));
-    for (const sx of [-1, 1])
-      per(d + 0.4, (t, s) => k.add(hewn(box(0.4, 0.42 + rand() * 0.18, s * 0.95), rand, 0.07), rand() < 0.5 ? C.stone : C.stoneCool, [sx * (w / 2 + 0.2), base - 0.2, t * (d + 0.4)], [0, (rand() - 0.5) * 0.1, 0], 0.02));
+    // chunky, half-sunk field stones round the plinth (darker than the wall so the wall stays the light plane)
+    const field = (x: number, z: number, r: number) =>
+      k.add(jitter(new THREE.DodecahedronGeometry(r, 0), 0.18, rand), rand() < 0.4 ? C.stoneDark : rand() < 0.5 ? C.stoneField : C.stoneCool, [x, base - 0.42 + r * 0.35, z], [rand(), rand() * 6, rand()], 0.02, [1.25, 0.8, 1.1]);
+    for (const sz of [-1, 1]) per(w + 0.5, (t) => field(t * (w + 0.5) + (rand() - 0.5) * 0.15, sz * (d / 2 + 0.2), 0.3 + rand() * 0.14));
+    for (const sx of [-1, 1]) per(d + 0.1, (t) => field(sx * (w / 2 + 0.2), t * (d + 0.1) + (rand() - 0.5) * 0.15, 0.3 + rand() * 0.14));
 
     // walls (slightly bowed); some cottages keep a rubble-stone ground storey
     k.add(jitter(new THREE.BoxGeometry(w, eave, d, 4, 3, 3), 0.01, rand), plaster, [0, base + eave / 2, 0], [0, 0, 0], 0.016);
@@ -193,29 +196,35 @@ function cottage(k: Kit, ctx: OpeningCtx, h: House, index: number): number {
     const half = d / 2 + over;
     const slope = Math.atan2(rise, d / 2);
     const run = half / Math.cos(slope);
-    const thick = slate ? 0.26 : 0.46;
+    const thick = slate ? 0.24 : 0.3;
     const tone = slate ? C.slate : C.thatch;
     const toneDark = slate ? C.slateDark : C.thatchDark;
+    // t: 0 at the ridge → 1 at the eave edge; ySurf = the gable line extended under the overhang
+    const ySurf = (t: number) => wallTop + rise - Math.tan(slope) * half * t;
     for (const sz of [-1, 1]) {
-      // slab whose top face passes through the ridge line and overhangs the eave by `over`
-      const cz = (sz * (half - 0.05)) / 2;
-      const cy = wallTop + rise - Math.tan(slope) * (half / 2) + thick * 0.5;
-      k.add(hewn(new THREE.BoxGeometry(w + over * 2, thick, run, 5, 1, 4), rand, slate ? 0.015 : 0.035), tone, [0, cy, cz], [sz * slope, 0, 0], 0.024);
-      const eaveY = wallTop + rise - Math.tan(slope) * half;
-      const eaveZ = sz * half;
+      const zAt = (t: number) => sz * half * t;
       if (slate) {
-        for (let c = 1; c < 5; c++) {
-          const t = c / 5;
-          k.add(box(w + over * 2 + 0.02, 0.07, 0.1), toneDark, [0, eaveY + thick + Math.tan(slope) * half * t - 0.02, eaveZ * (1 - t)], [sz * slope, 0, 0], 0.012);
-        }
-        k.add(box(w + over * 2 + 0.06, 0.12, 0.16), toneDark, [0, eaveY + thick * 0.5, eaveZ], [sz * slope, 0, 0], 0.016);
+        k.add(hewn(new THREE.BoxGeometry(w + over * 2, thick, run, 5, 1, 4), rand, 0.012), tone, [0, ySurf(0.5) + thick / 2, zAt(0.5)], [sz * slope, 0, 0], 0.024);
+        for (const t of [0.22, 0.42, 0.62, 0.82]) k.add(box(w + over * 2 + 0.02, 0.06, 0.12), toneDark, [0, ySurf(t) + thick + 0.01, zAt(t)], [sz * slope, 0, 0], 0.01);
+        k.add(box(w + over * 2 + 0.06, thick + 0.04, 0.14), toneDark, [0, ySurf(1) + thick / 2, zAt(1)], [sz * slope, 0, 0], 0.016);
       } else {
-        k.add(jitter(cyl(0.27, 0.27, w + over * 2 + 0.1, 10, 'x'), 0.06, rand), toneDark, [0, eaveY + thick * 0.35, eaveZ], [0, 0, 0], 0.022);
-        // a mid-course roll breaks the slab into layered thatch
-        k.add(jitter(cyl(0.16, 0.16, w + over * 2, 8, 'x'), 0.06, rand), toneDark, [0, eaveY + thick * 0.9 + Math.tan(slope) * half * 0.5, eaveZ * 0.5], [0, 0, 0], 0.016);
+        // three overlapping courses, each lower one proud of the last, every course ends in a rolled lip
+        const bands = [[0, 0.42], [0.34, 0.72], [0.64, 1]] as const;
+        bands.forEach(([t0, t1], c) => {
+          const tm = (t0 + t1) / 2;
+          const lift = c * 0.07;
+          k.add(jitter(new THREE.BoxGeometry(w + over * 2 - (2 - c) * 0.06, thick, run * (t1 - t0), 6, 1, 2), 0.03, rand), c % 2 ? C.thatchDark : tone, [0, ySurf(tm) + thick / 2 + lift, zAt(tm)], [sz * slope, 0, 0], 0.02);
+          const r = c === 2 ? 0.27 : 0.19;
+          k.add(jitter(cyl(r, r, w + over * 2 - (2 - c) * 0.06 + 0.06, 10, 'x'), 0.07, rand), toneDark, [0, ySurf(t1) + thick * 0.55 + lift - r * 0.3, zAt(t1)], [0, 0, 0], c === 2 ? 0.022 : 0.016);
+        });
+        // moss on the shaded courses (old roofs nobody re-thatched)
+        for (let m = 0; m < 3; m++) {
+          const t = 0.25 + rand() * 0.6;
+          k.add(jitter(new THREE.IcosahedronGeometry(0.28, 1), 0.25, rand), C.moss, [(rand() - 0.5) * w, ySurf(t) + thick + 0.08, zAt(t)], [sz * slope, rand() * 6, 0], 0.012, [1.4, 0.35, 1]);
+        }
       }
     }
-    k.add(jitter(cyl(slate ? 0.17 : 0.34, slate ? 0.17 : 0.34, w + over * 2 + 0.15, 10, 'x'), slate ? 0.01 : 0.05, rand), toneDark, [0, wallTop + rise + thick * 0.95, 0], [0, 0, 0], 0.024);
+    k.add(jitter(cyl(slate ? 0.17 : 0.36, slate ? 0.17 : 0.36, w + over * 2 + 0.15, 10, 'x'), slate ? 0.01 : 0.05, rand), toneDark, [0, ySurf(0) + thick + (slate ? 0.02 : 0.08), 0], [0, 0, 0], 0.024);
 
     // front (+z): arched door under a hooded porch, step, one or two windows
     const front = d / 2;
@@ -398,7 +407,7 @@ export function buildVillage(ctx: OpeningCtx): void {
     g.name = `cottage-${i}`;
     scene.add(g);
     ctx.occluders.push(g);
-    colliders.push({ kind: 'box', x: h.x, z: h.z, yaw: 0, hx: h.w / 2 + 0.25, hz: h.d / 2 + 0.25, top: y0 + 0.55 + h.eave + h.rise });
+    colliders.push({ kind: 'box', x: h.x, z: h.z, yaw: 0, hx: h.w / 2 + 0.45, hz: h.d / 2 + 0.45, top: y0 + 0.55 + h.eave + h.rise });
     colliders.push({ kind: 'post', x: h.x - h.w * 0.2 - 1.0, z: h.z + h.d / 2 + 0.6, r: 0.36 });
     colliders.push({ kind: 'post', x: h.x + h.w * 0.42, z: h.z + h.d / 2 + 0.65, r: 0.38 });
     if (h.chimney) colliders.push({ kind: 'post', x: h.x - h.w / 2 - 0.35, z: h.z - h.d * 0.18, r: 0.5 });
