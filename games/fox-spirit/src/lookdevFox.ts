@@ -1,10 +1,10 @@
 /**
- * Hearth-fox for the P0 lookdev ("Pressed Ink → Living Cel").
+ * Hearth-fox "Emberkit" (starter-creature direction B) for the P0 lookdev ("Pressed Ink → Living Cel").
  *
  * Authored in Blender (tools/blender/scripts/hearth_fox_*.py) → assets/hero/hearth_fox.glb:
- * `fox_coat` (skinned, vertex-coloured coat; TEXCOORD_0.x = ember mask) + `fox_face` (eyes, nose),
+ * `fox_coat` (skinned, vertex-coloured coat; TEXCOORD_0.x = ember mask) + `fox_face` (eyes with a self-lit spark, nose),
  * clips idle / walk / trot / lope / run / jumpUp / fall / land (in place; the rig's glTF extras carry each clip's ground speed).
- * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes, ember kick-up at footfalls and landings.
+ * Here: two-tone cel coat (hatched shadow tone, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes, ember kick-up at footfalls and landings.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -60,14 +60,13 @@ function coatMaterial(emberGain: number): THREE.MeshToonMaterial {
       .replace(
         '#include <opaque_fragment>',
         `{
-          // living cel: band the total (key + hemi + hearth) light into 3 crisp steps so the hemi fill
-          // can't airbrush the coat; the shadow step leans rust-plum (melancholy), never grey
+          // living cel: band the total (key + hemi + hearth) light into two crisp tones so the hemi fill
+          // can't airbrush the coat; the shadow tone leans rust-plum (melancholy), never grey
           vec3 lit = outgoingLight - totalEmissiveRadiance;
           float L = dot(lit, vec3(0.2126, 0.7152, 0.0722)) / max(1e-3, dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)));
-          // lit step kept close to mid so band edges read as paint, not a lacquer highlight
+          // starter-creature read: two flat tones, no lacquer highlight
           float shade = smoothstep(0.43, 0.47, L);
-          float band = mix(0.44, 0.84, shade);
-          band = mix(band, 0.96, step(0.92, L));
+          float band = mix(0.6, 1.0, shade);
           vec3 tint = mix(vec3(0.82, 0.58, 0.66), vec3(1.0), shade);
           // pressed-ink hatching in the shadow step: the fox shares the world's printed medium
           float hatch = step(0.66, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.16));
@@ -132,7 +131,7 @@ function flameMaterial(size: [number, number], seed: number, uLean: { value: THR
   });
 }
 
-export async function loadHearthFox(inkMaterial: (width: number) => THREE.Material, inkWidth = 0.024): Promise<HearthFox> {
+export async function loadHearthFox(inkMaterial: (width: number) => THREE.Material, inkWidth = 0.02): Promise<HearthFox> {
   const gltf = await new GLTFLoader().loadAsync('/assets/hero/hearth_fox.glb');
   const root = new THREE.Group();
   const model = gltf.scene;
@@ -221,11 +220,11 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
   const flameGeo = new THREE.PlaneGeometry(1, 1);
   const tail5 = model.getObjectByName('tail5') as THREE.Bone | undefined;
   const tongues: [THREE.Bone | undefined, [number, number, number], [number, number], number][] = [
-    [tailTip, [0, 0.06, 0], [0.19, 0.4], 0.1],
-    [tailTip, [0.04, 0.0, 0.02], [0.13, 0.27], 0.55],
-    [tailTip, [-0.045, -0.03, -0.01], [0.12, 0.22], 0.85],
-    [tail5, [0.03, 0.03, 0.03], [0.1, 0.18], 0.35],
-    [tail5, [-0.04, -0.02, 0.02], [0.09, 0.14], 0.7],
+    [tailTip, [0, 0.04, 0], [0.15, 0.3], 0.1],
+    [tailTip, [0.03, 0.0, 0.02], [0.1, 0.2], 0.55],
+    [tailTip, [-0.035, -0.02, -0.01], [0.09, 0.16], 0.85],
+    [tail5, [0.025, 0.02, 0.02], [0.08, 0.13], 0.35],
+    [tail5, [-0.03, -0.015, 0.015], [0.07, 0.1], 0.7],
   ];
   for (const [bone, off, size, seed] of tongues) {
     if (!bone) continue;
@@ -366,7 +365,7 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       pawBones.forEach((pawBone, i) => {
         pawBone.getWorldPosition(pawAt);
         // paw height in the fox's own frame, so slopes under the root don't fake a strike
-        const down = root.worldToLocal(pawLocal.copy(pawAt)).y < 0.03;
+        const down = root.worldToLocal(pawLocal.copy(pawAt)).y < 0.02;
         if (down && !pawDown[i] && fox.striding) kick(pawAt, 2, 0.18);
         pawDown[i] = down;
       });

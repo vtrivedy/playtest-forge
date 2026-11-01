@@ -10,6 +10,8 @@ from mathutils import Vector, Matrix
 
 FPS = 30
 scene.render.fps = FPS
+# every paw / hip offset below is authored for a 0.4 m leg; K re-fits it to the starter fox's short sturdy legs
+K = 0.52
 arm = rig.data
 TAU = math.pi * 2
 
@@ -35,11 +37,11 @@ for s in "LR":
     ctl(f"ctl_fpaw.{s}", eb[f"pastern.{s}"].tail)
     ctl(f"ctl_wrist.{s}", eb[f"forearm.{s}"].tail, f"ctl_fpaw.{s}", up=True)
     ctl(f"ctl_ftoe.{s}", eb[f"fpaw.{s}"].tail, f"ctl_fpaw.{s}", 0.02)
-    ctl(f"pole_elbow.{s}", eb[f"forearm.{s}"].head + Vector((0, 0.35, 0)), "hips")
+    ctl(f"pole_elbow.{s}", eb[f"forearm.{s}"].head + Vector((0, 0.2, 0)), "hips")
     ctl(f"ctl_hpaw.{s}", eb[f"meta.{s}"].tail)
     ctl(f"ctl_hock.{s}", eb[f"shin.{s}"].tail, f"ctl_hpaw.{s}", up=True)
     ctl(f"ctl_htoe.{s}", eb[f"hpaw.{s}"].tail, f"ctl_hpaw.{s}", 0.02)
-    ctl(f"pole_stifle.{s}", eb[f"shin.{s}"].head + Vector((0, -0.35, 0)), "hips")
+    ctl(f"pole_stifle.{s}", eb[f"shin.{s}"].head + Vector((0, -0.2, 0)), "hips")
 bpy.ops.object.mode_set(mode="POSE")
 pb = rig.pose.bones
 for b in pb:
@@ -118,14 +120,14 @@ def rot(bone, pitch=0.0, yaw=0.0, roll=0.0):
 
 def paw(name, fwd, up, tilt):
     p = pb[name]
-    p.location = p.bone.matrix_local.to_3x3().inverted() @ Vector((0.0, -fwd, up))
+    p.location = p.bone.matrix_local.to_3x3().inverted() @ (Vector((0.0, -fwd, up)) * K)
     p.rotation_euler = (tilt * SGN[name], 0, 0)
 
 
 def hip_offset(side=0.0, up=0.0, fwd=0.0):
     """world-space hip shift (x = fox left, z = up, fwd = -Y) → bone-local location"""
     m = pb["hips"].bone.matrix_local.to_3x3().inverted()
-    pb["hips"].location = m @ Vector((side, -fwd, up))
+    pb["hips"].location = m @ (Vector((side, -fwd, up)) * K)
 
 
 def ease(x):
@@ -165,16 +167,16 @@ def key_all(f):
 
 GAITS = {
     # name: frames, stride per cycle (m), duty, phase offsets LH LF RH RF, lifts (front, hind)
-    "walk": dict(frames=34, stride=0.6, duty=0.64, off=dict(LH=0.0, LF=0.27, RH=0.5, RF=0.77), lift=(0.06, 0.05)),
+    "walk": dict(frames=20, stride=0.6, duty=0.64, off=dict(LH=0.0, LF=0.27, RH=0.5, RF=0.77), lift=(0.06, 0.05)),
     # trot: diagonal pairs, closes the walk → run gap (~1.3 m/s)
-    # speeds form an even ladder (each ≈2× the last) so the game's stride-matched rate stays within ~0.6–1.6
+    # short legs → quick scurrying cadence; speeds (K·stride·FPS/frames ≈ .47 / .94 / 1.85 / 3.18 m/s) form an even ladder (each ≈2× the last) so the game's stride-matched rate stays within ~0.6–1.6
     # at every gait switch; a big gap forces rate clamps and the planted paws slide
-    "trot": dict(frames=18, stride=0.66, duty=0.46, off=dict(LH=0.0, RF=0.02, RH=0.5, LF=0.52), lift=(0.09, 0.07)),
+    "trot": dict(frames=11, stride=0.66, duty=0.46, off=dict(LH=0.0, RF=0.02, RH=0.5, LF=0.52), lift=(0.09, 0.07)),
     # lope: 3-beat canter (hind, diagonal pair, lead fore), half the gallop's spine flex, ~2.0 m/s
-    "lope": dict(frames=16, stride=1.07, duty=0.36, off=dict(LH=0.0, RH=0.27, LF=0.31, RF=0.58), lift=(0.12, 0.1), centre=(0.02, 0.04),
+    "lope": dict(frames=9, stride=1.07, duty=0.36, off=dict(LH=0.0, RH=0.27, LF=0.31, RF=0.58), lift=(0.12, 0.1), centre=(0.02, 0.04),
                  reach=(0.08, 0.04), fold=(0.7, 0.4), flex=0.55),
     # run: long gallop stride (most distance in suspension), ~3.5 m/s gameplay top speed
-    "run": dict(frames=14, stride=1.63, duty=0.27, off=dict(LH=0.0, RH=0.09, LF=0.45, RF=0.55), lift=(0.15, 0.12), centre=(0.03, 0.07),
+    "run": dict(frames=8, stride=1.63, duty=0.27, off=dict(LH=0.0, RH=0.09, LF=0.45, RF=0.55), lift=(0.15, 0.12), centre=(0.03, 0.07),
                 reach=(0.14, 0.08), fold=(0.75, 0.3)),
 }
 

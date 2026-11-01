@@ -29,9 +29,9 @@ cam = bpy.data.objects.get("sheet_cam") or bpy.data.objects.new("sheet_cam", bpy
 if cam.name not in sc.collection.objects:
     sc.collection.objects.link(cam)
 cam.data.type = "ORTHO"
-cam.data.ortho_scale = 2.3
+cam.data.ortho_scale = 1.3
 sc.camera = cam
-VIEWS = {"side": (Vector((3.0, 0.25, 0.5)), Vector((0, 0.25, 0.5))), "q": (Vector((2.2, -2.2, 1.1)), Vector((0, 0, 0.4)))}
+VIEWS = {"side": (Vector((3.0, 0.08, 0.33)), Vector((0, 0.08, 0.33))), "q": (Vector((1.5, -1.5, 0.75)), Vector((0, 0, 0.3)))}
 for name in clips:
     act = bpy.data.actions[f"src_{name}"]
     rig.animation_data.action = act
