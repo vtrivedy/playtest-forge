@@ -129,6 +129,28 @@ function windowUnit(k: Kit, rand: () => number, flowers: boolean): void {
   }
 }
 
+/** thatch course slab (local z = down-slope when `sz` = +1): lumpy top, scalloped fringe at the eave end */
+function thatchCourse(w: number, t: number, len: number, sz: number, rand: () => number): THREE.BufferGeometry {
+  const g = new THREE.BoxGeometry(w, t, len, Math.ceil(w / 0.18), 1, 3);
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  const o = rand() * 10;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const y = p.getY(i);
+    const z = p.getZ(i) * sz;
+    const bump = Math.sin(x * 2.1 + o) * Math.sin(z * 3.3 + o) * 0.035;
+    if (y > 0) p.setY(i, y + bump);
+    if (z > len / 2 - 1e-3) {
+      // combed fringe: scallops every ~0.45 m, the tips droop
+      const sc = Math.abs(Math.sin(x * 7 + o));
+      p.setZ(i, (z + 0.09 * sc) * sz);
+      p.setY(i, p.getY(i) - 0.07 * sc);
+    }
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
 type House = (typeof HOUSES)[number];
 
 function cottage(k: Kit, ctx: OpeningCtx, h: House, index: number): number {
@@ -208,14 +230,12 @@ function cottage(k: Kit, ctx: OpeningCtx, h: House, index: number): number {
         for (const t of [0.22, 0.42, 0.62, 0.82]) k.add(box(w + over * 2 + 0.02, 0.06, 0.12), toneDark, [0, ySurf(t) + thick + 0.01, zAt(t)], [sz * slope, 0, 0], 0.01);
         k.add(box(w + over * 2 + 0.06, thick + 0.04, 0.14), toneDark, [0, ySurf(1) + thick / 2, zAt(1)], [sz * slope, 0, 0], 0.016);
       } else {
-        // three overlapping courses, each lower one proud of the last, every course ends in a rolled lip
+        // three overlapping courses, each lower one proud of the last, each ending in a combed, scalloped fringe
         const bands = [[0, 0.42], [0.34, 0.72], [0.64, 1]] as const;
         bands.forEach(([t0, t1], c) => {
           const tm = (t0 + t1) / 2;
-          const lift = c * 0.07;
-          k.add(jitter(new THREE.BoxGeometry(w + over * 2 - (2 - c) * 0.06, thick, run * (t1 - t0), 6, 1, 2), 0.03, rand), c % 2 ? C.thatchDark : tone, [0, ySurf(tm) + thick / 2 + lift, zAt(tm)], [sz * slope, 0, 0], 0.02);
-          const r = c === 2 ? 0.27 : 0.19;
-          k.add(jitter(cyl(r, r, w + over * 2 - (2 - c) * 0.06 + 0.06, 10, 'x'), 0.07, rand), toneDark, [0, ySurf(t1) + thick * 0.55 + lift - r * 0.3, zAt(t1)], [0, 0, 0], c === 2 ? 0.022 : 0.016);
+          const wide = w + over * 2 - (2 - c) * 0.06;
+          k.add(thatchCourse(wide, thick, run * (t1 - t0), sz, rand), c % 2 ? C.thatchDark : tone, [0, ySurf(tm) + thick / 2 + c * 0.07, zAt(tm)], [sz * slope, 0, 0], c === 2 ? 0.022 : 0.016);
         });
         // moss on the shaded courses (old roofs nobody re-thatched)
         for (let m = 0; m < 3; m++) {
@@ -233,7 +253,7 @@ function cottage(k: Kit, ctx: OpeningCtx, h: House, index: number): number {
     k.add(archSlab(0.88, 1.74, 0.12), C.door, [doorX, base, front + 0.1]);
     for (const dx of [-0.22, 0, 0.22]) k.add(box(0.03, 1.5, 0.04), C.timberDark, [doorX + dx, base + 0.8, front + 0.17]);
     k.add(cyl(0.05, 0.05, 0.06, 8, 'z'), C.amber, [doorX + 0.3, base + 0.9, front + 0.18]);
-    k.add(hewn(box(1.4, 0.32, 0.7), rand, 0.05), C.stone, [doorX, base - 0.2, front + 0.45], [0, 0, 0], 0.02);
+    k.add(hewn(box(1.4, 0.32, 0.7), rand, 0.05), C.stoneField, [doorX, base - 0.2, front + 0.45], [0, 0, 0], 0.02);
     k.at(doorX, base + 2.05, front + 0.35, 0, () => {
       for (const s of [-1, 1]) k.add(hewn(box(0.85, 0.12, 0.75), rand, 0.02), tone, [s * 0.36, 0.18, 0], [0, 0, -s * 0.5], 0.016);
       for (const s of [-1, 1]) k.add(box(0.08, 0.5, 0.08), C.timber, [s * 0.55, -0.12, -0.15], [0.7, 0, 0]);
