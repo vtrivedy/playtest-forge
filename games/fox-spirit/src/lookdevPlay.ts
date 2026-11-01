@@ -396,6 +396,8 @@ class FootIK {
 
 export interface PlayController {
   cam: FollowCamera;
+  /** Highest walkable surface; posts return Infinity so placement can reject them. */
+  surfaceAt: (x: number, z: number) => number;
   step: (dt: number) => void;
   state: () => Record<string, unknown>;
   setStick: (x: number | null, z?: number) => void;
@@ -410,6 +412,10 @@ export function createPlay(opts: {
   start: { x: number; z: number; yaw: number };
   /** touchdown from a jump: feet position, impact 0..1 */
   onLand?: (at: THREE.Vector3, impact: number) => void;
+  /** Contextual pickup/place. Edged independently of key repeat. */
+  onInteract?: () => void;
+  /** Called before an accepted dash changes velocity, including midair dashes. */
+  onDash?: (lastGrounded: THREE.Vector3) => void;
   /**
    * Blockers that sit right beside the fox (arch piers). Main's follow camera does not pull in for a
    * blocker within ~1 m of the fox; it reports a fade and leaves the cutout to the world. These meshes
@@ -569,6 +575,8 @@ export function createPlay(opts: {
   let bufferT = 0;
   let jumpHeld = false;
   let dashHeld = false;
+  let interactHeld = false;
+  const lastGrounded = new THREE.Vector3();
   let dashT = 0;
   let dashCooldownT = 0;
   let dashesUsed = 0;
@@ -590,6 +598,7 @@ export function createPlay(opts: {
     yawRate = 0;
     vel.set(0, 0, 0);
     grounded = true;
+    lastGrounded.copy(pos);
     dashT = dashCooldownT = 0;
     gliding = false;
     cam.snapBehind(yaw);
@@ -617,8 +626,12 @@ export function createPlay(opts: {
     const jump = keys.has('Space');
     if (jump && !jumpHeld) bufferT = P.buffer;
     jumpHeld = jump;
+    const interact = keys.has('KeyE');
+    if (interact && !interactHeld) opts.onInteract?.();
+    interactHeld = interact;
     const dash = keys.has('ShiftLeft') || keys.has('ShiftRight');
     if (dash && !dashHeld && dashCooldownT <= 0) {
+      opts.onDash?.(lastGrounded.clone());
       dashT = P.dashDuration;
       dashCooldownT = P.dashDuration + P.dashCooldown;
       dashesUsed++;
@@ -641,6 +654,7 @@ export function createPlay(opts: {
   function step(dt: number) {
     dashT = Math.max(0, dashT - dt);
     dashCooldownT = Math.max(0, dashCooldownT - dt);
+    if (grounded && Number.isFinite(surface(pos.x, pos.z))) lastGrounded.copy(pos);
     readInput();
     bufferT -= dt;
     const want = wish.length();
@@ -784,6 +798,7 @@ export function createPlay(opts: {
 
   return {
     cam,
+    surfaceAt: surface,
     step,
     teleport(x, z, y) {
       teleport(x, z, y);
