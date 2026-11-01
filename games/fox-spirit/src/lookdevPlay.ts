@@ -458,6 +458,8 @@ export function createPlay(opts: {
       lookAhead: 1.2,
       fov: 50,
       clearance: 0.35,
+      // main's recentre scales with speed / 7.5 m/s (its fox runs 9); ours tops out at 3.6, so match the rate
+      recenterRate: 2.6,
     },
   });
 
