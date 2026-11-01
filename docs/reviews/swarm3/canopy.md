@@ -98,3 +98,11 @@ provisional pending integrated Page play. No new gait approval from stills.
 
 Final tuck route02: 5/5 PASS/errors[], middle→high→roost plus underside walk/dash.
 Inspected final high chase: leaf full width, veins and fox readable. tsc+vite PASS.
+
+Maple visual revision: independent Moss/Flint reviews rejected floating plate
+silhouettes. Enlarged curved inked stalks, authored lobed curled blades, tapered
+veins, and persistent local warmth on first support contact. No support positions
+or launch tuning changed. Final route /captures/tallow/canopy-maple-03 passes5/5,
+errors[], actual high chase inspected: warm contacted blade versus pale untouched
+roost; fox readable. Earlier02 passed but paint shader hid warmth; corrected and
+retested03. tsc/vite green. External BEAUTIFUL re-verdict pending; no approval claim.

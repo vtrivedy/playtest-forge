@@ -115,3 +115,9 @@ the real-input chain. The underside scan found a blade directly over the lens wi
 the fox sight rays. Also shrink each visual leaf horizontally near the lens
 (1.75m footprint, within .65m of its height), damping back to full size outside
 that band. Collision and stem remain stable; use the existing chase camera.
+
+## Visual revision after independent review
+Keep support positions/feel fixed. Give each spring a substantial curved inked stalk,
+a curled maple-lobed blade and tapered fine veins. First top contact permanently
+warms that blade locally; no ColorField restore slot is consumed. Chase camera
+visibility treatment remains active. Re-run chain and underside/visibility probes.
