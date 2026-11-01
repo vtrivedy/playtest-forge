@@ -106,7 +106,7 @@ export const KEEPING = (() => {
     /** dark root-hearth bowl among the roots, just behind the hinge */
     root: { ...local(0, 1.35), y: terraceTop, r: 0.75 },
     /** Hearthtree pivot (root crown) and fall direction; arrested lean from vertical (rad) */
-    hinge: { ...hinge, y: terraceTop - 0.6 },
+    hinge: { ...hinge, y: terraceTop - 0.8 },
     fall,
     leanArrested: 0.52,
     /** far crag the crown lands across: walkable top = terraceTop */

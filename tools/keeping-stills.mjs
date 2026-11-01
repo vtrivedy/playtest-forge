@@ -25,12 +25,16 @@ const POSES = {
 };
 const CAMS = {
   // the reveal from the shelf landing
-  reveal: [[10.5, 7.2, 74.5], [27, 12, 73]],
+  reveal: [[9, 7.4, 77.5], [27, 13, 72]],
   // the whole place from the meadow below
-  wide: [[6, 6, 98], [24, 7, 72]],
+  wide: [[0, 3.2, 93], [24, 8, 74]],
   // side-on across the gorge: tree, terrace and crag in one frame
-  gorge: [[12, 9, 62], [27, 11, 70]],
+  gorge: [[10, 12, 66], [27, 11, 70.5]],
   aerial: [[2, 34, 102], [22, 4, 72]],
+  // the tree itself, from over the ridge
+  tree: [[14, 15, 80], [27.5, 13, 70.5]],
+  // looking back along the fallen trunk from the crag
+  across: [[24.6, 11.6, 61.8], [28, 9.6, 74]],
 };
 const paint = arg('paint', '0') === '1';
 const settle = Number(arg('settle', '0'));
