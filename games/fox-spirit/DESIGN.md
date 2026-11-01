@@ -408,3 +408,11 @@ hook compatibility before consuming the shared capture slot for the full baselin
 Require a clean source worktree before creating any capture output so the recorded
 SHA identifies all source and asset inputs. Gait is driven by analog stick magnitude
 0.14 for walking and 0.8 for running; the trace's run flag only labels that beat.
+
+Baseline route revision: the first probe from (0,70) approached the H-a shelf
+at (13,75.5) and its nearby arch. Stage the next probe at (0,56), keeping the
+same timeline and yaw. Its expected footprint, translated from the first trace,
+is approximately x[-1,16], z[43,58]: south of the shelf and pond, east of the
+(-6,58) tree, and north of the (8,26) tree. This is a source-screened candidate,
+not an accepted route; inspect all six probe stills and telemetry before full
+capture. Preserve the failed first probe as evidence of the staging change.

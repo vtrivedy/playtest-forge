@@ -60,9 +60,9 @@ try {
       h.autopilot(false);
       h.setKeys([]);
       h.setStick(0, 0);
-      const y = h.debug.world.collision.highestAt(0, 70);
+      const y = h.debug.world.collision.highestAt(0, 56);
       if (!Number.isFinite(y)) throw Error('No safe baseline meadow floor');
-      h.teleport(0, y, 70, Math.PI);
+      h.teleport(0, y, 56, Math.PI);
     } else {
       h.setPaint('half');
       h.teleport(0.6, 3.2, Math.PI);
