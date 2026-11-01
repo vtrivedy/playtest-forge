@@ -405,6 +405,12 @@ export function createPlay(opts: {
   start: { x: number; z: number; yaw: number };
   /** touchdown from a jump: feet position, impact 0..1 */
   onLand?: (at: THREE.Vector3, impact: number) => void;
+  /**
+   * Blockers that sit right beside the fox (arch piers). Main's follow camera does not pull in for a
+   * blocker within ~1 m of the fox; it reports a fade and leaves the cutout to the world. These meshes
+   * fade (and drop their ink hulls) while that fade is on.
+   */
+  cutout?: THREE.Object3D[];
 }): PlayController {
   const { fox, groundH, colliders } = opts;
   const P = PLAY;
@@ -498,6 +504,32 @@ export function createPlay(opts: {
       c.add(cam.params, 'sideBias', -1, 1, 0.01);
     });
   }
+
+  const cutMats: THREE.Material[] = [];
+  const cutHulls: THREE.Object3D[] = [];
+  for (const root of opts.cutout ?? [])
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (mesh.userData.ink) return void cutHulls.push(mesh);
+      // own material (shared stone materials stay opaque elsewhere); keep the toon/paint shader patch
+      const src = mesh.material as THREE.Material;
+      const m = src.clone();
+      m.onBeforeCompile = src.onBeforeCompile;
+      m.customProgramCacheKey = src.customProgramCacheKey;
+      m.transparent = true;
+      mesh.material = m;
+      cutMats.push(m);
+    });
+  let cutK = 0;
+  const applyCutout = (dt: number) => {
+    if (!cutMats.length) return;
+    const info = cam.debug.internals();
+    const fade = Number(/fade=([\d.]+)/.exec(info)?.[1] ?? 0);
+    cutK = THREE.MathUtils.damp(cutK, /blocker=pier/.test(info) ? fade : 0, 10, dt);
+    for (const m of cutMats) m.opacity = 1 - 0.8 * cutK;
+    for (const h of cutHulls) h.visible = cutK < 0.3;
+  };
 
   const keys = new Set<string>();
   let stick: THREE.Vector2 | null = null;
@@ -698,6 +730,7 @@ export function createPlay(opts: {
       airTime: grounded ? 0 : airT,
       landing: null,
     });
+    applyCutout(dt);
   }
 
   return {
@@ -729,7 +762,7 @@ export function createPlay(opts: {
       stanceFeet: ik.stanceFeet,
       maxSlide: +ik.slide.toFixed(3),
       paws: fox.paws(),
-      camera: { pos: cam.camera.position.toArray().map((v) => +v.toFixed(3)) },
+      camera: { pos: cam.camera.position.toArray().map((v) => +v.toFixed(3)), boom: cam.debug.internals(), blocked: cam.debug.blocked() },
     }),
   };
 }

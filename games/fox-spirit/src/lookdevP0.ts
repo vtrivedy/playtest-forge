@@ -1047,6 +1047,8 @@ export async function runLookdevP0(): Promise<void> {
         groundH,
         colliders,
         start: { x: FOX_HOME.x, z: FOX_HOME.z + 4, yaw: Math.PI },
+        // pier courses, caps and bands (local x ≈ ±SPAN, below the springing line)
+        cutout: arch.children.filter((c) => Math.abs(Math.abs(c.position.x) - 1.75) < 0.5 && c.position.y > 0.5 && c.position.y < 4.2),
         onLand(at, impact) {
           if (field.restores.length >= 4) return;
           field.restore(at, 4.5 + 3 * impact + 2 * field.restores.length, 1.8, { edgeMax: 1.4 });
