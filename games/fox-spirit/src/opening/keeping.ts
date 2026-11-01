@@ -26,6 +26,9 @@ export const SETTLE = {
 /** the Hearthtree is drawn at this scale over the kit maple proportions: the slice's tallest crown */
 const TREE_SCALE = 1.45;
 
+/** crown shedding after the impact (s from impact; leaves per second per lobe) */
+export const SHED = { delay: 0.35, stagger: 1.6, dur: 2.6, rate: 26 };
+
 type Phase = 'arrested' | 'settling' | 'bridge';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -84,14 +87,14 @@ function buildHearthtree(rand: () => number, baseY: number) {
   const L = 10.5;
   // a near-straight trunk (it must lie flat as a walk), a little S so it never reads as a pole
   const trunk = new THREE.CatmullRomCurve3([V(0, -0.5, 0), V(0.12, L * 0.35, -0.08), V(-0.1, L * 0.7, 0.1), V(0.05, L, 0.18)]);
-  const radius = (t: number) => THREE.MathUtils.lerp(0.72, 0.3, t) + (1 - THREE.MathUtils.smoothstep(t, 0, 0.1)) * 0.35;
+  const radius = (t: number) => THREE.MathUtils.lerp(0.72, 0.3, t) + (1 - THREE.MathUtils.smoothstep(t, 0, 0.1)) * 0.14;
   tree.add(inked(jitter(plumeGeometry(trunk, radius, 28, 11, 0), 0.04, rand, 2.0), bark, 0.026, true));
   const pads: Array<{ at: THREE.Vector3; r: number }> = [];
   // limbs: sideways (±x) and forward (+z, they hang under the bridge once fallen); never back (−z → up)
   const LIMBS: Array<[number, number, number, number]> = [
     // [t along trunk, azimuth (0 = +x, π/2 = +z), reach, rise]
-    [0.5, 0.15, 2.6, 1.6], [0.58, Math.PI - 0.2, 2.4, 1.9], [0.66, Math.PI / 2 + 0.3, 2.0, 1.6],
-    [0.74, -0.25, 2.2, 2.0], [0.8, Math.PI + 0.35, 2.0, 2.0], [0.86, Math.PI / 2 - 0.5, 1.8, 2.2],
+    [0.64, 0.15, 2.6, 1.6], [0.7, Math.PI - 0.2, 2.4, 1.9], [0.76, Math.PI / 2 + 0.3, 2.0, 1.6],
+    [0.82, -0.25, 2.2, 2.0], [0.86, Math.PI + 0.35, 2.0, 2.0], [0.9, Math.PI / 2 - 0.5, 1.8, 2.2],
   ];
   LIMBS.forEach(([t, a, reach, rise], i) => {
     const from = trunk.getPointAt(t);
@@ -122,6 +125,10 @@ function buildHearthtree(rand: () => number, baseY: number) {
     pad.position.copy(pd.at);
     pad.rotation.set((rand() - 0.5) * 0.5, rand() * 6.28, (rand() - 0.5) * 0.5);
     pad.userData.rest = pad.position.clone();
+    pad.userData.r = pd.r;
+    pad.userData.emit = 0;
+    // outer lobes let go first, the top crown last
+    pad.userData.shed = SHED.delay + (i / pads.length) * SHED.stagger + rand() * 0.25;
     tree.add(pad);
     padMeshes.push(pad);
   });
@@ -300,10 +307,15 @@ export function createKeeping(ctx: OpeningCtx) {
   pivot.add(tree);
   ctx.occluders.push(tree);
   const settled = Math.PI / 2 - 0.035;
+  // standing, the trunk blocks; fallen, its root crown is a low hump the fox walks over onto the bridge
+  const trunkPost: Collider = { kind: 'post', x: K.hinge.x + K.fall.x * 0.5, z: K.hinge.z + K.fall.z * 0.5, r: 1.0 };
+  colliders.push(trunkPost);
   tree.rotation.x = K.leanArrested;
 
-  // ---- leaves pressed in mid-air under the crown; they resume with the tree
-  const LEAVES = 240;
+  // ---- leaves pressed in mid-air under the crown resume with the tree; once it lands, the crown sheds:
+  // the autumn it was holding finishes, and the lobes drain into a leaf storm that carpets the bridge
+  const PRESSED = 240;
+  const LEAVES = PRESSED + 560;
   const leafMat = toon(0xffffff, { contour: 0.3, climbBase: K.terrace.top, ramp: RAMP_CANOPY });
   leafMat.side = THREE.DoubleSide;
   const leaves = new THREE.InstancedMesh(mapleLeafGeometry(0.17), leafMat, LEAVES);
@@ -312,8 +324,13 @@ export function createKeeping(ctx: OpeningCtx) {
   scene.add(leaves);
   const leaf = Array.from({ length: LEAVES }, () => ({
     p: new THREE.Vector3(), v: new THREE.Vector3(), rot: new THREE.Euler(rand() * 6, rand() * 6, rand() * 6),
-    spin: (rand() - 0.5) * 5, sway: rand() * 6.28, state: 'frozen' as 'frozen' | 'falling' | 'rest', restT: 0,
+    spin: (rand() - 0.5) * 5, sway: rand() * 6.28, state: 'frozen' as 'frozen' | 'idle' | 'falling' | 'rest',
   }));
+  const idle = leaf.slice(PRESSED);
+  for (const l of idle) {
+    l.state = 'idle';
+    l.p.set(K.hinge.x, -50, K.hinge.z);
+  }
   const tone = new THREE.Color();
   leaf.forEach((l, i) => leaves.setColorAt(i, tone.setHex(i % 3 ? 0xa4483a : 0xc06a3c).multiplyScalar(0.85 + rand() * 0.25)));
   const crownWorld = (out: THREE.Vector3) => {
@@ -323,7 +340,7 @@ export function createKeeping(ctx: OpeningCtx) {
     return tree.localToWorld(out);
   };
   scene.updateMatrixWorld(true);
-  for (const l of leaf) {
+  for (const l of leaf.slice(0, PRESSED)) {
     // a pressed drift: a loose sheet hanging from the crown toward the gorge floor, stopped mid-fall
     crownWorld(l.p);
     l.p.y -= rand() * rand() * 7;
@@ -341,6 +358,19 @@ export function createKeeping(ctx: OpeningCtx) {
     return Number.isFinite(s) ? s : groundH(x, z);
   };
 
+  // ---- landing dust: soft paper-dust puffs along where the trunk comes down
+  const PUFFS = 14;
+  const puffMat = new THREE.MeshBasicMaterial({ color: 0xe2cfb2, transparent: true, opacity: 0, depthWrite: false, fog: true });
+  const puffs = Array.from({ length: PUFFS }, (_, i) => {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), puffMat.clone());
+    const s = 2.5 + (i / (PUFFS - 1)) * 10 + (rand() - 0.5) * 0.8;
+    m.position.set(K.hinge.x + K.fall.x * s + (rand() - 0.5) * 1.2, K.terrace.top - 0.2 + rand() * 0.4, K.hinge.z + K.fall.z * s + (rand() - 0.5) * 1.2);
+    m.visible = false;
+    m.userData.delay = Math.abs(s - 8) * 0.025 + rand() * 0.08;
+    scene.add(m);
+    return m;
+  });
+
   // ---- release + settle
   let phase: Phase = 'arrested';
   let t = 0;
@@ -353,6 +383,7 @@ export function createKeeping(ctx: OpeningCtx) {
     const s = reach / 2 - 0.3;
     return { kind: 'box', x: K.hinge.x + K.fall.x * s, z: K.hinge.z + K.fall.z * s, yaw: K.terrace.yaw, hx: 0.62, hz: reach / 2 + 0.3, top: K.terrace.top + 0.12 };
   };
+  const sinceImpact = () => (phase === 'arrested' ? -1 : t - SETTLE.shiver - SETTLE.fall);
   const angleAt = (tau: number): number => {
     const S = SETTLE;
     if (tau < S.shiver) return K.leanArrested + 0.014 * Math.sin(tau * 52) * THREE.MathUtils.smoothstep(tau, 0, 0.35);
@@ -398,9 +429,9 @@ export function createKeeping(ctx: OpeningCtx) {
   ctx.onUpdate((dt) => {
     const S = SETTLE;
     let impact = false;
+    const before = t;
+    if (phase !== 'arrested') t += dt;
     if (phase === 'settling') {
-      const before = t;
-      t += dt;
       tree.rotation.x = angleAt(t);
       const hit = S.shiver + S.fall;
       if (before < hit && t >= hit) {
@@ -408,7 +439,8 @@ export function createKeeping(ctx: OpeningCtx) {
         impacts++;
         // the bridge takes weight a beat after the trunk lands
         bridge = bridgeBox();
-        colliders.push(bridge);
+        colliders.splice(colliders.indexOf(trunkPost), 1);
+        colliders.push(bridge, { kind: 'cap', x: K.hinge.x, z: K.hinge.z, r: 1.45, base: K.terrace.top, h: 0.36 });
       }
       if (t >= hit + S.bounce) {
         phase = 'bridge';
@@ -416,12 +448,35 @@ export function createKeeping(ctx: OpeningCtx) {
         onSettled?.();
       }
     }
-    // crown follow-through: lobes lag the trunk, then wobble out after the impact
-    const sinceHit = phase === 'arrested' ? -1 : t - S.shiver - S.fall;
+    for (const m of puffs) {
+      const u = (sinceImpact() - (m.userData.delay as number)) / 1.1;
+      m.visible = u > 0 && u < 1;
+      if (!m.visible) continue;
+      const r = 0.3 + Math.sqrt(u) * 1.2;
+      m.scale.set(r * 1.4, r * 0.6, r * 1.4);
+      m.position.y += dt * 0.25;
+      (m.material as THREE.MeshBasicMaterial).opacity = 0.26 * (1 - u) * Math.min(1, u * 8);
+    }
+    // crown follow-through: lobes lag the trunk, wobble out after the impact, then shed into leaves
+    const sinceHit = sinceImpact();
     for (const [i, pad] of pads.entries()) {
       const rest = pad.userData.rest as THREE.Vector3;
       const wob = sinceHit > 0 ? Math.exp(-3.5 * sinceHit) * Math.sin(sinceHit * 14 + i) * 0.22 : 0;
       pad.position.set(rest.x, rest.y + wob, rest.z + (phase === 'settling' && sinceHit < 0 ? -0.15 : 0));
+      const u = sinceHit < 0 ? 0 : THREE.MathUtils.clamp((sinceHit - (pad.userData.shed as number)) / SHED.dur, 0, 1);
+      pad.scale.setScalar(1 - THREE.MathUtils.smoothstep(u, 0, 1) * 0.999);
+      pad.visible = u < 1;
+      if (u <= 0 || u >= 1) continue;
+      pad.userData.emit = (pad.userData.emit as number) + dt * SHED.rate * (1.2 - u);
+      for (; (pad.userData.emit as number) >= 1; pad.userData.emit = (pad.userData.emit as number) - 1) {
+        const l = idle.find((x) => x.state === 'idle');
+        if (!l) break;
+        const r = (pad.userData.r as number) * pad.scale.x;
+        l.p.set((rand() - 0.5) * r * 1.6, (rand() - 0.3) * r, (rand() - 0.5) * r * 1.6).add(pad.position);
+        tree.localToWorld(l.p);
+        l.v.set((rand() - 0.5) * 0.8, rand() * 0.6, (rand() - 0.5) * 0.8);
+        l.state = 'falling';
+      }
     }
     // leaves: frozen until the shiver ends; then they fall, settle, and the living crown keeps dropping them
     const go = phase !== 'arrested' && t > S.shiver * 0.6;
@@ -431,21 +486,13 @@ export function createKeeping(ctx: OpeningCtx) {
         l.state = 'falling';
         l.v.set((rand() - 0.5) * 0.4, -0.2 - rand() * 0.4, (rand() - 0.5) * 0.4);
       }
-      if (impact && rand() < 0.45) {
+      if (l.state === 'idle' && impact && rand() < 0.15) {
         // the landing shakes a burst loose from the crown
         crownWorld(l.p);
         l.v.set((rand() - 0.5) * 2.4, 1.0 + rand() * 1.6, (rand() - 0.5) * 2.4);
         l.state = 'falling';
       }
-      if (l.state === 'rest') {
-        l.restT += dt;
-        if (phase === 'bridge' && l.restT > 8 && rand() < dt * 0.08) {
-          crownWorld(l.p);
-          l.v.set(0, -0.3, 0);
-          l.state = 'falling';
-        }
-        continue;
-      }
+      if (l.state === 'rest' || l.state === 'idle') continue;
       l.sway += dt * 2.2;
       l.v.y = Math.max(-0.9, l.v.y - dt * 2.2);
       l.v.x = THREE.MathUtils.damp(l.v.x, Math.cos(l.sway) * 0.55, 2, dt);
@@ -458,7 +505,6 @@ export function createKeeping(ctx: OpeningCtx) {
         l.p.y = floor + 0.02;
         l.rot.set((rand() - 0.5) * 0.2, rand() * 6, (rand() - 0.5) * 0.2);
         l.state = 'rest';
-        l.restT = 0;
       }
     }
     if (phase !== 'arrested') syncLeaves();
@@ -481,6 +527,7 @@ export function createKeeping(ctx: OpeningCtx) {
         impact: lastImpact,
         impacts,
         bridgeTop: +(K.terrace.top + 0.12).toFixed(3),
+        crownLobes: pads.filter((p) => p.visible).length,
         stair,
       };
     },

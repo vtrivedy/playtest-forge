@@ -27,7 +27,7 @@ const TREES: Array<[number, number, number, TreeKind, number]> = [
   [10, 62.5, 1.0, 'grove', 5],
   [0.5, 59, 1.3, 'grove', 3],
   // east: rust crowns off-axis, beyond the shelf
-  [19.5, 63.5, 1.3, 'hero', 0],
+  [33, 85, 1.3, 'hero', 0],
   [24.5, 87.5, 1.05, 'grove', 2],
   [18.5, 90.5, 0.95, 'grove', 5],
   // between the village and the meadow
