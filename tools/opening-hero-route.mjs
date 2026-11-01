@@ -11,6 +11,7 @@ export function createOpeningRoute() {
     { beat: 'first colour', to: [-7.2, 88], mag: 0.2 },
     { beat: 'well path', to: [-4, 88], mag: 0.28 },
     { beat: 'village to meadow', to: [0, 80], mag: 0.4 },
+    { beat: 'turn toward hearth', to: [5.6, 81], mag: 0.28 },
     { beat: 'cold hearth', to: [5.6, 77.5], mag: 0.28 },
     { beat: 'cold hearth pause', hold: 5 },
     { beat: 'bring the warmth', to: [5.6, 74.2], mag: 0.3 },
