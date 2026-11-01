@@ -23,6 +23,8 @@ const POSES = {
   terrace: [29.6, 77.4, -2.9],
   bridge: [27.4, 71.0, -2.9],
   crag: [26.2, 66.6, -2.9],
+  // at the root-hearth facing the lean (where the coal is set down)
+  root: [28.45, 75.5, -2.9],
   // on the steam pad facing the stair
   stair: [25.6, 80.6, 1.75],
   // halfway up the stair
@@ -34,10 +36,14 @@ const CAMS = {
   // the whole place from the meadow below
   wide: [[0, 3.2, 93], [24, 8, 74]],
   // side-on across the gorge: tree, terrace and crag in one frame
-  gorge: [[10, 12, 66], [27, 11, 70.5]],
+  gorge: [[38, 16, 71], [26, 11, 70]],
   aerial: [[2, 34, 102], [22, 4, 72]],
   // the stair along the terrace's north cliff, from the ledge
   stairside: [[22.5, 7.4, 84.5], [29.5, 7.2, 79]],
+  // the fall from the stair top: terrace, tree and crag across the gorge
+  stairtop: [[33.5, 12.6, 81.5], [25.5, 10, 68]],
+  // the whole fall side-on from the west, over the shelf ridge
+  side: [[8, 17, 70], [24, 11, 68]],
   // the tree itself, from over the ridge
   tree: [[14, 15, 80], [27.5, 13, 70.5]],
   // looking back along the fallen trunk from the crag
@@ -76,7 +82,38 @@ try {
     return h.state().opening.keeping;
   }, { paint, settle, steam });
   console.log('keeping', JSON.stringify(st));
-  for (const name of pick) {
+  // --seq cam:t1,t2,… renders one camera through the settle (release at t=0, paint follows the latch)
+  const seq = arg('seq', '');
+  if (seq) {
+    const [name, times] = seq.split(':');
+    let at = 0;
+    await page.evaluate((pose) => {
+      const h = window.__gameHooks;
+      const { ctx } = window.__opening;
+      if (pose) {
+        h.teleport(...pose);
+        h.advance(90, 1 / 60, false);
+      }
+      ctx.field.restore(ctx.fox.root.position.clone().set(28.3, 9.5, 74.9), 14, 1.4, { edgeMax: 1.6 });
+      h.keepingRelease();
+    }, POSES[name] ?? null);
+    for (const t of times.split(',').map(Number)) {
+      await page.evaluate(({ frames, cam }) => {
+        const h = window.__gameHooks;
+        h.advance(frames, 1 / 60, false);
+        if (!cam) return void h.advance(1, 1 / 60, true);
+        const c = window.__opening.camera;
+        c.position.set(...cam[0]);
+        c.lookAt(...cam[1]);
+        c.updateMatrixWorld();
+        h.advance(0, 1 / 60, true);
+      }, { frames: Math.round((t - at) * 60), cam: CAMS[name] ?? null });
+      at = t;
+      await page.screenshot({ path: path.join(out, `${name}-${t}.png`) });
+      console.log(name, t);
+    }
+  }
+  for (const name of seq ? [] : pick) {
     const t0 = Date.now();
     const cam = CAMS[name];
     const [x, z, yaw] = POSES[name] ?? POSES.cradle;

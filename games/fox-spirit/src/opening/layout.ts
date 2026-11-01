@@ -104,7 +104,7 @@ export const KEEPING = (() => {
     /** root-hearth terrace: box behind the hinge along −fall */
     terrace,
     /** dark root-hearth bowl among the roots, just behind the hinge */
-    root: { ...local(0, 1.35), y: terraceTop, r: 0.75 },
+    root: { ...local(0.3, 0.1), y: terraceTop, r: 0.75 },
     /** Hearthtree pivot (root crown) and fall direction; arrested lean from vertical (rad) */
     hinge: { ...hinge, y: terraceTop - 0.8 },
     fall,
