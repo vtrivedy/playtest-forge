@@ -405,3 +405,6 @@ teleports, camera poses, forced restoration, or controller tuning during the tak
 Retain six stills, per-frame state, final window.__game, exact source SHA and tool
 hash. Check encoded duration against simulated seconds. A short smoke run proves
 hook compatibility before consuming the shared capture slot for the full baseline.
+Require a clean source worktree before creating any capture output so the recorded
+SHA identifies all source and asset inputs. Gait is driven by analog stick magnitude
+0.14 for walking and 0.8 for running; the trace's run flag only labels that beat.

@@ -19,14 +19,15 @@ const seconds = Number(arg('seconds', '30'));
 const port = Number(arg('port', '5197'));
 if (!['main', 'lookdev'].includes(mode) || !(seconds > 0 && seconds <= 30)) throw Error('Use --mode main|lookdev and --seconds in (0,30]');
 if (fs.existsSync(out)) throw Error(`Output already exists. Use a fresh attempt directory: ${out}`);
-fs.mkdirSync(path.join(out, 'frames'), { recursive: true });
 const probeOnly = process.argv.includes('--probe');
 const fps = 30;
 const count = Math.round(seconds * fps);
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' }).trim();
 const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: source, encoding: 'utf8' }).trim();
+if (dirty) throw Error(`Capture source must be clean so its SHA is reproducible:\n${dirty}`);
+fs.mkdirSync(path.join(out, 'frames'), { recursive: true });
 const toolHash = createHash('sha256').update(fs.readFileSync(fileURLToPath(import.meta.url))).digest('hex');
-// World-space analog input, identical for both builds. Speed differences remain observable.
+// Gait comes from analog magnitude; run is a trace label, not a key input.
 function inputAt(t) {
   if (t < 2 || (t >= 20 && t < 22) || t >= 28) return { x: 0, z: 0, run: false, jump: false, beat: 'idle / settle' };
   const run = t >= 8 && t < 20;
