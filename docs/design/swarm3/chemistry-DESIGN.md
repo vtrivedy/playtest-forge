@@ -53,3 +53,14 @@ After H-a records its first successful elevated landing, retire its tutorial HUD
 permanently. The landing is the handoff to Carry; a completed-hearth message must
 not overlap the nearby coal interaction prompt. Keep incomplete hearth guidance
 and the existing successful-ride telemetry unchanged.
+
+## Root-hearth breathing room (driver frame review)
+
+The Keeping root fire should mark care without hiding the fox or the coal in a
+column of sparks. Author a quiet mote profile on that HearthSpot: 32 embers
+(instead of 220), four lifted leaves (instead of 36), and 1.45× ember diameter.
+Use evenly distributed existing seeded particles so the sparse column still
+breathes over time. The original teaching hearth and steam appearance keep their
+current profiles. Chemistry, ignition, lift and completion timing stay unchanged.
+Verify the same real-input stair/placement probe before/after, including screenshots
+and __game; continuous chase review belongs to the integrated hero route.

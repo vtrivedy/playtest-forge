@@ -41,7 +41,7 @@ export const UPDRAFT_DEFAULTS: UpdraftTunables = {
   probeRing: 0.9,
 };
 
-export type HearthSpot = { id: string; x: number; y: number; z: number; height?: number; medium?: 'steam'; bedOffset?: number };
+export type HearthSpot = { id: string; x: number; y: number; z: number; height?: number; medium?: 'steam'; bedOffset?: number; quietMotes?: boolean };
 
 /** Height of the hearth's ash bed above its ground point — the column starts here */
 const DEFAULT_BED_OFFSET = 0.92;
@@ -131,7 +131,14 @@ export class Hearth {
 
     // Rising embers and lifted leaves; separate feathered warm-air body (no shell).
     this.embers = shared.embers.clone();
-    const pts = new THREE.Points(shared.emberGeo, this.embers);
+    // Root care beat: a few readable sparks instead of a full riding column.
+    // Keep the existing deterministic seed pattern, with a smaller draw range.
+    const emberGeo = spot.quietMotes ? shared.emberGeo.clone() : shared.emberGeo;
+    if (spot.quietMotes) {
+      emberGeo.setDrawRange(0, 32);
+      this.embers.uniforms.uEmberSize!.value = 1.45;
+    }
+    const pts = new THREE.Points(emberGeo, this.embers);
     pts.position.y = this.bedY;
     pts.frustumCulled = false;
     this.group.add(pts);
@@ -139,7 +146,9 @@ export class Hearth {
     const leafMaterial = this.embers.clone();
     leafMaterial.uniforms = this.embers.uniforms;
     leafMaterial.blending = THREE.NormalBlending;
-    const leaves = new THREE.Points(shared.leafGeo, leafMaterial);
+    const leafGeo = spot.quietMotes ? shared.leafGeo.clone() : shared.leafGeo;
+    if (spot.quietMotes) leafGeo.setDrawRange(shared.leafGeo.drawRange.start, 4);
+    const leaves = new THREE.Points(leafGeo, leafMaterial);
     leaves.position.y = this.bedY;
     leaves.frustumCulled = false;
     this.group.add(leaves);
@@ -388,10 +397,10 @@ function createShared(): HearthShared {
   leafGeo.setDrawRange(N_EMBER, N_LEAF);
   emberGeo.setDrawRange(0, N_EMBER);
   const embers = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 2.2 }, uScale: { value: 640 } },
+    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 2.2 }, uScale: { value: 640 }, uEmberSize: { value: 1 } },
     vertexShader: /* glsl */ `
       attribute vec4 seed;
-      uniform float uTime, uHeat, uHeight, uRadius, uScale;
+      uniform float uTime, uHeat, uHeight, uRadius, uScale, uEmberSize;
       varying float vA;
       varying float vLeaf;
       varying float vHot;
@@ -417,7 +426,7 @@ function createShared(): HearthShared {
         vLeaf = leaf;
         vHot = 1.0 - ph;
         vSpin = seed.z * 6.2832 + uTime * (1.5 + seed.y * 2.0);
-        float size = leaf > 0.5 ? mix(0.22, 0.38, seed.x) : mix(0.08, 0.18, seed.x) * (1.3 - ph * 0.5);
+        float size = leaf > 0.5 ? mix(0.22, 0.38, seed.x) : mix(0.08, 0.18, seed.x) * (1.3 - ph * 0.5) * uEmberSize;
         gl_PointSize = size * uScale / max(0.5, -mv.z);
       }`,
     fragmentShader: /* glsl */ `
