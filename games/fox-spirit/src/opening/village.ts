@@ -543,7 +543,7 @@ function laneWalls(k: Kit, ctx: OpeningCtx, g: Gate): { x: number; z: number; ya
         const z = g.z + g.nz * s * (GATE_HALF + 0.15) - g.dz * t;
         const y = ctx.groundH(x, z);
         k.add(hewn(box(0.42, 0.36, 0.5), rand, 0.08), rand() < 0.5 ? C.stoneField : C.stoneDark, [x, y + 0.12, z], [0, yaw + (rand() - 0.5) * 0.3, 0], 0.018);
-        if (rand() < 0.75) k.add(hewn(box(0.38, 0.28, 0.44), rand, 0.08), rand() < 0.5 ? C.stone : C.stoneCool, [x + (rand() - 0.5) * 0.08, y + 0.44, z], [0, yaw + (rand() - 0.5) * 0.4, 0], 0.016);
+        if (rand() < 0.75) k.add(hewn(box(0.38, 0.28, 0.44), rand, 0.08), rand() < 0.5 ? C.stoneField : C.stoneCool, [x + (rand() - 0.5) * 0.08, y + 0.44, z], [0, yaw + (rand() - 0.5) * 0.4, 0], 0.016);
       }
       const tm = (a! + b!) / 2;
       const cx = g.x + g.nx * s * (GATE_HALF + 0.15) - g.dx * tm;
