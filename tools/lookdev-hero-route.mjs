@@ -55,12 +55,6 @@ export function createHeroRoute() {
       L = LEGS[leg];
     };
     if ((L.hold !== undefined && legT >= L.hold) || (L.time !== undefined && legT >= L.time)) next();
-    if (L.face !== undefined) {
-      // a slow step round toward the camera, `face` degrees off the line of sight
-      const [cx, , cz] = state.camera.pos;
-      const a = Math.atan2(cx - px, cz - pz) + (L.face * Math.PI) / 180;
-      return { x: Math.sin(a) * L.mag, z: Math.cos(a) * L.mag, jump: false, beat: L.beat };
-    }
     if (L.to) {
       const d = Math.hypot(L.to[0] - px, L.to[1] - pz);
       // a jump leg ends once the fox has landed; a run leg when it reaches the waypoint
@@ -68,6 +62,12 @@ export function createHeroRoute() {
       if ((L.jumpAt === undefined && d < (L.arrive ?? 0.7)) || landed) next();
     }
     if (L.hold !== undefined) return { x: 0, z: 0, jump: false, beat: L.beat };
+    if (L.face !== undefined) {
+      // a slow step round toward the camera, `face` degrees off the line of sight
+      const [cx, , cz] = state.camera.pos;
+      const a = Math.atan2(cx - px, cz - pz) + (L.face * Math.PI) / 180;
+      return { x: Math.sin(a) * L.mag, z: Math.cos(a) * L.mag, jump: false, beat: L.beat };
+    }
     const dx = L.to[0] - px;
     const dz = L.to[1] - pz;
     const d = Math.hypot(dx, dz) || 1;
