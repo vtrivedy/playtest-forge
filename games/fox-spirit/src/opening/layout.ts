@@ -15,7 +15,7 @@ export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const
 
 /**
  * Runaway Page flight loops, one per stage: [x, height above base terrain (groundH), z]. Stage 1 starts east of the well (the hedgehog has the well's face), in the wake view, and
- * circles the plaza; stages 2–3 circle over the canopy chain and the pop-up ruin high enough that only those reach it. `payoff.r` = radius of the permanent wash that rolls out from where the page is kept.
+ * circles the plaza; stages 2–3 circle over the canopy chain and the pop-up ruin high enough that only those reach it. `payoff.step` / `payoff.r` = radius of the permanent wash at each catch / when the page is kept.
  */
 export const PAGE = {
   stages: [
@@ -26,7 +26,7 @@ export const PAGE = {
     // stage 3 shuttles 1 m above the pop-up ruin's overlook and second leaf (Rook POP_UP_RUIN tops 1.02 / 0.47 abs): a jump reaches it
     [[-24.4, 3.0, 71], [-26.4, 4.2, 68.6], [-28.4, 2.1, 71], [-26.4, 4.0, 73.4]],
   ] as ReadonlyArray<ReadonlyArray<readonly [number, number, number]>>,
-  payoff: { r: 55 },
+  payoff: { r: 55, step: 13 },
 } as const;
 
 /** The Still Crown on the Summit: far down the vista gap past the bridge, low enough to sit inside the chase frame */

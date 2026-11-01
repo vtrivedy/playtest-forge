@@ -175,6 +175,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.r, 4, { edgeMax: 3 });
       return;
     }
+    // every catch gives a slice back: a warm wash around where it was caught (the last one gives the whole slice)
+    ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.step, 2.5, { edgeMax: 2.5 });
     stage = catches;
     s = 0;
     place(stage, 0, flingTo);
