@@ -60,7 +60,7 @@ export function groundH(x: number, z: number): number {
     flat = Math.min(flat, THREE.MathUtils.smoothstep(k, 0.8, 4));
   }
   // the meadow dips gently south of the village toward the shelf
-  const meadow = -0.6 * THREE.MathUtils.smoothstep(z, 84, 70);
+  const meadow = -0.6 * (1 - THREE.MathUtils.smoothstep(z, 70, 84));
   const r = rimK(x, z);
   const rim = THREE.MathUtils.smoothstep(r, 0.92, 1.08) * 7 + Math.max(0, r - 1.08) * 14;
   return swell * flat * 0.8 + meadow + rim;
