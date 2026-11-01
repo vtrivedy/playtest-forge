@@ -273,8 +273,9 @@ def catmull(pts, n):
     return out
 
 
-# big crescent: leaves the rump low, swoops back and up, flame point curls forward over the back
-TAIL_PTS = [P(-0.13, 0.245), P(-0.23, 0.25), P(-0.31, 0.3), P(-0.35, 0.39), P(-0.34, 0.49), P(-0.29, 0.57), P(-0.22, 0.62)]
+# big crescent swooping back, up and a touch to the fox's left; the flame point trails behind, never over the
+# back, so the chase cam (behind, slightly high) still sees head, ears and body past it
+TAIL_PTS = [P(-0.13, 0.245, 0.0), P(-0.23, 0.255, 0.03), P(-0.32, 0.29, 0.08), P(-0.39, 0.35, 0.13), P(-0.43, 0.42, 0.17), P(-0.44, 0.49, 0.19), P(-0.42, 0.55, 0.19)]
 TAIL_N = 34
 
 
@@ -284,7 +285,7 @@ def tail_radius(t):
     bloom = 0.5 + 0.5 * smooth_(0.05, 0.28, t)
     body = math.sin(min(1.0, 0.1 + t * 0.9) * math.pi) ** 0.5
     tip = (1 - smooth_(0.5, 1.0, t)) ** 0.9  # long flame taper to a point, no scoop end
-    return 0.105 * bloom * body * (1 - 0.15 * t) * (0.2 + 0.8 * tip) + 0.002
+    return 0.092 * bloom * body * (1 - 0.15 * t) * (0.2 + 0.8 * tip) + 0.002
 
 
 def smooth_(e0, e1, x):
@@ -394,7 +395,17 @@ def tufts(ob, region, amp, freq):
 
 TAU = math.pi * 2
 # chest/neck ruff: front + sides of the throat down to the brisket, not the back
-tufts(body, lambda co: smooth01(0.08, 0.14, -co.y) * smooth01(0.2, 0.16, -co.y) * smooth01(0.16, 0.22, co.z) * smooth01(0.36, 0.3, co.z), 0.028, 11)
+tufts(body, lambda co: smooth01(0.08, 0.14, -co.y) * smooth01(0.2, 0.16, -co.y) * smooth01(0.16, 0.22, co.z) * smooth01(0.36, 0.3, co.z), 0.03, 9)
+
+
+def cheek_region(co):
+    """lower outer cheeks, behind the eyes: where the starter fox's fluff flares out"""
+    rel = co - HEAD_PIVOT
+    u, side = -rel.y, abs(co.x)
+    return smooth01(0.085, 0.105, side) * smooth01(0.01, -0.03, rel.z) * smooth01(-0.07, -0.04, u) * smooth01(0.04, 0.0, u)
+
+
+tufts(head, cheek_region, 0.018, 5)
 for p in body.data.polygons:
     p.use_smooth = True
 for e in EARS:
