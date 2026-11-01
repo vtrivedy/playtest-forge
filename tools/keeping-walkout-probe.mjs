@@ -14,6 +14,8 @@ try {
   const routes = {
     // under the ledge / steam pad, out past the terrace's SW corner and where the SE ridge column was
     pit: [[22.6, 78.0], [24.3, 73.9], [24.9, 71.5], [23.5, 69.0], [20.5, 66.2], [12, 65]],
+    // the same pit with a player's straight steer through the slot (Flint's free-play waypoints)
+    slot: [[22.6, 78.0], [24.3, 73.9], [23.5, 69.0], [20.5, 66.2], [12, 65]],
     // the gorge floor under the bridge
     gorge: [[27.5, 69.5], [24, 70.3], [23.2, 68.6], [20.5, 66.2], [12, 65]],
     // inside the bend, under the shoulder side

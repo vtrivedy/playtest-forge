@@ -165,13 +165,17 @@ export function createKeeping(ctx: OpeningCtx) {
     const len = Math.hypot(bx - ax, bz - az);
     colliders.push({ kind: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, yaw: Math.atan2(bx - ax, bz - az), hx: 0.2, hz: len / 2, top: SHELF_TOP + 0.34 });
     const m = Math.max(2, Math.round(len / 0.45));
+    // one fade unit per run: the chase cam sees through the rubble instead of sinking behind it
+    const run = new THREE.Group();
+    scene.add(run);
+    ctx.occluders.push(run);
     for (let k = 0; k <= m; k++) {
       const t = k / m;
       const sz = 0.15 + rand() * 0.1;
       const r = buildRock(rand, sz);
       r.scale.y = 1.25;
       r.position.set(ax + (bx - ax) * t + (rand() - 0.5) * 0.12, SHELF_TOP + sz * 0.3, az + (bz - az) * t + (rand() - 0.5) * 0.12);
-      scene.add(r);
+      run.add(r);
     }
   };
   const bendOuter: Array<[number, number]> = [];
@@ -385,9 +389,15 @@ export function createKeeping(ctx: OpeningCtx) {
   }
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
-  const one = new THREE.Vector3(1, 1, 1);
+  const one = new THREE.Vector3();
+  const near = new THREE.Vector3();
   const syncLeaves = () => {
-    leaf.forEach((l, i) => leaves.setMatrixAt(i, m4.compose(l.p, q.setFromEuler(l.rot), one)));
+    // leaves shrink away inside ~2.5 m of the lens so none fills the chase frame as a flat card
+    const lens = ctx.player?.cam.camera.position;
+    leaf.forEach((l, i) => {
+      const k = lens ? THREE.MathUtils.smoothstep(near.copy(l.p).distanceTo(lens), 0.9, 2.6) : 1;
+      leaves.setMatrixAt(i, m4.compose(l.p, q.setFromEuler(l.rot), one.setScalar(Math.max(0.001, k))));
+    });
     leaves.instanceMatrix.needsUpdate = true;
   };
   syncLeaves();
@@ -545,7 +555,7 @@ export function createKeeping(ctx: OpeningCtx) {
         l.state = 'rest';
       }
     }
-    if (phase !== 'arrested') syncLeaves();
+    syncLeaves();
     lastImpact = impact;
   });
 
