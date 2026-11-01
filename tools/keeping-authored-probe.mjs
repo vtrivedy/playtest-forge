@@ -18,7 +18,7 @@ await stage(K.coal.x,K.coal.z);await key('e');await sample('01-carry',true);
 await stage(K.steam.x,K.steam.z);await advance(360);await sample('02-carried-basin-reject');await key('e');await advance(360);await sample('03-steam',true);
 await page.keyboard.down('Space');let maxY=-Infinity;for(let i=0;i<12;i++){const s=await advance(15);maxY=Math.max(maxY,s.pos[1]);evidence.samples.push({label:`lift-${i}`,state:s});}await sample('04-lift',true);await page.keyboard.up('Space');evidence.maxLiftY=maxY;
 await stage(K.steam.x,K.steam.z);await key('e');await sample('05-recovered');
-await stage(K.root.x,K.root.z);await key('e');await advance(480);await sample('06-root-bridge',true);
+await stage(29.0,77.35,Math.atan2(K.root.x-29.0,K.root.z-77.35));await key('e');await advance(480);await sample('06-root-bridge',true);
 await stage(K.hinge.x+K.fall.x*K.span*.5,K.hinge.z+K.fall.z*K.span*.5,Math.atan2(K.fall.x,K.fall.z));await advance(30);await sample('07-bridge-collision',true);
 evidence.expected={terraceTop:K.terrace.top,bridgeTop:K.terrace.top+.12};
 const at=label=>evidence.samples.find(s=>s.label===label).state;
@@ -28,6 +28,7 @@ evidence.assertions=[
 ['placed coal latches steam',C(at('03-steam')).steamLatched],
 ['lift clears authored terrace',maxY>K.terrace.top+1],
 ['recovery preserves steam',at('05-recovered').opening.carry.carried&&C(at('05-recovered')).steamLatched],
+['root placement keeps fox outside bowl',Math.hypot(at('06-root-bridge').pos[0]-K.root.x,at('06-root-bridge').pos[2]-K.root.z)>1.05],
 ['root releases bridge exactly once',C(at('06-root-bridge')).releases===1&&at('06-root-bridge').opening.keeping.impacts===1],
 ['bridge supports player',at('07-bridge-collision').grounded&&Math.abs(at('07-bridge-collision').pos[1]-evidence.expected.bridgeTop)<.03],
 ['no page errors',evidence.errors.length===0]
