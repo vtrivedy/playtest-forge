@@ -9,3 +9,5 @@ Camera visibility is local to the actual object between the chase lens and the f
 Controls and movement remain WASD + jump + dash, hold-jump glide. Verify continuous trail in a no-jump run, compare cold/lit hearth color, inspect chase views beside house and pier, then retest the worst visual issue. Capture screenshots and window.__game on the integrated opening before landing.
 
 Capture correction: the well edge can hide the front half of the fox while three rays around its centre remain clear. Sample the projected body width at low-body and ear heights, including the swept tail width. Preserve local object ownership and full recovery; do not fade all scenery from a camera-wide flag.
+
+Trail review correction: threshold the soft gameplay mask into a cel interior with a narrow wet front. Use world-space multiscale fibre noise at the front and a restrained pooled rim; preserve the authored ground palette rather than tinting the whole wake amber. Compare identical smoke-route frames before/after and replay once after visual review.

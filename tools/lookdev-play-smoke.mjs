@@ -152,6 +152,13 @@ try {
     if (still) await page.screenshot({ path: path.join(out, `${String(++n).padStart(2, '0')}-${label}.png`) });
   }
   fs.writeFileSync(path.join(out, 'trace.json'), JSON.stringify(trace));
+  // opening art review: fixed cameras, paper and painted (quick mode only)
+  const shots = hero ? [] : await page.evaluate(() => window.__gameHooks.shots ?? []);
+  for (const name of shots)
+    for (const paint of ['none', 'full']) {
+      await page.evaluate(({ name, paint }) => window.__gameHooks.shot(name, paint), { name, paint });
+      await page.screenshot({ path: path.join(out, `${String(++n).padStart(2, '0')}-shot-${name}-${paint}.png`) });
+    }
 } finally {
   await browser.close();
   await server.close();

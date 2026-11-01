@@ -92,6 +92,12 @@ function column(rand: () => number, x: number, z: number, r: number, y0: number,
   return g;
 }
 
+/** Register a column (one fade unit) with the chase-cam occlusion */
+function occluder<T extends THREE.Object3D>(ctx: OpeningCtx, o: T): T {
+  ctx.occluders.push(o);
+  return o;
+}
+
 /**
  * H-a, the cold hearth: a two-step stone plinth carrying a ring of seven fire-blackened bowl stones
  * (rim ≈ ground + 1, around the reactor's ash bed at +0.92). It blocks like a low wall; the fox lights it
@@ -103,6 +109,8 @@ function buildHearth(ctx: OpeningCtx): void {
   const g = new THREE.Group();
   g.position.set(HEARTH_A.x, y, HEARTH_A.z);
   scene.add(g);
+  // the bowl sits right where a dash stops: fade it like a cottage when it blocks the chase cam
+  ctx.occluders.push(g);
   const plinth = [
     [2.0, 0.34, -0.06, 0x7e7465],
     [1.5, 0.28, 0.28, 0x8e8577],
@@ -153,7 +161,7 @@ function buildShelf(ctx: OpeningCtx): void {
   for (const lx of [-3, 0, 3]) {
     for (const lz of [-3, 0, 3]) {
       const edge = Math.abs(lx) + Math.abs(lz) > 0;
-      root.add(column(rand, lx + (rand() - 0.5) * 0.4, lz + (rand() - 0.5) * 0.4, edge ? 2.25 : 2.0, g0 - 2, top, true));
+      root.add(occluder(ctx, column(rand, lx + (rand() - 0.5) * 0.4, lz + (rand() - 0.5) * 0.4, edge ? 2.25 : 2.0, g0 - 2, top, true)));
     }
   }
   colliders.push({ kind: 'box', x: SHELF.x, z: SHELF.z, yaw: SHELF.yaw, hx: hw, hz: hd, top });
@@ -166,7 +174,7 @@ function buildShelf(ctx: OpeningCtx): void {
     [-4.6, hd + 1.8, 1.9, 4.2], [hw + 10.5, 1, 3, 11.5],
   ];
   for (const [lx, lz, r, h] of RIDGE) {
-    root.add(column(rand, lx, lz, r, g0 - 2, g0 + h + (h > 8 ? 1 : 0), h < 8.5 && rand() < 0.6));
+    root.add(occluder(ctx, column(rand, lx, lz, r, g0 - 2, g0 + h + (h > 8 ? 1 : 0), h < 8.5 && rand() < 0.6)));
     const [wx, wz] = world(lx, lz);
     colliders.push({ kind: 'post', x: wx, z: wz, r: r * 0.95 });
   }
@@ -186,6 +194,7 @@ function buildShelf(ctx: OpeningCtx): void {
   beacon.position.set(tx, top - 0.1, tz);
   beacon.rotation.y = 2.2;
   scene.add(beacon);
+  ctx.occluders.push(beacon);
   colliders.push({ kind: 'post', x: tx, z: tz, r: 0.45 * 1.05 * 1.5 });
   // a boulder pair on the shelf so the landing has a foreground
   for (const [lx, lz, sz] of [[hw - 1.2, hd - 1.4, 0.55], [hw - 2.3, hd - 0.9, 0.35]] as const) {
@@ -248,6 +257,7 @@ export function buildMeadow(ctx: OpeningCtx): void {
     t.position.set(x, y - 0.1, z);
     t.rotation.y = rand() * 6;
     scene.add(t);
+    ctx.occluders.push(t);
     colliders.push({ kind: 'post', x, z, r: (kind === 'hero' ? 0.42 : kind === 'lean' ? 0.38 : 0.3) * sc * 1.5 });
   }
   for (const [x, z, s] of ROCKS) {
