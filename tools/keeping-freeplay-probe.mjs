@@ -126,16 +126,17 @@ try {
   check('vista valley walks back to the meadow', Math.hypot(s.pos[0] - 4, s.pos[2] - 72) < 2, { valley, end: s.pos });
   await shot('04-back-from-valley');
 
-  // 5. the pockets under the ledge/terrace/crag walk back out to the meadow (Moss flood-fill waypoints, #swarm :214)
+  // 5. the pockets under the ledge/terrace/crag walk back out to the meadow (waypoints = tools/keeping-walkout-probe.mjs)
   for (const [name, start, path] of [
-    ['pit north of the terrace', [22.6, 78.0], [[24.3, 73.9], [23.5, 69.0], [21.5, 64.5], [12, 64]]],
-    ['gorge floor under the bridge', [27.5, 69.5], [[23.5, 68.5], [21.5, 64.5], [12, 64]]],
+    ['pit under ledge/pad', [22.6, 78.0], [[24.3, 73.9], [24.9, 71.5], [23.5, 69.0], [20.5, 66.2], [12, 65]]],
+    ['gorge floor under the bridge', [27.5, 69.5], [[24, 70.3], [23.2, 68.6], [20.5, 66.2], [12, 65]]],
+    ['inside of the bend', [22.4, 80.2], [[22.3, 77.8], [24.3, 73.9], [24.9, 71.5], [20.5, 66.2], [12, 65]]],
   ]) {
     await boot();
     await page.evaluate(() => { const h = window.__gameHooks; h.keepingSteam(); h.keepingRelease(); h.advance(400, 1 / 60, false); });
     await stage(start[0], start[1], 0);
     for (const p of path) s = await drive(p, { max: 15, r: 0.7 });
-    check(`walk out: ${name}`, Math.hypot(s.pos[0] - 12, s.pos[2] - 64) < 1.5 && s.pos[1] < 2, { end: s.pos });
+    check(`walk out: ${name}`, Math.hypot(s.pos[0] - 12, s.pos[2] - 65) < 1.5 && s.pos[1] < 2, { end: s.pos });
   }
 } catch (e) {
   evidence.errors.push(String(e?.stack ?? e));
