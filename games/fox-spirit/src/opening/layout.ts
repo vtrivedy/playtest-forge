@@ -143,3 +143,16 @@ export const KEEPING = (() => {
     span,
   };
 })();
+
+/** West-grove paper ruin: permanent dash folds, then a southern return to meadow. */
+export const POP_UP_RUIN = {
+  entry: { x: -24, z: 75 },
+  leaves: [
+    { x: -27, z: 75, top: 0.08 },
+    { x: -31, z: 75, top: 0.63 },
+  ],
+  width: 3.4,
+  depth: 3.6,
+  overlook: { x: -35, z: 75, top: 1.18, width: 3.4, depth: 3.6 },
+  returnEnd: { x: -35, z: 79.7 },
+} as const;

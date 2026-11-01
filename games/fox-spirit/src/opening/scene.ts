@@ -23,6 +23,7 @@ import { CARRY, createCarry } from './carry';
 import { createKeepingChemistry } from './chemistry';
 import { createKeeping } from './keeping';
 import { createHearthHum } from './hum';
+import { buildPopUpRuin } from './popUpRuin';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -95,6 +96,7 @@ export async function runOpening(): Promise<void> {
   buildMeadow(ctx);
   buildVillage(ctx);
   const keeping = createKeeping(ctx);
+  const popUpRuin = buildPopUpRuin(ctx);
   const crown = createCrown(ctx, sky.mist);
 
   const contact = buildContactShadow();
@@ -201,7 +203,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), hum: hum.state() } });
+  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), hum: hum.state(), popUpRuin: popUpRuin.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
