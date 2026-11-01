@@ -131,3 +131,6 @@ underside walk/dash 5/5 PASS, errors[]. Retained `window.__game` final state:
 3 launches, roost visited; final spring apex2.428m, time-to-apex.583s,
 airtime2.183s. Staged entry disclosed. tsc and vite build PASS.
 Independent replacement-art verdict pending; approved integrated art unchanged.
+Lens retest `/captures/tallow/canopy-cupped-visibility-01`: 2/2 PASS/errors[],
+actual `window.__game.state()` retained. Inspected blocked and recovered chase
+stills: overhead band absent, fox readable; leaves recover outside lens band.
