@@ -24,7 +24,7 @@ const port = Number(arg('port', '5187'));
 const effect = arg('effect');
 const outDir = path.resolve(root, arg('out', effect ? `playtest-forge-artifacts/sprint2/fx/${effect}/r0` : 'playtest-output/fox-spirit/fx')!);
 fs.mkdirSync(outDir, { recursive: true });
-const url = `http://127.0.0.1:${port}/?q=high&seed=1`;
+const url = `http://127.0.0.1:${port}/?world=russetvale&q=high&seed=1`;
 
 type Hooks = Record<string, (...a: unknown[]) => unknown>;
 

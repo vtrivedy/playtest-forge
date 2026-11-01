@@ -114,7 +114,7 @@ async function play(page: import('playwright').Page): Promise<void> {
 }
 
 let vite: ChildProcess | undefined;
-const baseUrl = urlOverride ?? `http://127.0.0.1:${port}/`;
+const baseUrl = urlOverride ?? `http://127.0.0.1:${port}/?world=russetvale`;
 
 try {
   if (!urlOverride) {

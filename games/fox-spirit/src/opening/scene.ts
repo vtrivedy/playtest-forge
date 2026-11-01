@@ -1,5 +1,5 @@
 /**
- * The Keeping — opening slice (`?lookdev=p0&play=1`): wake in the sepia village of Lanternhollow,
+ * The Keeping — opening slice (default boot `/`): wake in the sepia village of Lanternhollow,
  * carry the paint down the hub path into Arrival Meadow, light the cold hearth H-a and ride its heat
  * onto the rock shelf. Pressed Ink → Living Cel kit (lookdevKit.ts), hearth-fox B, chase camera.
  *

@@ -42,7 +42,7 @@ const outDir = path.resolve(root, arg('out', '../playtest-forge-artifacts/money-
 const framesDir = path.join(outDir, 'frames');
 fs.rmSync(framesDir, { recursive: true, force: true });
 fs.mkdirSync(framesDir, { recursive: true });
-const url = `http://127.0.0.1:${port}/?q=${quality}`;
+const url = `http://127.0.0.1:${port}/?world=russetvale&q=${quality}`;
 
 /** Checkpoints by sequence age (s since the fox entered the trigger); ignition is at 1.0 s */
 const CHECKPOINTS: Array<[string, number]> = [

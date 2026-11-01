@@ -1959,15 +1959,14 @@ async function boot() {
   tick();
 }
 
-// Redesign (?lookdev=p0): self-contained slices, the game never boots. `&play=1` = the opening
-// (Lanternhollow → Arrival Meadow → H-a); without it, the P0 clearing lookdev stills.
+// Default boot: The Keeping opening (Lanternhollow → Arrival Meadow → H-a, opening/scene.ts).
+// `?lookdev=p0` = the P0 clearing lookdev stills; `?world=russetvale` = the old realistic Russetvale game.
 const query = new URLSearchParams(location.search);
-const lookdev = query.get('lookdev');
-(lookdev === 'p0'
-  ? query.has('play')
-    ? import('./opening/scene').then((m) => m.runOpening())
-    : import('./lookdevP0').then((m) => m.runLookdevP0())
-  : boot()
+(query.get('world') === 'russetvale'
+  ? boot()
+  : query.get('lookdev') === 'p0'
+    ? import('./lookdevP0').then((m) => m.runLookdevP0())
+    : import('./opening/scene').then((m) => m.runOpening())
 ).catch((err) => {
   console.error(err);
   const s = document.getElementById('status');

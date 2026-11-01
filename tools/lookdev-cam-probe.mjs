@@ -1,4 +1,4 @@
-// Sim-only camera audit of the hero route (?lookdev=p0&play=1): counts frames where the follow camera
+// Sim-only camera audit of the hero route (default boot `/`): counts frames where the follow camera
 // reports the fox's sight line blocked, per beat. No rendering beyond boot.
 //
 //   node tools/lookdev-cam-probe.mjs
@@ -12,7 +12,7 @@ const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle',
 try {
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 720 } })).newPage();
   page.setDefaultTimeout(300000);
-  await page.goto('http://127.0.0.1:5193/?lookdev=p0&play=1');
+  await page.goto('http://127.0.0.1:5193/');
   await page.waitForFunction(() => window.__gameHooks?.ready === true);
   let state = await page.evaluate((s) => { const h = window.__gameHooks; h.setManual(true); h.teleport(s.x, s.z, s.yaw); return h.advance(1, 1 / 60, false); }, HERO_START);
   const route = createHeroRoute();

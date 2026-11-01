@@ -49,7 +49,7 @@ async function waitReady(url: string, ms = 60_000) {
 
 async function main() {
   const vite = startVite();
-  const url = `http://127.0.0.1:${port}/`;
+  const url = `http://127.0.0.1:${port}/?world=russetvale`;
   try {
     await waitReady(url);
     const browser = await chromium.launch({

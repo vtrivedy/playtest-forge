@@ -1,5 +1,5 @@
 /**
- * Lookdev play (`?lookdev=p0&play=1`): the hearth-fox runs the P0 clearing under a real chase camera.
+ * Lookdev play (`?lookdev=p0` stills; the opening is the default boot): the hearth-fox runs the P0 clearing under a real chase camera.
  * DESIGN-lookdev-play.md. Authored clips are the pose (speed-driven gait tree, pose-matched gait
  * changes, jumpUp → fall → land); procedural work is limited to small additives (turn bank, pitch).
  */

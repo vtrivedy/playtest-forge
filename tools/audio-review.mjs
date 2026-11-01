@@ -13,7 +13,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto('http://127.0.0.1:5183', { waitUntil: 'networkidle' });
+  await page.goto('http://127.0.0.1:5183/?world=russetvale', { waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.__gameHooks?.state);
   const before = await page.evaluate(() => window.__gameHooks.state());
   if (before.audio.state !== 'locked') throw Error('Audio unlocked before gesture');
