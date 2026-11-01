@@ -85,46 +85,49 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   }
 
   R.leaves.forEach((p) => {
-    // Pivot lies along the west edge. The paper leaf opens east, away from its safe dash apron.
+    // Approach edge is the hinge. The printed face is visible closed; the leaf opens away from the fox.
     const pivot = new THREE.Group();
-    pivot.position.set(p.x - R.width / 2, p.top - 0.12, p.z);
-    pivot.rotation.z = Math.PI / 2;
+    const ax = Math.cos(p.yaw), az = -Math.sin(p.yaw);
+    pivot.position.set(p.x + ax * R.width / 2, p.top - 0.12, p.z + az * R.width / 2);
+    pivot.rotation.set(0, p.yaw, -Math.PI / 2);
     root.add(pivot);
     ctx.occluders.push(pivot);
     const slab = box(R.width, 0.24, R.depth, paper);
-    slab.position.x = R.width / 2;
+    slab.position.x = -R.width / 2;
     pivot.add(slab);
     // Inset ribs keep the broad surface legible as a folded architectural leaf.
     for (const dz of [-1.45, 1.45]) {
       const rib = box(R.width - 0.1, 0.045, 0.12, ink);
-      rib.position.set(R.width / 2, 0.14, dz);
+      rib.position.set(-R.width / 2, 0.14, dz);
       pivot.add(rib);
     }
     for (const x of [0.22, R.width / 2, R.width - 0.22]) {
       const crease = box(0.045, 0.03, R.depth - 0.6, brass);
-      crease.position.set(x, 0.145, 0);
+      crease.position.set(-x, 0.145, 0);
       pivot.add(crease);
     }
     // Engraved arch/vein: visible in pressed ink, quiet under the restored paper palette.
     const stroke = (points: number[][], radius = 0.018) => {
-      const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x!, 0.15, z!)));
+      const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(-x!, 0.15, z!)));
       pivot.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, radius, 4, false), etched));
     };
     stroke([[0.45, -1.05], [1.6, -1.05], [2.8, 0], [1.6, 1.05], [0.45, 1.05]]);
     stroke([[0.55, 0], [1.65, 0], [2.8, 0]], 0.022);
     for (const side of [-1, 1]) stroke([[1.3, 0], [1.7, side * 0.43], [1.9, side * 0.75]], 0.013);
-    const marker = spindle(p.x + R.width / 2 + 0.06, p.top, p.z);
-    const gx = p.x + R.width / 2 + 0.2;
-    const base = ctx.groundH(gx, p.z);
-    const guard: Collider = { kind: 'cap', x: gx, z: p.z, r: 0.65, base, h: p.top + 0.18 - base };
+    const marker = spindle(p.x + ax * (R.width / 2 + 0.06), p.top, p.z + az * (R.width / 2 + 0.06));
+    marker.rotation.y = p.yaw;
+    const gx = p.x + ax * (R.width / 2 + 0.2);
+    const gz = p.z + az * (R.width / 2 + 0.2);
+    const base = ctx.groundH(gx, gz);
+    const guard: Collider = { kind: 'cap', x: gx, z: gz, r: 0.65, base, h: p.top + 0.18 - base };
     ctx.colliders.push(guard);
     const housing = inked(new THREE.CylinderGeometry(0.28, 0.65, guard.h, 6), stone, 0.02, true);
-    housing.position.set(gx, base + guard.h / 2, p.z);
+    housing.position.set(gx, base + guard.h / 2, gz);
     root.add(housing);
     folds.push({
-      pivot, spindle: marker, x: marker.position.x, y: p.top, z: p.z,
+      pivot, spindle: marker, x: marker.position.x, y: p.top, z: marker.position.z,
       elapsed: 0, phase: 'folded', guard, housing,
-      land: () => ctx.colliders.push({ kind: 'box', x: p.x, z: p.z, yaw: 0, hx: R.width / 2, hz: R.depth / 2, top: p.top }),
+      land: () => ctx.colliders.push({ kind: 'box', x: p.x, z: p.z, yaw: p.yaw, hx: R.width / 2, hz: R.depth / 2, top: p.top }),
     });
   });
 
@@ -167,7 +170,11 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
     const s = ctx.player.state();
     const p = ctx.fox.root.position;
     const dash = Number(s.dashesUsed);
-    const onLeaf = R.leaves.some(q => Math.abs(p.x - q.x) < R.width / 2 && Math.abs(p.z - q.z) < R.depth / 2 && Math.abs(p.y - q.top) < 0.12 && s.grounded);
+    const inside = (q: typeof R.leaves[number], margin = 0) => {
+      const dx = p.x - q.x, dz = p.z - q.z;
+      return Math.abs(dx * Math.cos(q.yaw) - dz * Math.sin(q.yaw)) < R.width / 2 + margin && Math.abs(dx * Math.sin(q.yaw) + dz * Math.cos(q.yaw)) < R.depth / 2 + margin;
+    };
+    const onLeaf = R.leaves.some(q => inside(q) && Math.abs(p.y - q.top) < 0.12 && s.grounded);
     if (onLeaf) hadLanding = true;
     if (hadLanding && s.grounded && !onLeaf && p.y < R.leaves[0].top - 0.12) { misses++; hadLanding = false; }
     if (s.grounded && Math.abs(p.x - O.x) < 1.5 && Math.abs(p.z - O.z) < 1.6 && Math.abs(p.y - O.top) < 0.12) { reached = true; hadLanding = false; }
@@ -175,7 +182,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
       const eligible = i === 0 || (i === 1 ? folds[0]!.phase === 'open' : reached);
       const within = Math.hypot(p.x - f.x, p.z - f.z) < RUIN_FEEL.hitRadius && Math.abs(p.y - f.y) < 1.1;
       // Only east-side approaches activate leaves: the slab's sweep stays clear of the fox.
-      const clear = i === 2 ? p.z < O.z + O.depth / 2 - 0.3 : p.x > R.leaves[i]!.x + R.width / 2 + 0.32;
+      const clear = i === 2 ? p.z < O.z + O.depth / 2 - 0.3 : (p.x - R.leaves[i]!.x) * Math.cos(R.leaves[i]!.yaw) - (p.z - R.leaves[i]!.z) * Math.sin(R.leaves[i]!.yaw) > R.width / 2 + 0.32;
       if (f.phase === 'folded' && eligible && within && clear && s.dashing && dash !== lastDash) {
         f.phase = 'opening';
         lastDash = dash;
@@ -185,10 +192,10 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
         const u = Math.min(1, f.elapsed / RUIN_FEEL.unfold);
         const eased = 1 - (1 - u) ** 3;
         const angle = Math.PI / 2 * (1 - eased) + Math.sin(u * Math.PI * 2) * 0.035 * Math.sin(u * Math.PI);
-        if (i < 2) f.pivot.rotation.z = angle;
+        if (i < 2) f.pivot.rotation.z = -angle;
         else f.pivot.rotation.x = angle;
         if (f.housing) f.housing.scale.y = 1 - eased * 0.85;
-        const underLeaf = i < 2 && Math.abs(p.x - R.leaves[i]!.x) < R.width / 2 + 0.1 && Math.abs(p.z - f.z) < R.depth / 2 + 0.1 && p.y < R.leaves[i]!.top - 0.05;
+        const underLeaf = i < 2 && inside(R.leaves[i]!, 0.1) && p.y < R.leaves[i]!.top - 0.05;
         const alongReturn = THREE.MathUtils.clamp((p.z - returnPivot.position.z) / length, 0, 1);
         const returnTop = THREE.MathUtils.lerp(O.top, endY, alongReturn) - 0.05;
         const underReturn = i === 2 && Math.abs(p.x - O.x) < 1.35 && p.z > returnPivot.position.z - 0.1 && p.z < R.returnEnd.z + 0.1 && p.y < returnTop - 0.05;
@@ -199,7 +206,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
           f.phase = 'open'; f.land();
           if (i === 2) {
             returns++;
-            ctx.field.restore(new THREE.Vector3((R.leaves[0].x + R.overlook.x) / 2, O.top, O.z), 7, 1.3, { edgeMax: 0.8 });
+            ctx.field.restore(new THREE.Vector3((R.leaves[0].x + R.overlook.x) / 2, O.top, (R.leaves[0].z + O.z) / 2), 7, 1.3, { edgeMax: 0.8 });
           }
         }
       }

@@ -148,11 +148,11 @@ export const KEEPING = (() => {
 export const POP_UP_RUIN = {
   entry: { x: -24, z: 75 },
   leaves: [
-    { x: -27, z: 75, top: -0.08 },
-    { x: -31, z: 75, top: 0.47 },
+    { x: -27, z: 75, top: -0.08, yaw: 0 },
+    { x: -28.4, z: 71, top: 0.47, yaw: -Math.PI / 2 },
   ],
   width: 3.4,
   depth: 3.6,
-  overlook: { x: -35, z: 75, top: 1.02, width: 3.4, depth: 3.6 },
-  returnEnd: { x: -35, z: 79.7 },
+  overlook: { x: -24.4, z: 71, top: 1.02, width: 3.4, depth: 3.6 },
+  returnEnd: { x: -24.4, z: 75.7 },
 } as const;
