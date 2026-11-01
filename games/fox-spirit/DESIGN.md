@@ -398,3 +398,9 @@ Pressed Ink → Living Cel stays melancholy autumn. Ground should carry broad co
 Keep the existing clearing, route, paint restoration and locomotion fixed. The ground is a quiet supporting plane for the burnt-orange fox. Reduce only ground-material paper hatching so the pale ruled strip in the half-painted close view no longer dominates. Temper the worn path toward weathered ochre and break its long bright run with broad, low-contrast earth variation. Preserve the muted moss/umber field and short route-edge dressing. Shared shader support is owned by Cinder; ground requests an explicit hatch weight. Compare matched 01/02/03/04/05 stills, inspect restored and paper ground, and obtain a teammate verdict before landing. No movement tuning is part of this slice.
 
 Ground contact API: return the existing ground mesh from buildGround so world dressing can raycast the actual triangulated surface when placing contact marks. This changes no geometry, material, placement, or render output.
+## Swarm world refinement
+Keep the clearing in Pressed Ink → Living Cel. Canopy sprigs render only at the
+view silhouette; chunky crown outlines have uneven lobes and gaps. Exposed limbs
+curve upward and taper to fine tips. Rust foliage keeps ochre accents and three
+readable values. Cloud hatching stays on the lower shaded rim. Verify the five
+fixed lookdev shots before requesting an independent teammate verdict.

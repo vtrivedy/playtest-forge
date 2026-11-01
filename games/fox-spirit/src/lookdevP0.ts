@@ -306,7 +306,8 @@ function canopyPad(rand: () => number, radius: number, height: number, tones: Ca
     const clump = 0.2 * Math.sin(x * 3.1 + ph[0]!) * Math.sin(y * 2.7 + ph[1]!) * Math.sin(z * 3.3 + ph[2]!);
     const fine = 0.07 * Math.sin(x * 7.3 + ph[3]!) * Math.sin(y * 6.1 + ph[4]!) * Math.sin(z * 7.7 + ph[5]!);
     const tooth = 0.05 * Math.abs(Math.sin(a * 17 + ph[3]! * 3)) * (1 - Math.abs(y));
-    const k = 1 + clump + fine + tooth;
+    const notch = Math.pow(0.5 + 0.5 * Math.sin(a * 5.0 + ph[0]!), 8) * (1 - y * y) * 0.2;
+    const k = 1 + clump * 1.35 + fine + tooth - notch;
     const yy = y > 0 ? y * height : y * height * 0.8;
     p.setXYZ(i, x * radius * k, yy * k, z * radius * k);
   }
@@ -315,11 +316,12 @@ function canopyPad(rand: () => number, radius: number, height: number, tones: Ca
   const cols = new Float32Array(n.count * 3);
   const lit = new THREE.Color(tones[0]);
   const mid = new THREE.Color(tones[1]);
+  const shade = new THREE.Color(tones[2]);
   const c = new THREE.Color();
   for (let i = 0; i < n.count; i++) {
     const ny = n.getY(i);
     // one body tone below, lit crown above — the toon ramp supplies the shade band (no plum toadstool cap)
-    c.copy(mid).lerp(lit, THREE.MathUtils.smoothstep(ny, 0.4, 0.55));
+    c.copy(shade).lerp(mid, THREE.MathUtils.smoothstep(ny, -0.8, -0.35)).lerp(lit, THREE.MathUtils.smoothstep(ny, 0.05, 0.4));
     cols.set([c.r, c.g, c.b], i * 3);
   }
   out.setAttribute('color', new THREE.BufferAttribute(cols, 3));
@@ -402,18 +404,19 @@ function buildMaple(rand: () => number, scale: number, kind: TreeKind, palette: 
       const from = trunkCurve.getPointAt(0.42 + (i / limbs) * 0.45 + rand() * 0.06);
       const bare = i === holeA || i === holeB;
       // bare limbs reach past the crown so they read as branches against sky, not lines on a lobe
-      const reach = (kind === 'hero' ? 1.5 : kind === 'tall' ? 0.8 : 1.15) * (0.6 + rand() * 0.7) * (bare ? 1.7 : 1);
-      const rise = 0.5 + rand() * 0.9;
+      const reach = (kind === 'hero' ? 1.5 : kind === 'tall' ? 0.8 : 1.15) * (0.6 + rand() * 0.7) * (bare ? 1.05 : 1);
+      const rise = 0.65 + rand() * 0.9;
       const end = from.clone().add(V(Math.cos(a) * reach, rise, Math.sin(a) * reach));
-      const mid = from.clone().lerp(end, 0.5).add(V(0, 0.35, 0));
+      const mid = from.clone().lerp(end, 0.5).add(V(0, -0.18, 0));
       const limbCurve = new THREE.CatmullRomCurve3([from, mid, end]);
       const lr = r0 * 0.42;
-      g.add(inked(plumeGeometry(limbCurve, (t) => THREE.MathUtils.lerp(lr, lr * 0.45, t), 10, 6, 0), bark, 0.018, true));
+      g.add(inked(plumeGeometry(limbCurve, (t) => THREE.MathUtils.lerp(lr, lr * (bare ? 0.06 : 0.3), t), 10, 6, 0), bark, 0.018, true));
       if (bare) {
         // bare limb: forks into two inked twigs so the hole reads as branch, not a missing mesh
-        for (const tw of [-0.7, 0.6]) {
-          const tip = end.clone().add(V(Math.cos(a + tw) * 0.55, 0.35 + rand() * 0.3, Math.sin(a + tw) * 0.55));
-          g.add(inked(plumeGeometry(new THREE.CatmullRomCurve3([end.clone(), end.clone().lerp(tip, 0.5).add(V(0, 0.1, 0)), tip]), (t) => THREE.MathUtils.lerp(lr * 0.45, lr * 0.15, t), 6, 5, 0), bark, 0.014, true));
+        for (const tw of [0.55]) {
+          const fork = limbCurve.getPointAt(0.65);
+          const tip = fork.clone().add(V(Math.cos(a + tw) * 0.38, 0.45 + rand() * 0.3, Math.sin(a + tw) * 0.38));
+          g.add(inked(plumeGeometry(new THREE.CatmullRomCurve3([fork, fork.clone().lerp(tip, 0.5).add(V(0, -0.08, 0)), tip]), (t) => THREE.MathUtils.lerp(lr * 0.32, lr * 0.025, t), 6, 5, 0), bark, 0.014, true));
         }
         continue;
       }
@@ -431,7 +434,7 @@ function buildMaple(rand: () => number, scale: number, kind: TreeKind, palette: 
     }
   }
   pads.forEach((pd, i) => {
-    const tones = CANOPY[(palette + (i % 3 === 2 ? 1 : 0)) % CANOPY.length]!;
+    const tones = CANOPY[kind === 'hero' && i === 1 ? 1 : (palette + (i % 3 === 2 ? 1 : 0)) % CANOPY.length]!;
     const geo = canopyPad(rand, pd.r, pd.h, tones);
     const pad = inked(geo, toon(0xffffff, { vertexColors: true, contour: 0.9, climbBase, ramp: RAMP_CANOPY }), 0.028, true);
     pad.position.copy(pd.at);
@@ -444,6 +447,19 @@ function buildMaple(rand: () => number, scale: number, kind: TreeKind, palette: 
   const PER = 4;
   const cardMat = toon(0xffffff, { vertexColors: true, climbBase, ramp: RAMP_CANOPY });
   cardMat.side = THREE.DoubleSide;
+  const paintCards = cardMat.onBeforeCompile;
+  cardMat.onBeforeCompile = (shader, renderer) => {
+    paintCards(shader, renderer);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLeafOut;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vLeafOut = normalize(mat3(modelMatrix) * mat3(instanceMatrix) * vec3(0.0, 1.0, 0.0));`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLeafOut;')
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+        if (abs(dot(normalize(vLeafOut), normalize(cameraPosition - vLkWorld))) > 0.32) discard;`);
+  };
+  cardMat.customProgramCacheKey = () => 'lk-paint-rim-leaf';
   const cards = new THREE.InstancedMesh(RIM_LEAF, cardMat, pads.length * CLUSTERS * PER);
   const cm = new THREE.Matrix4();
   const cq = new THREE.Quaternion();
@@ -455,7 +471,7 @@ function buildMaple(rand: () => number, scale: number, kind: TreeKind, palette: 
   const side = new THREE.Vector3();
   let ci = 0;
   pads.forEach((pd, i) => {
-    const tones = CANOPY[(palette + (i % 3 === 2 ? 1 : 0)) % CANOPY.length]!;
+    const tones = CANOPY[kind === 'hero' && i === 1 ? 1 : (palette + (i % 3 === 2 ? 1 : 0)) % CANOPY.length]!;
     const a0 = rand() * 6.28;
     for (let k = 0; k < CLUSTERS; k++) {
       // one sprig breaks the contour together, a value step darker than its lobe
@@ -472,7 +488,7 @@ function buildMaple(rand: () => number, scale: number, kind: TreeKind, palette: 
         cs.setScalar(pd.r * (0.15 + rand() * 0.07));
         cp.set(pd.at.x + Math.cos(a) * pd.r * 0.98, pd.at.y + yv * pd.h * 0.85, pd.at.z + Math.sin(a) * pd.r * 0.98);
         cards.setMatrixAt(ci, cm.compose(cp, cq, cs));
-        cards.setColorAt(ci, cc.setHex(tones[1]).lerp(new THREE.Color(tones[2]), 0.3 + rand() * 0.2));
+        cards.setColorAt(ci, cc.setHex(tones[1]).lerp(new THREE.Color(tones[0]), 0.25 + rand() * 0.2));
       }
     }
   });
@@ -833,7 +849,8 @@ function buildSky(scene: THREE.Scene, sunDir: THREE.Vector3): LookdevSky {
         cw = mix(cw, paper * vec3(1.05, 1.03, 0.98), b2 * 0.85);
         cw = mix(cw, mix(paper, uInk, 0.66), pool * 0.8);
         float hl = fract((fc.x + fc.y + lkNoise(fc * 0.04) * 5.0) * 0.17);
-        float shadeSide = (1.0 - smoothstep(0.26, 0.4, s)) * smoothstep(thr + 0.02, thr + 0.1, c0) * smoothstep(0.1, 0.2, hp) * smoothstep(0.0, 0.03, cUp - cDn + 0.02);
+        float lowerRim = smoothstep(0.025, 0.065, cUp - cDn) * (1.0 - smoothstep(thr + 0.07, thr + 0.14, c0));
+        float shadeSide = lowerRim * (1.0 - smoothstep(0.24, 0.36, s)) * smoothstep(0.08, 0.18, hp) * (0.35 + 0.65 * (1.0 - sunSide));
         float hatch = smoothstep(0.42, 0.3, hl) * shadeSide * (0.55 + 0.45 * lkNoise(vec2(az * 9.0, hp * 30.0)));
         cw = mix(cw, uInk * 1.4, hatch * 0.38);
         vec3 unpainted = mix(paper, cw, mWash * (0.82 + 0.18 * gran));
@@ -962,6 +979,25 @@ export async function runLookdevP0(): Promise<void> {
     const r = buildRock(rand, s);
     r.position.set(x, groundH(x, z) + s * 0.25, z);
     scene.add(r);
+    r.updateMatrixWorld(true);
+    const vertices = r.geometry.getAttribute('position');
+    const indices = r.geometry.index;
+    const contacts: THREE.Vector3[] = [];
+    for (let i = 0; i < (indices?.count ?? vertices.count); i += 3) {
+      const triangle = [0, 1, 2].map((j) => new THREE.Vector3()
+        .fromBufferAttribute(vertices, indices ? indices.getX(i + j) : i + j).applyMatrix4(r.matrixWorld));
+      const heights = triangle.map((v) => v.y - groundH(v.x, v.z));
+      const crossings: THREE.Vector3[] = [];
+      for (let j = 0; j < 3; j++) {
+        const k = (j + 1) % 3;
+        if (heights[j]! * heights[k]! >= 0) continue;
+        const point = triangle[j]!.clone().lerp(triangle[k]!, heights[j]! / (heights[j]! - heights[k]!));
+        point.y = groundH(point.x, point.z) + 0.018;
+        crossings.push(point);
+      }
+      if (crossings.length === 2) contacts.push(...crossings);
+    }
+    scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(contacts), new THREE.LineBasicMaterial({ color: INK })));
   }
 
   const fox = await loadHearthFox((w) => inkMaterial(w));
