@@ -60,3 +60,22 @@ Verdict: NEEDS REVISION
 - Obtain independent play of full chain and safe retry.
 - Review upper-route chase distance at normal resolution.
 - Obtain two independent FUN + BEAUTIFUL verdicts before integration.
+
+## Independent review — exact f2af9d5 (Rook, #swarm:555)
+
+Normal-resolution chain 5/5 PASS; deliberate westward miss, grounded meadow
+landing, walking return, ordinary held-jump re-entry and full chain retry 8/8
+PASS with errors[]. No teleport occurs between miss and successful relaunch.
+Independent retained evidence: captures volume
+`/reviews/rook-canopy-f2af9d5-retry2/` (evidence.json, route-high.png,
+retry-entry.png, other route/underside stills and WebM).
+Tallow downloaded and inspected the actual JSON and high/retry PNGs, confirming
+all eight checks and readable fox/veins at normal resolution.
+
+Rook verdict: FUN MARGINALLY/provisional, BEAUTIFUL MARGINALLY. Rising rhythm,
+steering and safe retry work; beige background flattens depth and entry underside
+hides the fox on a failed approach. Initial retry attempt began too far away for
+ordinary entry jump; corrected running approach succeeds. This is controlled
+mechanical evidence, not unfamiliar-player discovery. Page endpoint and combined
+route remain untested. Candidate still not ready to land; launch and anchors
+unchanged. Camera/leaf occlusion ownership requested from Flint in #swarm:559.
