@@ -543,8 +543,10 @@ function laneWalls(k: Kit, ctx: OpeningCtx, g: Gate): { x: number; z: number; ya
         const x = g.x + g.nx * s * (GATE_HALF + 0.15) - g.dx * t;
         const z = g.z + g.nz * s * (GATE_HALF + 0.15) - g.dz * t;
         const y = ctx.groundH(x, z);
-        k.add(jitter(new THREE.DodecahedronGeometry(0.27, 0), 0.16, rand), rand() < 0.5 ? C.stoneField : C.stoneDark, [x, y + 0.14, z], [rand(), yaw + rand(), rand()], 0.018, [0.95, 0.75, 1.15]);
-        if (rand() < 0.75) k.add(jitter(new THREE.DodecahedronGeometry(0.22, 0), 0.18, rand), rand() < 0.5 ? C.stoneField : C.stoneCool, [x + (rand() - 0.5) * 0.08, y + 0.46, z], [rand(), yaw + rand(), rand()], 0.016, [0.95, 0.75, 1.2]);
+        // two flat hewn courses, offset, then a row of thin cap slabs
+        k.add(hewn(box(0.42, 0.22, 0.5), rand, 0.06), rand() < 0.5 ? C.stoneField : C.stoneDark, [x, y + 0.08, z], [0, yaw + (rand() - 0.5) * 0.12, 0], 0.016);
+        k.add(hewn(box(0.4, 0.2, 0.46), rand, 0.06), rand() < 0.5 ? C.stoneDark : C.stoneCool, [x + (rand() - 0.5) * 0.06, y + 0.29, z + (rand() - 0.5) * 0.06], [0, yaw + 0.25 * (i % 2 ? 1 : -1), 0], 0.016);
+        k.add(hewn(box(0.48, 0.1, 0.52), rand, 0.04), C.stoneCool, [x, y + 0.45, z], [0, yaw + (rand() - 0.5) * 0.1, (rand() - 0.5) * 0.08], 0.014);
       }
       const tm = (a! + b!) / 2;
       const cx = g.x + g.nx * s * (GATE_HALF + 0.15) - g.dx * tm;
@@ -627,10 +629,9 @@ export function buildVillage(ctx: OpeningCtx): void {
     const wellTop = new THREE.Vector3(WELL.x, ctx.groundH(WELL.x, WELL.z) + 2.75, WELL.z);
     festoon(props, posts.plaza!, wellTop, 0.45);
     festoon(props, wellTop, new THREE.Vector3(gate.x - gate.nx * GATE_HALF, gate.y + 2.25, gate.z - gate.nz * GATE_HALF), 0.55);
-    festoon(props, posts.north!, new THREE.Vector3(-9, ctx.groundH(-9, 97.6) + 2.7, 97.6), 0.35);
     // back-garden fences
     // back gardens: a wattle fence ~2 m off the back wall, cabbage rows between
-    for (const [ax, bx, z, wallZ] of [[-21, -15, 80.4, 82.7], [-31.5, -25.5, 79.8, 82.1], [8.6, 15.4, 90.8, 92.9], [-12, -6.2, 95.9, 97.8]] as const) {
+    for (const [ax, bx, z, wallZ] of [[-21, -15, 80.4, 82.7], [-31.5, -25.5, 79.8, 82.1], [8.6, 15.4, 90.8, 92.9]] as const) {
       colliders.push({ kind: 'box', ...fence(props, ctx, ax, z, bx, z) });
       for (let row = 0; row < 2; row++)
         for (let x = ax + 0.6; x < bx - 0.4; x += 0.62) {
