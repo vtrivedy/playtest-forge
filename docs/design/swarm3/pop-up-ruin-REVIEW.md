@@ -41,3 +41,6 @@ Verdict: NEEDS REVISION
 - Play Page-guided integrated camera framing.
 - Review continuous rendered-motion route.
 - Two independent FUN + BEAUTIFUL verdicts before integration.
+
+
+Paper revision WIP: first full route10/10 PASS/errors[] at /captures/rook/ruin-paper-wip. Chase review found the large illustration rotated90° relative to the closed page; corrected its print orientation, then replaced chunky jamb stacks with tapered broken piers and dark undercroft. Final revised pass pending. All physics, top heights and route colliders remain the previous tested layout. System ffmpeg absent: recovered c442403 route.mp4 from saved PNGs with imageio-ffmpeg and uploaded to /reviews/rook-ruin-c442403-motion. Probe now accepts FFMPEG_PATH. Teammate FUN/BEAUTIFUL still NOT YET; no integration land authorized by these checks.

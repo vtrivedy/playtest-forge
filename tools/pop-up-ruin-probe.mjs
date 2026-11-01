@@ -41,4 +41,4 @@ evidence.assertions=[['first opens',at('02-first-unfold').opening.popUpRuin.fold
 fs.writeFileSync(`${out}/evidence.json`,JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence.assertions));
 if(evidence.assertions.some(a=>!a.pass))throw Error('Ruin route failed; inspect evidence.json');
 }finally{await browser.close();await server.close();}
-if(motion&&movieFrame)execFileSync('ffmpeg',['-y','-loglevel','error','-framerate','10','-i',`${out}/frames/%05d.png`,'-c:v','libx264','-pix_fmt','yuv420p',`${out}/route.mp4`]);
+if(motion&&movieFrame)execFileSync(process.env.FFMPEG_PATH || 'ffmpeg',['-y','-loglevel','error','-framerate','10','-i',`${out}/frames/%05d.png`,'-c:v','libx264','-pix_fmt','yuv420p',`${out}/route.mp4`]);

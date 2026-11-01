@@ -24,8 +24,49 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   const stone = toon(0x827263, { contour: 0.5, hatchWeight: 0.35 });
   const paper = toon(0xa99672, { contour: 0.4, hatchWeight: 0.15 });
   const brass = toon(0xb67a43, { contour: 0.5 });
+  const undercroft = toon(0x464d50, { contour: 0.7, hatchWeight: 0.4 });
   const ink = toon(0x48382b);
-  const etched = new THREE.MeshBasicMaterial({ color: 0x574432, fog: true });
+  // Original ink illustration. Transparent paper print takes the same light/fog as the world.
+  const canvas = document.createElement('canvas'); canvas.width = canvas.height = 768;
+  const g = canvas.getContext('2d')!;
+  g.translate(0, 768); g.rotate(-Math.PI / 2);
+  g.strokeStyle = '#433d37'; g.fillStyle = '#595045'; g.lineCap = 'round'; g.lineJoin = 'round';
+  const stroke = (points: number[][], width = 5, close = false, fill = false) => {
+    g.beginPath(); points.forEach(([x,y], i) => i ? g.lineTo(x!,y!) : g.moveTo(x!,y!));
+    if (close) g.closePath(); if (fill) g.fill(); g.lineWidth = width; g.stroke();
+  };
+  // Jagged ashlar piers and pointed voussoirs, with an empty doorway as the focal silhouette.
+  stroke([[140,620],[154,335],[209,333],[211,287],[274,240],[306,217],[383,151],[462,220],[501,245],[561,290],[560,340],[615,344],[632,620]], 10);
+  stroke([[237,611],[248,365],[283,318],[333,278],[384,230],[438,279],[490,320],[526,368],[535,612]], 8);
+  stroke([[140,620],[237,611],[248,365],[211,333],[154,335]], 4, true, true);
+  stroke([[535,612],[632,620],[615,344],[560,340],[526,368]], 4, true, true);
+  g.fillStyle='#746957';
+  for (let j=0;j<5;j++) for (const side of [-1,1]) {
+    const x=side<0?154:542, y=381+j*44;
+    stroke([[x,y],[x+66,y-4],[x+65,y+31],[x+2,y+34]],2,true);
+    stroke([[x+12,y+8],[x+46,y+6]],1.5);
+  }
+  for (let i=0;i<9;i++) {
+    const t=i/8, x=211+t*350, y=338-Math.sin(t*Math.PI)*180;
+    stroke([[x,y],[x+(384-x)*.15,y+39]],3);
+  }
+  // Ivy, fallen stones, grass and ink hatching make a picture, not an architectural diagram.
+  for (let i=0;i<22;i++) {
+    const y=340+i*12, x=181+Math.sin(i*.8)*15;
+    stroke([[x,y],[x+17,y+18],[x+5,y+25]],2);
+    stroke([[x+10,y+14],[x-7,y+5],[x-12,y+18]],1.5,true,true);
+  }
+  for (let i=0;i<18;i++) {
+    const x=95+i*34,y=628+Math.sin(i*2.2)*13;
+    stroke([[x-5,y+19],[x,y],[x+8,y+13]],2);
+    if(i%3===0)stroke([[x,y+22],[x+23,y+16],[x+34,y+26],[x+9,y+31]],2,true);
+  }
+  stroke([[110,687],[312,678],[458,686],[653,674]],3);
+  stroke([[468,112],[480,103],[491,113],[502,105],[513,113]],3);
+  stroke([[540,157],[549,151],[557,159]],2);
+  const print = new THREE.CanvasTexture(canvas); print.colorSpace = THREE.SRGBColorSpace;
+  print.anisotropy = 4;
+  const printMaterial = new THREE.MeshBasicMaterial({ map: print, transparent: true, depthWrite: false, fog: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   const folds: Fold[] = [];
   let reached = false;
   let returns = 0;
@@ -63,25 +104,22 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   ctx.colliders.push({ kind: 'box', x: O.x, z: O.z, yaw: 0, hx: O.width / 2, hz: O.depth / 2, top: O.top });
   for (const dz of [-1.2, 0, 1.2]) {
     const base = ctx.groundH(O.x, O.z + dz);
-    const support = box(1.0, O.top - base - 0.24, 0.85, stone, 0.05);
+    const support = box(1.0, O.top - base - 0.24, 0.85, undercroft, 0.05);
     support.position.set(O.x - 0.7, (O.top + base - 0.24) / 2, O.z + dz);
     root.add(support);
   }
-  // Broken jambs frame the village view rather than boxing in the fox.
-  for (const dz of [-1.5, 1.5]) {
-    for (let i = 0; i < 3; i++) {
-      const block = box(0.55, 0.5, 0.55, stone, 0.035);
-      block.position.set(O.x - 1.4, O.top + 0.25 + i * 0.51, O.z + dz);
-      block.rotation.y = dz * 0.03 + i * 0.04;
-      root.add(block);
-    }
-  }
-
+  // Narrow tapered remnants and a broken pointed arch; open sky stays between them.
   for (const side of [-1, 1]) {
-    const brokenArch = box(0.58, 0.45, 0.85, stone, 0.035);
-    brokenArch.position.set(O.x - 1.4, O.top + 1.65, O.z + side * 1.2);
-    brokenArch.rotation.x = side * 0.55;
-    root.add(brokenArch);
+    const pier = inked(hewn(new THREE.CylinderGeometry(0.24, 0.37, 1.85, 5, 3), ctx.rand, 0.045), stone, 0.014, true);
+    pier.position.set(O.x - 1.4, O.top + 0.925, O.z + side * 1.5);
+    pier.rotation.y = side * 0.2; root.add(pier);
+    for (let i = 0; i < 3; i++) {
+      const arch = box(0.33, 0.3, 0.5, stone, 0.035);
+      arch.position.set(O.x - 1.4, O.top + 1.83 + i * 0.27, O.z + side * (1.4 - i * 0.19));
+      arch.rotation.x = side * 0.54; root.add(arch);
+    }
+    const foot = box(0.7, 0.12, 0.8, undercroft, 0.03);
+    foot.position.set(O.x - 1.4, O.top + 0.06, O.z + side * 1.5); root.add(foot);
   }
 
   R.leaves.forEach((p) => {
@@ -92,28 +130,37 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
     pivot.rotation.set(0, p.yaw, -Math.PI / 2);
     root.add(pivot);
     ctx.occluders.push(pivot);
-    const slab = box(R.width, 0.24, R.depth, paper);
-    slab.position.x = -R.width / 2;
-    pivot.add(slab);
-    // Inset ribs keep the broad surface legible as a folded architectural leaf.
-    for (const dz of [-1.45, 1.45]) {
-      const rib = box(R.width - 0.1, 0.045, 0.12, ink);
-      rib.position.set(-R.width / 2, 0.14, dz);
-      pivot.add(rib);
+    // A torn illustrated page, rather than timber rails: its picture becomes the path.
+    const outline = new THREE.Shape();
+    const corners = [[-R.width, -R.depth / 2], [0, -R.depth / 2], [0, R.depth / 2], [-R.width, R.depth / 2]];
+    corners.forEach(([x, z], edge) => {
+      const [nx, nz] = corners[(edge + 1) % 4]!;
+      for (let j = 0; j < 14; j++) {
+        const t = j / 14, nick = j % 3 === 1 ? 0.065 : 0.018;
+        const px = x! + (nx! - x!) * t + (edge === 1 ? -nick : edge === 3 ? nick : 0);
+        const pz = z! + (nz! - z!) * t + (edge === 0 ? nick : edge === 2 ? -nick : 0);
+        if (!edge && !j) outline.moveTo(px, -pz); else outline.lineTo(px, -pz);
+      }
+    });
+    outline.closePath();
+    const pageGeo = new THREE.ExtrudeGeometry(outline, { depth: 0.24, bevelEnabled: false, steps: 1 });
+    pageGeo.rotateX(-Math.PI / 2); pageGeo.translate(0, -0.12, 0);
+    pivot.add(inked(pageGeo, paper, 0.009, true));
+    const illustration = new THREE.Mesh(new THREE.PlaneGeometry(R.width - 0.24, R.depth - 0.24), printMaterial);
+    illustration.rotation.x = -Math.PI / 2;
+    illustration.position.set(-R.width / 2, 0.126, 0);
+    pivot.add(illustration);
+    // Cloth tabs bridge the hinge; small dark stitches make the fold direction explicit.
+    for (const z of [-1.18, 0, 1.18]) {
+      const tab = box(0.26, 0.035, 0.25, paper, 0);
+      tab.position.set(-0.055, 0.135, z); pivot.add(tab);
+      for (const dz of [-0.075, 0.075]) {
+        const stitch = box(0.15, 0.012, 0.018, ink, 0);
+        stitch.position.set(-0.06, 0.159, z + dz); pivot.add(stitch);
+      }
     }
-    for (const x of [0.22, R.width / 2, R.width - 0.22]) {
-      const crease = box(0.045, 0.03, R.depth - 0.6, brass);
-      crease.position.set(-x, 0.145, 0);
-      pivot.add(crease);
-    }
-    // Engraved arch/vein: visible in pressed ink, quiet under the restored paper palette.
-    const stroke = (points: number[][], radius = 0.018) => {
-      const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(-x!, 0.15, z!)));
-      pivot.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, radius, 4, false), etched));
-    };
-    stroke([[0.45, -1.05], [1.6, -1.05], [2.8, 0], [1.6, 1.05], [0.45, 1.05]]);
-    stroke([[0.55, 0], [1.65, 0], [2.8, 0]], 0.022);
-    for (const side of [-1, 1]) stroke([[1.3, 0], [1.7, side * 0.43], [1.9, side * 0.75]], 0.013);
+    const crease = box(0.025, 0.015, R.depth - 0.15, ink, 0);
+    crease.position.set(-0.2, 0.135, 0); pivot.add(crease);
     const marker = spindle(p.x + ax * (R.width / 2 + 0.06), p.top, p.z + az * (R.width / 2 + 0.06));
     marker.rotation.y = p.yaw;
     const gx = p.x + ax * (R.width / 2 + 0.2);
@@ -191,7 +238,8 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
         f.elapsed += dt;
         const u = Math.min(1, f.elapsed / RUIN_FEEL.unfold);
         const eased = 1 - (1 - u) ** 3;
-        const angle = Math.PI / 2 * (1 - eased) + Math.sin(u * Math.PI * 2) * 0.035 * Math.sin(u * Math.PI);
+        const slap = u > 0.5 ? Math.sin((u - 0.5) * Math.PI * 4) * (1 - u) * 0.23 : 0;
+        const angle = Math.PI / 2 * (1 - eased) + slap;
         if (i < 2) f.pivot.rotation.z = -angle;
         else f.pivot.rotation.x = angle;
         if (f.housing) f.housing.scale.y = 1 - eased * 0.85;
