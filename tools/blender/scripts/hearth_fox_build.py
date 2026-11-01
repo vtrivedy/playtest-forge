@@ -394,7 +394,17 @@ def tufts(ob, region, amp, freq):
 
 TAU = math.pi * 2
 # chest/neck ruff: front + sides of the throat down to the brisket, not the back
-tufts(body, lambda co: smooth01(0.08, 0.14, -co.y) * smooth01(0.2, 0.16, -co.y) * smooth01(0.16, 0.22, co.z) * smooth01(0.36, 0.3, co.z), 0.028, 11)
+tufts(body, lambda co: smooth01(0.08, 0.14, -co.y) * smooth01(0.2, 0.16, -co.y) * smooth01(0.16, 0.22, co.z) * smooth01(0.36, 0.3, co.z), 0.03, 9)
+
+
+def cheek_region(co):
+    """lower outer cheeks, behind the eyes: where the starter fox's fluff flares out"""
+    rel = co - HEAD_PIVOT
+    u, side = -rel.y, abs(co.x)
+    return smooth01(0.085, 0.105, side) * smooth01(0.01, -0.03, rel.z) * smooth01(-0.07, -0.04, u) * smooth01(0.04, 0.0, u)
+
+
+tufts(head, cheek_region, 0.018, 5)
 for p in body.data.polygons:
     p.use_smooth = True
 for e in EARS:
