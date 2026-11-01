@@ -18,7 +18,7 @@ bone("root", (0, 0, 0), (0, -0.12, 0))
 bone("hips", P(-0.27, 0.43), P(-0.08, 0.425), "root")
 bone("spine", P(-0.08, 0.425), P(0.12, 0.42), "hips")
 bone("chest", P(0.12, 0.42), P(0.27, 0.5), "spine")
-bone("neck", P(0.27, 0.5), P(0.355, 0.625), "chest")
+bone("neck", P(0.27, 0.5), P(0.37, 0.6), "chest")
 bone("head", HEAD_PIVOT, HEAD_PIVOT + Vector((0, -0.16, -0.012)), "neck")
 for e in EARS:
     zs = sorted(e.data.vertices, key=lambda v: v.co.z)

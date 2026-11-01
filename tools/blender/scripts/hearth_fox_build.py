@@ -45,8 +45,8 @@ NODES = {
     "chest": (P(0.12, 0.395), 0.09, 0.148),
     "withers": (P(0.22, 0.44), 0.08, 0.105),
     "neck0": (P(0.29, 0.52), 0.07, 0.08),
-    "neck1": (P(0.34, 0.6), 0.058, 0.062),
-    "neck2": (P(0.37, 0.645), 0.045, 0.048),
+    "neck1": (P(0.345, 0.575), 0.06, 0.064),
+    "neck2": (P(0.38, 0.61), 0.046, 0.05),
 }
 LEGS = {
     # front: shoulder → elbow → wrist → paw → toe
@@ -144,7 +144,7 @@ def lerp_table(tab, u):
 
 
 # ------------------------------------------------------------------ head: wedge skull, cheek ruff, long tapered muzzle
-HEAD_PIVOT = P(0.375, 0.655)
+HEAD_PIVOT = P(0.4, 0.625)
 HEAD_PITCH = math.radians(-6)  # nose slightly down: wary, not perky
 #        u      halfw  top    bot    zc
 HEAD = [(-0.09, 0.024, 0.024, 0.024, 0.0),
@@ -284,7 +284,8 @@ def tail_radius(t):
     # narrow-ish dock leaving the rump, fur blooms after it, long taper to the flame point
     bloom = 0.42 + 0.58 * smooth_(0.06, 0.3, t)
     body = math.sin(min(1.0, 0.1 + t * 1.0) * math.pi) ** 0.5
-    return 0.108 * bloom * body * (1 - 0.15 * t) + 0.004
+    tip = (1 - smooth_(0.62, 1.0, t)) ** 0.7
+    return 0.108 * bloom * body * (1 - 0.15 * t) * (0.35 + 0.65 * tip) + 0.003
 
 
 def smooth_(e0, e1, x):
@@ -335,7 +336,7 @@ SADDLE = lin(0x8e3416)  # deep rust along the back
 CREAM = lin(0xe9d5b0)
 INK = lin(0x2a1a14)
 EMBER = lin(0xff7a24)
-GOLD = lin(0xffd68a)
+GOLD = lin(0xffa640)  # deep amber: stays a flame under bloom, never blows to white
 
 
 def mix(a, b, t):
@@ -429,7 +430,7 @@ def ear_fn(ear):
 
     def fn(co, n):
         t = (co.z - z0) / (z1 - z0)
-        inner = smooth01(0.2, 0.6, n.dot(face)) * smooth01(0.85, 0.6, t)
+        inner = smooth01(0.45, 0.8, n.dot(face)) * smooth01(0.7, 0.45, t) * smooth01(0.0, 0.12, t)
         c = mix(COAT, CREAM, inner * 0.9)
         c = mix(c, INK, smooth01(0.58, 0.72, t + 0.03 * fur_noise(co.x, co.y)) * (1 - inner * 0.6))
         c = mix(c, SADDLE, 0.5 * smooth01(-0.2, -0.6, n.dot(face)) * smooth01(0.6, 0.4, t))

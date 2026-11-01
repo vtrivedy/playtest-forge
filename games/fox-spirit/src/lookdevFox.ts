@@ -52,6 +52,14 @@ function coatMaterial(emberGain: number): THREE.MeshToonMaterial {
       .replace(
         '#include <opaque_fragment>',
         `{
+          // living cel: band the total (key + hemi + hearth) light into 3 crisp steps so the hemi fill
+          // can't airbrush the coat; the shadow step leans rust-plum (melancholy), never grey
+          vec3 lit = outgoingLight - totalEmissiveRadiance;
+          float L = dot(lit, vec3(0.2126, 0.7152, 0.0722)) / max(1e-3, dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)));
+          float band = mix(0.42, 0.8, smoothstep(0.41, 0.49, L));
+          band = mix(band, 1.1, smoothstep(0.9, 1.0, L));
+          vec3 tint = mix(vec3(0.82, 0.58, 0.66), vec3(1.0), smoothstep(0.43, 0.97, L));
+          outgoingLight = diffuseColor.rgb * band * tint + totalEmissiveRadiance;
           float rim = 1.0 - clamp(dot(normalize(normal), vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
           outgoingLight += vec3(1.0, 0.55, 0.22) * smoothstep(0.6, 0.88, rim) * 0.3 * (1.0 - vEmber);
         }
@@ -75,7 +83,8 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
   const skinned: THREE.SkinnedMesh[] = [];
   const pawBones: THREE.Bone[] = [];
   model.traverse((o) => {
-    if (/^[fh]paw\.[LR]$/.test(o.name)) pawBones.push(o as THREE.Bone);
+    // GLTFLoader sanitizes bone names (fpaw.L → fpawL)
+    if (/^[fh]paw\.?[LR]$/.test(o.name)) pawBones.push(o as THREE.Bone);
     if ((o as THREE.Bone).isBone) {
       if (o.name === 'tail6') tailTip = o as THREE.Bone;
       if (o.name === 'neck') neck = o as THREE.Bone;
@@ -92,7 +101,7 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
     for (let i = 0; i < uv.count; i++) ember[i] = uv.getX(i);
     geo.setAttribute('aEmber', new THREE.BufferAttribute(ember, 1));
     const isCoat = mesh.name.startsWith('fox_coat');
-    mesh.material = coatMaterial(isCoat ? 2.2 : 0.9);
+    mesh.material = coatMaterial(isCoat ? 1.7 : 0.9);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
@@ -106,18 +115,18 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
     }
   }
 
-  // ember tongues licking off the tail tip + a warm hearth light
+  // ember wisps streaming off the pointed tail tip (along the tail bone's +Y) + a warm hearth light
   const tongues: THREE.Mesh[] = [];
-  const flameGroup = new THREE.Group();
   if (tailTip) {
-    tailTip.add(flameGroup);
-    for (let i = 0; i < 4; i++) {
-      const g = new THREE.ConeGeometry(0.024 - i * 0.003, 0.16 - i * 0.022, 5);
-      g.translate(0, 0.05, 0);
-      const t = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: new THREE.Color(1.9, 0.62, 0.13), transparent: true, opacity: 0.8, depthWrite: false }));
-      t.position.set((i - 1.5) * 0.012, 0.11 + i * 0.012, 0);
-      t.rotation.set((i - 1.5) * 0.25, 0, (i - 1.5) * 0.35);
-      flameGroup.add(t);
+    const tipLen = 0.095; // tail6 bone length (leaf bone: glTF keeps no tail position)
+    const wispMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 0.42, 0.07), transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending });
+    for (let i = 0; i < 3; i++) {
+      const g = new THREE.ConeGeometry(0.014 - i * 0.003, 0.13 - i * 0.03, 6);
+      g.translate(0, 0.06 - i * 0.012, 0);
+      const t = new THREE.Mesh(g, wispMat);
+      t.position.set((i - 1) * 0.008, tipLen * 0.85, 0);
+      t.rotation.set(-0.25 + i * 0.12, 0, (i - 1) * 0.45);
+      tailTip.add(t);
       tongues.push(t);
     }
   }
