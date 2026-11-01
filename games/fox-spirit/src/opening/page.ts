@@ -217,8 +217,15 @@ export function buildRunawayPage(ctx: OpeningCtx) {
         for (let i = 0; i < 6; i++) emit(pos, 0.8, 1.2);
       }
     }
-    const seesLeap = TUNE.hop[stage] && launchStart && d < 3.8;
-    if (phase === 'perched' && (d < TUNE.spookAt[stage]! || seesLeap) && !(TUNE.hop[stage] && windedT > 0)) {
+    // high stages: a leap at it from the next leaf startles it — it jerks up, then sags winded on the same perch,
+    // so landing beneath it and springing straight up is the catch; dawdle under it and it flits to the other perch
+    if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 3.8 && windedT <= 0) {
+      windedT = TUNE.hopRest + 0.6;
+      dodges++;
+      side.set(0, 0.9, 0);
+      for (let i = 0; i < 8; i++) emit(pos, 0.9, 1.4);
+    }
+    if (phase === 'perched' && d < TUNE.spookAt[stage]! && !(TUNE.hop[stage] && windedT > 0)) {
       phase = 'fleeing';
       if (TUNE.hop[stage]) {
         // pick the next perch along the loop
@@ -240,7 +247,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     }
     if (phase === 'perched' || phase === 'fleeing') {
       place(stage, s, tmp);
-      side.multiplyScalar(Math.exp(-dt * 0.9));
+      side.x *= Math.exp(-dt * 0.9);
+      side.z *= Math.exp(-dt * 0.9);
+      side.y *= Math.exp(-dt * 4);
       tmp.add(side);
       pos.lerp(tmp, 1 - Math.exp(-dt * 10));
     } else if (phase === 'flung') {
