@@ -72,17 +72,19 @@ export function createKeepingRoute() {
     { beat: 'dash-drop', hold: 1.4 },
     { beat: 'back for the coal', toCoal: true, mag: 0.45 },
     { beat: 'pick it back up', interact: true, until: (s) => op(s).carry?.carried, hold: 1 },
-    { beat: 'to the spring', to: [24.7, 80.3], mag: 0.6 },
+    // spring and root-hearth have rim lips: the route stops at the rim and Carry sets the coal into the bowl
+    { beat: 'to the spring', to: [24.2, 80.6], mag: 0.6, reach: 0.2 },
     { beat: 'set it in the spring', interact: true, until: (s) => !op(s).carry?.carried, hold: 1 },
     { beat: 'steam wakes', hold: 9, until: (s) => op(s).chemistry?.steamLatched, min: 2.5 },
     { beat: 'steam rising', hold: 1.5 },
     { beat: 'take the coal again', interact: true, until: (s) => op(s).carry?.carried, hold: 1 },
     { beat: 'ride the steam', lift: [24.95, 79.36], rise: 6.5 },
-    { beat: 'glide to the terrace', to: [28.6, 76.6], mag: 0.8, glide: true },
-    { beat: 'to the root-hearth', to: [28.45, 75.85], mag: 0.3 },
+    { beat: 'glide to the terrace', to: [29.3, 77.7], mag: 0.8, glide: true },
+    { beat: 'to the root-hearth', to: [29.0, 77.35], mag: 0.3, reach: 0.2 },
     { beat: 'set warmth at the roots', interact: true, until: (s) => !op(s).carry?.carried, hold: 1 },
     { beat: 'the roots take it', hold: 10, until: (s) => op(s).chemistry?.completed, min: 1 },
     { beat: 'the tree finishes falling', hold: 7, until: (s) => op(s).keeping?.phase === 'bridge', min: 4.5 },
+    { beat: 'round the bowl', to: [29.7, 75.3], mag: 0.35 },
     { beat: 'onto the bridge', to: [27.8, 72.6], mag: 0.35 },
     { beat: 'cross the bridge', to: [26.2, 66.2], mag: 0.45 },
     { beat: 'the Crown answers', hold: 4 },
@@ -99,7 +101,7 @@ export function createKeepingRoute() {
     const coal = op(state).carry?.position;
     const target = () => (leg.toCoal && coal ? [coal[0], coal[2]] : leg.to);
     let to = target();
-    if (to && Math.hypot(x - to[0], z - to[1]) < (leg.glide ? 0.8 : leg.toCoal ? 0.75 : 0.55)) next();
+    if (to && Math.hypot(x - to[0], z - to[1]) < (leg.reach ?? (leg.glide ? 0.8 : leg.toCoal ? 0.75 : 0.55))) next();
     if (leg.lift) {
       launchY ??= y;
       if (y > launchY + leg.rise) next();
