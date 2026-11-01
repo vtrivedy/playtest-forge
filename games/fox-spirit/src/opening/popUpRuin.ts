@@ -25,11 +25,12 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   const paper = toon(0xa99672, { contour: 0.4, hatchWeight: 0.15 });
   const brass = toon(0xb67a43, { contour: 0.5 });
   const ink = toon(0x48382b);
+  const etched = new THREE.MeshBasicMaterial({ color: 0x574432, fog: true });
   const folds: Fold[] = [];
   let reached = false;
   let returns = 0;
   let misses = 0;
-  let wasOnLeaf = false;
+  let hadLanding = false;
   let lastDash = -1;
 
   const box = (w: number, h: number, d: number, mat: THREE.Material, rough = 0.015) =>
@@ -48,6 +49,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
       leaf.rotation.x = side * 0.35;
       g.add(leaf);
     }
+    g.scale.setScalar(0.55);
     root.add(g);
     return g;
   }
@@ -75,6 +77,13 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
     }
   }
 
+  for (const side of [-1, 1]) {
+    const brokenArch = box(0.58, 0.45, 0.85, stone, 0.035);
+    brokenArch.position.set(O.x - 1.4, O.top + 1.65, O.z + side * 1.2);
+    brokenArch.rotation.x = side * 0.55;
+    root.add(brokenArch);
+  }
+
   R.leaves.forEach((p) => {
     // Pivot lies along the west edge. The paper leaf opens east, away from its safe dash apron.
     const pivot = new THREE.Group();
@@ -96,6 +105,14 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
       crease.position.set(x, 0.145, 0);
       pivot.add(crease);
     }
+    // Engraved arch/vein: visible in pressed ink, quiet under the restored paper palette.
+    const stroke = (points: number[][], radius = 0.018) => {
+      const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x!, 0.15, z!)));
+      pivot.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, radius, 4, false), etched));
+    };
+    stroke([[0.45, -1.05], [1.6, -1.05], [2.8, 0], [1.6, 1.05], [0.45, 1.05]]);
+    stroke([[0.55, 0], [1.65, 0], [2.8, 0]], 0.022);
+    for (const side of [-1, 1]) stroke([[1.3, 0], [1.7, side * 0.43], [1.9, side * 0.75]], 0.013);
     const marker = spindle(p.x + R.width / 2 + 0.06, p.top, p.z);
     const gx = p.x + R.width / 2 + 0.2;
     const base = ctx.groundH(gx, p.z);
@@ -151,9 +168,9 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
     const p = ctx.fox.root.position;
     const dash = Number(s.dashesUsed);
     const onLeaf = R.leaves.some(q => Math.abs(p.x - q.x) < R.width / 2 && Math.abs(p.z - q.z) < R.depth / 2 && Math.abs(p.y - q.top) < 0.12 && s.grounded);
-    if (wasOnLeaf && s.grounded && !onLeaf && p.y < 0.05) misses++;
-    wasOnLeaf = Boolean(onLeaf);
-    if (s.grounded && Math.abs(p.x - O.x) < 1.5 && Math.abs(p.z - O.z) < 1.6 && Math.abs(p.y - O.top) < 0.12) reached = true;
+    if (onLeaf) hadLanding = true;
+    if (hadLanding && s.grounded && !onLeaf && p.y < R.leaves[0].top - 0.12) { misses++; hadLanding = false; }
+    if (s.grounded && Math.abs(p.x - O.x) < 1.5 && Math.abs(p.z - O.z) < 1.6 && Math.abs(p.y - O.top) < 0.12) { reached = true; hadLanding = false; }
     folds.forEach((f, i) => {
       const eligible = i === 0 || (i === 1 ? folds[0]!.phase === 'open' : reached);
       const within = Math.hypot(p.x - f.x, p.z - f.z) < RUIN_FEEL.hitRadius && Math.abs(p.y - f.y) < 1.1;
@@ -171,18 +188,22 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
         if (i < 2) f.pivot.rotation.z = angle;
         else f.pivot.rotation.x = angle;
         if (f.housing) f.housing.scale.y = 1 - eased * 0.85;
-        const under = i < 2 && Math.abs(p.x - R.leaves[i]!.x) < R.width / 2 + 0.1 && Math.abs(p.z - f.z) < R.depth / 2 + 0.1 && p.y < R.leaves[i]!.top - 0.05;
+        const underLeaf = i < 2 && Math.abs(p.x - R.leaves[i]!.x) < R.width / 2 + 0.1 && Math.abs(p.z - f.z) < R.depth / 2 + 0.1 && p.y < R.leaves[i]!.top - 0.05;
+        const alongReturn = THREE.MathUtils.clamp((p.z - returnPivot.position.z) / length, 0, 1);
+        const returnTop = THREE.MathUtils.lerp(O.top, endY, alongReturn) - 0.05;
+        const underReturn = i === 2 && Math.abs(p.x - O.x) < 1.35 && p.z > returnPivot.position.z - 0.1 && p.z < R.returnEnd.z + 0.1 && p.y < returnTop - 0.05;
+        const under = underLeaf || underReturn;
         if (u >= 1 && !under) {
           if (f.guard) { const n = ctx.colliders.indexOf(f.guard); if (n >= 0) ctx.colliders.splice(n, 1); }
           if (f.housing) f.housing.visible = false;
           f.phase = 'open'; f.land();
           if (i === 2) {
             returns++;
-            ctx.field.restore(new THREE.Vector3(-31, O.top, O.z), 7, 1.3, { edgeMax: 0.8 });
+            ctx.field.restore(new THREE.Vector3((R.leaves[0].x + R.overlook.x) / 2, O.top, O.z), 7, 1.3, { edgeMax: 0.8 });
           }
         }
       }
-      f.spindle.scale.setScalar(f.phase === 'folded' && eligible ? 1 + Math.sin(t * 3.2) * 0.06 : 1);
+      f.spindle.scale.setScalar(0.55 * (f.phase === 'folded' && eligible ? 1 + Math.sin(t * 3.2) * 0.06 : 1));
       f.spindle.rotation.x = f.phase === 'open' ? 0.25 : 0;
     });
   });
