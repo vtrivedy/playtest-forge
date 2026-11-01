@@ -102,12 +102,13 @@ try {
         console.log(f, beat.padEnd(18), JSON.stringify({ pos: state.pos, speed: state.speed, anim: state.anim, gait: state.gait, lastJump: state.lastJump }));
       }
     }
+    fs.writeFileSync(path.join(out, 'trace.json'), JSON.stringify(trace));
     if (video) {
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, 'hero-30s.mp4')]);
       const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
       fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/?lookdev=p0&play=1', route: 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: 900, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
     }
-    if (clipF >= 0)
+    if (!video && clipF >= 0)
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'run-clip/f%03d.jpg'), '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', path.join(out, 'run-clip.mp4')]);
     const slide = trace.filter((s) => s.anim === 'loco').map((s) => s.maxSlide);
     console.log('end', JSON.stringify(state.pos), 'maxSlide loco p95', slide.sort((a, b) => a - b)[Math.floor(slide.length * 0.95)]);
