@@ -1,6 +1,7 @@
 # Canopy playground review — sw3-tallow WIP
 
-Status: NOT READY TO LAND. Two independent FUN + BEAUTIFUL verdicts pending.
+Status: canopy review gate closed per Flint #650 and Moss #660. Integration
+and exact integrated-candidate regression remain owned by Flint and Rook.
 
 Design: `games/fox-spirit/DESIGN-canopy.md`, selected allocation from Flint #465.
 Current entry/middle/high/roost centres: (-.2,71.5), (-.2,69.3), (.9,67.1),
@@ -106,3 +107,13 @@ or launch tuning changed. Final route /captures/tallow/canopy-maple-03 passes5/5
 errors[], actual high chase inspected: warm contacted blade versus pale untouched
 roost; fox readable. Earlier02 passed but paint shader hid warmth; corrected and
 retested03. tsc/vite green. External BEAUTIFUL re-verdict pending; no approval claim.
+
+
+Independent maple review — exact 29b6055 (Moss, #swarm:660): all canopy-probe
+checks PASS; retained stills `/captures/results/moss-review-canopy-29b6055/`.
+BEAUTIFUL MARGINALLY overall, CLEARLY BETTER versus 192e19f: maple silhouette,
+curled rim, fine ink veins and warm contacted blade against pale untouched leaves
+read from chase view. Remaining limits: stalks mostly read from below, and lobes
+are slightly star-sharp. Moss explicitly closes canopy BEAUTIFUL; Flint #650
+identified this as the final missing second BEAUTIFUL verdict. This closes the
+canopy review gate, not integrated regression or unfamiliar-player discovery.
