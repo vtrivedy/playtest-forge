@@ -107,6 +107,23 @@ try {
       }
     }
     fs.writeFileSync(path.join(out, 'trace.json'), JSON.stringify(trace));
+    if (opening) {
+      const hearths = trace.flatMap(s => s.updraft?.hearths ?? s.hearth?.hearths ?? []);
+      const shelf = trace.filter(s => s.grounded && Math.hypot(s.pos[0] - 13, s.pos[2] - 75.5) < 3);
+      const summary = {
+        seconds, frames: trace.length, finalBeat: beat,
+        beats: [...new Set(trace.map(s => s.beat))],
+        hearthLit: hearths.some(h => h.id === 'H-a' && h.heat > 0.9),
+        glideFrames: trace.filter(s => s.gliding).length,
+        peakFeetY: Math.max(...trace.map(s => s.pos[1])),
+        shelfLanding: shelf.length ? shelf.at(-1).pos : null,
+        dashesUsed: Math.max(...trace.map(s => s.dashesUsed ?? 0)),
+        lastJump: state.lastJump,
+        game: await page.evaluate(() => ({ mode: window.__game?.mode, state: window.__gameHooks.state() })),
+      };
+      fs.writeFileSync(path.join(out, 'opening-summary.json'), JSON.stringify(summary, null, 2));
+      console.log('OPENING_SUMMARY', JSON.stringify(summary));
+    }
     if (video) {
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, opening ? 'opening-75s.mp4' : 'hero-30s.mp4')]);
       const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
