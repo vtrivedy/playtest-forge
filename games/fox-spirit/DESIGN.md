@@ -390,3 +390,6 @@ Also capture a six-second close run and six concept-angle hero stills. Assemble
 a50-second trailer on Modal from that run, best20-second loco showcase,12seconds
 of summit-r4 restoration and12seconds of Reach. List every source commit and
 staging limitation; this is editorial footage, not a claimed continuous clear.
+
+## Redesign sprint 1 — SOL ground slice
+Pressed Ink → Living Cel stays melancholy autumn. Ground should carry broad cool umber/moss masses with a restrained cream-ochre worn path so the burnt-orange fox separates at wide distance. Leaf litter groups along shoulders rather than evenly covering the clearing; short dry tufts stay outside the route. A cool ink contact pool anchors the fox. Preserve paper-to-paint restore and existing movement tuning. Ownership agreed in sprint COMMS.md (chat :15/:24): extract four ground functions to lookdevGround.ts, pass world helpers as context, remove old implementations. Verify 01/02/03/05 stills, tsc/vite gates, gameplay __game; review worst visual issue and recapture once. FOX reviews distance read; WORLD reviews palette/detail.

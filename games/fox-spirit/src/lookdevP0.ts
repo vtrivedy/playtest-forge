@@ -10,6 +10,7 @@
  * window.__lookdevHooks: setPaint('none'|'half'|'full'), setCamera('wide'|'fox'|'hero'), advance(frames, dt), ready.
  */
 import * as THREE from 'three';
+import { buildGround, buildGrass, buildLeaves, buildContactShadow } from './lookdevGround';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   createForgeRenderer,
@@ -271,37 +272,6 @@ function groundH(x: number, z: number): number {
   return (hills * flat + bowl) * (z < -12 ? 1 + (-12 - z) * 0.03 : 1);
 }
 
-function buildGround(scene: THREE.Scene): void {
-  const geo = new THREE.PlaneGeometry(180, 180, 150, 150);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-  const col = new Float32Array(pos.count * 3);
-  // muted, lower-value ground so the fox coat is the hottest note; grouped into soft cel patches
-  const sage = new THREE.Color(0x66603f);
-  const ochre = new THREE.Color(0x957446);
-  const umber = new THREE.Color(0x7a4a32);
-  const dirt = new THREE.Color(0xa08566);
-  const c = new THREE.Color();
-  const band = (v: number, at: number) => THREE.MathUtils.smoothstep(v, at - 0.05, at + 0.05);
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const z = pos.getZ(i);
-    pos.setY(i, groundH(x, z));
-    const n = Math.sin(x * 0.23 + Math.cos(z * 0.19) * 2) * 0.5 + 0.5;
-    c.copy(sage).lerp(ochre, band(n, 0.45) * 0.85);
-    // leaf-litter drifts under the maples
-    const litter = Math.max(0, Math.sin(x * 0.5 + 1.3) * Math.sin(z * 0.43 - 0.4));
-    c.lerp(umber, band(litter, 0.3) * 0.55);
-    const pd = pathDist(x, z);
-    c.lerp(dirt, 1 - THREE.MathUtils.smoothstep(pd, 0.9, 1.8));
-    col.set([c.r, c.g, c.b], i * 3);
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  geo.computeVertexNormals();
-  const ground = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true }));
-  ground.receiveShadow = true;
-  scene.add(ground);
-}
 
 /** Flat-faced (chiselled) jittered block: hewn stone that keeps hard cel planes */
 function hewn(geo: THREE.BufferGeometry, rand: () => number, amount = 0.05): THREE.BufferGeometry {
@@ -357,7 +327,6 @@ const CANOPY: CanopyTones[] = [
   [0x9a6d4a, 0x744832, 0x4a2e2e], // sienna
 ];
 /** Leaf litter: same family, dimmer still — it sits under the fox and must not compete */
-const LITTER = [0x744032, 0x80603e, 0x8a6c4a, 0x5c3028];
 
 type TreeKind = 'hero' | 'grove' | 'tall' | 'shrub';
 
@@ -598,43 +567,6 @@ function buildRuinStub(rand: () => number): THREE.Group {
   return g;
 }
 
-function buildGrass(scene: THREE.Scene, rand: () => number): void {
-  // short, thin, muted tufts: texture for the ground, never a foreground focal point
-  const blade = new THREE.ConeGeometry(0.035, 0.42, 3);
-  blade.translate(0, 0.2, 0);
-  const mat = toon(0xffffff);
-  const N = 900;
-  const mesh = new THREE.InstancedMesh(blade, mat, N);
-  const m = new THREE.Matrix4();
-  const q = new THREE.Quaternion();
-  const e = new THREE.Euler();
-  const s = new THREE.Vector3();
-  const p = new THREE.Vector3();
-  const col = new THREE.Color();
-  let k = 0;
-  while (k < N) {
-    const x = (rand() - 0.5) * 44;
-    const z = (rand() - 0.5) * 44 - 2;
-    // keep the path and the hero-shot foreground clear
-    if (pathDist(x, z) < 1.4 || Math.hypot(x + 1.6, z - 7.2) < 3.5) continue;
-    // tufts: 3-5 blades around a point
-    const cnt = 3 + Math.floor(rand() * 3);
-    for (let j = 0; j < cnt && k < N; j++, k++) {
-      p.set(x + (rand() - 0.5) * 0.3, 0, z + (rand() - 0.5) * 0.3);
-      p.y = groundH(p.x, p.z) - 0.03;
-      e.set((rand() - 0.5) * 0.7, rand() * 6, (rand() - 0.5) * 0.7);
-      q.setFromEuler(e);
-      const h = 0.5 + rand() * 0.7;
-      s.set(1, h, 1);
-      m.compose(p, q, s);
-      mesh.setMatrixAt(k, m);
-      col.setHex(rand() < 0.6 ? 0x8f8350 : rand() < 0.5 ? 0x6e7148 : 0x8e5a3a);
-      mesh.setColorAt(k, col);
-    }
-  }
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-}
 
 /** Five-lobed maple-leaf silhouette (not a confetti pentagon) */
 function mapleLeafGeometry(size: number): THREE.BufferGeometry {
@@ -659,61 +591,8 @@ const LEAF_CARD = (() => {
   return g;
 })();
 
-function buildLeaves(scene: THREE.Scene, rand: () => number): void {
-  // drifts: most leaves pile in clusters (under canopies, along the path shoulders), the rest scattered
-  const N = 1400;
-  const mesh = new THREE.InstancedMesh(mapleLeafGeometry(0.085), toon(0xffffff), N);
-  const m = new THREE.Matrix4();
-  const col = new THREE.Color();
-  const drifts = Array.from({ length: 22 }, () => {
-    const a = rand() * Math.PI * 2;
-    const r = 2 + Math.sqrt(rand()) * 18;
-    return [Math.cos(a) * r, Math.sin(a) * r - 4, 0.8 + rand() * 1.6] as const;
-  });
-  for (let i = 0; i < N; i++) {
-    let x: number;
-    let z: number;
-    if (i % 5 < 3) {
-      const [dx, dz, dr] = drifts[i % drifts.length]!;
-      const a = rand() * Math.PI * 2;
-      const r = Math.pow(rand(), 0.7) * dr;
-      x = dx + Math.cos(a) * r;
-      z = dz + Math.sin(a) * r;
-    } else {
-      const a = rand() * Math.PI * 2;
-      const r = Math.sqrt(rand()) * 22;
-      x = Math.cos(a) * r;
-      z = Math.sin(a) * r - 3;
-    }
-    m.makeRotationY(rand() * 6).setPosition(x, groundH(x, z) + 0.02 + rand() * 0.01, z);
-    mesh.setMatrixAt(i, m);
-    mesh.setColorAt(i, col.setHex(LITTER[i % LITTER.length]!));
-  }
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-}
 
 /** Soft ink-wash contact pool under the hero (world-side decal; anchors the fox at any distance) */
-function buildContactShadow(): THREE.Mesh {
-  const mat = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.MultiplyBlending,
-    premultipliedAlpha: true,
-    uniforms: { uInk: { value: new THREE.Color(0x3a2418) } },
-    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform vec3 uInk; varying vec2 vUv;
-      void main() {
-        vec2 q = (vUv - 0.5) * vec2(2.0, 2.0);
-        float a = (1.0 - smoothstep(0.15, 1.0, length(q))) * 0.55;
-        gl_FragColor = vec4(mix(vec3(1.0), uInk, a), 1.0);
-      }`,
-  });
-  const disc = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.8), mat);
-  disc.rotation.x = -Math.PI / 2;
-  disc.renderOrder = 1;
-  return disc;
-}
 
 function buildDistance(scene: THREE.Scene, rand: () => number): void {
   // layered ridges that fade into the mist
@@ -1211,10 +1090,11 @@ export async function runLookdevP0(): Promise<void> {
   const sky = buildSky(scene, new THREE.Vector3(0.7, 0.32, 0.25));
 
   const rand = rng(7);
-  buildGround(scene);
+  const groundContext = { groundH, pathDist, toon, mapleLeafGeometry };
+  buildGround(scene, groundContext);
   buildDistance(scene, rand);
-  buildGrass(scene, rand);
-  buildLeaves(scene, rand);
+  buildGrass(scene, rand, groundContext);
+  buildLeaves(scene, rand, groundContext);
 
   const ARCH = new THREE.Vector3(-0.3, 0, -8);
   const arch = buildArch(rand, groundH(ARCH.x, ARCH.z));
