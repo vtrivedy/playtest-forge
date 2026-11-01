@@ -95,7 +95,7 @@ const SPECS: Spec[] = [
       tail: { at: [-0.52, 1.08], parent: 'body' },
     },
     parts: [
-      { k: 'ell', bone: 'body', c: [0, 0.97], r: [0.5, 0.24, 0.2], col: 0xa8683c },
+      { k: 'ell', bone: 'body', c: [0, 0.97], r: [0.5, 0.26, 0.22], col: 0xa8683c },
       { k: 'ell', bone: 'body', c: [-0.36, 0.99], r: [0.21, 0.22, 0.19], col: 0xa0603a },
       { k: 'ell', bone: 'body', c: [0.02, 0.86], r: [0.38, 0.1, 0.17], col: 0xd8b48a },
       { k: 'ell', bone: 'tail', c: [-0.56, 1.06], r: [0.06, 0.1, 0.05], col: 0xf0e2c8, rot: 0.5 },
@@ -108,10 +108,14 @@ const SPECS: Spec[] = [
       { k: 'tube', bone: 'head', pts: [[0.61, 1.8], [0.72, 1.94]], r: [0.016, 0.008], col: 0xe6d6b0, z: 0.06 },
       { k: 'tube', bone: 'head', pts: [[0.63, 1.63], [0.61, 1.86], [0.52, 2.02]], r: [0.026, 0.012], col: 0xe6d6b0, z: -0.06 },
       { k: 'tube', bone: 'head', pts: [[0.61, 1.8], [0.72, 1.94]], r: [0.016, 0.008], col: 0xe6d6b0, z: -0.06 },
-      { k: 'tube', bone: 'legFL', pts: [[0.32, 0.82], [0.35, 0.44], [0.33, 0.0]], r: [0.055, 0.028], col: 0x7a4a2a, z: 0.09 },
-      { k: 'tube', bone: 'legFR', pts: [[0.32, 0.82], [0.35, 0.44], [0.33, 0.0]], r: [0.055, 0.028], col: 0x7a4a2a, z: -0.09 },
-      { k: 'tube', bone: 'legBL', pts: [[-0.34, 0.84], [-0.42, 0.46], [-0.36, 0.0]], r: [0.065, 0.028], col: 0x7a4a2a, z: 0.09 },
-      { k: 'tube', bone: 'legBR', pts: [[-0.34, 0.84], [-0.42, 0.46], [-0.36, 0.0]], r: [0.065, 0.028], col: 0x7a4a2a, z: -0.09 },
+      { k: 'tube', bone: 'legFL', pts: [[0.32, 0.84], [0.35, 0.44], [0.33, 0.06]], r: [0.075, 0.034], col: 0x8a5432, z: 0.09 },
+      { k: 'cone', bone: 'legFL', from: [0.33, 0.07], to: [0.35, 0.0], r: 0.04, col: 0x2a1a12, z: 0.09 },
+      { k: 'tube', bone: 'legFR', pts: [[0.32, 0.84], [0.35, 0.44], [0.33, 0.06]], r: [0.075, 0.034], col: 0x8a5432, z: -0.09 },
+      { k: 'cone', bone: 'legFR', from: [0.33, 0.07], to: [0.35, 0.0], r: 0.04, col: 0x2a1a12, z: -0.09 },
+      { k: 'tube', bone: 'legBL', pts: [[-0.34, 0.86], [-0.43, 0.46], [-0.36, 0.06]], r: [0.09, 0.034], col: 0x8a5432, z: 0.09 },
+      { k: 'cone', bone: 'legBL', from: [-0.36, 0.07], to: [-0.35, 0.0], r: 0.04, col: 0x2a1a12, z: 0.09 },
+      { k: 'tube', bone: 'legBR', pts: [[-0.34, 0.86], [-0.43, 0.46], [-0.36, 0.06]], r: [0.09, 0.034], col: 0x8a5432, z: -0.09 },
+      { k: 'cone', bone: 'legBR', from: [-0.36, 0.07], to: [-0.35, 0.0], r: 0.04, col: 0x2a1a12, z: -0.09 },
     ],
     eye: { at: [0.71, 1.58], r: 0.018, bone: 'head' },
   },
@@ -318,6 +322,97 @@ function buildCreature(spec: Spec, rand: () => number): { root: THREE.Group; bon
 
 type Phase = 'pressed' | 'popping' | 'performing' | 'alive';
 
+/**
+ * Sound: a pressed drawing breathes a faint glassy shimmer you can find by ear; the pop is a paper "fwump"
+ * and a two-note chime, then the creature's own voice. WebAudio starts on the first key, like the hearth hum.
+ */
+function createUnpressedAudio() {
+  let ac: AudioContext | null = null;
+  let master: GainNode;
+  const shimmers = new Map<string, GainNode>();
+  const start = () => {
+    if (ac) return;
+    ac = new AudioContext();
+    master = ac.createGain();
+    master.gain.value = 0.6;
+    master.connect(ac.destination);
+  };
+  addEventListener('keydown', start, { once: true });
+  addEventListener('pointerdown', start, { once: true });
+  const env = (g: GainNode, t0: number, peak: number, a: number, d: number) => {
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
+  };
+  const tone = (f0: number, f1: number, type: OscillatorType, t0: number, peak: number, a: number, d: number, lp = 4000) => {
+    const o = ac!.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t0);
+    o.frequency.exponentialRampToValueAtTime(f1, t0 + a + d);
+    const f = ac!.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = lp;
+    const g = ac!.createGain();
+    env(g, t0, peak, a, d);
+    o.connect(f).connect(g).connect(master);
+    o.start(t0);
+    o.stop(t0 + a + d + 0.05);
+  };
+  return {
+    /** per-frame: shimmer loudness by distance to each still-pressed drawing (0 when found) */
+    shimmer(id: string, k: number) {
+      if (!ac) return;
+      let g = shimmers.get(id);
+      if (!g) {
+        g = ac.createGain();
+        g.gain.value = 0;
+        const f = ac.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.value = 1800 + shimmers.size * 260;
+        f.Q.value = 6;
+        for (const [hz, det] of [[880, 0], [1320, 2.5], [1760, -1.5]] as const) {
+          const o = ac.createOscillator();
+          o.type = 'sine';
+          o.frequency.value = hz * (1 + shimmers.size * 0.125) + det;
+          o.connect(f);
+          o.start();
+        }
+        f.connect(g).connect(master);
+        shimmers.set(id, g);
+      }
+      g.gain.setTargetAtTime(0.018 * k, ac.currentTime, 0.2);
+    },
+    pop(id: string) {
+      if (!ac) return;
+      const t = ac.currentTime;
+      // paper fwump: a short low-passed noise burst
+      const len = Math.floor(ac.sampleRate * 0.35);
+      const buf = ac.createBuffer(1, len, ac.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      const f = ac.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(2400, t);
+      f.frequency.exponentialRampToValueAtTime(300, t + 0.3);
+      const g = ac.createGain();
+      env(g, t, 0.35, 0.01, 0.32);
+      src.connect(f).connect(g).connect(master);
+      src.start(t);
+      // two-note chime, a little different per creature
+      const root = id === 'hedgehog' ? 784 : id === 'heron' ? 659 : 587;
+      tone(root, root, 'sine', t + 0.08, 0.09, 0.01, 1.2);
+      tone(root * 1.5, root * 1.5, 'sine', t + 0.26, 0.07, 0.01, 1.4);
+      // the creature's voice
+      if (id === 'hedgehog') for (const dt of [0.7, 0.86]) tone(1500, 2300, 'sine', t + dt, 0.05, 0.01, 0.07);
+      if (id === 'heron') tone(420, 260, 'sawtooth', t + 1.0, 0.06, 0.02, 0.32, 1200);
+      if (id === 'deer') tone(700, 520, 'triangle', t + 1.0, 0.05, 0.05, 0.5, 1800);
+      shimmers.get(id)?.gain.setTargetAtTime(0, t, 0.1);
+    },
+  };
+}
+
 const smooth = (a: number, b: number, t: number) => THREE.MathUtils.smoothstep(t, a, b);
 /** a springy settle 0 → 1 with one overshoot */
 const spring = (t: number) => (t >= 1 ? 1 : 1 - Math.exp(-6 * t) * Math.cos(t * 9.5));
@@ -370,6 +465,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
 
   const world = new THREE.Vector3();
   const local = new THREE.Vector3();
+  const audio = createUnpressedAudio();
 
   function unpress(id: string): boolean {
     const c = creatures.find((k) => k.spec.id === id);
@@ -377,6 +473,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     c.phase = 'popping';
     c.t = 0;
     c.root.visible = true;
+    audio.pop(c.spec.id);
     for (const f of c.flakes) {
       f.m.visible = true;
       f.m.position.set((rand() - 0.2) * 0.8 * c.spec.scale, (0.2 + rand() * 1.3) * c.spec.scale, 0.05);
@@ -520,6 +617,8 @@ export function buildUnpressed(ctx: OpeningCtx) {
         const breath = 0.5 + 0.5 * Math.sin(clock * 1.6 + c.idleSeed);
         m.color.setRGB(1, 0.93 + 0.07 * breath, 0.84 + 0.12 * breath);
         m.opacity = 0.82 + 0.18 * breath;
+        const dist = Math.hypot(fox.x - c.at.x, fox.z - c.at.z);
+        audio.shimmer(c.spec.id, (1 - THREE.MathUtils.smoothstep(dist, 2, 12)) * (0.6 + 0.4 * breath));
         if (p?.dashing && Math.hypot(fox.x - c.at.x, fox.z - c.at.z) < UNPRESS.trigger && Math.abs(fox.y - c.at.y) < 2.2) unpress(c.spec.id);
         continue;
       }

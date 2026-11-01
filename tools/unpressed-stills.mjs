@@ -18,9 +18,9 @@ const only = arg('only', '');
 const dash = arg('dash', '0') === '1';
 // [fox chase pose x, z, yaw (faces the drawing)], [camera, look] for the performance
 const SHOTS = {
-  hedgehog: { pose: [-2.9, 85.6, 2.6], cam: [[-3.6, 1.3, 86.8], [-2.2, 0.3, 84.2]] },
-  heron: { pose: [5.6, 77.0, 2.0], cam: [[5.2, 2.2, 77.6], [8.0, 2.4, 75.2]] },
-  deer: { pose: [26.8, 67.6, -2.49], cam: [[28.6, 11.4, 69.6], [25.3, 10.0, 64.6]] },
+  hedgehog: { pose: [-2.9, 85.6, 2.6], cam: [[-4.4, 1.5, 86.6], [-2.6, 0.3, 84.6]], alive: [[-5.4, 1.2, 86.4], [-3.97, 0.2, 85.19]] },
+  heron: { pose: [5.6, 77.0, 2.0], cam: [[5.2, 2.2, 77.6], [8.0, 2.4, 75.2]], alive: [[7.0, 6.3, 77.4], [9.25, 5.6, 75.35]] },
+  deer: { pose: [26.8, 67.6, -2.49], cam: [[28.6, 11.4, 69.6], [25.3, 10.0, 64.6]], alive: [[27.6, 10.6, 64.6], [26.18, 10.1, 63.05]] },
 };
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5195, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
@@ -61,6 +61,18 @@ try {
       at = t;
       await page.screenshot({ path: path.join(out, `${id}-${t}.png`) });
       console.log(id, t, JSON.stringify(st));
+    }
+    if (s.alive) {
+      await page.evaluate(({ cam }) => {
+        const h = window.__gameHooks;
+        h.advance(600, 1 / 60, false);
+        const c = window.__opening.camera;
+        c.position.set(...cam[0]);
+        c.lookAt(...cam[1]);
+        c.updateMatrixWorld();
+        h.advance(0, 1 / 60, true);
+      }, { cam: s.alive });
+      await page.screenshot({ path: path.join(out, `${id}-alive.png`) });
     }
   }
 } finally {
