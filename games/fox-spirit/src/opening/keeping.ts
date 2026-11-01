@@ -219,6 +219,20 @@ export function createKeeping(ctx: OpeningCtx) {
     curb(a[0], a[1], corner[0], corner[1]);
     curb(corner[0], corner[1], b[0], b[1]);
   }
+  // the bend's inside shoulder: fills the slot between B and the ridge so a step off B near the corner
+  // lands on turf instead of in a pit the fox could never leave
+  {
+    const [bx, bz] = pts[1]!;
+    const [cx, cz] = pts[2]!;
+    const yaw = Math.atan2(cx - bx, cz - bz);
+    const len = Math.hypot(cx - bx, cz - bz);
+    const t = 0.3;
+    const nIn = { x: -(cz - bz) / len, z: (cx - bx) / len };
+    const side = Math.sign((pts[0]![0] - bx) * nIn.x + (pts[0]![1] - bz) * nIn.z) || 1;
+    const x = bx + (cx - bx) * t + nIn.x * side * 1.9;
+    const z = bz + (cz - bz) * t + nIn.z * side * 1.9;
+    plinth(ctx, { x, z, hx: 1.5, hz: 2.0, yaw, top: SHELF_TOP }, 1.5, 2);
+  }
   // steam pad under the spring, a little wider than the ledge
   plinth(ctx, { x: K.steam.x, z: K.steam.z, hx: 1.9, hz: 1.9, yaw: K.terrace.yaw, top: SHELF_TOP }, 1.7, 2);
 
