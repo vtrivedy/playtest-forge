@@ -54,7 +54,8 @@ function toonRamp(stops: number[]): THREE.DataTexture {
 }
 /** 3 bands: plum shadow, warm mid, lit */
 const RAMP_WORLD = toonRamp([70, 150, 255]);
-const RAMP_FOX = toonRamp([85, 165, 255]);
+/** Fox: deeper shadow step + firmer mid so the coat reads as cel, not airbrushed */
+const RAMP_FOX = toonRamp([52, 140, 255]);
 
 /** Shared paint uniforms: restores as (x, z, radius, edge) */
 const paintU = {
@@ -248,7 +249,7 @@ function buildGround(scene: THREE.Scene): void {
   const col = new Float32Array(pos.count * 3);
   const moss = new THREE.Color(0x7d8a4c);
   const ochre = new THREE.Color(0xc29a52);
-  const rust = new THREE.Color(0xa45a32);
+  const rust = new THREE.Color(0x8a5838);
   const dirt = new THREE.Color(0xc9a36e);
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
@@ -271,7 +272,10 @@ function buildGround(scene: THREE.Scene): void {
   scene.add(ground);
 }
 
-const FOLIAGE = [0xb8401f, 0xd0682a, 0xe0a03c, 0x9c2e1c];
+/** Melancholy-warm maples: a notch darker / greyer than pure autumn so the fox stays the brightest note */
+const FOLIAGE = [0x8e4129, 0x9f5e35, 0xab854d, 0x713226];
+/** Leaf litter: same family, dimmer still — it sits under the fox and must not compete */
+const LITTER = [0x7a4029, 0x885b39, 0x917649, 0x613124];
 
 function buildMaple(rand: () => number, scale: number, hueBias = 0): THREE.Group {
   const g = new THREE.Group();
@@ -423,7 +427,7 @@ function buildLeaves(scene: THREE.Scene, rand: () => number): void {
     const z = Math.sin(a) * r - 3;
     m.makeRotationY(rand() * 6).setPosition(x, groundH(x, z) + 0.02, z);
     mesh.setMatrixAt(i, m);
-    mesh.setColorAt(i, col.setHex(FOLIAGE[i % FOLIAGE.length]!));
+    mesh.setColorAt(i, col.setHex(LITTER[i % LITTER.length]!));
   }
   mesh.receiveShadow = true;
   scene.add(mesh);
@@ -455,7 +459,7 @@ function foxToon(color: THREE.ColorRepresentation, emissive = 0x000000, ei = 0):
       '#include <opaque_fragment>',
       `{
         float rim = 1.0 - clamp(dot(normalize(normal), vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
-        outgoingLight += vec3(1.0, 0.55, 0.22) * smoothstep(0.62, 0.9, rim) * 0.22;
+        outgoingLight += vec3(1.0, 0.55, 0.22) * smoothstep(0.55, 0.85, rim) * 0.34;
       }
       #include <opaque_fragment>`,
     );
@@ -551,10 +555,10 @@ function buildFox(): { root: THREE.Group; update: (t: number) => void; setHeadYa
   torsoGeo.scale(0.88, 1.05, 1);
   torsoGeo.computeVertexNormals();
   body.add(inked(torsoGeo, coat, W));
-  // cream throat blaze (narrow, runs up the neck — not a disc)
-  const bib = new THREE.Mesh(ellipsoid([0.07, 0.17, 0.07]), cream);
-  bib.position.set(0, 0.1, 0.27);
-  bib.rotation.x = -0.75;
+  // cream throat blaze: thin sliver laid along the underside of the neck, sunk so only its face shows
+  const bib = new THREE.Mesh(ellipsoid([0.04, 0.095, 0.03]), cream);
+  bib.position.set(0, 0.105, 0.405);
+  bib.rotation.x = 0.78;
   body.add(bib);
 
   const head = new THREE.Group();
@@ -577,11 +581,12 @@ function buildFox(): { root: THREE.Group; update: (t: number) => void; setHeadYa
   const snout = inked(snoutGeo, coat, W);
   snout.position.set(0, -0.03, 0.19);
   head.add(snout);
-  const jawGeo = new THREE.ConeGeometry(0.06, 0.2, 8);
+  // cream underjaw tucked inside the snout: only a thin underside sliver shows (no grin line)
+  const jawGeo = new THREE.ConeGeometry(0.055, 0.14, 8);
   jawGeo.rotateX(Math.PI / 2);
   jawGeo.scale(1, 0.5, 1);
   const jaw = new THREE.Mesh(jawGeo, cream);
-  jaw.position.set(0, -0.065, 0.16);
+  jaw.position.set(0, -0.05, 0.13);
   head.add(jaw);
   const nose = new THREE.Mesh(ellipsoid([0.022, 0.018, 0.02], 10), ink);
   nose.position.set(0, -0.02, 0.31);
@@ -616,28 +621,49 @@ function buildFox(): { root: THREE.Group; update: (t: number) => void; setHeadYa
     ear.add(new THREE.Mesh(inner, cream));
   }
 
-  // short tapered legs: coat at the top, ink-dipped below
+  // one tapered tube per leg, coat fading to ink toward the paw; hind legs kink back at the hock
+  const legMat = foxToon(0xffffff);
+  const legPrev = legMat.onBeforeCompile;
+  legMat.onBeforeCompile = (shader, r) => {
+    legPrev.call(legMat, shader, r);
+    shader.uniforms.uLegTop = { value: new THREE.Color(0xc45c26) };
+    shader.uniforms.uLegInk = { value: new THREE.Color(0x2a1a14) };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aAlong;\nvarying float vAlong;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAlong = aAlong;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vAlong;\nuniform vec3 uLegTop;\nuniform vec3 uLegInk;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(uLegTop, uLegInk, smoothstep(0.45, 0.8, vAlong));');
+  };
+  legMat.customProgramCacheKey = () => 'lk-fox-leg';
+  const V = (y: number, z: number) => new THREE.Vector3(0, y, z);
+  const frontLeg = plumeGeometry(
+    new THREE.CatmullRomCurve3([V(0, 0), V(-0.14, 0.01), V(-0.28, 0.0), V(-0.37, 0.005), V(-0.395, 0.05)]),
+    (t) => THREE.MathUtils.lerp(0.07, 0.028, Math.min(1, t * 1.15)) + THREE.MathUtils.smoothstep(t, 0.85, 1) * 0.008,
+    24,
+    10,
+    0,
+  );
+  const hindLeg = plumeGeometry(
+    new THREE.CatmullRomCurve3([V(0, 0), V(-0.13, 0.035), V(-0.25, -0.04), V(-0.37, -0.005), V(-0.395, 0.045)]),
+    (t) => THREE.MathUtils.lerp(0.085, 0.028, Math.min(1, t * 1.15)) + THREE.MathUtils.smoothstep(t, 0.85, 1) * 0.008,
+    24,
+    10,
+    0,
+  );
   const legs: THREE.Group[] = [];
-  const legDefs: Array<[number, number, number]> = [
-    [0.085, 0.2, 0],
-    [-0.085, 0.2, 0.18],
-    [0.09, -0.3, 0.14],
-    [-0.09, -0.3, -0.1],
+  const legDefs: Array<[number, number, number, boolean]> = [
+    [0.085, 0.2, 0, false],
+    [-0.085, 0.2, 0.18, false],
+    [0.09, -0.3, 0.14, true],
+    [-0.09, -0.3, -0.1, true],
   ];
-  for (const [x, z, swing] of legDefs) {
+  for (const [x, z, swing, hind] of legDefs) {
     const leg = new THREE.Group();
     leg.position.set(x, 0.0, z);
     leg.rotation.x = swing;
     body.add(leg);
-    const upper = new THREE.CylinderGeometry(0.075, 0.045, 0.2, 8);
-    upper.translate(0, -0.1, 0);
-    leg.add(inked(upper, coat, W * 0.8));
-    const lower = new THREE.CylinderGeometry(0.042, 0.026, 0.22, 8);
-    lower.translate(0, -0.29, 0);
-    leg.add(inked(lower, ink, W * 0.8));
-    const paw = inked(ellipsoid([0.038, 0.025, 0.055], 10), ink, W * 0.7);
-    paw.position.set(0, -0.405, 0.02);
-    leg.add(paw);
+    leg.add(inked(hind ? hindLeg : frontLeg, legMat, W * 0.8));
     legs.push(leg);
   }
 
