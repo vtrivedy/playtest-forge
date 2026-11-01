@@ -27,8 +27,8 @@ const TREES: Array<[number, number, number, TreeKind, number]> = [
   [10, 62.5, 1.0, 'grove', 5],
   [0.5, 59, 1.3, 'grove', 3],
   // east: rust crowns off-axis, beyond the shelf
-  [21.5, 67, 1.3, 'hero', 0],
-  [23, 84, 1.05, 'grove', 2],
+  [19.5, 63.5, 1.3, 'hero', 0],
+  [24.5, 87.5, 1.05, 'grove', 2],
   [18.5, 90.5, 0.95, 'grove', 5],
   // between the village and the meadow
   [8, 81.5, 0.9, 'grove', 4],
@@ -58,7 +58,7 @@ const ROCKS: Array<[number, number, number]> = [
  * a little turned and offset from the one below. Many columns side by side read as a jointed rock
  * outcrop (chunky, Arceus-style), never a building. `moss` caps the top with a turf drum whose top is y1.
  */
-function column(rand: () => number, x: number, z: number, r: number, y0: number, y1: number, moss: boolean): THREE.Group {
+export function column(rand: () => number, x: number, z: number, r: number, y0: number, y1: number, moss: boolean): THREE.Group {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   const sides = rand() < 0.5 ? 6 : 7;
