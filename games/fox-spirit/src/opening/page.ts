@@ -28,6 +28,11 @@ const TUNE = {
   jink: 2.4,
   /** after a dodge it is winded for a moment: slower, glow dims — the opening (shrinks per stage) */
   winded: [1.8, 1.4, 1.1],
+  /** high stages hop perch to perch (leaf to leaf, flap to flap) instead of running laps; spook radius per stage */
+  hop: [false, true, true],
+  spookAt: [4.5, 2.2, 2.2],
+  /** after a hop it rests, winded, on the new perch */
+  hopRest: 1.5,
 };
 
 type Phase = 'perched' | 'fleeing' | 'flung' | 'kept';
@@ -37,7 +42,16 @@ function loop(points: ReadonlyArray<readonly [number, number, number]>) {
   const pts = points.map(([x, y, z]) => new THREE.Vector3(x, y, z));
   const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
   const length = curve.getLength();
-  return { curve, length, at: (s: number, out: THREE.Vector3) => curve.getPointAt((((s / length) % 1) + 1) % 1, out) };
+  // arc position of each even control point: the perches a hopping page rests on
+  const perches = pts.filter((_, i) => i % 2 === 0).map((p) => {
+    let best = 0, bd = Infinity;
+    for (let k = 0; k <= 400; k++) {
+      const d = curve.getPointAt(k / 400).distanceToSquared(p);
+      if (d < bd) [bd, best] = [d, (k / 400) * length];
+    }
+    return best;
+  });
+  return { curve, length, perches, at: (s: number, out: THREE.Vector3) => curve.getPointAt((((s / length) % 1) + 1) % 1, out) };
 }
 
 function pageTexture(): THREE.CanvasTexture {
@@ -128,6 +142,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   let dodges = 0;
   let windedT = 0;
   let beat = 0;
+  let hopTo = 0;
   let wasDashing = false;
   /** sideways jink offset (world xz), eased back to the flight line */
   const side = new THREE.Vector3();
@@ -196,7 +211,21 @@ export function buildRunawayPage(ctx: OpeningCtx) {
         for (let i = 0; i < 6; i++) emit(pos, 0.8, 1.2);
       }
     }
-    if (phase === 'perched' && d < TUNE.spook) phase = 'fleeing';
+    if (phase === 'perched' && d < TUNE.spookAt[stage]! && !(TUNE.hop[stage] && windedT > 0)) {
+      phase = 'fleeing';
+      if (TUNE.hop[stage]) {
+        // pick the next perch along the loop
+        const L = stages[stage]!;
+        const here = ((s % L.length) + L.length) % L.length;
+        const ahead = L.perches.map((p) => (p - here + L.length) % L.length).filter((x) => x > 0.5);
+        hopTo = s + Math.min(...ahead);
+      }
+    }
+    if (phase === 'fleeing' && TUNE.hop[stage] && s >= hopTo) {
+      s = hopTo;
+      phase = 'perched';
+      windedT = TUNE.hopRest;
+    }
     if (phase === 'fleeing') {
       if (d > TUNE.wait) phase = 'perched';
       else s += THREE.MathUtils.lerp(TUNE.fast, TUNE.slow, THREE.MathUtils.smoothstep(d, 1.5, TUNE.spook)) * (windedT > 0 ? 0.55 : 1) * dt;
