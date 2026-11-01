@@ -7,6 +7,7 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { createHeroRoute, HERO_START } from './lookdev-hero-route.mjs';
 
 const arg = (k, d) => {
@@ -60,6 +61,7 @@ try {
     }, HERO_START);
     let beat = '';
     let touchdownF = -1;
+    let clipF = -1;
     for (let f = 0; f < 1800; f++) {
       const input = route(f / 60, state);
       const prev = state;
@@ -67,6 +69,9 @@ try {
       const apex = !prev.grounded && prev.vel[1] > 0 && prev.vel[1] - 15 / 60 <= 0;
       const touch = touchdownF >= 0 && f === touchdownF + 2;
       const shot = input.beat !== beat || apex || touch;
+      // 2 s run clip (30 fps) at the start of the loop back
+      if (input.beat === 'loop back' && clipF < 0) clipF = f;
+      const clipFrame = clipF >= 0 && f - clipF < 120 && (f - clipF) % 2 === 0;
       beat = input.beat;
       state = await page.evaluate(
         ({ input, shot }) => {
@@ -75,8 +80,12 @@ try {
           h.setKeys(input.jump ? ['Space'] : []);
           return h.advance(1, 1 / 60, shot);
         },
-        { input, shot },
+        { input, shot: shot || clipFrame },
       );
+      if (clipFrame) {
+        fs.mkdirSync(path.join(out, 'run-clip'), { recursive: true });
+        await page.screenshot({ path: path.join(out, 'run-clip', `f${String((f - clipF) / 2).padStart(3, '0')}.jpg`), type: 'jpeg', quality: 90 });
+      }
       trace.push({ f, beat, input, ...state, paws: undefined });
       if (!prev.grounded && state.grounded) touchdownF = f;
       if (shot) {
@@ -85,6 +94,8 @@ try {
         console.log(f, beat.padEnd(18), JSON.stringify({ pos: state.pos, speed: state.speed, anim: state.anim, gait: state.gait, lastJump: state.lastJump }));
       }
     }
+    if (clipF >= 0)
+      execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'run-clip/f%03d.jpg'), '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', path.join(out, 'run-clip.mp4')]);
     const slide = trace.filter((s) => s.anim === 'loco').map((s) => s.maxSlide);
     console.log('end', JSON.stringify(state.pos), 'maxSlide loco p95', slide.sort((a, b) => a - b)[Math.floor(slide.length * 0.95)]);
   }
