@@ -987,7 +987,19 @@ export async function runLookdevP0(): Promise<void> {
   fox.root.add(contact);
   fox.root.rotation.y = 0.55;
   scene.add(fox.root);
-  const player = play ? createPlay({ fox, groundH, colliders, start: { x: FOX_HOME.x, z: FOX_HOME.z + 4, yaw: Math.PI } }) : null;
+  // play: the fox carries the paint — each jump's landing blooms a ragged restore wavefront (4 shader slots)
+  const player = play
+    ? createPlay({
+        fox,
+        groundH,
+        colliders,
+        start: { x: FOX_HOME.x, z: FOX_HOME.z + 4, yaw: Math.PI },
+        onLand(at, impact) {
+          if (field.restores.length >= 4) return;
+          field.restore(at, 4.5 + 3 * impact + 2 * field.restores.length, 1.8, { edgeMax: 1.4 });
+        },
+      })
+    : null;
   const view = player?.cam.camera ?? camera;
 
   // restore wavefronts come from the game's ColorField clock
@@ -1046,6 +1058,14 @@ export async function runLookdevP0(): Promise<void> {
       if (fox.speed > 0) fox.root.position.y = groundH(fox.root.position.x, fox.root.position.z);
     }
     field.update(dt);
+    if (player && paintMode === 'none') {
+      // world grade follows how much of the clearing the fox has painted
+      const k = Math.min(1, field.restores.reduce((a, r) => a + r.radius * r.radius, 0) / 260);
+      sky.setPaint(k, new THREE.Vector2(0.8, -0.6));
+      matchFogToSky(scene, fog, sky.mist);
+      post.params.restore = k;
+      lights.key.color.set(0xffe6c4).lerp(new THREE.Color(0xffd6b0), k);
+    }
     syncPaint();
     sky.update(dt);
   }
@@ -1058,7 +1078,7 @@ export async function runLookdevP0(): Promise<void> {
   }
   addEventListener('resize', resize);
 
-  setPaint('half');
+  setPaint(player ? 'none' : 'half');
   if (!player) setCamera('wide');
   resize();
   let manual = false;

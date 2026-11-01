@@ -393,6 +393,8 @@ export function createPlay(opts: {
   groundH: (x: number, z: number) => number;
   colliders: Collider[];
   start: { x: number; z: number; yaw: number };
+  /** touchdown from a jump: feet position, impact 0..1 */
+  onLand?: (at: THREE.Vector3, impact: number) => void;
 }): PlayController {
   const { fox, groundH, colliders } = opts;
   const P = PLAY;
@@ -599,6 +601,7 @@ export function createPlay(opts: {
         lastJump.air = airT;
         landT = 0;
         cam.land(impact * 0.6);
+        if (lastJump.apex > 0.2) opts.onLand?.(pos, impact);
         vel.y = 0;
         // horizontal momentum carries into the ground run along the new facing
         speed = Math.hypot(vel.x, vel.z) * Math.max(0, Math.cos(wrap(Math.atan2(vel.x, vel.z) - yaw)));
