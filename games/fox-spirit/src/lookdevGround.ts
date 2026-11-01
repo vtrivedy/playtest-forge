@@ -9,7 +9,7 @@ interface GroundContext {
 }
 const LITTER = [0x603a2d, 0x786044, 0x897354, 0x493d34];
 
-export function buildGround(scene: THREE.Scene, ctx: GroundContext): void {
+export function buildGround(scene: THREE.Scene, ctx: GroundContext): THREE.Mesh {
   const { groundH, pathDist, toon } = ctx;
   const geo = new THREE.PlaneGeometry(180, 180, 150, 150);
   geo.rotateX(-Math.PI / 2);
@@ -45,6 +45,7 @@ export function buildGround(scene: THREE.Scene, ctx: GroundContext): void {
   const ground = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true, hatchWeight: 0.22 }));
   ground.receiveShadow = true;
   scene.add(ground);
+  return ground;
 }
 
 
