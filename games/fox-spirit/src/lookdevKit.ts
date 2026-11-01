@@ -292,6 +292,17 @@ export const CANOPY: CanopyTones[] = [
   [0x94483a, 0x6c3028, 0x45242a], // dried crimson
   [0x9a6d4a, 0x744832, 0x4a2e2e], // sienna
 ];
+/** Late-summer moss/olive crowns (palette ≥ CANOPY.length): sit behind the fox's read line so the coat stays the hot note */
+export const CANOPY_MOSS: CanopyTones[] = [
+  [0x858149, 0x5f5c35, 0x3d3a29], // olive
+  [0x8c7c4c, 0x655634, 0x42372a], // moss-ochre
+];
+/** Lobe tones for a palette index: autumn family below CANOPY.length, moss family above */
+function canopyTones(palette: number, kind: TreeKind, i: number): CanopyTones {
+  const fam = palette >= CANOPY.length ? CANOPY_MOSS : CANOPY;
+  if (kind === 'hero' && i === 1) return CANOPY[1]!;
+  return fam[(palette + (i % 3 === 2 ? 1 : 0)) % fam.length]!;
+}
 
 export type TreeKind = 'hero' | 'grove' | 'tall' | 'lean';
 
@@ -391,7 +402,7 @@ export function buildMaple(rand: () => number, scale: number, kind: TreeKind, pa
     }
   }
   pads.forEach((pd, i) => {
-    const tones = CANOPY[kind === 'hero' && i === 1 ? 1 : (palette + (i % 3 === 2 ? 1 : 0)) % CANOPY.length]!;
+    const tones = canopyTones(palette, kind, i);
     const geo = canopyPad(rand, pd.r, pd.h, tones);
     const pad = inked(geo, toon(0xffffff, { vertexColors: true, contour: 0.9, climbBase, ramp: RAMP_CANOPY }), 0.028, true);
     pad.position.copy(pd.at);
@@ -428,7 +439,7 @@ export function buildMaple(rand: () => number, scale: number, kind: TreeKind, pa
   const side = new THREE.Vector3();
   let ci = 0;
   pads.forEach((pd, i) => {
-    const tones = CANOPY[kind === 'hero' && i === 1 ? 1 : (palette + (i % 3 === 2 ? 1 : 0)) % CANOPY.length]!;
+    const tones = canopyTones(palette, kind, i);
     const a0 = rand() * 6.28;
     for (let k = 0; k < CLUSTERS; k++) {
       // one sprig breaks the contour together, a value step darker than its lobe
@@ -633,18 +644,57 @@ export function mapleLeafGeometry(size: number): THREE.BufferGeometry {
   return g;
 }
 
-export function buildDistance(scene: THREE.Scene, rand: () => number): void {
-  // layered ridges that fade into the mist
+/** Layered ridges that fade into the mist: `count` humps on an arc (centred on `dir`) around (cx, cz) */
+export function buildDistance(
+  scene: THREE.Scene,
+  rand: () => number,
+  o: { cx?: number; cz?: number; dir?: number; arc?: number; count?: number; y?: number } = {},
+): void {
+  const { cx = 0, cz = 0, dir = -Math.PI / 2, arc = 2.6, count = 9, y = -4 } = o;
   const ridgeMat = toon(0x7e6a62);
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < count; i++) {
     const geo = jitter(new THREE.IcosahedronGeometry(1, 1), 0.18, rand, 0.6);
     const r = new THREE.Mesh(geo, ridgeMat);
-    const a = -Math.PI / 2 + (i / 8 - 0.5) * 2.6;
+    const a = dir + (i / (count - 1) - 0.5) * arc;
     const d = 55 + rand() * 25;
-    r.position.set(Math.cos(a) * d, -4, Math.sin(a) * d);
+    r.position.set(cx + Math.cos(a) * d, y, cz + Math.sin(a) * d);
     r.scale.set(18 + rand() * 14, 10 + rand() * 9, 14 + rand() * 6);
     scene.add(r);
   }
+}
+
+/**
+ * Ink line where a prop meets the ground: walk its triangles, bisect each edge that crosses the
+ * surface and draw the crossing segments just above it. Reads as the pressed-ink contact of a boulder.
+ */
+export function contactInk(mesh: THREE.Mesh, surfaceH: (x: number, z: number) => number): THREE.LineSegments {
+  mesh.updateMatrixWorld(true);
+  const vertices = mesh.geometry.getAttribute('position');
+  const indices = mesh.geometry.index;
+  const contacts: THREE.Vector3[] = [];
+  for (let i = 0; i < (indices?.count ?? vertices.count); i += 3) {
+    const triangle = [0, 1, 2].map((j) => new THREE.Vector3()
+      .fromBufferAttribute(vertices, indices ? indices.getX(i + j) : i + j).applyMatrix4(mesh.matrixWorld));
+    const heights = triangle.map((v) => v.y - surfaceH(v.x, v.z));
+    const crossings: THREE.Vector3[] = [];
+    for (let j = 0; j < 3; j++) {
+      const k = (j + 1) % 3;
+      if (heights[j]! * heights[k]! >= 0) continue;
+      let lo = 0;
+      let hi = 1;
+      const point = new THREE.Vector3();
+      for (let step = 0; step < 12; step++) {
+        const t = (lo + hi) / 2;
+        point.copy(triangle[j]!).lerp(triangle[k]!, t);
+        if ((point.y - surfaceH(point.x, point.z)) * heights[j]! > 0) lo = t;
+        else hi = t;
+      }
+      point.y = surfaceH(point.x, point.z) + 0.025;
+      crossings.push(point);
+    }
+    if (crossings.length === 2) contacts.push(...crossings);
+  }
+  return new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(contacts), new THREE.LineBasicMaterial({ color: INK }));
 }
 
 // ---------------------------------------------------------------------------------------------

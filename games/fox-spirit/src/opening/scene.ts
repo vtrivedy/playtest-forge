@@ -196,6 +196,8 @@ export async function runOpening(): Promise<void> {
   const w = window as unknown as Record<string, unknown>;
   w.__gameHooks = gameHooks;
   w.__game = { mode: 'opening', hooks: gameHooks, state };
+  // read-only handles for art tooling (tools/opening-stills.mjs: free camera, paint the slice)
+  w.__opening = { ctx, camera: view };
 
   let last = performance.now();
   const tick = () => {
