@@ -16,11 +16,18 @@ if coll is None:
     scene.collection.children.link(coll)
 for ob in list(coll.objects):
     bpy.data.objects.remove(ob, do_unlink=True)
+for _m in list(bpy.data.meshes) + list(bpy.data.armatures):
+    if _m.users == 0:
+        (bpy.data.meshes if isinstance(_m, bpy.types.Mesh) else bpy.data.armatures).remove(_m)
+
+
+LEG_LIFT = 0.06  # stretches legs: everything above the paws rides up, paws stay on the ground
 
 
 def P(f, z, x=0.0):
     """forward f (+ = nose), up z, lateral x"""
-    return Vector((x, -f, z))
+    t = max(0.0, min(1.0, (z - 0.02) / 0.34))
+    return Vector((x, -f, z + LEG_LIFT * t * t * (3 - 2 * t)))
 
 
 def link(ob):
@@ -31,20 +38,21 @@ def link(ob):
 # ------------------------------------------------------------------ body skeleton (skin modifier)
 # (name, point, radius_side, radius_up)
 NODES = {
-    "rump": (P(-0.37, 0.43), 0.075, 0.085),
-    "loin": (P(-0.22, 0.425), 0.072, 0.075),
-    "waist": (P(-0.06, 0.42), 0.074, 0.08),
-    "chest": (P(0.12, 0.40), 0.085, 0.125),
-    "withers": (P(0.22, 0.44), 0.078, 0.1),
-    "neck0": (P(0.29, 0.52), 0.062, 0.07),
-    "neck1": (P(0.34, 0.6), 0.05, 0.052),
-    "neck2": (P(0.37, 0.645), 0.042, 0.045),
+    "dock": (P(-0.42, 0.45), 0.042, 0.048),
+    "rump": (P(-0.31, 0.43), 0.074, 0.084),
+    "loin": (P(-0.18, 0.44), 0.068, 0.068),
+    "waist": (P(-0.04, 0.44), 0.07, 0.066),
+    "chest": (P(0.12, 0.395), 0.09, 0.148),
+    "withers": (P(0.22, 0.44), 0.08, 0.105),
+    "neck0": (P(0.29, 0.52), 0.07, 0.08),
+    "neck1": (P(0.34, 0.6), 0.058, 0.062),
+    "neck2": (P(0.37, 0.645), 0.045, 0.048),
 }
 LEGS = {
-    # front: shoulder → elbow → wrist → paw
-    "F": [(P(0.19, 0.35), 0.048, 0.055), (P(0.15, 0.23), 0.03, 0.032), (P(0.17, 0.075), 0.017, 0.017), (P(0.18, 0.02), 0.019, 0.017), (P(0.215, 0.014), 0.017, 0.012)],
-    # hind: hip → stifle → hock → paw  (digitigrade: hock pulled back)
-    "H": [(P(-0.3, 0.37), 0.07, 0.09), (P(-0.235, 0.25), 0.046, 0.05), (P(-0.27, 0.19), 0.032, 0.032), (P(-0.35, 0.11), 0.018, 0.02), (P(-0.33, 0.02), 0.019, 0.017), (P(-0.295, 0.014), 0.017, 0.012)],
+    # front: shoulder → elbow → wrist → paw → toe
+    "F": [(P(0.19, 0.35), 0.05, 0.06), (P(0.15, 0.23), 0.031, 0.033), (P(0.17, 0.075), 0.017, 0.017), (P(0.18, 0.02), 0.019, 0.017), (P(0.215, 0.014), 0.017, 0.012)],
+    # hind: hip → stifle → mid-shin → hock → paw → toe  (digitigrade: hock pulled back)
+    "H": [(P(-0.25, 0.385), 0.06, 0.074), (P(-0.185, 0.25), 0.045, 0.048), (P(-0.22, 0.19), 0.032, 0.032), (P(-0.3, 0.11), 0.018, 0.02), (P(-0.28, 0.02), 0.019, 0.017), (P(-0.245, 0.014), 0.017, 0.012)],
 }
 LEG_X = {"F": 0.055, "H": 0.06}
 
@@ -57,7 +65,7 @@ def add(p, rs, ru):
     return len(verts) - 1
 
 
-chain = ["rump", "loin", "waist", "chest", "withers", "neck0", "neck1", "neck2"]
+chain = ["dock", "rump", "loin", "waist", "chest", "withers", "neck0", "neck1", "neck2"]
 ids = {}
 for n in chain:
     ids[n] = add(*NODES[n])
@@ -80,7 +88,7 @@ skin = body.modifiers.new("skin", "SKIN")
 skin.use_smooth_shade = True
 for sv, (rs, ru) in zip(me.skin_vertices[0].data, radii):
     sv.radius = (rs, ru)
-me.skin_vertices[0].data[ids["rump"]].use_root = True
+me.skin_vertices[0].data[ids["rump"]].use_root = True  # (dock hangs off the rump → plume grows out of continuous skin)
 sub = body.modifiers.new("sub", "SUBSURF")
 sub.levels = sub.render_levels = 2
 print("body nodes", len(verts))
@@ -267,14 +275,14 @@ def catmull(pts, n):
     return out
 
 
-TAIL_PTS = [P(-0.3, 0.465), P(-0.44, 0.45), P(-0.62, 0.37), P(-0.82, 0.34), P(-1.0, 0.37), P(-1.13, 0.45), P(-1.22, 0.56)]
+TAIL_PTS = [P(-0.25, 0.46), P(-0.38, 0.42), P(-0.53, 0.33), P(-0.72, 0.27), P(-0.91, 0.28), P(-1.05, 0.35), P(-1.14, 0.46)]
 TAIL_N = 34
 
 
 def tail_radius(t):
     # root sits inside the rump at body girth so the back line flows into the plume; fullest ~50%
     # narrow-ish dock leaving the rump, fur blooms after it, long taper to the flame point
-    bloom = 0.62 + 0.38 * smooth_(0.04, 0.3, t)
+    bloom = 0.42 + 0.58 * smooth_(0.06, 0.3, t)
     body = math.sin(min(1.0, 0.1 + t * 1.0) * math.pi) ** 0.5
     return 0.108 * bloom * body * (1 - 0.15 * t) + 0.004
 
@@ -434,7 +442,7 @@ def tail_fn(co, n):
     i = min(range(len(cs)), key=lambda k: (cs[k] - co).length_squared)
     t = i / TAIL_N + 0.025 * fur_noise(co.x * 3, co.z * 3)
     c = mix(COAT, SADDLE, 0.4 * smooth01(0.1, 0.4, t) * smooth01(0.2, 0.7, n.z))
-    c = mix(c, EMBER, smooth01(0.52, 0.72, t))
+    c = mix(c, EMBER, smooth01(0.45, 0.7, t))
     c = mix(c, GOLD, smooth01(0.8, 0.97, t))
     return c, smooth01(0.55, 0.95, t)
 
@@ -463,4 +471,9 @@ for o in EYES:
 nose.data.transform(nose.matrix_world)
 nose.matrix_world = Matrix.Identity(4)
 paint(nose, lambda co, n: (INK, 0.0))
+# concept head reads larger against the body: scale the painted head kit about the skull pivot
+HEAD_SCALE = 1.1
+_hs = Matrix.Translation(HEAD_PIVOT) @ Matrix.Scale(HEAD_SCALE, 4) @ Matrix.Translation(-HEAD_PIVOT)
+for o in [head, nose] + EARS + EYES:
+    o.data.transform(_hs)
 print("painted")

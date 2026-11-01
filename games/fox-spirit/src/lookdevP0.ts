@@ -4,10 +4,10 @@
  * Self-contained Russetvale slice booted by `?lookdev=p0` (main.ts never boots the game then).
  * Unpainted world = warm sepia paper + ink; painted = soft 3-band cel autumn. The boundary is the
  * ColorField restore wavefront (same restore() / update() clock the game uses), drawn here with a
- * ragged watercolour edge + tide-line on MeshToonMaterial. The fox stand-in is procedural and never
- * graded (it carries the colour). Ink = inverted hulls.
+ * ragged watercolour edge + tide-line on MeshToonMaterial. The fox is the authored hearth-fox GLB
+ * (lookdevFox.ts) and is never graded (it carries the colour). Ink = inverted hulls.
  *
- * window.__lookdevHooks: setPaint('none'|'half'|'full'), setCamera('wide'|'fox'|'hero'), advance(frames, dt), ready.
+ * window.__lookdevHooks: setPaint('none'|'half'|'full'), setCamera(Shot), setFoxClip(clip, travel), advance(frames, dt), ready.
  */
 import * as THREE from 'three';
 import { buildGround, buildGrass, buildLeaves, buildContactShadow } from './lookdevGround';
@@ -20,9 +20,10 @@ import {
   applyHeightFog,
   matchFogToSky,
 } from '../../../src/render';
+import { loadHearthFox, type FoxClip } from './lookdevFox';
 
 type PaintMode = 'none' | 'half' | 'full';
-type Shot = 'wide' | 'fox' | 'hero';
+type Shot = 'wide' | 'fox' | 'hero' | 'foxProfile' | 'foxQuarter' | 'foxWalk';
 
 const INK = new THREE.Color(0x24160e);
 const FOX_HOME = new THREE.Vector3(0.6, 0, 3.2);
@@ -54,8 +55,6 @@ function toonRamp(stops: number[]): THREE.DataTexture {
 }
 /** 3 bands: plum shadow, warm mid, lit */
 const RAMP_WORLD = toonRamp([70, 150, 255]);
-/** Fox: deeper shadow step + firmer mid so the coat reads as cel, not airbrushed */
-const RAMP_FOX = toonRamp([52, 140, 255]);
 
 /** Shared paint uniforms: restores as (x, z, radius, edge) */
 const paintU = {
@@ -609,31 +608,8 @@ function buildDistance(scene: THREE.Scene, rand: () => number): void {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Fox stand-in: lean, low-slung, long snout, big ears, flame-plume tail
+// Geometry helpers
 // ---------------------------------------------------------------------------------------------
-
-function foxToon(color: THREE.ColorRepresentation, emissive = 0x000000, ei = 0): THREE.MeshToonMaterial {
-  const m = new THREE.MeshToonMaterial({ color, gradientMap: RAMP_FOX, emissive, emissiveIntensity: ei });
-  // soft warm rim so the silhouette lifts off the paper
-  m.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <opaque_fragment>',
-      `{
-        float rim = 1.0 - clamp(dot(normalize(normal), vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
-        outgoingLight += vec3(1.0, 0.55, 0.22) * smoothstep(0.55, 0.85, rim) * 0.34;
-      }
-      #include <opaque_fragment>`,
-    );
-  };
-  m.customProgramCacheKey = () => 'lk-fox';
-  return m;
-}
-
-function ellipsoid(r: [number, number, number], seg = 20): THREE.BufferGeometry {
-  const g = new THREE.SphereGeometry(1, seg, Math.round(seg * 0.7));
-  g.scale(...r);
-  return g;
-}
 
 /** Capped tube with an authored radius profile; `lobes` > 0 adds flame lobes toward the tip */
 function plumeGeometry(curve: THREE.Curve<THREE.Vector3>, radius: (t: number) => number, rings = 36, sides = 12, lobes = 0.16): THREE.BufferGeometry {
@@ -681,239 +657,6 @@ function plumeGeometry(curve: THREE.Curve<THREE.Vector3>, radius: (t: number) =>
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
-}
-
-function buildFox(): { root: THREE.Group; update: (t: number) => void; setHeadYaw: (y: number) => void } {
-  const root = new THREE.Group();
-  const coat = foxToon(0xc45c26);
-  const coatDeep = foxToon(0x9c3f1a);
-  const cream = foxToon(0xe8cfa6);
-  const ink = foxToon(0x2a1a14);
-  const emberTip = foxToon(0xff7a2a, 0xff5a10, 1.6);
-  const W = 0.02;
-
-  const body = new THREE.Group();
-  body.position.y = 0.4;
-  root.add(body);
-
-  // lean torso: one haunch → tucked waist → deep chest → raised neck sweep (single silhouette)
-  const spine = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 0.05, -0.44),
-    new THREE.Vector3(0, 0.06, -0.27),
-    new THREE.Vector3(0, 0.03, -0.04),
-    new THREE.Vector3(0, 0.05, 0.18),
-    new THREE.Vector3(0, 0.17, 0.34),
-    new THREE.Vector3(0, 0.3, 0.44),
-  ]);
-  const girth = (t: number) => {
-    const k = [0.09, 0.155, 0.135, 0.18, 0.12, 0.09];
-    const f = t * (k.length - 1);
-    const i = Math.min(k.length - 2, Math.floor(f));
-    const u = f - i;
-    return THREE.MathUtils.lerp(k[i]!, k[i + 1]!, u * u * (3 - 2 * u));
-  };
-  const torsoGeo = plumeGeometry(spine, girth, 40, 14, 0);
-  torsoGeo.scale(0.88, 1.05, 1);
-  torsoGeo.computeVertexNormals();
-  body.add(inked(torsoGeo, coat, W));
-  // cream throat blaze: thin sliver laid along the underside of the neck, sunk so only its face shows
-  const bib = new THREE.Mesh(ellipsoid([0.04, 0.095, 0.03]), cream);
-  bib.position.set(0, 0.105, 0.405);
-  bib.rotation.x = 0.78;
-  body.add(bib);
-
-  const head = new THREE.Group();
-  head.position.set(0, 0.35, 0.5);
-  body.add(head);
-  // wedge skull: wide at the cheeks, flat brow, tapering into the snout
-  const skullGeo = ellipsoid([0.12, 0.095, 0.13]);
-  const sp = skullGeo.getAttribute('position') as THREE.BufferAttribute;
-  for (let i = 0; i < sp.count; i++) {
-    const z = sp.getZ(i);
-    // pinch toward the front, flare at the back cheeks → triangle from above
-    sp.setX(i, sp.getX(i) * (1 - Math.max(0, z) * 2.2 + Math.max(0, -z) * 0.8));
-  }
-  skullGeo.computeVertexNormals();
-  head.add(inked(skullGeo, coat, W));
-  // long tapered snout
-  const snoutGeo = new THREE.ConeGeometry(0.08, 0.25, 10);
-  snoutGeo.rotateX(Math.PI / 2);
-  snoutGeo.scale(1, 0.72, 1);
-  const snout = inked(snoutGeo, coat, W);
-  snout.position.set(0, -0.03, 0.19);
-  head.add(snout);
-  // cream underjaw tucked inside the snout: only a thin underside sliver shows (no grin line)
-  const jawGeo = new THREE.ConeGeometry(0.055, 0.14, 8);
-  jawGeo.rotateX(Math.PI / 2);
-  jawGeo.scale(1, 0.5, 1);
-  const jaw = new THREE.Mesh(jawGeo, cream);
-  jaw.position.set(0, -0.05, 0.13);
-  head.add(jaw);
-  const nose = new THREE.Mesh(ellipsoid([0.022, 0.018, 0.02], 10), ink);
-  nose.position.set(0, -0.02, 0.31);
-  head.add(nose);
-  // narrow almond eyes with an ember glint
-  for (const s of [-1, 1]) {
-    const eye = new THREE.Mesh(ellipsoid([0.026, 0.011, 0.018], 10), ink);
-    eye.position.set(0.075 * s, 0.03, 0.095);
-    eye.rotation.set(0, 0.5 * s, -0.35 * s);
-    head.add(eye);
-    const glint = new THREE.Mesh(new THREE.SphereGeometry(0.006, 6, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.2, 0.4) }));
-    glint.position.set(0.08 * s, 0.034, 0.108);
-    head.add(glint);
-  }
-  // big pointed ears, ink-dark backs, ember tips
-  for (const s of [-1, 1]) {
-    const ear = new THREE.Group();
-    ear.position.set(0.075 * s, 0.07, -0.02);
-    ear.rotation.set(-0.2, 0, -0.32 * s);
-    head.add(ear);
-    const outer = new THREE.ConeGeometry(0.075, 0.26, 4);
-    outer.translate(0, 0.13, 0);
-    outer.scale(1, 1, 0.5);
-    ear.add(inked(outer, coatDeep, W));
-    const tip = new THREE.ConeGeometry(0.032, 0.08, 4);
-    tip.translate(0, 0.226, 0);
-    tip.scale(1, 1, 0.55);
-    ear.add(new THREE.Mesh(tip, emberTip));
-    const inner = new THREE.ConeGeometry(0.045, 0.17, 3);
-    inner.translate(0, 0.1, 0.022);
-    inner.scale(1, 1, 0.4);
-    ear.add(new THREE.Mesh(inner, cream));
-  }
-
-  // one tapered tube per leg, coat fading to ink toward the paw; hind legs kink back at the hock
-  const legMat = foxToon(0xffffff);
-  const legPrev = legMat.onBeforeCompile;
-  legMat.onBeforeCompile = (shader, r) => {
-    legPrev.call(legMat, shader, r);
-    shader.uniforms.uLegTop = { value: new THREE.Color(0xc45c26) };
-    shader.uniforms.uLegInk = { value: new THREE.Color(0x2a1a14) };
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aAlong;\nvarying float vAlong;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAlong = aAlong;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vAlong;\nuniform vec3 uLegTop;\nuniform vec3 uLegInk;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(uLegTop, uLegInk, smoothstep(0.45, 0.8, vAlong));');
-  };
-  legMat.customProgramCacheKey = () => 'lk-fox-leg';
-  const V = (y: number, z: number) => new THREE.Vector3(0, y, z);
-  const frontLeg = plumeGeometry(
-    new THREE.CatmullRomCurve3([V(0, 0), V(-0.14, 0.01), V(-0.28, 0.0), V(-0.37, 0.005), V(-0.395, 0.05)]),
-    (t) => THREE.MathUtils.lerp(0.07, 0.028, Math.min(1, t * 1.15)) + THREE.MathUtils.smoothstep(t, 0.85, 1) * 0.008,
-    24,
-    10,
-    0,
-  );
-  const hindLeg = plumeGeometry(
-    new THREE.CatmullRomCurve3([V(0, 0), V(-0.13, 0.035), V(-0.25, -0.04), V(-0.37, -0.005), V(-0.395, 0.045)]),
-    (t) => THREE.MathUtils.lerp(0.085, 0.028, Math.min(1, t * 1.15)) + THREE.MathUtils.smoothstep(t, 0.85, 1) * 0.008,
-    24,
-    10,
-    0,
-  );
-  const legs: THREE.Group[] = [];
-  const legDefs: Array<[number, number, number, boolean]> = [
-    [0.085, 0.2, 0, false],
-    [-0.085, 0.2, 0.18, false],
-    [0.09, -0.3, 0.14, true],
-    [-0.09, -0.3, -0.1, true],
-  ];
-  for (const [x, z, swing, hind] of legDefs) {
-    const leg = new THREE.Group();
-    leg.position.set(x, 0.0, z);
-    leg.rotation.x = swing;
-    body.add(leg);
-    leg.add(inked(hind ? hindLeg : frontLeg, legMat, W * 0.8));
-    legs.push(leg);
-  }
-
-  // thick flame-plume tail: sweeps back and up, widest mid, burning tip
-  const tailCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 0.06, -0.46),
-    new THREE.Vector3(0, 0.02, -0.72),
-    new THREE.Vector3(0, 0.14, -0.98),
-    new THREE.Vector3(0, 0.42, -1.14),
-    new THREE.Vector3(0, 0.72, -1.12),
-  ]);
-  const tailGeo = plumeGeometry(
-    tailCurve,
-    (t) => 0.05 + Math.pow(Math.sin(Math.min(1, t * 1.08) * Math.PI), 0.8) * 0.17 * (1 - t * 0.3),
-    44,
-    14,
-  );
-  // coat at the root → deeper flame → burning ember toward the tip (self-lit so it never sinks into shadow)
-  const tailMat = foxToon(0xffffff);
-  const tailPrev = tailMat.onBeforeCompile;
-  tailMat.onBeforeCompile = (shader, r) => {
-    tailPrev.call(tailMat, shader, r);
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aAlong;\nvarying float vAlong;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAlong = aAlong;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vAlong;')
-      .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
-        vec3 tailCol = mix(vec3(0.56, 0.11, 0.025), vec3(0.42, 0.06, 0.012), smoothstep(0.2, 0.55, vAlong));
-        diffuseColor.rgb = mix(tailCol, vec3(1.0, 0.36, 0.06), smoothstep(0.62, 0.95, vAlong));`,
-      )
-      .replace(
-        '#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>
-        totalEmissiveRadiance += vec3(1.0, 0.32, 0.06) * (smoothstep(0.5, 1.0, vAlong) * 1.6 + 0.06);`,
-      );
-  };
-  tailMat.customProgramCacheKey = () => 'lk-fox-tail';
-  const tail = inked(tailGeo, tailMat, W);
-  const tailGroup = new THREE.Group();
-  tailGroup.add(tail);
-  tailGroup.position.z = 0.06;
-  body.add(tailGroup);
-  // flame tip + tongues licking off the plume
-  const tipGeo = plumeGeometry(
-    new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0.66, -1.14), new THREE.Vector3(0, 0.84, -1.08), new THREE.Vector3(0.0, 1.0, -0.98)]),
-    (t) => 0.07 * (1 - t) + 0.004,
-    12,
-    10,
-  );
-  const flameMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.0, 1.15, 0.3) });
-  const flame = new THREE.Mesh(tipGeo, flameMat);
-  tailGroup.add(flame);
-  const tongues: THREE.Mesh[] = [];
-  for (let i = 0; i < 3; i++) {
-    const tg = new THREE.ConeGeometry(0.03, 0.18, 5);
-    tg.translate(0, 0.09, 0);
-    const t = new THREE.Mesh(tg, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 0.75, 0.18) }));
-    t.position.set((i - 1) * 0.06, 0.8, -1.1 + i * 0.03);
-    t.rotation.set(0.3, 0, (i - 1) * 0.4);
-    tailGroup.add(t);
-    tongues.push(t);
-  }
-  const tailLight = new THREE.PointLight(0xff7a30, 1.6, 3.5, 2);
-  tailLight.position.set(0, 0.95, -1.0);
-  tailGroup.add(tailLight);
-
-  root.traverse((o) => {
-    if ((o as THREE.Mesh).isMesh && !o.userData.ink) o.castShadow = true;
-  });
-
-  let headYaw = 0.3;
-  return {
-    root,
-    setHeadYaw(y: number) {
-      headYaw = y;
-    },
-    update(t) {
-      // breathing + tail sway + flame flicker (alive, not idle-frozen)
-      body.position.y = 0.4 + Math.sin(t * 2.2) * 0.006;
-      tailGroup.rotation.y = Math.sin(t * 1.3) * 0.12;
-      tailGroup.rotation.x = Math.sin(t * 0.9) * 0.04;
-      head.rotation.set(Math.sin(t * 0.7) * 0.03 + 0.08, headYaw + Math.sin(t * 0.5) * 0.05, 0);
-      tongues.forEach((tg, i) => (tg.scale.y = 0.8 + 0.35 * Math.abs(Math.sin(t * 7 + i * 2.1))));
-      tailLight.intensity = 1.5 + Math.sin(t * 9) * 0.25;
-    },
-  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1060,11 +803,15 @@ function buildSky(scene: THREE.Scene, sunDir: THREE.Vector3): LookdevSky {
 // Boot
 // ---------------------------------------------------------------------------------------------
 
-/** Camera pose + fox yaw / head turn per shot (fox stands at FOX_HOME) */
-const SHOTS: Record<Shot, { pos: [number, number, number]; look: [number, number, number]; fov: number; foxYaw: number; headYaw: number }> = {
+/** Camera pose + fox yaw / head turn per shot (fox stands at FOX_HOME + foxAt) */
+const SHOTS: Record<Shot, { pos: [number, number, number]; look: [number, number, number]; fov: number; foxYaw: number; headYaw: number; foxAt?: [number, number] }> = {
   wide: { pos: [9.5, 5.2, 17], look: [-1.2, 1.6, -4], fov: 50, foxYaw: Math.PI - 0.35, headYaw: 0.2 },
   fox: { pos: [2.75, 0.62, 3.75], look: [0.5, 0.52, 2.95], fov: 40, foxYaw: 0.25, headYaw: 0.45 },
   hero: { pos: [-1.6, 0.8, 7.2], look: [0.6, 1.7, -6], fov: 46, foxYaw: 0.55, headYaw: 0.3 },
+  // hearth-fox review shots: true profile, 3/4 front, static profile the walk crosses
+  foxProfile: { pos: [0.3, 0.5, 5.35], look: [0.28, 0.42, 3.2], fov: 40, foxYaw: Math.PI / 2, headYaw: 0 },
+  foxQuarter: { pos: [1.95, 0.72, 4.55], look: [0.5, 0.45, 3.05], fov: 38, foxYaw: 0.95, headYaw: 0.25 },
+  foxWalk: { pos: [0.6, 0.6, 6.3], look: [0.6, 0.4, 3.2], fov: 44, foxYaw: Math.PI / 2, headYaw: 0, foxAt: [-1.2, 0] },
 };
 
 export async function runLookdevP0(): Promise<void> {
@@ -1145,7 +892,7 @@ export async function runLookdevP0(): Promise<void> {
     scene.add(r);
   }
 
-  const fox = buildFox();
+  const fox = await loadHearthFox((w) => inkMaterial(w));
   fox.root.position.set(FOX_HOME.x, groundH(FOX_HOME.x, FOX_HOME.z), FOX_HOME.z);
   const contact = buildContactShadow();
   contact.position.set(0, 0.03, -0.15);
@@ -1185,6 +932,8 @@ export async function runLookdevP0(): Promise<void> {
     camera.lookAt(...s.look);
     camera.fov = s.fov;
     camera.updateProjectionMatrix();
+    const [ax, az] = s.foxAt ?? [0, 0];
+    fox.root.position.set(FOX_HOME.x + ax, groundH(FOX_HOME.x + ax, FOX_HOME.z + az), FOX_HOME.z + az);
     fox.root.rotation.y = s.foxYaw;
     fox.setHeadYaw(s.headYaw);
     lights.key.target.position.set(s.look[0], 0, s.look[2]);
@@ -1195,7 +944,8 @@ export async function runLookdevP0(): Promise<void> {
   let time = 0;
   function frame(dt: number): void {
     time += dt;
-    fox.update(time);
+    fox.update(dt);
+    if (fox.speed > 0) fox.root.position.y = groundH(fox.root.position.x, fox.root.position.z);
     field.update(dt);
     syncPaint();
     sky.update(dt);
@@ -1219,6 +969,12 @@ export async function runLookdevP0(): Promise<void> {
     },
     setPaint,
     setCamera,
+    setFoxClip(clip: FoxClip, travel = false) {
+      fox.play(clip, travel);
+    },
+    get fox() {
+      return { clip: fox.clip, speed: fox.speed, x: fox.root.position.x, z: fox.root.position.z, paws: fox.paws() };
+    },
     advance(frames = 1, dt = 1 / 60) {
       manual = true;
       for (let i = 0; i < frames; i++) frame(dt);
