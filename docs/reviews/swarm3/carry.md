@@ -86,3 +86,18 @@ still clear beside cheek, fox silhouette preserved. Initial/per-comparison
 teleports and the front inspection lens remain disclosed staging; this probe
 checks Carry regression, not stair traversal or continuous route completion.
 Rook owns stair ascent/descent verification; Flint owns full-route capture.
+
+## Final stair + canopy regression — 551258f
+
+Merged Moss c126b5e. Exact TypeScript and Vite production build pass.
+Live Carry rerun `/captures/tallow/carry-final-stair-09/` passes all ten checks
+with saved window.__game snapshots, screenshots and video. Earlier attempt08
+ended signal143 before saving results and is not counted. Staging disclosures
+remain the same; this is not a continuous-route or unfamiliar-player claim.
+
+Reviewed `/captures/tallow/keeping-final-art-08/{root,bridge}.png`: CLEARLY BETTER
+than the canopy-blocked exit. Trunk line and far-crag gap read clearly; bare
+limbs and falling leaves preserve the autumn mood. Staged Keeping snapshot:
+phase bridge, bridgeTop9.577, crownLobes0, stair open. The separate `across`
+free-camera still catches a near-camera leaf card; normal root/bridge chase
+views stay clear. Rook owns physical stairs, Flint full-route/hero evidence.
