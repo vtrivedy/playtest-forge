@@ -79,7 +79,7 @@ export function createKeepingRoute() {
     { beat: 'take the coal again', interact: true, until: (s) => op(s).carry?.carried, hold: 1 },
     { beat: 'ride the steam', lift: [24.95, 79.36], rise: 6.5 },
     { beat: 'glide to the terrace', to: [28.6, 76.6], mag: 0.8, glide: true },
-    { beat: 'to the root-hearth', to: [28.5, 75.6], mag: 0.3 },
+    { beat: 'to the root-hearth', to: [28.45, 75.85], mag: 0.3 },
     { beat: 'set warmth at the roots', interact: true, until: (s) => !op(s).carry?.carried, hold: 1 },
     { beat: 'the roots take it', hold: 10, until: (s) => op(s).chemistry?.completed, min: 1 },
     { beat: 'the tree finishes falling', hold: 7, until: (s) => op(s).keeping?.phase === 'bridge', min: 4.5 },
