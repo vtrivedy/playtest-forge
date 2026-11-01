@@ -22,6 +22,8 @@ const POSES = {
   // terrace top, looking at the lean
   lean: [29.4, 78.2, -2.75],
   bend: [17.4, 81.6, 0.6],
+  // just past the bend after the dash toward the spring (chase cam behind, over the outer curb)
+  dash: [21.4, 83.4, 2.26],
   ledge: [21.2, 84.2, 2.2],
   spring: [23.6, 80.6, 2.4],
   terrace: [29.6, 77.4, -2.9],
