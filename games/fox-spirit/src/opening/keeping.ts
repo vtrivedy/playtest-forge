@@ -160,6 +160,7 @@ export function createKeeping(ctx: OpeningCtx) {
   // ---- ledge: shelf → bend → steam pad, moss-capped columns under walk boxes, a low curb on the drop side
   const W = K.ledgeWidth;
   const pts = K.ledge;
+  const rubble: THREE.Object3D[] = [];
   // curb: one low continuous blocker per run (the fox needs a jump to leave), drawn as a row of mossy rubble
   const curb = (ax: number, az: number, bx: number, bz: number) => {
     const len = Math.hypot(bx - ax, bz - az);
@@ -175,7 +176,9 @@ export function createKeeping(ctx: OpeningCtx) {
       const r = buildRock(rand, sz);
       r.scale.y = 1.25;
       r.position.set(ax + (bx - ax) * t + (rand() - 0.5) * 0.12, SHELF_TOP + sz * 0.3, az + (bz - az) * t + (rand() - 0.5) * 0.12);
+      r.userData.scale = r.scale.clone();
       run.add(r);
+      rubble.push(r);
     }
   };
   const bendOuter: Array<[number, number]> = [];
@@ -460,6 +463,21 @@ export function createKeeping(ctx: OpeningCtx) {
     t = 0;
   }
 
+  // rubble right under the lens shrinks away: the chase cam behind the fox at a curb (after a dash
+  // or at the bend) would otherwise frame a wall of boulders over the fox's legs
+  const lensAt = new THREE.Vector3();
+  ctx.onUpdate(() => {
+    const cam = ctx.player?.cam.camera;
+    if (!cam) return;
+    cam.getWorldPosition(lensAt);
+    if (Math.abs(lensAt.y - SHELF_TOP) > 4) return;
+    for (const r of rubble) {
+      const d = Math.hypot(r.position.x - lensAt.x, r.position.z - lensAt.z);
+      const k = THREE.MathUtils.smoothstep(d, 0.9, 2.2);
+      r.scale.copy(r.userData.scale as THREE.Vector3).multiplyScalar(Math.max(0.001, k));
+      r.visible = k > 0.01;
+    }
+  });
   ctx.onUpdate((dt) => {
     if (stair === 'unfolding') {
       stairT += dt;
