@@ -14,7 +14,7 @@ export function createOpeningRoute() {
     { beat: 'turn toward hearth', to: [5.6, 81], mag: 0.28 },
     { beat: 'cold hearth', to: [5.6, 77.5], mag: 0.28 },
     { beat: 'cold hearth pause', hold: 5 },
-    { beat: 'bring the warmth', to: [5.6, 74.2], mag: 0.3 },
+    { beat: 'bring the warmth', to: [4.3, 74.8], mag: 0.3 },
     { beat: 'hearth lit', hold: 5 },
     { beat: 'ride the warm air', lift: true },
     { beat: 'glide to shelf', to: [13, 75.5], mag: 1, glide: true },
@@ -36,7 +36,7 @@ export function createOpeningRoute() {
     }
     if (leg.hold !== undefined) return { x: 0, z: 0, jump: false, dash: false, beat: leg.beat };
     // Remain inside the full-strength core while holding jump. Input stops horizontal drift.
-    const to = leg.lift ? [5.6, 74.2] : leg.to;
+    const to = leg.lift ? [4.3, 74.8] : leg.to;
     const dx = to[0] - x;
     const dz = to[1] - z;
     const d = Math.hypot(dx, dz) || 1;
