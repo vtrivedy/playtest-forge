@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHeroRoute, HERO_START } from './lookdev-hero-route.mjs';
+import { createOpeningRoute, OPENING_START } from './opening-hero-route.mjs';
 
 const arg = (k, d) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -55,16 +56,19 @@ try {
   await page.evaluate(() => window.__gameHooks.setManual(true));
   let n = 0;
   if (hero) {
-    const route = createHeroRoute();
+    const opening = await page.evaluate(() => window.__game?.mode === 'opening');
+    const seconds = Number(arg('route-seconds', opening ? '75' : '30'));
+    const totalFrames = Math.round(seconds * 60);
+    const route = opening ? createOpeningRoute() : createHeroRoute();
     let state = await page.evaluate((s) => {
       const h = window.__gameHooks;
       h.teleport(s.x, s.z, s.yaw);
       return h.advance(1, 1 / 60, false);
-    }, HERO_START);
+    }, opening ? OPENING_START : HERO_START);
     let beat = '';
     let touchdownF = -1;
     let clipF = -1;
-    for (let f = 0; f < 1800; f++) {
+    for (let f = 0; f < totalFrames; f++) {
       const input = route(f / 60, state);
       const prev = state;
       // extra stills: jump apex, 2 frames after touchdown
@@ -80,7 +84,7 @@ try {
         ({ input, shot }) => {
           const h = window.__gameHooks;
           h.setStick(input.x, input.z);
-          h.setKeys(input.jump ? ['Space'] : []);
+          h.setKeys([...(input.jump ? ['Space'] : []), ...(input.dash ? ['ShiftLeft'] : [])]);
           return h.advance(1, 1 / 60, shot);
         },
         { input, shot: shot || clipFrame || videoFrame },
@@ -88,7 +92,7 @@ try {
       if (videoFrame) {
         fs.mkdirSync(path.join(out, 'frames'), { recursive: true });
         await page.screenshot({ path: path.join(out, 'frames', `f${String((f - 1) / 2).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 92 });
-        if (f % 120 === 1) console.log('frame', (f - 1) / 2, '/ 900');
+        if (f % 120 === 1) console.log('frame', (f - 1) / 2, `/ ${totalFrames / 2}`);
       }
       if (clipFrame) {
         fs.mkdirSync(path.join(out, 'run-clip'), { recursive: true });
@@ -104,9 +108,9 @@ try {
     }
     fs.writeFileSync(path.join(out, 'trace.json'), JSON.stringify(trace));
     if (video) {
-      execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, 'hero-30s.mp4')]);
+      execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, opening ? 'opening-75s.mp4' : 'hero-30s.mp4')]);
       const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
-      fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/?lookdev=p0&play=1', route: 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: 900, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
+      fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/?lookdev=p0&play=1', route: opening ? 'tools/opening-hero-route.mjs' : 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: totalFrames / 2, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
     }
     if (!video && clipF >= 0)
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'run-clip/f%03d.jpg'), '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', path.join(out, 'run-clip.mp4')]);
