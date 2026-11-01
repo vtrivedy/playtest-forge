@@ -452,7 +452,9 @@ export function createPlay(opts: {
     params: {
       distance: 2.9,
       runDistance: 2.7,
-      minDistance: 2.0,
+      // room to pull in front of a pier; a smaller 3/4 bias keeps the lens inside the arch opening
+      minDistance: 1.2,
+      sideBias: 0.35,
       height: 1.15,
       groundLift: 0.2,
       lookHeight: 0.33,
