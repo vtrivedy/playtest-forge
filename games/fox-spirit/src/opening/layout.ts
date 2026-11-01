@@ -15,14 +15,15 @@ export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const
 
 /**
  * Runaway Page flight loops, one per stage: [x, height above base terrain (groundH), z]. Stage 1 circles the well
- * plaza; stages 2–3 are greybox loops on the canopy (Tallow) and pop-up ruin (Rook) footprints, to be
- * re-threaded over their leaves / flaps. `payoff` = the permanent wash when the page is kept.
+ * plaza; stages 2–3 circle over the canopy chain and the pop-up ruin high enough that only those reach it. `payoff` = the permanent wash when the page is kept.
  */
 export const PAGE = {
   stages: [
     [[-8, 1.6, 87.2], [-5.2, 1.1, 87.6], [-2, 1.1, 91], [-1, 1.2, 95.5], [-5, 1.1, 97.2], [-10.5, 1.2, 95.5], [-13.5, 1.1, 90], [-12.5, 1.2, 86.8], [-10.5, 1.1, 82.8]],
-    [[2, 1.3, 70], [5.5, 1.1, 66.5], [2, 1.4, 63.5], [-2.5, 1.2, 66], [-3, 1.3, 70.5]],
-    [[-27, 1.3, 72], [-31, 1.2, 76.5], [-35, 1.3, 71.5], [-30.5, 1.2, 67], [-25, 1.2, 68]],
+    // stage 2 shuttles between the canopy's roost and high leaf (Tallow CANOPY), out of reach from the meadow floor
+    [[-1, 4.6, 64.7], [0.2, 5.4, 65.6], [0.9, 4.2, 67.1], [-0.6, 4.8, 66.4]],
+    // stage 3 shuttles between the pop-up ruin's overlook and its second leaf (Rook POP_UP_RUIN), out of reach from the floor
+    [[-24.4, 3.0, 71], [-26.4, 3.6, 70.2], [-28.4, 2.3, 71], [-26.4, 3.4, 71.8]],
   ] as ReadonlyArray<ReadonlyArray<readonly [number, number, number]>>,
   payoff: { x: -4, z: 80, r: 45 },
 } as const;
