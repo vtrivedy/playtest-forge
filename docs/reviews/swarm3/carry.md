@@ -56,7 +56,9 @@ Final tuning uses lateral .27m, forward .18m, lower .07m and the original .115m
 radius. A larger .13m trial hid part of the face from the contact lens and was
 rejected. The final front still preserves both eyes and muzzle; the chase still
 shows the charcoal body outside the cheek. Source cradle is now Moss's clear
-(15.1,77.4) position. Named revised teammate verdict pending.
+(15.1,77.4) position. Rook verdict (chat118): CLEARLY BETTER vs8ca889a after reviewing both
+chase and unobstructed contact stills; visual sign-off only, continuous route
+completion remains pending.
 
 `/captures/tallow/carry-final-06` passes10/10 assertions, adding held-jump glide
 and actual W-key acceleration comparison. Both runs reach2.099m/s after20f.
