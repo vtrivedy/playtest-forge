@@ -81,6 +81,15 @@ func update(dt: float, cam: Camera3D, feet: Vector3) -> void:
 			m.next_pass = u.ink[i] if u.fade < 0.2 else null
 
 
+## every unit back to fully opaque, ink restored
+func clear() -> void:
+	for u in units:
+		u.fade = 0.0
+		for i in u.mats.size():
+			u.mats[i].set_shader_parameter("fade", 0.0)
+			u.mats[i].next_pass = u.ink[i]
+
+
 func state() -> Dictionary:
 	var faded := 0
 	for u in units:

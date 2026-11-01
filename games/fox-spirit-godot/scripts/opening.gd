@@ -32,8 +32,6 @@ var post: ShaderMaterial
 var hud: Label
 var time := 0.0
 var elapsed := 0.0
-## art override: flood the slice with paint (shot(…, "full"))
-var paint_override := -1.0
 
 
 func _ready() -> void:
@@ -186,8 +184,10 @@ func _physics_process(dt: float) -> void:
 	field.step(dt, p)
 	for fn in ctx.updates:
 		fn.call(dt, time)
-	occlusion.update(dt, cam, p)
-	_grade(field.paint_k() if paint_override < 0.0 else paint_override)
+	# art shots park the fox; the chase cutout only runs behind a live chase camera
+	if fox.is_physics_processing():
+		occlusion.update(dt, cam, p)
+	_grade(field.paint_k())
 	var near := Vector2(p.x - Layout.HEARTH_A.x, p.z - Layout.HEARTH_A.z).length() < 12.0
 	hud.text = "The warmth carries on." if hearth.complete else ("Space · jump and hold to ride the warm air" if hearth.latched else "Bring your colour to the cold hearth · run close or Shift dash")
 	hud.modulate.a = move_toward(hud.modulate.a, 1.0 if near and elapsed > 2.0 else 0.0, dt * 2.5)
@@ -204,17 +204,17 @@ func _grade(k: float) -> void:
 	post.set_shader_parameter("time", time)
 
 
-## frame a fixed review camera (scene.ts shot); paint "full" floods the slice
+## frame a fixed review camera (scene.ts shot); paint "full" floods the slice. The chase cutout is
+## parked (nothing fades for an art camera), as three's shot() renders before occlusion runs.
 func shot(name: String, paint := "none") -> void:
+	fox.set_physics_process(false)
+	occlusion.clear()
 	var s: Array = SHOTS[name]
 	cam.global_position = s[0]
 	cam.look_at(s[1])
 	cam.fov = s[2]
-	if paint == "full":
-		RenderingServer.global_shader_parameter_set("paint_restore_count", 1)
-		RenderingServer.global_shader_parameter_set("paint_restore_0", Vector4(-4, 84, 200, 2.5))
-		paint_override = 1.0
-		_grade(1.0)
+	if paint == "full" and field.restores.is_empty():
+		field.restore(Vector3(-4, 0, 84), 200.0, 0.01, 2.5)
 
 
 ## the harness surface (window.__game equivalent)

@@ -66,9 +66,8 @@ func _run_shots() -> void:
 	await _settle(30)
 	var paint: String = "full" if args.get("paint", "") == "full" else "none"
 	for name in str(args.shots).split(","):
-		opening.fox.set_physics_process(false)
 		opening.shot(name, paint)
-		await get_tree().process_frame
+		await _settle(5)
 		await _save("shot-" + name + ("-paint" if paint == "full" else ""))
 	get_tree().quit()
 
