@@ -7,6 +7,7 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHeroRoute, HERO_START } from './lookdev-hero-route.mjs';
 
 const arg = (k, d) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -14,6 +15,8 @@ const arg = (k, d) => {
 };
 const port = Number(arg('port', '5191'));
 const out = path.resolve(arg('out', '/tmp/lookdev-play-smoke'));
+// --hero: run the 30 s hero route sim-only (stills at beat changes) instead of the short beat list
+const hero = process.argv.includes('--hero');
 fs.mkdirSync(out, { recursive: true });
 
 const server = await createServer({
@@ -48,7 +51,37 @@ try {
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 300000 });
   await page.evaluate(() => window.__gameHooks.setManual(true));
   let n = 0;
-  for (const [label, frames, stick, keys, still] of ROUTE) {
+  if (hero) {
+    const route = createHeroRoute();
+    let state = await page.evaluate((s) => {
+      const h = window.__gameHooks;
+      h.teleport(s.x, s.z, s.yaw);
+      return h.advance(1, 1 / 60, false);
+    }, HERO_START);
+    let beat = '';
+    for (let f = 0; f < 1800; f++) {
+      const input = route(f / 60, state);
+      const shot = input.beat !== beat;
+      beat = input.beat;
+      state = await page.evaluate(
+        ({ input, shot }) => {
+          const h = window.__gameHooks;
+          h.setStick(input.x, input.z);
+          h.setKeys(input.jump ? ['Space'] : []);
+          return h.advance(1, 1 / 60, shot);
+        },
+        { input, shot },
+      );
+      trace.push({ f, beat, input, ...state, paws: undefined });
+      if (shot) {
+        await page.screenshot({ path: path.join(out, `${String(++n).padStart(2, '0')}-${beat.replace(/ /g, '-')}.png`) });
+        console.log(f, beat.padEnd(18), JSON.stringify({ pos: state.pos, speed: state.speed, anim: state.anim, gait: state.gait, lastJump: state.lastJump }));
+      }
+    }
+    const slide = trace.filter((s) => s.anim === 'loco').map((s) => s.maxSlide);
+    console.log('end', JSON.stringify(state.pos), 'maxSlide loco p95', slide.sort((a, b) => a - b)[Math.floor(slide.length * 0.95)]);
+  }
+  for (const [label, frames, stick, keys, still] of hero ? [] : ROUTE) {
     const states = await page.evaluate(
       ({ frames, stick, keys }) => {
         const h = window.__gameHooks;
