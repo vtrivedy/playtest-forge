@@ -3,13 +3,15 @@
  *
  * Authored in Blender (tools/blender/scripts/hearth_fox_*.py) → assets/hero/hearth_fox.glb:
  * `fox_coat` (skinned, vertex-coloured coat; TEXCOORD_0.x = ember mask) + `fox_face` (eyes, nose),
- * clips idle / walk / run (in place; the rig's glTF extras carry each clip's ground speed).
+ * clips idle / walk / trot / run / jumpUp / fall / land (in place; the rig's glTF extras carry each clip's ground speed).
  * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-export type FoxClip = 'idle' | 'walk' | 'run';
+export type FoxClip = 'idle' | 'walk' | 'trot' | 'run' | 'jumpUp' | 'fall' | 'land';
+/** play once and hold the last frame; the rest loop */
+const ONE_SHOT: ReadonlySet<string> = new Set(['jumpUp', 'land']);
 
 export interface HearthFox {
   root: THREE.Group;
@@ -233,7 +235,14 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
 
   const mixer = new THREE.AnimationMixer(model);
   const actions = new Map<string, THREE.AnimationAction>();
-  for (const clip of gltf.animations) actions.set(clip.name, mixer.clipAction(clip));
+  for (const clip of gltf.animations) {
+    const action = mixer.clipAction(clip);
+    if (ONE_SHOT.has(clip.name)) {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+    }
+    actions.set(clip.name, action);
+  }
   let current: FoxClip = 'idle';
   let travel = false;
   actions.get('idle')?.play();

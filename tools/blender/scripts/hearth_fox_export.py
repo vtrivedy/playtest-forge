@@ -1,13 +1,13 @@
 """Hearth-fox export: bake IK-authored clips to FK deform keys, strip controls, write GLB.
 
-Exec'd after hearth_fox_anim.py. Output: assets/hero/hearth_fox.glb with clips idle / walk / run.
+Exec'd after hearth_fox_anim.py. Output: assets/hero/hearth_fox.glb with clips idle / walk / trot / run / jumpUp / fall / land.
 """
-import bpy
+import bpy, os
 
-OUT = "/workspace/kit/wt/s1-fox/assets/hero/hearth_fox.glb"
+OUT = os.path.normpath(HERE + "../../../assets/hero/hearth_fox.glb")
 DEFORM = [b.name for b in rig.data.bones if b.use_deform]
 CLIP_SPEED = {k: g["stride"] * FPS / g["frames"] for k, g in GAITS.items()}
-CLIP_SPEED["idle"] = 0.0
+CLIP_SPEED.update(idle=0.0, jumpUp=0.0, fall=0.0, land=0.0)
 
 bpy.context.view_layer.objects.active = rig
 bpy.ops.object.mode_set(mode="POSE")
@@ -82,5 +82,4 @@ bpy.ops.export_scene.gltf(
     export_materials="PLACEHOLDER",
     export_image_format="NONE",
 )
-import os
 print("exported", OUT, os.path.getsize(OUT), "bytes; speeds", CLIP_SPEED)
