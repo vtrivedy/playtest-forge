@@ -4,7 +4,7 @@
  * Authored in Blender (tools/blender/scripts/hearth_fox_*.py) → assets/hero/hearth_fox.glb:
  * `fox_coat` (skinned, vertex-coloured coat; TEXCOORD_0.x = ember mask) + `fox_face` (eyes, nose),
  * clips idle / walk / run (in place; the rig's glTF extras carry each clip's ground speed).
- * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, ember tail glow + drifting ember motes.
+ * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -113,11 +113,11 @@ function flameMaterial(size: [number, number], seed: number, uLean: { value: THR
         float d = min(abs(x - split * 0.5), abs(x + split * 0.5) + 0.04 * step(0.6, y));
         float f = d / max(w, 1e-3);
         if (f > 1.0) discard;
-        vec3 rust = vec3(0.55, 0.13, 0.04);
-        vec3 ember = vec3(1.0, 0.36, 0.07);
-        vec3 core = vec3(1.0, 0.68, 0.22);
-        vec3 col = f > 0.8 ? rust : (f > 0.42 || y > h * 0.7 ? ember : core);
-        gl_FragColor = vec4(col * 1.6, 1.0);
+        vec3 rust = vec3(0.42, 0.09, 0.03);
+        vec3 ember = vec3(0.92, 0.3, 0.06);
+        vec3 core = vec3(1.0, 0.56, 0.16);
+        vec3 col = f > 0.78 ? rust : (f > 0.45 || y > h * 0.65 ? ember : core);
+        gl_FragColor = vec4(col * 1.1, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
@@ -207,16 +207,17 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
   (tailTip ?? root).add(tailLight);
   tailLight.position.set(0, 0.08, 0);
 
-  // spirit signal: cel flame tongues licking off the tail's burn-out point, small wisps off the ear tips
+  // spirit signal: cel flame tongues along the tail's burn-out third (the brush becomes fire), tallest at the point
   const uTime = { value: 0 };
   const uLean = { value: new THREE.Vector3() };
-  const flameGeo = new THREE.PlaneGeometry(1, 1).translate(0.5, 0.5, 0);
+  const flameGeo = new THREE.PlaneGeometry(1, 1);
+  const tail5 = model.getObjectByName('tail5') as THREE.Bone | undefined;
   const tongues: [THREE.Bone | undefined, [number, number, number], [number, number], number][] = [
-    [tailTip, [0, 0.05, 0], [0.15, 0.3], 0.1],
-    [tailTip, [0.025, 0.0, 0.02], [0.1, 0.2], 0.55],
-    [tailTip, [-0.03, -0.02, -0.01], [0.09, 0.17], 0.85],
-    [earTips[0], [0, 0.13, 0], [0.035, 0.085], 0.3],
-    [earTips[1], [0, 0.13, 0], [0.035, 0.085], 0.7],
+    [tailTip, [0, 0.06, 0], [0.13, 0.27], 0.1],
+    [tailTip, [0.03, 0.0, 0.02], [0.09, 0.18], 0.55],
+    [tailTip, [-0.035, -0.03, -0.01], [0.08, 0.15], 0.85],
+    [tail5, [0.02, 0.03, 0.03], [0.07, 0.12], 0.35],
+    [tail5, [-0.03, -0.02, 0.02], [0.06, 0.09], 0.7],
   ];
   for (const [bone, off, size, seed] of tongues) {
     if (!bone) continue;
