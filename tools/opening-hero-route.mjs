@@ -193,6 +193,8 @@ export function createSliceRoute() {
       const go = p.phase === 'perched' && p.winded;
       return { ...(go ? steer(s, [p.pos[0], p.pos[2]]) : { x: 0, z: 0 }), jump: go, done: false };
     } },
+    hold('the page opens', 1.8),
+    hold('colour rolls out', 2.6),
     hold('the meadow paints', Infinity),
   ];
   return (t, state) => {
