@@ -41,7 +41,7 @@ export const UPDRAFT_DEFAULTS: UpdraftTunables = {
   probeRing: 0.9,
 };
 
-export type HearthSpot = { id: string; x: number; y: number; z: number; height?: number };
+export type HearthSpot = { id: string; x: number; y: number; z: number; height?: number; medium?: 'steam' };
 
 /** Height of the hearth's ash bed above its ground point — the column starts here */
 const BED_Y = 0.92;
@@ -142,6 +142,10 @@ export class Hearth {
     leaves.frustumCulled = false;
     this.group.add(leaves);
     this.glow = shared.glow.clone();
+    if (spot.medium === 'steam') {
+      this.glow.uniforms.uBodyColor!.value.set(0xc6bfa2);
+      this.glow.uniforms.uOpacity!.value = 0.25;
+    }
     const haze = new THREE.Mesh(shared.glowGeo, this.glow);
     haze.position.y = BED_Y;
     haze.frustumCulled = false;
@@ -202,6 +206,13 @@ export class Hearth {
     this.smokeMesh.visible = this.smoke.opacity > 0.01;
     this.smokeMesh.position.y = BED_Y + h * 1.4;
     this.smokeMesh.scale.setScalar(1 + h * 0.5);
+    if (this.spot.medium === 'steam') {
+      // Wet heat uses the same lift/reactor, but reads as paper-pale vapor.
+      this.embers.uniforms.uHeat!.value = 0;
+      this.flame.uniforms.uHeat!.value = 0;
+      this.ash.emissiveIntensity = 0.04 + vis * 0.12;
+      this.light.intensity = vis * 2.0;
+    }
     this.debug.visible = debugOn;
     if (debugOn) {
       const c = this.debugMat.color;
@@ -458,7 +469,7 @@ function createShared(): HearthShared {
     return geo;
   })();
   const glow = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 1.9 } },
+    uniforms: { uTime: { value: 0 }, uHeat: { value: 0 }, uHeight: { value: 9 }, uRadius: { value: 1.9 }, uBodyColor: { value: new THREE.Color(0.56, 0.24, 0.075) }, uOpacity: { value: 0.12 } },
     vertexShader: /* glsl */ `
       attribute vec4 seed;
       uniform float uTime, uHeight, uRadius;
@@ -482,6 +493,8 @@ function createShared(): HearthShared {
       uniform float uTime, uHeat;
       varying vec2 vUv;
       varying float vLife, vSeed;
+      uniform vec3 uBodyColor;
+      uniform float uOpacity;
       void main() {
         vec2 q = (vUv - 0.5) * 2.0;
         // Wavering interior with a guaranteed zero-alpha border on all four edges.
@@ -490,9 +503,9 @@ function createShared(): HearthShared {
         float feather = 1.0 - smoothstep(0.1, 1.0, d);
         float folds = 0.65 + 0.35 * sin(q.y * 7.0 - uTime * 2.4 + vSeed + q.x * 3.0);
         float life = smoothstep(0.0, 0.16, vLife) * (1.0 - smoothstep(0.55, 1.0, vLife));
-        float alpha = min(1.0, uHeat) * life * feather * feather * folds * 0.12;
+        float alpha = min(1.0, uHeat) * life * feather * feather * folds * uOpacity;
         // Body is alpha-composited russet air; ember cores provide the glow separately.
-        gl_FragColor = vec4(vec3(0.56, 0.24, 0.075), alpha);
+        gl_FragColor = vec4(uBodyColor, alpha);
         #include <colorspace_fragment>
       }`,
     transparent: true,
