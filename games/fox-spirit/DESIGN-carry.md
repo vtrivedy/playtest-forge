@@ -7,8 +7,11 @@ slows the fox, never disappears, and continues burning when set down. Existing
 jump, glide, dash, gait and camera tuning stay fixed. Pickup/place uses a
 contextual E press (provisional exception to the two-action convention;
 team control review pending); Space and Shift keep their
-shipped behavior. Placement is grounded, at the fox's feet, so water/hearth
-chemistry can read the same physical heat source. Pickup works within a short,
+shipped behavior. Placement is grounded. Within 1.6 m of an authored steam/root bowl on the
+same floor, the coal rolls from the fox into its bed over 0.35 s; elsewhere it
+stays at the feet. The fox can care for the bowl from its rim without entering
+the fire. Bowl placement remains recoverable from the same rim (1.75 m pickup
+reach only for coal in a bowl). Chemistry reads the settled bowl position. Pickup works within a short,
 forgiving radius. Holding a button never repeatedly toggles the coal.
 
 Before an accepted dash, a carried coal is placed at the most recent safe
