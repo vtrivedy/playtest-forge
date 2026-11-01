@@ -19,7 +19,7 @@ import { createOpeningHearth } from './hearth';
 import { createOpeningPaint } from './paint';
 import { createOpeningOcclusion } from './occlusion';
 import { createCrown } from './crown';
-import { createCarry } from './carry';
+import { CARRY, createCarry } from './carry';
 import { createKeepingChemistry } from './chemistry';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
@@ -223,6 +223,7 @@ export async function runOpening(): Promise<void> {
     /** dev: play the Crown's Keeping response (the Keeping latch calls this) */
     crownRespond: crown.respond,
     params: PLAY,
+    carry: CARRY,
     camera: player.cam.params,
   };
   const w = window as unknown as Record<string, unknown>;
