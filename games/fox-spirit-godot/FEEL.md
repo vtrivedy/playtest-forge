@@ -41,7 +41,20 @@ fox teleported to (−1.5, 80) facing the meadow, world-relative stick, 60 Hz fi
 
 ## Look
 
-Side-by-side stills at identical poses: `/captures/results/godot-oak-side-by-side-01/`.
+Side-by-side stills at identical poses, unpainted and painted (`sbs-*.png` in
+`/captures/results/godot-oak-side-by-side-01/`): spawn, well, meadow, hearth chase poses
+(`tools/opening-stills.mjs` POSES) and the overview / village art cameras.
+
+What still differs, looking at those pairs:
+- Distant ink reads **bolder** in Godot (rim groves in the overview/village views) although the hull
+  maths is the same; three's SMAA + its thinner far lines look softer. Not resolved.
+- The hearth's point-light pool is brighter and yellower in Godot; flames are larger, harder cel
+  shapes; the column has fewer airborne embers than three's points.
+- Painted grade is a touch warmer/yellower in Godot (canvas grade after tonemapping vs three's linear
+  grade before ACES); three keeps more plum in the shadow band.
+- Canopy palettes drift on the rim: the RNG is bit-exact, but call counts diverge where my primitive
+  welding produces a different unique-vertex count than three's `mergeVertices` → later trees pick
+  different palettes. Groves placed from data (TREES / ROCKS / HOUSES / PATHS) match exactly.
 
 - **Pressed ink → living cel** ports almost verbatim: the paper/cel shader body (ragged watercolour
   front, tide line, pigment bleed, paper tooth/fibre/foxing, pressed-ink hatching, trail wake with the
@@ -56,9 +69,11 @@ Side-by-side stills at identical poses: `/captures/results/godot-oak-side-by-sid
   `CUSTOM0` — one mesh per merged village group keeps every part's ink weight. Nicer than three's
   separate hull meshes.
 - **Occluder fade:** Godot version screen-door dithers (opaque pipeline, no sorting, no material
-  cloning) and drops the ink pass; sight rays hit exact trimesh shapes on a dedicated physics layer.
-  three.js uses real transparency, which looks softer on the well/cottage edges; Godot's dither is
-  visible as a fine pattern on the fading wall at 960×540.
+  cloning) and drops the ink pass; sight rays hit exact trimesh shapes (faces baked to world space,
+  backface collision on so a lens inside the well ring still sees the ring) on a dedicated physics
+  layer. three.js uses real transparency, which looks softer; Godot's 4×4 Bayer dither is plainly
+  visible as a dot pattern on the faded Great Well at 960×540 (`pose-wellblock` capture). A blue-noise
+  threshold or TAA would hide it; not done.
 - **Post:** Godot Environment glow + ACES (with `tonemap_white` raised — see below) + a small canvas
   grade (vignette, grain, sepia↔restored split tone). three's grade runs in linear before ACES; Godot's
   canvas grade sees the tonemapped frame, so it is a gentler approximation.

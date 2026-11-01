@@ -31,7 +31,6 @@ var key: DirectionalLight3D
 var post: ShaderMaterial
 var hud: Label
 var time := 0.0
-var elapsed := 0.0
 
 
 func _ready() -> void:
@@ -178,7 +177,6 @@ func _build_overlay() -> void:
 
 func _physics_process(dt: float) -> void:
 	time += dt
-	elapsed += dt
 	var p := fox.global_position
 	hearth.update(dt, time, field.sample, p, fox.dashing)
 	field.step(dt, p)
@@ -190,7 +188,7 @@ func _physics_process(dt: float) -> void:
 	_grade(field.paint_k())
 	var near := Vector2(p.x - Layout.HEARTH_A.x, p.z - Layout.HEARTH_A.z).length() < 12.0
 	hud.text = "The warmth carries on." if hearth.complete else ("Space · jump and hold to ride the warm air" if hearth.latched else "Bring your colour to the cold hearth · run close or Shift dash")
-	hud.modulate.a = move_toward(hud.modulate.a, 1.0 if near and elapsed > 2.0 else 0.0, dt * 2.5)
+	hud.modulate.a = move_toward(hud.modulate.a, 1.0 if near and time > 2.0 else 0.0, dt * 2.5)
 
 
 ## world grade follows how much of the slice the fox has painted
