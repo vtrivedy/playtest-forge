@@ -319,6 +319,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       phase = 'perched';
       place(stage, 0, pos);
     },
+    /** for the hum: where it is, whether it's in flight, how many times it's been caught */
+    voice: () => ({ pos, fleeing: phase === 'fleeing' || phase === 'flung', catches, kept: phase === 'kept' }),
     state: () => ({ stage, phase, catches, skips, dodges, winded: windedT > 0, s: +s.toFixed(2), pos: pos.toArray().map((v) => +v.toFixed(2)) }),
   };
 }

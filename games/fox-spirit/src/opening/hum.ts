@@ -1,18 +1,28 @@
 /**
  * Hearth hum (DESIGN v1 orientation: "hearths hum first"). Every lit hearth drones a low warm chord whose
  * loudness follows the fox's distance, so a lit hearth can be found by ear; cold ones are silent. The coal
- * crackles softly near the fox. A Keeping completion swells one rising chord. WebAudio starts on first input.
+ * crackles softly near the fox; the Runaway Page rustles (findable by ear) and chimes per catch. A Keeping
+ * completion swells one rising chord. WebAudio starts on first input.
  */
 import * as THREE from 'three';
 import type { Hearth } from '../chem/updraft';
 
-const HUM = { near: 3, far: 26, gain: 0.07, crackle: 0.025 };
+const HUM = { near: 3, far: 26, gain: 0.07, crackle: 0.025, rustle: 0.05 };
 
-export function createHearthHum(opts: { hearths: Hearth[]; fox: THREE.Object3D; coal: () => THREE.Vector3 }) {
+export function createHearthHum(opts: {
+  hearths: Hearth[];
+  fox: THREE.Object3D;
+  coal: () => THREE.Vector3;
+  /** the Runaway Page: a dry paper flutter you can find by ear; a rising note per catch */
+  page?: () => { pos: THREE.Vector3; fleeing: boolean; catches: number; kept: boolean };
+}) {
   let ctx: AudioContext | null = null;
   let master: GainNode;
   const voices: Array<{ h: Hearth; gain: GainNode }> = [];
   let crackle: GainNode;
+  let rustle: GainNode;
+  let rustleBand: BiquadFilterNode;
+  let caught = 0;
 
   function start(): void {
     if (ctx) return;
@@ -56,6 +66,21 @@ export function createHearthHum(opts: { hearths: Hearth[]; fox: THREE.Object3D; 
     crackle.gain.value = 0;
     src.connect(hp).connect(crackle).connect(master);
     src.start();
+    // page flutter: band-passed noise, amplitude-beaten like wingbeats
+    const flutter = ctx.createBufferSource();
+    const fb = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const fd = fb.getChannelData(0);
+    for (let i = 0; i < fd.length; i++) fd[i] = (Math.random() * 2 - 1) * (0.55 + 0.45 * Math.sin((i / ctx.sampleRate) * Math.PI * 2 * 9));
+    flutter.buffer = fb;
+    flutter.loop = true;
+    rustleBand = ctx.createBiquadFilter();
+    rustleBand.type = 'bandpass';
+    rustleBand.frequency.value = 2600;
+    rustleBand.Q.value = 0.9;
+    rustle = ctx.createGain();
+    rustle.gain.value = 0;
+    flutter.connect(rustleBand).connect(rustle).connect(master);
+    flutter.start();
   }
   const unlock = () => {
     start();
@@ -64,6 +89,23 @@ export function createHearthHum(opts: { hearths: Hearth[]; fox: THREE.Object3D; 
   addEventListener('keydown', unlock);
   addEventListener('pointerdown', unlock);
 
+  /** a short paper-bright arpeggio; one more note per catch, a full open chord when it is kept */
+  function chime(n: number): void {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [523.3, 659.3, 784, 1046.5].slice(0, Math.min(4, n + 1)).forEach((hz, i) => {
+      const o = ctx!.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = hz;
+      const g = ctx!.createGain();
+      g.gain.setValueAtTime(0, t + i * 0.09);
+      g.gain.linearRampToValueAtTime(0.06, t + i * 0.09 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + 1.4);
+      o.connect(g).connect(master);
+      o.start(t + i * 0.09);
+      o.stop(t + i * 0.09 + 1.5);
+    });
+  }
   const fall = (d: number) => 1 - THREE.MathUtils.smoothstep(d, HUM.near, HUM.far);
   return {
     update(): void {
@@ -75,6 +117,16 @@ export function createHearthHum(opts: { hearths: Hearth[]; fox: THREE.Object3D; 
         gain.gain.setTargetAtTime(HUM.gain * lit * fall(f.distanceTo(h.base)), now, 0.25);
       }
       crackle.gain.setTargetAtTime(HUM.crackle * (1 - THREE.MathUtils.smoothstep(f.distanceTo(opts.coal()), 0.5, 7)), now, 0.2);
+      const pg = opts.page?.();
+      if (pg) {
+        const near = 1 - THREE.MathUtils.smoothstep(f.distanceTo(pg.pos), 1, 28);
+        rustle.gain.setTargetAtTime(pg.kept ? 0 : HUM.rustle * near * (pg.fleeing ? 1.6 : 0.7), now, 0.15);
+        rustleBand.frequency.setTargetAtTime(pg.fleeing ? 3400 : 2400, now, 0.2);
+        if (pg.catches > caught) {
+          caught = pg.catches;
+          chime(pg.kept ? 4 : caught);
+        }
+      }
     },
     /** the Keeping lets go: one rising open chord, swelling then fading over ~6 s */
     swell(): void {

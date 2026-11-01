@@ -145,7 +145,7 @@ export async function runOpening(): Promise<void> {
       keeping.release();
     },
   });
-  const hum = createHearthHum({ hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position });
+  const hum = createHearthHum({ hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position, page: runaway.voice });
   // the far Crown answers once the near tree has finished falling: attractor ladder resolves near → far
   // near → far: the settle swells the hum; the Crown answers when the fox steps out onto the far crag
   // and faces the vista gap (or after a while, so the response is never missed)
