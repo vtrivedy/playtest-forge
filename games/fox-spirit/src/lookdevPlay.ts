@@ -456,8 +456,8 @@ export function createPlay(opts: {
     lensBlocked,
     scenery: sightProxies,
     params: {
-      distance: 2.9,
-      runDistance: 2.7,
+      distance: 2.45,
+      runDistance: 2.35,
       // room to pull in front of a pier; a smaller 3/4 bias keeps the lens inside the arch opening
       minDistance: 1.2,
       sideBias: 0.35,
@@ -465,7 +465,7 @@ export function createPlay(opts: {
       groundLift: 0.2,
       lookHeight: 0.33,
       framingHeight: 0.38,
-      airDistance: 3.1,
+      airDistance: 2.65,
       lookAhead: 1.2,
       fov: 50,
       clearance: 0.35,

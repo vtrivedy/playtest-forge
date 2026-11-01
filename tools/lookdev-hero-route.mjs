@@ -7,8 +7,8 @@
 //
 // Beats: settle in sepia → walk out → run → jump onto the mossy rock (paint bloom) → run to the arch →
 // jump the plinth (bloom) → through the arch, loop back across the clearing → open-ground leap (bloom)
-// → wide run round the west side → last leap (bloom) → trot back across the painted clearing → ease to a
-// walk → stop and look at the arch.
+// → wide run round the west side → last leap (bloom) → run on → hop → ease to a walk → turn 3/4 toward
+// the lens (face beat) → hold.
 
 export const HERO_START = { x: 0.6, z: 7.2, yaw: Math.PI };
 
@@ -29,10 +29,12 @@ const LEGS = [
   { beat: 'wide run', to: [-3.4, 4.4], mag: 1 },
   { beat: 'wide run', to: [-4.9, 0.2], mag: 1 },
   { beat: 'last leap', to: [-3.6, -2.6], mag: 1, jumpAt: 2.3, arrive: 0.8 },
-  { beat: 'trot back', to: [-1.5, -1.2], mag: 0.45 },
-  { beat: 'trot back', to: [0.6, -2.0], mag: 0.45 },
-  { beat: 'ease', to: [0.2, -4.6], mag: 0.18 },
-  { beat: 'stop and look', hold: 99 },
+  { beat: 'run on', to: [-0.9, -1.0], mag: 1 },
+  { beat: 'hop', to: [1.2, 0.2], mag: 1, jumpAt: 1.5, arrive: 0.8 },
+  { beat: 'ease', to: [1.9, 1.3], mag: 0.2 },
+  // turn ~3/4 toward the lens so the face reads, then hold
+  { beat: 'turn to camera', face: 50, mag: 0.06, time: 1.2 },
+  { beat: 'look', hold: 99 },
 ];
 
 export function createHeroRoute() {
@@ -52,7 +54,13 @@ export function createHeroRoute() {
       jumpT = -1;
       L = LEGS[leg];
     };
-    if (L.hold !== undefined && legT >= L.hold) next();
+    if ((L.hold !== undefined && legT >= L.hold) || (L.time !== undefined && legT >= L.time)) next();
+    if (L.face !== undefined) {
+      // a slow step round toward the camera, `face` degrees off the line of sight
+      const [cx, , cz] = state.camera.pos;
+      const a = Math.atan2(cx - px, cz - pz) + (L.face * Math.PI) / 180;
+      return { x: Math.sin(a) * L.mag, z: Math.cos(a) * L.mag, jump: false, beat: L.beat };
+    }
     if (L.to) {
       const d = Math.hypot(L.to[0] - px, L.to[1] - pz);
       // a jump leg ends once the fox has landed; a run leg when it reaches the waypoint
