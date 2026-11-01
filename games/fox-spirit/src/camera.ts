@@ -59,6 +59,8 @@ export type CameraTunables = {
   glideFov: number;
   /** Seconds of position lag (critically damped) */
   lag: number;
+  /** Faster vertical response on drops; avoids stacking two full chase lags. */
+  fallLag: number;
   lookAhead: number;
   /** Max auto-recentre rate behind the heading (rad/s) at full run speed */
   recenterRate: number;
@@ -132,6 +134,7 @@ export function createFollowCamera(opts: {
     runFov: 0,
     glideFov: 3,
     lag: 0.14,
+    fallLag: opts.params?.lag ?? 0.14,
     lookAhead: 1.6,
     recenterRate: 1.25,
     recenterDelay: 1.2,
@@ -150,6 +153,7 @@ export function createFollowCamera(opts: {
   let manualT = 99;
   let groundLock = 0;
   let focusY = 0;
+  let fallTrack = 0;
   let dist = params.distance;
   let fovNow = params.fov;
   let dip = 0;
@@ -247,9 +251,10 @@ export function createFollowCamera(opts: {
 
   // Exact critically damped spring, stable across frame rates.
   function spring(dt: number) {
-    const omega = 2 / Math.max(0.02, params.lag);
-    const decay = Math.exp(-omega * dt);
     for (const axis of ['x', 'y', 'z'] as const) {
+      const lag = axis === 'y' ? THREE.MathUtils.lerp(params.lag, Math.min(params.lag, params.fallLag), fallTrack) : params.lag;
+      const omega = 2 / Math.max(0.02, lag);
+      const decay = Math.exp(-omega * dt);
       const offset = rig[axis] - desired[axis];
       const impulse = posVel[axis] + omega * offset;
       rig[axis] = desired[axis] + (offset + impulse * dt) * decay;
@@ -638,7 +643,12 @@ export function createFollowCamera(opts: {
       if (f.grounded) groundLock = p.y;
       else if (f.gliding || p.y < groundLock - 1.2) groundLock = Math.min(groundLock, p.y + 0.6);
       const goalY = f.grounded ? p.y : groundLock + Math.max(0, p.y - groundLock) * params.jumpTrack + Math.min(0, p.y - groundLock);
-      focusY = THREE.MathUtils.damp(focusY, goalY, f.grounded ? 9 : 8, dt);
+      const fallGoal = THREE.MathUtils.smoothstep(-f.vel.y, 1, 5);
+      fallTrack = THREE.MathUtils.damp(fallTrack, fallGoal, fallGoal > fallTrack ? 18 : 5, dt);
+      const baseFocusRate = f.grounded ? 9 : 8;
+      const fallFocusRate = params.fallLag < params.lag ? 2 / Math.max(0.02, params.fallLag) : baseFocusRate;
+      const focusRate = THREE.MathUtils.lerp(baseFocusRate, fallFocusRate, fallTrack);
+      focusY = THREE.MathUtils.damp(focusY, goalY, focusRate, dt);
 
       // ---- auto-recentre behind the run direction (never while backpedalling toward the lens)
       if (speed > 1 && manualT > params.recenterDelay && !f.dashing) {
