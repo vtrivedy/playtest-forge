@@ -37,7 +37,7 @@ function glyphTexture(id: GlyphId | 'seal', fill = false): THREE.CanvasTexture {
       const tri = 1 - Math.abs(u - 0.5) * 2;
       const down = Math.abs(Math.atan2(Math.sin(a), -Math.cos(a)));
       const lower = 1 - 0.45 * THREE.MathUtils.smoothstep(down, 1.9, 2.8);
-      const r = (34 + 70 * Math.pow(tri, 1.6) * lower) * (1 + 0.05 * Math.abs(Math.sin(a * 24)));
+      const r = (52 + 54 * Math.pow(tri, 0.85) * lower) * (1 + 0.07 * Math.abs(Math.sin(a * 30)));
       const x = 128 + Math.sin(a) * r;
       const y = 124 - Math.cos(a) * r;
       if (i === 0) g.moveTo(x, y);
@@ -173,26 +173,41 @@ export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {
     const mat = stoneMat.clone();
     mat.onBeforeCompile = stoneMat.onBeforeCompile;
     mat.customProgramCacheKey = stoneMat.customProgramCacheKey;
-    const slab = inked(hewn(new THREE.BoxGeometry(1.0, 1.75, 0.36, 2, 3, 1), rand, 0.06), mat, 0.022, true);
-    slab.position.y = 0.82;
-    slab.rotation.z = (rand() - 0.5) * 0.08;
-    g.add(slab);
+    // a standing stone: a four-sided taper (flat faces for the glyph), rough-hewn, leaning a little,
+    // its top knocked off at a slant and its foot sunk in moss
+    const geo = new THREE.CylinderGeometry(0.5, 0.75, 2.0, 4, 3, false, Math.PI / 4);
+    geo.scale(1, 1, 0.4);
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i < pos.count; i++) if (pos.getY(i) > 0.9) pos.setY(i, pos.getY(i) - 0.22 * (pos.getX(i) + 0.5));
+    const slab = inked(hewn(geo, rand, 0.05), mat, 0.022, true);
+    // the lean is on a body group so the glyph decals lean with the stone (they are not under the slab:
+    // the chase-cam fade clones whatever is under an occluder)
+    const body = new THREE.Group();
+    body.position.y = 0.9;
+    body.rotation.z = (rand() - 0.5) * 0.1;
+    body.rotation.x = (rand() - 0.5) * 0.06;
+    body.add(slab);
+    g.add(body);
+    const moss = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), toon(0x5e5c3a, { contour: 0.4 }));
+    moss.scale.set(0.85, 0.16, 0.5);
+    moss.receiveShadow = true;
+    g.add(moss);
     // only the slab fades for the chase cam: the fade clones materials, and the decals' must stay ours
     ctx.occluders.push(slab);
     colliders.push({ kind: 'post', x: s.x, z: s.z, r: 0.55 });
     const tex = glyphTexture(s.id);
     // the glyph on both faces: ink when painted, an ember fill + glow once lit in turn
     const faces = [1, -1].map((side) => {
-      const ink = decal(tex, 0.78, 0xffffff);
-      ink.position.set(0, 1.0, side * 0.19);
+      const ink = decal(tex, 0.62, 0xffffff);
+      ink.position.set(0, 0.15, side * 0.182);
       if (side < 0) ink.rotation.y = Math.PI;
-      const glow = decal(glyphTexture(s.id, true), 0.8, 0xffa040);
-      glow.position.set(0, 1.0, side * 0.186);
+      const glow = decal(glyphTexture(s.id, true), 0.64, 0xffa040);
+      glow.position.set(0, 0.15, side * 0.178);
       if (side < 0) glow.rotation.y = Math.PI;
-      g.add(ink, glow);
+      body.add(ink, glow);
       return { ink, glow };
     });
-    return { ...s, y, faces, mat, reveal: 0, painted: false, lit: false, litPulse: 0, warm: 0 };
+    return { ...s, y, faces, mat, slab, reveal: 0, painted: false, lit: false, litPulse: 0, warm: 0 };
   });
 
   // ---- the shrine: two posts, a lintel with the order, a back slab, a two-leaf paper door
@@ -307,9 +322,11 @@ export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {
       s.warm = THREE.MathUtils.damp(s.warm, s.lit ? 1 : 0, 4, dt);
       s.mat.emissive.setRGB(0.55 * s.warm * breath, 0.2 * s.warm * breath, 0.04 * s.warm);
       for (const f of s.faces) {
-        (f.ink.material as THREE.MeshBasicMaterial).opacity = s.reveal;
+        // when the chase cam fades the stone, its glyph fades with it (never a glyph floating in air)
+        const fade = (s.slab.material as THREE.Material).opacity;
+        (f.ink.material as THREE.MeshBasicMaterial).opacity = s.reveal * fade;
         
-        (f.glow.material as THREE.MeshBasicMaterial).opacity = s.warm;
+        (f.glow.material as THREE.MeshBasicMaterial).opacity = s.warm * fade;
         f.glow.scale.setScalar(1 + s.litPulse * 0.25);
       }
     }

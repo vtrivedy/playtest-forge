@@ -59,6 +59,8 @@ try {
   // (review stills only: the fox is parked by the lens so the chase-cam fade never hides the subject)
   const lens = async (name, cam, look) => { await page.evaluate(([cam, look]) => { const h = window.__gameHooks; h.teleport(cam[0] + (look[0] - cam[0]) * 0.35, cam[2] + (look[2] - cam[2]) * 0.35, 0); h.advance(20, 1 / 60, false); const c = window.__opening.camera; c.position.set(...cam); c.lookAt(...look); c.updateMatrixWorld(); window.__gameHooks.advance(0, 1 / 60, true); }, [cam, look]); await page.screenshot({ path: path.join(out, `${name}.png`) }); };
   log.push(['after solve', await page.evaluate(() => window.__gameHooks.state().opening.glyphs)]);
+  await lens('06a-leaf-front', [22.0, 1.1, 94.0], [21.0, 1.0, 90.6]);
+  await lens('06a2-leaf-side', [25.0, 1.0, 89.2], [21.0, 1.0, 90.6]);
   await lens('06b-flame-lit', [28.0, 1.5, 95.0], [29.4, 1.0, 91.6]);
   await lens('06c-shrine', [27.6, 1.7, 89.4], [32.0, 1.2, 88.6]);
   // to the open shrine, dash the kit page
