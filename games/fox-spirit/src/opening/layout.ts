@@ -13,8 +13,8 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 /** rock shelf the H-a updraft lifts onto: 9 × 9, top = ground + 5 */
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
-/** The Still Crown on the Summit: far east-southeast, beyond the ridge, backlit by the low sun */
-export const CROWN = { x: 135, y: -16, z: 40, yaw: -Math.PI / 2, scale: 1.6 } as const;
+/** The Still Crown on the Summit: due south past the bridge, so crossing it walks straight at the Crown (and it stands over the meadow from the wake spot) */
+export const CROWN = { x: 4, y: -24, z: -42, yaw: 0, scale: 1.6 } as const;
 
 /** Cottages (all face +z: door on the z + d/2 wall) */
 export const HOUSES = [
@@ -106,7 +106,7 @@ export const KEEPING = (() => {
     /** dark root-hearth bowl among the roots, just behind the hinge */
     root: { ...local(0, 1.35), y: terraceTop, r: 0.75 },
     /** Hearthtree pivot (root crown) and fall direction; arrested lean from vertical (rad) */
-    hinge: { ...hinge, y: terraceTop - 0.6 },
+    hinge: { ...hinge, y: terraceTop - 0.8 },
     fall,
     leanArrested: 0.52,
     /** far crag the crown lands across: walkable top = terraceTop */

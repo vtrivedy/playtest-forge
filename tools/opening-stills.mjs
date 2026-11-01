@@ -29,8 +29,8 @@ const CAMS = {
   hearthclose: [[0.5, 2.4, 80.5], [7, 1.2, 72.5]],
   ridge: [[-2, 3, 64], [16, 5, 78]],
   village: [[6, 7, 66], [-10, 1, 92]],
-  crown: [[14, 7.5, 76], [135, 50, 40]],
-  crownwide: [[-2, 4, 86], [60, 12, 60]],
+  crown: [[27.6, 11.6, 75.5], [8, 40, -42]],
+  crownwide: [[-5, 3.2, 93], [2, 18, -42]],
 };
 const paint = arg('paint', '0') === '1';
 // --respond S: play the Crown's Keeping response for S seconds before the stills
