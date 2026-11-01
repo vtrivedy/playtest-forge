@@ -48,3 +48,27 @@ dash-drop never consumes or cools coal; movement parameters are unchanged.
 
 Next: authored route capture, teammate before/after verdict, then honest human
 feel-gate status. No extra content until Carry is acceptable.
+
+## Final Carry offset retest — 4b2b797
+
+Rook rated the initial fix MARGINALLY (chat80): the exposed coal was a sliver.
+Final tuning uses lateral .27m, forward .18m, lower .07m and the original .115m
+radius. A larger .13m trial hid part of the face from the contact lens and was
+rejected. The final front still preserves both eyes and muzzle; the chase still
+shows the charcoal body outside the cheek. Source cradle is now Moss's clear
+(15.1,77.4) position. Named revised teammate verdict pending.
+
+`/captures/tallow/carry-final-06` passes10/10 assertions, adding held-jump glide
+and actual W-key acceleration comparison. Both runs reach2.099m/s after20f.
+Recorded held-jump/glide apex .792m, time-to-apex .317s, airtime .717s; ground
+projection of the air dash2.0m. These describe the scripted staged probe, not
+unfamiliar-player discovery or the uninterrupted Keeping route.
+
+Modal quick on8bd34af342e206ca2e52ef57560487e525612606 completed71.64s,21 opening
+stills with __game trace, no video. Job quick-8bd34af342-180820-166406. Inspecting
+03-run confirms preserved opening style. Final integrated hero is still required.
+
+Capture lesson: `/captures` is already remote-backed. Never download a Modal
+volume into it to refresh a stale view: use an existing directory under `/tmp`.
+An attempted download damaged only Tallow's own earlier quick8ca889a result;
+it was replaced by the successful8bd34af capture above.
