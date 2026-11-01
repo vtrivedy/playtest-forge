@@ -28,6 +28,18 @@ margin. Broad first landing, higher second landing, optional roost cut from seco
 Exact anchors require the integrated candidate's safe ground and sightline survey.
 Do not add an invisible launch volume that can fire through a platform underside.
 
+### Ground survey constraints (provisional, not allocated)
+South-central meadow x=-4..8/z=66..74 is a candidate envelope, not a clear floor.
+Existing meadow.ts rocks at (2.4,70.5), (3.6,69.3), (8.2,71) have cap collider
+radii .825/.495/.605m and heights .713/.428/.523m above ground. Include fox
+body clearance and missed-landing drift around those caps; testing only groundH
+would incorrectly certify the retry floor. Do not silently remove scenery.
+Prefer the western part of this envelope for an initial survey, keeping the
+existing village-to-meadow path traversable. H-a (5.6,74.2) and its live updraft,
+the east shelf/Keeping and western grove are separate occupied spaces. Leaf
+footprints, missed-landing corridors and chase-camera swing need an actual
+integrated scene playtest before any anchors or safe-floor claim are accepted.
+
 ## Module boundary (proposed)
 Tallow owns a new opening/canopy.ts and a focused keyboard probe. Scene owner wires
 one construction/update call and the existing surface registry. Any controller
