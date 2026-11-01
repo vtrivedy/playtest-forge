@@ -219,7 +219,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     }
     // high stages: a leap at it from the next leaf startles it — it jerks up, then sags winded on the same perch,
     // so landing beneath it and springing straight up is the catch; dawdle under it and it flits to the other perch
-    if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 3.8 && windedT <= 0) {
+    if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 4.6 && windedT <= 0) {
       windedT = TUNE.hopRest + 0.6;
       dodges++;
       side.set(0, 0.9, 0);
