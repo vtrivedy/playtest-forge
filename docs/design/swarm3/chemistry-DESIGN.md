@@ -71,3 +71,11 @@ The root bowl centre is solid after Moss3861382. Stage chemistry and stair
 regressions at (29.0,77.35), facing the bowl, to verify placement from outside
 the raised rim. Retain real E placement and one-shot bridge assertions; add a
 check that the fox stays outside the bowl. Staged starts remain disclosed.
+
+## Spring rim regression
+
+Stage at the authored spring approach (24.17,80.65), facing the bowl.
+Verify real E placement centres the coal while fox stays outside, same-rim
+recovery preserves ignition, and Space hold lifts the carrying fox above the
+terrace. Retain screenshots and __game. This is a staged-start regression,
+not a continuous route or landing proof. No gameplay changes.

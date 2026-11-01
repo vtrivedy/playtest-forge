@@ -167,3 +167,15 @@ export const CANOPY = [
   { id: 'high', x: 0.9, z: 67.1, rise: 3.0 },
   { id: 'roost', x: -1, z: 64.7, rise: 3.5 },
 ] as const;
+/** West-grove paper ruin: permanent dash folds, then a southern return to meadow. */
+export const POP_UP_RUIN = {
+  entry: { x: -24, z: 75 },
+  leaves: [
+    { x: -27, z: 75, top: -0.08, yaw: 0 },
+    { x: -28.4, z: 71, top: 0.47, yaw: -Math.PI / 2 },
+  ],
+  width: 3.4,
+  depth: 3.6,
+  overlook: { x: -24.4, z: 71, top: 1.02, width: 3.4, depth: 3.6 },
+  returnEnd: { x: -24.4, z: 75.7 },
+} as const;
