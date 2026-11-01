@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { canopyPad, inked, jitter, mapleLeafGeometry, plumeGeometry } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
-import { CROWN } from './layout';
+import { CROWN, VISTA } from './layout';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 /** silhouette tones, near → far value step; tinted toward the sky mist each frame */
@@ -35,6 +35,19 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
     mats.push({ m, base: m.color.clone(), mistK });
     return m;
   };
+
+  // foothills down the vista gap: three paper layers, darker near → paler far, so the valley reads deep
+  const HILLS: Array<[number, number, number, number, number]> = [
+    // [along the fall line past the crag, across, half-width, height, mist]
+    [34, -16, 22, 4, 0.18], [40, 17, 20, 3, 0.2], [70, -30, 30, 7, 0.35], [78, 26, 28, 6, 0.36], [120, 0, 46, 1, 0.55], [125, -52, 34, 18, 0.6], [128, 54, 36, 20, 0.6],
+  ];
+  for (const [a, c, w, h, k] of HILLS) {
+    const hill = new THREE.Mesh(jitter(new THREE.IcosahedronGeometry(1, 2), 0.14, rand, 0.7), mat(0x7c6a5c, k));
+    hill.position.set(VISTA.x + VISTA.dx * a + VISTA.dz * c, -14, VISTA.z + VISTA.dz * a - VISTA.dx * c);
+    hill.scale.set(w, h + 14, w * 0.6);
+    hill.rotation.y = Math.atan2(VISTA.dx, VISTA.dz);
+    ctx.scene.add(hill);
+  }
 
   // the Summit: a stack of weathered columns (same language as the shelf ridge) narrowing to a crag
   const stone = mat(STONE, 0.36);

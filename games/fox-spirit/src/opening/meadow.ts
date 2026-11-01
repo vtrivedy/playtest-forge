@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { buildDistance, buildMaple, buildRock, contactInk, hewn, inked, mapleLeafGeometry, toon, type TreeKind } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import type { OpeningCtx } from './scene';
-import { BOUNDS, HEARTH_A, HOUSES, pathDist, rimK, SHELF, WELL } from './layout';
+import { BOUNDS, HEARTH_A, HOUSES, inVista, pathDist, rimK, SHELF, WELL } from './layout';
 
 /** Stone strata, base → cap: warm grey-ochre bands so the shelf reads as layered rock, not a crate */
 const STRATA = [0x6e5c4c, 0x8a7560, 0x7a6754, 0x93806a];
@@ -27,7 +27,7 @@ const TREES: Array<[number, number, number, TreeKind, number]> = [
   [10, 62.5, 1.0, 'grove', 5],
   [0.5, 59, 1.3, 'grove', 3],
   // east: rust crowns off-axis, beyond the shelf
-  [19.5, 63.5, 1.3, 'hero', 0],
+  [33, 85, 1.3, 'hero', 0],
   [24.5, 87.5, 1.05, 'grove', 2],
   [18.5, 90.5, 0.95, 'grove', 5],
   // between the village and the meadow
@@ -233,6 +233,7 @@ export function buildMeadow(ctx: OpeningCtx): void {
     const k = 1.06 + rand() * 0.14;
     const x = BOUNDS.cx + Math.cos(a) * BOUNDS.rx * k;
     const z = BOUNDS.cz + Math.sin(a) * BOUNDS.rz * k;
+    if (inVista(x, z, 3)) continue;
     const y = groundH(x, z);
     const t = buildMaple(rand, 1.4 + rand() * 0.5, rand() < 0.4 ? 'tall' : 'grove', rand() < 0.6 ? 4 + (i & 1) : i & 3, y);
     t.position.set(x, y - 0.1, z);
@@ -245,6 +246,7 @@ export function buildMeadow(ctx: OpeningCtx): void {
     const k2 = 1.32 + rand() * 0.18;
     const x2 = BOUNDS.cx + Math.cos(a) * BOUNDS.rx * k2;
     const z2 = BOUNDS.cz + Math.sin(a) * BOUNDS.rz * k2;
+    if (inVista(x2, z2, 3)) continue;
     const y2 = groundH(x2, z2);
     const t = buildMaple(rand, 1.6 + rand() * 0.5, 'grove', 4 + (i & 1), y2);
     t.position.set(x2, y2 - 0.1, z2);
@@ -278,5 +280,9 @@ export function buildMeadow(ctx: OpeningCtx): void {
     drifts: TREES.map(([x, z, sc]) => [x, z, 1.6 + sc * 1.4] as const),
     keep: (x, z) => clear(x, z, 0.2),
   });
-  buildDistance(scene, rand, { cx: BOUNDS.cx, cz: BOUNDS.cz, dir: -Math.PI / 2, arc: Math.PI * 1.9, count: 16, y: 2 });
+  // no ridge in the vista gap past the far crag: the Crown is framed there
+  buildDistance(scene, rand, {
+    cx: BOUNDS.cx, cz: BOUNDS.cz, dir: -Math.PI / 2, arc: Math.PI * 1.9, count: 16, y: 2,
+    keep: (x, z) => !inVista(x, z, 18),
+  });
 }

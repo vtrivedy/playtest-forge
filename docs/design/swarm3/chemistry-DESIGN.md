@@ -38,3 +38,11 @@ Typecheck and build exact pushed SHA. Play placement → visible steam → glide
 recover coal → root ignition; verify no repeat release and no aura-only latch.
 Retain screenshots + state, review chase readability against baseline, fix worst
 visual fault and retest. At least one teammate verdict before integration land.
+
+## Authored bowl visual correction
+
+The shared hearth defaults to a raised brazier ash bed 0.92 m above its ground.
+The Keeping spring and root bowls are ground-level art. Give HearthSpot an optional
+bedOffset (default 0.92) and author these two at 0.03 m, so disk, fire, vapor and
+lift agree with the actual bowl. Keep spot.y as the placement floor. Steam uses
+slightly lighter, stronger paper vapor for readability against the ochre cliff.

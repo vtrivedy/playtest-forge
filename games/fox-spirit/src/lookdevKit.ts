@@ -648,9 +648,9 @@ export function mapleLeafGeometry(size: number): THREE.BufferGeometry {
 export function buildDistance(
   scene: THREE.Scene,
   rand: () => number,
-  o: { cx?: number; cz?: number; dir?: number; arc?: number; count?: number; y?: number } = {},
+  o: { cx?: number; cz?: number; dir?: number; arc?: number; count?: number; y?: number; keep?: (x: number, z: number) => boolean } = {},
 ): void {
-  const { cx = 0, cz = 0, dir = -Math.PI / 2, arc = 2.6, count = 9, y = -4 } = o;
+  const { cx = 0, cz = 0, dir = -Math.PI / 2, arc = 2.6, count = 9, y = -4, keep } = o;
   const ridgeMat = toon(0x7e6a62);
   for (let i = 0; i < count; i++) {
     const geo = jitter(new THREE.IcosahedronGeometry(1, 1), 0.18, rand, 0.6);
@@ -659,6 +659,7 @@ export function buildDistance(
     const d = 55 + rand() * 25;
     r.position.set(cx + Math.cos(a) * d, y, cz + Math.sin(a) * d);
     r.scale.set(18 + rand() * 14, 10 + rand() * 9, 14 + rand() * 6);
+    if (keep && !keep(r.position.x, r.position.z)) continue;
     scene.add(r);
   }
 }
