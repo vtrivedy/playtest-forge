@@ -15,7 +15,7 @@ import { column } from './meadow';
 /** Authored settle timing (s from release) and shape */
 export const SETTLE = {
   shiver: 0.9,
-  fall: 1.6,
+  fall: 1.3,
   bounce: 0.9,
   /** fall curve exponent: > 1 accelerates like a toppling mass */
   ease: 2.3,
@@ -164,10 +164,10 @@ export function createKeeping(ctx: OpeningCtx) {
   const curb = (ax: number, az: number, bx: number, bz: number) => {
     const len = Math.hypot(bx - ax, bz - az);
     colliders.push({ kind: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, yaw: Math.atan2(bx - ax, bz - az), hx: 0.2, hz: len / 2, top: SHELF_TOP + 0.34 });
-    const m = Math.max(2, Math.round(len / 0.62));
+    const m = Math.max(2, Math.round(len / 0.45));
     for (let k = 0; k <= m; k++) {
       const t = k / m;
-      const sz = 0.2 + rand() * 0.14;
+      const sz = 0.15 + rand() * 0.1;
       const r = buildRock(rand, sz);
       r.scale.y = 1.25;
       r.position.set(ax + (bx - ax) * t + (rand() - 0.5) * 0.12, SHELF_TOP + sz * 0.3, az + (bz - az) * t + (rand() - 0.5) * 0.12);
@@ -383,11 +383,11 @@ export function createKeeping(ctx: OpeningCtx) {
   };
 
   // ---- landing dust: soft paper-dust puffs along where the trunk comes down
-  const PUFFS = 14;
+  const PUFFS = 10;
   const puffMat = new THREE.MeshBasicMaterial({ color: 0xe2cfb2, transparent: true, opacity: 0, depthWrite: false, fog: true });
   const puffs = Array.from({ length: PUFFS }, (_, i) => {
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), puffMat.clone());
-    const s = 2.5 + (i / (PUFFS - 1)) * 10 + (rand() - 0.5) * 0.8;
+    const s = 5.5 + (i / (PUFFS - 1)) * 7 + (rand() - 0.5) * 0.8;
     m.position.set(K.hinge.x + K.fall.x * s + (rand() - 0.5) * 1.2, K.terrace.top - 0.2 + rand() * 0.4, K.hinge.z + K.fall.z * s + (rand() - 0.5) * 1.2);
     m.visible = false;
     m.userData.delay = Math.abs(s - 8) * 0.025 + rand() * 0.08;
@@ -476,7 +476,7 @@ export function createKeeping(ctx: OpeningCtx) {
       const u = (sinceImpact() - (m.userData.delay as number)) / 1.1;
       m.visible = u > 0 && u < 1;
       if (!m.visible) continue;
-      const r = 0.3 + Math.sqrt(u) * 1.2;
+      const r = 0.25 + Math.sqrt(u) * 0.85;
       m.scale.set(r * 1.4, r * 0.6, r * 1.4);
       m.position.y += dt * 0.25;
       (m.material as THREE.MeshBasicMaterial).opacity = 0.26 * (1 - u) * Math.min(1, u * 8);

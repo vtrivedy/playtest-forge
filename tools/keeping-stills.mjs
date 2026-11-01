@@ -17,6 +17,10 @@ const [W, H] = arg('size', '960x540').split('x').map(Number);
 // fox pose [x, z, yaw]
 const POSES = {
   cradle: [14.2, 76.8, 0.9],
+  // the shelf landing looking east to the arrested tree over the ridge
+  landing: [11.2, 75.6, 1.62],
+  // terrace top, looking at the lean
+  lean: [29.4, 78.2, -2.75],
   bend: [17.4, 81.6, 0.6],
   ledge: [21.2, 84.2, 2.2],
   spring: [23.6, 80.6, 2.4],
