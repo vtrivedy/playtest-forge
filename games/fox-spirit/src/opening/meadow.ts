@@ -170,7 +170,7 @@ function buildShelf(ctx: OpeningCtx): void {
   // [lx, lz, r, height above g0] — blockers only, never a climb route
   const RIDGE: Array<[number, number, number, number]> = [
     [hw + 2.2, -3.2, 2.4, 7.4], [hw + 2.6, 1.2, 2.6, 8.3], [hw + 2.0, 5.0, 2.2, 6.4],
-    [hw + 5.2, -1.2, 2.0, 9.4],
+    [hw + 4.6, -1.0, 2.0, 9.4],
     [hw + 1.2, -hd - 2.2, 2.3, 6.6], [-1.5, -hd - 2.0, 2.3, 5.6],
   ];
   for (const [lx, lz, r, h] of RIDGE) {
