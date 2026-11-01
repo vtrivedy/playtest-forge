@@ -37,9 +37,9 @@ export function buildCanopy(ctx: OpeningCtx) {
     const blade = inked(geo, material, 0.009, true);
     blade.castShadow = blade.receiveShadow = true;
     root.add(blade);
-    // Fine veins follow the top; matte cream keeps the landing readable in pressed ink.
+    // Raised dark veins remain legible above the curled paper blade.
     const veins = new THREE.Group();
-    const veinMat = toon(0x68573b);
+    const veinMat = new THREE.MeshToonMaterial({ color: 0x68573b });
     const line = (from: THREE.Vector3, to: THREE.Vector3, radius: number) => {
       const d = to.clone().sub(from);
       const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, d.length(), 5), veinMat);
@@ -47,9 +47,9 @@ export function buildCanopy(ctx: OpeningCtx) {
       m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
       veins.add(m);
     };
-    line(new THREE.Vector3(0, 0.008, -1.18), new THREE.Vector3(0, 0.008, 1.25), 0.014);
+    line(new THREE.Vector3(0, 0.12, -1.18), new THREE.Vector3(0, 0.12, 1.25), 0.024);
     for (const z of [-0.65, -0.15, 0.35, 0.75]) for (const side of [-1, 1]) {
-      line(new THREE.Vector3(0, 0.008, z - 0.22), new THREE.Vector3(side * (0.95 - Math.abs(z) * 0.42), 0.008, z + 0.15), 0.009);
+      line(new THREE.Vector3(0, 0.12, z - 0.22), new THREE.Vector3(side * (0.95 - Math.abs(z) * 0.42), 0.12, z + 0.15), 0.018);
     }
     root.add(veins);
     const stemMat = toon(0x675c3b);

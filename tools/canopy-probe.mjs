@@ -9,15 +9,17 @@ fs.mkdirSync(out,{recursive:true});
 const server=await createServer({configFile:'games/fox-spirit/vite.config.ts',server:{port:5198,host:'127.0.0.1',strictPort:true},logLevel:'error'});
 await server.listen();
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader']});
-const context=await browser.newContext({viewport:{width:960,height:540},recordVideo:{dir:out,size:{width:960,height:540}}});
+const captureSize=process.argv.includes('--motion')?{width:480,height:270}:{width:960,height:540};
+const context=await browser.newContext({viewport:captureSize,recordVideo:{dir:out,size:captureSize}});
 const page=await context.newPage();page.setDefaultTimeout(120000);
 const result={staging:'Per-profile teleport to first leaf top; all takeoff and flight driven by real Space input. Comparisons alter only launchSpeed tunable.',errors:[],checks:[],samples:[]};
 page.on('pageerror',e=>result.errors.push(String(e)));
 const motion=process.argv.includes('--motion');
 const routeOnly=process.argv.includes('--route-only');
-const step=async(n=1)=>page.evaluate(([n,m])=>window.__gameHooks.advance(n,1/60,m),[n,motion]);
+let frameCount=0;
+const step=async(n=1)=>{frameCount+=n;return page.evaluate(([n,m])=>window.__gameHooks.advance(n,1/60,m),[n,motion && frameCount%6===0]);};
 const shot=async(name)=>{await page.evaluate(()=>window.__gameHooks.advance(0,1/60,true));await page.screenshot({path:path.join(out,name+'.png')});};
-const check=(name,pass,detail)=>result.checks.push({name,pass,detail});
+const check=(name,pass,detail)=>{result.checks.push({name,pass,detail});fs.writeFileSync(path.join(out,'progress.json'),JSON.stringify(result,null,2));};
 try{
  await page.goto('http://127.0.0.1:5198');await page.waitForFunction(()=>window.__gameHooks?.ready);await page.evaluate(()=>window.__gameHooks.setManual(true));
  if(!routeOnly){
