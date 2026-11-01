@@ -59,8 +59,8 @@ function coatMaterial(emberGain: number): THREE.MeshToonMaterial {
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-        // ember burns in two flat cel steps (no airbrushed gradient along the tail)
-        float emberStep = 0.45 * step(0.2, vEmber) + 0.55 * step(0.62, vEmber);
+        // ember burns in two flat cel steps on the last third only (the plume itself stays coat, not a glowing balloon)
+        float emberStep = 0.35 * step(0.45, vEmber) + 0.65 * step(0.8, vEmber);
         totalEmissiveRadiance += diffuseColor.rgb * emberStep * ${emberGain.toFixed(2)};`,
       )
       .replace(
