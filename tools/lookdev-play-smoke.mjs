@@ -67,12 +67,15 @@ try {
     }, opening ? OPENING_START : HERO_START);
     let beat = '';
     let touchdownF = -1;
+    let apexCaptured = false;
     let clipF = -1;
     for (let f = 0; f < totalFrames; f++) {
       const input = route(f / 60, state);
       const prev = state;
       // extra stills: jump apex, 2 frames after touchdown
-      const apex = !prev.grounded && prev.vel[1] > 0 && prev.vel[1] - 15 / 60 <= 0;
+      if (prev.grounded) apexCaptured = false;
+      const apex = !apexCaptured && !prev.grounded && prev.vel[1] > 0 && prev.vel[1] - 15 / 60 <= 0;
+      if (apex) apexCaptured = true;
       const touch = touchdownF >= 0 && f === touchdownF + 2;
       const shot = input.beat !== beat || apex || touch;
       // 2 s run clip (30 fps) at the start of the loop back
