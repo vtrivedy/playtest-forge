@@ -4,7 +4,7 @@
  * Authored in Blender (tools/blender/scripts/hearth_fox_*.py) → assets/hero/hearth_fox.glb:
  * `fox_coat` (skinned, vertex-coloured coat; TEXCOORD_0.x = ember mask) + `fox_face` (eyes, nose),
  * clips idle / walk / trot / run / jumpUp / fall / land (in place; the rig's glTF extras carry each clip's ground speed).
- * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes.
+ * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes, ember kick-up at footfalls and landings.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -233,6 +233,39 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
   const tipPrev = new THREE.Vector3();
   let tipInit = false;
 
+  // ember kick-up: a few sparks where a paw strikes at trot/run, a ring of them on landing (world-space pool)
+  const PUFFS = 64;
+  const puffPos = new Float32Array(PUFFS * 3);
+  const puffCol = new Float32Array(PUFFS * 3);
+  const puffVel = new Float32Array(PUFFS * 3);
+  const puffAge = new Float32Array(PUFFS).fill(1);
+  const puffGeo = new THREE.BufferGeometry();
+  puffGeo.setAttribute('position', new THREE.BufferAttribute(puffPos, 3));
+  puffGeo.setAttribute('color', new THREE.BufferAttribute(puffCol, 3));
+  const puffs = new THREE.Points(puffGeo, motes.material);
+  puffs.frustumCulled = false;
+  puffs.matrixAutoUpdate = false;
+  puffs.matrixWorldAutoUpdate = false;
+  root.add(puffs);
+  const PUFF_LIFE = 0.9;
+  let puffNext = 0;
+  let puffSeed = 1;
+  const rand = () => ((puffSeed = (puffSeed * 16807) % 2147483647) / 2147483647);
+  const kick = (at: THREE.Vector3, n: number, spread: number) => {
+    for (let k = 0; k < n; k++) {
+      const i = puffNext;
+      puffNext = (puffNext + 1) % PUFFS;
+      const a = rand() * Math.PI * 2;
+      const r = spread * (0.4 + 0.6 * rand());
+      puffPos.set([at.x, at.y + 0.02, at.z], i * 3);
+      puffVel.set([Math.cos(a) * r, 0.25 + 0.35 * rand(), Math.sin(a) * r], i * 3);
+      puffAge[i] = 0;
+    }
+  };
+  const pawDown = pawBones.map(() => true);
+  const pawAt = new THREE.Vector3();
+  const pawLocal = new THREE.Vector3();
+
   const mixer = new THREE.AnimationMixer(model);
   const actions = new Map<string, THREE.AnimationAction>();
   for (const clip of gltf.animations) {
@@ -286,6 +319,9 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       next.reset().play();
       if (prev) next.crossFadeFrom(prev, 0.25, true);
       current = clip;
+      if (clip === 'land') {
+        for (const pawBone of pawBones) kick(pawBone.getWorldPosition(pawAt), 4, 0.5);
+      }
     },
     update(dt) {
       time += dt;
@@ -316,6 +352,31 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       moteGeo.attributes.position!.needsUpdate = true;
       moteGeo.attributes.color!.needsUpdate = true;
       tailLight.intensity = 1.3 + Math.sin(time * 9) * 0.2;
+      // footfalls: a paw crossing down to the root's ground plane at trot/run speed kicks two sparks
+      const striding = current === 'trot' || current === 'run';
+      pawBones.forEach((pawBone, i) => {
+        pawBone.getWorldPosition(pawAt);
+        // paw height in the fox's own frame, so slopes under the root don't fake a strike
+        const down = root.worldToLocal(pawLocal.copy(pawAt)).y < 0.03;
+        if (down && !pawDown[i] && striding) kick(pawAt, 2, 0.18);
+        pawDown[i] = down;
+      });
+      for (let i = 0; i < PUFFS; i++) {
+        if (puffAge[i]! >= 1) {
+          puffCol.fill(0, i * 3, i * 3 + 3);
+          continue;
+        }
+        puffAge[i] = Math.min(1, puffAge[i]! + dt / PUFF_LIFE);
+        const drag = Math.exp(-4 * dt);
+        puffVel[i * 3]! *= drag;
+        puffVel[i * 3 + 2]! *= drag;
+        for (let c = 0; c < 3; c++) puffPos[i * 3 + c]! += puffVel[i * 3 + c]! * dt;
+        const k = puffAge[i]!;
+        const fade = (1 - k) * Math.min(1, k * 8);
+        puffCol.set([2.4 * fade, (0.8 - 0.45 * k) * fade, 0.12 * fade], i * 3);
+      }
+      puffGeo.attributes.position!.needsUpdate = true;
+      puffGeo.attributes.color!.needsUpdate = true;
       // flames lean away from the tip's motion (eased), so a running fox trails fire
       uTime.value = time;
       if (tailTip) {
