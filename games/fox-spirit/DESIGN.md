@@ -393,3 +393,15 @@ staging limitation; this is editorial footage, not a claimed continuous clear.
 
 ## Redesign sprint 1 — SOL ground slice
 Pressed Ink → Living Cel stays melancholy autumn. Ground should carry broad cool umber/moss masses with a restrained cream-ochre worn path so the burnt-orange fox separates at wide distance. Leaf litter groups along shoulders rather than evenly covering the clearing; short dry tufts stay outside the route. A cool ink contact pool anchors the fox. Preserve paper-to-paint restore and existing movement tuning. Ownership agreed in sprint COMMS.md (chat :15/:24): extract four ground functions to lookdevGround.ts, pass world helpers as context, remove old implementations. Verify 01/02/03/05 stills, tsc/vite gates, gameplay __game; review worst visual issue and recapture once. FOX reviews distance read; WORLD reviews palette/detail.
+
+## Redesign swarm matched movement evidence
+Rust owns a capture tool, not movement tuning. The evidence unit is a fixed 30-second
+world-stick/key timeline at 60 Hz simulation and 30 Hz output. It includes idle,
+walk, run, curved turns, a tapped jump, landing, and a held jump. Both main fa1a413
+and the redesigned clearing use that exact input sequence, normal chase camera,
+and one disclosed initial placement on safe ground. Different worlds cannot share
+absolute spawn coordinates; record each spawn and all subsequent states. No later
+teleports, camera poses, forced restoration, or controller tuning during the take.
+Retain six stills, per-frame state, final window.__game, exact source SHA and tool
+hash. Check encoded duration against simulated seconds. A short smoke run proves
+hook compatibility before consuming the shared capture slot for the full baseline.
