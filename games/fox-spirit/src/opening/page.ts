@@ -17,7 +17,7 @@ const TUNE = {
   fast: 3.5,
   /** catch: dash or airborne contact, horizontal / vertical reach from the fox's feet */
   reach: 1.35,
-  reachY: 1.9,
+  reachY: 1.25,
   /** walking into it: it skips ahead this far */
   skip: 1.8,
   fling: 2.6,
@@ -32,7 +32,9 @@ const TUNE = {
   hop: [false, true, true],
   spookAt: [4.5, 2.2, 2.2],
   /** after a hop it rests, winded, on the new perch */
-  hopRest: 1.5,
+  hopRest: 2.2,
+  /** a hop is a quick flit (m/s along its arc) */
+  hopSpeed: 5,
 };
 
 type Phase = 'perched' | 'fleeing' | 'flung' | 'kept';
@@ -144,6 +146,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   let beat = 0;
   let hopTo = 0;
   let wasDashing = false;
+  let wasGrounded = true;
   /** sideways jink offset (world xz), eased back to the flight line */
   const side = new THREE.Vector3();
   let flingT = 0;
@@ -188,6 +191,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     const dy = pos.y - fox.y;
     const dashStart = !!st.dashing && !wasDashing;
     wasDashing = !!st.dashing;
+    // in the high stages a spring/jump toward it is the lunge it watches for
+    const launchStart = !st.grounded && wasGrounded;
+    wasGrounded = !!st.grounded;
     windedT = Math.max(0, windedT - dt);
     if ((phase === 'perched' || phase === 'fleeing') && dashStart && windedT <= 0 && d > TUNE.dodgeFrom[stage]! && d < TUNE.dodgeTo) {
       // it sees the lunge: a quick jink across the fox's line and a little ahead
@@ -201,7 +207,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       for (let i = 0; i < 8; i++) emit(pos, 0.9, 1.6);
     }
     if (phase === 'perched' || phase === 'fleeing') {
-      const pounce = (st.dashing || !st.grounded) && d < TUNE.reach && dy > -0.4 && dy < TUNE.reachY;
+      const pounce = !(TUNE.hop[stage] && phase === 'fleeing') && (st.dashing || !st.grounded) && d < TUNE.reach && dy > -0.4 && dy < TUNE.reachY;
       if (pounce) caught();
       else if (d < 1.1 && st.grounded && t - lastSkip > 0.7) {
         lastSkip = t;
@@ -211,7 +217,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
         for (let i = 0; i < 6; i++) emit(pos, 0.8, 1.2);
       }
     }
-    if (phase === 'perched' && d < TUNE.spookAt[stage]! && !(TUNE.hop[stage] && windedT > 0)) {
+    const seesLeap = TUNE.hop[stage] && launchStart && d < 3.8;
+    if (phase === 'perched' && (d < TUNE.spookAt[stage]! || seesLeap) && !(TUNE.hop[stage] && windedT > 0)) {
       phase = 'fleeing';
       if (TUNE.hop[stage]) {
         // pick the next perch along the loop
@@ -228,6 +235,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     }
     if (phase === 'fleeing') {
       if (d > TUNE.wait) phase = 'perched';
+      else if (TUNE.hop[stage]) s += TUNE.hopSpeed * dt;
       else s += THREE.MathUtils.lerp(TUNE.fast, TUNE.slow, THREE.MathUtils.smoothstep(d, 1.5, TUNE.spook)) * (windedT > 0 ? 0.55 : 1) * dt;
     }
     if (phase === 'perched' || phase === 'fleeing') {

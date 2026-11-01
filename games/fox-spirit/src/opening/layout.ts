@@ -19,11 +19,12 @@ export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const
  */
 export const PAGE = {
   stages: [
-    [[-8, 1.6, 87.2], [-5.2, 1.1, 87.6], [-2, 1.1, 91], [-1, 1.2, 95.5], [-5, 1.1, 97.2], [-10.5, 1.2, 95.5], [-13.5, 1.1, 90], [-12.5, 1.2, 86.8], [-10.5, 1.1, 82.8]],
-    // stage 2 shuttles between the canopy's roost and high leaf (Tallow CANOPY), out of reach from the meadow floor
-    [[-1, 4.6, 64.7], [0.2, 5.4, 65.6], [0.9, 4.2, 67.1], [-0.6, 4.8, 66.4]],
-    // stage 3 shuttles between the pop-up ruin's overlook and its second leaf (Rook POP_UP_RUIN), out of reach from the floor
-    [[-24.4, 3.0, 71], [-26.4, 3.6, 70.2], [-28.4, 2.3, 71], [-26.4, 3.4, 71.8]],
+    [[-8, 1.2, 87.2], [-5.2, 1.1, 87.6], [-2, 1.1, 91], [-1, 1.2, 95.5], [-5, 1.1, 97.2], [-10.5, 1.2, 95.5], [-13.5, 1.1, 90], [-12.5, 1.2, 86.8], [-10.5, 1.1, 82.8]],
+    // stage 2 shuttles 1.6 m above the canopy's roost and high leaf (Tallow CANOPY rise 3.5 / 3.0): landing on a leaf
+    // can't reach it, a spring launch through it can; hops arc out wide so it never flies into the fox
+    [[-1, 5.1, 64.7], [2.6, 6.4, 64.6], [0.9, 4.6, 67.1], [-3, 6.2, 67.4]],
+    // stage 3 shuttles 1 m above the pop-up ruin's overlook and second leaf (Rook POP_UP_RUIN tops 1.02 / 0.47 abs): a jump reaches it
+    [[-24.4, 3.0, 71], [-26.4, 4.2, 68.6], [-28.4, 2.1, 71], [-26.4, 4.0, 73.4]],
   ] as ReadonlyArray<ReadonlyArray<readonly [number, number, number]>>,
   payoff: { x: -4, z: 80, r: 45 },
 } as const;
