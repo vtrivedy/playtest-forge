@@ -13,7 +13,7 @@ export type Collider =
   /** mound (rock): surface = base + h·√(1 − (d/r)²) */
   | { kind: 'cap'; x: number; z: number; r: number; base: number; h: number }
   /** oriented box (plinth step, pier, ruin block); `yaw` = the group's rotation.y */
-  | { kind: 'box'; x: number; z: number; yaw: number; hx: number; hz: number; top: number }
+  | { kind: 'box'; x: number; z: number; yaw: number; hx: number; hz: number; top: number; oneWay?: boolean }
   /** trunk: always blocks */
   | { kind: 'post'; x: number; z: number; r: number };
 
@@ -412,6 +412,8 @@ export function createPlay(opts: {
   start: { x: number; z: number; yaw: number };
   /** touchdown from a jump: feet position, impact 0..1 */
   onLand?: (at: THREE.Vector3, impact: number) => void;
+  /** Supported top contact; optional spring returns launch velocity after its load dwell. */
+  onGroundContact?: (at: THREE.Vector3, arrivalSpeed: number, jumpHeld: boolean, dt: number) => number | null;
   /** Contextual pickup/place. Edged independently of key repeat. */
   onInteract?: () => void;
   /** Called before an accepted dash changes velocity, including midair dashes. */
@@ -431,15 +433,19 @@ export function createPlay(opts: {
   const ik = new FootIK(fox.root, fox.model);
 
   /** walkable surface (posts excluded unless `solid`) */
-  const surface = (x: number, z: number, solid = true) => {
+  const surface = (x: number, z: number, solid = true, ceiling = Infinity) => {
     let y = groundH(x, z);
-    for (const c of colliders) if (solid || c.kind !== 'post') y = Math.max(y, colliderTop(c, x, z));
+    for (const c of colliders) {
+      if (c.kind === 'box' && c.oneWay && c.top > ceiling) continue;
+      if (solid || c.kind !== 'post') y = Math.max(y, colliderTop(c, x, z));
+    }
     return y;
   };
 
   /** lens sphere inside a pier / block / rock / trunk */
   const lensBlocked = (x: number, y: number, z: number, r: number) =>
     colliders.some((c) => {
+      if (c.kind === 'box' && c.oneWay) return false;
       for (const [ox, oz] of LENS_RING.map(([u, w]) => [u * r, w * r])) if (colliderTop(c, x + ox, z + oz) > y - r) return true;
       return false;
     });
@@ -451,7 +457,7 @@ export function createPlay(opts: {
   const proxyMat = new THREE.MeshStandardMaterial();
   for (const c of colliders) {
     const base = groundH(c.x, c.z) - 0.2;
-    if (c.kind === 'box' && c.top - base > 1) {
+    if (c.kind === 'box' && !c.oneWay && c.top - base > 1) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(c.hx * 2, c.top - base, c.hz * 2), proxyMat);
       m.position.set(c.x, (base + c.top) / 2, c.z);
       m.rotation.y = c.yaw;
@@ -465,7 +471,7 @@ export function createPlay(opts: {
     }
   }
   const cam = createFollowCamera({
-    surfaceAt: (x, z) => surface(x, z, false),
+    surfaceAt: (x, z) => surface(x, z, false, fox.root.position.y + P.step),
     lensBlocked,
     scenery: sightProxies,
     params: {
@@ -648,7 +654,7 @@ export function createPlay(opts: {
     const tol = grounded ? P.step : 0.05;
     const fwdX = Math.sin(yaw) * 0.28;
     const fwdZ = Math.cos(yaw) * 0.28;
-    const ok = (x: number, z: number) => surface(x, z) <= feetY + tol && surface(x + fwdX, z + fwdZ) <= feetY + tol + 0.15;
+    const ok = (x: number, z: number) => surface(x, z, true, feetY + tol + 0.15) <= feetY + tol && surface(x + fwdX, z + fwdZ, true, feetY + tol + 0.15) <= feetY + tol + 0.15;
     if (ok(nx, pos.z)) pos.x = nx;
     else vel.x = 0;
     if (ok(pos.x, nz)) pos.z = nz;
@@ -659,7 +665,7 @@ export function createPlay(opts: {
     if (dashT > 0 && dashT <= dt) lastDashDistance = Math.hypot(pos.x - dashStart.x, pos.z - dashStart.z);
     dashT = Math.max(0, dashT - dt);
     dashCooldownT = Math.max(0, dashCooldownT - dt);
-    if (grounded && Number.isFinite(surface(pos.x, pos.z))) lastGrounded.copy(pos);
+    if (grounded && Number.isFinite(surface(pos.x, pos.z, true, pos.y + P.step))) lastGrounded.copy(pos);
     readInput();
     bufferT -= dt;
     const want = wish.length();
@@ -717,6 +723,7 @@ export function createPlay(opts: {
     const feetY = pos.y;
     moveTo(pos.x + vel.x * dt, pos.z + vel.z * dt, feetY);
 
+    let arrivalSpeed = 0;
     if (!grounded) {
       airT += dt;
       jumpT += dt;
@@ -735,9 +742,10 @@ export function createPlay(opts: {
       if (vel.y < 0) rising = false;
       pos.y += vel.y * dt;
       if (pos.y > apexY) { apexY = pos.y; apexTime = airT; }
-      const floor = surface(pos.x, pos.z);
+      const floor = surface(pos.x, pos.z, true, feetY + 0.06);
       if (pos.y <= floor && vel.y <= 0) {
-        const impact = THREE.MathUtils.clamp(-vel.y / 9, 0, 1);
+        arrivalSpeed = -vel.y;
+        const impact = THREE.MathUtils.clamp(arrivalSpeed / 9, 0, 1);
         pos.y = floor;
         grounded = true;
         lastJump.apex = apexY - takeoffY;
@@ -752,7 +760,7 @@ export function createPlay(opts: {
         speed = Math.hypot(vel.x, vel.z) * Math.max(0, Math.cos(wrap(Math.atan2(vel.x, vel.z) - yaw)));
       }
     } else {
-      const floor = surface(pos.x, pos.z);
+      const floor = surface(pos.x, pos.z, true, feetY + P.step);
       if (floor < pos.y - P.step) {
         // walked off a ledge
         grounded = false;
@@ -763,6 +771,20 @@ export function createPlay(opts: {
         takeoffY = apexY = pos.y;
         apexTime = 0;
       } else pos.y = floor;
+    }
+    if (grounded) {
+      const launch = opts.onGroundContact?.(pos, arrivalSpeed, jumpHeld, dt);
+      if (launch != null && launch > 0) {
+        grounded = false;
+        rising = true;
+        cut = false;
+        coyoteT = bufferT = 0;
+        vel.y = launch;
+        airT = jumpT = 0;
+        takeoffY = apexY = pos.y;
+        apexTime = 0;
+        landT = 99;
+      }
     }
     if (opts.updrafts && lift) opts.updrafts.trackRide(dt, pos.y, vel.y, grounded, lift, grounded ? 'opening-ground' : null);
     landT += dt;
@@ -781,7 +803,7 @@ export function createPlay(opts: {
     if (grounded) {
       const fx = Math.sin(yaw) * 0.3;
       const fz = Math.cos(yaw) * 0.3;
-      slope = -Math.atan2(surface(pos.x + fx, pos.z + fz, false) - surface(pos.x - fx, pos.z - fz, false), 0.6) * P.slopeTilt;
+      slope = -Math.atan2(surface(pos.x + fx, pos.z + fz, false, pos.y + P.step) - surface(pos.x - fx, pos.z - fz, false, pos.y + P.step), 0.6) * P.slopeTilt;
     }
     pitch = THREE.MathUtils.damp(pitch, THREE.MathUtils.clamp(grounded ? slope : -vel.y * P.airPitch, -0.35, 0.35), 8, dt);
     fox.root.position.copy(pos);
@@ -789,7 +811,7 @@ export function createPlay(opts: {
     fox.model.rotation.set(pitch, 0, bank);
     fox.striding = grounded && anim.state === 'loco' && anim.gaitName !== 'walk';
     fox.update(dt);
-    ik.apply(dt, (x, z) => surface(x, z, false), grounded, anim.state === 'loco');
+    ik.apply(dt, (x, z) => surface(x, z, false, pos.y + P.step), grounded, anim.state === 'loco');
 
     cam.update(dt, {
       target: pos,
@@ -806,7 +828,7 @@ export function createPlay(opts: {
 
   return {
     cam,
-    surfaceAt: surface,
+    surfaceAt: (x, z) => surface(x, z, true, pos.y + P.step),
     step,
     teleport(x, z, y) {
       teleport(x, z, y);

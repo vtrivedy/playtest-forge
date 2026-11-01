@@ -1,8 +1,8 @@
-# Canopy playground — proposal, not selected
+# Canopy playground — selected greybox
 
 Current direction: Kit #swarm:398 supersedes the Carry-only sprint scope.
-Pitch/debate: Tallow:402/:407, Rook:405/:409. Await Moss/Flint pitches and shared
-selection before runtime work. No FUN or BEAUTIFUL verdict is claimed.
+Selected by Flint #swarm:465: Tallow owns south-central x=-4..8/z=62..73.
+No FUN or BEAUTIFUL verdict is claimed. Greybox first; route anchors provisional.
 
 ## Player experience
 See a broad leaf hammock above a safe clearing. Jump onto it, feel it bow under
@@ -28,8 +28,8 @@ margin. Broad first landing, higher second landing, optional roost cut from seco
 Exact anchors require the integrated candidate's safe ground and sightline survey.
 Do not add an invisible launch volume that can fire through a platform underside.
 
-### Ground survey constraints (provisional, not allocated)
-South-central meadow x=-4..8/z=66..74 is a candidate envelope, not a clear floor.
+### Ground survey constraints (allocated; anchors provisional)
+South-central meadow x=-4..8/z=62..73 is allocated, not a certified clear floor.
 Existing meadow.ts rocks at (2.4,70.5), (3.6,69.3), (8.2,71) have cap collider
 radii .825/.495/.605m and heights .713/.428/.523m above ground. Include fox
 body clearance and missed-landing drift around those caps; testing only groundH
@@ -40,7 +40,7 @@ the east shelf/Keeping and western grove are separate occupied spaces. Leaf
 footprints, missed-landing corridors and chase-camera swing need an actual
 integrated scene playtest before any anchors or safe-floor claim are accepted.
 
-## Module boundary (proposed)
+## Module boundary
 Tallow owns a new opening/canopy.ts and a focused keyboard probe. Scene owner wires
 one construction/update call and the existing surface registry. Any controller
 launch hook is a small explicit shared contract agreed before editing lookdevPlay.
@@ -50,14 +50,16 @@ launches, active profile, last apex gain, airtime, landing leaf, roost visit, re
 Rook's hidden bud may permanently reveal an alternate first entry; it must use
 this same route and spring interface. Discovery is optional and cannot gate play.
 
-### Proposed controller contract (not implemented)
-The controller asks the module for a spring request only after its ordinary
-top-surface landing test succeeds. Supply leaf ID, grounded contact position,
-vertical arrival speed and current jump-held input. A request returns a vertical
-launch speed and leaf ID; only the controller changes velocity, grounded state,
+### Controller contract
+The controller asks onGroundContact only after ordinary top support succeeds.
+Supply grounded contact position, vertical arrival speed, jump-held input and dt.
+The module resolves leaf ID and allows a 0.12s load dwell before returning a
+vertical launch speed; only the controller changes velocity, grounded state,
 jump animation and jump/apex telemetry. Preserve horizontal velocity, air steering,
 dash-drop and camera behavior. Do not inject lift into the updraft system.
 
+Leaf boxes are one-way top surfaces: rising/underneath traversal never blocks
+or lands. Collision stays at the authored top while the visual leaf bows.
 Use a contact latch per leaf: one release per arrival, rearmed only after leaving
 that leaf's top footprint and contact-height band. Compression is visual; collision
 stays on a stable authored surface during the first greybox. A held-jump arrival
@@ -90,3 +92,16 @@ independently judging FUN + BEAUTIFUL before landing, per Kit:398.
 Cut or revise if holding jump obscures intent, repeated automatic bounces trap the
 fox, the next landing stays offscreen, or the chain is less enjoyable than ordinary
 jump/glide. A successful script alone cannot establish human fun.
+
+## Greybox measurements (2026-11-01; still under review)
+Staged entry, real Space input, unchanged gravity15: launch8.66 gives2.428m apex
+at.583s; launch10.25 gives3.417m at.683s. Released jump remains stationary/walkable;
+under-leaf walk does not launch. /captures/tallow/canopy-greybox-01 passed5/5;
+02 passed those plus underside but FAILED the first chained landing from rest.
+The 2.8m centre gap was too tight with current low-speed air steering. Revised
+centres entry(-.2,71.5),middle(-.2,69.3),high(.9,67.1),roost(-1,64.7) shorten
+first gaps; rise values .42/1.9/3/3.5 above existing ground are unchanged.
+No passive rebound is implemented: a released arrival stays stable, while held
+jump loads for.12s then springs. No scenery moves and no permanent-restore slot.
+03 tests the revised chain and underside dash plus pointed/curl/ink blade fix.
+No human fun or final visual approval is inferred from mechanical passes.

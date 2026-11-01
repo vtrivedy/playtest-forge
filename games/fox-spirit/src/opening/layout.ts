@@ -143,3 +143,11 @@ export const KEEPING = (() => {
     span,
   };
 })();
+
+/** Optional canopy route; broad one-way leaf tops above the meadow retry floor. */
+export const CANOPY = [
+  { id: 'entry', x: -0.2, z: 71.5, rise: 0.42 },
+  { id: 'middle', x: -0.2, z: 69.3, rise: 1.9 },
+  { id: 'high', x: 0.9, z: 67.1, rise: 3.0 },
+  { id: 'roost', x: -1, z: 64.7, rise: 3.5 },
+] as const;
