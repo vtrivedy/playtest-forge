@@ -580,6 +580,8 @@ export function createPlay(opts: {
   let dashT = 0;
   let dashCooldownT = 0;
   let dashesUsed = 0;
+  const dashStart = new THREE.Vector3();
+  let lastDashDistance = 0;
   let gliding = false;
   let cut = false;
   let rising = false;
@@ -588,8 +590,9 @@ export function createPlay(opts: {
   let bank = 0;
   let pitch = 0;
   let apexY = 0;
+  let apexTime = 0;
   let takeoffY = 0;
-  const lastJump = { apex: 0, air: 0 };
+  const lastJump = { apex: 0, air: 0, timeToApex: 0 };
 
   function teleport(x: number, z: number, y0: number) {
     pos.set(x, surface(x, z), z);
@@ -635,6 +638,7 @@ export function createPlay(opts: {
       dashT = P.dashDuration;
       dashCooldownT = P.dashDuration + P.dashCooldown;
       dashesUsed++;
+      dashStart.copy(pos);
     }
     dashHeld = dash;
   }
@@ -652,6 +656,7 @@ export function createPlay(opts: {
   }
 
   function step(dt: number) {
+    if (dashT > 0 && dashT <= dt) lastDashDistance = Math.hypot(pos.x - dashStart.x, pos.z - dashStart.z);
     dashT = Math.max(0, dashT - dt);
     dashCooldownT = Math.max(0, dashCooldownT - dt);
     if (grounded && Number.isFinite(surface(pos.x, pos.z))) lastGrounded.copy(pos);
@@ -699,6 +704,7 @@ export function createPlay(opts: {
       jumpT = 0;
       takeoffY = pos.y;
       apexY = pos.y;
+      apexTime = 0;
     }
 
     if (dashT > 0) {
@@ -728,7 +734,7 @@ export function createPlay(opts: {
       }
       if (vel.y < 0) rising = false;
       pos.y += vel.y * dt;
-      apexY = Math.max(apexY, pos.y);
+      if (pos.y > apexY) { apexY = pos.y; apexTime = airT; }
       const floor = surface(pos.x, pos.z);
       if (pos.y <= floor && vel.y <= 0) {
         const impact = THREE.MathUtils.clamp(-vel.y / 9, 0, 1);
@@ -736,6 +742,7 @@ export function createPlay(opts: {
         grounded = true;
         lastJump.apex = apexY - takeoffY;
         lastJump.air = airT;
+        lastJump.timeToApex = apexTime;
         landT = 0;
         cam.land(impact * 0.6);
         fox.land(impact);
@@ -754,6 +761,7 @@ export function createPlay(opts: {
         jumpT = 99;
         vel.y = 0;
         takeoffY = apexY = pos.y;
+        apexTime = 0;
       } else pos.y = floor;
     }
     if (opts.updrafts && lift) opts.updrafts.trackRide(dt, pos.y, vel.y, grounded, lift, grounded ? 'opening-ground' : null);
@@ -820,10 +828,11 @@ export function createPlay(opts: {
       gliding,
       dashing: dashT > 0,
       dashesUsed,
+      lastDashDistance: +lastDashDistance.toFixed(3),
       updraft: opts.updrafts?.state(),
       airTime: +airT.toFixed(3),
       apexY: +apexY.toFixed(3),
-      lastJump: { apex: +lastJump.apex.toFixed(3), air: +lastJump.air.toFixed(3) },
+      lastJump: { apex: +lastJump.apex.toFixed(3), air: +lastJump.air.toFixed(3), timeToApex: +lastJump.timeToApex.toFixed(3) },
       anim: anim.state,
       gait: anim.gaitName,
       playback: +anim.rate.toFixed(3),
