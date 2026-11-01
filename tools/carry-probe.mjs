@@ -78,6 +78,29 @@ try {
     camera.quaternion.copy(window.__carrySavedCamera.quat);
     window.__gameHooks.advance(0);
   });
+  if (process.argv.includes('--mouth-variants')) {
+    for (const [name, values] of [
+      ['jaw-a', { mouthSide: 0.09, mouthForward: 0.13, mouthLower: 0.055, emberSize: 0.085 }],
+      ['jaw-b', { mouthSide: 0.045, mouthForward: 0.13, mouthLower: 0.065, emberSize: 0.075 }],
+    ]) {
+      await page.evaluate(values => Object.assign(window.__gameHooks.carry, values), values);
+      await sample(`variant-${name}-chase`, 60, true);
+      await page.evaluate(() => {
+        const { camera, ctx } = window.__opening;
+        window.__carrySavedCamera = { pos: camera.position.clone(), quat: camera.quaternion.clone() };
+        const p = ctx.fox.root.position;
+        camera.position.set(p.x + 1.3, p.y + 0.8, p.z + 1.6);
+        camera.lookAt(p.x, p.y + 0.35, p.z + 0.15);
+        window.__gameHooks.advance(0);
+      });
+      await page.screenshot({ path: path.join(out, `variant-${name}-contact.png`) });
+      await page.evaluate(() => {
+        const { camera } = window.__opening;
+        camera.position.copy(window.__carrySavedCamera.pos);
+        camera.quaternion.copy(window.__carrySavedCamera.quat);
+      });
+    }
+  }
   await page.keyboard.up('e'); await advance(1);
   if (!portraitOnly) {
     await press('Space', 12);
