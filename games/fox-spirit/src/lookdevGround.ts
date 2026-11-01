@@ -49,7 +49,7 @@ export function buildGrass(scene: THREE.Scene, rand: () => number, ctx: GroundCo
   const blade = new THREE.ConeGeometry(0.035, 0.42, 3);
   blade.translate(0, 0.2, 0);
   const mat = toon(0xffffff);
-  const N = 650;
+  const N = 900;
   const mesh = new THREE.InstancedMesh(blade, mat, N);
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
@@ -86,7 +86,7 @@ export function buildGrass(scene: THREE.Scene, rand: () => number, ctx: GroundCo
 export function buildLeaves(scene: THREE.Scene, rand: () => number, ctx: GroundContext): void {
   const { groundH, pathDist, toon, mapleLeafGeometry } = ctx;
   // drifts: most leaves pile in clusters (under canopies, along the path shoulders), the rest scattered
-  const N = 1700;
+  const N = 1400;
   const mesh = new THREE.InstancedMesh(mapleLeafGeometry(0.095), toon(0xffffff), N);
   const m = new THREE.Matrix4();
   const col = new THREE.Color();
