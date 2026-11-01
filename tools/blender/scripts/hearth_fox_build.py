@@ -469,8 +469,9 @@ def tail_fn(co, n):
     i = min(range(len(cs)), key=lambda k: (cs[k] - co).length_squared)
     t = i / TAIL_N + 0.025 * fur_noise(co.x * 3, co.z * 3)
     c = mix(COAT, SADDLE, 0.4 * smooth01(0.1, 0.4, t) * smooth01(0.2, 0.7, n.z))
-    c = mix(c, EMBER, smooth01(0.45, 0.7, t))
-    c = mix(c, GOLD, smooth01(0.8, 0.97, t))
+    # burn-out in two ragged cel bands (rust coat → ember → amber point), not an airbrushed vinyl gradient
+    c = mix(c, EMBER, smooth01(0.6, 0.64, t))
+    c = mix(c, GOLD, smooth01(0.84, 0.88, t))
     return c, smooth01(0.55, 0.95, t)
 
 
