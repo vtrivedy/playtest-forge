@@ -117,3 +117,17 @@ read from chase view. Remaining limits: stalks mostly read from below, and lobes
 are slightly star-sharp. Moss explicitly closes canopy BEAUTIFUL; Flint #650
 identified this as the final missing second BEAUTIFUL verdict. This closes the
 canopy review gate, not integrated regression or unfamiliar-player discovery.
+
+## Post-integration cup and stalk polish
+Rounded maple-lobe shoulders (quadratic outline), deeper lateral cup and drooping
+distal tip; darker thicker midrib and .24m curved stalk. Same authored supports,
+launch8.66, dwell.12 and camera visibility contract. Compared actual high chase
+against maple03: fewer needle corners and more legible curled side profile;
+fox and warm/pale contrast remain readable. Ground underside shows substantial
+stalk; chase stalk readability remains limited by blade coverage and grove depth.
+
+Live keyboard `/captures/tallow/canopy-cupped-01`: chain middle/high/roost and
+underside walk/dash 5/5 PASS, errors[]. Retained `window.__game` final state:
+3 launches, roost visited; final spring apex2.428m, time-to-apex.583s,
+airtime2.183s. Staged entry disclosed. tsc and vite build PASS.
+Independent replacement-art verdict pending; approved integrated art unchanged.

@@ -121,3 +121,10 @@ Keep support positions/feel fixed. Give each spring a substantial curved inked s
 a curled maple-lobed blade and tapered fine veins. First top contact permanently
 warms that blade locally; no ColorField restore slot is consumed. Chase camera
 visibility treatment remains active. Re-run chain and underside/visibility probes.
+
+## Post-integration canopy polish
+Keep the approved route and launch profile. Round the maple lobe shoulders while
+retaining their pointed tips; cup the outer blade more clearly and droop its distal
+tip. Strengthen the dark central rib and curved stalk for chase-scale readability.
+Compare upper-chain stills, then repeat real-input chain and lens recovery checks.
+This is visual polish only; independent review remains required before landing.
