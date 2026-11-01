@@ -15,16 +15,26 @@ export function buildCanopy(ctx: OpeningCtx) {
     root.position.set(a.x, top, a.z);
     ctx.scene.add(root);
     const shape = new THREE.Shape();
-    shape.moveTo(0, -1.4);
-    for (const [x, z] of [[-.28,-.8],[-.85,-1.02],[-.72,-.42],[-1.4,-.28],[-1.03,.12],[-1.23,.69],[-.58,.53],[-.5,1.05],[-.22,.84],[0,1.48],[.22,.84],[.5,1.05],[.58,.53],[1.23,.69],[1.03,.12],[1.4,-.28],[.72,-.42],[.85,-1.02],[.28,-.8]]) shape.lineTo(x!, z!);
+    const outline = [[0,-1.4],[-.28,-.8],[-.85,-1.02],[-.72,-.42],[-1.4,-.28],[-1.03,.12],[-1.23,.69],[-.58,.53],[-.5,1.05],[-.22,.84],[0,1.48],[.22,.84],[.5,1.05],[.58,.53],[1.23,.69],[1.03,.12],[1.4,-.28],[.72,-.42],[.85,-1.02],[.28,-.8]];
+    // Broad, rounded shoulders keep the maple silhouette from reading as a star.
+    const rounding = 0.23;
+    for (let i = 0; i < outline.length; i++) {
+      const previous = outline[(i + outline.length - 1) % outline.length]!;
+      const current = outline[i]!, next = outline[(i + 1) % outline.length]!;
+      const beforeX = current[0]! + (previous[0]! - current[0]!) * rounding;
+      const beforeZ = current[1]! + (previous[1]! - current[1]!) * rounding;
+      if (i === 0) shape.moveTo(beforeX, beforeZ);
+      else shape.lineTo(beforeX, beforeZ);
+      shape.quadraticCurveTo(current[0]!, current[1]!, current[0]! + (next[0]! - current[0]!) * rounding, current[1]! + (next[1]! - current[1]!) * rounding);
+    }
     shape.closePath();
     const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.065, bevelEnabled: true, bevelSize: 0.045, bevelThickness: 0.025, bevelSegments: 1, steps: 1, curveSegments: 14 });
     geo.rotateX(-Math.PI / 2);
     const points = geo.getAttribute('position');
     for (let j = 0; j < points.count; j++) {
       const x = points.getX(j), z = points.getZ(j);
-      const curl = Math.pow(Math.max(0, Math.abs(x) - 0.7), 2) * 0.7 + Math.pow(Math.max(0, Math.abs(z) - 0.95), 2) * 0.6;
-      points.setY(j, points.getY(j) - 0.09 + curl);
+      const curl = Math.pow(Math.max(0, Math.abs(x) - 0.55), 2) * 0.95 + Math.pow(Math.max(0, Math.abs(z) - 0.95), 2) * 0.6;
+      points.setY(j, points.getY(j) - 0.09 + curl - Math.pow(Math.max(0, z - 0.65), 2) * 0.42);
     }
     geo.computeVertexNormals();
     const material = new THREE.MeshToonMaterial({ color: 0xc6bda4 });
@@ -33,7 +43,7 @@ export function buildCanopy(ctx: OpeningCtx) {
     root.add(blade);
     // Raised dark veins remain legible above the curled paper blade.
     const veins = new THREE.Group();
-    const veinMat = new THREE.MeshToonMaterial({ color: 0x68573b });
+    const veinMat = new THREE.MeshToonMaterial({ color: 0x51442e });
     const line = (from: THREE.Vector3, to: THREE.Vector3, radius: number) => {
       const d = to.clone().sub(from);
       const m = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.15, radius, d.length(), 5), veinMat);
@@ -41,7 +51,7 @@ export function buildCanopy(ctx: OpeningCtx) {
       m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
       veins.add(m);
     };
-    line(new THREE.Vector3(0, 0.12, -1.18), new THREE.Vector3(0, 0.12, 1.25), 0.022);
+    line(new THREE.Vector3(0, 0.12, -1.18), new THREE.Vector3(0, 0.12, 1.25), 0.035);
     for (const z of [-0.65, -0.15, 0.35, 0.75]) for (const side of [-1, 1]) {
       line(new THREE.Vector3(0, 0.12, z - 0.22), new THREE.Vector3(side * (0.95 - Math.abs(z) * 0.42), 0.12, z + 0.15), 0.009);
     }
@@ -54,7 +64,7 @@ export function buildCanopy(ctx: OpeningCtx) {
       new THREE.Vector3(a.x + 0.5, top - a.rise * 0.45, a.z - 0.6),
       new THREE.Vector3(a.x, top - 0.06, a.z),
     ]);
-    const stem = inked(new THREE.TubeGeometry(curve, 16, 0.19, 8, false), stemMat, 0.012, true);
+    const stem = inked(new THREE.TubeGeometry(curve, 16, 0.24, 8, false), stemMat, 0.012, true);
     stem.castShadow = true;
     ctx.scene.add(stem);
     return { ...a, top, root, blade, veins, material, touched: false, contact: false, latched: false, dwell: 0, compression: 0, pulse: 0, lensScale: 1 };
