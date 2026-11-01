@@ -182,9 +182,13 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
       // Stagger the fine joints on each exposed facet without adding a heavy grid.
       for (let face = 0; face < 6; face++) {
         const angle = (face + 0.5) * Math.PI / 3;
-        const joint = new THREE.Mesh(new THREE.BoxGeometry(0.014, guard.h / 3 - 0.035, 0.012), undercroft);
-        joint.position.set(Math.sin(angle) * radius((lo + hi) / 2) * 0.87, block.position.y, Math.cos(angle) * radius((lo + hi) / 2) * 0.87);
-        joint.rotation.set(0, angle, 0);
+        const offset = course % 2 ? 0.065 : -0.065;
+        const points = [lo + 0.024 / guard.h, hi - 0.024 / guard.h].map(t => {
+          const r = radius(t) * Math.cos(Math.PI / 6) + 0.003;
+          return new THREE.Vector3(Math.sin(angle) * r + Math.cos(angle) * offset,
+            guard.h * (t - 0.5), Math.cos(angle) * r - Math.sin(angle) * offset);
+        });
+        const joint = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0x46413b, fog: true }));
         housing.add(joint);
       }
     }
