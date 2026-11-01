@@ -12,13 +12,15 @@ import { buildSky, inkMaterial, paintU, rng } from '../lookdevKit';
 import { buildContactShadow } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import { createPlay, PLAY, type Collider, type PlayController } from '../lookdevPlay';
-import { groundH, SPAWN } from './layout';
+import { groundH, KEEPING, SPAWN } from './layout';
 import { buildMeadow } from './meadow';
 import { buildVillage } from './village';
 import { createOpeningHearth } from './hearth';
 import { createOpeningPaint } from './paint';
 import { createOpeningOcclusion } from './occlusion';
 import { createCrown } from './crown';
+import { createCarry } from './carry';
+import { createKeepingChemistry } from './chemistry';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -99,15 +101,38 @@ export async function runOpening(): Promise<void> {
   const hearth = createOpeningHearth({
     scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p),
     onIgnite: (at) => field.restore(at, 12, 1.8, { edgeMax: 1.4 }),
+    extraSpots: [
+      { id: 'steam', ...KEEPING.steam, height: 6, medium: 'steam' },
+      { id: 'root', ...KEEPING.root, height: 7 },
+    ],
   });
+  // the controller exists only after every build; its callbacks reach the carry through this binding
+  let carry: ReturnType<typeof createCarry> | null = null;
   const player = createPlay({
     fox,
     groundH,
     colliders: ctx.colliders,
     start: SPAWN,
     updrafts: hearth.updrafts,
+    onInteract: () => carry?.interact(),
+    onDash: (lastGrounded) => carry?.beforeDash(lastGrounded),
   });
   ctx.player = player;
+  carry = createCarry({
+    scene, fox: fox.root,
+    source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
+    surfaceAt: player.surfaceAt,
+  });
+  const coal = carry;
+  const chemistry = createKeepingChemistry({
+    updrafts: hearth.updrafts, steamId: 'steam', rootId: 'root',
+    coal: () => coal.heatSource(),
+    onSteam: (at) => field.restore(at, 7, 1.6, { edgeMax: 1.2 }),
+    onComplete: (at) => {
+      field.restore(at, 14, 1.4, { edgeMax: 1.6 });
+      crown.respond();
+    },
+  });
   const view = player.cam.camera;
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
@@ -121,6 +146,8 @@ export async function runOpening(): Promise<void> {
     time += dt;
     hearth.update(dt, time, player.state() as { dashing?: boolean });
     player.step(dt);
+    coal.update(dt, time, player.state() as { grounded: boolean; dashing?: boolean });
+    chemistry.update(dt, time);
     // the key's shadow frustum rides with the fox
     const p = fox.root.position;
     lights.key.target.position.set(p.x, 0, p.z);
@@ -149,7 +176,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, crown: crown.state() } });
+  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
