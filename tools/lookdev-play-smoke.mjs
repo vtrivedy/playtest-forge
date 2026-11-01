@@ -128,7 +128,7 @@ try {
           pickups: state.opening?.carry?.pickups, placements: state.opening?.carry?.placements, dashDrops: state.opening?.carry?.dashDrops,
           steamLatchedAt: trace.find(s => s.opening?.chemistry?.steamLatched)?.f ?? null,
           completedAt: trace.find(s => s.opening?.chemistry?.completed)?.f ?? null,
-          bridgeReadyAt: trace.find(s => s.opening?.keeping?.bridgeReady)?.f ?? null,
+          bridgeReadyAt: trace.find(s => s.opening?.keeping?.bridge)?.f ?? null,
           crossedBridge: trace.some(s => s.grounded && Math.hypot(s.pos[0] - 26.2, s.pos[2] - 66.2) < 1.5 && s.pos[1] > 8),
           crown: state.opening?.crown,
         } : undefined,
