@@ -117,6 +117,25 @@ try {
     check('Carrying preserves acceleration and run speed', Math.abs(carryingRun.speed - emptyRun.speed) < 0.015);
     evidence.samples.push({ label: 'movement-comparison', carryingRun, emptyRun });
   }
+  if (!portraitOnly) {
+    // Disclosed staged starts at each bowl rim; all pickup/place/reactions use live E input.
+    if (!coal(await advance()).carried) { await stage(); await press('e'); }
+    for (const name of ['steam', 'root']) {
+      const bowl = (await advance()).opening.chemistry[name].position;
+      await page.evaluate(([x,y,z]) => {
+        const h = window.__gameHooks;
+        h.setStick(0,0); h.setKeys([]); h.teleport(x, z + 1.4, Math.PI); h.advance(90,1/60,true);
+      }, bowl);
+      const before = await sample(`06-${name}-rim-carried`, 1, true);
+      const placed = await press('e');
+      check(`${name}: rim E places in bowl bed`, !coal(placed).carried && Math.hypot(...coal(placed).position.map((v,i) => v-bowl[i])) < 0.01);
+      check(`${name}: fox stays outside bowl`, Math.hypot(placed.pos[0]-bowl[0],placed.pos[2]-bowl[2]) > 1.2);
+      await sample(`07-${name}-rim-placed`, 180, true);
+      const recovered = await press('e');
+      check(`${name}: coal recoverable from same rim`, coal(recovered).carried);
+      evidence.samples.push({ label: `${name}-rim-pose`, before });
+    }
+  }
   console.log(JSON.stringify({ out, assertions: evidence.assertions }, null, 2));
 } finally {
   fs.writeFileSync(path.join(out, 'evidence.json'), JSON.stringify(evidence, null, 2));

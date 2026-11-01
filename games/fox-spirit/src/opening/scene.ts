@@ -128,6 +128,7 @@ export async function runOpening(): Promise<void> {
     scene, fox: fox.root,
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
     surfaceAt: player.surfaceAt,
+    bowls: [KEEPING.steam, KEEPING.root].map(b => new THREE.Vector3(b.x, b.y, b.z)),
   });
   const coal = carry;
   const chemistry = createKeepingChemistry({
