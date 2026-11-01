@@ -7,3 +7,5 @@ Reuse the existing Reactor and UpdraftSystem. The opening wrapper supplies the f
 The optional `?gui` panel exposes jump buffering/coyote time, glide sink, dash speed/duration/cooldown, and column rise/response so feel variations can be compared in the playable slice.
 
 Verification: drive the real input hooks from village to H-a to shelf; record jump apex/air, dash count, heat and ride peak/landing in window.__game. Capture cold/lit/shelf chase views and review against before. Keep default boot flip until full slice passes team gates.
+
+Route probe gate: terrain must remain continuous across the village/meadow boundary. The first actual-input trace stuck at z≈84 because the meadow's reversed smoothstep edges made a 0.6 m step; use ascending edges and invert the interpolation for a gentle southward dip.
