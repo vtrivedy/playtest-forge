@@ -30,6 +30,7 @@ const C = {
   flag: 0x8d8471,
   bloom: [0x9a4f3c, 0xa8834a, 0x7d5a6a],
   leaf: 0x5d6040,
+  cabbage: 0x6d7350,
   rope: 0x8a7357,
 };
 
@@ -628,8 +629,16 @@ export function buildVillage(ctx: OpeningCtx): void {
     festoon(props, wellTop, new THREE.Vector3(gate.x - gate.nx * GATE_HALF, gate.y + 2.25, gate.z - gate.nz * GATE_HALF), 0.55);
     festoon(props, posts.north!, new THREE.Vector3(-9, ctx.groundH(-9, 97.6) + 2.7, 97.6), 0.35);
     // back-garden fences
-    for (const [ax, az, bx, bz] of [[-21, 81.8, -15, 81.8], [-31.5, 81.2, -25.5, 81.2], [8.6, 92.2, 15.4, 92.2], [-12, 97.2, -6.2, 97.2]] as const)
-      colliders.push({ kind: 'box', ...fence(props, ctx, ax, az, bx, bz) });
+    // back gardens: a wattle fence ~2 m off the back wall, cabbage rows between
+    for (const [ax, bx, z, wallZ] of [[-21, -15, 80.4, 82.7], [-31.5, -25.5, 79.8, 82.1], [8.6, 15.4, 90.8, 92.9], [-12, -6.2, 95.9, 97.8]] as const) {
+      colliders.push({ kind: 'box', ...fence(props, ctx, ax, z, bx, z) });
+      for (let row = 0; row < 2; row++)
+        for (let x = ax + 0.6; x < bx - 0.4; x += 0.62) {
+          const zz = z + (wallZ - z) * (0.33 + row * 0.3);
+          const r = 0.17 + ctx.rand() * 0.06;
+          props.add(jitter(new THREE.IcosahedronGeometry(r, 1), 0.22, ctx.rand), row ? C.leaf : C.cabbage, [x + (ctx.rand() - 0.5) * 0.15, ctx.groundH(x, zz) + r * 0.55, zz], [0, ctx.rand() * 6, 0], 0.01, [1, 0.8, 1]);
+        }
+    }
     handCart(props, ctx, -11.2, 81.8, 0.7);
     colliders.push({ kind: 'box', x: -11.2, z: 81.8, yaw: 0.7, hx: 0.75, hz: 1.2, top: ctx.groundH(-11.2, 81.8) + 0.9 });
     for (const [x, z, yaw, up] of [[-24.6, 89.4, 0.3, 0], [-23.4, 89.9, 1.2, 0], [-24.1, 89.6, 0.8, 1]] as const)
