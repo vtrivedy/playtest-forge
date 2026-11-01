@@ -1959,7 +1959,9 @@ async function boot() {
   tick();
 }
 
-boot().catch((err) => {
+// Redesign lookdev (?lookdev=p0): self-contained slice, the game never boots
+const lookdev = new URLSearchParams(location.search).get('lookdev');
+(lookdev === 'p0' ? import('./lookdevP0').then((m) => m.runLookdevP0()) : boot()).catch((err) => {
   console.error(err);
   const s = document.getElementById('status');
   if (s) s.textContent = `Boot failed: ${String(err)}`;
