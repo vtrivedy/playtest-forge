@@ -13,6 +13,12 @@ export type FoxClip = 'idle' | 'walk' | 'run';
 
 export interface HearthFox {
   root: THREE.Group;
+  /** glTF scene under root; the play animator drives its mixer directly (lookdevPlay.ts) */
+  model: THREE.Object3D;
+  mixer: THREE.AnimationMixer;
+  actions: Map<string, THREE.AnimationAction>;
+  /** authored ground speed per clip (m/s, glTF extras) */
+  clipSpeed: Record<string, number>;
   update: (dt: number) => void;
   setHeadYaw: (y: number) => void;
   /** crossfade to a clip; `travel` moves the root along its facing at the clip's authored speed */
@@ -181,6 +187,10 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
 
   const fox: HearthFox = {
     root,
+    model,
+    mixer,
+    actions,
+    clipSpeed: speeds,
     get clip() {
       return current;
     },

@@ -8,6 +8,7 @@
  * (lookdevFox.ts) and is never graded (it carries the colour). Ink = inverted hulls.
  *
  * window.__lookdevHooks: setPaint('none'|'half'|'full'), setCamera(Shot), setFoxClip(clip, travel), advance(frames, dt), ready.
+ * `&play=1`: the fox is playable under a chase camera (lookdevPlay.ts); window.__gameHooks drives it.
  */
 import * as THREE from 'three';
 import { buildGround, buildGrass, buildLeaves, buildContactShadow } from './lookdevGround';
@@ -21,6 +22,7 @@ import {
   matchFogToSky,
 } from '../../../src/render';
 import { loadHearthFox, type FoxClip } from './lookdevFox';
+import { createPlay, PLAY, type Collider } from './lookdevPlay';
 
 type PaintMode = 'none' | 'half' | 'full';
 type Shot = 'wide' | 'fox' | 'hero' | 'foxProfile' | 'foxQuarter' | 'foxWalk';
@@ -947,6 +949,21 @@ export async function runLookdevP0(): Promise<void> {
     t.rotation.y = kind === 'lean' ? -2.95 : spin;
     scene.add(t);
   }
+  const play = new URLSearchParams(location.search).has('play');
+  const colliders: Collider[] = [];
+  const archBase = groundH(ARCH.x, ARCH.z) - 0.15;
+  const archBox = (lx: number, hx: number, hz: number, top: number) => {
+    const c = Math.cos(0.12);
+    const s = Math.sin(0.12);
+    colliders.push({ kind: 'box', x: ARCH.x + lx * c, z: ARCH.z - lx * s, yaw: 0.12, hx, hz, top: archBase + top });
+  };
+  archBox(0, 2.9, 1.3, 0.25);
+  archBox(0, 2.45, 1.0, 0.55);
+  for (const sx of [-1, 1]) archBox(sx * 1.75, 0.6, 0.55, 4);
+  const stubBase = groundH(-4.4, -6.2) - 0.1;
+  colliders.push({ kind: 'box', x: -4.4, z: -6.2, yaw: 0.5, hx: 0.5, hz: 0.48, top: stubBase + 1.14 });
+  colliders.push({ kind: 'box', x: -4.4 + 0.9 * Math.cos(0.5) + 0.6 * Math.sin(0.5), z: -6.2 - 0.9 * Math.sin(0.5) + 0.6 * Math.cos(0.5), yaw: 1.1, hx: 0.5, hz: 0.45, top: stubBase + 0.5 });
+  for (const [x, z, sc, kind] of trees) colliders.push({ kind: 'post', x, z, r: (kind === 'hero' ? 0.42 : kind === 'lean' ? 0.38 : 0.3) * sc * 1.5 });
   const rocks: Array<[number, number, number]> = [
     [-2.2, 1.2, 0.55],
     [2.6, -2.5, 0.9],
@@ -960,6 +977,7 @@ export async function runLookdevP0(): Promise<void> {
     const r = buildRock(rand, s);
     r.position.set(x, groundH(x, z) + s * 0.25, z);
     scene.add(r);
+    colliders.push({ kind: 'cap', x, z, r: s * 1.1, base: groundH(x, z), h: s * 0.95 });
   }
 
   const fox = await loadHearthFox((w) => inkMaterial(w));
@@ -969,11 +987,13 @@ export async function runLookdevP0(): Promise<void> {
   fox.root.add(contact);
   fox.root.rotation.y = 0.55;
   scene.add(fox.root);
+  const player = play ? createPlay({ fox, groundH, colliders, start: { x: FOX_HOME.x, z: FOX_HOME.z + 4, yaw: Math.PI } }) : null;
+  const view = player?.cam.camera ?? camera;
 
   // restore wavefronts come from the game's ColorField clock
   const field = createColorField({ bounds: { minX: -90, maxX: 90, minZ: -90, maxZ: 90 } });
   let paintMode: PaintMode = 'none';
-  const post = createPostStack(renderer, scene, camera, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
+  const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
   function setPaint(mode: PaintMode): void {
     paintMode = mode;
@@ -1014,23 +1034,33 @@ export async function runLookdevP0(): Promise<void> {
   let time = 0;
   function frame(dt: number): void {
     time += dt;
-    fox.update(dt);
-    if (fox.speed > 0) fox.root.position.y = groundH(fox.root.position.x, fox.root.position.z);
+    if (player) {
+      player.step(dt);
+      // the key's shadow frustum rides with the fox
+      const p = fox.root.position;
+      lights.key.target.position.set(p.x, 0, p.z);
+      lights.key.position.set(p.x + 14, 16, p.z + 6);
+      lights.key.target.updateMatrixWorld();
+    } else {
+      fox.update(dt);
+      if (fox.speed > 0) fox.root.position.y = groundH(fox.root.position.x, fox.root.position.z);
+    }
     field.update(dt);
     syncPaint();
     sky.update(dt);
-    post.render();
   }
   function resize(): void {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
+    player?.cam.resize(innerWidth, innerHeight);
     forge.setSize(innerWidth, innerHeight);
     post.setSize(innerWidth, innerHeight);
   }
   addEventListener('resize', resize);
 
   setPaint('half');
-  setCamera('wide');
+  if (!player) setCamera('wide');
+  resize();
   let manual = false;
   const hooks = {
     ready: false,
@@ -1048,19 +1078,49 @@ export async function runLookdevP0(): Promise<void> {
     advance(frames = 1, dt = 1 / 60) {
       manual = true;
       for (let i = 0; i < frames; i++) frame(dt);
+      post.render();
       return time;
     },
   };
   (window as unknown as { __lookdevHooks: typeof hooks }).__lookdevHooks = hooks;
+  if (player) {
+    // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
+    const gameHooks = {
+      get ready() {
+        return hooks.ready;
+      },
+      state: player.state,
+      setStick: player.setStick,
+      setKeys: player.setKeys,
+      teleport: player.teleport,
+      setPaint,
+      setManual(on: boolean) {
+        manual = on;
+        last = performance.now();
+      },
+      advance(frames = 1, dt = 1 / 60, render = true) {
+        manual = true;
+        for (let i = 0; i < frames; i++) frame(dt);
+        if (render) post.render();
+        return player.state();
+      },
+      params: PLAY,
+      camera: player.cam.params,
+    };
+    (window as unknown as { __gameHooks: typeof gameHooks }).__gameHooks = gameHooks;
+  }
   // for tooling that waits on the game handle
-  (window as unknown as { __game: object }).__game = { mode: 'lookdev-p0', hooks };
+  (window as unknown as { __game: object }).__game = { mode: player ? 'lookdev-play' : 'lookdev-p0', hooks };
 
   let last = performance.now();
   const tick = () => {
     const now = performance.now();
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (!manual) frame(dt);
+    if (!manual) {
+      frame(dt);
+      post.render();
+    }
     hooks.ready = true;
     requestAnimationFrame(tick);
   };
