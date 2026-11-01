@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { RAMP_WORLD, inkMaterial, hullGeometry, plumeGeometry, hewn, toon, inked } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import type { Collider } from '../lookdevPlay';
-import { KIT, UNPRESSED } from './layout';
+import { JOGS, KIT, UNPRESSED } from './layout';
 
 type P2 = readonly [number, number];
 type Part =
@@ -26,7 +26,7 @@ type Part =
   | { k: 'spines'; bone: string; c: P2; r: readonly [number, number, number]; col: number; n: number };
 
 type Spec = {
-  id: 'hedgehog' | 'heron' | 'deer' | 'kit';
+  id: 'hedgehog' | 'heron' | 'deer' | 'kit' | 'hare';
   scale: number;
   /** bone pivots in profile space and their parents (root = the creature's feet origin) */
   bones: Record<string, { at: P2; parent?: string }>;
@@ -148,6 +148,36 @@ const SPECS: Spec[] = [
       { k: 'tube', bone: 'legB', pts: [[-0.14, 0.2], [-0.15, 0.0]], r: [0.04, 0.03], col: 0x3a2418, z: -0.06 },
     ],
     eye: { at: [0.36, 0.46], r: 0.016, bone: 'head' },
+  },
+  {
+    id: 'hare',
+    scale: 1.15,
+    bones: {
+      body: { at: [0, 0.2] },
+      head: { at: [0.17, 0.3], parent: 'body' },
+      earL: { at: [0.2, 0.42], parent: 'head' },
+      earR: { at: [0.2, 0.42], parent: 'head' },
+      tail: { at: [-0.22, 0.25], parent: 'body' },
+      legF: { at: [0.12, 0.15], parent: 'body' },
+      legB: { at: [-0.1, 0.17], parent: 'body' },
+    },
+    parts: [
+      { k: 'ell', bone: 'body', c: [0, 0.22], r: [0.2, 0.12, 0.11], col: 0x9a7452, rot: 0.12 },
+      { k: 'ell', bone: 'body', c: [-0.12, 0.19], r: [0.13, 0.13, 0.12], col: 0x8c6848 },
+      { k: 'ell', bone: 'body', c: [0.06, 0.15], r: [0.13, 0.05, 0.08], col: 0xe8d8bc },
+      { k: 'ell', bone: 'tail', c: [-0.25, 0.25], r: [0.05, 0.05, 0.05], col: 0xf4ecdc },
+      { k: 'ell', bone: 'head', c: [0.24, 0.34], r: [0.1, 0.075, 0.07], col: 0x9a7452, rot: -0.3 },
+      { k: 'ell', bone: 'head', c: [0.325, 0.31], r: [0.02, 0.018, 0.02], col: 0x3a2418 },
+      { k: 'ell', bone: 'earL', c: [0.17, 0.55], r: [0.035, 0.14, 0.018], col: 0x8c6848, rot: 0.35, z: 0.035 },
+      { k: 'ell', bone: 'earL', c: [0.12, 0.66], r: [0.022, 0.04, 0.02], col: 0x2a1a12, rot: 0.35, z: 0.035 },
+      { k: 'ell', bone: 'earR', c: [0.17, 0.55], r: [0.035, 0.14, 0.018], col: 0x8c6848, rot: 0.35, z: -0.035 },
+      { k: 'ell', bone: 'earR', c: [0.12, 0.66], r: [0.022, 0.04, 0.02], col: 0x2a1a12, rot: 0.35, z: -0.035 },
+      { k: 'tube', bone: 'legF', pts: [[0.12, 0.15], [0.14, 0.0]], r: [0.03, 0.022], col: 0x7a5a3e, z: 0.05 },
+      { k: 'tube', bone: 'legF', pts: [[0.12, 0.15], [0.14, 0.0]], r: [0.03, 0.022], col: 0x7a5a3e, z: -0.05 },
+      { k: 'ell', bone: 'legB', c: [-0.04, 0.02], r: [0.1, 0.022, 0.03], col: 0x7a5a3e, z: 0.08 },
+      { k: 'ell', bone: 'legB', c: [-0.04, 0.02], r: [0.1, 0.022, 0.03], col: 0x7a5a3e, z: -0.08 },
+    ],
+    eye: { at: [0.26, 0.37], r: 0.015, bone: 'head' },
   },
 ];
 
@@ -454,6 +484,7 @@ function createUnpressedAudio() {
       if (id === 'hedgehog') for (const dt of [0.7, 0.86]) tone(1500, 2300, 'sine', t + dt, 0.05, 0.01, 0.07);
       if (id === 'heron') tone(420, 260, 'sawtooth', t + 1.0, 0.06, 0.02, 0.32, 1200);
       if (id === 'deer') tone(700, 520, 'triangle', t + 1.0, 0.05, 0.05, 0.5, 1800);
+      if (id === 'hare') for (const dt of [1.1, 1.32]) tone(190, 110, 'sine', t + dt, 0.09, 0.005, 0.12);
       shimmers.get(id)?.gain.setTargetAtTime(0, t, 0.1);
     },
   };
@@ -470,17 +501,20 @@ export function buildUnpressed(ctx: OpeningCtx) {
     return s !== undefined && Number.isFinite(s) ? s : ctx.groundH(x, z);
   };
 
-  // the far crag's page-stone (the deer is pressed into its face)
-  {
-    const st = UNPRESSED.deer.stone;
-    const slab = inked(hewn(new THREE.BoxGeometry(1.5, 1.7, 0.32, 2, 2, 1), rand, 0.05), toon(0x8e8172, { contour: 0.5 }), 0.022, true);
-    slab.position.set(st.x, UNPRESSED.deer.y + 0.78, st.z);
-    slab.rotation.y = st.yaw;
+  /** a standing page-stone a drawing is pressed into (its face = local +z) */
+  const pageStone = (x: number, z: number, yaw: number, foot: number, w: number, h: number) => {
+    const slab = inked(hewn(new THREE.BoxGeometry(w, h, 0.32, 2, 2, 1), rand, 0.05), toon(0x8e8172, { contour: 0.5 }), 0.022, true);
+    slab.position.set(x, foot + h / 2 - 0.07, z);
+    slab.rotation.y = yaw;
     slab.rotation.z = 0.04;
     scene.add(slab);
     ctx.occluders.push(slab);
-    ctx.colliders.push({ kind: 'box', x: st.x, z: st.z, yaw: st.yaw, hx: 0.75, hz: 0.2, top: UNPRESSED.deer.y + 1.6 });
-  }
+    ctx.colliders.push({ kind: 'box', x, z, yaw, hx: w / 2, hz: 0.2, top: foot + h - 0.1 });
+  };
+  // the far crag's page-stone (the deer is pressed into its face)
+  pageStone(UNPRESSED.deer.stone.x, UNPRESSED.deer.stone.z, UNPRESSED.deer.stone.yaw, UNPRESSED.deer.y, 1.5, 1.7);
+  // the hare's low waymark stone at the canopy's foot, its face toward the roost
+  pageStone(JOGS.hare.stone.x, JOGS.hare.stone.z, UNPRESSED.hare.yaw, ctx.groundH(JOGS.hare.stone.x, JOGS.hare.stone.z), 1.0, 1.1);
 
   const creatures = SPECS.map((spec) => {
     const at = spec.id === 'kit' ? KIT : UNPRESSED[spec.id];
@@ -659,6 +693,51 @@ export function buildUnpressed(ctx: OpeningCtx) {
     return !moving;
   };
 
+  perform.hare = (c, t, dt) => {
+    // shake off the page, sit up and look at the fox, then lope ahead along the jog; lag and it sits up and
+    // looks back for you; at the end it sits at the ruin's entry facing the paper
+    B(c, 'head').rotation.z = t < 0.5 ? Math.sin(t * 34) * 0.22 * (1 - t / 0.5) : 0;
+    B(c, 'earL').rotation.x = B(c, 'earR').rotation.x = t < 0.5 ? Math.sin(t * 40) * 0.3 : 0;
+    const fox = ctx.fox.root.position;
+    const path = UNPRESSED.hare.path;
+    const s = path[Math.min(c.leg, path.length - 1)]!;
+    const dx = s.x - c.holder.position.x;
+    const dz = s.z - c.holder.position.z;
+    const d = Math.hypot(dx, dz);
+    const advanced = d <= 0.2 && c.leg < path.length - 1;
+    if (advanced) c.leg++;
+    const end = c.leg === path.length - 1 && d <= 0.2;
+    const near = Math.hypot(fox.x - c.holder.position.x, fox.z - c.holder.position.z) < JOGS.lead;
+    // it goes once it has seen you (1.1 s), keeps a lead, and holds while you lag
+    const moving = t > 1.1 && !end && (near || c.gait % (Math.PI * 2) > 0.4);
+    if (moving && d > 0.001) {
+      face(c, dx, dz, Math.min(1, dt * 7));
+      const step = Math.min(d, dt * 3.6);
+      c.holder.position.x += (dx / d) * step;
+      c.holder.position.z += (dz / d) * step;
+      c.gait += dt * 11;
+    } else c.gait = 0;
+    // the bound: hind legs drive, the body arcs, forelegs reach for the landing
+    const g = c.gait;
+    const air = moving ? Math.max(0, Math.sin(g)) : 0;
+    B(c, 'legB').rotation.z = moving ? -0.9 * Math.sin(g + 0.6) : 0;
+    B(c, 'legF').rotation.z = moving ? 0.8 * Math.sin(g - 0.5) : 0;
+    // waiting: sit up tall, ears up, head turned back toward the fox
+    c.bow = THREE.MathUtils.damp(c.bow, moving ? 0 : 1, 6, dt);
+    B(c, 'body').position.y = 0.2 + air * 0.12;
+    B(c, 'body').rotation.z = (moving ? Math.cos(g) * 0.16 : 0) + c.bow * 0.5;
+    B(c, 'head').rotation.z -= c.bow * 0.42;
+    const look = end ? JOGS.look : fox;
+    const rel = Math.atan2(-(look.z - c.holder.position.z), look.x - c.holder.position.x) - c.holder.rotation.y;
+    B(c, 'head').rotation.y = THREE.MathUtils.clamp(Math.atan2(Math.sin(rel), Math.cos(rel)), -1.3, 1.3) * c.bow;
+    B(c, 'tail').rotation.z = Math.sin(t * 6) * 0.2;
+    c.holder.position.y = THREE.MathUtils.damp(c.holder.position.y, floorAt(c.holder.position.x, c.holder.position.z), 12, dt);
+    if (!end) return false;
+    face(c, JOGS.look.x - c.holder.position.x, JOGS.look.z - c.holder.position.z, Math.min(1, dt * 3));
+    c.arrived = c.arrived ?? t;
+    return t - c.arrived > 1.2;
+  };
+
   const idle: Record<Spec['id'], (c: (typeof creatures)[number], t: number) => void> = {
     hedgehog(c, t) {
       // snuffle: quick nose bobs in bursts, the odd look round
@@ -711,6 +790,25 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'tail').rotation.y = -1.6 * tuck;
       B(c, 'legF').rotation.z = -1.2 * tuck;
       B(c, 'legB').rotation.z = 1.2 * tuck;
+    },
+    hare(c, t) {
+      // sits at the ruin's entry: nose twitches, ear flicks, a face-wash every few seconds; watches the fox near
+      const fx = ctx.fox.root.position;
+      const dx = fx.x - c.holder.position.x;
+      const dz = fx.z - c.holder.position.z;
+      const watch = 1 - THREE.MathUtils.smoothstep(Math.hypot(dx, dz), 2.5, 5);
+      const rel = Math.atan2(-dz, dx) - c.holder.rotation.y;
+      c.bow = THREE.MathUtils.damp(c.bow, watch, 3, 1 / 60);
+      const wash = smooth(0, 0.25, Math.sin(t * 0.5 + c.idleSeed)) * (1 - c.bow);
+      B(c, 'body').position.y = 0.2;
+      B(c, 'body').rotation.z = 0.35 + c.bow * 0.15 + Math.sin(t * 2.4) * 0.015;
+      B(c, 'head').rotation.y = THREE.MathUtils.clamp(Math.atan2(Math.sin(rel), Math.cos(rel)), -1.3, 1.3) * c.bow;
+      B(c, 'head').rotation.z = -0.3 - c.bow * 0.12 - wash * 0.35 + Math.sin(t * 19) * 0.02;
+      B(c, 'legF').rotation.z = wash * (1.4 + Math.sin(t * 9) * 0.25);
+      const flick = Math.max(0, Math.sin(t * 1.3 + c.idleSeed * 2)) ** 12;
+      B(c, 'earL').rotation.x = flick * 0.5;
+      B(c, 'earR').rotation.x = -(Math.max(0, Math.sin(t * 1.1 + c.idleSeed)) ** 12) * 0.5;
+      B(c, 'tail').rotation.z = 0;
     },
     deer(c, t) {
       // graze, lift the head, chew, ear flicks and tail flicks

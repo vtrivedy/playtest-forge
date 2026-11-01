@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { buildDistance, buildMaple, buildRock, contactInk, hewn, inked, mapleLeafGeometry, toon, type TreeKind } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import type { OpeningCtx } from './scene';
-import { BOUNDS, HEARTH_A, HOUSES, inVista, pathDist, rimK, SHELF, WELL } from './layout';
+import { BOUNDS, HEARTH_A, HOUSES, inVista, JOGS, pathDist, rimK, SHELF, WELL } from './layout';
 
 /** Stone strata, base → cap: warm grey-ochre bands so the shelf reads as layered rock, not a crate */
 const STRATA = [0x6e5c4c, 0x8a7560, 0x7a6754, 0x93806a];
@@ -280,9 +280,65 @@ export function buildMeadow(ctx: OpeningCtx): void {
     drifts: TREES.map(([x, z, sc]) => [x, z, 1.6 + sc * 1.4] as const),
     keep: (x, z) => clear(x, z, 0.2),
   });
+  buildJogs(ctx, groundCtx, clear);
   // no ridge in the vista gap past the far crag: the Crown is framed there
   buildDistance(scene, rand, {
     cx: BOUNDS.cx, cz: BOUNDS.cz, dir: -Math.PI / 2, arc: Math.PI * 1.9, count: 16, y: 2,
     keep: (x, z) => !inVista(x, z, 18),
   });
+}
+
+/**
+ * The jogs (DESIGN-jogs.md): waymark cairns at the bends of the canopy → ruin leg, each topped by a
+ * finger-stone laid toward the next bend, and a wind-combed leaf ribbon along the line's shoulder.
+ */
+function buildJogs(ctx: OpeningCtx, groundCtx: Parameters<typeof buildLeaves>[2], clear: (x: number, z: number, r: number) => boolean): void {
+  const { scene, groundH, rand, colliders } = ctx;
+  for (const c of JOGS.cairns) {
+    const y0 = groundH(c.x, c.z);
+    let y = y0;
+    // flat field stones, each a little smaller and askew on the one below
+    for (const [sz, ox, oz] of [[0.42, 0, 0], [0.34, 0.05, -0.04], [0.26, -0.03, 0.04], [0.19, 0.03, 0.02]] as const) {
+      const r = buildRock(rand, sz, sz > 0.4);
+      r.scale.set(1.15, 0.62, 1.15);
+      r.rotation.z = (rand() - 0.5) * 0.18;
+      y += sz * 0.36;
+      r.position.set(c.x + ox, y, c.z + oz);
+      y += sz * 0.36;
+      scene.add(r);
+    }
+    // the finger-stone: a long hewn slab on the cap, its point toward the next bend, a little raised
+    const yaw = Math.atan2(c.to.x - c.x, c.to.z - c.z);
+    const finger = inked(hewn(new THREE.BoxGeometry(0.24, 0.12, 1.0, 1, 1, 4), rand, 0.03), toon(0x9c8a70, { contour: 0.5 }), 0.02, true);
+    const pos = finger.geometry.getAttribute('position') as THREE.BufferAttribute;
+    // taper to a point at +z
+    for (let i = 0; i < pos.count; i++) {
+      const k = THREE.MathUtils.smoothstep(pos.getZ(i), -0.1, 0.5);
+      pos.setX(i, pos.getX(i) * (1 - 0.75 * k));
+      pos.setY(i, pos.getY(i) * (1 - 0.4 * k));
+    }
+    pos.needsUpdate = true;
+    finger.geometry.computeVertexNormals();
+    finger.position.set(c.x, y - 0.02, c.z);
+    finger.rotation.set(0, yaw, 0);
+    finger.rotateX(-0.12);
+    scene.add(finger);
+    colliders.push({ kind: 'cap', x: c.x, z: c.z, r: 0.42, base: y0, h: y - y0 });
+  }
+  // the ribbon: drift centres along the line, set off to its shoulder and swung side to side like windrows
+  const drifts: Array<readonly [number, number, number]> = [];
+  const L = JOGS.line;
+  for (let i = 0; i + 1 < L.length; i++) {
+    const [ax, az] = L[i]!;
+    const [bx, bz] = L[i + 1]!;
+    const len = Math.hypot(bx - ax, bz - az);
+    const n = Math.ceil(len / 1.1);
+    for (let j = 0; j < n; j++) {
+      const u = j / n;
+      const side = 1.05 + 0.35 * Math.sin((i * n + j) * 1.7);
+      drifts.push([ax + (bx - ax) * u + ((bz - az) / len) * side, az + (bz - az) * u - ((bx - ax) / len) * side, 0.55 + 0.25 * rand()] as const);
+    }
+  }
+  const near = (x: number, z: number) => drifts.some(([dx, dz, dr]) => Math.hypot(x - dx, z - dz) < dr + 0.2);
+  buildLeaves(scene, rand, groundCtx, { cx: -11, cz: 74, r: 1, n: 2600, drifts, keep: (x, z) => near(x, z) && clear(x, z, 0.2) });
 }

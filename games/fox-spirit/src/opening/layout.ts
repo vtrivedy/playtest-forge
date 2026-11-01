@@ -180,6 +180,33 @@ export const POP_UP_RUIN = {
   returnEnd: { x: -24.4, z: 75.7 },
 } as const;
 /**
+ * The jogs (DESIGN-jogs.md): the meadow leg from the canopy's foot north and then west to the paper ruin.
+ * Cairns sit just off the line at its bends, each topped by a finger-stone laid toward `to`; the leaf
+ * ribbon is drifted along `line`; the hare's waymark stone faces the canopy roost.
+ */
+export const JOGS = (() => {
+  const roost = CANOPY[CANOPY.length - 1];
+  const stone = { x: -3.6, z: 67.4 };
+  const fx = roost.x - stone.x;
+  const fz = roost.z - stone.z;
+  const fl = Math.hypot(fx, fz);
+  return {
+    line: [[-4.5, 66.5], [-5.6, 72.5], [-6.6, 77.6], [-11, 79.4], [-16.8, 79.6], [-21.6, 76.8]] as ReadonlyArray<readonly [number, number]>,
+    cairns: [
+      { x: -6.2, z: 68.6, to: { x: -6.6, z: 77.6 } },
+      { x: -8.4, z: 76.3, to: { x: -16.8, z: 79.6 } },
+      { x: -19.0, z: 77.6, to: { x: -24, z: 75 } },
+    ],
+    /** the hare's waymark stone; `face` is its drawing's outward normal (toward the roost) */
+    hare: { stone, x: stone.x + (fx / fl) * 0.2, z: stone.z + (fz / fl) * 0.2, face: { x: fx / fl, z: fz / fl } },
+    harePath: [{ x: -4.9, z: 69.2 }, { x: -5.6, z: 73.4 }, { x: -7.2, z: 78.2 }, { x: -11.5, z: 80.0 }, { x: -16.8, z: 79.9 }, { x: -21.9, z: 77.4 }],
+    /** the hare lopes on only while the fox is within `lead` m; it sits facing `look` at the end */
+    lead: 5.5,
+    look: { x: -24, z: 75 },
+  };
+})();
+
+/**
  * Unpressed creatures (DESIGN-unpressed.md): where each pressed drawing sits. `yaw` orients the creature's
  * profile plane on the surface (its local +z = the surface's outward normal); `y` is the drawing's foot line;
  * `settle` is where the creature ends up living after its performance.
@@ -211,6 +238,12 @@ export const UNPRESSED = (() => {
     deer: { x: stone.x - K.fall.x * 0.2, z: stone.z - K.fall.z * 0.2, y: K.crag.top, yaw: Math.atan2(-K.fall.x, -K.fall.z), stone: { ...stone, yaw: K.crag.yaw }, settle: { ...cragAt(-0.7, 2.1), y: K.crag.top },
       /** out of the stone toward the bridge, round its left end, to the far edge facing the Crown */
       path: [cragAt(1.35, 0.25), cragAt(0.0, 0.5), cragAt(-0.7, 2.1)] },
+    hare: {
+      ...JOGS.hare, y: groundH(JOGS.hare.x, JOGS.hare.z) + 0.34, yaw: Math.atan2(JOGS.hare.face.x, JOGS.hare.face.z),
+      /** it lopes ahead of the fox along the jog and sits at the ruin's entry */
+      path: JOGS.harePath,
+      settle: JOGS.harePath[JOGS.harePath.length - 1]!,
+    },
   };
 })();
 
