@@ -305,8 +305,8 @@ function canopyPad(rand: () => number, radius: number, height: number, tones: Ca
     // clumped bulges (sub-clusters of leaves) + fine serration for a jagged inked silhouette
     const clump = 0.2 * Math.sin(x * 3.1 + ph[0]!) * Math.sin(y * 2.7 + ph[1]!) * Math.sin(z * 3.3 + ph[2]!);
     const fine = 0.07 * Math.sin(x * 7.3 + ph[3]!) * Math.sin(y * 6.1 + ph[4]!) * Math.sin(z * 7.7 + ph[5]!);
-    const tooth = 0.05 * Math.abs(Math.sin(a * 17 + ph[3]! * 3)) * (1 - Math.abs(y));
-    const notch = Math.pow(0.5 + 0.5 * Math.sin(a * 5.0 + ph[0]!), 8) * (1 - y * y) * 0.2;
+    const tooth = 0.055 * Math.sin(a * 19 + y * 17 + ph[3]!) * Math.sin(y * 23 + ph[4]!);
+    const notch = Math.pow(0.5 + 0.5 * Math.sin(a * 5 + y * 3 + ph[0]!), 5) * (1 - y * y) * 0.36;
     const k = 1 + clump * 1.35 + fine + tooth - notch;
     const yy = y > 0 ? y * height : y * height * 0.8;
     p.setXYZ(i, x * radius * k, yy * k, z * radius * k);
@@ -421,7 +421,7 @@ function buildMaple(rand: () => number, scale: number, kind: TreeKind, palette: 
         continue;
       }
       const r = (kind === 'hero' ? 1.1 : kind === 'tall' ? 0.75 : 0.9) * (0.6 + rand() * 0.7);
-      pads.push({ at: end.add(V((rand() - 0.5) * 0.4, 0.2, (rand() - 0.5) * 0.4)), r, h: r * (0.7 + rand() * 0.2) });
+      pads.push({ at: end.clone().lerp(from, 0.18).add(V((rand() - 0.5) * 0.2, 0.05, (rand() - 0.5) * 0.2)), r, h: r * (0.7 + rand() * 0.2) });
     }
     // crown mass: a big top lobe with fillers packed between it and the limb tiers
     const cr = kind === 'hero' ? 1.6 : kind === 'tall' ? 1.0 : kind === 'lean' ? 1.15 : 1.25;
@@ -928,7 +928,13 @@ export async function runLookdevP0(): Promise<void> {
 
   const rand = rng(7);
   const groundContext = { groundH, pathDist, toon, mapleLeafGeometry };
-  buildGround(scene, groundContext);
+  const ground = buildGround(scene, groundContext);
+  ground.updateMatrixWorld(true);
+  const contactRay = new THREE.Raycaster(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+  const surfaceHeight = (x: number, z: number): number => {
+    contactRay.ray.origin.set(x, 100, z);
+    return contactRay.intersectObject(ground, false)[0]!.point.y;
+  };
   buildDistance(scene, rand);
   buildGrass(scene, rand, groundContext);
   buildLeaves(scene, rand, groundContext);
@@ -986,13 +992,21 @@ export async function runLookdevP0(): Promise<void> {
     for (let i = 0; i < (indices?.count ?? vertices.count); i += 3) {
       const triangle = [0, 1, 2].map((j) => new THREE.Vector3()
         .fromBufferAttribute(vertices, indices ? indices.getX(i + j) : i + j).applyMatrix4(r.matrixWorld));
-      const heights = triangle.map((v) => v.y - groundH(v.x, v.z));
+      const heights = triangle.map((v) => v.y - surfaceHeight(v.x, v.z));
       const crossings: THREE.Vector3[] = [];
       for (let j = 0; j < 3; j++) {
         const k = (j + 1) % 3;
         if (heights[j]! * heights[k]! >= 0) continue;
-        const point = triangle[j]!.clone().lerp(triangle[k]!, heights[j]! / (heights[j]! - heights[k]!));
-        point.y = groundH(point.x, point.z) + 0.018;
+        let lo = 0;
+        let hi = 1;
+        const point = new THREE.Vector3();
+        for (let step = 0; step < 12; step++) {
+          const t = (lo + hi) / 2;
+          point.copy(triangle[j]!).lerp(triangle[k]!, t);
+          if ((point.y - surfaceHeight(point.x, point.z)) * heights[j]! > 0) lo = t;
+          else hi = t;
+        }
+        point.y = surfaceHeight(point.x, point.z) + 0.025;
         crossings.push(point);
       }
       if (crossings.length === 2) contacts.push(...crossings);

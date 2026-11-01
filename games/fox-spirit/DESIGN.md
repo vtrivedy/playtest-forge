@@ -404,3 +404,14 @@ view silhouette; chunky crown outlines have uneven lobes and gaps. Exposed limbs
 curve upward and taper to fine tips. Rust foliage keeps ochre accents and three
 readable values. Cloud hatching stays on the lower shaded rim. Verify the five
 fixed lookdev shots before requesting an independent teammate verdict.
+
+### World review correction — crown and rock contact
+Ember rated 98c3cd1 MARGINALLY against d419723: crown lobes read as stacked
+pillows, the low hero lobe appears detached, and smooth silhouettes lost leaf
+texture. Keep each lobe's sphere topology but cut several deeper, uneven angular
+sinuses through its radial contour and add smaller teeth across elevation as
+well as azimuth. Pull limb-end foliage inward/down toward its supporting branch;
+retain exposed branch gaps. Use the returned ground mesh for downward contact
+samples, then bisect each crossing rock edge against that actual surface and
+lift contact ink 2.5 cm. Verify five fixed stills, fix the weakest read, retest,
+and request another named-SHA verdict before integration.
