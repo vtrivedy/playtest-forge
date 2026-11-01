@@ -19,6 +19,8 @@ type Part =
   | { k: 'tube'; bone: string; pts: readonly P2[]; r: readonly [number, number]; col: number; z?: number }
   /** cone from base to tip */
   | { k: 'cone'; bone: string; from: P2; to: P2; r: number; col: number; z?: number }
+  /** a flat feathered panel (wing): polygon in the profile plane, extruded `depth` across, at `z` */
+  | { k: 'panel'; bone: string; pts: readonly P2[]; depth: number; col: number; z?: number }
   /** spines: small cones bristling from the upper half of an ellipsoid */
   | { k: 'spines'; bone: string; c: P2; r: readonly [number, number, number]; col: number; n: number };
 
@@ -68,10 +70,8 @@ const SPECS: Spec[] = [
     parts: [
       { k: 'ell', bone: 'body', c: [0, 1.0], r: [0.4, 0.2, 0.19], col: 0x6c7a82, rot: 0.22 },
       { k: 'ell', bone: 'body', c: [-0.4, 0.88], r: [0.2, 0.07, 0.1], col: 0x3c464c, rot: 0.35 },
-      { k: 'ell', bone: 'wingL', c: [-0.1, 1.04], r: [0.46, 0.13, 0.035], col: 0x56636b, rot: 0.25, z: 0.17 },
-      { k: 'tube', bone: 'wingL', pts: [[0.1, 1.08], [-0.25, 0.98], [-0.58, 0.86]], r: [0.05, 0.015], col: 0x22262a, z: 0.2 },
-      { k: 'ell', bone: 'wingR', c: [-0.1, 1.04], r: [0.46, 0.13, 0.035], col: 0x56636b, rot: 0.25, z: -0.17 },
-      { k: 'tube', bone: 'wingR', pts: [[0.1, 1.08], [-0.25, 0.98], [-0.58, 0.86]], r: [0.05, 0.015], col: 0x22262a, z: -0.2 },
+      { k: 'panel', bone: 'wingL', pts: [[0.16, 1.14], [0.02, 1.2], [-0.2, 1.17], [-0.44, 1.07], [-0.66, 0.9], [-0.58, 0.88], [-0.6, 0.83], [-0.48, 0.86], [-0.46, 0.8], [-0.34, 0.86], [-0.3, 0.82], [-0.18, 0.9], [0.0, 0.94], [0.14, 1.02]], depth: 0.035, col: 0x56636b, z: 0.19 },
+      { k: 'panel', bone: 'wingR', pts: [[0.16, 1.14], [0.02, 1.2], [-0.2, 1.17], [-0.44, 1.07], [-0.66, 0.9], [-0.58, 0.88], [-0.6, 0.83], [-0.48, 0.86], [-0.46, 0.8], [-0.34, 0.86], [-0.3, 0.82], [-0.18, 0.9], [0.0, 0.94], [0.14, 1.02]], depth: 0.035, col: 0x56636b, z: -0.19 },
       { k: 'tube', bone: 'neck', pts: [[0.28, 1.1], [0.4, 1.32], [0.3, 1.52], [0.4, 1.72]], r: [0.075, 0.05], col: 0xb9bdb8 },
       { k: 'ell', bone: 'head', c: [0.44, 1.78], r: [0.1, 0.065, 0.06], col: 0xcfd0ca },
       { k: 'tube', bone: 'head', pts: [[0.42, 1.83], [0.3, 1.86], [0.2, 1.82]], r: [0.02, 0.006], col: 0x22222a },
@@ -138,6 +138,12 @@ function partGeometry(p: Part, rand: () => number): THREE.BufferGeometry[] {
     const curve = new THREE.CatmullRomCurve3(p.pts.map(([x, y]) => new THREE.Vector3(x, y, p.z ?? 0)));
     return [plumeGeometry(curve, (t) => THREE.MathUtils.lerp(p.r[0], p.r[1], t), 14, 8, 0)];
   }
+  if (p.k === 'panel') {
+    const sh = new THREE.Shape(p.pts.map(([x, y]) => new THREE.Vector2(x, y)));
+    const g = new THREE.ExtrudeGeometry(sh, { depth: p.depth, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.01, bevelSegments: 1, curveSegments: 4 });
+    g.translate(0, 0, (p.z ?? 0) - p.depth / 2);
+    return [g];
+  }
   if (p.k === 'cone') {
     const len = Math.hypot(p.to[0] - p.from[0], p.to[1] - p.from[1]);
     const g = new THREE.ConeGeometry(p.r, len, 10, 1);
@@ -169,7 +175,7 @@ function drawProfile(spec: Spec): { tex: THREE.CanvasTexture; w: number; h: numb
   const xs: number[] = [];
   const ys: number[] = [];
   for (const p of spec.parts) {
-    const pts: P2[] = p.k === 'ell' || p.k === 'spines' ? [[p.c[0] - p.r[0] - 0.12, p.c[1] - p.r[1] - 0.12], [p.c[0] + p.r[0] + 0.12, p.c[1] + p.r[1] + 0.12]] : p.k === 'tube' ? [...p.pts] : [p.from, p.to];
+    const pts: P2[] = p.k === 'ell' || p.k === 'spines' ? [[p.c[0] - p.r[0] - 0.12, p.c[1] - p.r[1] - 0.12], [p.c[0] + p.r[0] + 0.12, p.c[1] + p.r[1] + 0.12]] : p.k === 'tube' || p.k === 'panel' ? [...p.pts] : [p.from, p.to];
     for (const [x, y] of pts) {
       xs.push(x);
       ys.push(y);
@@ -194,6 +200,14 @@ function drawProfile(spec: Spec): { tex: THREE.CanvasTexture; w: number; h: numb
     if (p.k === 'ell' || p.k === 'spines') {
       g.ellipse(X(p.c[0]), Y(p.c[1]), p.r[0] * k + grow, p.r[1] * k + grow, -(p.k === 'ell' ? p.rot ?? 0 : 0), 0, Math.PI * 2);
       g.fill();
+    } else if (p.k === 'panel') {
+      g.lineJoin = 'round';
+      g.lineWidth = grow * 2;
+      g.moveTo(X(p.pts[0]![0]), Y(p.pts[0]![1]));
+      for (const q of p.pts.slice(1)) g.lineTo(X(q[0]), Y(q[1]));
+      g.closePath();
+      g.fill();
+      if (grow > 0) g.stroke();
     } else if (p.k === 'tube') {
       g.lineCap = 'round';
       g.lineJoin = 'round';
