@@ -17,7 +17,9 @@ const arg = (k, d) => {
 const port = Number(arg('port', '5191'));
 const out = path.resolve(arg('out', '/tmp/lookdev-play-smoke'));
 // --hero: run the 30 s hero route sim-only (stills at beat changes) instead of the short beat list
-const hero = process.argv.includes('--hero');
+const hero = process.argv.includes('--hero') || process.argv.includes('--video');
+// --video: hero route rendered every 2nd sim step → frames/ + hero-30s.mp4 (30 fps, 1280×720) + manifest
+const video = process.argv.includes('--video');
 fs.mkdirSync(out, { recursive: true });
 
 const server = await createServer({
@@ -71,7 +73,8 @@ try {
       const shot = input.beat !== beat || apex || touch;
       // 2 s run clip (30 fps) at the start of the loop back
       if (input.beat === 'loop back' && clipF < 0) clipF = f;
-      const clipFrame = clipF >= 0 && f - clipF < 120 && (f - clipF) % 2 === 0;
+      const clipFrame = !video && clipF >= 0 && f - clipF < 120 && (f - clipF) % 2 === 0;
+      const videoFrame = video && f % 2 === 1;
       beat = input.beat;
       state = await page.evaluate(
         ({ input, shot }) => {
@@ -80,8 +83,13 @@ try {
           h.setKeys(input.jump ? ['Space'] : []);
           return h.advance(1, 1 / 60, shot);
         },
-        { input, shot: shot || clipFrame },
+        { input, shot: shot || clipFrame || videoFrame },
       );
+      if (videoFrame) {
+        fs.mkdirSync(path.join(out, 'frames'), { recursive: true });
+        await page.screenshot({ path: path.join(out, 'frames', `f${String((f - 1) / 2).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 92 });
+        if (f % 120 === 1) console.log('frame', (f - 1) / 2, '/ 900');
+      }
       if (clipFrame) {
         fs.mkdirSync(path.join(out, 'run-clip'), { recursive: true });
         await page.screenshot({ path: path.join(out, 'run-clip', `f${String((f - clipF) / 2).padStart(3, '0')}.jpg`), type: 'jpeg', quality: 90 });
@@ -93,6 +101,11 @@ try {
         await page.screenshot({ path: path.join(out, `${String(++n).padStart(2, '0')}-${tag}.png`) });
         console.log(f, beat.padEnd(18), JSON.stringify({ pos: state.pos, speed: state.speed, anim: state.anim, gait: state.gait, lastJump: state.lastJump }));
       }
+    }
+    if (video) {
+      execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, 'hero-30s.mp4')]);
+      const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
+      fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/?lookdev=p0&play=1', route: 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: 900, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
     }
     if (clipF >= 0)
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'run-clip/f%03d.jpg'), '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', path.join(out, 'run-clip.mp4')]);
