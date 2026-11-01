@@ -470,10 +470,11 @@ export function createKeeping(ctx: OpeningCtx) {
     const cam = ctx.player?.cam.camera;
     if (!cam) return;
     cam.getWorldPosition(lensAt);
-    if (Math.abs(lensAt.y - SHELF_TOP) > 4) return;
+    // off the ledge storey the lens is never inside the rubble: every rock is whole again
+    const level = Math.abs(lensAt.y - SHELF_TOP) <= 4;
     for (const r of rubble) {
       const d = Math.hypot(r.position.x - lensAt.x, r.position.z - lensAt.z);
-      const k = THREE.MathUtils.smoothstep(d, 0.9, 2.2);
+      const k = level ? THREE.MathUtils.smoothstep(d, 0.9, 2.2) : 1;
       r.scale.copy(r.userData.scale as THREE.Vector3).multiplyScalar(Math.max(0.001, k));
       r.visible = k > 0.01;
     }
