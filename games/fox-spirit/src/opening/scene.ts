@@ -16,6 +16,8 @@ import { groundH, SPAWN } from './layout';
 import { buildMeadow } from './meadow';
 import { buildVillage } from './village';
 import { createOpeningHearth } from './hearth';
+import { createOpeningPaint } from './paint';
+import { createOpeningOcclusion } from './occlusion';
 
 export interface OpeningCtx {
   scene: THREE.Scene;
@@ -79,18 +81,18 @@ export async function runOpening(): Promise<void> {
   fox.root.add(contact);
   scene.add(fox.root);
 
-  const hearth = createOpeningHearth({ scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p) });
+  const paint = createOpeningPaint({ field, renderer, uniforms: paintU, groundH });
+  const occlusion = createOpeningOcclusion([...ctx.occluders, ...ctx.cutout]);
+  const hearth = createOpeningHearth({
+    scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p),
+    onIgnite: (at) => field.restore(at, 12, 1.8, { edgeMax: 1.4 }),
+  });
   const player = createPlay({
     fox,
     groundH,
     colliders: ctx.colliders,
     start: SPAWN,
-    cutout: ctx.cutout,
     updrafts: hearth.updrafts,
-    onLand(at, impact) {
-      if (field.restores.length >= 4) return;
-      field.restore(at, 4.5 + 3 * impact + 2 * field.restores.length, 1.8, { edgeMax: 1.4 });
-    },
   });
   ctx.player = player;
   const view = player.cam.camera;
@@ -112,7 +114,9 @@ export async function runOpening(): Promise<void> {
     lights.key.position.set(p.x + 14, 16, p.z + 6);
     lights.key.target.updateMatrixWorld();
     for (const fn of updates) fn(dt, time);
-    field.update(dt);
+    paint.update(dt, p);
+    scene.updateMatrixWorld(true);
+    occlusion.update(dt, view, p);
     // world grade follows how much of the slice the fox has painted
     const k = Math.min(1, field.restores.reduce((a, r) => a + r.radius * r.radius, 0) / 260);
     sky.setPaint(k, new THREE.Vector2(0.8, -0.6));
@@ -132,7 +136,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), restores: field.restores.length } });
+  const state = () => ({ ...player.state(), opening: { hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {

@@ -4,6 +4,7 @@
  * Scenes (lookdevP0 clearing, opening slice) own their layout; they build from here.
  */
 import * as THREE from 'three';
+import { createTrailUniforms, TRAIL_DECLARATIONS, TRAIL_BLEND } from './opening/paint';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const INK = new THREE.Color(0x24160e);
@@ -39,6 +40,7 @@ export const RAMP_CANOPY = toonRamp([118, 178, 255]);
 
 /** Shared paint uniforms: restores as (x, z, radius, edge) */
 export const paintU = {
+  ...createTrailUniforms(),
   uRestore: { value: Array.from({ length: 4 }, () => new THREE.Vector4()) },
   uRestoreCount: { value: 0 },
   uPaper: { value: new THREE.Color(0.8, 0.66, 0.47) },
@@ -89,6 +91,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
         varying vec3 vLkWorld;
         uniform vec4 uRestore[4];
         uniform int uRestoreCount;
+        ${TRAIL_DECLARATIONS}
         uniform vec3 uPaper;
         uniform vec3 uPaperInk;
         uniform float uLkContour;
@@ -120,6 +123,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             tide = max(tide, exp(-pow((d + e * 0.9) / (e * 0.9), 2.0)));
             bloom = max(bloom, exp(-pow((d - 0.35 - 0.25 * lkNoise(xz * 1.7)) / 0.3, 2.0)) * step(0.5, r.z));
           }
+          ${TRAIL_BLEND}
           float lum = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
           float t = clamp(lum / 1.25, 0.0, 1.0);
           // paper: tooth + laid fibres (screen) and old-paper stains / foxing (world)
