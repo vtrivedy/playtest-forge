@@ -105,3 +105,13 @@ No passive rebound is implemented: a released arrival stays stable, while held
 jump loads for.12s then springs. No scenery moves and no permanent-restore slot.
 03 tests the revised chain and underside dash plus pointed/curl/ink blade fix.
 No human fun or final visual approval is inferred from mechanical passes.
+
+## Camera visibility revision (Flint #567)
+Register each leaf root (blade, ink and raised veins) in the existing opening
+occlusion registry. Between-lens leaves fade as a single visual unit; clear
+leaves recover their authored opacity. Stems and collision remain unchanged.
+Verify failed-entry underside and upper chase at normal resolution, then repeat
+the real-input chain. The underside scan found a blade directly over the lens without intersecting
+the fox sight rays. Also shrink each visual leaf horizontally near the lens
+(1.75m footprint, within .65m of its height), damping back to full size outside
+that band. Collision and stem remain stable; use the existing chase camera.

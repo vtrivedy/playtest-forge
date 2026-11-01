@@ -79,3 +79,22 @@ ordinary entry jump; corrected running approach succeeds. This is controlled
 mechanical evidence, not unfamiliar-player discovery. Page endpoint and combined
 route remain untested. Candidate still not ready to land; launch and anchors
 unchanged. Camera/leaf occlusion ownership requested from Flint in #swarm:559.
+
+### Lens-underside revision — 2026-11-01
+Flint #567 assigned canopy-only visibility. Registered blade+ink+veins roots with
+shared opening occlusion. First scan (`/captures/tallow/canopy-visibility-01`)
+failed: a middle blade directly above the entry chase lens filled the upper edge
+without intersecting the fox sight rays. Added a damped horizontal visual tuck
+within 1.75m of the lens and .65m of blade height, restoring outside that band.
+No controller, collider, spring, stem, anchor or scene change.
+
+Retest `/captures/tallow/canopy-visibility-02`: 2/2 checks pass, errors[], actual
+`window.__game.state()` retained. Inspected same entry/yaw PNG before/after:
+overhead opaque band gone, fox silhouette unchanged, village now visible.
+Normal-resolution route `/captures/tallow/canopy-occlusion-01` passed5/5 before
+the tuck; final tuck route retest recorded separately as `canopy-occlusion-02`.
+This is a bounded visibility improvement; full feature FUN/BEAUTIFUL remains
+provisional pending integrated Page play. No new gait approval from stills.
+
+Final tuck route02: 5/5 PASS/errors[], middle→high→roost plus underside walk/dash.
+Inspected final high chase: leaf full width, veins and fox readable. tsc+vite PASS.
