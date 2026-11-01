@@ -8,7 +8,7 @@
  */
 import * as THREE from 'three';
 import { createForgeRenderer, createColorField, createPostStack, applyLookdevLights, applyHeightFog, matchFogToSky, type ColorField } from '../../../../src/render';
-import { buildSky, inkMaterial, paintU, rng } from '../lookdevKit';
+import { buildSky, inkMaterial, paintU, RESTORE_SLOTS, rng } from '../lookdevKit';
 import { buildContactShadow } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import { createPlay, PLAY, type Collider, type PlayController } from '../lookdevPlay';
@@ -163,8 +163,8 @@ export async function runOpening(): Promise<void> {
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
   function syncPaint(): void {
-    paintU.uRestoreCount.value = Math.min(4, field.restores.length);
-    field.restores.slice(0, 4).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
+    paintU.uRestoreCount.value = Math.min(RESTORE_SLOTS, field.restores.length);
+    field.restores.slice(0, RESTORE_SLOTS).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
   }
 
   let time = 0;

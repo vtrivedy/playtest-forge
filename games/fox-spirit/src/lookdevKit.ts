@@ -39,9 +39,11 @@ export const RAMP_WORLD = toonRamp([70, 150, 255]);
 export const RAMP_CANOPY = toonRamp([118, 178, 255]);
 
 /** Shared paint uniforms: restores as (x, z, radius, edge) */
+/** permanent restore regions the paint shader reads (H-a, steam, root, ruin, page… — one slot each) */
+export const RESTORE_SLOTS = 8;
 export const paintU = {
   ...createTrailUniforms(),
-  uRestore: { value: Array.from({ length: 4 }, () => new THREE.Vector4()) },
+  uRestore: { value: Array.from({ length: RESTORE_SLOTS }, () => new THREE.Vector4()) },
   uRestoreCount: { value: 0 },
   uPaper: { value: new THREE.Color(0.8, 0.66, 0.47) },
   uPaperInk: { value: new THREE.Color(0.2, 0.13, 0.08) },
@@ -89,7 +91,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
         '#include <common>',
         `#include <common>
         varying vec3 vLkWorld;
-        uniform vec4 uRestore[4];
+        uniform vec4 uRestore[${RESTORE_SLOTS}];
         uniform int uRestoreCount;
         ${TRAIL_DECLARATIONS}
         uniform vec3 uPaper;
@@ -109,7 +111,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           float lift = max(0.0, vLkWorld.y - uLkClimb.x) * uLkClimb.y;
           float drops = smoothstep(0.7, 0.78, lkNoise(xz * 1.3 + 11.0)) * (1.0 - step(0.2, lift));
           float paint = 0.0, tide = 0.0, bloom = 0.0;
-          for (int i = 0; i < 4; i++) {
+          for (int i = 0; i < ${RESTORE_SLOTS}; i++) {
             if (i >= uRestoreCount) break;
             vec4 r = uRestore[i];
             float d = length(xz - r.xy) - r.z + rag * min(1.0, r.z / 12.0) + lift;
