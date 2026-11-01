@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { buildMaple, hewn, inked, jitter, toon } from '../lookdevKit';
+import { hewn, inked, jitter, toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import { HOUSES, PATHS, WELL } from './layout';
 
@@ -27,7 +27,7 @@ const C = {
   slateDark: 0x4a4952,
   amber: 0xe6a65a,
   door: 0x6b4a32,
-  flag: 0x9b917d,
+  flag: 0x8d8471,
   bloom: [0x9a4f3c, 0xa8834a, 0x7d5a6a],
   leaf: 0x5d6040,
   rope: 0x8a7357,
@@ -340,28 +340,48 @@ function firePit(k: Kit, ctx: OpeningCtx, x: number, z: number): void {
   });
 }
 
-function flagstones(ctx: OpeningCtx): THREE.InstancedMesh {
+/** worn flagstones set flush in the lanes: a few irregular slab shapes, barely proud of the earth */
+function flagstones(ctx: OpeningCtx): THREE.Group {
   const { rand } = ctx;
-  const stone = hewn(new THREE.CylinderGeometry(0.32, 0.36, 0.12, 7), rand, 0.06);
-  const pts: THREE.Matrix4[] = [];
+  const shapes = Array.from({ length: 4 }, (_, v) => {
+    const g = new THREE.CylinderGeometry(0.3, 0.33, 0.1, 5 + v, 1);
+    const p = g.getAttribute('position') as THREE.BufferAttribute;
+    const lobes = Array.from({ length: 5 + v }, () => 0.75 + rand() * 0.4);
+    for (let i = 0; i < p.count; i++) {
+      const a = Math.atan2(p.getZ(i), p.getX(i));
+      const k = lobes[Math.round(((a + Math.PI) / (Math.PI * 2)) * (5 + v)) % (5 + v)]!;
+      p.setX(i, p.getX(i) * k);
+      p.setZ(i, p.getZ(i) * k);
+    }
+    return hewn(g, rand, 0.04);
+  });
+  const placed: THREE.Matrix4[][] = shapes.map(() => []);
   for (const [ax, az, bx, bz] of PATHS) {
     if (Math.min(az, bz) < 78) continue; // meadow tracks are worn earth, not flagged
     const len = Math.hypot(bx - ax, bz - az);
     const nx = -(bz - az) / len;
     const nz = (bx - ax) / len;
-    for (let s = 0.4; s < len; s += 0.55 + rand() * 0.25) {
+    for (let s = 0.3; s < len; s += 0.62 + rand() * 0.3) {
+      if (rand() < 0.18) continue; // missing stones: worn gaps
       const t = s / len;
-      const side = (rand() - 0.5) * 1.0;
+      const side = (rand() - 0.5) * 1.1;
       const x = ax + (bx - ax) * t + nx * side;
       const z = az + (bz - az) * t + nz * side;
-      const sc = 0.75 + rand() * 0.5;
-      pts.push(new THREE.Matrix4().compose(new THREE.Vector3(x, ctx.groundH(x, z) - 0.03, z), tmpQ.setFromEuler(tmpE.set(0, rand() * 6, 0)), new THREE.Vector3(sc, 1, sc * (0.8 + rand() * 0.3))));
+      const sc = 0.8 + rand() * 0.45;
+      placed[Math.floor(rand() * shapes.length)]!.push(
+        new THREE.Matrix4().compose(new THREE.Vector3(x, ctx.groundH(x, z) - 0.035, z), tmpQ.setFromEuler(tmpE.set((rand() - 0.5) * 0.06, rand() * 6, (rand() - 0.5) * 0.06)), new THREE.Vector3(sc, 1, sc)),
+      );
     }
   }
-  const mesh = new THREE.InstancedMesh(stone, toon(C.flag, { hatchWeight: 0.5 }), pts.length);
-  pts.forEach((m, i) => mesh.setMatrixAt(i, m));
-  mesh.receiveShadow = true;
-  return mesh;
+  const g = new THREE.Group();
+  const mat = toon(C.flag, { hatchWeight: 0.6 });
+  shapes.forEach((geo, v) => {
+    const mesh = new THREE.InstancedMesh(geo, mat, placed[v]!.length);
+    placed[v]!.forEach((m, i) => mesh.setMatrixAt(i, m));
+    mesh.receiveShadow = true;
+    g.add(mesh);
+  });
+  return g;
 }
 
 function lanternPost(k: Kit, ctx: OpeningCtx, x: number, z: number, yaw: number): THREE.Vector3 {
@@ -466,6 +486,96 @@ function chimneySmoke(ctx: OpeningCtx, x: number, y: number, z: number): void {
   });
 }
 
+const GATE_HALF = 1.35;
+type Gate = { x: number; y: number; z: number; yaw: number; nx: number; nz: number; dx: number; dz: number };
+
+/** gate frame across the hub lane where it leaves for the meadow: local x across the lane, z along it */
+function laneGate(ctx: OpeningCtx): Gate {
+  const [ax, az, bx, bz] = [-4, 88, -3, 81];
+  const len = Math.hypot(bx - ax, bz - az);
+  const dx = (bx - ax) / len;
+  const dz = (bz - az) / len;
+  const x = ax + (bx - ax) * 0.8;
+  const z = az + (bz - az) * 0.8;
+  // across-lane axis n = (−dz, dx) → kit yaw with local +x = n
+  const nx = -dz;
+  const nz = dx;
+  return { x, z, y: ctx.groundH(x, z), yaw: Math.atan2(-nz, nx), nx, nz, dx, dz };
+}
+
+/** lych-gate: stout posts on stones, tie beam, a little thatched hood and a hanging lantern */
+function buildGate(k: Kit, ctx: OpeningCtx, g: Gate): void {
+  const { rand } = ctx;
+  k.at(g.x, g.y, g.z, g.yaw, () => {
+    for (const s of [-1, 1]) {
+      k.add(hewn(box(0.62, 0.5, 0.62), rand, 0.07), C.stoneField, [s * GATE_HALF, 0.15, 0], [0, rand(), 0], 0.02);
+      k.add(jitter(new THREE.BoxGeometry(0.3, 2.6, 0.3, 1, 3, 1), 0.02, rand), C.timber, [s * GATE_HALF, 1.55, 0]);
+      k.add(box(0.12, 0.7, 0.12), C.timber, [s * (GATE_HALF - 0.3), 2.25, 0], [0, 0, s * 0.75]);
+    }
+    k.add(jitter(new THREE.BoxGeometry(GATE_HALF * 2 + 0.7, 0.24, 0.3, 4, 1, 1), 0.02, rand), C.timberDark, [0, 2.48, 0]);
+    // thatched hood: two fringed courses meeting at a rolled ridge
+    const slope = 0.62;
+    for (const sz of [-1, 1]) k.add(thatchCourse(GATE_HALF * 2 + 1.0, 0.24, 1.25, sz, rand), C.thatch, [0, 2.95, sz * 0.47], [sz * slope, 0, 0], 0.02);
+    k.add(jitter(cyl(0.2, 0.2, GATE_HALF * 2 + 1.1, 10, 'x'), 0.04, rand), C.thatchDark, [0, 3.32, 0], [0, 0, 0], 0.02);
+    // lantern hung from the beam's centre, and a carved maple plaque on the beam
+    k.add(cyl(0.015, 0.015, 0.45, 4), C.rope, [0, 2.15, 0]);
+    k.add(box(0.3, 0.38, 0.3), C.amber, [0, 1.78, 0], [0, 0.4, 0]);
+    k.add(new THREE.ConeGeometry(0.26, 0.18, 4), C.timberDark, [0, 2.03, 0], [0, Math.PI / 4 + 0.4, 0]);
+    k.add(box(0.36, 0.06, 0.36), C.timberDark, [0, 1.57, 0], [0, 0.4, 0]);
+    k.add(hewn(box(0.7, 0.42, 0.08), rand, 0.03), C.door, [0, 2.48, 0.19]);
+    k.add(new THREE.ExtrudeGeometry(mapleShape(0.16), { depth: 0.04, bevelEnabled: false }), C.amber, [0, 2.46, 0.23]);
+  });
+}
+
+/** low dry-stone walls along both sides of the hub lane down to the gate, with a gap or two */
+function laneWalls(k: Kit, ctx: OpeningCtx, g: Gate): { x: number; z: number; yaw: number; hx: number; hz: number; top: number }[] {
+  const { rand } = ctx;
+  const out: { x: number; z: number; yaw: number; hx: number; hz: number; top: number }[] = [];
+  const yaw = Math.atan2(g.dx, g.dz);
+  for (const s of [-1, 1]) {
+    // from the gate post back toward the plaza
+    const runs = s < 0 ? [[0.3, 2.6], [3.4, 4.6]] : [[0.3, 3.8]];
+    for (const [a, b] of runs) {
+      const n = Math.round((b! - a!) / 0.5);
+      for (let i = 0; i < n; i++) {
+        const t = a! + ((i + 0.5) / n) * (b! - a!);
+        const x = g.x + g.nx * s * (GATE_HALF + 0.15) - g.dx * t;
+        const z = g.z + g.nz * s * (GATE_HALF + 0.15) - g.dz * t;
+        const y = ctx.groundH(x, z);
+        k.add(hewn(box(0.42, 0.36, 0.5), rand, 0.08), rand() < 0.5 ? C.stoneField : C.stoneDark, [x, y + 0.12, z], [0, yaw + (rand() - 0.5) * 0.3, 0], 0.018);
+        if (rand() < 0.75) k.add(hewn(box(0.38, 0.28, 0.44), rand, 0.08), rand() < 0.5 ? C.stoneField : C.stoneCool, [x + (rand() - 0.5) * 0.08, y + 0.44, z], [0, yaw + (rand() - 0.5) * 0.4, 0], 0.016);
+      }
+      const tm = (a! + b!) / 2;
+      const cx = g.x + g.nx * s * (GATE_HALF + 0.15) - g.dx * tm;
+      const cz = g.z + g.nz * s * (GATE_HALF + 0.15) - g.dz * tm;
+      out.push({ x: cx, z: cz, yaw, hx: 0.28, hz: (b! - a!) / 2, top: ctx.groundH(cx, cz) + 0.62 });
+    }
+  }
+  return out;
+}
+
+/** plank store-shed with a lean-to slate roof and a sack pile */
+function shed(k: Kit, ctx: OpeningCtx, x: number, z: number, yaw: number): { x: number; z: number; yaw: number; hx: number; hz: number; top: number } {
+  const { rand } = ctx;
+  const y = ctx.groundH(x, z) - 0.05;
+  const [w, d, hFront, hBack] = [2.6, 2.0, 2.1, 1.5];
+  k.at(x, y, z, yaw, () => {
+    k.add(hewn(box(w + 0.3, 0.4, d + 0.3), rand, 0.04), C.stoneDark, [0, 0.05, 0], [0, 0, 0], 0.02);
+    for (let i = 0; i < 7; i++) {
+      const px = -w / 2 + (i + 0.5) * (w / 7);
+      k.add(box(w / 7 - 0.02, hFront, 0.08), i % 2 ? C.door : C.timber, [px, 0.2 + hFront / 2, d / 2], [0, 0, (rand() - 0.5) * 0.03], 0.012);
+      k.add(box(w / 7 - 0.02, hBack, 0.08), i % 2 ? C.timber : C.door, [px, 0.2 + hBack / 2, -d / 2], [0, 0, 0], 0.012);
+    }
+    for (const s of [-1, 1]) k.add(box(0.08, (hFront + hBack) / 2, d), C.timber, [(s * w) / 2, 0.2 + (hFront + hBack) / 4, 0]);
+    for (const s of [-1, 1]) for (const sz of [-1, 1]) k.add(box(0.16, sz > 0 ? hFront : hBack, 0.16), C.timberDark, [(s * w) / 2, 0.2 + (sz > 0 ? hFront : hBack) / 2, (sz * d) / 2]);
+    const slope = Math.atan2(hFront - hBack, d);
+    k.add(hewn(new THREE.BoxGeometry(w + 0.6, 0.16, d + 0.8, 3, 1, 3), rand, 0.015), C.slate, [0, 0.2 + (hFront + hBack) / 2 + 0.1, 0], [slope, 0, 0], 0.02);
+    k.add(box(0.9, 1.5, 0.06), C.timberDark, [0.3, 0.95, d / 2 + 0.05]);
+    for (let i = 0; i < 3; i++) k.add(jitter(new THREE.IcosahedronGeometry(0.3, 1), 0.15, rand), C.cloth[0]!, [-w / 2 - 0.45 + (i % 2) * 0.3, 0.3 + Math.floor(i / 2) * 0.4, d / 2 - 0.2 - i * 0.25], [0, rand() * 6, 0], 0.014, [1, 0.75, 1.3]);
+  });
+  return { x, z, yaw, hx: w / 2 + 0.25, hz: d / 2 + 0.35, top: y + hFront + 0.3 };
+}
+
 export function buildVillage(ctx: OpeningCtx): void {
   const { scene, colliders } = ctx;
   HOUSES.forEach((h, i) => {
@@ -485,46 +595,49 @@ export function buildVillage(ctx: OpeningCtx): void {
     }
   });
 
-  const props = new Kit();
-  greatWell(props, ctx);
+  /** each landmark is its own merged group so the chase-cam cutout fades only what blocks */
+  const group = (name: string, fn: (k: Kit) => void) => {
+    const k = new Kit();
+    fn(k);
+    const g = k.build();
+    g.name = name;
+    scene.add(g);
+    ctx.occluders.push(g);
+  };
+  group('great-well', (k) => greatWell(k, ctx));
   colliders.push({ kind: 'post', x: WELL.x, z: WELL.z, r: 1.8 });
-  firePit(props, ctx, -11.5, 93.6);
-  colliders.push({ kind: 'cap', x: -11.5, z: 93.6, r: 1.1, base: ctx.groundH(-11.5, 93.6), h: 0.25 });
-  const posts: Record<string, THREE.Vector3> = {};
-  for (const [name, x, z, yaw] of [['plaza', -12, 86.4, 0.4], ['east', 6.6, 89.4, Math.PI], ['meadow', -3.2, 81.6, -0.6], ['north', -4.2, 96.5, 2.4]] as const) {
-    posts[name] = lanternPost(props, ctx, x, z, yaw);
-    colliders.push({ kind: 'post', x, z, r: 0.2 });
-  }
-  // festoons: plaza post ↔ well hood ↔ meadow post, and across the north lane
-  const wellTop = new THREE.Vector3(WELL.x, ctx.groundH(WELL.x, WELL.z) + 2.75, WELL.z);
-  festoon(props, posts.plaza!, wellTop, 0.45);
-  festoon(props, wellTop, posts.meadow!, 0.5);
-  festoon(props, posts.north!, new THREE.Vector3(-9, ctx.groundH(-9, 97.6) + 2.7, 97.6), 0.35);
-  // back-garden fences
-  for (const [ax, az, bx, bz] of [[-21, 81.8, -15, 81.8], [-31.5, 81.2, -25.5, 81.2], [8.6, 92.2, 15.4, 92.2], [-12, 97.2, -6.2, 97.2]] as const)
-    colliders.push({ kind: 'box', ...fence(props, ctx, ax, az, bx, bz) });
-  handCart(props, ctx, -11.2, 81.8, 0.7);
-  colliders.push({ kind: 'box', x: -11.2, z: 81.8, yaw: 0.7, hx: 0.75, hz: 1.2, top: ctx.groundH(-11.2, 81.8) + 0.9 });
-  for (const [x, z, yaw] of [[-23.2, 90.4, 0.3], [-22.0, 90.9, 1.2], [-22.7, 90.6, 0.8]] as const) {
-    const y = ctx.groundH(x, z);
-    props.add(hewn(new THREE.BoxGeometry(1.0, 0.55, 0.6, 2, 1, 1), ctx.rand, 0.05), C.thatch, [x, y + 0.26 + (x === -22.7 ? 0.55 : 0), z], [0, yaw, 0], 0.016);
-  }
-  colliders.push({ kind: 'box', x: -22.6, z: 90.6, yaw: 0.6, hx: 1.1, hz: 0.7, top: ctx.groundH(-22.6, 90.6) + 1.1 });
-  washingLine(props, ctx, -33.5, 91.2, -29.2, 91.8);
-  for (const [x, z] of [[-33.5, 91.2], [-29.2, 91.8]] as const) colliders.push({ kind: 'post', x, z, r: 0.12 });
-  const pg = props.build();
-  pg.name = 'village-props';
-  scene.add(pg);
-  ctx.occluders.push(pg);
-  scene.add(flagstones(ctx));
 
-  // a few village maples between the cottages (meadow trees are meadow.ts)
-  for (const [x, z, s, pal] of [[-23.5, 95.5, 1.0, 1], [-1.5, 104, 1.15, 2], [3.5, 96.5, 0.85, 3], [-35.5, 94.5, 1.1, 0]] as const) {
-    const y = ctx.groundH(x, z);
-    const t = buildMaple(ctx.rand, s, 'grove', pal, y);
-    t.position.set(x, y - 0.1, z);
-    t.rotation.y = ctx.rand() * 6;
-    scene.add(t);
-    colliders.push({ kind: 'post', x, z, r: 0.45 * s });
-  }
+  // the lych-gate where the hub lane leaves the village for Arrival Meadow, lane walls leading to it
+  const gate = laneGate(ctx);
+  group('lane-gate', (k) => {
+    buildGate(k, ctx, gate);
+    for (const c of laneWalls(k, ctx, gate)) colliders.push({ kind: 'box', ...c });
+  });
+  for (const s of [-1, 1]) colliders.push({ kind: 'post', x: gate.x + gate.nx * s * GATE_HALF, z: gate.z + gate.nz * s * GATE_HALF, r: 0.3 });
+
+  const posts: Record<string, THREE.Vector3> = {};
+  group('village-props', (props) => {
+    firePit(props, ctx, -11.5, 93.6);
+    for (const [name, x, z, yaw] of [['plaza', -12, 86.4, 0.4], ['east', 6.6, 89.4, Math.PI], ['north', -4.2, 96.5, 2.4]] as const) {
+      posts[name] = lanternPost(props, ctx, x, z, yaw);
+      colliders.push({ kind: 'post', x, z, r: 0.2 });
+    }
+    // festoons: plaza post ↔ well hood ↔ lane gate, and across the north lane
+    const wellTop = new THREE.Vector3(WELL.x, ctx.groundH(WELL.x, WELL.z) + 2.75, WELL.z);
+    festoon(props, posts.plaza!, wellTop, 0.45);
+    festoon(props, wellTop, new THREE.Vector3(gate.x - gate.nx * GATE_HALF, gate.y + 2.25, gate.z - gate.nz * GATE_HALF), 0.55);
+    festoon(props, posts.north!, new THREE.Vector3(-9, ctx.groundH(-9, 97.6) + 2.7, 97.6), 0.35);
+    // back-garden fences
+    for (const [ax, az, bx, bz] of [[-21, 81.8, -15, 81.8], [-31.5, 81.2, -25.5, 81.2], [8.6, 92.2, 15.4, 92.2], [-12, 97.2, -6.2, 97.2]] as const)
+      colliders.push({ kind: 'box', ...fence(props, ctx, ax, az, bx, bz) });
+    handCart(props, ctx, -11.2, 81.8, 0.7);
+    colliders.push({ kind: 'box', x: -11.2, z: 81.8, yaw: 0.7, hx: 0.75, hz: 1.2, top: ctx.groundH(-11.2, 81.8) + 0.9 });
+    for (const [x, z, yaw, up] of [[-24.6, 89.4, 0.3, 0], [-23.4, 89.9, 1.2, 0], [-24.1, 89.6, 0.8, 1]] as const)
+      props.add(hewn(new THREE.BoxGeometry(1.0, 0.55, 0.6, 2, 1, 1), ctx.rand, 0.05), C.thatch, [x, ctx.groundH(x, z) + 0.26 + up * 0.55, z], [0, yaw, 0], 0.016);
+    colliders.push({ kind: 'box', x: -24, z: 89.6, yaw: 0.6, hx: 1.1, hz: 0.7, top: ctx.groundH(-24, 89.6) + 1.1 });
+    washingLine(props, ctx, -33.5, 91.2, -29.2, 91.8);
+    for (const [x, z] of [[-33.5, 91.2], [-29.2, 91.8]] as const) colliders.push({ kind: 'post', x, z, r: 0.12 });
+  });
+  group('store-shed', (k) => colliders.push({ kind: 'box', ...shed(k, ctx, 2.4, 87.4, 0.35) }));
+  scene.add(flagstones(ctx));
 }

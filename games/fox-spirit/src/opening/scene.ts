@@ -26,6 +26,7 @@ const SHOTS: Record<string, { pos: [number, number, number]; look: [number, numb
   well: { pos: [-4.2, 1.5, 89.2], look: [-8, 1.1, 85] },
   lane: { pos: [-11.5, 1.4, 89.6], look: [-28, 1.8, 85.5] },
   meadow: { pos: [-4.5, 3.2, 91], look: [6, 1, 74] },
+  gate: { pos: [-4.9, 1.3, 88.6], look: [-2.9, 1.5, 81] },
   aerial: { pos: [-4, 46, 122], look: [-4, 0, 82], fov: 45 },
 };
 
