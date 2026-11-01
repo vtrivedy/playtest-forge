@@ -4,7 +4,7 @@
  * Authored in Blender (tools/blender/scripts/hearth_fox_*.py) → assets/hero/hearth_fox.glb:
  * `fox_coat` (skinned, vertex-coloured coat; TEXCOORD_0.x = ember mask) + `fox_face` (eyes, nose),
  * clips idle / walk / run (in place; the rig's glTF extras carry each clip's ground speed).
- * Here: 3-band toon coat with warm rim, skinned inverted-hull ink, ember tail glow + flame tongues.
+ * Here: 3-band cel coat (hatched shadow step, hard warm rim), skinned inverted-hull ink, ember tail glow + drifting ember motes.
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -56,12 +56,17 @@ function coatMaterial(emberGain: number): THREE.MeshToonMaterial {
           // can't airbrush the coat; the shadow step leans rust-plum (melancholy), never grey
           vec3 lit = outgoingLight - totalEmissiveRadiance;
           float L = dot(lit, vec3(0.2126, 0.7152, 0.0722)) / max(1e-3, dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)));
-          float band = mix(0.42, 0.8, smoothstep(0.41, 0.49, L));
-          band = mix(band, 1.1, smoothstep(0.9, 1.0, L));
+          // lit step kept close to mid so band edges read as paint, not a lacquer highlight
+          float shade = smoothstep(0.41, 0.49, L);
+          float band = mix(0.44, 0.84, shade);
+          band = mix(band, 1.0, smoothstep(0.9, 1.0, L));
           vec3 tint = mix(vec3(0.82, 0.58, 0.66), vec3(1.0), smoothstep(0.43, 0.97, L));
-          outgoingLight = diffuseColor.rgb * band * tint + totalEmissiveRadiance;
+          // pressed-ink hatching in the shadow step: the fox shares the world's printed medium
+          float hatch = step(0.66, fract((gl_FragCoord.x + gl_FragCoord.y) * 0.16));
+          outgoingLight = diffuseColor.rgb * band * tint * (1.0 - 0.18 * hatch * (1.0 - shade)) + totalEmissiveRadiance;
+          // one hard warm rim band (not a soft sheen)
           float rim = 1.0 - clamp(dot(normalize(normal), vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
-          outgoingLight += vec3(1.0, 0.55, 0.22) * smoothstep(0.6, 0.88, rim) * 0.3 * (1.0 - vEmber);
+          outgoingLight += vec3(1.0, 0.55, 0.22) * smoothstep(0.72, 0.76, rim) * 0.22 * (1.0 - vEmber);
         }
         #include <opaque_fragment>`,
       );
@@ -70,7 +75,7 @@ function coatMaterial(emberGain: number): THREE.MeshToonMaterial {
   return m;
 }
 
-export async function loadHearthFox(inkMaterial: (width: number) => THREE.Material, inkWidth = 0.016): Promise<HearthFox> {
+export async function loadHearthFox(inkMaterial: (width: number) => THREE.Material, inkWidth = 0.024): Promise<HearthFox> {
   const gltf = await new GLTFLoader().loadAsync('/assets/hero/hearth_fox.glb');
   const root = new THREE.Group();
   const model = gltf.scene;
@@ -115,21 +120,39 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
     }
   }
 
-  // ember wisps streaming off the pointed tail tip (along the tail bone's +Y) + a warm hearth light
-  const tongues: THREE.Mesh[] = [];
-  if (tailTip) {
-    const tipLen = 0.095; // tail6 bone length (leaf bone: glTF keeps no tail position)
-    const wispMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 0.42, 0.07), transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending });
-    for (let i = 0; i < 3; i++) {
-      const g = new THREE.ConeGeometry(0.014 - i * 0.003, 0.13 - i * 0.03, 6);
-      g.translate(0, 0.06 - i * 0.012, 0);
-      const t = new THREE.Mesh(g, wispMat);
-      t.position.set((i - 1) * 0.008, tipLen * 0.85, 0);
-      t.rotation.set(-0.25 + i * 0.12, 0, (i - 1) * 0.45);
-      tailTip.add(t);
-      tongues.push(t);
-    }
-  }
+  // ember motes: drift up off the tail tip (and a few off the ear tips), fading orange → ash.
+  // World-space Points (identity matrixWorld) so the trail stays behind a walking fox.
+  const earTips = ['earL', 'earR'].map((n) => model.getObjectByName(n) as THREE.Bone | undefined);
+  const MOTES = 48;
+  const motePos = new Float32Array(MOTES * 3);
+  const moteCol = new Float32Array(MOTES * 3);
+  const moteGeo = new THREE.BufferGeometry();
+  moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+  moteGeo.setAttribute('color', new THREE.BufferAttribute(moteCol, 3));
+  const moteTex = (() => {
+    const n = 16;
+    const d = new Uint8Array(n * n * 4);
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const r = Math.hypot(x - n / 2 + 0.5, y - n / 2 + 0.5) / (n / 2);
+        d.set([255, 255, 255, Math.round(255 * Math.max(0, 1 - r) ** 1.5)], (y * n + x) * 4);
+      }
+    const t = new THREE.DataTexture(d, n, n, THREE.RGBAFormat);
+    t.needsUpdate = true;
+    return t;
+  })();
+  const motes = new THREE.Points(
+    moteGeo,
+    new THREE.PointsMaterial({ size: 0.03, map: moteTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+  );
+  motes.frustumCulled = false;
+  motes.matrixAutoUpdate = false;
+  motes.matrixWorldAutoUpdate = false;
+  root.add(motes);
+  const moteSeed = Array.from({ length: MOTES }, (_, i) => [((i * 0.618034) % 1) * 1.6, ((i * 0.414214) % 1) * 2 - 1, ((i * 0.732051) % 1) * 2 - 1] as const);
+  const spawn = new THREE.Vector3();
+  const tipOff = new THREE.Vector3(0, 0.07, 0);
+  const earOff = new THREE.Vector3(0, 0.15, 0);
   const tailLight = new THREE.PointLight(0xff7a30, 1.4, 2.6, 2);
   (tailTip ?? root).add(tailLight);
   tailLight.position.set(0, 0.08, 0);
@@ -190,7 +213,25 @@ export async function loadHearthFox(inkMaterial: (width: number) => THREE.Materi
       addYaw(neck, look * 0.45);
       addYaw(head, look * 0.55);
       if (travel) root.position.addScaledVector(fwd.set(0, 0, 1).applyQuaternion(root.quaternion), (speeds[current] ?? 0) * dt);
-      tongues.forEach((t, i) => (t.scale.y = 0.75 + 0.4 * Math.abs(Math.sin(time * 7 + i * 2.1))));
+      // motes: fixed 1.6 s life, staggered; respawn position = tail tip (or ear tip for every 6th)
+      for (let i = 0; i < MOTES; i++) {
+        const [phase, sx, sz] = moteSeed[i]!;
+        const age = (time + phase) % 1.6;
+        const src = i % 6 === 0 ? earTips[(i / 6) % 2]! : tailTip;
+        if (!src) continue;
+        spawn.copy(src === tailTip ? tipOff : earOff);
+        src.localToWorld(spawn);
+        const k = age / 1.6;
+        motePos[i * 3] = spawn.x + sx * 0.05 * k + Math.sin(time * 2 + i) * 0.02 * k;
+        motePos[i * 3 + 1] = spawn.y + 0.32 * k + 0.1 * k * k;
+        motePos[i * 3 + 2] = spawn.z + sz * 0.05 * k;
+        const fade = Math.sin(Math.PI * Math.min(1, k * 1.4)) * (1 - k);
+        moteCol[i * 3] = 2.2 * fade;
+        moteCol[i * 3 + 1] = (0.75 - 0.4 * k) * fade;
+        moteCol[i * 3 + 2] = 0.12 * fade;
+      }
+      moteGeo.attributes.position!.needsUpdate = true;
+      moteGeo.attributes.color!.needsUpdate = true;
       tailLight.intensity = 1.3 + Math.sin(time * 9) * 0.2;
     },
   };

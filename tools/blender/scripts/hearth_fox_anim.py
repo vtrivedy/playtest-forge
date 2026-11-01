@@ -187,30 +187,41 @@ def author_gait(name):
             paw(f"ctl_{'f' if front else 'h'}paw.{s}", f + c, up, tilt)
         w = TAU * ph
         if not run:
-            # walk: soft double bob, hip roll/yaw follow the hind feet, chest counters, head steady
-            bob = 0.007 * math.cos(2 * w)
-            rot("hips", pitch=0.02 * math.sin(2 * w), yaw=0.05 * math.sin(w), roll=0.045 * math.sin(w + 0.6))
-            hip_offset(side=0.006 * math.sin(w + 0.6), up=bob - 0.01)
-            rot("spine", yaw=-0.03 * math.sin(w), pitch=-0.01 * math.sin(2 * w))
-            rot("chest", yaw=-0.05 * math.sin(w + 0.4), roll=-0.04 * math.sin(w + 0.4 + math.pi * 0.5))
-            rot("neck", pitch=-0.04 + 0.025 * math.sin(2 * w + 0.8), yaw=0.03 * math.sin(w + 1.0))
-            rot("head", pitch=0.06 - 0.02 * math.sin(2 * w + 0.8), yaw=-0.02 * math.sin(w + 1.0))
+            # walk: pelvis drops at each hind contact (ph 0, .5) and rises on push-off; shoulders do the
+            # same a quarter-cycle later (front contacts .27/.77). Body sits ~9% low so stance legs stay bent.
+            g_w = TAU * g["off"]["LF"]
+            hip_bob = -0.012 * math.cos(2 * w)
+            sh_bob = -0.012 * math.cos(2 * w - 2 * g_w)
+            hip_offset(side=0.008 * math.sin(w + 0.6), up=hip_bob - 0.036)
+            rot("hips", pitch=0.03 * math.sin(2 * w), yaw=0.06 * math.sin(w), roll=0.07 * math.sin(w + 0.9))
+            # shoulder height relative to the hips → spine pitch; lateral bend opposes the hips
+            rot("spine", yaw=-0.05 * math.sin(w + 0.3), pitch=(hip_bob - sh_bob) / 0.38)
+            rot("chest", yaw=-0.05 * math.sin(w + 0.7), roll=-0.05 * math.sin(w - g_w + 0.9), pitch=0.02 * math.sin(2 * w - 2 * g_w))
+            # head: cancel most of the shoulder bob, keep a small nod that lags front contact by ~2 frames
+            lag = TAU * 2 / N
+            nod = 0.03 * math.sin(2 * w - 2 * g_w - lag)
+            rot("neck", pitch=0.06 - (hip_bob - sh_bob) / 0.38 * 0.8 + nod * 0.4, yaw=0.04 * math.sin(w + 1.0))
+            rot("head", pitch=-0.02 + nod, yaw=-0.03 * math.sin(w + 1.0))
+            # tail: chain, each joint ~2.5 frames behind its parent, amplitude growing to the tip
             for i in range(1, 7):
-                rot(f"tail{i}", pitch=0.02 * math.sin(2 * w - i * 0.5) + (0.03 if i < 3 else -0.02), yaw=0.07 * math.sin(w - i * 0.55))
-            rot("ear.L", pitch=0.05 * math.sin(2 * w))
-            rot("ear.R", pitch=0.05 * math.sin(2 * w + 0.5))
+                k = 0.4 + 0.6 * i / 6
+                rot(f"tail{i}", pitch=0.05 * math.sin(2 * w - i * 0.9) + (0.04 if i < 3 else -0.02), yaw=0.17 * k * math.sin(w - i * 0.46))
+            rot("ear.L", pitch=0.06 * math.sin(2 * w - lag))
+            rot("ear.R", pitch=0.06 * math.sin(2 * w - lag + 0.5))
         else:
             # run: gather/extend spine flex, suspension lift, head steady, tail streams, ears pinned
             # flex > 0: gathered (rump tucked, back arched) as the hind paws swing under; < 0: extended
             flex = math.sin(w + 0.9)
-            rot("hips", pitch=0.2 * flex, roll=0.02 * math.sin(w))
-            hip_offset(up=0.035 * math.sin(w - 0.6) + 0.01)
-            rot("spine", pitch=-0.14 * flex)
-            rot("chest", pitch=-0.1 * flex + 0.03)
-            rot("neck", pitch=0.1 + 0.08 * flex)
-            rot("head", pitch=0.04 - 0.1 * flex)
+            # (+pitch = bone tip down: an arch is hips tip UP, spine/chest tips DOWN)
+            rot("hips", pitch=-0.22 * flex, roll=0.02 * math.sin(w))
+            hip_offset(up=0.035 * math.sin(w - 0.6) - 0.01)
+            rot("spine", pitch=0.16 * flex)
+            rot("chest", pitch=0.1 * flex + 0.03)
+            rot("neck", pitch=0.06 - 0.12 * flex)
+            rot("head", pitch=0.04 - 0.08 * flex)
             for i in range(1, 7):
-                rot(f"tail{i}", pitch=(-0.12 if i == 1 else 0.05) + 0.06 * math.sin(w - i * 0.7), yaw=0.03 * math.sin(w * 0.5 * 2 - i * 0.6))
+                k = 0.4 + 0.6 * i / 6
+                rot(f"tail{i}", pitch=(-0.12 if i == 1 else 0.04) + 0.1 * k * math.sin(w - i * 0.8), yaw=0.05 * k * math.sin(w - i * 0.6))
             rot("ear.L", pitch=-0.45)
             rot("ear.R", pitch=-0.45)
         key_all(fr)
@@ -228,7 +239,7 @@ def author_idle():
         for leg in ("LF", "RF", "LH", "RH"):
             paw(f"ctl_{'f' if leg[1] == 'F' else 'h'}paw.{leg[0]}", 0.0, 0.0, 0.0)
         breath = math.sin(2 * w)
-        hip_offset(side=0.004 * math.sin(w), up=-0.003 + 0.0025 * breath)
+        hip_offset(side=0.004 * math.sin(w), up=-0.022 + 0.0025 * breath)
         rot("hips", roll=0.015 * math.sin(w))
         rot("spine", pitch=-0.012 * breath)
         rot("chest", pitch=0.015 * breath)

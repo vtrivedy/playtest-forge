@@ -42,17 +42,17 @@ NODES = {
     "rump": (P(-0.31, 0.43), 0.074, 0.084),
     "loin": (P(-0.18, 0.44), 0.068, 0.068),
     "waist": (P(-0.04, 0.44), 0.07, 0.066),
-    "chest": (P(0.12, 0.395), 0.09, 0.148),
-    "withers": (P(0.22, 0.44), 0.08, 0.105),
-    "neck0": (P(0.29, 0.52), 0.07, 0.08),
-    "neck1": (P(0.345, 0.575), 0.06, 0.064),
-    "neck2": (P(0.38, 0.61), 0.046, 0.05),
+    "chest": (P(0.12, 0.395), 0.097, 0.152),
+    "withers": (P(0.22, 0.44), 0.088, 0.11),
+    "neck0": (P(0.285, 0.51), 0.078, 0.086),
+    "neck1": (P(0.33, 0.555), 0.064, 0.068),
+    "neck2": (P(0.365, 0.585), 0.048, 0.052),
 }
 LEGS = {
     # front: shoulder → elbow → wrist → paw → toe
-    "F": [(P(0.19, 0.35), 0.05, 0.06), (P(0.15, 0.23), 0.031, 0.033), (P(0.17, 0.075), 0.017, 0.017), (P(0.18, 0.02), 0.019, 0.017), (P(0.215, 0.014), 0.017, 0.012)],
+    "F": [(P(0.19, 0.35), 0.060, 0.072), (P(0.15, 0.23), 0.037, 0.040), (P(0.17, 0.075), 0.020, 0.020), (P(0.18, 0.02), 0.019, 0.017), (P(0.215, 0.014), 0.017, 0.012)],
     # hind: hip → stifle → mid-shin → hock → paw → toe  (digitigrade: hock pulled back)
-    "H": [(P(-0.25, 0.385), 0.06, 0.074), (P(-0.185, 0.25), 0.045, 0.048), (P(-0.22, 0.19), 0.032, 0.032), (P(-0.3, 0.11), 0.018, 0.02), (P(-0.28, 0.02), 0.019, 0.017), (P(-0.245, 0.014), 0.017, 0.012)],
+    "H": [(P(-0.25, 0.385), 0.072, 0.089), (P(-0.185, 0.25), 0.054, 0.058), (P(-0.22, 0.19), 0.038, 0.038), (P(-0.3, 0.11), 0.022, 0.024), (P(-0.28, 0.02), 0.019, 0.017), (P(-0.245, 0.014), 0.017, 0.012)],
 }
 LEG_X = {"F": 0.055, "H": 0.06}
 
@@ -144,7 +144,7 @@ def lerp_table(tab, u):
 
 
 # ------------------------------------------------------------------ head: wedge skull, cheek ruff, long tapered muzzle
-HEAD_PIVOT = P(0.4, 0.625)
+HEAD_PIVOT = P(0.39, 0.6)
 HEAD_PITCH = math.radians(-6)  # nose slightly down: wary, not perky
 #        u      halfw  top    bot    zc
 HEAD = [(-0.09, 0.024, 0.024, 0.024, 0.0),
@@ -167,7 +167,7 @@ def cheek(u):
     def shape(a):
         # a measured from +side; lower cheek ≈ -25°
         d = min(abs(((a - (-0.45)) + math.pi) % (2 * math.pi) - math.pi), abs(((a - (math.pi + 0.45)) + math.pi) % (2 * math.pi) - math.pi))
-        return 1 + 0.42 * amt * max(0.0, 1 - d / 0.6) ** 1.6
+        return 1 + 0.55 * amt * max(0.0, 1 - d / 0.55) ** 1.4
     return shape
 
 
@@ -282,10 +282,10 @@ TAIL_N = 34
 def tail_radius(t):
     # root sits inside the rump at body girth so the back line flows into the plume; fullest ~50%
     # narrow-ish dock leaving the rump, fur blooms after it, long taper to the flame point
-    bloom = 0.42 + 0.58 * smooth_(0.06, 0.3, t)
+    bloom = 0.5 + 0.5 * smooth_(0.05, 0.28, t)
     body = math.sin(min(1.0, 0.1 + t * 1.0) * math.pi) ** 0.5
     tip = (1 - smooth_(0.62, 1.0, t)) ** 0.7
-    return 0.108 * bloom * body * (1 - 0.15 * t) * (0.35 + 0.65 * tip) + 0.003
+    return 0.128 * bloom * body * (1 - 0.15 * t) * (0.35 + 0.65 * tip) + 0.003
 
 
 def smooth_(e0, e1, x):
@@ -374,6 +374,25 @@ def paint(ob, fn):
 
 apply_mods(body)
 apply_mods(head, 2)
+
+
+def tufts(ob, region, amp, freq):
+    """jagged fur: sharp ridges pushed out along the normal, pointing down/back (reads as tufts in silhouette)"""
+    for v in ob.data.vertices:
+        w = region(v.co)
+        if w <= 0:
+            continue
+        a = math.atan2(v.co.x, v.co.z - 0.3) * freq
+        saw = (a / TAU) % 1.0 + 0.35 * math.sin(-v.co.y * 60.0 + v.co.z * 40.0)
+        spike = max(0.0, 1 - abs((saw % 1.0) - 0.5) * 2.4) ** 2.5
+        v.co += v.normal * amp * w * spike
+
+
+TAU = math.pi * 2
+# chest/neck ruff: front + sides of the throat down to the brisket, not the back
+tufts(body, lambda co: smooth01(0.16, 0.24, -co.y) * smooth01(0.42, 0.36, -co.y) * smooth01(0.36, 0.44, co.z) * smooth01(0.66, 0.58, co.z), 0.022, 9)
+for p in body.data.polygons:
+    p.use_smooth = True
 for e in EARS:
     apply_mods(e, 1)
 apply_mods(tail, 1)
