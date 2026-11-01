@@ -26,6 +26,7 @@ import {
   buildSky,
   contactInk,
   type TreeKind,
+  RESTORE_SLOTS,
 } from './lookdevKit';
 import {
   createForgeRenderer,
@@ -200,8 +201,8 @@ export async function runLookdevP0(): Promise<void> {
     lights.key.color.set(0xffe6c4).lerp(new THREE.Color(0xffd6b0), k);
   }
   function syncPaint(): void {
-    paintU.uRestoreCount.value = Math.min(4, field.restores.length);
-    field.restores.slice(0, 4).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
+    paintU.uRestoreCount.value = Math.min(RESTORE_SLOTS, field.restores.length);
+    field.restores.slice(0, RESTORE_SLOTS).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
   }
   function setCamera(shot: Shot): void {
     const s = SHOTS[shot];

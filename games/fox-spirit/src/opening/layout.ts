@@ -13,6 +13,22 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 /** rock shelf the H-a updraft lifts onto: 9 × 9, top = ground + 5 */
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
+/**
+ * Runaway Page flight loops, one per stage: [x, height above base terrain (groundH), z]. Stage 1 starts east of the well (the hedgehog has the well's face), in the wake view, and
+ * circles the plaza; stages 2–3 circle over the canopy chain and the pop-up ruin high enough that only those reach it. `payoff` = the permanent wash when the page is kept.
+ */
+export const PAGE = {
+  stages: [
+    [[-1.8, 1.3, 88.2], [-2, 1.1, 91], [-1, 1.2, 95.5], [-5, 1.1, 97.2], [-10.5, 1.2, 95.5], [-13.2, 1.2, 90.2], [-12.5, 1.2, 86.8], [-10.5, 1.1, 82.8], [-5.2, 1.1, 84.2]],
+    // stage 2 shuttles 1.6 m above the canopy's roost and high leaf (Tallow CANOPY rise 3.5 / 3.0): landing on a leaf
+    // can't reach it, a spring launch through it can; hops arc out wide so it never flies into the fox
+    [[-1, 5.1, 64.7], [2.6, 6.4, 64.6], [0.9, 4.6, 67.1], [-3, 6.2, 67.4]],
+    // stage 3 shuttles 1 m above the pop-up ruin's overlook and second leaf (Rook POP_UP_RUIN tops 1.02 / 0.47 abs): a jump reaches it
+    [[-24.4, 3.0, 71], [-26.4, 4.2, 68.6], [-28.4, 2.1, 71], [-26.4, 4.0, 73.4]],
+  ] as ReadonlyArray<ReadonlyArray<readonly [number, number, number]>>,
+  payoff: { x: -4, z: 80, r: 45 },
+} as const;
+
 /** The Still Crown on the Summit: far down the vista gap past the bridge, low enough to sit inside the chase frame */
 export const CROWN = { x: 2, y: -70, z: -112, yaw: 0, scale: 1.6 } as const;
 
@@ -144,6 +160,25 @@ export const KEEPING = (() => {
   };
 })();
 
+/** Optional canopy route; broad one-way leaf tops above the meadow retry floor. */
+export const CANOPY = [
+  { id: 'entry', x: -0.2, z: 71.5, rise: 0.42 },
+  { id: 'middle', x: -0.2, z: 69.3, rise: 1.9 },
+  { id: 'high', x: 0.9, z: 67.1, rise: 3.0 },
+  { id: 'roost', x: -1, z: 64.7, rise: 3.5 },
+] as const;
+/** West-grove paper ruin: permanent dash folds, then a southern return to meadow. */
+export const POP_UP_RUIN = {
+  entry: { x: -24, z: 75 },
+  leaves: [
+    { x: -27, z: 75, top: -0.08, yaw: 0 },
+    { x: -28.4, z: 71, top: 0.47, yaw: -Math.PI / 2 },
+  ],
+  width: 3.4,
+  depth: 3.6,
+  overlook: { x: -24.4, z: 71, top: 1.02, width: 3.4, depth: 3.6 },
+  returnEnd: { x: -24.4, z: 75.7 },
+} as const;
 /**
  * Unpressed creatures (DESIGN-unpressed.md): where each pressed drawing sits. `yaw` orients the creature's
  * profile plane on the surface (its local +z = the surface's outward normal); `y` is the drawing's foot line;

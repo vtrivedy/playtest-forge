@@ -49,6 +49,11 @@ slightly lighter, stronger paper vapor for readability against the ochre cliff.
 
 ## Retire the first heat teach
 
+Before the first successful ride, show H-a guidance only within 6 m of its
+base in three dimensions. Players visiting canopy or ruin first should see those
+places without the hearth lesson following them. Preserve the permanent retirement
+after a successful ride. Verify near/far/overhead positions and real movement.
+
 After H-a records its first successful elevated landing, retire its tutorial HUD
 permanently. The landing is the handoff to Carry; a completed-hearth message must
 not overlap the nearby coal interaction prompt. Keep incomplete hearth guidance
@@ -71,3 +76,11 @@ The root bowl centre is solid after Moss3861382. Stage chemistry and stair
 regressions at (29.0,77.35), facing the bowl, to verify placement from outside
 the raised rim. Retain real E placement and one-shot bridge assertions; add a
 check that the fox stays outside the bowl. Staged starts remain disclosed.
+
+## Spring rim regression
+
+Stage at the authored spring approach (24.17,80.65), facing the bowl.
+Verify real E placement centres the coal while fox stays outside, same-rim
+recovery preserves ignition, and Space hold lifts the carrying fox above the
+terrace. Retain screenshots and __game. This is a staged-start regression,
+not a continuous route or landing proof. No gameplay changes.
