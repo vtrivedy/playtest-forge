@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { createFollowCamera, type FollowCamera } from './camera';
 import type { HearthFox } from './lookdevFox';
+import type { UpdraftSystem } from './chem/updraft';
 
 /** Walkable / blocking shapes built from the same data that places the props. */
 export type Collider =
@@ -29,6 +30,10 @@ export const PLAY = {
   turnSlow: 7,
   turnFast: 3.6,
   jumpVelocity: 5.0,
+  glideSink: 1.35,
+  dashSpeed: 8,
+  dashDuration: 0.24,
+  dashCooldown: 0.55,
   gravity: 15,
   fallGravity: 1.45,
   /** vy multiplier when jump is released while rising */
@@ -411,6 +416,8 @@ export function createPlay(opts: {
    * fade (and drop their ink hulls) while that fade is on.
    */
   cutout?: THREE.Object3D[];
+  /** Opening heat teach: existing chemistry volume, sampled by real movement. */
+  updrafts?: UpdraftSystem;
 }): PlayController {
   const { fox, groundH, colliders } = opts;
   const P = PLAY;
@@ -550,6 +557,11 @@ export function createPlay(opts: {
   let coyoteT = 0;
   let bufferT = 0;
   let jumpHeld = false;
+  let dashHeld = false;
+  let dashT = 0;
+  let dashCooldownT = 0;
+  let dashesUsed = 0;
+  let gliding = false;
   let cut = false;
   let rising = false;
   let landT = 99;
@@ -567,6 +579,8 @@ export function createPlay(opts: {
     yawRate = 0;
     vel.set(0, 0, 0);
     grounded = true;
+    dashT = dashCooldownT = 0;
+    gliding = false;
     cam.snapBehind(yaw);
   }
   teleport(opts.start.x, opts.start.z, opts.start.yaw);
@@ -592,6 +606,13 @@ export function createPlay(opts: {
     const jump = keys.has('Space');
     if (jump && !jumpHeld) bufferT = P.buffer;
     jumpHeld = jump;
+    const dash = keys.has('ShiftLeft') || keys.has('ShiftRight');
+    if (dash && !dashHeld && dashCooldownT <= 0) {
+      dashT = P.dashDuration;
+      dashCooldownT = P.dashDuration + P.dashCooldown;
+      dashesUsed++;
+    }
+    dashHeld = dash;
   }
 
   /** horizontal move with step / wall blocking, per axis so the fox slides along walls */
@@ -607,6 +628,8 @@ export function createPlay(opts: {
   }
 
   function step(dt: number) {
+    dashT = Math.max(0, dashT - dt);
+    dashCooldownT = Math.max(0, dashCooldownT - dt);
     readInput();
     bufferT -= dt;
     const want = wish.length();
@@ -653,6 +676,13 @@ export function createPlay(opts: {
       apexY = pos.y;
     }
 
+    if (dashT > 0) {
+      speed = P.dashSpeed;
+      vel.x = Math.sin(yaw) * speed;
+      vel.z = Math.cos(yaw) * speed;
+    }
+    const lift = opts.updrafts?.liftAt(pos.x, pos.y, pos.z);
+    gliding = !grounded && jumpHeld && airT > 0.12 && (vel.y <= 0 || (lift?.k ?? 0) > 0.05);
     const feetY = pos.y;
     moveTo(pos.x + vel.x * dt, pos.z + vel.z * dt, feetY);
 
@@ -663,7 +693,14 @@ export function createPlay(opts: {
         vel.y *= P.jumpCut;
         cut = true;
       }
-      vel.y -= P.gravity * (vel.y < 0 ? P.fallGravity : 1) * dt;
+      if (gliding) {
+        const heat = lift?.k ?? 0;
+        const target = THREE.MathUtils.lerp(-P.glideSink, opts.updrafts?.tun.maxRise ?? 6.5, heat);
+        vel.y = THREE.MathUtils.damp(vel.y, target, heat > 0 ? opts.updrafts!.tun.liftResponse : 5, dt);
+      } else {
+        const fall = vel.y < 0 ? P.fallGravity * (1 - (opts.updrafts?.tun.fallLift ?? 0) * (lift?.k ?? 0)) : 1;
+        vel.y -= P.gravity * fall * dt;
+      }
       if (vel.y < 0) rising = false;
       pos.y += vel.y * dt;
       apexY = Math.max(apexY, pos.y);
@@ -694,6 +731,7 @@ export function createPlay(opts: {
         takeoffY = apexY = pos.y;
       } else pos.y = floor;
     }
+    if (opts.updrafts && lift) opts.updrafts.trackRide(dt, pos.y, vel.y, grounded, lift, grounded ? 'opening-ground' : null);
     landT += dt;
 
     // clip state
@@ -725,8 +763,8 @@ export function createPlay(opts: {
       vel,
       facing: yaw,
       grounded,
-      gliding: false,
-      dashing: false,
+      gliding,
+      dashing: dashT > 0,
       airTime: grounded ? 0 : airT,
       landing: null,
     });
@@ -753,6 +791,10 @@ export function createPlay(opts: {
       speed: +speed.toFixed(3),
       yaw: +yaw.toFixed(3),
       grounded,
+      gliding,
+      dashing: dashT > 0,
+      dashesUsed,
+      updraft: opts.updrafts?.state(),
       airTime: +airT.toFixed(3),
       apexY: +apexY.toFixed(3),
       lastJump: { apex: +lastJump.apex.toFixed(3), air: +lastJump.air.toFixed(3) },

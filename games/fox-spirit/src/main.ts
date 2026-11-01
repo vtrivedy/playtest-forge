@@ -1959,9 +1959,16 @@ async function boot() {
   tick();
 }
 
-// Redesign lookdev (?lookdev=p0): self-contained slice, the game never boots
-const lookdev = new URLSearchParams(location.search).get('lookdev');
-(lookdev === 'p0' ? import('./lookdevP0').then((m) => m.runLookdevP0()) : boot()).catch((err) => {
+// Redesign (?lookdev=p0): self-contained slices, the game never boots. `&play=1` = the opening
+// (Lanternhollow → Arrival Meadow → H-a); without it, the P0 clearing lookdev stills.
+const query = new URLSearchParams(location.search);
+const lookdev = query.get('lookdev');
+(lookdev === 'p0'
+  ? query.has('play')
+    ? import('./opening/scene').then((m) => m.runOpening())
+    : import('./lookdevP0').then((m) => m.runLookdevP0())
+  : boot()
+).catch((err) => {
   console.error(err);
   const s = document.getElementById('status');
   if (s) s.textContent = `Boot failed: ${String(err)}`;
