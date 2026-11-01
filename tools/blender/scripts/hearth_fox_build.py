@@ -273,8 +273,9 @@ def catmull(pts, n):
     return out
 
 
-# big crescent: leaves the rump low, swoops back and up, flame point curls forward over the back
-TAIL_PTS = [P(-0.13, 0.245), P(-0.23, 0.25), P(-0.31, 0.3), P(-0.35, 0.39), P(-0.34, 0.49), P(-0.29, 0.57), P(-0.22, 0.62)]
+# big crescent swooping back, up and a touch to the fox's left; the flame point trails behind, never over the
+# back, so the chase cam (behind, slightly high) still sees head, ears and body past it
+TAIL_PTS = [P(-0.13, 0.245, 0.0), P(-0.23, 0.255, 0.03), P(-0.32, 0.29, 0.08), P(-0.39, 0.35, 0.13), P(-0.43, 0.42, 0.17), P(-0.44, 0.49, 0.19), P(-0.42, 0.55, 0.19)]
 TAIL_N = 34
 
 
@@ -284,7 +285,7 @@ def tail_radius(t):
     bloom = 0.5 + 0.5 * smooth_(0.05, 0.28, t)
     body = math.sin(min(1.0, 0.1 + t * 0.9) * math.pi) ** 0.5
     tip = (1 - smooth_(0.5, 1.0, t)) ** 0.9  # long flame taper to a point, no scoop end
-    return 0.105 * bloom * body * (1 - 0.15 * t) * (0.2 + 0.8 * tip) + 0.002
+    return 0.092 * bloom * body * (1 - 0.15 * t) * (0.2 + 0.8 * tip) + 0.002
 
 
 def smooth_(e0, e1, x):
