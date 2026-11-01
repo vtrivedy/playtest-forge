@@ -33,6 +33,9 @@ const SHOTS: Record<string, { pos: [number, number, number]; look: [number, numb
   meadow: { pos: [-4.5, 3.2, 91], look: [6, 1, 74] },
   gate: { pos: [-4.9, 1.3, 88.6], look: [-2.9, 1.5, 81] },
   aerial: { pos: [-4, 46, 122], look: [-4, 0, 82], fov: 45 },
+  // the first Keeping: the arrested Hearthtree over the ridge, and the gorge it falls across
+  hearthtree: { pos: [14, 15, 80], look: [27.5, 13, 70.5] },
+  gorge: { pos: [38, 16, 71], look: [26, 11, 70] },
 };
 
 export interface OpeningCtx {

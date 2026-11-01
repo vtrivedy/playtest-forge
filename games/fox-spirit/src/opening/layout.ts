@@ -137,7 +137,7 @@ export const KEEPING = (() => {
     /** Hearthtree pivot (root crown) and fall direction; arrested lean from vertical (rad) */
     hinge: { ...hinge, y: terraceTop - 0.8 },
     fall,
-    leanArrested: 0.52,
+    leanArrested: 0.95,
     /** far crag the crown lands across: walkable top = terraceTop */
     crag: { ...crag, hx: 2.5, hz: 2.7, yaw, top: terraceTop },
     span,
