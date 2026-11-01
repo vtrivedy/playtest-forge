@@ -198,6 +198,17 @@ export async function runOpening(): Promise<void> {
     forge.setSize(innerWidth, innerHeight);
     post.setSize(innerWidth, innerHeight);
   }
+  // mouse look: drag to swing the chase camera round the fox (it resumes auto-recentring after a pause)
+  let dragging = false;
+  addEventListener('pointerdown', (e) => {
+    dragging = true;
+    (e.target as Element | null)?.setPointerCapture?.(e.pointerId);
+  });
+  addEventListener('pointerup', () => void (dragging = false));
+  addEventListener('pointercancel', () => void (dragging = false));
+  addEventListener('pointermove', (e) => {
+    if (dragging) player.cam.orbit(-e.movementX * 0.006, e.movementY * 0.003);
+  });
   addEventListener('resize', resize);
   resize();
 
