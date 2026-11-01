@@ -19,6 +19,16 @@ import { createOpeningHearth } from './hearth';
 import { createOpeningPaint } from './paint';
 import { createOpeningOcclusion } from './occlusion';
 
+/** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
+const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
+  hub: { pos: [-1.5, 4.2, 101], look: [-11, 1.2, 86] },
+  cottage: { pos: [-13.2, 1.7, 98.8], look: [-18.4, 2.0, 92] },
+  well: { pos: [-4.2, 1.5, 89.2], look: [-8, 1.1, 85] },
+  lane: { pos: [-11.5, 1.4, 89.6], look: [-28, 1.8, 85.5] },
+  meadow: { pos: [-4.5, 3.2, 91], look: [6, 1, 74] },
+  aerial: { pos: [-4, 46, 122], look: [-4, 0, 82], fov: 45 },
+};
+
 export interface OpeningCtx {
   scene: THREE.Scene;
   renderer: THREE.WebGLRenderer;
@@ -155,6 +165,30 @@ export async function runOpening(): Promise<void> {
       for (let i = 0; i < frames; i++) frame(dt);
       if (render) post.render();
       return state();
+    },
+    shots: Object.keys(SHOTS),
+    /** render one review still from a fixed camera; paint 'full' floods the slice for that frame only */
+    shot(name: string, paint: 'none' | 'full' = 'none') {
+      const s = SHOTS[name];
+      if (!s) throw new Error(`unknown shot ${name}`);
+      const saved = { pos: view.position.clone(), quat: view.quaternion.clone(), fov: view.fov };
+      view.position.set(...s.pos);
+      view.lookAt(...s.look);
+      view.fov = s.fov ?? 50;
+      view.updateProjectionMatrix();
+      if (paint === 'full') {
+        paintU.uRestoreCount.value = 1;
+        paintU.uRestore.value[0]!.set(-4, 84, 200, 2.5);
+        post.params.restore = 1;
+        sky.setPaint(1, new THREE.Vector2(0.8, -0.6));
+        matchFogToSky(scene, fog, sky.mist);
+      }
+      post.render();
+      view.position.copy(saved.pos);
+      view.quaternion.copy(saved.quat);
+      view.fov = saved.fov;
+      view.updateProjectionMatrix();
+      frame(0);
     },
     params: PLAY,
     camera: player.cam.params,
