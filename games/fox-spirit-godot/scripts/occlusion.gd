@@ -13,7 +13,10 @@ var _by_body := {}
 func setup(roots: Array[Node3D], world: Node3D) -> void:
 	for root in roots:
 		var u := {root = root, mats = [] as Array[ShaderMaterial], ink = [], fade = 0.0}
-		for n in root.find_children("*", "GeometryInstance3D", true, false):
+		var geo := root.find_children("*", "GeometryInstance3D", true, false)
+		if root is GeometryInstance3D:
+			geo.append(root)
+		for n in geo:
 			var gi := n as GeometryInstance3D
 			var m := gi.material_override as ShaderMaterial
 			if m == null or not m.shader.resource_path.contains("world_cel"):
@@ -21,14 +24,22 @@ func setup(roots: Array[Node3D], world: Node3D) -> void:
 			u.mats.append(m)
 			u.ink.append(m.next_pass)
 			if gi is MeshInstance3D:
+				# faces baked to world space: physics bodies ignore the maples' scaled transforms
+				var xf := gi.global_transform
+				var faces := (gi as MeshInstance3D).mesh.get_faces()
+				for i in faces.size():
+					faces[i] = xf * faces[i]
+				var shape := ConcavePolygonShape3D.new()
+				shape.set_faces(faces)
+				# a lens inside a cottage / the well ring still sees the wall it is inside
+				shape.backface_collision = true
 				var body := StaticBody3D.new()
 				body.collision_layer = SIGHT_LAYER
 				body.collision_mask = 0
 				var cs := CollisionShape3D.new()
-				cs.shape = (gi as MeshInstance3D).mesh.create_trimesh_shape()
+				cs.shape = shape
 				body.add_child(cs)
 				world.add_child(body)
-				body.global_transform = gi.global_transform
 				_by_body[body.get_rid()] = u
 		units.append(u)
 

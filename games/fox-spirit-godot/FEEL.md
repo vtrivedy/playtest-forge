@@ -11,9 +11,9 @@ fox teleported to (−1.5, 80) facing the meadow, world-relative stick, 60 Hz fi
 
 | band (stick) | three.js gait / speed / playback | Godot gait / speed / playback | stance-paw slide p50 / p95 (m/s) three.js | Godot |
 |---|---|---|---|---|
-| walk (0.15) | walk / 0.48 / 1.026 | walk / 0.48 / 1.026 | 0 / 0.029 | 0 / 0.016 |
+| walk (0.15) | walk / 0.48 / 1.026 | walk / 0.48 / 1.026 | 0 / 0.029 | 0 / 0.013 |
 | trot (0.35) | trot / 1.12 / 1.197 | trot / 1.12 / 1.197 | 0 / 0 | 0 / 0.001 |
-| run (1.0)   | run / 3.20 / 1.007  | run / 3.20 / 1.007  | 0 / 0 | 0 / 0.002 |
+| run (1.0)   | run / 3.20 / 1.007  | run / 3.20 / 1.007  | 0 / 0 | 0 / 0.000 |
 | full jump   | apex 0.792 m, air 0.633 s | apex 0.792 m, air 0.633 s | | |
 
 - **Movement maths is a 1:1 port** (same PLAY tunables, same accel/decel/turn-rate/coyote/buffer/jump-cut/
@@ -26,12 +26,17 @@ fox teleported to (−1.5, 80) facing the meadow, world-relative stick, 60 Hz fi
   two-bone solve keeping pastern/paw world orientation) brought it to three's level. Bug worth
   remembering: the paw ground rays hit the fox's own capsule until the body RID was excluded.
 - **Animation graph:** Godot `AnimationTree` (Transition state {idle, loco, jumpUp, fall, land} with
-  per-target cross-fade; loco = Transition over walk/trot/lope/run → TimeScale) replaces ~250 lines of
-  hand-rolled mixer weights. Not ported: three's *pose-matched gait entry* (the phase table that enters
-  the new gait at the paw layout matching the old one). Godot cross-fades from phase 0 of the new gait;
-  the IK hides most of it, but gait changes read slightly mushier than three.js in slow motion.
+  per-target cross-fade; loco = Transition over walk/trot/lope/run) replaces three's hand-rolled mixer
+  weights. Gaits are still *time-driven from their own phase* like FoxAnimator (each gait behind a
+  TimeSeek + TimeScale 0, seeked every tick), so the pose-matched gait entry ports exactly: the
+  paw-layout match table is built at load from the animation tracks (bone chains composed over the
+  rest pose — no playback needed). Measured effect is small once FootIK is in (walk/trot/run p95
+  0.016/0.001/0.002 → 0.013/0.001/0.000 m/s): the IK already hides most of a mismatched entry; the
+  match is about the swing legs during the 0.2 s cross-fade, which the stance-slide metric does not
+  see — not quantified here.
 - **Route:** the real-input hero route (village → lych-gate → run + jump → cold hearth → aura ignition →
-  updraft ride → glide → shelf) completes in both. Godot ride: entry vy 3.5, peak feet 9.5 m,
+  updraft ride → glide → shelf; adapted from `tools/opening-hero-route.mjs`, which I did not re-run on
+  the three.js side) completes in Godot. Godot ride: entry vy 3.5, peak feet 9.5 m,
   t(+7 m) 1.37 s, landed on the shelf at 4.96 m.
 
 ## Look

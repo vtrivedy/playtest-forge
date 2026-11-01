@@ -13,6 +13,8 @@ extends Node
 const POSES := {
 	spawn = [-6.0, 92.0, PI * 0.92], well = [-5.5, 87.5, PI * 0.75], meadow = [-1.5, 80.0, PI * 0.85],
 	hearth = [2.6, 77.5, PI * 0.75], shelf = [3.4, 71.5, PI * 0.55], back = [9.0, 66.0, -0.2], dashstop = [4.3, 72.95, PI * 0.95],
+	## fox just past the Great Well with the lens behind it: the well must fade
+	wellblock = [-8.0, 87.9, 0.0],
 }
 
 var opening: Opening
@@ -128,8 +130,9 @@ func _hero_route() -> Array:
 		{beat = "through the gate", to = Vector2(-3.2, 80.5), mag = 0.75},
 		{beat = "run into the meadow", to = Vector2(-1.5, 72.0), mag = 1.0, jump_at = [0.6, 2.0]},
 		{beat = "loop past the groves", to = Vector2(0.5, 68.5), mag = 1.0},
-		{beat = "meadow bend", to = Vector2(-0.5, 76.5), mag = 0.8},
-		{beat = "cold hearth", to = Vector2(2.0, 78.5), mag = 0.4},
+		{beat = "meadow bend", to = Vector2(-1.0, 77.0), mag = 0.8},
+		{beat = "above the hearth", to = Vector2(4.0, 80.5), mag = 0.6},
+		{beat = "cold hearth", to = Vector2(5.4, 77.8), mag = 0.3},
 		{beat = "cold hearth pause", hold = 2.0},
 		{beat = "bring the warmth", to = Vector2(4.3, 74.8), mag = 0.4},
 		{beat = "hearth lit", hold = 2.5},
