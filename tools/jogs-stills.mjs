@@ -13,7 +13,7 @@ fs.mkdirSync(out, { recursive: true });
 // [name, from x, z, toward x, z]
 const POSES = [
   ['1-gate-to-canopy', -3.2, 82.0, -0.2, 74.4],
-  ['2a-hare-stone', -1.4, 65.0, -3.6, 67.4],
+  ['2a-hare-stone', -1, 64.7, -7.0, 70.4], // on the roost (teleport lands on its top)
   ['2-off-canopy', -4.0, 66.0, -6, 77.5],
   ['3-meadow-north', -5.6, 72.5, -6, 77.5],
   ['4-turn-west', -6.4, 77.6, -14, 80],
@@ -37,7 +37,7 @@ try {
   }
   if (hare) {
     const log = [];
-    await page.evaluate(() => { const h = window.__gameHooks; h.teleport(-2.2, 66.0, Math.atan2(-1.4, 1.4)); h.advance(30, 1 / 60, false); });
+    await page.evaluate(() => { const h = window.__gameHooks; h.teleport(-5.6, 69.0, Math.atan2(-1.4, 1.4)); h.advance(30, 1 / 60, false); });
     await page.keyboard.down('ShiftLeft');
     await page.evaluate(() => window.__gameHooks.advance(4, 1 / 60, false));
     await page.keyboard.up('ShiftLeft');
@@ -61,7 +61,7 @@ try {
       h.advance(0, 1 / 60, true);
       return { fox: s.pos.map((v) => +v.toFixed(2)), hare: s.opening.unpressed.creatures.find((k) => k.id === 'hare') };
     }, [to, mag]);
-    const legs = [[-4.8, 66.4], [-5.0, 69.4], [-5.6, 73.4], [-7.2, 78.2], [-11.5, 80.0], [-16.8, 79.9], [-20.6, 78.2]];
+    const legs = [[-5.4, 70.2], [-5.6, 72.0], [-5.8, 74.0], [-7.2, 78.2], [-11.5, 80.0], [-16.8, 79.9], [-20.6, 78.2]];
     const closeLens = (name) => page.evaluate(() => {
       const h = window.__gameHooks;
       const a = h.state().opening.unpressed.creatures.find((k) => k.id === 'hare').at;

@@ -540,6 +540,11 @@ export function buildUnpressed(ctx: OpeningCtx) {
       holder.add(f);
       return { m: f, v: new THREE.Vector3(), s: new THREE.Vector3() };
     });
+    // the hare's scut glows a little so the white flash carries across the sepia meadow
+    if (spec.id === 'hare')
+      bones.tail!.traverse((o) => {
+        if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial) o.material.emissive.setHex(0x8a7a62);
+      });
     // the kit's page is sealed behind the glyph shrine's door until it opens
     paper.visible = spec.id !== 'kit';
     return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0 };
@@ -730,7 +735,9 @@ export function buildUnpressed(ctx: OpeningCtx) {
     const look = end ? JOGS.look : fox;
     const rel = Math.atan2(-(look.z - c.holder.position.z), look.x - c.holder.position.x) - c.holder.rotation.y;
     B(c, 'head').rotation.y = THREE.MathUtils.clamp(Math.atan2(Math.sin(rel), Math.cos(rel)), -1.3, 1.3) * c.bow;
-    B(c, 'tail').rotation.z = Math.sin(t * 6) * 0.2;
+    // the scut flashes white on every bound: what you follow at range
+    B(c, 'tail').rotation.z = Math.sin(t * 6) * 0.2 + air * 0.7;
+    B(c, 'tail').scale.setScalar(1 + air * 0.9);
     c.holder.position.y = THREE.MathUtils.damp(c.holder.position.y, floorAt(c.holder.position.x, c.holder.position.z), 12, dt);
     if (!end) return false;
     face(c, JOGS.look.x - c.holder.position.x, JOGS.look.z - c.holder.position.z, Math.min(1, dt * 3));
@@ -809,6 +816,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'earL').rotation.x = flick * 0.5;
       B(c, 'earR').rotation.x = -(Math.max(0, Math.sin(t * 1.1 + c.idleSeed)) ** 12) * 0.5;
       B(c, 'tail').rotation.z = 0;
+      B(c, 'tail').scale.setScalar(1);
     },
     deer(c, t) {
       // graze, lift the head, chew, ear flicks and tail flicks

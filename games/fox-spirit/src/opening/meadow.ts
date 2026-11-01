@@ -297,15 +297,19 @@ function buildJogs(ctx: OpeningCtx, groundCtx: Parameters<typeof buildLeaves>[2]
   for (const c of JOGS.cairns) {
     const y0 = groundH(c.x, c.z);
     let y = y0;
-    // flat field stones, each a little smaller and askew on the one below
-    for (const [sz, ox, oz] of [[0.42, 0, 0], [0.34, 0.05, -0.04], [0.26, -0.03, 0.04], [0.19, 0.03, 0.02]] as const) {
-      const r = buildRock(rand, sz, sz > 0.4);
-      r.scale.set(1.15, 0.62, 1.15);
-      r.rotation.z = (rand() - 0.5) * 0.18;
-      y += sz * 0.36;
-      r.position.set(c.x + ox, y, c.z + oz);
-      y += sz * 0.36;
+    // field stones of uneven size and thickness, each smaller and askew on the one below
+    let sz = 0.4 + rand() * 0.12;
+    const n = 3 + Math.floor(rand() * 2);
+    for (let k = 0; k < n; k++) {
+      const flat = 0.5 + rand() * 0.35;
+      const r = buildRock(rand, sz, k === 0);
+      r.scale.set(1.05 + rand() * 0.25, flat, 0.9 + rand() * 0.25);
+      r.rotation.z = (rand() - 0.5) * 0.3;
+      y += sz * 0.58 * flat;
+      r.position.set(c.x + (rand() - 0.5) * 0.12, y, c.z + (rand() - 0.5) * 0.12);
+      y += sz * 0.55 * flat;
       scene.add(r);
+      sz *= 0.6 + rand() * 0.3;
     }
     // the finger-stone: a long hewn slab on the cap, its point toward the next bend, a little raised
     const yaw = Math.atan2(c.to.x - c.x, c.to.z - c.z);

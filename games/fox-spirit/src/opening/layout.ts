@@ -182,24 +182,23 @@ export const POP_UP_RUIN = {
 /**
  * The jogs (DESIGN-jogs.md): the meadow leg from the canopy's foot north and then west to the paper ruin.
  * Cairns sit just off the line at its bends, each topped by a finger-stone laid toward `to`; the leaf
- * ribbon is drifted along `line`; the hare's waymark stone faces the canopy roost.
+ * ribbon is drifted along `line`; the hare's waymark stone (the first waymark) faces the canopy roost.
  */
 export const JOGS = (() => {
   const roost = CANOPY[CANOPY.length - 1];
-  const stone = { x: -3.6, z: 67.4 };
+  const stone = { x: -7.0, z: 70.4 };
   const fx = roost.x - stone.x;
   const fz = roost.z - stone.z;
   const fl = Math.hypot(fx, fz);
   return {
     line: [[-4.5, 66.5], [-5.6, 72.5], [-6.6, 77.6], [-11, 79.4], [-16.8, 79.6], [-21.6, 76.8]] as ReadonlyArray<readonly [number, number]>,
     cairns: [
-      { x: -6.2, z: 68.6, to: { x: -6.6, z: 77.6 } },
       { x: -8.4, z: 76.3, to: { x: -16.8, z: 79.6 } },
       { x: -19.0, z: 77.6, to: { x: -24, z: 75 } },
     ],
     /** the hare's waymark stone; `face` is its drawing's outward normal (toward the roost) */
     hare: { stone, x: stone.x + (fx / fl) * 0.2, z: stone.z + (fz / fl) * 0.2, face: { x: fx / fl, z: fz / fl } },
-    harePath: [{ x: -4.9, z: 69.2 }, { x: -5.6, z: 73.4 }, { x: -7.2, z: 78.2 }, { x: -11.5, z: 80.0 }, { x: -16.8, z: 79.9 }, { x: -21.9, z: 77.4 }],
+    harePath: [{ x: -6.2, z: 71.4 }, { x: -6.1, z: 74.4 }, { x: -7.2, z: 78.2 }, { x: -11.5, z: 80.0 }, { x: -16.8, z: 79.9 }, { x: -21.9, z: 77.4 }],
     /** the hare lopes on only while the fox is within `lead` m; it sits facing `look` at the end */
     lead: 5.5,
     look: { x: -24, z: 75 },
