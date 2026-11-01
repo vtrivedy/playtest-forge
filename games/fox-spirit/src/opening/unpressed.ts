@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { RAMP_WORLD, inkMaterial, hullGeometry, plumeGeometry, hewn, toon, inked } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import type { Collider } from '../lookdevPlay';
-import { UNPRESSED } from './layout';
+import { KIT, UNPRESSED } from './layout';
 
 type P2 = readonly [number, number];
 type Part =
@@ -26,7 +26,7 @@ type Part =
   | { k: 'spines'; bone: string; c: P2; r: readonly [number, number, number]; col: number; n: number };
 
 type Spec = {
-  id: 'hedgehog' | 'heron' | 'deer';
+  id: 'hedgehog' | 'heron' | 'deer' | 'kit';
   scale: number;
   /** bone pivots in profile space and their parents (root = the creature's feet origin) */
   bones: Record<string, { at: P2; parent?: string }>;
@@ -121,6 +121,33 @@ const SPECS: Spec[] = [
       { k: 'cone', bone: 'legBR', from: [-0.36, 0.07], to: [-0.35, 0.0], r: 0.04, col: 0x2a1a12, z: -0.09 },
     ],
     eye: { at: [0.71, 1.58], r: 0.018, bone: 'head' },
+  },
+  {
+    id: 'kit',
+    scale: 1,
+    bones: {
+      body: { at: [0, 0.28] },
+      head: { at: [0.24, 0.36], parent: 'body' },
+      tail: { at: [-0.2, 0.32], parent: 'body' },
+      legF: { at: [0.14, 0.2], parent: 'body' },
+      legB: { at: [-0.14, 0.2], parent: 'body' },
+    },
+    parts: [
+      { k: 'ell', bone: 'body', c: [0, 0.29], r: [0.24, 0.12, 0.12], col: 0xc8642c },
+      { k: 'ell', bone: 'body', c: [0.14, 0.27], r: [0.1, 0.1, 0.1], col: 0xf2e6d2 },
+      { k: 'ell', bone: 'head', c: [0.31, 0.43], r: [0.12, 0.1, 0.1], col: 0xc8642c },
+      { k: 'cone', bone: 'head', from: [0.38, 0.41], to: [0.52, 0.38], r: 0.05, col: 0xf2e6d2 },
+      { k: 'ell', bone: 'head', c: [0.525, 0.38], r: [0.018, 0.016, 0.018], col: 0x1a1010 },
+      { k: 'ell', bone: 'head', c: [0.28, 0.58], r: [0.04, 0.08, 0.02], col: 0xb85626, rot: 0.25, z: 0.06 },
+      { k: 'ell', bone: 'head', c: [0.28, 0.58], r: [0.04, 0.08, 0.02], col: 0xb85626, rot: 0.25, z: -0.06 },
+      { k: 'tube', bone: 'tail', pts: [[-0.2, 0.32], [-0.36, 0.38], [-0.5, 0.34]], r: [0.06, 0.1], col: 0xc8642c },
+      { k: 'ell', bone: 'tail', c: [-0.55, 0.33], r: [0.07, 0.07, 0.07], col: 0xf2e6d2 },
+      { k: 'tube', bone: 'legF', pts: [[0.14, 0.2], [0.15, 0.0]], r: [0.035, 0.03], col: 0x3a2418, z: 0.06 },
+      { k: 'tube', bone: 'legF', pts: [[0.14, 0.2], [0.15, 0.0]], r: [0.035, 0.03], col: 0x3a2418, z: -0.06 },
+      { k: 'tube', bone: 'legB', pts: [[-0.14, 0.2], [-0.15, 0.0]], r: [0.04, 0.03], col: 0x3a2418, z: 0.06 },
+      { k: 'tube', bone: 'legB', pts: [[-0.14, 0.2], [-0.15, 0.0]], r: [0.04, 0.03], col: 0x3a2418, z: -0.06 },
+    ],
+    eye: { at: [0.36, 0.46], r: 0.016, bone: 'head' },
   },
 ];
 
@@ -456,7 +483,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
   }
 
   const creatures = SPECS.map((spec) => {
-    const at = UNPRESSED[spec.id];
+    const at = spec.id === 'kit' ? KIT : UNPRESSED[spec.id];
     const { root, bones } = buildCreature(spec, rand);
     const holder = new THREE.Group();
     holder.position.set(at.x, at.y, at.z);
@@ -479,6 +506,8 @@ export function buildUnpressed(ctx: OpeningCtx) {
       holder.add(f);
       return { m: f, v: new THREE.Vector3(), s: new THREE.Vector3() };
     });
+    // the kit's page is sealed behind the glyph shrine's door until it opens
+    paper.visible = spec.id !== 'kit';
     return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0 };
   });
 
@@ -512,7 +541,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
   }
   const lerpAngle = (a: number, b: number, k: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * k;
 
-  const perform: Record<Spec['id'], (c: (typeof creatures)[number], t: number, dt: number) => boolean> = {
+  const perform: Partial<Record<Spec['id'], (c: (typeof creatures)[number], t: number, dt: number) => boolean>> = {
     hedgehog(c, t, dt) {
       const s = UNPRESSED.hedgehog.settle;
       // shake off the page, hop down from the wall face, trundle an arc, settle and sniff
@@ -601,6 +630,34 @@ export function buildUnpressed(ctx: OpeningCtx) {
     },
   };
 
+  perform.kit = (c, t, dt) => {
+    // shake free, look at the fox, then trot home across the meadow and curl up by the well
+    B(c, 'head').rotation.z = t < 0.7 ? Math.sin(t * 24) * 0.25 * (1 - t / 0.7) : 0;
+    B(c, 'tail').rotation.z = Math.sin(t * 7) * 0.35;
+    if (t < 1.2) return false;
+    const path = KIT.path;
+    const s = path[Math.min(c.leg, path.length - 1)]!;
+    const dx = s.x - c.holder.position.x;
+    const dz = s.z - c.holder.position.z;
+    const d = Math.hypot(dx, dz);
+    const advanced = d <= 0.15 && c.leg < path.length - 1;
+    if (advanced) c.leg++;
+    const moving = d > 0.15 || advanced;
+    if (moving && d > 0.001) {
+      face(c, dx, dz, Math.min(1, dt * 6));
+      const step = Math.min(d, dt * 2.2);
+      c.holder.position.x += (dx / d) * step;
+      c.holder.position.z += (dz / d) * step;
+      c.gait += dt * 14;
+    }
+    const sw = moving ? Math.sin(c.gait) * 0.8 : 0;
+    B(c, 'legF').rotation.z = sw;
+    B(c, 'legB').rotation.z = -sw;
+    B(c, 'body').position.y = 0.28 + (moving ? Math.abs(Math.sin(c.gait)) * 0.035 : 0);
+    c.holder.position.y = THREE.MathUtils.damp(c.holder.position.y, floorAt(c.holder.position.x, c.holder.position.z), 12, dt);
+    return !moving;
+  };
+
   const idle: Record<Spec['id'], (c: (typeof creatures)[number], t: number) => void> = {
     hedgehog(c, t) {
       // snuffle: quick nose bobs in bursts, the odd look round
@@ -641,6 +698,18 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'head').rotation.z = preen * 0.9 + Math.sin(t * 7) * 0.08 * preen;
       B(c, 'body').rotation.z = Math.sin(t * 0.3) * 0.03;
       B(c, 'wingL').rotation.x = -0.15 - preen * 0.15;
+    },
+    kit(c, t) {
+      // curled up asleep by the well: tucked head, tail wrapped round, slow breathing
+      c.bow = THREE.MathUtils.damp(c.bow, 1, 2, 1 / 60);
+      const tuck = c.bow;
+      B(c, 'body').position.y = 0.28 - 0.1 * tuck;
+      B(c, 'body').scale.y = 1 - 0.18 * tuck + Math.sin(t * 1.7) * 0.03;
+      B(c, 'head').rotation.z = -0.55 * tuck;
+      B(c, 'head').rotation.y = 0.5 * tuck;
+      B(c, 'tail').rotation.y = -1.6 * tuck;
+      B(c, 'legF').rotation.z = -1.2 * tuck;
+      B(c, 'legB').rotation.z = 1.2 * tuck;
     },
     deer(c, t) {
       // graze, lift the head, chew, ear flicks and tail flicks
@@ -690,6 +759,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     const fox = ctx.fox.root.position;
     for (const c of creatures) {
       if (c.phase === 'pressed') {
+        if (!c.paper.visible) continue;
         // a slow warm breath in the wash so a drawing can be spotted as alive
         const m = c.paper.material as THREE.MeshBasicMaterial;
         const breath = 0.5 + 0.5 * Math.sin(clock * 1.6 + c.idleSeed);
@@ -731,7 +801,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
         continue;
       }
       if (c.phase === 'performing') {
-        if (perform[c.spec.id](c, c.t, dt)) {
+        if (perform[c.spec.id]!(c, c.t, dt)) {
           c.phase = 'alive';
           c.t = 0;
           if (c.spec.id === 'heron') {
@@ -748,8 +818,16 @@ export function buildUnpressed(ctx: OpeningCtx) {
     if (fling >= 0 && (fling += dt) > 0.9) fling = -1;
   });
 
+  /** the glyph shrine opened: its sealed page fades in and becomes findable */
+  function unlock(id: string): void {
+    const c = creatures.find((k) => k.spec.id === id);
+    if (!c || c.paper.visible) return;
+    c.paper.visible = true;
+  }
+
   return {
     unpress,
+    unlock,
     contact,
     state() {
       return {

@@ -213,3 +213,35 @@ export const UNPRESSED = (() => {
       path: [cragAt(1.35, 0.25), cragAt(0.0, 0.5), cragAt(-0.7, 2.1)] },
   };
 })();
+
+/**
+ * Ink glyph stones (DESIGN-glyphs.md): three standing stones in the east meadow whose glyphs only show while
+ * freshly painted by the aura, and a sealed paper-door shrine at the rim foot whose lintel (also paint-read)
+ * gives the order. `yaw` turns each slab; the shrine faces west, back into the rim slope.
+ */
+export const GLYPHS = {
+  stones: [
+    { id: 'leaf', x: 21.0, z: 90.6, yaw: 0.35 },
+    { id: 'flame', x: 29.4, z: 91.6, yaw: -0.4 },
+    { id: 'moon', x: 30.2, z: 81.6, yaw: 1.2 },
+  ],
+  /** the lintel's order */
+  order: ['moon', 'leaf', 'flame'] as const,
+  shrine: { x: 33.4, z: 89.6, yaw: -Math.PI / 2 },
+  /** seconds a lit stone holds before guttering; painting a stone out of turn gutters them all */
+  window: 16,
+} as const;
+
+/** the fox kit sealed in the glyph shrine (an unpressed creature, locked until the door opens) */
+export const KIT = (() => {
+  const sh = GLYPHS.shrine;
+  const c = Math.cos(sh.yaw);
+  const s = Math.sin(sh.yaw);
+  const at = (lx: number, lz: number) => ({ x: sh.x + lx * c + lz * s, z: sh.z - lx * s + lz * c });
+  const page = at(0, -0.56);
+  return {
+    ...page, y: groundH(sh.x, sh.z) + 0.25, yaw: sh.yaw,
+    /** out through the door, across the meadow, home to curl up by the well */
+    path: [at(0, 1.6), { x: 24, z: 88.6 }, { x: 8, z: 88.6 }, { x: -6.0, z: 87.8 }],
+  };
+})();

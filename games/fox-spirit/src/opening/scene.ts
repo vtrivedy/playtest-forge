@@ -23,6 +23,7 @@ import { CARRY, createCarry } from './carry';
 import { createKeepingChemistry } from './chemistry';
 import { createKeeping } from './keeping';
 import { buildUnpressed } from './unpressed';
+import { buildGlyphs } from './glyphs';
 import { createHearthHum } from './hum';
 import { buildRunawayPage } from './page';
 import { buildCanopy } from './canopy';
@@ -102,6 +103,7 @@ export async function runOpening(): Promise<void> {
   const keeping = createKeeping(ctx);
   const popUpRuin = buildPopUpRuin(ctx);
   const unpressed = buildUnpressed(ctx);
+  const glyphs = buildGlyphs(ctx, { onSolved: () => unpressed.unlock('kit') });
   const crown = createCrown(ctx, sky.mist);
   const runaway = buildRunawayPage(ctx);
 
@@ -221,7 +223,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), hum: hum.state(), page: runaway.state(), popUpRuin: popUpRuin.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), page: runaway.state(), popUpRuin: popUpRuin.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -272,6 +274,8 @@ export async function runOpening(): Promise<void> {
     pageStage: runaway.toStage,
     /** dev: pop a pressed creature without the dash (hedgehog | heron | deer) */
     unpress: unpressed.unpress,
+    /** dev: open the glyph shrine without solving it */
+    glyphSolve: glyphs.solve,
     /** dev: unfold the steam stair without the steam latch */
     keepingSteam: keeping.reconnectSteam,
     canopy: canopy.feel,
