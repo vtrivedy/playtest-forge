@@ -179,3 +179,39 @@ export const POP_UP_RUIN = {
   overlook: { x: -24.4, z: 71, top: 1.02, width: 3.4, depth: 3.6 },
   returnEnd: { x: -24.4, z: 75.7 },
 } as const;
+/**
+ * Unpressed creatures (DESIGN-unpressed.md): where each pressed drawing sits. `yaw` orients the creature's
+ * profile plane on the surface (its local +z = the surface's outward normal); `y` is the drawing's foot line;
+ * `settle` is where the creature ends up living after its performance.
+ */
+export const UNPRESSED = (() => {
+  // hub-lane dry-stone wall, lane side, two metres up the lane from the lych-gate (village.ts laneGate/laneWalls)
+  const d = { x: 1 / Math.hypot(1, 7), z: -7 / Math.hypot(1, 7) };
+  const n = { x: -d.z, z: d.x };
+  const wall = { x: -3.2 + n.x * 1.5 - d.x * 2.0, z: 82.4 + n.z * 1.5 - d.z * 2.0 };
+  const hog = { x: wall.x - n.x * 0.31, z: wall.z - n.z * 0.31 };
+  // the shelf's west cliff, between the lz 0 / −3 columns, facing H-a
+  const sc = Math.cos(SHELF.yaw);
+  const ss = Math.sin(SHELF.yaw);
+  const shelfAt = (lx: number, lz: number) => ({ x: SHELF.x + lx * sc + lz * ss, z: SHELF.z - lx * ss + lz * sc });
+  const heron = shelfAt(-5.45, -1.4);
+  // the far crag: a standing page-stone near its far-left corner, its face toward the bridge
+  const K = KEEPING;
+  const cc = Math.cos(K.crag.yaw);
+  const cs = Math.sin(K.crag.yaw);
+  const cragAt = (lx: number, lz: number) => ({ x: K.crag.x + lx * cc + lz * cs, z: K.crag.z - lx * cs + lz * cc });
+  const stone = cragAt(1.35, 1.2);
+  return {
+    hedgehog: { ...hog, y: groundH(hog.x, hog.z) + 0.1, yaw: Math.atan2(-n.x, -n.z), settle: { x: hog.x - n.x * 1.6 - d.x * 0.9, z: hog.z - n.z * 1.6 - d.z * 0.9 } },
+    heron: {
+      ...heron, y: groundH(heron.x, heron.z) + 0.7, yaw: Math.atan2(-sc, ss),
+      /** it lives at the cliff foot, back to the rock: land on it and it flings you up onto the shelf */
+      settle: { ...shelfAt(-6.1, 1.5), y: groundH(shelfAt(-6.1, 1.5).x, shelfAt(-6.1, 1.5).z) },
+      /** its facing once settled (away from the cliff, out over the meadow) */
+      out: { x: -sc, z: ss },
+    },
+    deer: { x: stone.x - K.fall.x * 0.2, z: stone.z - K.fall.z * 0.2, y: K.crag.top, yaw: Math.atan2(-K.fall.x, -K.fall.z), stone: { ...stone, yaw: K.crag.yaw }, settle: { ...cragAt(-0.7, 2.1), y: K.crag.top },
+      /** out of the stone toward the bridge, round its left end, to the far edge facing the Crown */
+      path: [cragAt(1.35, 0.25), cragAt(0.0, 0.5), cragAt(-0.7, 2.1)] },
+  };
+})();

@@ -22,6 +22,7 @@ import { createCrown } from './crown';
 import { CARRY, createCarry } from './carry';
 import { createKeepingChemistry } from './chemistry';
 import { createKeeping } from './keeping';
+import { buildUnpressed } from './unpressed';
 import { createHearthHum } from './hum';
 import { buildRunawayPage } from './page';
 import { buildCanopy } from './canopy';
@@ -100,6 +101,7 @@ export async function runOpening(): Promise<void> {
   const canopy = buildCanopy(ctx);
   const keeping = createKeeping(ctx);
   const popUpRuin = buildPopUpRuin(ctx);
+  const unpressed = buildUnpressed(ctx);
   const crown = createCrown(ctx, sky.mist);
   const runaway = buildRunawayPage(ctx);
 
@@ -125,7 +127,7 @@ export async function runOpening(): Promise<void> {
     groundH,
     colliders: ctx.colliders,
     start: SPAWN,
-    onGroundContact: canopy.contact,
+    onGroundContact: (at, speed, jumpHeld, dt) => canopy.contact(at, speed, jumpHeld, dt) ?? unpressed.contact(at, speed, jumpHeld, dt),
     updrafts: hearth.updrafts,
     onInteract: () => carry?.interact(),
     onDash: (lastGrounded) => carry?.beforeDash(lastGrounded),
@@ -219,7 +221,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), hum: hum.state(), page: runaway.state(), popUpRuin: popUpRuin.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), hum: hum.state(), page: runaway.state(), popUpRuin: popUpRuin.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -268,6 +270,8 @@ export async function runOpening(): Promise<void> {
     /** dev: play the Hearthtree settle without the root-hearth latch */
     keepingRelease: keeping.release,
     pageStage: runaway.toStage,
+    /** dev: pop a pressed creature without the dash (hedgehog | heron | deer) */
+    unpress: unpressed.unpress,
     /** dev: unfold the steam stair without the steam latch */
     keepingSteam: keeping.reconnectSteam,
     canopy: canopy.feel,
