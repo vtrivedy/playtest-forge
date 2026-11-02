@@ -92,7 +92,7 @@ const which = arg('route', 'millbrook');
 // --audio: a listening tour instead of a clip: nothing rendered, the sim paced to the wall clock, and the three
 // pre-master stems (music / ambience / sfx) recorded sample-for-sample → mix.wav + stems + beats (Ember)
 const audio = process.argv.includes('--audio');
-const ROUTE = which === 'hermitage' ? HERMITAGE_ROUTE : which === 'grand' ? [...HERMITAGE_ROUTE, ['to the west lane', [-12.6, 96.6]], ['west yard', [-14, 95]], ...MILLBROOK_ROUTE.slice(1)] : MILLBROOK_ROUTE;
+const ROUTE = which === 'hermitage' ? HERMITAGE_ROUTE : which === 'grand' ? [...HERMITAGE_ROUTE, ['back past the cottage', [-5.6, 102.6]], ['north lane foot', [-5.2, 99.4]], ['by the well lane', [-6.0, 92.5]], ...MILLBROOK_ROUTE.slice(1)] : MILLBROOK_ROUTE;
 const START = {
   village: { at: [-5.2, 92.5, Math.atan2(2.2, -11.5)], beat: 0 },
   lane: { at: [-36, 89, -1.4], beat: 5 },
