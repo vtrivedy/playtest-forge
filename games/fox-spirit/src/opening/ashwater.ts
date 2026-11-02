@@ -270,13 +270,25 @@ export function buildAshwater(
   basin.position.set(wellAt.x, LEDGE.top + 0.3, wellAt.z);
   root.add(basin);
   colliders.push({ kind: 'post', x: wellAt.x, z: wellAt.z, r: 1.5 });
-  const glowMat = new THREE.MeshBasicMaterial({ color: C.glow, transparent: true, opacity: 0.22, side: THREE.DoubleSide, toneMapped: false, depthWrite: false });
-  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 14, 14, 1, true), glowMat);
-  glow.geometry.translate(0, 7, 0);
+  // the fill: a soft additive beam, bright at the water and fading to nothing as it rises (not a solid tube)
+  const fade = document.createElement('canvas');
+  fade.width = 4;
+  fade.height = 128;
+  const fg = fade.getContext('2d')!;
+  const grad = fg.createLinearGradient(0, 0, 0, 128);
+  // (alphaMap reads the green channel: an opaque black → white ramp, not alpha on white — Reed :815)
+  grad.addColorStop(0, '#000000');
+  grad.addColorStop(0.55, '#595959');
+  grad.addColorStop(1, '#ffffff');
+  fg.fillStyle = grad;
+  fg.fillRect(0, 0, 4, 128);
+  const glowMat = new THREE.MeshBasicMaterial({ color: C.glow, alphaMap: new THREE.CanvasTexture(fade), transparent: true, opacity: 0.22, side: THREE.DoubleSide, toneMapped: false, depthWrite: false, blending: THREE.AdditiveBlending });
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.75, 12, 20, 1, true), glowMat);
+  glow.geometry.translate(0, 6, 0);
   glow.position.set(wellAt.x, LEDGE.top + 0.3, wellAt.z);
   root.add(glow);
   // its water (lit with the column) and a ring of leaning slates, like the vale's well stones, with reeds between
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(1.15, 18).rotateX(-Math.PI / 2), glowMat);
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(1.15, 18).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: C.glow, transparent: true, opacity: 0.55, toneMapped: false }));
   pool.position.set(wellAt.x, LEDGE.top + 0.42, wellAt.z);
   root.add(pool);
   for (let i = 0; i < 6; i++) {
