@@ -192,6 +192,12 @@ permits branch unmute; Vivek then hears the landed result on main.
 - Capture the sfx bus directly (`window.__opening.ctx.audio.sfx.connect(dest)`) to get a stem while the master
   is muted (tools/sfx-capture.mjs).
 
+## Feel lint (Moss)
+
+- `npm run lint:feel` (tools/lint-feel.mjs) turns fixed bugs into rules over `src/opening`: no `1/60` in per-frame
+  code (use dt), no `clamp(Math.atan2(...))` yaw (flips behind; use a damped side-holding turn), no heading from a raw
+  per-frame displacement. Opt a line out with `// lint-feel: ok <reason>`. Add a rule whenever a bug is fixed.
+
 ## Coordination (Moss)
 
 - Before building shared infrastructure someone else claimed, run `git ls-remote origin` and check for new branches (e.g. `sw3-flint-audio`): a teammate's work can be pushed to a side branch without a channel post. I built a duplicate audio graph for ~20 min before finding Flint's.

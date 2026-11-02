@@ -135,6 +135,5 @@ is cut with a 0.5 s equal-power crossfade. See `docs/design/swarm3/audio-DESIGN.
 | `bird-0..4` — five isolated calls (at 58.6, 331.7, 273.2, 336.6, 225.2 s), denoised (afftdn), high-passed 1.5 kHz, 2.2 s with fades | https://opengameart.org/content/park-ambiences (`park_ambience_birds.wav`) | Thimras | CC0 |
 | `hearth-crackle.ogg` (2.8 s loop) | https://opengameart.org/content/fire-crackling | AntumDeluge | CC0 |
 | `steam-0..2.ogg` (markers 1–3) | https://opengameart.org/content/steam-release-sounds | bart | CC0 |
-| `step-grass-0..4`, `step-wood-0..4`, `step-stone-0..4` (footstep_grass/wood/concrete), `land-0..2` (impactSoft_medium) | https://kenney.nl/assets/impact-sounds | Kenney | CC0 |
 | `cloth-0..3` (cloth1–4) | https://kenney.nl/assets/rpg-audio | Kenney | CC0 |
 | `soft-paper` (bookFlip1), `soft-wing` (cloth1), `soft-leaf` (cloth3), `soft-unfold` (bookOpen), `soft-pin` (bookPlace1) — derived (high-pass 90 Hz, 2× low-pass 1.2–1.5 kHz, 15–25 ms fade-in, mono), creatures/canopy/ruin/homecoming, Moss | https://kenney.nl/assets/rpg-audio | Kenney | CC0 |
