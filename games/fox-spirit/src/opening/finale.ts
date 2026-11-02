@@ -637,7 +637,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         const wide = rig.cradle.clone().addScaledVector(d, -10.5).add(new THREE.Vector3(0, 4.2, 0));
         const aim = rig.cradle.clone().addScaledVector(d, 7).add(new THREE.Vector3(0, 3.2, 0));
         const T = FINALE_TIMING;
-        const until = T.warming + T.unbinding + T.open + T.released * 0.7;
+        // the wide holds until the snow, which eases straight on to the family (familyShot) when the fox is by the cradle
+        const until = T.warming + T.unbinding + T.open + T.released + 0.5;
         opts.cam.playPath({
           keys: [
             { t: 0, pos: cam.position.clone(), look: look0 },
