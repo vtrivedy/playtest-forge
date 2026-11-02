@@ -31,3 +31,17 @@ The desk-arrival screenshot confirms the foreground post no longer crosses the f
 All 20 original input-driven route legs and six state/error checks pass on this exact production source. TypeScript, build and lint:feel pass. [Saved state and route results](capacity-retest-443f6fa.json). Full trace and three reviewed screenshots: `/captures/sorrel/hermitage-capacity-443f6fa/`. This checks Hermitage restoration, not a fully occupied 24-slot budget.
 
 Ancestry matters: this commit does **not** contain the separately tested desk-post fix 1ee10b8. Its arrival screenshot has the old translucent post across the frame; integration must retain both changes. Release shows a visible fox on the slope; village return still hides the head behind the cottage step. These are access/state passes with the same bounded visual limitations, not a motion/audio verdict. Bramble notified.
+
+## Integrated production retest — 628d1b7
+
+Merged keeping-d2 into sw4-sorrel as fe96d47; runtime source matches integration, with no source diff. TypeScript, production build and lint:feel pass. All 20 movement legs and six state/error checks pass: lines free, plateau painted, desk caption present, finite transforms, no JS errors. [Compact results and window.__game](integrated-628d1b7.json). Full trace and three reviewed PNGs: `/captures/sorrel/hermitage-integrated-628d1b7/`.
+
+The desk foreground post fix survives integration. The same approach still crops the desk at left; release shows the fox on the slope; village return still obscures its head with the cottage step. Fern owns the camera review. This is access/interaction evidence, not continuous motion or audio approval. Bramble's integrated replacement rock positions supersede 2e5bdb0: do not merge the obsolete sw4-sorrel-hermitage-fix branch.
+
+## Missing-system checker hardening
+
+The independent probe now records `hermitagePresent` and fails interaction checks when Hermitage is absent, rather than throwing while reading `freed`. It also requires exactly three freed lines. This was exposed by Fern38490c0, which descends from the older75d09eb integration and does not yet include Hermitage; its missing destination is not evidence of a regression in628d1b7.
+
+Positive production rerun on3a5d616 (runtime matches628d1b7; harness-only diff): all20 legs and7 checks pass, finite transforms,0JS errors. Saved window.__game, traces and three reviewed PNGs: `/captures/sorrel/hermitage-harness-current-3a5d616/`. Desk remains cropped left; release fox is visible; village step obscures head. No new composition or motion-quality claim.
+
+Negative check: evaluated the exact new checks expression against the saved live38490c0 failed-route evidence; `hermitagePresent`, lines, paint and caption all return false without throwing. `/captures/sorrel/hermitage-fern-38490c0/hardened-checks.json`. The subsequent full negative browser replay was terminated (exit143) before evidence and is not counted as a completed run. Node syntax and git whitespace checks pass. Candidate38490c0 TypeScript/build/lint also pass, independently of destination availability.
