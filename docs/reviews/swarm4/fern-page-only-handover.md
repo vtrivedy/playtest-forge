@@ -84,3 +84,27 @@ the new repository evaluator both pass the actual documented camera state.
 The new evaluator also rejects a missing-onward negative control. TypeScript,
 feel lint/camera release checks and production build pass. Offline 640×360
 SwiftShader, final hold 10 fps, silent; no realtime or audio verdict.
+
+## Recorder setup parity — cbadec6, runtime d0d1953
+
+Kit's live GPU capture still reportedly lacks the reveal and has isolated black
+frames (#swarm :617); the offline checks do not clear that failure. A focused
+replay on cbadec6 changes two setup differences: normal `/` boot instead of
+`?manual=1`, and one initial simulation step instead of 60. Runtime sources
+remain identical to d0d1953. The route again arrives in 73.267 simulated seconds
+with the page pinned, only the page lantern lit, full=false and onward=48.
+All ten checks pass, including the reveal, follow-camera return and zero errors.
+
+Reviewed all 100 final-hold frames on four sheets and native reveal/ruin frames.
+The caption and hearthward stream render, the scenic lens crops the fox, and
+the readable fox follow framing returns. No additional runtime change follows
+from this test. Evidence: `/captures/fern/capture-parity-d0d1953/` (probe copy,
+state, acceptance, route stills, 100 hold frames and four sheets); compact
+acceptance is retained as `fern-capture-parity-d0d1953.json` beside this review.
+This remains silent 640×360 SwiftShader, 60 Hz simulation and 10 fps hold capture.
+
+Requested the actual GPU recorder module and endpoint state from Kit. One
+unverified driver hypothesis is stopping simulation on the shared route's
+`complete` flag (four seconds into homecoming) while recording continues.
+Neither that hypothesis nor a GPU/runtime or recording-buffer fault has been
+established by this setup-parity replay.
