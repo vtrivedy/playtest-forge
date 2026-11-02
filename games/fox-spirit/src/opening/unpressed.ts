@@ -487,7 +487,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       });
     // the kit's page is sealed behind the glyph shrine's door until it opens
     paper.visible = spec.id !== 'kit';
-    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false, look: 0, beat: 0 };
+    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false, look: 0, beat: 0, startle: -1 };
   });
 
   const world = new THREE.Vector3();
@@ -762,6 +762,19 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'head').rotation.z = Math.sin(t * 18) * 0.08 * burst - 0.05;
       B(c, 'head').rotation.y = Math.sin(t * 0.37 + c.idleSeed) * 0.35;
       B(c, 'body').scale.y = 1 + Math.sin(t * 3.1) * 0.02;
+      // startled: tuck the head and legs in and round up into a spiny ball, then slowly uncurl
+      const curl = c.startle < 0 ? 0 : smooth(0, 0.15, c.startle) * (1 - smooth(1.6, 2.5, c.startle));
+      if (curl > 0) {
+        B(c, 'head').rotation.z -= 1.1 * curl;
+        B(c, 'head').rotation.y *= 1 - curl;
+        B(c, 'legF').rotation.z = -1.3 * curl;
+        B(c, 'legB').rotation.z = 1.3 * curl;
+        B(c, 'body').rotation.z = 0.35 * curl;
+        B(c, 'body').scale.set(1 - 0.12 * curl, 1 + 0.18 * curl, 1);
+      } else {
+        B(c, 'legF').rotation.z = B(c, 'legB').rotation.z = B(c, 'body').rotation.z = 0;
+        B(c, 'body').scale.x = 1;
+      }
     },
     heron(c, t, dt) {
       if (fling >= 0) {
@@ -827,6 +840,19 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'earR').rotation.x = -(Math.max(0, Math.sin(t * 1.1 + c.idleSeed)) ** 12) * 0.5;
       B(c, 'tail').rotation.z = 0;
       B(c, 'tail').scale.setScalar(1);
+      // startled: one high bound straight up, ears flat, scut flashing, then it sits again
+      if (c.startle >= 0 && c.startle < 0.6) {
+        const u = c.startle / 0.6;
+        B(c, 'body').position.y = 0.2 + Math.sin(u * Math.PI) * 0.32;
+        B(c, 'body').rotation.z -= Math.sin(u * Math.PI) * 0.25;
+        B(c, 'earL').rotation.x = B(c, 'earR').rotation.x = 0;
+        B(c, 'earL').rotation.z = B(c, 'earR').rotation.z = -0.7 * Math.sin(u * Math.PI);
+        B(c, 'tail').scale.setScalar(1 + 0.9 * Math.sin(u * Math.PI));
+        B(c, 'legB').rotation.z = -0.9 * Math.sin(u * Math.PI);
+      } else {
+        B(c, 'earL').rotation.z = B(c, 'earR').rotation.z = 0;
+        B(c, 'legB').rotation.z = 0;
+      }
     },
     deer(c, t, dt) {
       // graze, lift the head, chew, ear flicks and tail flicks
@@ -930,6 +956,9 @@ export function buildUnpressed(ctx: OpeningCtx) {
         }
         continue;
       }
+      // a dash close by startles a living creature (the hedgehog balls up, the hare hops); it settles back after
+      if (c.startle >= 0) c.startle += dt;
+      if (p?.dashing && (c.startle < 0 || c.startle > 2.6) && Math.hypot(fox.x - c.holder.position.x, fox.z - c.holder.position.z) < 2.6) c.startle = 0;
       idle[c.spec.id](c, clock, dt);
     }
     if (fling >= 0 && (fling += dt) > 0.9) fling = -1;
