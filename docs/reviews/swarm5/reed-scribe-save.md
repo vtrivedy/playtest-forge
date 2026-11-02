@@ -52,3 +52,27 @@ it does not add an animation-quality or blind-wander claim.
 On f49f3aa1: TypeScript, production Vite build, `lint:feel` including the saved-opening AST guard and arrival-lens
 negative control pass. TLC passes unchanged fresh-play models: Discovery 112 generated / 38 distinct states,
 RunawayPage 24/9, TeachOrder 4/4. These models do not model save reconstruction or prove input geometry.
+
+## Visual retest — b374e01af5b62bc568a05188289d7f0da9a9e0d8
+
+Thistle eb4abb29's richer Scribe and Press art integrated. Same fresh physical Press route on T4/EGL: **PASS**,
+zero JavaScript errors; all three local and canonical completion facts, earned Inkstep and Maple fill 1 are
+explicitly asserted. All five portal transitions pass, including physical return and Ashwater re-entry.
+Native Tab opens the Album (`mapOpen:true`). Extra stationary frames retain the lever hold and coda.
+Press spawn to the first final-scene frame remains 91.517 simulation seconds, before those extra holds.
+
+Personally inspected [the polished scene](reed-scribe-save/scribe-polished.png). Fox-eared hood, scarf and flared
+robe make the Scribe read more like a character; page stacks and the pressed leaf give the work surface a purpose.
+The coda's dark outline now makes it readable on snow. Upper story banner still crosses the Press beam, and
+the surrounding ledge remains sparse. These sampled frames do not prove animation quality.
+
+A separate [first-brazier view](reed-scribe-save/brazier-occluded.png) is almost wholly blocked by pale geometry,
+leaving only an ear visible. Fox [-724.67, 1.67, 113.97], lens [-723.287, 3.929, 115.344], camera `blocked:true`.
+The same failure exists in bfc0481e; it is not introduced by the art retest. Exact blocking mesh has not been
+diagnosed. Reported to the camera/world owner. This prevents whole-route camera/visual acceptance despite the
+readable final composition. The solution-caption and duration gaps also remain.
+
+Full evidence: `/captures/reed/press-route-b374e01a/`; persistent volume
+`keeping-swarm5-captures/reed/press-route-b374e01af5/`. TypeScript, production build, feel/arrival lint and diff
+checks pass. Saved/fresh evidence above is also persisted under `reed/save-f49f3aa1/` and `reed/discovery-f49f3aa1/`
+on the same volume.
