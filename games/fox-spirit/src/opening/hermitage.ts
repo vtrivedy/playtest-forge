@@ -23,7 +23,7 @@ const HANGER: Tree[] = [
   [-16.0, 119.6, 1.1, 'tall', 4],
   [6.2, 119.6, 1.0, 'lean', 5],
   [-13.2, 124.2, 1.05, 'grove', 0],
-  [3.2, 128.4, 1.2, 'hero', 2],
+  [5.6, 127.4, 1.2, 'hero', 2],
   [-15.8, 134.6, 1.1, 'tall', 5],
   [3.4, 137.4, 1.0, 'grove', 4],
   [-10.6, 142.0, 1.15, 'tall', 4],
@@ -75,8 +75,8 @@ export function buildHermitage(ctx: OpeningCtx) {
   buildDesk(k, ctx);
   buildPress(k, ctx);
   buildStones(k, ctx);
-  // the lane's edge: a few root-steps of stone where the climb is steepest
-  for (const [x, z, s] of [[-13.6, 111.2, 0.5], [-10.6, 112.4, 0.4], [-15.4, 117.2, 0.55], [-9.6, 122.6, 0.45]] as const) {
+  // boulders on the lane's shoulders (≥ 2.9 m off its centre line, so the climb stays clear)
+  for (const [x, z, s] of [[-16.2, 110.7, 0.5], [-10.6, 112.1, 0.4], [-15.4, 118.9, 0.55], [-7.3, 120.5, 0.45]] as const) {
     const r = buildRock(rand, s);
     r.position.set(x, groundH(x, z) + s * 0.25, z);
     background.push(r);
