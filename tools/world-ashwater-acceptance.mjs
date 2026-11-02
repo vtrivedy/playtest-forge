@@ -181,10 +181,11 @@ try {
   await shot('07b-flooded');
   const flooded = (await state()).ash;
   if (!flooded.flood || flooded.poolY <= drainedPool + 1) throw Error('Weir gate did not raise the cistern');
-  await go(11.5, 35.4);
+  await go(12.75, 35.4);
   await shot('07c-weir-edge');
-  await go(12.4, 32.5, { jump: true, jumpAt: 1.8, hold: 16, max: 200, reach: 0.5, land: true });
+  await go(12.75, 32.3, { max: 200, reach: 0.5 });
   await shot('07d-punt');
+  await go(12.75, 30.1);
   await go(14.2, 30.0, { max: 200, reach: 0.4 });
   await shot('07e-wall');
   await go(14.2, 27.0);
