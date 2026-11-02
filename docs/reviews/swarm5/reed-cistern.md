@@ -49,3 +49,11 @@ zero-black-frame claim follows from this run.
 
 Full evidence: `/captures/reed/cistern-26280aa3/`; persistent volume
 `keeping-swarm5-captures/reed/world-entry-26280aa30a/`.
+
+## New geometry acceptance plan
+
+Cedar's 5ac3f4fc changes the punt, shelf and wall heights. Repeat fresh default boot → physical invitation and homecoming → hub arch → all three puzzles. Use the new walkable punt/shelf coordinates from Cedar's probe without placement or progress setters. Keep the explicit lingering-mat, rising-flood and canonical reward assertions. Save screenshots and full game state on a pinned merged SHA; review the crossing and Album before reporting acceptance. This updates only the diagnostic route, not production geometry.
+
+### Pier camera follow-up design
+
+The new route passes on d126bc50, but 07e-wall shows the tall pier masking the fox. Register that solid mesh with the existing chase-camera occlusion fade, as Press already does for its solids. Preserve its collider and all puzzle coordinates/heights. Rerun the same pinned fresh hub route and compare 07e-wall before accepting the visual correction.
