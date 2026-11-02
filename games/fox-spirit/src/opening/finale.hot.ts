@@ -57,6 +57,8 @@ export type FinaleRig = {
   onwardMesh: THREE.InstancedMesh;
   onwardLut: Float32Array;
   onwardAt: THREE.Vector3;
+  /** where the current stream starts (the fox, when it was last rebuilt) */
+  onwardFrom: THREE.Vector3;
   emberAt: THREE.Vector3;
   homeReady: () => boolean;
   emberWhere: (out: THREE.Vector3) => boolean;
@@ -354,7 +356,7 @@ function stepOnward(rig: FinaleRig, dt: number): void {
     // Remote page completion leaves the reveal pending until the fox comes home.
     if (rig.events.homeCaption()) s.homeSaid = 1;
   }
-  if (want && rig.emberAt.distanceToSquared(rig.onwardAt) > 1) rig.events.onward(rig.emberAt);
+  if (want && (rig.emberAt.distanceToSquared(rig.onwardAt) > 1 || f.distanceToSquared(rig.onwardFrom) > 16)) rig.events.onward(rig.emberAt);
   s.onwardT = want ? Math.min(3, s.onwardT + dt) : Math.max(0, s.onwardT - dt * 2);
   const on = smooth(s.onwardT, 0.5, 3);
   if (on <= 0.001) {
