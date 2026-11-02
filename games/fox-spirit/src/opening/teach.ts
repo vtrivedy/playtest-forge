@@ -11,12 +11,13 @@ import { updateTeach, type TeachState } from './teach.hot';
 export function createTeach(ctx: OpeningCtx) {
   const plane = createLetterPlane(2560, 128, 0.075, 0.8, { x: -0.94, left: true, panel: true });
   const t: TeachState = { plane, cam: null, offered: null, drawn: null, o: 0, redraw: (text) => plane.draw([{ text, px: 70 }]) };
-  ctx.onUpdate((dt) => updateTeach(t, dt));
   return {
     /** fix the line to the rendered lens (the camera must be in the scene) */
     mount(cam: THREE.PerspectiveCamera): void {
       cam.add(plane.mesh);
       t.cam = cam;
+      // Mount after every builder: consume this frame's offers after all providers have run.
+      ctx.onUpdate((dt) => updateTeach(t, dt));
     },
     /** call every frame this hint should show (pass a constant string: no per-frame allocation) */
     offer(text: string): void {

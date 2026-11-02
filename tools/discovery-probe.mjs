@@ -37,7 +37,7 @@ try{
     h.setStick(x,z);h.setKeys(jump?(dash?['Space','ShiftLeft']:['Space']):dash?['ShiftLeft']:[]);
     shot=renderEvery>0&&p.f%renderEvery===0;
     p.s=h.advance(1,1/60,shot);p.f++;
-    if(p.f%15===0||c.leg!==p.s.opening.discovery.leg)p.rows.push({transition:c.leg!==p.s.opening.discovery.leg?`${c.leg}->${p.s.opening.discovery.leg}`:null,injected:p.injected,t:p.f/60,pos:p.s.pos,grounded:p.s.grounded,vel:p.s.vel,cue:p.s.opening.discovery,page:p.s.opening.page,canopy:p.s.opening.canopy.lastLeaf,ruin:p.s.opening.popUpRuin});
+    if(p.f%15===0||c.leg!==p.s.opening.discovery.leg)p.rows.push({transition:c.leg!==p.s.opening.discovery.leg?`${c.leg}->${p.s.opening.discovery.leg}`:null,injected:p.injected,t:p.f/60,pos:p.s.pos,grounded:p.s.grounded,vel:p.s.vel,cue:p.s.opening.discovery,teach:p.s.opening.teach,page:p.s.opening.page,canopy:p.s.opening.canopy.lastLeaf,ruin:p.s.opening.popUpRuin});
     if(shot)break;
    }
    const rows=p.rows;p.rows=[];return{f:p.f,shot,rows,s:p.s};
@@ -49,7 +49,7 @@ try{
  evidence.game=await page.evaluate(()=>window.__game.state());
  fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));
  await page.evaluate(()=>window.__gameHooks.advance(0,1/60,true));await page.screenshot({path:`${out}/end.png`});
- evidence.checks={firstCatch:evidence.game.opening.page.catches>0,canopy:evidence.game.opening.canopy.roostVisits>0,overlook:evidence.game.opening.popUpRuin.reached,kept:evidence.game.opening.page.phase==='kept',noErrors:evidence.errors.length===0,finite:evidence.trace.every(r=>r.pos.every(Number.isFinite)),landingGates:evidence.trace.filter(r=>['jump1->fold2','jump1->jump2','jump2->jump3','jump3->catch'].includes(r.transition)).every(r=>r.grounded),mistakeInjected:mistake==='none'||evidence.trace.some(r=>r.injected)};
+ evidence.checks={firstCatch:evidence.game.opening.page.catches>0,canopy:evidence.game.opening.canopy.roostVisits>0,overlook:evidence.game.opening.popUpRuin.reached,kept:evidence.game.opening.page.phase==='kept',noErrors:evidence.errors.length===0,finite:evidence.trace.every(r=>r.pos.every(Number.isFinite)),noCompetingHearthHint:evidence.trace.every(r=>!r.cue.active||!/cold hearth|warm air/.test(r.teach?.showing??'')),landingGates:evidence.trace.filter(r=>['jump1->fold2','jump1->jump2','jump2->jump3','jump3->catch'].includes(r.transition)).every(r=>r.grounded),mistakeInjected:mistake==='none'||evidence.trace.some(r=>r.injected)};
  evidence.frames=image;
  evidence.completed=true;
  console.log(JSON.stringify(evidence.checks));

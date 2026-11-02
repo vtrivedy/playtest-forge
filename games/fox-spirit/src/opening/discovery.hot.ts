@@ -5,6 +5,7 @@ import { CANOPY, JOGS, POP_UP_RUIN } from './layout';
 const TO_CANOPY = [[-4, 88], [-3.2, 86.5], [-3.2, 80.5], [-0.2, 74.4], [-0.2, 71.5]] as const;
 const HINTS = ['Follow the loose page', 'Shift · dash to catch it', 'Space · hold to spring from a leaf', 'Shift · dash into the folded tab', 'Space · jump across the paper', 'Let the paper unfold'] as const;
 type Action = 'follow' | 'dash' | 'spring' | 'unfold' | 'jump' | 'wait';
+type ActionIndex = 0 | 1 | 2 | 3 | 4 | 5;
 const ACTIONS: readonly Action[] = ['follow', 'dash', 'spring', 'unfold', 'jump', 'wait'];
 type PageView = { readonly pos: THREE.Vector3; readonly catches: number; readonly kept: boolean };
 type CanopyView = { readonly lastLeaf: string | null };
@@ -18,14 +19,16 @@ function invitationPaper(): THREE.CanvasTexture {
   canvas.height = 96;
   const g = canvas.getContext('2d')!;
   g.fillStyle = '#f0d395';
-  g.strokeStyle = '#78512e';
-  g.lineWidth = 3;
+  g.strokeStyle = '#c58c2d';
+  g.lineWidth = 6;
   g.beginPath();
   g.moveTo(5, 5); g.lineTo(58, 3); g.lineTo(57, 73);
   g.lineTo(52, 89); g.lineTo(43, 83); g.lineTo(34, 91);
   g.lineTo(22, 85); g.lineTo(8, 91); g.closePath();
   g.fill(); g.stroke();
+  g.strokeStyle = '#694522';
   g.lineWidth = 2;
+  g.stroke();
   g.beginPath();
   g.moveTo(16, 28); g.lineTo(47, 24);
   g.moveTo(16, 40); g.lineTo(41, 37);
@@ -40,7 +43,7 @@ function invitationPaper(): THREE.CanvasTexture {
 export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyView, ruin: RuinView) {
   // cold:begin
   const target = new THREE.Vector3();
-  let action = 0;
+  let action: ActionIndex = 0;
   let active = true;
   const scraps = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.28, 0.4), new THREE.MeshBasicMaterial({ map: invitationPaper(), side: THREE.DoubleSide, transparent: true, alphaTest: 0.05 }), 4);
   scraps.name = 'page-invitation';
@@ -56,7 +59,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   let seenCatches = -1;
   // cold:end
 
-  function setTarget(x: number, z: number, y: number, nextAction: number): void {
+  function setTarget(x: number, z: number, y: number, nextAction: ActionIndex): void {
     target.set(x, y, z);
     action = nextAction;
   }
@@ -79,7 +82,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
     setTarget(q[0], q[1], ctx.groundH(q[0], q[1]) + 0.35, 0);
   }
 
-  function onRuinLeaf(index: number): boolean {
+  function onRuinLeaf(index: 0 | 1 | 2): boolean {
     const fox = ctx.fox.root.position;
     const q = index === 2 ? POP_UP_RUIN.overlook : POP_UP_RUIN.leaves[index]!;
     return !!ctx.player?.motion.grounded && Math.abs(fox.x - q.x) < 1.6 && Math.abs(fox.z - q.z) < 1.6 && Math.abs(fox.y - q.top) < 0.12;
@@ -158,8 +161,8 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
     for (let i = 0; i < count; i++) {
       const along = (i + 1) * step;
       const blend = along / distance;
-      position.set(fox.x + dx * blend, fox.y + (target.y - fox.y) * blend + 0.45 + Math.sin(t * 2 + i) * 0.1, fox.z + dz * blend);
-      position.y = Math.max(position.y, ctx.groundH(position.x, position.z) + 0.45);
+      position.set(fox.x + dx * blend, fox.y + (target.y - fox.y) * blend + 0.25 + Math.sin(t * 2 + i) * 0.1, fox.z + dz * blend);
+      position.y = Math.max(position.y, ctx.groundH(position.x, position.z) + 0.3);
       euler.set(Math.sin(t * 1.7 + i) * 0.22, Math.sin(t * 1.2 + i) * 0.16, Math.sin(t * 1.5 + i * 2) * 0.25);
       flutter.setFromEuler(euler);
       rotation.copy(ctx.player!.cam.camera.quaternion).multiply(flutter);

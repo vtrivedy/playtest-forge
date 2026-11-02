@@ -7,6 +7,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { lintHotSource, hotLintSelfTest } from './hot-path-lint.mjs';
 import { lintAssetSource, assetLintSelfTest } from './asset-path-lint.mjs';
+import { lintTeachOrderSource, teachOrderSelfTest } from './teach-order-lint.mjs';
+teachOrderSelfTest();
 assetLintSelfTest();
 hotLintSelfTest();
 
@@ -35,6 +37,10 @@ const RULES = [
 ];
 
 const findings = [];
+for (const name of ['teach.ts', 'scene.ts']) {
+  const file = path.join(ROOT, name);
+  findings.push(...lintTeachOrderSource(file, fs.readFileSync(file, 'utf8')));
+}
 for (const f of fs.readdirSync(ROOT).filter((n) => n.endsWith('.ts'))) {
   const file = path.join(ROOT, f);
   const source = fs.readFileSync(file, 'utf8');
