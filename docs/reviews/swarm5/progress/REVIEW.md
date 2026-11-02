@@ -90,3 +90,15 @@ fixtures, as recorded in `SAVED-AUTUMN-AUDIT.md`. Requested Maple's canonical
 mechanism mapping again before attempting restoration; Reed owns the separate
 Album contrast follow-up. Optional-memory reload success does not close either
 issue or the game's duration gap.
+
+## Autumn reconstruction and four-memory integration — 22:02 UTC
+
+The earlier saved-autumn mapping/reconstruction gap is corrected and landed in
+`keeping-d3`/main `69da5af0`. [AUTUMN-SAVE-FIX.md](AUTUMN-SAVE-FIX.md) records
+the canonical physical bindings, earned-save reload, eight-second fall movie,
+zero-error saved prefixes and fresh production opening regression. The
+[four-secret reload follow-up](OPTIONAL-MEMORY-RELOAD.md) independently checks
+the expanded Album through twelve reloads, including complete paragraphs,
+physical Ashwater secret flags and no unintended level/ability/Seedwell gains.
+The earlier paragraphs above remain dated historical findings. These fixes do
+not close duration, unfamiliar-player insight or overall world-art acceptance.
