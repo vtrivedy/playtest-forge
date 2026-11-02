@@ -42,6 +42,8 @@ export function buildAshwater(
   const rand = rng(7071);
   const root = new THREE.Group();
   root.name = 'ashwater';
+  /** tall pieces the chase camera may look through (the cistern walls, the weir pier, the mill) */
+  const occluders: THREE.Object3D[] = [];
   scene.add(root);
 
   // ---- ground: one sheet over the oval, vertex-coloured moss / sedge / peat by height and wetness
@@ -259,6 +261,7 @@ export function buildAshwater(
   wheel.rotation.y = Math.PI / 2;
   mill.add(wall, roof, wheel);
   root.add(mill);
+  occluders.push(mill);
   colliders.push({ kind: 'box', x: millAt.x, z: millAt.z, yaw: 0, hx: 3.3, hz: 2.8, top: WEIR.top + 3.4 });
 
   // ---- the Reed Seedwell on its ledge: a slate basin; restored, a teal column of light rises from it
@@ -416,6 +419,7 @@ export function buildAshwater(
     m.position.set(a.x, (CISTERN.wallTop - 1.3) / 2, a.z);
     m.castShadow = m.receiveShadow = true;
     root.add(m);
+    occluders.push(m);
     colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx: (x1 - x0) / 2, hz: (z1 - z0) / 2, top: CISTERN.wallTop });
   };
   cWall(W.x0 - CISTERN.wall, W.x0, W.z0 - CISTERN.wall, WEIR.z0);
@@ -428,6 +432,7 @@ export function buildAshwater(
     pier.position.set(a.x, 2.5, a.z);
     pier.castShadow = true;
     root.add(pier);
+    occluders.push(pier);
     colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx, hz, top: 6.3 });
   }
   cWall(W.x0, CISTERN.gate.x0, W.z0 - CISTERN.wall, W.z0);
@@ -582,6 +587,7 @@ export function buildAshwater(
   ctx.onUpdate((dt) => updateAshwater(rig, dt));
 
   return {
+    occluders,
     spawn: { x: spawnAt.x, z: spawnAt.z, yaw: ASH_SPAWN.yaw },
     state: () => ({
       damA: rig.s.burstA >= 0, damA2: rig.s.burstA2 >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2),

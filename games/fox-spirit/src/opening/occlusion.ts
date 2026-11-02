@@ -6,7 +6,7 @@ type Blocker = { root: THREE.Object3D; meshes: THREE.Mesh[]; owned: OwnedMateria
 
 export function createOpeningOcclusion(roots: THREE.Object3D[]) {
   const seen = new Set<THREE.Mesh>();
-  const blockers: Blocker[] = roots.map((root) => {
+  const makeBlocker = (root: THREE.Object3D): Blocker => {
     const meshes: THREE.Mesh[] = [];
     const ink: Blocker['ink'] = [];
     root.traverse((o) => {
@@ -17,7 +17,8 @@ export function createOpeningOcclusion(roots: THREE.Object3D[]) {
       else meshes.push(mesh);
     });
     return { root, meshes, ink, owned: [], fade: 0 };
-  });
+  };
+  const blockers: Blocker[] = roots.map(makeBlocker);
   const owner = new Map<THREE.Object3D, Blocker>();
   const meshes = blockers.flatMap((b) => b.meshes);
   for (const b of blockers) for (const mesh of b.meshes) owner.set(mesh, b);
@@ -50,6 +51,15 @@ export function createOpeningOcclusion(roots: THREE.Object3D[]) {
   }
 
   return {
+    /** register a blocker built after the cutout was created (world islands build late) */
+    add(root: THREE.Object3D): void {
+      const b = makeBlocker(root);
+      blockers.push(b);
+      for (const mesh of b.meshes) {
+        meshes.push(mesh);
+        owner.set(mesh, b);
+      }
+    },
     /** Call after player.step has placed the chase camera. Roots must exclude fox and terrain. */
     update(dt: number, camera: THREE.Camera, feet: THREE.Vector3) {
       hidden.clear();
