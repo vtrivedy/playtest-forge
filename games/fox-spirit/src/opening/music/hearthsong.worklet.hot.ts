@@ -355,6 +355,7 @@ class Hearthsong extends AudioWorkletProcessor {
         if (n >= 0) {
           this.lIncTo = (TAU * hz(n)) / sampleRate;
           if (this.lGate === 0) this.lInc = this.lIncTo;
+          else this.lAmp *= 0.6; // tongue each note: a recorder re-articulates, a theremin slides
           this.lGate = 1;
           this.lAge = 0;
         } else if (n === -2) this.lGate = 0;
@@ -414,7 +415,7 @@ class Hearthsong extends AudioWorkletProcessor {
     const bassAtk = 1 - Math.exp(-1 / (sampleRate * 0.02));
     const leadAtk = 1 - Math.exp(-1 / (sampleRate * 0.07));
     const leadRel = 1 - Math.exp(-1 / (sampleRate * 0.35));
-    const glide = 1 - Math.exp(-1 / (sampleRate * 0.03));
+    const glide = 1 - Math.exp(-1 / (sampleRate * 0.008)); // a 30 ms portamento read as a theremin
     const bellDec = Math.pow(0.001, 1 / (sampleRate * 2.6));
     const idxDec = Math.pow(0.001, 1 / (sampleRate * 0.9));
     const vibHz = (TAU * 5.1) / sampleRate;
@@ -503,7 +504,7 @@ class Hearthsong extends AudioWorkletProcessor {
         this.lAge += 1 / sampleRate;
         this.lVib += vibHz;
         if (this.lVib > TAU) this.lVib -= TAU;
-        const depth = 0.006 * Math.min(1, Math.max(0, (this.lAge - 0.25) * 2));
+        const depth = 0.0035 * Math.min(1, Math.max(0, (this.lAge - 0.4) * 2));
         this.lPh += this.lInc * (1 + depth * Math.sin(this.lVib));
         if (this.lPh > TAU) this.lPh -= TAU;
         this.lNoise += (this.rand() * 2 - 1 - this.lNoise) * 0.18;
