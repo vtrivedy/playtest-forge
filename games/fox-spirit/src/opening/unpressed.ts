@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { RAMP_WORLD, inkMaterial, hullGeometry, plumeGeometry, hewn, toon, inked } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
+import type { OpeningAudio } from './audio';
 import type { Collider } from '../lookdevPlay';
 import { HOMECOMING, JOGS, KIT, UNPRESSED } from './layout';
 
@@ -402,33 +403,26 @@ type Phase = 'pressed' | 'popping' | 'performing' | 'alive';
  * Sound: a pressed drawing breathes a faint glassy shimmer you can find by ear; the pop is a paper "fwump"
  * and a two-note chime, then the creature's own voice. WebAudio starts on the first key, like the hearth hum.
  */
-function createUnpressedAudio() {
-  let ac: AudioContext | null = null;
-  let master: GainNode;
+function createUnpressedAudio(audio: OpeningAudio) {
+  const ac = audio.ac;
+  const master = ac.createGain();
+  master.gain.value = 0.6;
+  master.connect(audio.sfx);
   const shimmers = new Map<string, GainNode>();
-  const start = () => {
-    if (ac) return;
-    ac = new AudioContext();
-    master = ac.createGain();
-    master.gain.value = 0.6;
-    master.connect(ac.destination);
-  };
-  addEventListener('keydown', start, { once: true });
-  addEventListener('pointerdown', start, { once: true });
   const env = (g: GainNode, t0: number, peak: number, a: number, d: number) => {
     g.gain.setValueAtTime(0, t0);
     g.gain.linearRampToValueAtTime(peak, t0 + a);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
   };
   const tone = (f0: number, f1: number, type: OscillatorType, t0: number, peak: number, a: number, d: number, lp = 4000) => {
-    const o = ac!.createOscillator();
+    const o = ac.createOscillator();
     o.type = type;
     o.frequency.setValueAtTime(f0, t0);
     o.frequency.exponentialRampToValueAtTime(f1, t0 + a + d);
-    const f = ac!.createBiquadFilter();
+    const f = ac.createBiquadFilter();
     f.type = 'lowpass';
     f.frequency.value = lp;
-    const g = ac!.createGain();
+    const g = ac.createGain();
     env(g, t0, peak, a, d);
     o.connect(f).connect(g).connect(master);
     o.start(t0);
@@ -437,7 +431,7 @@ function createUnpressedAudio() {
   return {
     /** per-frame: shimmer loudness by distance to each still-pressed drawing (0 when found) */
     shimmer(id: string, k: number) {
-      if (!ac) return;
+      if (ac.state !== 'running') return;
       let g = shimmers.get(id);
       if (!g) {
         g = ac.createGain();
@@ -459,7 +453,7 @@ function createUnpressedAudio() {
       g.gain.setTargetAtTime(0.018 * k, ac.currentTime, 0.2);
     },
     pop(id: string) {
-      if (!ac) return;
+      if (ac.state !== 'running') return;
       const t = ac.currentTime;
       // paper fwump: a short low-passed noise burst
       const len = Math.floor(ac.sampleRate * 0.35);
@@ -552,7 +546,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
 
   const world = new THREE.Vector3();
   const local = new THREE.Vector3();
-  const audio = createUnpressedAudio();
+  const audio = createUnpressedAudio(ctx.audio);
 
   function unpress(id: string): boolean {
     const c = creatures.find((k) => k.spec.id === id);

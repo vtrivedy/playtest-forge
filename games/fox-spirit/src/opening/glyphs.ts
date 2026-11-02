@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { hewn, inked, toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
+import type { OpeningAudio } from './audio';
 import { GLYPHS } from './layout';
 
 type GlyphId = (typeof GLYPHS.stones)[number]['id'];
@@ -117,21 +118,14 @@ function decal(tex: THREE.Texture, size: number, color: number, additive = false
   return m;
 }
 
-/** WebAudio on first input (as the hearth hum): rising chime per lit stone, a soft fall on gutter, a chord on open */
-function createGlyphAudio() {
-  let ac: AudioContext | null = null;
-  let out: GainNode;
-  const start = () => {
-    if (ac) return;
-    ac = new AudioContext();
-    out = ac.createGain();
-    out.gain.value = 0.5;
-    out.connect(ac.destination);
-  };
-  addEventListener('keydown', start, { once: true });
-  addEventListener('pointerdown', start, { once: true });
+/** on the opening's one graph (audio.ts): rising chime per lit stone, a soft fall on gutter, a chord on open */
+function createGlyphAudio(audio: OpeningAudio) {
+  const ac = audio.ac;
+  const out = ac.createGain();
+  out.gain.value = 0.5;
+  out.connect(audio.sfx);
   const note = (hz: number, at: number, peak: number, len: number, type: OscillatorType = 'sine') => {
-    if (!ac) return;
+    if (ac.state !== 'running') return;
     const t = ac.currentTime + at;
     const o = ac.createOscillator();
     o.type = type;
@@ -162,7 +156,7 @@ function createGlyphAudio() {
 export function buildGlyphs(ctx: OpeningCtx, opts: { onSolved?: () => void } = {}) {
   const { scene, rand, groundH, colliders, field } = ctx;
   const stoneMat = toon(0x8a7c6a, { contour: 0.5 });
-  const audio = createGlyphAudio();
+  const audio = createGlyphAudio(ctx.audio);
 
   const stones = GLYPHS.stones.map((s) => {
     const y = groundH(s.x, s.z);

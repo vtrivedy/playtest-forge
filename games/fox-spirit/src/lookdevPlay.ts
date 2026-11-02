@@ -284,6 +284,8 @@ class FootIK {
   /** worst stance-paw XZ speed this frame (m/s) — skate metric */
   slide = 0;
   stanceFeet = 0;
+  /** a paw touching down while moving (world position, hind paw?) — footfall sounds */
+  onPlant?: (at: THREE.Vector3, hind: boolean) => void;
 
   constructor(private root: THREE.Object3D, private model: THREE.Object3D) {
     const find = (n: string) => {
@@ -318,7 +320,10 @@ class FootIK {
       f.raw = pad.clone();
       const stance = pad.y - baseY < P.stanceHeight && rawSpeed < P.stanceSpeed;
       const g = ground(pad.x, pad.z);
-      if (stance && !f.planted) [f.planted, f.anchor] = [true, pad.clone()];
+      if (stance && !f.planted) {
+        [f.planted, f.anchor] = [true, pad.clone()];
+        if (moving) this.onPlant?.(pad, f.pole > 0);
+      }
       else if (!stance) f.planted = false;
       if (f.planted && moving) {
         const want = f.anchor.clone().sub(pad).setY(0);
@@ -414,6 +419,8 @@ export function createPlay(opts: {
   onLand?: (at: THREE.Vector3, impact: number) => void;
   /** Supported top contact; optional spring returns launch velocity after its load dwell. */
   onGroundContact?: (at: THREE.Vector3, arrivalSpeed: number, jumpHeld: boolean, dt: number) => number | null;
+  /** a paw plants while moving (footfalls) */
+  onFootfall?: (at: THREE.Vector3, hind: boolean) => void;
   /** Contextual pickup/place. Edged independently of key repeat. */
   onInteract?: () => void;
   /** Called before an accepted dash changes velocity, including midair dashes. */
@@ -431,6 +438,7 @@ export function createPlay(opts: {
   const P = PLAY;
   const anim = new FoxAnimator(fox);
   const ik = new FootIK(fox.root, fox.model);
+  ik.onPlant = (at, hind) => opts.onFootfall?.(at, hind);
 
   /** walkable surface (posts excluded unless `solid`) */
   const surface = (x: number, z: number, solid = true, ceiling = Infinity) => {

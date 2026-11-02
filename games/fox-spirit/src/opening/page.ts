@@ -143,6 +143,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   let skips = 0;
   let lastSkip = -1;
   let dodges = 0;
+  /** every startle (bolt, skip, jink, jerk up): the sound of it taking off */
+  let flaps = 0;
   let windedT = 0;
   let beat = 0;
   let beatRate = 1;
@@ -216,6 +218,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     if ((phase === 'perched' || phase === 'fleeing') && dashStart && windedT <= 0 && d > TUNE.dodgeFrom[stage]! && d < TUNE.dodgeTo) {
       // it sees the lunge: a quick jink across the fox's line and a little ahead
       dodges++;
+      flaps++;
       windedT = TUNE.winded[stage]!;
       const ax = pos.x - fox.x, az = pos.z - fox.z, al = Math.hypot(ax, az) || 1;
       const sign = Math.random() < 0.5 ? -1 : 1;
@@ -233,6 +236,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
         // walked into it: a startled skip ahead (it wants a dash)
         if (!TUNE.hop[stage]) sOwed += TUNE.skip;
         skips++;
+        flaps++;
         for (let i = 0; i < 6; i++) emit(pos, 0.8, 1.2);
       }
     }
@@ -241,11 +245,13 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 4.6 && windedT <= 0) {
       windedT = TUNE.hopRest + 0.6;
       dodges++;
+      flaps++;
       sideGoal.set(0, 0.9, 0);
       for (let i = 0; i < 8; i++) emit(pos, 0.9, 1.4);
     }
     if (phase === 'perched' && d < TUNE.spookAt[stage]! && !(TUNE.hop[stage] && windedT > 0)) {
       phase = 'fleeing';
+      flaps++;
       if (TUNE.hop[stage]) {
         // pick the next perch along the loop
         const L = stages[stage]!;
@@ -400,7 +406,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     /** true once the third catch keeps it and its rise-and-fade has finished */
     settled: () => phase === 'kept' && keptAt > 4.6,
     /** for the hum: where it is, whether it's in flight, how many times it's been caught */
-    voice: () => ({ pos, fleeing: phase === 'fleeing' || phase === 'flung', catches, kept: phase === 'kept' }),
+    voice: () => ({ pos, fleeing: phase === 'fleeing' || phase === 'flung', catches, flaps, kept: phase === 'kept' }),
     state: () => ({ stage, phase, catches, skips, dodges, winded: windedT > 0, yaw: +holder.rotation.y.toFixed(4), droop: +(body.position.y).toFixed(3), s: +s.toFixed(2), pos: pos.toArray().map((v) => +v.toFixed(4)) }),
   };
 }

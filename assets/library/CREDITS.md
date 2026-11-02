@@ -124,3 +124,19 @@ Lanternhollow village density pass: additional original cottage variants, timber
 Lanternhollow communal cooking pot, trivet, low stone ring and contained three-dimensional fire tongues are original procedural geometry/materials; no external assets or API used.
 
 Lanternhollow twelve-lantern pass: two additional cottage-mounted festoon cords and connected timber hooks reuse the original procedural lamp geometry/materials. No new external assets, downloads or API calls.
+
+## Opening audio — music, ambience, fox & page SFX (`games/fox-spirit/src/opening/sfx/`, Flint)
+All CC0 (public domain dedication). Derived files were cut/re-encoded (Ogg Vorbis q3–4, 44.1 kHz); loops are cut
+with a 3 s (crackle 0.5 s) equal-power crossfade and one fixed gain so the seam is sample-continuous. See
+`docs/design/swarm3/audio-DESIGN.md`.
+
+| Files | Source | Author | License |
+|---|---|---|---|
+| `music-hush-hamlet.ogg` (the author's loop edit, as is) | https://opengameart.org/content/hush-hamlet | Zane Little Music | CC0 |
+| `music-apple-cider.ogg` | https://opengameart.org/content/apple-cider | Zane Little Music | CC0 |
+| `amb-birds.ogg` (40 s loop from 60 s in, high-passed 180 Hz) | https://opengameart.org/content/park-ambiences (`park_ambience_birds.wav`) | Thimras | CC0 |
+| `amb-wind.ogg` (40 s loop from 30 s in) | https://opengameart.org/content/park-ambiences (`park_ambience_wind.wav`) | Thimras | CC0 |
+| `hearth-crackle.ogg` (2.8 s loop) | https://opengameart.org/content/fire-crackling | AntumDeluge | CC0 |
+| `steam-0..2.ogg` (markers 1–3) | https://opengameart.org/content/steam-release-sounds | bart | CC0 |
+| `step-grass-0..4`, `step-wood-0..4`, `step-stone-0..4` (footstep_grass/wood/concrete), `land-0..2` (impactSoft_medium) | https://kenney.nl/assets/impact-sounds | Kenney | CC0 |
+| `page-flip-0..2` (bookFlip1–3), `page-close` (bookClose), `cloth-0..3` (cloth1–4) | https://kenney.nl/assets/rpg-audio | Kenney | CC0 |

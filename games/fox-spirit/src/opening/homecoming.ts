@@ -77,25 +77,21 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   const m4 = new THREE.Matrix4();
 
   // a soft chime per lantern, rising a step each time
-  let ac: AudioContext | null = null;
+  const ac = ctx.audio.ac;
   const chime = (step: number) => {
-    try {
-      ac ??= new AudioContext();
-      const t = ac.currentTime;
-      for (const [mul, gain] of [[1, 0.06], [2, 0.02], [3.01, 0.01]] as const) {
-        const o = ac.createOscillator();
-        const g = ac.createGain();
-        o.type = 'sine';
-        o.frequency.value = [523, 587, 659, 784, 880][step]! * mul;
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(gain, t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
-        o.connect(g).connect(ac.destination);
-        o.start(t);
-        o.stop(t + 2.3);
-      }
-    } catch {
-      /* no audio */
+    if (ac.state !== 'running') return;
+    const t = ac.currentTime;
+    for (const [mul, gain] of [[1, 0.06], [2, 0.02], [3.01, 0.01]] as const) {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.value = [523, 587, 659, 784, 880][step]! * mul;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(gain, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+      o.connect(g).connect(ctx.audio.sfx);
+      o.start(t);
+      o.stop(t + 2.3);
     }
   };
 
