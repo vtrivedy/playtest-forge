@@ -132,11 +132,10 @@ export const FINALE = (() => {
     /** the Scribe's stool on the book's right (the cover opens to the left) */
     stool: local(2.5, 1.2),
     /** where the three pressed kits drift down, and the spot each curls up at round the cradle */
-    kits: [
-      { land: round(3.6, 0.9), curl: round(1.0, 0.75) },
-      { land: round(3.4, -0.7), curl: round(1.0, -0.6) },
-      { land: round(4.2, 0.1), curl: round(1.05, 1.9) },
-    ],
+    kits: [{ land: round(3.6, 0.9) }, { land: round(3.4, -0.7) }, { land: round(4.2, 0.1) }],
+    /** where kits may curl round the cradle: a ring on its open side (away from the book); each kit takes the free
+     * slot farthest from the hero and its siblings, so a kit never lies inside the fox */
+    slots: Array.from({ length: 9 }, (_, i) => round(1.35, -1.5 + (i * 3.6) / 8)),
   };
 })();
 

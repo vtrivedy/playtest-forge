@@ -15,6 +15,7 @@ import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
 import type { FollowCamera } from '../camera';
 import { CROWN, FINALE, HEARTH_A, KEEPING, pathDist, VISTA, WELL } from './layout';
+import { createLetterPlane } from './lettering';
 import { FINALE_TIMING, KIT_PHASES, PHASES, updateFinale, type FinaleRig } from './finale.hot';
 
 /** album paper, ink-frost, iron and the warm colours the hollow wakes into */
@@ -542,16 +543,13 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     return curve.getLength();
   };
 
-  // ---- the end card
-  const card = document.createElement('div');
-  card.dataset.finale = 'card';
-  Object.assign(card.style, {
-    position: 'fixed', left: '0', right: '0', top: '34%', textAlign: 'center', pointerEvents: 'none',
-    color: '#f6ead2', font: 'italic 54px Georgia,serif', letterSpacing: '0.04em', opacity: '0',
-    textShadow: '0 2px 18px rgba(40,24,12,.55)',
-  });
-  card.innerHTML = 'Russet Vale<div style="font:18px Georgia,serif;letter-spacing:.12em;margin-top:14px;opacity:.8">and the year turned</div>';
-  document.body.append(card);
+  // ---- the end card: drawn in the frame (lettering.ts) so every recording carries it; big, in the upper third
+  const card = createLetterPlane(2048, 720, 0.42, 0.5);
+  card.draw([
+    { text: 'Russet Vale', px: 300, italic: true, spacing: 0.02 },
+    { text: 'and the year turned', px: 84, spacing: 0.14, alpha: 0.9 },
+  ]);
+  opts.cam.camera.add(card.mesh);
   const say = (text: string) => ctx.captions.say(text);
 
   const F2 = F.kits;
@@ -637,19 +635,22 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       },
       card: () => {
         ctx.audio.cue('finale-rest');
-        // ease out to a held composition: fox, kits and ember in front, the open Album, the bare Crown beyond
+        // ease in to a held composition on the family: fox, kits and ember big in front, the open Album and the
+        // bare Crown in snow behind, the title over them. It holds (a slow push) until the player moves.
         const cam = opts.cam.camera;
         const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
-        // look between the book's face (local −z) and the Crown, from behind the ember
         const d = view();
-        const end = rig.cradle.clone().addScaledVector(d, -6.6).add(new THREE.Vector3(0, 2.3, 0));
-        const look = rig.cradle.clone().addScaledVector(d, 5).add(new THREE.Vector3(0, 1.3, 0));
+        const f = ctx.fox.root.position;
+        const group = rig.cradle.clone().lerp(new THREE.Vector3(f.x, cy, f.z), 0.45);
+        const side = new THREE.Vector3(-d.z, 0, d.x);
+        const end = group.clone().addScaledVector(d, -3.5).addScaledVector(side, 0.7).add(new THREE.Vector3(0, 1.3, 0));
+        const look = group.clone().addScaledVector(d, 2.4).add(new THREE.Vector3(0, 0.7, 0));
         const hold = FINALE_TIMING.cardIn + FINALE_TIMING.cardHold;
         opts.cam.playPath({
           keys: [
             { t: 0, pos: cam.position.clone(), look: look0 },
             { t: 4.5, pos: end, look },
-            { t: hold + 1, pos: end.clone().add(new THREE.Vector3(0, 0.6, 0)).addScaledVector(toCrown, -0.8), look: look.clone().add(new THREE.Vector3(0, 0.8, 0)) },
+            { t: 90, pos: end.clone().addScaledVector(d, 0.6).add(new THREE.Vector3(0, 0.25, 0)), look: look.clone().add(new THREE.Vector3(0, 0.25, 0)) },
           ],
           blendInS: 0.6, blendOutS: 2.5, lockS: hold,
         });
@@ -666,10 +667,11 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
     toCrown,
     kitLand: new Float32Array(F2.flatMap((k) => [k.land.x, k.land.z])),
-    kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
+    kitCurl: new Float32Array(F2.length * 2),
+    kitSlots: new Float32Array(F.slots.flatMap((p) => [p.x, p.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, onwardT: 0, onwardLen: 1, homeSaid: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, onwardT: 0, onwardLen: 1, homeSaid: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, kitNear: 99, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
     player: opts.player, heroLie: hero.lie, heroRest: hero.rest, lieDur: lieClip.duration,
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
@@ -690,7 +692,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     state: () => ({
       phase: PHASES[rig.s.phase], t: +rig.s.t.toFixed(2), kindles: rig.s.kindles, cradle: [+rig.cradle.x.toFixed(2), +rig.cradle.z.toFixed(2)],
       kits: Array.from(rig.kitPhase, (k) => KIT_PHASES[k]), card: ['hidden', 'showing', 'done'][rig.s.card], cardShows: rig.s.cardShows,
-      snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, onward: rig.onwardMesh.count, still: +rig.s.still.toFixed(2),
+      kitNear: +rig.s.kitNear.toFixed(2), snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, onward: rig.onwardMesh.count, still: +rig.s.still.toFixed(2),
     }),
   };
 }
