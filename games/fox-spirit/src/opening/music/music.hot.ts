@@ -34,6 +34,11 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
   /** the finale's first snow: 0 → 1, thins the song to pad, ocarina and bells */
   let snow = 0;
   let lifted = false;
+  /** where the fox was and how long it has stood there (s): a resting fox lets the song thin out */
+  let lastX = NaN;
+  let lastZ = NaN;
+  let still = 0;
+  let lastT = -1;
   let lastSet = -1;
   // cold:end
 
@@ -47,6 +52,13 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
     // ~10 Hz is plenty for a 1.6 s lean
     if (now - lastSet < 0.1) return;
     lastSet = now;
+    const moved = Math.hypot(x - lastX, z - lastZ);
+    still = moved > 0.3 || lastT < 0 ? 0 : still + (now - lastT);
+    if (moved > 0.3 || Number.isNaN(lastX)) {
+      lastX = x;
+      lastZ = z;
+    }
+    lastT = now;
     // weights: 1 inside r, smooth to 0 at 2r; the wild meadow fills whatever is left
     let total = 0;
     let lead = -1;
@@ -90,6 +102,11 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
       mix[4] = Math.max(mix[4]!, 0.55);
       mix[5] = Math.min(1, mix[5]! + 0.25);
     }
+    // standing still a while: the harp thins and the lead rests, so an idle game is quiet, not a loop playing at you
+    const idle = ramp(still, 20, 40);
+    mix[0] = mix[0]! * (1 - 0.55 * idle);
+    mix[3] = mix[3]! * (1 - 0.8 * idle);
+    mix[2] = mix[2]! * (1 - 0.5 * idle);
     const tc = glide > 0 || lifted ? 0.5 : LEAN;
     lifted = glide > 0;
     for (let k = 0; k < KEYS.length; k++) params[k]!.setTargetAtTime(mix[k]!, now, tc);

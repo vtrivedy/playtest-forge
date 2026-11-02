@@ -465,14 +465,15 @@ function buildLookout(ctx: OpeningCtx, background: THREE.Object3D[]): void {
   }
   // plateau: cairn, the seat (a long slab on two stones), a few asters
   const top = westFloor(L.z) + L.rise;
-  const seat = { x: L.x + 1.6, z: L.z + 1.2 };
+  // on the south-east lip, off the arrival line, facing back over the valley
+  const seat = { x: L.x + 2.4, z: L.z - 3.0 };
   const sy = groundH(seat.x, seat.z);
   const yaw = Math.atan2(1, 0.15); // faces east
   k.at(seat.x, sy, seat.z, yaw, () => {
-    for (const s of [-1, 1]) k.add(hewn(box(0.4, 0.42, 0.4), rand, 0.06), C.stoneDark, [s * 0.7, 0.2, 0], [0, rand(), 0], 0.018);
-    k.add(hewn(box(2.0, 0.16, 0.6), rand, 0.03), C.stone, [0, 0.48, 0], [0, 0, 0], 0.02);
+    for (const s of [-1, 1]) k.add(hewn(box(0.4, 0.42, 0.4), rand, 0.06), C.stoneField, [s * 0.5, 0.2, 0], [0, rand(), 0], 0.018);
+    k.add(hewn(box(1.5, 0.16, 0.55), rand, 0.05), C.stoneDark, [0, 0.48, 0], [0, 0, 0], 0.02);
   });
-  ctx.colliders.push({ kind: 'box', x: seat.x, z: seat.z, yaw: yaw + Math.PI / 2, hx: 0.32, hz: 1.0, top: sy + 0.56 });
+  ctx.colliders.push({ kind: 'box', x: seat.x, z: seat.z, yaw: yaw + Math.PI / 2, hx: 0.3, hz: 0.78, top: sy + 0.56 });
   let cy = groundH(L.x - 0.6, L.z + 2.6);
   let sz = 0.5;
   for (let i = 0; i < 5; i++) {

@@ -1,9 +1,10 @@
 // Millbrook walk: village → sunken lane → mill → dash the leaf dam → watch the brook run → bridge →
 // orchard → lookout, driven only by stick + Shift through __gameHooks (no mid-route teleports).
-//   node tools/millbrook-walk.mjs --out /tmp/mw [--every 4] [--size 960x540] [--from village|lane|mill]
+//   node tools/millbrook-walk.mjs --out /tmp/mw [--every 4] [--size 960x540] [--from village|lane|mill] [--route hermitage|grand] [--audio]
 // Fixed 1/60 sim; renders a chase-cam jpg every `every` sim frames, encodes clip.mp4 at 60/every fps.
 // Writes route.json (beats, timings, stuck spans, final __game state) before encoding.
 import { chromium } from 'playwright';
+import { installStemTap, saveStems } from './lib/stem-tap.mjs';
 import { createServer, preview } from 'vite';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -91,6 +92,9 @@ const HERMITAGE_ROUTE = [
   ['back in the village', [-9.7, 102.3]],
 ];
 const which = arg('route', 'millbrook');
+// --audio: a listening tour instead of a clip: nothing rendered, the sim paced to the wall clock, and the three
+// pre-master stems (music / ambience / sfx) recorded sample-for-sample → mix.wav + stems + beats (Ember)
+const audio = process.argv.includes('--audio');
 const ROUTE = which === 'hermitage' ? HERMITAGE_ROUTE : which === 'grand' ? [...HERMITAGE_ROUTE, ['back past the cottage', [-5.6, 102.6]], ['north lane foot', [-5.2, 99.4]], ['by the well lane', [-6.0, 92.5]], ...MILLBROOK_ROUTE.slice(1)] : MILLBROOK_ROUTE;
 const START = {
   village: { at: [-5.2, 92.5, Math.atan2(2.2, -11.5)], beat: 0 },
@@ -113,11 +117,17 @@ const log = { sha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8'
 try {
   await page.goto('http://127.0.0.1:5195/', { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
+  if (audio) {
+    await page.evaluate(() => { window.__listen = true; window.__gameHooks.setManual(true); });
+    await page.keyboard.press('ShiftRight');
+    await page.waitForFunction(() => window.__gameHooks.state().opening.audio.context === 'running', null, { timeout: 60000 });
+    await page.evaluate(installStemTap, ['music', 'ambience', 'sfx']);
+  }
   await page.evaluate((at) => {
     const h = window.__gameHooks;
     h.setManual(true);
     // silent visual probe: a live synth worklet would steal the 1-CPU box from the renderer
-    h.audioContext?.()?.suspend?.();
+    if (!window.__listen) h.audioContext?.()?.suspend?.();
     h.teleport(at[0], at[1], at[2]);
     h.advance(30, 1 / 60, false);
   }, START.at);
@@ -130,7 +140,7 @@ try {
   const t0 = Date.now();
   while (beat < ROUTE.length && frame < 60 * 240) {
     const [name, to, o = {}] = ROUTE[beat];
-    const render = frame % every === 0;
+    const render = !audio && frame % every === 0;
     const r = await page.evaluate(({ to, o, render, frame }) => {
       const h = window.__gameHooks;
       const s = h.state();
@@ -193,6 +203,10 @@ try {
     }
     frame++;
     const t = frame / 60;
+    if (audio) {
+      const ahead = t0 + t * 1000 - Date.now();
+      if (ahead > 0) await new Promise((res) => setTimeout(res, ahead));
+    }
     if (to) {
       if (r.d < lastProgress.d - 0.3) lastProgress = { t, d: r.d };
       if (t - lastProgress.t > 3 && stuckFrom < 0) stuckFrom = t;
@@ -218,6 +232,11 @@ try {
   });
   log.complete = beat === ROUTE.length;
   log.simSeconds = frame / 60;
+  if (audio) {
+    log.wallSeconds = (Date.now() - t0) / 1000;
+    log.audioSeconds = await saveStems(page, out);
+    log.music = await page.evaluate(() => window.__gameHooks.state().opening.audio.music);
+  }
   const px = [...(log.foxPx ?? [])].sort((a, b) => a - b);
   log.foxPxSummary = px.length ? { min: px[0], p10: px[Math.floor(px.length * 0.1)], median: px[Math.floor(px.length / 2)], under24: px.filter((v) => v < 24).length, frames: px.length } : null;
   console.log('fox px', JSON.stringify(log.foxPxSummary));
@@ -230,6 +249,7 @@ try {
   if (production) await new Promise(resolve => server.httpServer.close(resolve));
   else await server.close();
 }
+if (audio) process.exit(0);
 const ffmpeg = execFileSync('python3', ['-c', 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
 execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-framerate', String(60 / every), '-i', path.join(frames, 'f%05d.jpg'), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', path.join(out, 'clip.mp4')]);
 console.log('clip', path.join(out, 'clip.mp4'));
