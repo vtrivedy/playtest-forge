@@ -15,6 +15,11 @@ import { createPlay, PLAY, type Collider, type PlayController } from '../lookdev
 import { ALL_PATHS, FINALE, groundH, KEEPING, pathDist, SPAWN } from './layout';
 import { bakeLaneMap } from './lanePaint';
 import { buildWorldEdge } from './worldEdge';
+import { buildWorlds } from './worldsScene';
+import { WORLDS } from './worlds';
+import { createWorldProgress } from '../worlds/progress';
+import { createPageMap } from '../worlds/pageMap';
+import { buildSeedwells } from '../worlds/seedwells';
 import { bakeWorldBounds } from './worldBounds';
 import { buildMeadow } from './meadow';
 import { buildVillage } from './village';
@@ -266,6 +271,29 @@ export async function runOpening(): Promise<void> {
     if (Math.hypot(f.x - KEEPING.crag.x, f.z - KEEPING.crag.z) < 3.2 || t - settledAt > 25) crown.respond();
   });
   const view = player.cam.camera;
+  // the other worlds (DESIGN-worlds.md). Progress (Hazel's store) is the one truth: Ashwater's arch opens when
+  // Russetvale's first level (the page kept) is restored; the Press's once Ashwater has been entered.
+  const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
+  const worlds = buildWorlds(ctx, {
+    hubOpen: (to) => (to === 'ashwater' ? progress.isRestored('russetvale', 'teach') : progress.isVisited('ashwater', 'teach')),
+  });
+  const pageMap = createPageMap(view, progress);
+  buildSeedwells(scene, progress, [
+    { world: 'russetvale', x: -4, z: 77.5, y: groundH(-4, 77.5) },
+    { world: 'ashwater', x: 3, z: 93, y: groundH(3, 93) },
+    { world: 'press', x: -5, z: 95.2, y: groundH(-5, 95.2) },
+  ]);
+  // Russetvale's levels from their physical truth: page home → Keeping settled → the Press kindled
+  let progressT = 0;
+  ctx.onUpdate((dt) => {
+    pageMap.step();
+    progressT += dt;
+    if (progressT < 0.5) return;
+    progressT = 0;
+    if (homecoming.isPinned()) progress.complete('russetvale', 'teach');
+    if (settledAt >= 0) progress.complete('russetvale', 'develop');
+    if ((finale.state() as { kindles: number }).kindles > 0) progress.complete('russetvale', 'combine');
+  });
   // the lens carries the in-frame lettering (captions, end card), so it joins the scene graph
   scene.add(view);
   ctx.captions.mount(view);
@@ -293,6 +321,18 @@ export async function runOpening(): Promise<void> {
     time += dt;
     hearth.update(dt, time, player.state() as { dashing?: boolean });
     player.step(dt);
+    {
+      const fp = fox.root.position;
+      const to = worlds.crossing(fp.x, fp.z);
+      if (to) {
+        const w = WORLDS[to];
+        player.teleport(w.spawn.x, w.spawn.z, w.spawn.yaw);
+        worlds.resetCrossing();
+        ctx.captions.say(w.name);
+        progress.enterWorld(to === 'russetvale' ? 'hub' : to);
+        if (to !== 'russetvale') progress.visit(to, 'teach');
+      }
+    }
     coal.update(dt, time, player.state() as { grounded: boolean; dashing?: boolean });
     chemistry.update(dt, time);
     hum.update();
@@ -314,6 +354,8 @@ export async function runOpening(): Promise<void> {
     matchFogToSky(scene, fog, sky.mist);
     post.params.restore = k;
     lights.key.color.set(0xffe6c4).lerp(new THREE.Color(0xffd6b0), k);
+    if (scene.fog instanceof THREE.FogExp2) scene.fog.density = fog.density;
+    worlds.update(dt, p.x, view.position, sky, scene.fog instanceof THREE.FogExp2 ? scene.fog : null, lights.key);
     syncPaint();
     sky.update(dt);
   }
@@ -338,7 +380,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), captions: ctx.captions.state(), teach: ctx.teach.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), discovery: discovery.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), captions: ctx.captions.state(), teach: ctx.teach.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), discovery: discovery.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state(), worlds: { active: worlds.active, travels: worlds.travels, progress: progress.snapshot(), mapOpen: pageMap.isOpen() } } });
   const pxA = new THREE.Vector3();
   const pxB = new THREE.Vector3();
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
@@ -408,6 +450,12 @@ export async function runOpening(): Promise<void> {
       pxA.copy(f).project(view);
       pxB.copy(f).setY(f.y + 0.6).project(view);
       return pxA.z > 1 || pxB.z > 1 ? 0 : (Math.abs(pxB.y - pxA.y) * renderer.domElement.clientHeight) / 2;
+    },
+    /** dev: stand at a world's arrival (capture tools; players walk through the hub arches) */
+    travel(id: 'russetvale' | 'ashwater' | 'press') {
+      const w = WORLDS[id];
+      player.teleport(w.spawn.x, w.spawn.z, w.spawn.yaw);
+      worlds.resetCrossing();
     },
     /** dev: burst Millbrook's leaf dam without the dash */
     millBurst: millrace.burst,
