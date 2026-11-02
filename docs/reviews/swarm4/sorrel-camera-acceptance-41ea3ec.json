@@ -1,0 +1,110 @@
+{
+  "accepted": true,
+  "defaultRuntime": "41ea3ec",
+  "cases": {
+    "keeping": {
+      "runtime": "41ea3ecdf2be56a36fbaf8e1a5dd7f5fe8a11718",
+      "camera": {
+        "fromSeconds": 35,
+        "minChestDistance": 2.546389797340536,
+        "maxPitch": 15.551471131337868,
+        "maxStepSpeed": 16.009800123674186,
+        "maxGroundedFollowDistance": 2.7915698092650354,
+        "maxGroundedDistance": 5,
+        "minFollowFoxPixels": 33.00028796344209,
+        "minFoxPixels": 18,
+        "longestSmallFoxSeconds": 0,
+        "foxSizeFailure": null,
+        "pass": true
+      },
+      "checks": {
+        "state-check.json": {
+          "checks": {
+            "steam": true,
+            "completed": true,
+            "bridge": true,
+            "onCrag": true
+          },
+          "pass": true
+        },
+        "route-check.json": {
+          "expectedBeat": "a leaf comes down",
+          "actualBeat": "a leaf comes down",
+          "pass": true
+        }
+      },
+      "bodyFrames": 30,
+      "bodyMarginPass": true,
+      "staging": "one initial placement beside the first hearth; controller input and real heat/Carry progression thereafter; no forced Keeping or paint",
+      "evidence": "/captures/sorrel/keeping-final-default-41ea3ec"
+    },
+    "regionalDrop": {
+      "runtime": "22d4b4c1800669365341ef76f5eadadcb36e35a6",
+      "camera": {
+        "fromSeconds": 1,
+        "minChestDistance": 1.9304823231513966,
+        "maxPitch": 27.615656718630227,
+        "maxStepSpeed": 15.442454468121277,
+        "maxGroundedFollowDistance": 2.7136803422658304,
+        "maxGroundedDistance": 5,
+        "minFollowFoxPixels": 50.18029845273477,
+        "minFoxPixels": 18,
+        "longestSmallFoxSeconds": 0,
+        "foxSizeFailure": null,
+        "pass": true
+      },
+      "checks": {
+        "state-check.json": {
+          "checks": {
+            "firstFold": true,
+            "secondFold": true,
+            "belowLeaf": true,
+            "grounded": true,
+            "startedOnLeaf": true,
+            "realFall": true,
+            "realJumpRetry": true
+          },
+          "pass": true
+        },
+        "route-check.json": {
+          "expectedBeat": "ledge drop complete",
+          "actualBeat": "ledge drop complete",
+          "pass": true
+        }
+      },
+      "bodyFrames": 90,
+      "bodyMarginPass": true,
+      "staging": "two setup placements and real dashes open the ruin folds; one placement on the second leaf; recorded walk-off and jump retries thereafter; no forced page/fold/restore state",
+      "evidence": "/captures/sorrel/ruin-drop-integrated-22d4b4c-1p9"
+    },
+    "originalMiss": {
+      "runtime": "ebbdc980cc5996bc92527f1821442f5145b06d08",
+      "camera": {
+        "fromSeconds": 40,
+        "minChestDistance": 1.9449598967587995,
+        "maxPitch": 33.38932181173795,
+        "maxStepSpeed": 16.027189398019814,
+        "maxGroundedFollowDistance": 3.72561793532294,
+        "maxGroundedDistance": 5,
+        "minFollowFoxPixels": 39.863839346057055,
+        "minFoxPixels": 18,
+        "longestSmallFoxSeconds": 0,
+        "foxSizeFailure": null,
+        "pass": true
+      },
+      "checks": {
+        "miss-coverage.json": {
+          "requiredBeat": "leap to the overlook",
+          "reached": true,
+          "leftLeaf": true,
+          "fellBelowLeaf": true,
+          "pass": true
+        }
+      },
+      "bodyFrames": 60,
+      "bodyMarginPass": true,
+      "staging": "one start teleport; controller input thereafter",
+      "evidence": "/captures/sorrel/original-miss-integrated-ebbdc98-1p9"
+    }
+  }
+}

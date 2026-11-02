@@ -1,0 +1,109 @@
+# Hermitage chase recheck
+
+Pinned runtime `bd48cbd`, merging keeping-d2 `eca465e` with the accepted 1.9m
+clearance and ruin return-fan visibility fix. No runtime edits during capture.
+TypeScript and lint:feel (including camera release regressions) pass.
+
+100 simulated seconds at 30Hz, 640×360, one disclosed lane-mouth teleport,
+then ordinary controller input. All drying lines freed, plateau painted,
+desk caption present and complete return route pass. Zero JavaScript errors.
+Camera gates pass: minimum chest range 1.940m, maximum absolute pitch 35.25°,
+maximum sustained grounded range 2.790m, minimum fox projection 74.63px;
+no samples below the shared 24px floor.
+
+Reviewed timed stills at 1,8,16,24,32,40,48,56,64,72,80,90,99 seconds.
+Desk and caption are visible at16s; the fox is legible on the approach and
+return. At32s, a foreground trunk clips the left tail while face and torso
+remain visible. Its lens reports unresolved at fox(-12.315,5.173,138.730),
+camera(-12.060,6.522,136.343). Sent the exact still and position to Bramble;
+this is a bounded composition caveat, not a full character disappearance.
+No camera tuning is warranted by these stills. The pending ridge-tree fix and
+paint-wake change are absent from this named runtime and are not covered.
+
+Evidence: `/captures/sorrel/hermitage-bd48cbd/` has window.__game, all3000
+trace samples, checks and13 timed PNGs. This is access/state and sampled
+composition evidence; it does not claim continuous motion, audio quality,
+real-time performance, or unfamiliar-player discovery.
+
+## Matched pole-registration retest — fd98352
+
+Merged Bramble2f8f8a7 (including ca30642) and replayed the identical route for
+50 simulated seconds. All three state checks, complete route, camera gates,
+and60/60 captured animated-body screen margins pass. No JS errors; TypeScript
+and lint:feel pass. Camera extrema match the baseline values above.
+
+Reviewed every frame of the30–34s window across two contact sheets and exact
+32s PNG. Pole registration alone does **not** remove the foreground upright:
+it remains opaque beside the lens while the fox is standing, clips the tail,
+then exits the view as the fox turns and returns. Face and torso stay visible.
+This is not a visual-fix acceptance. Shared opening occlusion samples lateral
+rays at−0.42/0/+0.42m; narrow near-lens geometry can lie between those samples.
+Sent that source hypothesis and matched evidence to Bramble and Fern rather
+than altering the shared fader during concurrent reviews.
+
+Retest evidence: `/captures/sorrel/hermitage-pole-retest/`, including60 raw
+frames, four-second15fps clip, seven PNGs, window.__game and all1500 samples.
+The capture is offline30Hz640×360 without audio. The source remains frozen.
+
+## Matched moved-pole retest — e8d2e51
+
+Bramble700ec62 changes line three's endpoints, including moving its south pole
+north along the lens-to-fox axis. The identical50s replay still passes all3
+state checks, complete route,60/60 strict animated-body viewport margins,
+and camera gates with zero JS errors. TypeScript, lint:feel and production
+build pass (existing large-chunk warning).
+
+Visual verdict: **NOT YET**. Reviewed every frame of30–34s in two contact
+sheets and the exact32s PNG. The opaque pole now crosses the torso rather than
+only clipping the tail. It continues obstructing during the hold and clears
+as the fox turns away. Numeric body-margin checks establish screen bounds,
+not scenery visibility. Shared camera/fader settings remain unchanged.
+Recommended a lateral endpoint move to the geometry owner, keeping the common
+layout source for rendered pole, collider and interaction line.
+
+Evidence: `/captures/sorrel/hermitage-pole-moved/`:60raw frames,4s15fps clip,
+7timed PNGs, window.__game,1500trace samples and state/route/camera checks.
+Offline30Hz640×360, staged lane-mouth start, ordinary controller thereafter;
+no audio or real-time-performance verdict.
+
+## Matched wide-collider retest — c701933 (Bramble f4f59bb)
+
+Restored line-three position plus r0.38 pole camera colliders clears the opaque
+upright from the fox at32s, but introduces a framing regression. All60 frames
+of30–34s reviewed in two sheets and exact32s native PNG: lower body is cropped
+during the hold, then recovers as the fox turns. Only23/60 strict animated-body
+viewport margins pass; failures span simulation frames900–972 (30–32.4s).
+This candidate is **NOT YET** visually accepted. Recommended Bramble's local
+fallback of suspending line three from existing scenery without its poles.
+
+Same staged lane-mouth start, ordinary controller input,50simulated seconds,
+30Hz640×360, silent offline capture. All3state checks and complete route pass,
+0JS errors. Numeric camera gates still pass: min chest1.942m, max pitch35.248°,
+max sustained grounded range2.790m, min projected fox74.627px. These aggregate
+gates do not establish full-body framing. TypeScript, lint:feel and production
+build pass. Shared camera remains unchanged.
+
+Evidence: `/captures/sorrel/hermitage-pole-fat/`,60raw frames,4s15fps clip,
+all-frame sheets, timed PNGs, full window.__game and1500trace samples. Exact
+32s PNG is `19-32.00s.png`; named runtime c701933d21ef306526214444774358e35fcd6145.
+
+## Accepted lateral pole — 16e91bc (Bramble 74ce756)
+
+Line-three south pole at(-13.7,136.6), thin r0.1 colliders restored. Exact
+50s replay passes all3state checks, complete route, numeric camera gates and
+60/60 strict animated-body margins. Zero JS errors. Reviewed all60frames of
+30–34s plus native32s PNG: no upright over the fox, full body stays in view
+through the pause and turn. This closes the bounded pole caveat for this route.
+Camera extrema remain min chest1.942m, max pitch35.248°, max grounded2.790m,
+min fox74.627px. TypeScript/lint:feel/production build pass.
+
+Evidence `/captures/sorrel/hermitage-pole-lateral-thin/`: window.__game,
+1500samples,7stills,60rawframes,4s15fps clip and2all-frame sheets. Runtime
+16e91bc32acf51ce6601bc34adffe24618541ccc,50simulated seconds30Hz640×360,
+staged lane-mouth start, live controller thereafter, silent/offline.
+
+Intermediate lateral0943d18 with fat colliders also completed and passed in
+`/captures/sorrel/hermitage-pole-lateral-complete/`; its first non-PTY attempt
+was terminated143 after48s before final evidence and is not counted as a
+complete run. Final acceptance above uses the latest thin-collider source.
+Shared camera tuning and solver were not changed.
