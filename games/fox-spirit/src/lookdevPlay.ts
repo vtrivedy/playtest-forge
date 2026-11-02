@@ -684,7 +684,8 @@ export function createPlay(opts: {
             const sn = Math.sin(a * side);
             const rx = (dx * c - dz * sn) * Math.cos(a);
             const rz = (dx * sn + dz * c) * Math.cos(a);
-            if (okAt(x0 + rx, z0 + rz, (rx / len) * 0.28, (rz / len) * 0.28)) {
+            // a slide never carries the fox off a ledge: blockers that guard a drop (the ruin's folded leaves) stay safety stops
+            if (okAt(x0 + rx, z0 + rz, (rx / len) * 0.28, (rz / len) * 0.28) && surface(x0 + rx, z0 + rz, true, feetY + tol + 0.15) >= feetY - P.step) {
               pos.x = x0 + rx;
               pos.z = z0 + rz;
               slideSide = side;
