@@ -114,10 +114,15 @@ try {
   await shot('07b-flooded');
   // off the weir onto the risen punt, along it, onto the east wall, south to the Seedwell ledge
   await go(10.2, 34.0);
+  log.push(['step', await state()]);
   await go(10.4, 32.2, { jump: true, jumpAt: 3, hold: 16, max: 200, reach: 0.5, land: true });
+  log.push(['step', await state()]);
   await go(12.6, 32.2);
+  log.push(['step', await state()]);
   await go(15.25, 32.0, { jump: true, jumpAt: 2.5, hold: 16, max: 200, reach: 0.5, land: true });
+  log.push(['step', await state()]);
   await go(15.25, 28.5);
+  log.push(['step', await state()]);
   await go(18.0, 26.5);
   await settle(200);
   await shot('08-seedwell');
