@@ -12,9 +12,10 @@ type Surface = 'grass' | 'leaf' | 'wood' | 'stone';
 export const FOLEY = { step: 0.05, jump: 0.05, land: 0.12, glide: 0.04, warmth: 1800, gap: 0.16 };
 /** pad colour per surface: low-pass (Hz), resonance, decay (s) */
 const PAD: Record<Surface, { lp: number; q: number; decay: number; gain: number }> = {
-  grass: { lp: 420, q: 0.5, decay: 0.05, gain: 0.7 },
-  leaf: { lp: 900, q: 0.6, decay: 0.07, gain: 0.8 },
-  wood: { lp: 300, q: 2.5, decay: 0.08, gain: 1 },
+  // grass is silent underfoot (as it is): a run across the meadow leaves the quiet alone
+  grass: { lp: 420, q: 0.5, decay: 0.05, gain: 0 },
+  leaf: { lp: 900, q: 0.6, decay: 0.07, gain: 0.45 },
+  wood: { lp: 320, q: 0.9, decay: 0.07, gain: 0.6 },
   stone: { lp: 650, q: 0.8, decay: 0.035, gain: 0.8 },
 };
 
@@ -46,6 +47,7 @@ export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z:
   /** one soft pad: noise through the surface's low-pass under a quick rise and short exponential fall */
   function pad(s: Surface, gain: number, deeper = 1): void {
     const p = PAD[s];
+    if (p.gain * gain <= 0) return;
     const t = ac.currentTime;
     const src = ac.createBufferSource();
     src.buffer = burst;

@@ -21,7 +21,7 @@ and hidden birds, four-paw Kenney footsteps). The redo makes silence the default
 - **Birds are rare and far.** Single calls (five isolated, denoised calls), only once the colour is back
   (restored > 0.3), 28–70 s apart, 18–34 m away in a random direction, never the same call twice running.
 - **Foley is soft.** Forepaws only, ≥160 ms apart: each plant is a synthesized pad (a 6 ms-rise, 35–80 ms-fall
-  burst of noise under a surface low-pass: grass 420 Hz, leaf 900, wood 300 resonant, stone 650) — recorded footsteps
+  burst of noise under a surface low-pass: grass silent, leaf 900 Hz, wood 320, stone 650) — recorded footsteps
   read as taps/clicks/a ticking clock in every listening pass (Tallow :1388). Landing = a deeper, longer pad.
 - **No ducking.** Music only exists at moments, so there is nothing to duck under them.
 - `MIX.master` stays 0 on main until a teammate independently listens and agrees (Kit :1153).
