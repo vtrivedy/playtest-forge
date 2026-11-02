@@ -19,7 +19,7 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
   const previousLens = opts.previousLens;
   const params = opts.params;
   let focus = previousLens, lens = previousLens;
-  let dt = 0, ux = 0, uz = 1, best = Infinity, previousFree = false;
+  let dt = 0, ux = 0, uz = 1, best = Infinity, previousFree = false, candidateRadius = .35;
 
   function bodyRadius(point: THREE.Vector3): number {
     return Math.max(params.minDistance, Math.abs(point.y - focus.y) / MAX_PITCH_TAN);
@@ -46,7 +46,10 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
       candidateLens.z = focus.z + (cr > .01 ? cz / cr : uz) * minimumRoom;
     }
     const cost = candidateLens.distanceToSquared(lens) * .2 + (previousFree ? candidateLens.distanceToSquared(previousLens) * .8 : 0);
-    if (cost >= best || !floorClear(candidateLens) || blocked(candidateLens.x, candidateLens.y, candidateLens.z, .35)) return;
+    // A release sweep guarantees .2m clearance. If it has reached that shell,
+    // requiring .35m again can reject every small high-refresh escape step.
+    // Keep the swept safety margin until there is room for the wider goal shell.
+    if (cost >= best || !floorClear(candidateLens) || blocked(candidateLens.x, candidateLens.y, candidateLens.z, candidateRadius)) return;
     if (previousFree) {
       const steps = Math.ceil(candidateLens.distanceTo(previousLens) / .1);
       for (let i = 1; i < steps; i++) {
@@ -94,6 +97,7 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
     uz = range > .01 ? dz / range : Math.cos(opts.yaw() + params.sideBias);
     best = Infinity;
     previousFree = !firstFrame && !blocked(previousLens.x, previousLens.y, previousLens.z, .2);
+    candidateRadius = previousFree && blocked(previousLens.x, previousLens.y, previousLens.z, .35) ? .2 : .35;
     const previousClear = previousFree && bodyClear(previousLens);
     const minimum = bodyRadius(lens);
     const maximum = Math.max(range, params.distance, minimum) + .8;
@@ -102,6 +106,22 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
     for (let i = 0; i < ESCAPE_ANGLES.length; i++) {
       const a = THREE.MathUtils.degToRad(ESCAPE_ANGLES[i]!), c = Math.cos(a), s = Math.sin(a);
       check(focus.x + (ux * c + uz * s) * sideRange, focus.z + (uz * c - ux * s) * sideRange);
+    }
+    // Goal-centred rays can all converge into the same blocker when the old
+    // lens is behind a post. Search local tangents too, so a safe held pose
+    // remains an escape waypoint rather than a permanent camera anchor.
+    if (!Number.isFinite(best) && previousClear && floorClear(previousLens)) {
+      const dx = lens.x - previousLens.x, dz = lens.z - previousLens.z;
+      const length = Math.hypot(dx, dz);
+      if (length > .01) {
+        const step = Math.max(.08, 12 * dt), x = dx / length, z = dz / length;
+        for (let i = 0; i < ESCAPE_ANGLES.length; i++) {
+          const angle = THREE.MathUtils.degToRad(ESCAPE_ANGLES[i]!);
+          const c = Math.cos(angle), s = Math.sin(angle);
+          check(previousLens.x + (x * c + z * s) * step,
+            previousLens.z + (z * c - x * s) * step);
+        }
+      }
     }
     if (Number.isFinite(best)) lens.copy(freeLens);
     else if (previousClear && floorClear(previousLens)) { lens.copy(previousLens); return true; }
