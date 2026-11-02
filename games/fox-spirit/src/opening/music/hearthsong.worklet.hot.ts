@@ -37,6 +37,10 @@ const PLAYING = 0;
 const REQUESTED = 1;
 const CODA = 2;
 const DONE = 3;
+/** after the quiet, the song comes back softly from the top and never ends again */
+const EPILOGUE = 4;
+/** bars of silence after the coda before the epilogue (tla QuietBars), ≈45 s */
+const QUIET_BARS = 18;
 /** cue kinds (param `kind`, set with the cue) */
 const CUE_FORCE = 1;
 const CUE_REST = 3;
@@ -75,6 +79,7 @@ class Hearthsong extends AudioWorkletProcessor {
   forced = false;
   forces = MAX_FORCE;
   doneSlots = 0;
+  quiet = 0;
   chord = 0;
   // smoothed layer levels
   lv = new Float32Array(9);
@@ -242,7 +247,18 @@ class Hearthsong extends AudioWorkletProcessor {
       this.reportState();
       return;
     }
-    if (this.ending === DONE) return;
+    if (this.ending === DONE) {
+      if (this.quiet + 1 < QUIET_BARS) this.quiet++;
+      else {
+        this.ending = EPILOGUE;
+        this.bar = 0;
+        this.breath = false;
+        this.pass = 0;
+        this.reportState();
+      }
+      this.since = tick;
+      return;
+    }
     this.bar++;
     if (!this.breath && this.bar >= s.bars) { this.bar = 0; this.breath = true; }
     else if (this.breath && this.bar >= s.breathBars) { this.bar = 0; this.breath = false; this.pass++; }
@@ -390,8 +406,8 @@ class Hearthsong extends AudioWorkletProcessor {
     const cue = p.cue![0]!;
     if (cue !== this.lastCue) {
       const kind = p.kind![0]!;
-      if (this.ending !== PLAYING) { /* the song is ending: nothing new */ }
-      else if (kind === CUE_REST) this.ending = REQUESTED;
+      if (this.ending !== PLAYING && this.ending !== EPILOGUE) { /* the song is ending: nothing new */ }
+      else if (kind === CUE_REST) { if (this.ending === PLAYING) this.ending = REQUESTED; }
       else if (kind === CUE_FORCE) {
         // tla ForceCue: a finale moment sings even inside the gap (re-arms a fading swell)
         if ((this.swell === IDLE || this.swell === FADING) && this.forces > 0) { this.swell = ARMED; this.forced = true; this.forces--; }
@@ -405,7 +421,8 @@ class Hearthsong extends AudioWorkletProcessor {
     const bassG = 0.11 * lv[2]!;
     const leadG = 0.1 * Math.max(lv[3]!, singing ? 0.85 : 0);
     const bellG = 0.07 * Math.max(lv[4]!, swellGain * 0.6);
-    const master = lv[8]!;
+    // the epilogue is the song remembered: softer (it enters out of silence, so the step is never heard)
+    const master = lv[8]! * (this.ending === EPILOGUE ? 0.7 : 1);
     const bright = lv[5]!;
     const harpLp = 1 - Math.exp((-TAU * (1700 + 3600 * bright)) / sampleRate);
     const padLp = 1 - Math.exp((-TAU * (500 + 1300 * bright)) / sampleRate);
