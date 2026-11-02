@@ -92,7 +92,7 @@ export function H(x: number, z: number): number {
   // low hummocks of moss and peat
   let h = 0.22 * Math.sin(lx * 0.21 + 0.6) * Math.cos(lz * 0.17) + 0.12 * Math.sin(lx * 0.53 + lz * 0.41);
   // the weir plateau and the Seedwell ledge: sheer peat walls the fox cannot step up
-  const weir = smoothstep(lz, WEIR.z0 - 0.15, WEIR.z0 + 0.35) * smoothstep(WEIR.xMax + 0.3, WEIR.xMax - 0.2, lx);
+  const weir = smoothstep(lz, WEIR.z0 - 0.15, WEIR.z0 + 0.35) * (1 - smoothstep(lx, WEIR.xMax - 0.2, WEIR.xMax + 0.3));
   h = THREE.MathUtils.lerp(h, WEIR.top, weir);
   const ledge = -sdRect(lx, lz, LEDGE.x0, LEDGE.x1, LEDGE.z0, LEDGE.z1);
   if (ledge > -0.4) h = THREE.MathUtils.lerp(h, LEDGE.top, smoothstep(ledge, -0.4, 0.15));
@@ -101,7 +101,7 @@ export function H(x: number, z: number): number {
     const w = WATER[id];
     let d = sdRect(lx, lz, w.x0, w.x1, w.z0, w.z1);
     if (id === 'pond') d = Math.max(d, ISLET.r - Math.hypot(lx - ISLET.lx, lz - ISLET.lz));
-    h = THREE.MathUtils.lerp(h, BED, smoothstep(d, 0.7, -0.9));
+    h = THREE.MathUtils.lerp(h, BED, 1 - smoothstep(d, -0.9, 0.7));
   }
   // the oval's rim rises into reed banks and willow scrub
   const e = E(x, z);
