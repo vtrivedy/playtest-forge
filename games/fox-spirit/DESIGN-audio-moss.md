@@ -26,7 +26,7 @@ Redo after Vivek's rejection of the first mix (Kit :1144, "intrusive"). Everythi
 Removed: drawing shimmer drone, creature calls, hare bound thumps, heron wheel wingbeats, canopy launch thump,
 ruin creak + landing thump, lantern match-scratch, glass chime, tack click.
 
-Density: a slice playthrough has ≈ 15–20 of these in total (≈ 2 per minute), each tied to something the player did.
+Density: at most 22 of these in a whole slice (5 pops, 3 wingbeats, 4 leaves, 3 folds, 1 pin, 5 lanterns, 1 swell), each tied to something the player did; the slice route alone plays 8.
 
 ## Proof
 
