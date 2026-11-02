@@ -1,0 +1,48 @@
+{
+  "sha": "cbadec60b094968e47d2bd23c6e014edf7bfc703",
+  "runtime": "d0d1953d18ef113033b71d5834592bc442e287e8",
+  "differences": "boot / rather than ?manual=1; initial advance1 rather than advance60; otherwise retained probe",
+  "checks": {
+    "arrived": true,
+    "pagePinned": true,
+    "optionalNotRequired": true,
+    "onward48": true,
+    "reveal": true,
+    "cameraReturns": true,
+    "noPrematureShot": true,
+    "completeHoldFrames": true,
+    "finiteCamera": true,
+    "noErrors": true
+  },
+  "arrival": 73.26666666666667,
+  "homecoming": {
+    "pinned": true,
+    "sent": true,
+    "home": [],
+    "lit": [
+      "page"
+    ],
+    "full": false
+  },
+  "finale": {
+    "phase": "sealed",
+    "t": 83.33,
+    "kindles": 0,
+    "cradle": [
+      20.79,
+      39.64
+    ],
+    "kits": [
+      "pressed",
+      "pressed",
+      "pressed"
+    ],
+    "card": "hidden",
+    "cardShows": 0,
+    "snow": 0,
+    "leaves": 0,
+    "onward": 48,
+    "still": 0
+  },
+  "errors": []
+}

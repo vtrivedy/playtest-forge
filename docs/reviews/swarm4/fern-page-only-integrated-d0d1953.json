@@ -1,0 +1,30 @@
+{
+  "sha": "d0d1953d18ef113033b71d5834592bc442e287e8",
+  "checks": {
+    "arrived": true,
+    "pagePinned": true,
+    "optionalNotRequired": true,
+    "onward48": true,
+    "reveal": true,
+    "noErrors": true,
+    "cameraReturns": true,
+    "noPrematureShot": true,
+    "completeHoldFrames": true,
+    "finiteCamera": true
+  },
+  "allPass": true,
+  "rawHarnessCorrection": "Raw reveal check assumed camera.shot; actual API is camera.boom string. Raw evidence retained. Corrected acceptance parses shot= from documented runtime state.",
+  "homecoming": {
+    "pinned": true,
+    "sent": true,
+    "home": [],
+    "lit": [
+      "page"
+    ],
+    "full": false
+  },
+  "onward": 48,
+  "holdShotMax": 1.0,
+  "routeDuration": 73.26666666666667,
+  "limits": "Natural input-only slice after initial wake teleport; 60Hz offline simulation, route beat stills + final10s@10fps 640x360 SwiftShader, silent. No unfamiliar-player discovery, audio or real-time performance verdict."
+}

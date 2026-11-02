@@ -56,3 +56,55 @@ Shared archive (downloaded and SHA-256 compared):
 `keeping-swarm4-captures/fern/page-only-handover-075662b.tgz`.
 SHA-256: `6d504bc2aa80f0f3bed4925200a9b98136efd4645f8339513b9113b155a60418`.
 Local deliverable: playtest-output/fox-spirit/homecoming-page-only-075662b/.
+
+## Durable regression command
+
+`node tools/page-only-handover-probe.mjs OUT` now retains the natural slice
+probe in the repository. It writes beat screenshots, 100 final-hold frames and
+full state/trace evidence, and exits nonzero for any of the ten acceptance
+failures. `node tools/page-only-handover-probe.mjs --check-evidence
+OUT/evidence.json` rechecks the saved evidence without launching a browser.
+The assertion evaluator passes the retained 075662b run and fails a negative
+control with its onward count set to zero. This changes no game behavior.
+
+## Integrated build recheck — d0d1953
+
+Replayed the same natural shared slice on integrated `d0d1953d18ef113033b71d5834592bc442e287e8`:
+arrival 73.267 simulated seconds, pinned page only, full=false, onward=48;
+all ten checks pass. No reveal during the journey, reveal weight reaches 1,
+and returns to 0. Camera coordinates remain finite and no JS errors occur.
+All 100 final-hold frames reviewed on four sheets, plus native ruin and reveal
+stills. The well/gate/hearth route is visible; scenic fox cropping is unchanged;
+follow framing returns with the full fox visible. No runtime correction needed.
+
+Evidence: `/captures/fern/integrated-d0d1953/`, including `homecoming.mp4`,
+`evidence.json`, `acceptance.json`, 100 frames and all-frame sheets. The captured
+script still had the old raw diagnostic assertion; corrected acceptance and
+the new repository evaluator both pass the actual documented camera state.
+The new evaluator also rejects a missing-onward negative control. TypeScript,
+feel lint/camera release checks and production build pass. Offline 640×360
+SwiftShader, final hold 10 fps, silent; no realtime or audio verdict.
+
+## Recorder setup parity — cbadec6, runtime d0d1953
+
+Kit's live GPU capture still reportedly lacks the reveal and has isolated black
+frames (#swarm :617); the offline checks do not clear that failure. A focused
+replay on cbadec6 changes two setup differences: normal `/` boot instead of
+`?manual=1`, and one initial simulation step instead of 60. Runtime sources
+remain identical to d0d1953. The route again arrives in 73.267 simulated seconds
+with the page pinned, only the page lantern lit, full=false and onward=48.
+All ten checks pass, including the reveal, follow-camera return and zero errors.
+
+Reviewed all 100 final-hold frames on four sheets and native reveal/ruin frames.
+The caption and hearthward stream render, the scenic lens crops the fox, and
+the readable fox follow framing returns. No additional runtime change follows
+from this test. Evidence: `/captures/fern/capture-parity-d0d1953/` (probe copy,
+state, acceptance, route stills, 100 hold frames and four sheets); compact
+acceptance is retained as `fern-capture-parity-d0d1953.json` beside this review.
+This remains silent 640×360 SwiftShader, 60 Hz simulation and 10 fps hold capture.
+
+Requested the actual GPU recorder module and endpoint state from Kit. One
+unverified driver hypothesis is stopping simulation on the shared route's
+`complete` flag (four seconds into homecoming) while recording continues.
+Neither that hypothesis nor a GPU/runtime or recording-buffer fault has been
+established by this setup-parity replay.

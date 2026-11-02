@@ -55,3 +55,11 @@ Carry/near-ember fade and the actual finale's settled-Keeping + placed-ember
 requirements remain intact. Verify page-only homecoming (zero optional frees),
 remote pin then return, and the prior full-well case with rendered screenshots
 and window.__game. Explicitly distinguish staged hooks from natural traversal.
+
+Keep the natural page-only handover regression in
+`tools/page-only-handover-probe.mjs`: run the shared slice from its initial wake
+position, save beat screenshots and all 100 final-hold frames with
+`window.__game`, and fail if the page-only trail/reveal or return to follow
+regresses. Parse the documented `camera.boom` shot diagnostic rather than
+assuming a numeric `camera.shot` field. This is an offline visual/state check,
+not a realtime feel or audio verdict.
