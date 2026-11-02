@@ -30,8 +30,9 @@ function roomImpulse(ac: BaseAudioContext): AudioBuffer {
 export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
   const song = compileSong();
   let driver: MusicDriver | null = null;
-  const reported = { bar: -1, breath: false, swell: 'idle', pass: 0, since: 0, shaded: false };
+  const reported = { bar: -1, breath: false, swell: 'idle', pass: 0, since: 0, shaded: false, ending: 'playing', forces: 2 };
   const SWELLS = ['idle', 'armed', 'singing', 'fading'];
+  const ENDINGS = ['playing', 'requested', 'coda', 'done'];
   let cues = 0;
   const dry = ac.createGain();
   dry.gain.value = 0.8;
@@ -55,6 +56,8 @@ export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
         reported.pass = r[3]!;
         reported.since = r[4]!;
         reported.shaded = r[5] === 1;
+        reported.ending = ENDINGS[r[6]!] ?? '?';
+        reported.forces = r[7]!;
       };
       driver = createMusicDriver(ac, node);
       return true;
@@ -70,10 +73,14 @@ export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
       driver?.update(x, z, restored, at);
     },
     /** a moment: the lead sings from the next bar line, if the music has rested (≥ SWELL.gap bars) */
-    cue(at?: number): void {
+    cue(kind = 0, at?: number): void {
       if (!driver) return;
       cues++;
-      driver.cue(cues, at);
+      driver.cue(cues, kind, at);
+    },
+    /** the finale's first snow */
+    snow(): void {
+      driver?.snow();
     },
     state: () => ({ ready: driver !== null, ...reported, cues, levels: driver?.levels() ?? null }),
   };

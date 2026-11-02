@@ -22,11 +22,14 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
   // cold:begin (construction only)
   const params: AudioParam[] = KEYS.map((k) => node.parameters.get(k)!);
   const cueParam = node.parameters.get('cue')!;
+  const kindParam = node.parameters.get('kind')!;
   const level = node.parameters.get('level')!;
   const mix = new Float32Array(KEYS.length);
   const wild = new Float32Array(KEYS.map((k) => WILD[k]));
   const place = PLACES.map((p) => new Float32Array(KEYS.map((k) => p.c[k])));
   let started = false;
+  /** the finale's first snow: 0 → 1, thins the song to pad, ocarina and bells */
+  let snow = 0;
   let lastSet = -1;
   // cold:end
 
@@ -62,14 +65,26 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
     mix[2] = mix[2]! * ramp(restored, 0.15, 0.5);
     mix[3] = mix[3]! * ramp(restored, 0.3, 0.7);
     mix[5] = mix[5]! * (0.6 + 0.4 * ramp(restored, 0, 0.6));
+    if (snow > 0) {
+      mix[0] = mix[0]! * (1 - 0.6 * snow);
+      mix[2] = mix[2]! * (1 - snow);
+      mix[4] = Math.max(mix[4]!, 0.7 * snow);
+      mix[5] = mix[5]! + (0.85 - mix[5]!) * snow;
+      mix[6] = mix[6]! * (1 - snow);
+    }
     for (let k = 0; k < KEYS.length; k++) params[k]!.setTargetAtTime(mix[k]!, now, LEAN);
   }
 
   // cold:begin (built once)
   return {
     update,
-    cue(n: number, at = ac.currentTime): void {
+    /** kind: 0 a moment, 1 a finale moment (sings inside the gap), 3 the end (coda, then rest) */
+    cue(n: number, kind = 0, at = ac.currentTime): void {
+      kindParam.setValueAtTime(kind, at);
       cueParam.setValueAtTime(n, at);
+    },
+    snow(): void {
+      snow = 1;
     },
     levels: () => Object.fromEntries(KEYS.map((k, i) => [k, +mix[i]!.toFixed(2)])),
   };

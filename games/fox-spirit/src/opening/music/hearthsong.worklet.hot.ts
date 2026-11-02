@@ -32,6 +32,18 @@ const IDLE = 0;
 const ARMED = 1;
 const SINGING = 2;
 const FADING = 3;
+// the ending (tla `ending`)
+const PLAYING = 0;
+const REQUESTED = 1;
+const CODA = 2;
+const DONE = 3;
+/** cue kinds (param `kind`, set with the cue) */
+const CUE_FORCE = 1;
+const CUE_REST = 3;
+/** finale moments that may sing inside the gap, per game (tla MaxForce) */
+const MAX_FORCE = 2;
+/** the coda sings the tune's last line (tla CodaFrom = bars - 4) */
+const CODA_BARS = 4;
 
 // cold:end
 function hz(m: number): number {
@@ -42,7 +54,7 @@ class Hearthsong extends AudioWorkletProcessor {
   // cold:begin (construction only)
   static get parameterDescriptors() {
     const k = (name: string, d: number) => ({ name, defaultValue: d, minValue: 0, maxValue: 1000, automationRate: 'k-rate' });
-    return [k('harp', 0.5), k('pad', 0), k('bass', 0), k('lead', 0), k('bells', 0), k('bright', 0.5), k('shade', 0), k('cue', 0), k('level', 0)];
+    return [k('harp', 0.5), k('pad', 0), k('bass', 0), k('lead', 0), k('bells', 0), k('bright', 0.5), k('shade', 0), k('cue', 0), k('kind', 0), k('level', 0)];
   }
 
   s: Song;
@@ -59,6 +71,10 @@ class Hearthsong extends AudioWorkletProcessor {
   since: number;
   lastCue = 0;
   shaded = false;
+  ending = PLAYING;
+  forced = false;
+  forces = MAX_FORCE;
+  doneSlots = 0;
   chord = 0;
   // smoothed layer levels
   lv = new Float32Array(9);
@@ -110,7 +126,7 @@ class Hearthsong extends AudioWorkletProcessor {
   eL = new Float32Array(BELLS);
   eR = new Float32Array(BELLS);
   eNext = 0;
-  report = new Float64Array(6);
+  report = new Float64Array(8);
 
   constructor(options: { processorOptions: { song: Song; seed: number } }) {
     super(options);
@@ -202,11 +218,30 @@ class Hearthsong extends AudioWorkletProcessor {
   barLine(): void {
     const s = this.s;
     const swell = s.swell;
+    const tick = this.since < swell.gap ? this.since + 1 : this.since;
+    if (this.ending === REQUESTED) {
+      // asked to end: jump to the last line and let the lead sing it home
+      this.bar = s.bars - CODA_BARS;
+      this.breath = false;
+      this.swell = SINGING;
+      this.left = CODA_BARS;
+      this.since = 0;
+      this.forced = false;
+      this.ending = CODA;
+      this.reportState();
+      return;
+    }
+    if (this.ending === CODA) {
+      if (this.bar + 1 < s.bars) { this.bar++; this.left--; this.since = tick; }
+      else { this.ending = DONE; this.swell = IDLE; this.left = 0; this.since = tick; }
+      this.reportState();
+      return;
+    }
+    if (this.ending === DONE) return;
     this.bar++;
     if (!this.breath && this.bar >= s.bars) { this.bar = 0; this.breath = true; }
     else if (this.breath && this.bar >= s.breathBars) { this.bar = 0; this.breath = false; this.pass++; }
-    const tick = this.since < swell.gap ? this.since + 1 : this.since;
-    if (this.swell === ARMED && !this.breath) { this.swell = SINGING; this.left = swell.bars; this.since = 0; }
+    if (this.swell === ARMED && !this.breath) { this.swell = SINGING; this.left = swell.bars; this.since = 0; this.forced = false; }
     else if (this.swell === SINGING && (this.left <= 1 || this.breath)) { this.swell = FADING; this.left = swell.fade; this.since = tick; }
     else if (this.swell === SINGING) { this.left--; this.since = tick; }
     else if (this.swell === FADING && this.left <= 1) { this.swell = IDLE; this.left = 0; this.since = tick; }
@@ -216,6 +251,10 @@ class Hearthsong extends AudioWorkletProcessor {
     const sh = this.lv[6]!;
     if (sh > 0.6) this.shaded = true;
     else if (sh < 0.4) this.shaded = false;
+    this.reportState();
+  }
+
+  reportState(): void {
     const r = this.report;
     r[0] = this.bar;
     r[1] = this.breath ? 1 : 0;
@@ -223,7 +262,22 @@ class Hearthsong extends AudioWorkletProcessor {
     r[3] = this.pass;
     r[4] = this.since;
     r[5] = this.shaded ? 1 : 0;
+    r[6] = this.ending;
+    r[7] = this.forces;
     this.port.postMessage(r); // lint-feel: ok once per bar (2.5 s): state for window.__game
+  }
+
+  /** after the coda: roll the home chord once over a bar, let the pad hold it two more, then rest for good */
+  final(): void {
+    const s = this.s;
+    const k = this.doneSlots++;
+    if (k === 0) {
+      this.lGate = 0;
+      this.bInc = (TAU * hz(s.key - 24)) / sampleRate;
+      this.bAtk = 1;
+    }
+    if (k < 6) this.pluck(s.key - 12 + (k === 0 ? 0 : k === 1 ? 7 : k === 2 ? 12 : k === 3 ? 16 : k === 4 ? 19 : 24), 0.42 - k * 0.03);
+    if (k === 18) for (let v = 0; v < PADS; v++) this.pTo[v] = 0;
   }
 
   /** one eighth-note slot: decide what plays */
@@ -232,6 +286,11 @@ class Hearthsong extends AudioWorkletProcessor {
     if (this.slot === 0) this.barLine();
     const lv = this.lv;
     const slot = this.slot;
+    if (this.ending === DONE) {
+      this.slot = (slot + 1) % s.slots;
+      this.final();
+      return;
+    }
     const chords = this.shaded ? s.shadeChords : s.chords;
     // which tune this pass plays (a breath belongs to the tune it follows)
     const tb = (this.pass % s.tunes) * s.bars;
@@ -296,10 +355,16 @@ class Hearthsong extends AudioWorkletProcessor {
     lv[5]! += (p.bright![0]! - lv[5]!) * 0.05;
     lv[6]! += (p.shade![0]! - lv[6]!) * 0.05;
     lv[8]! += (p.level![0]! - lv[8]!) * 0.02;
-    // a cue: tla/Hearthsong.tla `Cue` (accepted only when idle and rested; otherwise dropped)
+    // a cue: tla/Hearthsong.tla `Cue` / `ForceCue` / `RestCue` (a plain cue sings only when idle and rested; else dropped)
     const cue = p.cue![0]!;
     if (cue !== this.lastCue) {
-      if (this.swell === IDLE && this.since >= this.s.swell.gap) this.swell = ARMED;
+      const kind = p.kind![0]!;
+      if (this.ending !== PLAYING) { /* the song is ending: nothing new */ }
+      else if (kind === CUE_REST) this.ending = REQUESTED;
+      else if (kind === CUE_FORCE) {
+        // tla ForceCue: a finale moment sings even inside the gap (re-arms a fading swell)
+        if ((this.swell === IDLE || this.swell === FADING) && this.forces > 0) { this.swell = ARMED; this.forced = true; this.forces--; }
+      } else if (this.swell === IDLE && this.since >= this.s.swell.gap) this.swell = ARMED;
       this.lastCue = cue;
     }
     const singing = this.swell === SINGING;

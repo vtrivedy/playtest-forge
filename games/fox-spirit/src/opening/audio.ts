@@ -169,10 +169,14 @@ export function createOpeningAudio() {
 
   const song = createMusic(ac, music);
   const cued: { cue: string; t: number }[] = [];
-  /** a moment happened (first hearth, a page caught, the Keeping, home): the song's lead may sing */
+  /**
+   * a moment happened (first hearth, a page caught, the Keeping, home): the song's lead may sing. The finale's
+   * moments are stronger: kindle/open sing even inside the rest gap, snow thins the song, rest plays it home and ends it.
+   */
   function cue(name: string): void {
     if (ac.state !== 'running') return;
-    song.cue();
+    if (name === 'finale-snow') song.snow();
+    else song.cue(name === 'finale-rest' ? 3 : name === 'finale-kindle' || name === 'finale-open' ? 1 : 0);
     cued.push({ cue: name, t: +ac.currentTime.toFixed(2) });
     if (cued.length > 12) cued.shift();
   }

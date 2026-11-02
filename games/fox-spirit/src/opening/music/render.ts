@@ -6,7 +6,7 @@ import { createMusic } from './music';
 import { PLACES } from './score';
 import { MIX } from '../audio';
 
-type Leg = { t: number; place: string; restored: number; cue?: boolean };
+type Leg = { t: number; place: string; restored: number; cue?: boolean; kind?: number; snow?: boolean };
 
 /** default listening walk: sepia village → hearth (lit, cue) → canopy → ruin → glyphs → keeping (cue) → vista */
 export const WALK: Leg[] = [
@@ -20,6 +20,10 @@ export const WALK: Leg[] = [
   { t: 150, place: 'keeping', restored: 0.8, cue: true },
   { t: 185, place: 'vista', restored: 1 },
   { t: 210, place: 'village', restored: 1, cue: true },
+  { t: 225, place: 'hollow', restored: 1, cue: true, kind: 1 },
+  { t: 232, place: 'hollow', restored: 1, cue: true, kind: 1 },
+  { t: 245, place: 'hollow', restored: 1, snow: true },
+  { t: 262, place: 'hollow', restored: 1, cue: true, kind: 3 },
 ];
 
 export async function renderHearthsong(seconds: number, walk: Leg[] = WALK, seed = 1): Promise<{ sr: number; l: string; r: string; marks: Leg[] }> {
@@ -35,7 +39,8 @@ export async function renderHearthsong(seconds: number, walk: Leg[] = WALK, seed
   for (let t = 0; t < seconds; t += 0.1) {
     while (li + 1 < walk.length && walk[li + 1]!.t <= t) {
       li++;
-      if (walk[li]!.cue) m.cue(walk[li]!.t);
+      if (walk[li]!.cue) m.cue(walk[li]!.kind ?? 0, walk[li]!.t);
+      if (walk[li]!.snow) m.snow();
     }
     const a = walk[li]!;
     const b = walk[Math.min(walk.length - 1, li + 1)]!;
