@@ -308,6 +308,47 @@ export function buildAshwater(
     root.add(w);
   }
 
+  // ---- the Ferrykeeper (DESIGN-worlds story): a heron pressed flat mid-wade at the Mill Pool's edge, its bill on the
+  // pole of the last ferry. When the Seedwell fills it unpresses — paper gains depth and colour — and flies off north
+  const heronShape = new THREE.Shape();
+  heronShape.moveTo(-0.55, 0.95); // tail
+  heronShape.quadraticCurveTo(-0.2, 1.25, 0.25, 1.15); // back
+  heronShape.quadraticCurveTo(0.45, 1.35, 0.32, 1.55); // neck S
+  heronShape.quadraticCurveTo(0.25, 1.78, 0.42, 1.86); // crown
+  heronShape.lineTo(0.95, 1.78); // bill
+  heronShape.lineTo(0.42, 1.76);
+  heronShape.quadraticCurveTo(0.3, 1.6, 0.4, 1.42);
+  heronShape.quadraticCurveTo(0.42, 1.1, 0.22, 0.9); // breast
+  heronShape.lineTo(0.08, 0.86);
+  heronShape.lineTo(0.1, 0.0); // front leg
+  heronShape.lineTo(0.05, 0.0);
+  heronShape.lineTo(0.0, 0.84);
+  heronShape.lineTo(-0.1, 0.84);
+  heronShape.lineTo(-0.2, 0.0); // back leg
+  heronShape.lineTo(-0.25, 0.0);
+  heronShape.lineTo(-0.2, 0.86);
+  heronShape.quadraticCurveTo(-0.45, 0.88, -0.55, 0.95);
+  const heronGeo = new THREE.ExtrudeGeometry(heronShape, { depth: 0.26, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 1 }).translate(0, 0, -0.13);
+  const heronMat = marsh(0xd8cfb8);
+  const heron = new THREE.Mesh(heronGeo, heronMat);
+  const heronAt = ash(-6.5, 18.2);
+  heron.position.set(heronAt.x, H(heronAt.x, heronAt.z), heronAt.z);
+  heron.rotation.y = -0.4;
+  heron.scale.set(1.3, 1.3, 0.08);
+  heron.castShadow = true;
+  root.add(heron);
+  const heronCol: Extract<Collider, { kind: 'post' }> = { kind: 'post', x: heronAt.x, z: heronAt.z, r: 0.45 };
+  colliders.push(heronCol);
+  // the last ferry: a flat punt moored at the pool's edge, its pole leaning on the heron's bill
+  const punt = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.22, 3.2), timber);
+  const puntAt = ash(-9.2, 21.2);
+  punt.position.set(puntAt.x, WATER.pool.full + 0.05, puntAt.z);
+  punt.rotation.y = 0.3;
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 3.4, 5), timber);
+  pole.position.set(heronAt.x - 0.9, 1.4, heronAt.z + 1.0);
+  pole.rotation.set(0.5, 0, 0.45);
+  root.add(punt, pole);
+
   // ---- the rig
   const say = (t: string) => ctx.captions.say(t);
   const rig: AshRig = {
@@ -328,9 +369,10 @@ export function buildAshwater(
       complete: (level) => {
         opts.complete(LEVEL_IDS[level]);
         if (level === 0) say('The reeds will hold you now.');
+        if (level === 1) say('The Ferrykeeper still waits.');
         if (level === 2) {
           ctx.audio.cue('finale-kindle');
-          say('The Reed Seedwell fills.');
+          say('The Scribe pressed the rain first.');
         }
       },
       splash: () => ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.1, rate: 0.6 }),
@@ -345,8 +387,12 @@ export function buildAshwater(
     matLoad: new Float32Array(MATS.length),
     glow,
     glowMat,
+    heron,
+    heronMat,
+    heronCol,
+    punt,
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
-    s: { burstA: -1, burstB: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0 },
+    s: { burstA: -1, burstB: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z },
   };
   // a saved game re-enters the marsh as it was left: drained channel / pool, burst dams, a lit Seedwell (no captions)
   const was = (l: (typeof LEVEL_IDS)[number]) => opts.isRestored?.(l) ?? false;
@@ -360,6 +406,8 @@ export function buildAshwater(
     rig.s.burstB = 999;
     rig.s.done |= 4;
     rig.s.glowK = 1;
+    // the Ferrykeeper already flew
+    rig.s.heronT = 99;
     damB.col.r = 0.001;
   }
   ctx.onUpdate((dt) => updateAshwater(rig, dt));

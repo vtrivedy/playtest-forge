@@ -35,10 +35,15 @@ export type AshRig = {
   matLoad: Float32Array;
   glow: THREE.Object3D;
   glowMat: THREE.MeshBasicMaterial;
+  /** the Ferrykeeper: pressed flat until the Seedwell fills, then unpresses and flies off */
+  heron: THREE.Object3D;
+  heronMat: THREE.MeshToonMaterial;
+  heronCol: Extract<Collider, { kind: 'post' }>;
+  punt: THREE.Object3D;
   safe: THREE.Vector3;
   s: {
     burstA: number; burstB: number; channelY: number; poolY: number; matK: number; glowK: number;
-    done: number; safeYaw: number; splashes: number; inMarsh: number;
+    done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number;
   };
 };
 
@@ -130,6 +135,19 @@ export function updateAshwater(rig: AshRig, dt: number): void {
   const g = smooth(s.glowK);
   rig.glow.scale.set(1, 0.14 + 0.86 * g, 1);
   rig.glowMat.opacity = 0.22 + 0.33 * g;
+  // the punt rides the Mill Pool's water; the Ferrykeeper unpresses with the Seedwell, then lifts away over the weir
+  rig.punt.position.y = Math.max(s.poolY, -1.0) + 0.05;
+  if (s.glowK > 0) {
+    const u = smooth(s.glowK);
+    rig.heron.scale.z = 0.08 + 1.22 * u;
+    rig.heronMat.color.setRGB(0.85 - 0.45 * u, 0.81 - 0.33 * u, 0.72 - 0.22 * u);
+    s.heronT += dt;
+    const fly = smooth((s.heronT - 3) / 6);
+    rig.heron.position.y = s.heronY + fly * 14;
+    rig.heron.position.z = s.heronZ + fly * 30;
+    rig.heron.visible = fly < 0.999;
+    if (fly > 0.2) rig.heronCol.r = 0.001;
+  }
 
   // one teach line at a time, only where it applies
   if (!s.inMarsh) return;
