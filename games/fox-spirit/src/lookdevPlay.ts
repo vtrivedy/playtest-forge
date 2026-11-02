@@ -615,6 +615,8 @@ export function createPlay(opts: {
     lastGrounded.copy(pos);
     dashT = dashCooldownT = 0;
     gliding = false;
+    // a teleport (world travel, wading reset, staged start) leaves no authored lens behind in the old place
+    cam.cancelShots();
     cam.snapBehind(yaw);
   }
   teleport(opts.start.x, opts.start.z, opts.start.yaw);
