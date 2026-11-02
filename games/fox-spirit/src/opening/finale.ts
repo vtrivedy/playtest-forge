@@ -7,12 +7,12 @@
  * This file builds (allocations allowed); every per-frame step lives in finale.hot.ts.
  */
 import * as THREE from 'three';
-import { buildMaple, buildRock, contactInk, hewn, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, toon } from '../lookdevKit';
+import { buildMaple, buildRock, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, toon } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
 import type { FollowCamera } from '../camera';
-import { CROWN, FINALE, KEEPING, pathDist } from './layout';
+import { CROWN, FINALE, KEEPING, pathDist, VISTA } from './layout';
 import { FINALE_TIMING, KIT_PHASES, PHASES, updateFinale, type FinaleRig } from './finale.hot';
 
 /** album paper, ink-frost, iron and the warm colours the hollow wakes into */
@@ -132,6 +132,41 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     slab.rotation.set((rand() - 0.5) * 0.12, Math.atan2(F.press.x - p.x, F.press.z - p.z) + dy, (rand() - 0.5) * 0.1);
     scene.add(slab);
     colliders.push({ kind: 'box', x: p.x, z: p.z, yaw: slab.rotation.y, hx: 0.5, hz: 0.16, top: y + h });
+  }
+
+  // ---- the far lip: a standing row of the Album's stone leaves, closing the hollow above the drop into the deep valley
+  // (one continuous collider line, taller than a jump, so the fox can't wander off down the endless vista floor)
+  {
+    const LIP = { a: 35.2, c0: -23, c1: 22.5 };
+    const n = Math.ceil((LIP.c1 - LIP.c0) / 0.7);
+    const slabGeo = hewn(new THREE.BoxGeometry(0.95, 1, 0.26, 2, 3, 1), rand, 0.05);
+    const slabs = new THREE.InstancedMesh(slabGeo, toon(0x7a6a58, { contour: 0.6 }), n);
+    const hull = new THREE.InstancedMesh(hullGeometry(slabGeo), inkMaterial(0.02), n);
+    const mm = new THREE.Matrix4();
+    const across = Math.atan2(VISTA.dx, VISTA.dz);
+    for (let i = 0; i < n; i++) {
+      const c = LIP.c0 + (i + 0.5) * ((LIP.c1 - LIP.c0) / n);
+      const p = F.at(LIP.a + Math.sin(c * 0.7) * 0.25, c);
+      const y = groundH(p.x, p.z);
+      // weathered and uneven, leaning every which way: a row of old standing leaves, not a built wall
+      const h = 1.05 + rand() * 1.0 + (rand() < 0.25 ? 0.7 : 0);
+      const w = 0.65 + rand() * 0.45;
+      mm.compose(
+        new THREE.Vector3(p.x, y + h / 2 - 0.2, p.z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler((rand() - 0.5) * 0.3, across + (rand() - 0.5) * 0.6, (rand() - 0.5) * 0.3)),
+        new THREE.Vector3(w, h, 0.8 + rand() * 0.5),
+      );
+      slabs.setMatrixAt(i, mm);
+      hull.setMatrixAt(i, mm);
+    }
+    slabs.castShadow = slabs.receiveShadow = true;
+    scene.add(slabs, hull);
+    // collider segments along the row, each top above the highest ground it spans + 2.2 m
+    for (let c = LIP.c0; c < LIP.c1; c += 3) {
+      const m = F.at(LIP.a, c + 1.5);
+      const top = Math.max(groundH(F.at(LIP.a, c).x, F.at(LIP.a, c).z), groundH(m.x, m.z), groundH(F.at(LIP.a, c + 3).x, F.at(LIP.a, c + 3).z)) + 2.3;
+      colliders.push({ kind: 'box', x: m.x, z: m.z, yaw: across, hx: 1.6, hz: 0.35, top });
+    }
   }
 
   // ---- the Scribe's Press: the Album lies shut on a stone plinth under a timber book-press, its iron screw
