@@ -30,6 +30,7 @@ and hidden birds, four-paw Kenney footsteps). The redo makes silence the default
 music phrases · ambience (wind, birds) · sfx (samples + synth voices, HRTF panners via `at(pos)`) → master →
 limiter → out, with a post-limiter `record` tap and pre-master `buses` for stems. Listener = rendered camera.
 
-## Measured (r3, `tools/mix-capture.mjs`, 60 s of the no-teleport slice route paced to wall clock)
-−31.3 LUFS integrated, peak −17.7 dBFS (pre-limiter, master at unity); music 2 phrases/min (page catches at
-~10 s and ~51 s; the 18 s catch is dropped by the 30 s rest); birds ≤ 2/min; footfalls ~110/min while moving.
+## Measured (main 5247b90, `tools/mix-capture.mjs`, 60 s of the no-teleport slice route paced to wall clock)
+−30.3 LUFS integrated, peak −17.5 dBFS (pre-limiter, master at unity); centroid 357 Hz; 77 attacks/min; ~72–76% of
+50 ms windows below −40 dBFS; music 2 phrases/min (page catches 1 and 3; catch 2 dropped by the 30 s rest); birds
+≤ 2/min. Reference envelope (Tallow, same tool): centroid 261–618 Hz, 86–235 attacks/min, quietest ref 55% < −40.

@@ -133,6 +133,14 @@ permits branch unmute; Vivek then hears the landed result on main.
 - Recorder smoke evidence: `/captures/rook/audio-recorder-final/`. Two running contexts, 304 meter samples, no silent samples, peak 0.02207, no page errors; decoded track 7.94 s stereo Opus, -41.2 LUFS, -33.0 dBFS true peak. This proves capture plumbing, not a good mix, audible spatial placement, seamless music, or event coverage.
 - Metering and source audit cannot replace listening. Review a named runtime SHA with event coverage and a loop boundary before claiming music/SFX quality. Prefer a post-mix recording bus when the runtime exposes one, and use the rendered camera for the listener pose.
 
+### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
+
+- Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
+  timed window (the winded sag) expired mid-leap so the page bolted from under the landing fox, and a point-in-time
+  reach test missed a fox that crossed the 1.35 m reach between two frames. Fix pattern: refresh timed windows on
+  the player's committing action (the leap), and test proximity swept along the step's path, counting "airborne"
+  at either end of the step. Replay any route with `advance(1, 0.05)` before calling a trigger robust.
+
 ### Machine listening and the full-mix capture (Flint, 2026-11-02)
 
 - `tools/mix-capture.mjs --out DIR --seconds 60`: plays the no-teleport slice route with the sim paced to the wall
