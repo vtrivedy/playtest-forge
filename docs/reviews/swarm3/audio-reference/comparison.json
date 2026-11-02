@@ -1,0 +1,430 @@
+[
+  {
+    "slug": "alba-along-the-path",
+    "sha256": "aa70bc23c9cdf9c536195ccba2b2dc24cfa6b2f5b360b4dc18f6df20b7f88377",
+    "provenance": "Published OST preview; not gameplay. https://music.apple.com/us/album/along-the-path/1568790780?i=1568790966&uo=4; first29.9s; no normalization",
+    "duration_s": 29.9,
+    "rms_dbfs": -16.68875039767957,
+    "peak_dbfs": -4.075011730194092,
+    "crest_db": 12.613738667485478,
+    "onsets_per_minute": 182.60869565217394,
+    "active_spectral_centroid_median_hz": 377.35774931345287,
+    "spectral_energy_fraction": {
+      "0-150Hz": 0.12458397448062897,
+      "150-500Hz": 0.7013189792633057,
+      "500-2000Hz": 0.16431884467601776,
+      "2000-6000Hz": 0.009096098132431507,
+      "6000-12001Hz": 0.0006821326678618789
+    },
+    "envelope_recurrence": {
+      "label": "Normalized RMS autocorrelation, lags .25-30s; can reflect movement rhythm or shared ambience, not sample identity",
+      "peaks": [
+        {
+          "lag_s": 1.2000000000000002,
+          "correlation": 0.281019525610868
+        },
+        {
+          "lag_s": 2.4000000000000004,
+          "correlation": 0.2585552981403312
+        },
+        {
+          "lag_s": 3.6,
+          "correlation": 0.20526213416963685
+        },
+        {
+          "lag_s": 9.600000000000001,
+          "correlation": 0.19173847038017827
+        },
+        {
+          "lag_s": 0.4,
+          "correlation": 0.1914498302936009
+        },
+        {
+          "lag_s": 6.0,
+          "correlation": 0.1587607278461418
+        },
+        {
+          "lag_s": 8.4,
+          "correlation": 0.15181903932835772
+        },
+        {
+          "lag_s": 2.0,
+          "correlation": 0.1501871247676282
+        }
+      ]
+    },
+    "rms_p90_minus_p10_db": 3.627508402963384,
+    "fraction_50ms_below_minus40_dbfs": 0.0
+  },
+  {
+    "slug": "alba-the-pine-grove",
+    "sha256": "8e29e9f15072bffaeb77806656f450a67ce06d367a9e602307a56da28ae74c17",
+    "provenance": "Published OST preview; not gameplay. https://music.apple.com/us/album/the-pine-grove/1568790780?i=1568790974&uo=4; first29.9s; no normalization",
+    "duration_s": 29.9,
+    "rms_dbfs": -15.472312745455081,
+    "peak_dbfs": -1.3147348165512085,
+    "crest_db": 14.157577928903873,
+    "onsets_per_minute": 208.69565217391306,
+    "active_spectral_centroid_median_hz": 260.6302523380043,
+    "spectral_energy_fraction": {
+      "0-150Hz": 0.14534303545951843,
+      "150-500Hz": 0.812488853931427,
+      "500-2000Hz": 0.03936319425702095,
+      "2000-6000Hz": 0.0024465485475957394,
+      "6000-12001Hz": 0.0003584088117349893
+    },
+    "envelope_recurrence": {
+      "label": "Normalized RMS autocorrelation, lags .25-30s; can reflect movement rhythm or shared ambience, not sample identity",
+      "peaks": [
+        {
+          "lag_s": 1.4500000000000002,
+          "correlation": 0.5334776157139482
+        },
+        {
+          "lag_s": 2.9000000000000004,
+          "correlation": 0.435096966476078
+        },
+        {
+          "lag_s": 4.3,
+          "correlation": 0.3492045443030699
+        },
+        {
+          "lag_s": 5.75,
+          "correlation": 0.3243961758606678
+        },
+        {
+          "lag_s": 11.5,
+          "correlation": 0.31487619153251195
+        },
+        {
+          "lag_s": 7.2,
+          "correlation": 0.3074066092060038
+        },
+        {
+          "lag_s": 10.05,
+          "correlation": 0.29854647920931265
+        },
+        {
+          "lag_s": 8.65,
+          "correlation": 0.2817329335468673
+        }
+      ]
+    },
+    "rms_p90_minus_p10_db": 6.772461673761269,
+    "fraction_50ms_below_minus40_dbfs": 0.0
+  },
+  {
+    "slug": "alba-a-summer-night",
+    "sha256": "59ed67b3111040208abbaf0de02b5c5e42a7eb83e224c62480ace1b5f8ee9f11",
+    "provenance": "Published OST preview; not gameplay. https://music.apple.com/us/album/a-summer-night/1568790780?i=1568791198&uo=4; first29.9s; no normalization",
+    "duration_s": 29.9,
+    "rms_dbfs": -31.91257356691537,
+    "peak_dbfs": -8.083122253417969,
+    "crest_db": 23.8294513134974,
+    "onsets_per_minute": 108.36120401337793,
+    "active_spectral_centroid_median_hz": 618.3315940236241,
+    "spectral_energy_fraction": {
+      "0-150Hz": 0.06234117969870567,
+      "150-500Hz": 0.7379235029220581,
+      "500-2000Hz": 0.1617729663848877,
+      "2000-6000Hz": 0.03190765529870987,
+      "6000-12001Hz": 0.006054605823010206
+    },
+    "envelope_recurrence": {
+      "label": "Normalized RMS autocorrelation, lags .25-30s; can reflect movement rhythm or shared ambience, not sample identity",
+      "peaks": [
+        {
+          "lag_s": 17.05,
+          "correlation": 0.2828922886816257
+        }
+      ]
+    },
+    "rms_p90_minus_p10_db": 22.242960945585217,
+    "fraction_50ms_below_minus40_dbfs": 0.5535117056856187
+  },
+  {
+    "slug": "short-hike-beach-buds",
+    "sha256": "d2558275039d3c24d13f7df07912cb055607f95baa05c6f4c171f7dfd4d6e0cd",
+    "provenance": "Published OST preview; not gameplay. https://music.apple.com/us/album/beach-buds-short-hike/1473635430?i=1473635431&uo=4; first29.9s; no normalization",
+    "duration_s": 29.882625,
+    "rms_dbfs": -13.782996688189005,
+    "peak_dbfs": 1.4856066703796387,
+    "crest_db": 15.268603358568644,
+    "onsets_per_minute": 234.91912106115174,
+    "active_spectral_centroid_median_hz": 402.7900321733878,
+    "spectral_energy_fraction": {
+      "0-150Hz": 0.4208535850048065,
+      "150-500Hz": 0.27362215518951416,
+      "500-2000Hz": 0.2923899292945862,
+      "2000-6000Hz": 0.011787831783294678,
+      "6000-12001Hz": 0.0013465593801811337
+    },
+    "envelope_recurrence": {
+      "label": "Normalized RMS autocorrelation, lags .25-30s; can reflect movement rhythm or shared ambience, not sample identity",
+      "peaks": [
+        {
+          "lag_s": 5.550000000000001,
+          "correlation": 0.4252260968423628
+        },
+        {
+          "lag_s": 2.75,
+          "correlation": 0.41153984359782475
+        },
+        {
+          "lag_s": 2.5500000000000003,
+          "correlation": 0.339760434549806
+        },
+        {
+          "lag_s": 8.3,
+          "correlation": 0.30652934363068884
+        },
+        {
+          "lag_s": 1.4000000000000001,
+          "correlation": 0.300598635337206
+        },
+        {
+          "lag_s": 11.100000000000001,
+          "correlation": 0.29889407879517954
+        },
+        {
+          "lag_s": 3.0,
+          "correlation": 0.2960286601092316
+        },
+        {
+          "lag_s": 1.1500000000000001,
+          "correlation": 0.28686766730952745
+        }
+      ]
+    },
+    "rms_p90_minus_p10_db": 8.967523554044359,
+    "fraction_50ms_below_minus40_dbfs": 0.0
+  },
+  {
+    "slug": "short-hike-somewhere-in-the-woods",
+    "sha256": "8da3b3f9e4bae560b104a891f027ad36eca83661291716c6c04dc8ac365c7550",
+    "provenance": "Published OST preview; not gameplay. https://music.apple.com/us/album/somewhere-in-the-woods-short-hike/1473635430?i=1473635434&uo=4; first29.9s; no normalization",
+    "duration_s": 29.882625,
+    "rms_dbfs": -14.012590772845614,
+    "peak_dbfs": 1.7330135107040405,
+    "crest_db": 15.745604283549655,
+    "onsets_per_minute": 150.58918016740498,
+    "active_spectral_centroid_median_hz": 472.34707655217983,
+    "spectral_energy_fraction": {
+      "0-150Hz": 0.33385294675827026,
+      "150-500Hz": 0.2741072475910187,
+      "500-2000Hz": 0.3778076469898224,
+      "2000-6000Hz": 0.01234135776758194,
+      "6000-12001Hz": 0.001890799030661583
+    },
+    "envelope_recurrence": {
+      "label": "Normalized RMS autocorrelation, lags .25-30s; can reflect movement rhythm or shared ambience, not sample identity",
+      "peaks": [
+        {
+          "lag_s": 9.600000000000001,
+          "correlation": 0.48616863647063197
+        },
+        {
+          "lag_s": 4.800000000000001,
+          "correlation": 0.341241187947815
+        },
+        {
+          "lag_s": 19.200000000000003,
+          "correlation": 0.1993395318137561
+        },
+        {
+          "lag_s": 0.6000000000000001,
+          "correlation": 0.1934848814598654
+        },
+        {
+          "lag_s": 7.2,
+          "correlation": 0.17033748183716546
+        },
+        {
+          "lag_s": 14.4,
+          "correlation": 0.16972913775220114
+        },
+        {
+          "lag_s": 2.4000000000000004,
+          "correlation": 0.1584218475120966
+        },
+        {
+          "lag_s": 16.8,
+          "correlation": 0.1533176491190387
+        }
+      ]
+    },
+    "rms_p90_minus_p10_db": 7.250518613371359,
+    "fraction_50ms_below_minus40_dbfs": 0.0
+  },
+  {
+    "slug": "short-hike-hello",
+    "sha256": "4b2663b606ca52c043759dd6ae7e0bb47253ba73a4bba4f458039819b53db26a",
+    "provenance": "Published OST preview; not gameplay. https://music.apple.com/us/album/hello/1473635430?i=1473635437&uo=4; first29.9s; no normalization",
+    "duration_s": 29.882625,
+    "rms_dbfs": -23.587534422422266,
+    "peak_dbfs": -1.606984257698059,
+    "crest_db": 21.980550164724207,
+    "onsets_per_minute": 86.33779662931218,
+    "active_spectral_centroid_median_hz": 603.4498614519953,
+    "spectral_energy_fraction": {
+      "0-150Hz": 0.13823972642421722,
+      "150-500Hz": 0.190032958984375,
+      "500-2000Hz": 0.6643007397651672,
+      "2000-6000Hz": 0.007425315678119659,
+      "6000-12001Hz": 1.306753119934001e-06
+    },
+    "envelope_recurrence": {
+      "label": "Normalized RMS autocorrelation, lags .25-30s; can reflect movement rhythm or shared ambience, not sample identity",
+      "peaks": [
+        {
+          "lag_s": 1.7000000000000002,
+          "correlation": 0.327213597129218
+        },
+        {
+          "lag_s": 6.8500000000000005,
+          "correlation": 0.30197946469815223
+        },
+        {
+          "lag_s": 3.45,
+          "correlation": 0.29197045907973807
+        },
+        {
+          "lag_s": 13.75,
+          "correlation": 0.2914740131106823
+        },
+        {
+          "lag_s": 0.55,
+          "correlation": 0.26792569892364987
+        },
+        {
+          "lag_s": 5.15,
+          "correlation": 0.21443500625078904
+        },
+        {
+          "lag_s": 12.0,
+          "correlation": 0.18129673612271952
+        },
+        {
+          "lag_s": 1.4500000000000002,
+          "correlation": 0.16481059812603388
+        }
+      ]
+    },
+    "rms_p90_minus_p10_db": 18.692592572693606,
+    "fraction_50ms_below_minus40_dbfs": 0.03511705685618729
+  },
+  {
+    "slug": "music-hush-hamlet",
+    "sha256": "d800f719f789f17044223bd65f7ab32275d5d175d04e76f9d4b548ce4fc5b260",
+    "provenance": "Existing game music source, unscaled; first29.9s; no normalization",
+    "duration_s": 29.9,
+    "rms_dbfs": -16.789331338130836,
+    "peak_dbfs": 0.3520955443382263,
+    "crest_db": 17.141426882469062,
+    "onsets_per_minute": 138.46153846153848,
+    "active_spectral_centroid_median_hz": 455.9886093335132,
+    "spectral_energy_fraction": {
+      "0-150Hz": 0.5863896608352661,
+      "150-500Hz": 0.2807476222515106,
+      "500-2000Hz": 0.10902969539165497,
+      "2000-6000Hz": 0.019745076075196266,
+      "6000-12001Hz": 0.004088045097887516
+    },
+    "envelope_recurrence": {
+      "label": "Normalized RMS autocorrelation, lags .25-30s; can reflect movement rhythm or shared ambience, not sample identity",
+      "peaks": [
+        {
+          "lag_s": 1.6,
+          "correlation": 0.7067638009410102
+        },
+        {
+          "lag_s": 3.2,
+          "correlation": 0.6991352143627835
+        },
+        {
+          "lag_s": 0.8,
+          "correlation": 0.5886211933218323
+        },
+        {
+          "lag_s": 4.800000000000001,
+          "correlation": 0.47534857553299226
+        },
+        {
+          "lag_s": 2.4000000000000004,
+          "correlation": 0.46664173828100797
+        },
+        {
+          "lag_s": 6.4,
+          "correlation": 0.4256852135506832
+        },
+        {
+          "lag_s": 4.0,
+          "correlation": 0.3840443889924815
+        },
+        {
+          "lag_s": 5.6000000000000005,
+          "correlation": 0.25254047672573904
+        }
+      ]
+    },
+    "rms_p90_minus_p10_db": 19.620999533889872,
+    "fraction_50ms_below_minus40_dbfs": 0.0033444816053511705
+  },
+  {
+    "slug": "music-apple-cider",
+    "sha256": "493833ceb7952ea5421e87ae83c9aa663145b95ffcb47d334cf3fff1a6e44dca",
+    "provenance": "Existing game music source, unscaled; first29.9s; no normalization",
+    "duration_s": 29.9,
+    "rms_dbfs": -16.03748740809462,
+    "peak_dbfs": 1.1421623229980469,
+    "crest_db": 17.179649731092667,
+    "onsets_per_minute": 184.6153846153846,
+    "active_spectral_centroid_median_hz": 877.2217198554879,
+    "spectral_energy_fraction": {
+      "0-150Hz": 0.745840311050415,
+      "150-500Hz": 0.1567818969488144,
+      "500-2000Hz": 0.046835724264383316,
+      "2000-6000Hz": 0.014922174625098705,
+      "6000-12001Hz": 0.03561990335583687
+    },
+    "envelope_recurrence": {
+      "label": "Normalized RMS autocorrelation, lags .25-30s; can reflect movement rhythm or shared ambience, not sample identity",
+      "peaks": [
+        {
+          "lag_s": 0.30000000000000004,
+          "correlation": 0.7520802271201521
+        },
+        {
+          "lag_s": 1.2000000000000002,
+          "correlation": 0.704480085907612
+        },
+        {
+          "lag_s": 0.9,
+          "correlation": 0.6430897601715121
+        },
+        {
+          "lag_s": 2.4000000000000004,
+          "correlation": 0.637253999850563
+        },
+        {
+          "lag_s": 4.800000000000001,
+          "correlation": 0.5947967107008806
+        },
+        {
+          "lag_s": 1.5,
+          "correlation": 0.5758044809825505
+        },
+        {
+          "lag_s": 0.6000000000000001,
+          "correlation": 0.564318223315871
+        },
+        {
+          "lag_s": 3.6,
+          "correlation": 0.5445220100126097
+        }
+      ]
+    },
+    "rms_p90_minus_p10_db": 31.13718533696693,
+    "fraction_50ms_below_minus40_dbfs": 0.12876254180602006
+  }
+]

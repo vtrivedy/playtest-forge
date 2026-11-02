@@ -193,3 +193,70 @@ source provenance are required for reference comparisons (Tallow owns those).
 Validation: synthetic1kHz sine centroid within10Hz and >99% energy in500–2000Hz;
 digital silence produces zero onsets, no active centroid or recurrence pairs.
 No game runtime or mute policy changed; no new game-play or listening signoff.
+
+### Matched reference recordings — Tallow, 2026-11-02 02:52 UTC
+
+Actual audio comparison now uses `tools/audio-understand.py` (Rook fdd0123),
+not verbal descriptions of reference games. Reproduce acquisition + analysis:
+
+```sh
+python3 tools/audio-reference-compare.py --out /tmp/audio-reference
+```
+
+Six public Apple/iTunes soundtrack previews, plus our two existing unscaled music
+assets; first **29.9 s of each**, no normalization, same 24 kHz mono downmix,
+FFT2048/hop512, fixed −90..−15 dB spectrogram scale. Preview positions within the
+full songs are chosen by the store, not assumed to be song starts. These are
+published OST masters, not recordings of gameplay. Sources are
+[Alba OST](https://music.apple.com/us/album/alba-a-wildlife-adventure-original-game-soundtrack/1568790780)
+and [A Short Hike OST](https://music.apple.com/us/album/a-short-hike/1473635430);
+composer attribution Lorena Álvarez and Mark Sparling respectively.
+Exact preview URLs, source hashes, decoded excerpt hashes and measurements:
+`docs/reviews/swarm3/audio-reference/{manifest,comparison}.json`. Reference audio
+stays outside the repo/game. Diagnostic images on captures volume:
+`/reviews/tallow-audio-reference/` (one directory per title).
+
+| Recording, excerpt | Mono RMS dBFS | Crest dB | Generic attacks/min | Median centroid Hz | 50ms RMS p90−p10 dB | Windows <−40dBFS |
+|---|---:|---:|---:|---:|---:|---:|
+| Alba — Along the Path | −16.7 | 12.6 | 182.6 | 377 | 3.6 | 0% |
+| Alba — The Pine Grove | −15.5 | 14.2 | 208.7 | 261 | 6.8 | 0% |
+| Alba — A Summer Night | −31.9 | 23.8 | 108.4 | 618 | 22.2 | 55.4% |
+| Short Hike — Beach Buds (Short Hike) | −13.8 | 15.3 | 234.9 | 403 | 9.0 | 0% |
+| Short Hike — Somewhere in the Woods (Short Hike) | −14.0 | 15.7 | 150.6 | 472 | 7.3 | 0% |
+| Short Hike — Hello? | −23.6 | 22.0 | 86.3 | 603 | 18.7 | 3.5% |
+| Our Hush Hamlet source | −16.8 | 17.1 | 138.5 | 456 | 19.6 | 0.3% |
+| Our Apple Cider source | −16.0 | 17.2 | 184.6 | 877 | 31.1 | 12.9% |
+
+Measured/visually inspected findings:
+
+- **Reference choice matters more than a generic attack ceiling.** Pine Grove
+  and Beach Buds have dense continuous arrangements and 209–235 detected attacks
+  per minute. These include musical notes. A low wildlife budget must use exact
+  call starts/gaps or isolated wildlife stems; do not compare it to spectral flux.
+- **A Summer Night is the useful sparse reference for this redo.** Two broad
+  low-frequency harmonic swells near 2 s and 19 s decay substantially, with long
+  passages near −45..−50 dBFS between them. Over half of its 50ms windows sit below
+  −40 dBFS. In Hello?, separate note attacks decay visibly and the upper spectrum
+  is mostly dark. This suggests finite phrases with room after their decay,
+  rather than reducing the master on an uninterrupted bed.
+- **Our sources need arrangement decisions, not a blanket claim that they are
+  too loud or bright.** Hush's first29.9s centroid456Hz lies among the references;
+  full96s plot then develops a busy sustained texture after ~20s. Apple Cider's
+  first29.9s actually has a larger p90−p10 range than all six references, but
+  centroid877Hz is highest in this sample. These observations support selecting
+  and spacing phrases, not rejecting tracks from one number. Gain reduction
+  changes absolute levels but retains rhythmic repetition and relative decays.
+- **Chroma recurrence is harmonic similarity, not repeated audio identity.**
+  Pine Grove has a broad bright recurrence matrix too. Do not label it an obvious
+  loop based on that. Envelope recurrence can flag a regular rhythm for closer
+  inspection; exact loop schedules still come from runtime/source data.
+- **No invented gameplay balance or bird cadence.** The OSTs contain no isolated
+  gameplay stems/marks; their titles do not identify birds in the audio. Rook's
+  aligned-stem option and exact `{time_s,kind}` event logs are the correct tools
+  for those comparisons. A YouTube attempt was stopped by its bot/login check;
+  official public preview acquisition succeeded without that route.
+
+Verification: all eight matched analyses exited0; duration29.9s; diagnostic PNGs
+reviewed for Summer Night, Hello?, Pine Grove, Beach Buds and full Hush. Python
+compile passed. This is a programmatic/visual audio critique, not a real-time
+listening claim or whole-game playtest. No runtime/mute changes in this slice.
