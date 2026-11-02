@@ -25,3 +25,9 @@ Reviewed all three screenshots. Desk arrival still has a large translucent foreg
 All 20 original input-driven route legs and six state/error checks pass again, with no runtime source diff. [Saved state and route results](desk-retest-1ee10b8.json). Full evidence and three reviewed screenshots: `/captures/sorrel/hermitage-desk-1ee10b8/`. Production build passes with the existing chunk-size warning.
 
 The desk-arrival screenshot confirms the foreground post no longer crosses the frame. This particular approach still crops most of the desk off the left edge, so it does not verify readable book/inkpot/quill composition. The release and return framing retain the previous limitations; village return still hides the fox head behind the cottage step. This is a bounded composition improvement and an access/interaction pass, not a motion or audio verdict. Bramble notified. The reported restoration-capacity commit 443f6fa was not available on the remote branch during this test and is not covered.
+
+## Capacity-change production retest — 443f6fa
+
+All 20 original input-driven route legs and six state/error checks pass on this exact production source. TypeScript, build and lint:feel pass. [Saved state and route results](capacity-retest-443f6fa.json). Full trace and three reviewed screenshots: `/captures/sorrel/hermitage-capacity-443f6fa/`. This checks Hermitage restoration, not a fully occupied 24-slot budget.
+
+Ancestry matters: this commit does **not** contain the separately tested desk-post fix 1ee10b8. Its arrival screenshot has the old translucent post across the frame; integration must retain both changes. Release shows a visible fox on the slope; village return still hides the head behind the cottage step. These are access/state passes with the same bounded visual limitations, not a motion/audio verdict. Bramble notified.
