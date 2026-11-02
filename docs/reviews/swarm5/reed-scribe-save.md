@@ -40,6 +40,13 @@ outside the diagnostic's scope; an Album checkmark alone does not establish that
 
 Evidence: `/captures/reed/save-f49f3aa1/`, full snapshots and screenshots.
 
+Fresh control on the same immutable f49f3aa1 checkout: `tools/discovery-probe.mjs --seconds 90 --idle 1.5`
+passes all 13 checks, with zero JavaScript errors and completed final capture. Three catches lead to a real
+grounded completion, `restoredAtLoad:false`, and a non-null contact position. Personally inspected the
+[overlook frame](reed-scribe-save/fresh-overlook.png): whole fox on the page platform, homeward guidance shown.
+Evidence: `/captures/reed/discovery-f49f3aa1/`. No continuous motion capture was requested in this replay;
+it does not add an animation-quality or blind-wander claim.
+
 ## Validation
 
 On f49f3aa1: TypeScript, production Vite build, `lint:feel` including the saved-opening AST guard and arrival-lens
