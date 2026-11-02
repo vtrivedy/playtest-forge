@@ -41,5 +41,17 @@ configuration; original tool hash and exact replacement are retained.
 The review branch merges this candidate with the separately verified canopy
 stem fade at `314a0492`. TypeScript and `lint:feel` (including camera envelope
 and world bounds) pass on that merge. Discovery TLC remains 112 generated/38
-distinct states, and TeachOrder 4/4, both without errors. A second production
-capture of the combined source is running; it has no result claim yet.
+distinct states, and TeachOrder 4/4, both without errors.
+
+Combined-source retest completed on immutable `314a0492`: another 70-second
+production T4/EGL capture, 1,050 frames at 15 fps, all 13 checks true and zero
+JavaScript errors. Grounded completion again occurs at 55.95 seconds; all 303
+rounded position samples match the priority-only replay. Inspected every
+captured frame of the 13–16 second canopy descent: the stem fades through the
+lens crossing and the fox stays visible. The final screenshot shows a whole,
+grounded fox on the overlook with the homeward instruction. Evidence volume:
+`keeping-swarm5-captures/reed/discovery-integrated-314a0492/`; local movie,
+state, final screenshot and descent sheet:
+`/captures/reed/discovery-integrated-314a0492/`. This closes the combined
+stem-visibility/retry regression on this source, with blind wandering and well
+arrival composition still separate open work.

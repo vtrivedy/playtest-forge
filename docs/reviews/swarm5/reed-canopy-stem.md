@@ -56,3 +56,9 @@ T4 replay on `c0eb9d41` passes all 13 checks and completes grounded at 55.95 s
 after four misses. The controller isolation above is retained as experiment
 history, not evidence that a rollback is necessary. See
 `reed-discovery-priority.md` for source review and captured recovery evidence.
+
+Combined production retest on `314a0492` is now complete: T4/EGL 70 seconds,
+15 fps, all 13 discovery checks true, zero JS errors, grounded completion 55.95 s.
+Every captured descent frame from 13–16 s was inspected at 15 fps; the stem
+fades and the fox remains visible. Its 303 sampled positions match the
+priority-only replay. Evidence volume `reed/discovery-integrated-314a0492`.
