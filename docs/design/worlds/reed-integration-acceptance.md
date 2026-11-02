@@ -74,3 +74,22 @@ Inspect motion as well as selected stills. Fix the worst visible problem and
 retest the changed path once before calling that path accepted. Report each case
 as PASS, FAIL, or BLOCKED with exact commit and artifact, and distinguish a
 first-puzzle/world deadline floor from the full nine-level design target.
+
+## Input-only probe scaffold
+
+`tools/world-input-probe.mjs --plan route.json --out /tmp/world-route` starts the
+real default opening with a fresh browser context. A plan contains `steps` with
+`name`, `frames`, `stick: [x,z]`, `keys`, and optional `expect` predicates (`path`
+within hooks state, with `equals` or `finite: true`). It exposes no arbitrary
+script, teleport or puzzle-state setter. Every step saves a gameplay screenshot,
+full hook/game state, assertion results and requested simulation duration; the
+report includes source commit, working-tree status, original input plan and
+browser errors. This is screenshot evidence, not a continuous video recorder.
+
+Scaffold smoke on source `7772d2bc`: one second idle then one second ordinary
+stick movement. Four finite-coordinate checks passed, no browser errors; fox
+moved from (-5.2, 0, 92.5) to (-4.462, 0.008, 92.468). Both 960×540 frames inspected:
+fox readable, normal follow view, page teaching visible. Local artifact:
+`/tmp/reed-world-smoke/report.json` and adjacent PNGs. This only validates the
+probe on the current opening; it establishes no new world, progress or save PASS.
+Canonical portal coordinates and state fields remain required for route plans.
