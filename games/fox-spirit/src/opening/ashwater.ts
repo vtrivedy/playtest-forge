@@ -84,18 +84,48 @@ export function buildAshwater(
   };
   const water = { channel: waterMesh('channel'), channelE: waterMesh('channelE'), pond: waterMesh('pond'), pool: waterMesh('pool') };
 
-  // ---- reeds: blades along every bank, thick at the water's edge
+  // ---- reeds: clumps, not spikes — fanned sedge tufts everywhere wet, and cattail stands (brown heads on stalks)
+  // crowding the water's edge; vertex-coloured (dark base → lighter tips, brown heads), tinted per clump
   const blade = new THREE.ConeGeometry(0.05, 1.3, 4).translate(0, 0.65, 0);
-  const REEDS = 5200;
-  const reeds = new THREE.InstancedMesh(blade, marsh(C.reed), REEDS);
+  const paint = (g: THREE.BufferGeometry, base: THREE.Color, tip: THREE.Color, h: number) => {
+    const ps = g.getAttribute('position') as THREE.BufferAttribute;
+    const cs = new Float32Array(ps.count * 3);
+    const t = new THREE.Color();
+    for (let i = 0; i < ps.count; i++) t.copy(base).lerp(tip, Math.min(1, Math.max(0, ps.getY(i) / h))).toArray(cs, i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(cs, 3));
+    return g;
+  };
+  const sedgeBase = new THREE.Color(0x2f4a2a), sedgeTip = new THREE.Color(0x8aa35a);
+  const fan = (count: number, len: number, lean: number, w: number) =>
+    Array.from({ length: count }, (_, i) => {
+      const a = (i / count) * Math.PI * 2 + rand() * 0.5;
+      const l = len * (0.7 + rand() * 0.5);
+      const g = new THREE.ConeGeometry(w, l, 3).translate(0, l / 2, 0);
+      g.rotateX(lean * (0.5 + rand() * 0.6)).rotateY(a).translate(Math.sin(a) * 0.06, 0, Math.cos(a) * 0.06);
+      return paint(g, sedgeBase, sedgeTip, l);
+    });
+  const sedgeGeo = mergeGeometries(fan(9, 0.75, 0.55, 0.035))!;
+  const cattailParts = fan(6, 1.25, 0.25, 0.03);
+  for (let k = 0; k < 3; k++) {
+    const a = rand() * 6.28, r = 0.12;
+    const stalk = paint(new THREE.CylinderGeometry(0.012, 0.016, 1.7, 4).translate(Math.sin(a) * r, 0.85, Math.cos(a) * r), sedgeBase, new THREE.Color(0x6f7f45), 1.7);
+    const head = new THREE.CapsuleGeometry(0.045, 0.22, 2, 5).translate(Math.sin(a) * r, 1.62, Math.cos(a) * r);
+    paint(head, new THREE.Color(0x5a3a22), new THREE.Color(0x6b4529), 2);
+    cattailParts.push(stalk.toNonIndexed(), head.toNonIndexed());
+  }
+  const cattailGeo = mergeGeometries(cattailParts.map((g) => (g.index ? g.toNonIndexed() : g)))!;
+  const reedMat = marsh(0xffffff, { vertexColors: true });
+  const REEDS = 3400;
+  const sedges = new THREE.InstancedMesh(sedgeGeo, reedMat, REEDS);
+  const cattails = new THREE.InstancedMesh(cattailGeo, reedMat, 1400);
   const tint = new THREE.Color();
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
   const sc = new THREE.Vector3();
   const p = new THREE.Vector3();
-  let n = 0;
-  for (let tries = 0; n < REEDS && tries < REEDS * 12; tries++) {
+  let n = 0, nc = 0;
+  for (let tries = 0; n < REEDS && tries < REEDS * 14; tries++) {
     const lx = (rand() - 0.5) * 140;
     const lz = (rand() - 0.5) * 130;
     const x = ASH_ORIGIN.x + lx;
@@ -103,18 +133,26 @@ export function buildAshwater(
     const h = H(x, z);
     if (waterAt(x, z) !== null || h > 5 || h < -0.3) continue;
     // reeds crowd the water's edge and the rim; keep the walking line (lx ≈ 0) and the gates readable
-    const edge = h < 0.05 ? 1 : h > 1.5 ? 0.5 : 0.12;
+    const edge = h < 0.05 ? 1 : h > 1.5 ? 0.5 : 0.22;
     if (rand() > edge || (Math.abs(lx) < 4 && lz < 40) || Math.hypot(lx - DAM_A.lx, lz - DAM_A.lz) < 3.5) continue;
-    p.set(x, h - 0.05, z);
-    e.set((rand() - 0.5) * 0.35, rand() * 6.28, (rand() - 0.5) * 0.35);
+    p.set(x, h - 0.04, z);
+    e.set((rand() - 0.5) * 0.2, rand() * 6.28, (rand() - 0.5) * 0.2);
     q.setFromEuler(e);
-    sc.set(1, 0.6 + rand() * 0.9, 1);
-    reeds.setMatrixAt(n, m4.compose(p, q, sc));
-    reeds.setColorAt(n, tint.set(rand() < 0.3 ? C.reedDry : C.reed));
-    n++;
+    const big = 0.8 + rand() * 0.7;
+    sc.set(big, big * (0.8 + rand() * 0.5), big);
+    m4.compose(p, q, sc);
+    tint.setRGB(0.85 + rand() * 0.25, 0.85 + rand() * 0.25, 0.8 + rand() * 0.2);
+    if (h < 0.08 && nc < 1400 && rand() < 0.45) {
+      cattails.setMatrixAt(nc, m4);
+      cattails.setColorAt(nc++, tint);
+    } else {
+      sedges.setMatrixAt(n, m4);
+      sedges.setColorAt(n++, tint);
+    }
   }
-  reeds.count = n;
-  root.add(reeds);
+  sedges.count = n;
+  cattails.count = nc;
+  root.add(sedges, cattails);
 
   // ---- reed dams: a slumped stack of cut reeds on the sluice culvert and on the mill race islet
   const damBlade = new THREE.CylinderGeometry(0.06, 0.06, 1.6, 4).rotateZ(Math.PI / 2);
