@@ -10,7 +10,7 @@ import { installStemTap } from './lib/stem-tap.mjs';
 import { createServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createSliceRoute, SLICE_START } from './opening-hero-route.mjs';
+
 
 const arg = (k, d) => {
   const i = process.argv.indexOf(`--${k}`);
@@ -22,6 +22,9 @@ const port = Number(arg('port', '5194'));
 // --late: after the route the fox idles in the painted meadow (birds come back); the Keeping is released with its
 // dev hook at 85 s (disclosed staging; use --seconds 130). The homecoming needs every creature walked home first.
 const late = process.argv.includes('--late');
+// --route-module path: any module exporting { createSliceRoute, SLICE_START } (default: the opening slice)
+const routeModule = arg('route-module', './opening-hero-route.mjs');
+const { createSliceRoute, SLICE_START } = await import(routeModule.startsWith('.') && !routeModule.startsWith('./tools') ? routeModule : path.resolve(routeModule));
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port, host: '127.0.0.1', strictPort: true, hmr: false }, logLevel: 'error' });
 await server.listen();
