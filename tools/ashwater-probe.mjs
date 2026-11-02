@@ -11,6 +11,8 @@ import { execFileSync } from 'node:child_process';
 const args = process.argv.slice(2);
 const out = path.resolve(args[0] && !args[0].startsWith('--') ? args[0] : '/tmp/ashwater-probe');
 const frames = args.includes('--frames');
+/** --clip: a continuous 10 fps capture (a still every 6 sim frames) → clip.mp4 */
+const clip = args.includes('--clip');
 fs.mkdirSync(out, { recursive: true });
 const port = 5201;
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
@@ -31,14 +33,21 @@ const shot = async (name) => {
   log.push([name, await state()]);
 };
 /** steer (world stick) toward local (lx, lz); optional jump (held = glide) / dash; returns when within reach */
+let ci = 0;
 const go = async (lx, lz, o = {}) => {
-  const r = await page.evaluate(([x, z, o]) => {
+  o.n0 = 0;
+  let r = 0;
+  for (;;) {
+    const chunk = clip ? 6 : 1e9;
+    const res = await page.evaluate(([x, z, o, chunk]) => {
     const h = window.__gameHooks;
-    let n = 0;
-    for (; n < (o.max ?? 900); n++) {
+    let n = o.n0;
+    const end = Math.min(o.max ?? 900, n + chunk);
+    let arrived = false;
+    for (; n < end; n++) {
       const s = h.state();
       const dx = x - s.pos[0], dz = z - s.pos[2], d = Math.hypot(dx, dz);
-      if (d < (o.reach ?? 0.35) && (!o.land || s.grounded)) break;
+      if (d < (o.reach ?? 0.35) && (!o.land || s.grounded)) { arrived = true; break; }
       const k = Math.min(1, d / 0.8) * (o.speed ?? 1);
       h.setStick(d > 0.05 ? (dx / d) * k : 0, d > 0.05 ? (dz / d) * k : 0);
       const keys = [];
@@ -49,16 +58,33 @@ const go = async (lx, lz, o = {}) => {
       h.setKeys(keys);
       h.advance(1, 1 / 60, false);
     }
-    h.setKeys([]);
-    return n;
-  }, [O.x + lx, O.z + lz, o]);
+    if (arrived || n >= (o.max ?? 900)) h.setKeys([]);
+    return { n, done: arrived || n >= (o.max ?? 900), jumped: o.jumped ?? null };
+  }, [O.x + lx, O.z + lz, o, chunk]);
+    o.n0 = res.n;
+    if (res.jumped !== null) o.jumped = res.jumped;
+    r = res.n;
+    if (clip) {
+      await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
+      await page.screenshot({ path: path.join(out, `c${String(ci++).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 78 });
+    }
+    if (res.done) break;
+  }
   if (frames) {
     await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
     await page.screenshot({ path: path.join(out, `f${String(fi++).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 80 });
   }
   return r;
 };
-const settle = (n) => page.evaluate((n) => { const h = window.__gameHooks; h.setStick(0, 0); h.setKeys([]); h.advance(n, 1 / 60, false); }, n);
+const settle = async (n) => {
+  for (let k = 0; k < n; k += clip ? 6 : n) {
+    await page.evaluate((m) => { const h = window.__gameHooks; h.setStick(0, 0); h.setKeys([]); h.advance(m, 1 / 60, false); }, clip ? Math.min(6, n - k) : n);
+    if (clip) {
+      await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
+      await page.screenshot({ path: path.join(out, `c${String(ci++).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 78 });
+    }
+  }
+};
 try {
   await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
@@ -145,6 +171,7 @@ try {
 } finally {
   const last = log.length ? log[log.length - 1][1] : null;
   fs.writeFileSync(path.join(out, 'log.json'), JSON.stringify({ log, errors, linger, pass: !!last && last.ash.done.length === 3 && !!linger && linger.splashesAfter > linger.splashesBefore && (last.ash.secrets & 3) === 3 }, null, 1));
+  if (clip && ci > 0) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '10', '-i', path.join(out, 'c%05d.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'clip.mp4')]);
   if (frames && fi > 0) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '6', '-i', path.join(out, 'f%04d.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'route.mp4')]);
   console.log(JSON.stringify({ errors, last }, null, 1));
   await browser.close();
