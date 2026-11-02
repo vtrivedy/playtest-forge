@@ -494,6 +494,26 @@ A clear destination is not a clear connecting segment. Full staged finale route 
 - Paint restores each need a shader slot (`RESTORE_SLOTS`, now 24; `uRestore` loop breaks at the count).
   With page (4) + Keeping (3) + homecoming + ruin + finale (2) + Millbrook/Hermitage (5) the old 16 was
   exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.
+- Input-route verification of the new places: `node tools/millbrook-walk.mjs --route millbrook|hermitage|grand
+  [--from lane|mill|kiln] --every N --size WxH` (stick/Shift/Space only; teleport at start). It records beats,
+  stuck spans (no progress >3 s), final `__game` state and fox legibility from `__gameHooks.foxScreenPx()`
+  (the one shared definition). Scripted routes steering straight into a concave corner (porch post + wall)
+  pin forever — waypoint round it rather than reshaping the world. Acceptance on main 671a290: 0 stuck,
+  all states true, fox ≥36 px @360p. Evidence `/captures/bramble/grand-671a290/`.
+- Waypoints inside a collider's footprint look like "stuck" in the log; check the target against box/post
+  colliders first (the mill box swallowed a "round the mill" waypoint; the lookout plateau rim is >1.3 m/m).
+- Render clips from a pinned `git worktree` (with node_modules symlinked) so /work stays editable — editing
+  src under a running Vite probe reloads it (HMR) and invalidates the run.
+- Controller slide (moveTo glides round posts/corners) must only act while the player steers at walk/run pace: authored routes and puzzles rely on momentum (dash, post-dash skid, coasting) stopping dead at a blocker — the pop-up ruin folds broke when a post-dash skid slid round the fold (Fern, b24bf90 → fixed). `PLAY.slide` toggles it for A/B; `node tools/page-motion-probe.mjs --out DIR` (sim-only, ~2 min) is the full-slice regression: 3 catches, kept, home.
+
+## Paint edges (Ember, swarm4)
+
+- Restores were hard islands: `edgeMax` ~1.2 m on most beats gives a shader edge of ~0.2 m plus a dark tide line.
+  Now each settled restore bleeds a paler feathered halo outward over ~40 s (`uRestoreBleed[i]`, set in scene.ts
+  next to `uRestore`; ground only). Keep per-slot shader work to one value noise: the loop runs for up to 24 slots
+  per fragment on every painted material.
+- Things that must read in colour inside sepia (falling lane leaves) need plain MeshToonMaterial; the paint patch
+  turns them to paper and they vanish (first lane-wind try).
 - Controller slide (moveTo glides round round posts only — trunks, pillars — never boxes) must only act while the player steers at walk/run pace into the post. Scripted routes are chaotic: a 2 cm nudge against a fold at 951 frames flipped a later 180° turn's side and walked the fox off a page (30 Hz). Restricting the slide to posts makes the full slice trace bit-identical to slide-off (`PLAY.slide=false`) at 30 Hz. Earlier: authored routes and puzzles rely on momentum (dash, post-dash skid, coasting) stopping dead at a blocker — the pop-up ruin folds broke when a post-dash skid slid round the fold (Fern, b24bf90 → fixed). `PLAY.slide` toggles it for A/B; `node tools/page-motion-probe.mjs --out DIR` (sim-only, ~2 min) is the full-slice regression: 3 catches, kept, home.
 
 ## Camera recovery, clearance and fold visibility — Fern

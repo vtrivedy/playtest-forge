@@ -29,11 +29,13 @@ import { createOpeningAudio, MIX, type OpeningAudio } from './audio';
 import { createFoxFoley } from './foley';
 import { buildRunawayPage } from './page.hot';
 import { buildHomecoming } from './homecoming';
+import { createLaneWind } from './laneWind.hot';
 import { buildLeafPiles } from './leafPiles';
 import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
 import { buildMillbrook } from './millbrook';
 import { buildDressing } from './dressing';
+import { unfadedBlockers } from './blockers';
 import { buildHermitage } from './hermitage';
 import { createDryingLines } from './hermitage.hot';
 import { createMillrace } from './millrace.hot';
@@ -149,6 +151,7 @@ export async function runOpening(): Promise<void> {
   const runaway = buildRunawayPage(ctx);
   const homecoming = buildHomecoming(ctx, runaway, unpressed);
   const leafPiles = buildLeafPiles(ctx);
+  const laneWind = createLaneWind(ctx);
 
   const contact = buildContactShadow();
   contact.position.set(0, 0.03, -0.15);
@@ -157,6 +160,10 @@ export async function runOpening(): Promise<void> {
 
   const paint = createOpeningPaint({ field, renderer, uniforms: paintU, groundH });
   const occlusion = createOpeningOcclusion([...ctx.occluders, ...ctx.cutout]);
+  {
+    const unfaded = unfadedBlockers(ctx.colliders, [...ctx.occluders, ...ctx.cutout], groundH);
+    if (unfaded.length) console.error(`unfaded blocker:\n${unfaded.join('\n')}`);
+  }
   const hearth = createOpeningHearth({
     scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p),
     onIgnite: (at) => field.restore(at, 12, 1.8, { edgeMax: 1.4 }),
@@ -251,6 +258,11 @@ export async function runOpening(): Promise<void> {
     }
     paintU.uRestoreCount.value = Math.min(RESTORE_SLOTS, field.restores.length);
     field.restores.slice(0, RESTORE_SLOTS).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
+    // after a wash settles its colour keeps seeping outward for ~40 s (up to 0.8 of its radius, ≤ 16 m)
+    for (let i = 0; i < paintU.uRestoreCount.value; i++) {
+      const r = field.restores[i]!;
+      paintU.uRestoreBleed.value[i] = Math.min(16, r.targetRadius * 0.8) * THREE.MathUtils.smoothstep(r.age, r.durationS * 0.5, r.durationS + 40);
+    }
   }
 
   let time = 0;
@@ -303,7 +315,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state() } });
   const pxA = new THREE.Vector3();
   const pxB = new THREE.Vector3();
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock

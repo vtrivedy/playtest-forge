@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { buildMaple, buildRock, hewn, jitter, mapleLeafGeometry, toon, type TreeKind } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import type { OpeningCtx } from './scene';
-import { pathDist } from './layout';
+import { pathDist, rimK } from './layout';
 import { bakeCells, bakeStatic } from './bake';
 import { archSlab, box, C, cyl, gable, Kit } from './village';
 import { HERMITAGE, NORTH_LANE, northE } from './hermitageLayout';
@@ -65,6 +65,8 @@ export function buildHermitage(ctx: OpeningCtx) {
     const z = 100 + rand() * 50;
     const e = northE(x, z);
     if (e < 2 || e > 12) continue;
+    // never down in the village: only on slopes outside the bowl too
+    if (rimK(x, z) < 1.08) continue;
     // keep the plateau's view south over the village open
     if (z < HERMITAGE.plateau.z - 3 && z > 108 && Math.abs(x - HERMITAGE.plateau.x) < 18 && Math.abs(x - HERMITAGE.plateau.x) > 0) {
       if (Math.abs(x - HERMITAGE.plateau.x) < 14 || z > 118) continue;
