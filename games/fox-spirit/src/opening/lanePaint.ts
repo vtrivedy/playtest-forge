@@ -54,10 +54,11 @@ export const LANE_BAND = /* glsl */ `
       // the verge's edge bites in and out like a loaded brush dragged along the road
       float ld = lt.r - uLaneWidth + rag * 0.32 + (lkNoise(xz * 0.9 + 5.3) - 0.5) * 0.7;
       float above = vLkWorld.y - lt.g;
-      // ground, kerbs and steps take the wash up to ~2 m; walls only a splash at their foot
+      // the wash lies on the ground (verge grass, kerbs, flagstones): props standing on a lane — the cold hearth, the
+      // well — keep their sepia until the fox brings colour to them; walls get only a splash at their foot
       float laneUp = abs(normalize(cross(dFdx(vLkWorld), dFdy(vLkWorld))).y);
-      float top = mix(0.35, 1.8, smoothstep(0.4, 0.8, laneUp));
-      float low = 1.0 - smoothstep(top, top + 0.6, above + (lkNoise(xz * 1.7) - 0.5) * 0.5);
+      float top = mix(0.3, 0.6, smoothstep(0.4, 0.8, laneUp));
+      float low = 1.0 - smoothstep(top, top + 0.35, above + (lkNoise(xz * 1.7) - 0.5) * 0.3);
       lane = (1.0 - smoothstep(-0.25, 0.25, ld)) * low;
       laneEdge = exp(-pow((ld + 0.18) / 0.14, 2.0)) * low;
       // restores run along the lane: a stream wide where it leaves the restore, the band's width at its far end
