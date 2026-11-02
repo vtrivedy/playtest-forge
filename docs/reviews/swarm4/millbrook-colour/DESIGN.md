@@ -1,0 +1,3 @@
+# Millbrook colour payoff check
+
+Kit reported that the village-to-Millbrook walk stays sepia. Before changing the restoration design, isolate the authored payoff: a real dash through the leaf dam, water reaching the wheel, and the existing permanent 26 m wash. Keep a fixed view of the mill for before/after comparison, then return to the chase camera. Save the exact source SHA, input steps, errors, full window.__game and restore radii at each observation. A staged start proves this local beat only. If the mill remains sepia after `painted`, fix the rendering cause; if it paints, report the distinction between the village arrival and the mill release rather than widening the wash without evidence.

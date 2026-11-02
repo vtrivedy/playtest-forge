@@ -4,7 +4,7 @@
 // Fixed 1/60 sim; renders a chase-cam jpg every `every` sim frames, encodes clip.mp4 at 60/every fps.
 // Writes route.json (beats, timings, stuck spans, final __game state) before encoding.
 import { chromium } from 'playwright';
-import { createServer } from 'vite';
+import { createServer, preview } from 'vite';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,6 +14,7 @@ const arg = (k, d) => {
   return i > 0 ? process.argv[i + 1] : d;
 };
 const out = path.resolve(arg('out', '/tmp/millbrook-walk'));
+const production = process.argv.includes('--production');
 const every = Number(arg('every', '4'));
 const [W, H] = arg('size', '960x540').split('x').map(Number);
 const from = arg('from', 'village');
@@ -26,7 +27,7 @@ const MILLBROOK_ROUTE = [
   ['wake', null, { hold: 1.5 }],
   ['plaza west', [-12.5, 89.4]],
   ['cottage lane', [-18.7, 87.4]],
-  ['between the yards', [-24.0, 88.3]],
+  ['cottage path bend', [-24, 88.3]],
   ['west cottages', [-29.2, 87.6]],
   ['last cottage', [-35.5, 89.2]],
   ['into the lane', [-46, 90.4]],
@@ -93,20 +94,22 @@ const which = arg('route', 'millbrook');
 const ROUTE = which === 'hermitage' ? HERMITAGE_ROUTE : which === 'grand' ? [...HERMITAGE_ROUTE, ['back past the cottage', [-5.6, 102.6]], ['north lane foot', [-5.2, 99.4]], ['by the well lane', [-6.0, 92.5]], ...MILLBROOK_ROUTE.slice(1)] : MILLBROOK_ROUTE;
 const START = {
   village: { at: [-5.2, 92.5, Math.atan2(2.2, -11.5)], beat: 0 },
-  lane: { at: [-36, 89, -1.4], beat: 6 },
-  mill: { at: [-69.5, 87.6, -0.4], beat: 10 },
-  kiln: { at: [-66.4, 97.4, 0], beat: 19 },
+  lane: { at: [-36, 89, -1.4], beat: ROUTE.findIndex(b => b[0] === 'into the lane') },
+  mill: { at: [-69.5, 87.6, -0.4], beat: ROUTE.findIndex(b => b[0] === 'mill door') },
+  kiln: { at: [-66.4, 97.4, 0], beat: ROUTE.findIndex(b => b[0] === 'onto the kiln') },
 }[from];
 
-const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5195, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
-await server.listen();
+const server = production
+  ? await preview({ configFile: 'games/fox-spirit/vite.config.ts', preview: { port: 5195, host: '127.0.0.1', strictPort: true }, logLevel: 'error' })
+  : await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5195, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
+if (!production) await server.listen();
 const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
 const page = await (await browser.newContext({ viewport: { width: W, height: H } })).newPage();
 page.setDefaultTimeout(600000);
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
-const log = { route: from, every, beats: [], stuck: [], errors };
+const log = { sha: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), runtime: production ? 'vite-production-preview' : 'vite-dev', complete: false, route: which, from, every, beats: [], stuck: [], errors };
 try {
   await page.goto('http://127.0.0.1:5195/', { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
@@ -197,7 +200,9 @@ try {
     if (advanceBeat) {
       if (stuckFrom >= 0) log.stuck.push({ beat: name, from: stuckFrom, to: t });
       stuckFrom = -1;
-      log.beats.push({ beat: name, t: Math.round(t * 100) / 100, pos: r.pos.map((v) => Math.round(v * 100) / 100), shot });
+      log.beats.push({ beat: name, t: Math.round(t * 100) / 100, pos: r.pos.map((v) => Math.round(v * 100) / 100), shot, arrived: Boolean(r.arrived || (!to && !o.lift && !r.wait)) });
+      fs.writeFileSync(path.join(out, 'route.tmp'), JSON.stringify(log, null, 1));
+      fs.renameSync(path.join(out, 'route.tmp'), path.join(out, 'route.json'));
       console.log(name, t.toFixed(1), JSON.stringify(r.pos.map((v) => Math.round(v * 10) / 10)), `${((Date.now() - t0) / 1000).toFixed(0)}s wall`);
       beat++;
       held = 0;
@@ -208,12 +213,16 @@ try {
     const s = window.__gameHooks.state();
     return { pos: s.pos, millrace: s.opening.millrace, millWeir: s.opening.millWeir, hermitage: s.opening.hermitage, restores: s.opening.restores };
   });
+  log.complete = beat === ROUTE.length;
   log.simSeconds = frame / 60;
+  log.checks = { complete: log.complete, allArrived: log.beats.every(b => b.arrived), finite: log.final.pos.every(Number.isFinite), noErrors: errors.length === 0 };
+  if (Object.values(log.checks).some(v => !v)) process.exitCode = 1;
   fs.writeFileSync(path.join(out, 'route.json'), JSON.stringify(log, null, 1));
   console.log('final', JSON.stringify(log.final), 'stuck', JSON.stringify(log.stuck), 'errors', errors.length);
 } finally {
   await browser.close();
-  await server.close();
+  if (production) await new Promise(resolve => server.httpServer.close(resolve));
+  else await server.close();
 }
 const ffmpeg = execFileSync('python3', ['-c', 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
 execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-framerate', String(60 / every), '-i', path.join(frames, 'f%05d.jpg'), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', path.join(out, 'clip.mp4')]);

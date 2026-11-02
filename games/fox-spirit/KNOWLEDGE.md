@@ -365,6 +365,55 @@ reviewed for Summer Night, Hello?, Pine Grove, Beach Buds and full Hush. Python
 compile passed. This is a programmatic/visual audio critique, not a real-time
 listening claim or whole-game playtest. No runtime/mute changes in this slice.
 
+## Ruin camera clearance — Fern, swarm4
+
+- Seed `f866379` already contains `f3ddb6f`'s lens recovery; do not repeat the
+  original head-penetration fix. Its remaining review request is pounce margin.
+- On `f866379`, the current 30Hz 90s input route succeeds: three catches, zero
+  skips, page pinned home, no errors. Late minimum chest distance 2.013m,
+  maximum pitch24.66°, maximum lens speed19.00m/s. Evidence:
+  `/captures/fern/baseline/evidence.json`. Final jump .750m apex/.300s to apex/
+  .633s air; four dashes, last dash2.132m. This is scripted play, not human fun.
+- Reproduce the failed-catch geometry intentionally with
+  `tools/camera-drop-probe.mjs --miss-overlook`: it omits jump while walking
+  toward the overlook, then permits genuine pounce retries. No page state is
+  forced. At1.2m, the late camera gate passes (1.233m/59.10°/10.80m/s), but the
+  view is tight. `/captures/fern/miss-12/drop.webm` retains64–68s at15fps, plus
+  all60 source frames; inspect complete pounces, not only timed stills.
+- `78ab7db` extracts the existing candidate search to `cameraEnvelope.hot.ts`.
+  Its workspace and helper closures are constructed once; the hot update reuses
+  them. `cameraCollider.hot.ts` removes the controller's per-sphere `.some` /
+  `.map` temporary arrays, while preserving its nine footprint samples.
+- `CameraEnvelope.tla` models only the discrete publication pipeline: floor
+  adjustment precedes the follow-envelope check; authored shots bypass it.
+  TLC checks9states. Removing the envelope call/guard violates FollowChecked
+  in5states. It does not prove the geometric search finds a clear pose, nor
+  silhouette, world visibility, continuity, or pitch. Recheck via
+  `.claude/skills/camera-envelope-check/SKILL.md`.
+- Long capture sessions can terminate before final JSON is written. Keep
+  periodically replaced `checkpoint.json` marked `complete:false`; require a
+  final evidence file and clean DONE for a completion claim. `--sparse-stills`
+  skips unrelated early images while keeping every simulation step and trace.
+- The envelope's supplied scenery callback still uses Three.js raycasts, whose
+  library internals allocate hit records. The extraction removes project-side
+  temporary candidate closures and collider query arrays; it is not a claim of
+  a completely allocation-free renderer or camera stack.
+- Final runtime `4ef7d74` chooses1.5m minimum body clearance; normal2.45m boom
+  remains. Complete90s30Hz success and missed-jump replays both pass. Late failure
+  range1.559m/pitch48.77°/speed10.75m/s versus1.2m's1.233m/59.10°/10.80m/s.
+  All60 failure and90 success clip frames retain2% viewport margin for projected
+  skinned geometry; complete source frames reviewed for flame tips and walls.
+  Final success3catches/0skips/page pinned. Evidence:
+  `/captures/fern/final-{success,miss}-4ef7d74/`; full scoped review and reproduce
+  commands in `docs/reviews/swarm4/fern-camera-4ef7d74.md`.
+- The hot AST gate must accept unknown external scalar callbacks without crashing:
+  guard an absent function node before calling TypeScript's `isIdentifier`.
+  Positive external-query fixture plus existing negative allocation fixtures cover
+  this bug class. Cross-module callback bodies and library internals remain outside
+  this local call-graph check.
+## Free camera release continuity — Fern, swarm4
+
+A clear destination is not a clear connecting segment. Full staged finale route on c330e89 exposed lens release steps1.024m leaving the crag and2.444m on return to meadow. Checking only blocked candidate motion leaves the free-pose early return unconstrained; limiting direct release but falling back to the destination when the intermediate segment is blocked is also wrong. cff7a25 keeps the escape search active until swept gradual release is safe, with12m/s release bound selected over16m/s. Full affected route and ruin success/intentional miss pass (integration2afb162); see docs/reviews/swarm4/fern-finale-cff7a25.md. Regression checks now run under lint:feel at30/60/120Hz and fail against the previous solver. The nine-state CameraEnvelope model verifies ordering only, not this continuous geometry. Emergency relocation can still exceed the release bound when no continuous safe pose is available.
 ## World expansion and render budget (Bramble, swarm4)
 
 - The playable world is a union of shapes, not one ellipse: `groundH` = lerp(bowl base, `westBase`, `westK(x)`)
@@ -420,6 +469,15 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
 - Hot-gate gap (fixed upstream request): roots were only `update/tick/frame/process` names — a `*.hot.ts` entry named `stepX` was never scanned. Name hot entries `update*` (or make every export a root).
 - This sandbox is 1 CPU: local SwiftShader continuous clips run ~0.5–1.8 fps at 640×360; run one probe at a time.
 - New builders draw from their own `rng(seed)`, never `ctx.rand`: each draw from the shared stream shifts every later builder's layout and the runtime stream replays depend on. The Crown's finale river (1800 draws) did exactly that until 1a28d58; Bramble's `tools/rand-fingerprint.mjs` (next ctx.rand values after boot) proves a change is stream-neutral.
+
+## Expanded-region camera and foreground sprites — Fern
+
+- A distance/pitch camera gate can pass while an animated tail leaves the viewport. Millbrook's27–29s wheel turn at1.5m failed6/30 skinned-body frames (maxNDCy1.233).1.8m and2.0m pass30/30; b24abc5 keeps1.8m with the larger hero. This supersedes the earlier ruin-only1.5m default, not its historical evidence. Project the full animated body and inspect actual pixels; shader flames, occlusion and UI are outside mesh-bounds checks.
+-60e4a2c's full70s west route completes without debug restores or timeout skips: mill turning/painted,kiln lit/rode,Weir reached,bank-height bridge crossed,lookout painted.510/510 continuous body frames pass; all reviewed. Route module has precise bridge waypoints and an explicit completion beat; the runner's --expect-beat fails unfinished paths. Bramble42af413 fixes the genuine0.56m bridge-entry step that aligning the bot revealed.
+- A framed body can still be veiled by particles.8292211 caps shared updraft ember/leaf billboards at12/24px and fades both near the lens. No lift/heat/collider change. The actual-shader GPU probe measures pixels at known depths and proves the old shader fails4/6cases; farther-visible checks prevent a broken blank shader passing. d0a3ee3 full route+120-frame in-game hold/rise retest passes and remains readable with bloom. Workflow: .claude/skills/updraft-sprite-visibility/SKILL.md.
+- Final integrated7ea02f2 original90s success:3catches0skips,page pinnedhome,0JS/console errors; all7 staged finale legs and45 handoff frames pass. Review docs/reviews/swarm4/fern-millbrook-final.md names exact per-run scope. Body clearance/appearance proof is not a whole-game gait or unfamiliar-player discovery verdict. Source stays fixed during captures; tools now start ?manual=1 and retain console shader errors too.
+## World build determinism and restore capacity
+
 - Shared build rand: every opening builder draws from one `ctx.rand` (rng 11). A new region that consumes
   it, or a new `continue` before a rand call in an old loop, re-lays-out every later builder (and can break
   other teams' recorded tapes). New regions get their own seed (`{ ...ctx, rand: rng(N) }`); check with

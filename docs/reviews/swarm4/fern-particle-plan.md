@@ -1,0 +1,5 @@
+# Near-camera updraft sprite visibility
+
+The Millbrook60e4a2c continuous camera capture shows large additive ember discs and leaves between the lens and fox during30–34s kiln hold. The camera keeps the full skinned body inside the viewport, but foreground glow repeatedly veils the face. Source shader uses fixed uScale640 and unbounded perspective point size; its near fade applies to leaves only. Example source frames are in /captures/fern/millbrook-final-motion/all-frames-2.png.
+
+After the pinned capture completes, cap point size and fade both sprite types before they fill the lens. Compare modest ember/leaf caps (12/24pixels initially) and retain a readable distant rising column. Change shader appearance only; no heat, lift, timing, geometry or collider changes. Coordinate chem/updraft.ts ownership with Bramble. Validate actual shader rendering at controlled lens depths, then replay the kiln hold→rise segment with continuous frames and __game. Inspect fox visibility and continued readability of the warm-air column. Keep source fixed during captures; disclose offline timing.

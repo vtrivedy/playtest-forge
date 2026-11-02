@@ -420,14 +420,13 @@ function createShared(): HearthShared {
         // a cold column shows nothing; heat thins the stream rather than dimming it all evenly
         float alive = step(seed.y * 0.85, uHeat);
         vA = fade * alive * min(1.0, uHeat * 1.4);
-        // Lifted leaves must dissolve before a foreground sprite covers the fox.
-        // Keep distant column leaves and additive embers at their authored weight.
-        vA *= mix(1.0, smoothstep(0.8, 2.0, -mv.z), leaf);
+        // Foreground billboards must not veil the fox; the distant column keeps its weight.
+        vA *= smoothstep(0.8, 2.6, -mv.z);
         vLeaf = leaf;
         vHot = 1.0 - ph;
         vSpin = seed.z * 6.2832 + uTime * (1.5 + seed.y * 2.0);
         float size = leaf > 0.5 ? mix(0.22, 0.38, seed.x) : mix(0.08, 0.18, seed.x) * (1.3 - ph * 0.5) * uEmberSize;
-        gl_PointSize = size * uScale / max(0.5, -mv.z);
+        gl_PointSize = min(size * uScale / max(0.5, -mv.z), mix(12.0, 24.0, leaf));
       }`,
     fragmentShader: /* glsl */ `
       varying float vA;
