@@ -13,11 +13,14 @@ import { execFileSync } from 'node:child_process';
 const args = process.argv.slice(2);
 const out = path.resolve(args[0] && !args[0].startsWith('--') ? args[0] : '/tmp/finale-route');
 const clip = args.includes('--clip');
+// --every N: one clip frame per N sim steps at 60 Hz (2 → 30 fps, 4 → 15 fps)
+const every = Number(args[args.indexOf('--every') + 1]) || 2;
+const size = args.includes('--small') ? { width: 640, height: 360 } : { width: 960, height: 540 };
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5197, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
 await server.listen();
 const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
-const page = await (await browser.newContext({ viewport: { width: 960, height: 540 } })).newPage();
+const page = await (await browser.newContext({ viewport: size })).newPage();
 page.setDefaultTimeout(600000);
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
@@ -84,9 +87,9 @@ try {
       frame += 2;
       const s = r.s;
       trace.push([frame, li, s.pos.map((v) => +v.toFixed(3)), s.grounded, s.gliding, s.opening.carry.carried, s.opening.finale.phase, s.opening.finale.card]);
-      if (clip) {
+      if (clip && frame % every === 0) {
         await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
-        await page.screenshot({ path: path.join(out, `f${String(frame / 2).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 80 });
+        await page.screenshot({ path: path.join(out, `f${String(frame / every).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 80 });
       }
       done = leg.until({ ...s, grounded: s.grounded }, r.d);
     }
@@ -98,7 +101,7 @@ try {
   if (clip) {
     const ff = await import('imageio-ffmpeg').catch(() => null);
     const bin = ff?.get_ffmpeg_exe?.() ?? 'ffmpeg';
-    execFileSync(bin, ['-y', '-v', 'error', '-framerate', '30', '-pattern_type', 'glob', '-i', path.join(out, 'f*.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'route.mp4')]);
+    execFileSync(bin, ['-y', '-v', 'error', '-framerate', String(60 / every), '-pattern_type', 'glob', '-i', path.join(out, 'f*.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'route.mp4')]);
   }
 } catch (e) {
   errors.push(String(e?.stack ?? e));
