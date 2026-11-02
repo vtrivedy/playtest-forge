@@ -1,20 +1,30 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
+const out=process.env.OUT || '/tmp/hazel-map-preview';
+const baseURL=process.env.BASE_URL || 'http://127.0.0.1:5180';
 const browser = await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-webgl']});
 const page = await browser.newPage({viewport:{width:1280,height:720}});
 // Explicit component fixture, never an integrated puzzle or portal acceptance run.
 const errors=[]; page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://127.0.0.1:5180/?manual');
+await page.goto(`${baseURL}/?manual`);
 await page.waitForFunction(()=>window.__gameHooks?.ready,{timeout:120000});
 await page.evaluate(()=>{window.__gameHooks.setStick(.6,0);window.__gameHooks.advance(60);window.__gameHooks.setStick(0,0);window.__gameHooks.advance(10)});
 const nativeMap=await page.evaluate(()=>typeof window.__game.state().opening.worlds?.mapOpen==='boolean');
 if(nativeMap){
  await page.keyboard.press('Tab');
  if(!await page.evaluate(()=>window.__game.state().opening.worlds.mapOpen))throw Error('native Album did not open');
+ await page.keyboard.press('BracketRight');
+ await page.evaluate(()=>window.__gameHooks.advance(1));
+ await fs.mkdir(out,{recursive:true});
+ await page.screenshot({path:`${out}/native-story-1280.png`});
+ await page.keyboard.press('BracketLeft');
  await page.keyboard.press('Tab');
  if(await page.evaluate(()=>window.__game.state().opening.worlds.mapOpen))throw Error('native Album did not close');
 }
 await page.evaluate(async()=>{
+ window.__albumText=[];
+ const originalFillText=CanvasRenderingContext2D.prototype.fillText;
+ CanvasRenderingContext2D.prototype.fillText=function(value,...args){window.__albumText.push(String(value));return originalFillText.call(this,value,...args)};
  const {createWorldProgress}=await import('/src/worlds/progress.ts');
  const {createPageMap}=await import('/src/worlds/pageMap.ts');
  const p=createWorldProgress();
@@ -25,18 +35,48 @@ await page.evaluate(async()=>{
  window.__mapPreview={progress:p,keyTarget,map:createPageMap(window.__opening.camera,p,keyTarget)};
  window.__mapPreview.map.setOpen(true); window.__gameHooks.advance(1);
 });
-await fs.mkdir('/tmp/hazel-map-preview',{recursive:true});
-await page.screenshot({path:'/tmp/hazel-map-preview/album-1280.png'});
+await fs.mkdir(out,{recursive:true});
+await page.screenshot({path:`${out}/album-1280.png`});
 await page.setViewportSize({width:960,height:540});
 await page.waitForTimeout(250);
 await page.evaluate(()=>{window.__mapPreview.map.step();window.__gameHooks.advance(2)});
 await page.waitForTimeout(100);
-await page.screenshot({path:'/tmp/hazel-map-preview/album-960.png'});
+await page.screenshot({path:`${out}/album-960.png`});
+const storyChecks=[];
+for(const world of ['russetvale','ashwater','press']){
+ await page.evaluate(()=>{window.__albumText=[]});
+ await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'BracketRight'})));
+ await page.evaluate(()=>window.__gameHooks.advance(1));
+ await page.screenshot({path:`${out}/story-${world}-960.png`});
+ const visibleText=await page.evaluate(()=>window.__albumText);
+ const missing=visibleText.filter(t=>t==='A page still missing').length;
+ const expectedMissing={russetvale:3,ashwater:1,press:0}[world];
+ const spoiler=world==='ashwater'&&visibleText.includes('The Scribe pressed the rain first');
+ storyChecks.push({world,missing,expectedMissing,spoiler,visibleText});
+ if(missing!==expectedMissing||spoiler)throw Error(`story reveal invariant failed: ${world}`);
+}
+await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'BracketRight'})));
+await page.evaluate(()=>window.__gameHooks.advance(1));
+await page.screenshot({path:`${out}/map-return-960.png`});
+
 await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
 const closed=await page.evaluate(()=>{window.__gameHooks.advance(1);return !window.__mapPreview.map.isOpen()});
-await page.screenshot({path:'/tmp/hazel-map-preview/closed-badge-960.png'});
+await page.screenshot({path:`${out}/closed-badge-960.png`});
 await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
 const open=await page.evaluate(()=>window.__mapPreview.map.isOpen());
+await page.evaluate(()=>{
+ window.__mapPreview.map.setOpen(false);
+ window.__mapPreview.progress.complete('russetvale','teach');
+ window.__mapPreview.progress.complete('russetvale','develop');
+ window.__mapPreview.progress.complete('russetvale','combine');
+ window.__mapPreview.map.step();window.__gameHooks.advance(1);
+});
+await page.screenshot({path:`${out}/returned-page-960.png`});
+await page.evaluate(()=>{
+ window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'}));
+ window.__gameHooks.advance(1);
+});
+await page.screenshot({path:`${out}/returned-story-960.png`});
 await page.evaluate(async()=>{
  const {buildSeedwells}=await import('/src/worlds/seedwells.ts');
  const THREE=await import('/@fs/work/node_modules/.vite/deps/three.js');
@@ -50,7 +90,8 @@ await page.evaluate(async()=>{
  const camera=new THREE.PerspectiveCamera(44,960/540,.1,100);camera.position.set(4,4,11);camera.lookAt(0,1,0);camera.updateMatrixWorld(true);
  const post=createPostStack(renderer,scene,camera,{bloomStrength:.2,pixelRatio:1});post.setSize(960,540);post.render();
 });
-await page.screenshot({path:'/tmp/hazel-map-preview/seedwells-960.png'});
-await fs.writeFile('/tmp/hazel-map-preview/state.json',JSON.stringify(await page.evaluate(()=>({game:window.__game.state(),progress:window.__mapPreview.progress.snapshot()})),null,2));
+await page.screenshot({path:`${out}/seedwells-960.png`});
+await fs.writeFile(`${out}/state.json`,JSON.stringify(await page.evaluate(()=>({game:window.__game.state(),progress:window.__mapPreview.progress.snapshot()})),null,2));
+await fs.writeFile(`${out}/story-checks.json`,JSON.stringify(storyChecks,null,2));
 if(errors.length || !closed || !open) throw Error(JSON.stringify({errors,closed,open,nativeRealKeyboard:nativeMap}));
 console.log(JSON.stringify({errors,closed,open,nativeRealKeyboard:nativeMap})); await browser.close();

@@ -126,6 +126,8 @@ console.log('ride2 peak', s.peak);
 await shot('08-ledge');
 await page.evaluate(() => { const h = window.__gameHooks; h.setStick(0.6, 0.8); h.advance(40, 1 / 60, false); h.setStick(null); h.advance(60, 1 / 60, false); });
 await shot('09-the-press');
+await page.evaluate(() => { const h = window.__gameHooks; h.setStick(-0.7, -0.7); h.advance(25, 1 / 60, false); h.setStick(null); h.advance(240, 1 / 60, false); });
+await shot('10-scribe-lever');
 // save re-entry: a plain reload (no ?fresh) rebuilds the solved Press from the saved progress
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded', timeout: 600000 });
 await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
