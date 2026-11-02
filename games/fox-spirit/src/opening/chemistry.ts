@@ -12,6 +12,8 @@ export function createKeepingChemistry(opts: {
   updrafts: UpdraftSystem;
   steamId: string;
   rootId: string;
+  /** Saved physical completion, without replaying ignition or release callbacks. */
+  restoredAtLoad?: boolean;
   coal: () => CoalHeatSource;
   /** Reconnect a permanent walking route so warmth can be picked back up. */
   onSteam?: (at: THREE.Vector3) => void;
@@ -26,8 +28,13 @@ export function createKeepingChemistry(opts: {
   const steam = find(opts.steamId);
   const root = find(opts.rootId);
   if (steam === root) throw new Error('Steam and root-hearth must be distinct heat reactions');
-  let steamLatched = false;
-  let completed = false;
+  let steamLatched = opts.restoredAtLoad ?? false;
+  let completed = opts.restoredAtLoad ?? false;
+  if (opts.restoredAtLoad) for (const h of [steam, root]) {
+    h.reactor.restored = true;
+    h.reactor.heat = 1;
+    h.reactor.state = 'restored';
+  }
   let steamReactions = 0;
   let releases = 0;
   const target = new THREE.Vector3();

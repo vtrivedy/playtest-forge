@@ -28,11 +28,17 @@ export function createMillWeir(
   parts: { lid: THREE.Object3D; belly: THREE.Object3D; lip: THREE.Vector3; foot: THREE.Vector3 },
   kiln: Hearth,
   wheel: { turning: () => boolean; spin: () => number },
+  restoredAtLoad = false,
 ) {
   const F = MILL_WEIR;
   const R = MILLBROOK.weir;
   let pump = 0;
-  let lit = false;
+  let lit = restoredAtLoad;
+  if (restoredAtLoad) {
+    kiln.reactor.restored = true;
+    kiln.reactor.heat = 1;
+    kiln.reactor.state = 'restored';
+  }
   let reached = false;
   let rodeAt = -1;
   let supplyNow = 0;
@@ -113,6 +119,7 @@ export function createMillWeir(
   }
   ctx.onUpdate(update);
   return {
+    get lit() { return lit; },
     state() {
       return { lit, heat: Math.round(kiln.reactor.heat * 100) / 100, rode: rodeAt >= 0, reached };
     },
