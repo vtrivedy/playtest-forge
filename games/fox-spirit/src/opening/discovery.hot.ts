@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import { CANOPY, JOGS, POP_UP_RUIN } from './layout';
+import { worldAt } from './worlds';
 
 const TO_CANOPY = [[-4, 88], [-3.2, 86.5], [-3.2, 80.5], [-0.2, 74.4], [-0.2, 71.5]] as const;
 const HINTS = ['Follow the loose page', 'Shift · dash to catch it', 'Space · hold to spring from a leaf', 'Shift · dash into the folded tab', 'Space · jump across the paper', 'Let the paper unfold', 'Hold Space · land on the overlook'] as const;
@@ -103,7 +104,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
     active = false;
   }
 
-  function updateTarget(): void {
+  function updateTarget(_world: 'russetvale'): void {
     const fox = ctx.fox.root.position;
     if (seenCatches !== page.catches) {
       seenCatches = page.catches;
@@ -171,7 +172,9 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   }
 
   ctx.onUpdate((_dt, t) => {
-    updateTarget();
+    const world = worldAt(ctx.fox.root.position.x);
+    if (world !== 'russetvale') { scraps.visible = false; return; }
+    updateTarget(world);
     scraps.visible = active;
     if (!active) return;
     const fox = ctx.fox.root.position;
@@ -197,6 +200,6 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   });
   return {
     get finished() { return leg === 'done'; },
-    state: () => ({ active, leg, completionAt: leg === 'done' ? completionAt.toArray() : null, target: target.toArray(), action: ACTIONS[action], hint: HINTS[action] }),
+    state: () => ({ active, visible: scraps.visible, leg, completionAt: leg === 'done' ? completionAt.toArray() : null, target: target.toArray(), action: ACTIONS[action], hint: HINTS[action] }),
   };
 }
