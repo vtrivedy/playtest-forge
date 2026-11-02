@@ -36,10 +36,89 @@ Peer reviews identified an exhaust-like swarm of tiny scraps and confusion betwe
 
 Independent final review — Reed, 2026-11-02 18:30 UTC: first goal PASS; leaf-versus-page PASS; action words PASS. He reviewed a 2 s continuity sheet, 13–16 s at 4 fps, all 13 evidence checks and the recorded game state. Recovery and retries read clearly. He flagged a separate camera defect: an opaque canopy branch/trunk briefly crosses the lens around 14–15.25 s, nearly filling it at 15 s. This is retained in the final clip and sent to Thistle; the discovery evidence does not claim camera perfection or classify that obstruction as a GPU black frame.
 
-## Follow-up: capture cadence sensitivity
+## Integration recovery regression and correction
 
-Reed reported a separate 50 s / 4 fps run on his integrated stem-fade candidate on 2026-11-02 at 18:40 UTC: three catches and a kept page, but a missed final landing left guidance active at `jump1`. The final 15 fps proof above remains scoped to its recorded source and cadence. Reed confirmed the discovery probe, policy and guidance code matched this branch; this is not explained by stale tools. His 90 s follow-up was still pending when this note was written.
+Integrated `68a252f0` changes the recovery path enough to miss the overlook after the third catch. At 49 s, the finale then replaces the still-active discovery jump instruction with “Follow the warm light home.” The cue follower stops jumping and remains below the paper platforms through 90 s. The real landing guard correctly withholds completion. The original successful `66dac775` clip remains valid on its source; it does not prove this integrated recovery.
 
-The geometry observer projects fragments through the camera matrices. Render cadence can affect when those matrices refresh, so cadence-dependent projected perception is a plausible explanation, not yet an isolated cause. The matching rendered/simulation-only samples above cover those two recorded runs only. They do not establish cadence independence. The missed landing is a retained negative result; correctly withholding completion is the expected safety behavior. No guidance or observer change is justified by this report alone.
+Candidate `f8442a9d` adds a read-only `canTeachOnward` callback, supplied by scene as `discovery.finished`. The finale only offers onward words after real discovery completion. The controller, motes, caption handling and grounded support gate are preserved. The existing `noCompetingHearthHint` assertion now also rejects the onward line during active discovery. The recorded failed trace provides a negative control: 166 competing-hint samples, first at 49 s; the original successful clip still passes the stronger assertion.
 
-Correction at 18:42 UTC: Reed identified a development-versus-production mismatch in that comparison and started a matched production replay (`--production 1 --seconds 50 --idle 1.5 --render-every 4`) plus a production state-only gate. `render-every 4` means 15 fps at the fixed 60 Hz simulation clock; the earlier 4 fps capture used a different cadence. Static inspection also finds `scene.updateMatrixWorld(true)` in every simulation frame and `camera.updateMatrixWorld()` in every camera update, so stale camera matrices are not an established explanation. Treat build mode, source revision and capture cadence as separate variables until the matched results arrive. The successful original clip and failed development replay remain separate evidence.
+Controlled production experiments, fixed 60 Hz simulation with 1.5 s idle:
+
+| Source / controlled substitution | Result | Evidence directory under `/captures/hazel/` |
+| --- | --- | --- |
+| Current `e3f785b1` (68-equivalent), 90 s | Kept page, missed overlook, active `jump1`; inspected final screenshot shows wrong onward words | `recheck-e3f785b1-state/` |
+| Same source, only controller restored verbatim from66 | All 13 checks; grounded done44.5167 s | `recheck-current-old-controller/` |
+| Same source, current controller retained, only onward teach disabled | All 13 checks; grounded done55.95 s | `recheck-current-no-onward-teach/` |
+| Actual guarded candidate `f8442a9d`, 65 s | All 13 checks; grounded done55.95 s; inspected final still shows whole fox on overlook and appropriate onward words | `discovery-priority-f8442a9d-state/` |
+| Guarded candidate merged with keeping `ecb7d903`, tip `c0eb9d41`, 65 s | All 13 checks; same grounded done55.95 s; all283 sampled rounded positions match candidate | `discovery-priority-c0eb9d41-integrated/` |
+
+Each directory contains `evidence.json` with full state and trace. Deliberate experimental substitutions have a separate `control.json` with file hashes; they are diagnostic controls, not shipping rollbacks. Only the failed current run and actual candidate state run captured final stills (`end.png`); the other state-only controls intentionally disabled snapshots.
+
+The controller first changes the sampled recovery position at 33.5 s, but the retained current-controller experiment proves that it can recover once jump words retain priority. A physics rollback is unnecessary for this reproduced failure. Reed independently reproduced the pre-fix failure in both production and development; render cadence was an early unsupported hypothesis, and camera/scene matrices refresh each simulation tick.
+
+TypeScript, production build and feel lint (including camera envelope and world bounds) pass on the merged candidate. Discovery TLC remains112 generated/38 distinct states. These structural checks do not establish route reachability.
+
+Continuous verification is complete on two render backends:
+
+- Local production `f8442a9d`: 60 s / 4 fps, all240 frames, all13 checks, zeroJSerrors, actualgroundeddone55.95 s. `/captures/hazel/discovery-priority-f8442a9d-rendered-detached/` contains `discovery.mp4`, full `evidence.json`, `end.png`, and inspected `recovery-review.jpg` / `landing-review.jpg`. The 45/47/49/51 s sheet preserves landing words and retry jumps; the 49/53/56/59 s sheet shows the final retry and homeward words only after the landing. Whole fox silhouette and action words remain readable in these recovery frames. The known earlier canopy occlusion caveat remains separate; this candidate does not include Reed's stem patch.
+- Independent Reed T4 production `c0eb9d41`: 70 s /15fps, all1050 frames, all13 checks, zeroJSerrors, grounded done55.95 s after four ruin misses. He found zero active-discovery warm-hint samples and58 post-completion warm-hint samples, and inspected continuity plus the43–60 s retry sheet. Evidence volume `reed/discovery-priority-c0eb9d41` (same capture-directory name on Reed's workspace). His narrow source review confirms the callback is read-only and correctly gated.
+
+The first local 60 s/4fps foreground attempt was terminated after57 frames and remains under `discovery-priority-f8442a9d-rendered/` as incomplete negative capture evidence; it is not used as a successful replay. Blind-wander overlook discovery remains open.
+
+## Exact-tip blind control after recovery approval
+
+`2551ca124a8473b3d3476f6fa4be3277f9050915`, unchanged original blind policy,
+120 seconds, seed 1, corrected stuck detector: one catch, no overlook visit,
+minimum overlook distance 9.4178 m, 12 unsticks / 8.08 stuck seconds, zero JS
+errors. Full saved game state and trajectory:
+`/captures/hazel/blind-2551ca12-seed1/naive.json`. This is simulation-only evidence;
+it contains no screenshots or motion capture.
+
+The fox leaves the village and passes the canopy rather than taking its jumping
+route: position (-4.0,68.6) at10 s, (3.7,58.5) at20 s and (-16.4,57.1) at30 s.
+Eight unstick events cluster near the Millbrook edge (-67..-66,104) during60–74 s,
+outside the village test area. These coordinates identify a replay target, not
+a verified geometry cause. Sent to Thistle. This independently reproduces Kit's
+blind-control finding; it does not satisfy the unaided-overlook requirement.
+Discovery TLC recheck remains112 generated /38 distinct states, no errors.
+
+## Five-minute unchanged blind control
+
+On `bcc9747821bf94c6d70a26b8621bc9b38862da81`, seed2 with the original blind
+policy ran the full300 simulation seconds: one catch, no kept page, no overlook
+visit and no completed guidance. Minimum horizontal overlook distance was
+5.5146m;32 unsticks /24.92 stuck seconds; zeroJSerrors. It left the village and
+entered Millbrook. Full state and trajectory are saved in
+`/captures/hazel/blind-bcc97478-seed2-300/naive.json`. This is simulation-only
+evidence, with no motion-quality or visual claim.
+
+The fox passed south of the canopy at20s (-10.5,57.9), then west of the ruin
+at50s (-35.4,80.6); merely extending the run to five minutes did not recover
+the missed traversal. The blind policy deliberately ignores both rendered leaf
+guides and action words. Its failure remains a failure of the requested blind
+control, even though the separate cue follower completes the route. Do not
+silently replace that requirement with the cue-policy result or weaken the
+real-landing guard to make the score pass. No gameplay change accompanies this
+control. Discovery TLC rechecked112 generated /38 distinct states, no errors.
+
+Bounded visual replay on the same source:60 simulation seconds, one screenshot
+every2 seconds,30 frames; `/captures/hazel/blind-bcc97478-seed2-visual/`
+contains the movie, full `window.__game` in `naive.json`, and `review.jpg`.
+All120 half-second rounded trajectory samples exactly match the corresponding
+prefix of the300-second state-only run. The movie plays at4x simulation speed;
+these sparse frames support only a composition/path observation, not continuous
+motion review. The first catch and leaf invitation are visible, but the blind
+fox runs around the canopy and up the adjoining slope. Large foreground geometry
+obscures part of the fox around14–22s and again near tree trunks later. This
+source predates Reed's stem-fade fix; a combined-tip comparison is required
+before calling that an unresolved integrated defect.
+
+Combined comparison completed on immutable
+`b13dfe15800b4c3a4d9e5f2f9b6e875651432216`, which includes Reed's stem fix.
+The24-second replay has12 frames and zeroJSerrors; all48 sampled positions
+match the baseline prefix. The20s still retains the same large foreground
+obstruction and partial fox. Evidence:
+`/captures/hazel/blind-b13dfe15-seed2-occlusion/` (movie, frames, full state).
+This approach therefore remains a separate camera finding after the stem fix;
+the mesh responsible has not yet been identified. It does not invalidate the
+independently approved13–16s cue-following stem improvement.

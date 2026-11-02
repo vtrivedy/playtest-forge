@@ -444,3 +444,11 @@ its paper treads and ink fade together, as the other ruin leaves do. Keep fold
 progression, terrain and camera tuning intact. Verify the original 90-second
 miss route, inspect the final clip frames that previously hid the fox, and retain
 camera gates plus window.__game evidence.
+
+### Discovery recovery instruction priority — swarm5 follow-up
+
+A kept page does not prove the fox landed on the overlook. While discovery is
+active, its jump/landing instructions must retain priority over the onward home
+instruction. The probe must reject that competing line after a missed landing,
+including when all three catches are already recorded. Preserve the real support
+contact gate; prove recovery with the normal input-only observer and saved state.
