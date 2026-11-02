@@ -8,7 +8,7 @@
  * (allocations allowed); every per-frame step lives in press.hot.ts.
  */
 import * as THREE from 'three';
-import { RAMP_WORLD } from '../lookdevKit';
+import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressH } from './worlds';
@@ -225,6 +225,85 @@ export function buildPress(
     root.add(g);
     return g;
   });
+
+  // ---- dressing: snow caps on every top edge, page edges on the shelf face, icicles under the ridge, loose pages and
+  // ink blots on the snow (instanced; own seed — never ctx.rand)
+  const rd = rng(9127);
+  const snowCap = winter(0xf1f2f4);
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const v = new THREE.Vector3();
+  const sc = new THREE.Vector3();
+  const caps: [number, number, number, number, number][] = [];
+  for (const side of [-1, 1]) caps.push([side < 0 ? -RIDGE.xMax : RIDGE.gate + 0.35, side < 0 ? -RIDGE.gate - 0.35 : RIDGE.xMax, RIDGE.lz, ridgeTop, RIDGE.half + 0.12]);
+  caps.push([-SHELF.xMax, SHELF.xMax, SHELF.z1, SHELF_TOP, 0.5]);
+  caps.push([LEDGE.x0, LEDGE.x1, LEDGE.z1, LEDGE_TOP, 0.45]);
+  for (const [x0, x1, lz, top, d] of caps) {
+    const c = press((x0 + x1) / 2, lz);
+    const cap = new THREE.Mesh(new THREE.CapsuleGeometry(d * 0.55, x1 - x0, 3, 8).rotateZ(Math.PI / 2), snowCap);
+    cap.scale.set(1, 0.42, 1);
+    cap.position.set(c.x, top + 0.04, c.z);
+    root.add(cap);
+  }
+  // page edges: thin dark strips across the shelf and ledge faces, staggered like a sheaf seen side-on
+  const edgeGeo = new THREE.BoxGeometry(1, 0.035, 0.05);
+  const EDGES = 520;
+  const edges = new THREE.InstancedMesh(edgeGeo, winter(0x6f6656), EDGES);
+  for (let i = 0; i < EDGES; i++) {
+    const onLedge = i > EDGES * 0.85;
+    const x0 = onLedge ? LEDGE.x0 : -SHELF.xMax + 2;
+    const x1 = onLedge ? LEDGE.x1 : SHELF.xMax - 2;
+    const lx = x0 + rd() * (x1 - x0);
+    const y = onLedge ? SHELF_TOP + 0.1 + rd() * (LEDGE.rise - 0.2) : RIDGE_BASE - 0.4 + rd() * (SHELF_TOP - RIDGE_BASE + 0.2);
+    const at = press(lx, (onLedge ? LEDGE.z1 : SHELF.z1) + 0.02 + (onLedge ? 0.3 : 0.35) * rd());
+    sc.set(1.5 + rd() * 6, 1, 1);
+    m4.compose(v.set(at.x, y, at.z), q.identity(), sc);
+    edges.setMatrixAt(i, m4);
+  }
+  root.add(edges);
+  // icicles under the ridge's lintel and along its north face
+  const icicle = new THREE.ConeGeometry(0.07, 0.6, 5).rotateX(Math.PI).translate(0, -0.3, 0);
+  const ICE = 160;
+  const icicles = new THREE.InstancedMesh(icicle, new THREE.MeshStandardMaterial({ color: 0xdbe6f2, roughness: 0.15, transparent: true, opacity: 0.85 }), ICE);
+  for (let i = 0; i < ICE; i++) {
+    let lx = (rd() * 2 - 1) * 40;
+    if (Math.abs(lx) < RIDGE.gate + 0.4) lx += Math.sign(lx || 1) * 2;
+    const at = press(lx, RIDGE.lz + (rd() > 0.5 ? 1 : -1) * (RIDGE.half + 0.06));
+    sc.set(1, 0.6 + rd() * 1.2, 1);
+    m4.compose(v.set(at.x, ridgeTop - 0.05, at.z), q.identity(), sc);
+    icicles.setMatrixAt(i, m4);
+  }
+  root.add(icicles);
+  // loose pages and ink blots lying in the snow (kept off the puzzle lanes' membranes)
+  const LEAVES = 140;
+  const leaves = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.42, 0.56).rotateX(-Math.PI / 2), winter(0xe2dccd, { side: THREE.DoubleSide }), LEAVES);
+  const BLOTS = 60;
+  const blots = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 9).rotateX(-Math.PI / 2), winter(0x262833), BLOTS);
+  let nl = 0;
+  let nb = 0;
+  for (let i = 0; i < 400 && (nl < LEAVES || nb < BLOTS); i++) {
+    const lx = (rd() * 2 - 1) * 38;
+    const lz = -40 + rd() * 78;
+    const onShelf = lz < SHELF.z1 && lz > SHELF.z0;
+    const at = press(lx, lz);
+    if (Math.hypot(lx - MEMBRANE_A.lx, lz - MEMBRANE_A.lz) < 3 || Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) < 3) continue;
+    if (Math.abs(lz - RIDGE.lz) < 1.6 || (lx > LEDGE.x0 - 1 && lx < LEDGE.x1 + 1 && lz < LEDGE.z1 + 1 && lz > LEDGE.z0)) continue;
+    const y = onShelf ? SHELF_TOP : pressH(at.x, at.z);
+    if (!onShelf && pressH(at.x, at.z) > RIDGE_BASE + 1.2) continue;
+    if (nl < LEAVES && rd() < 0.75) {
+      e.set((rd() - 0.5) * 0.3, rd() * 6.3, (rd() - 0.5) * 0.3);
+      m4.compose(v.set(at.x, y + 0.03, at.z), q.setFromEuler(e), sc.set(1, 1, 1));
+      leaves.setMatrixAt(nl++, m4);
+    } else if (nb < BLOTS) {
+      const r = 0.3 + rd() * 0.9;
+      m4.compose(v.set(at.x, y + 0.02, at.z), q.setFromEuler(e.set(0, rd() * 6.3, 0)), sc.set(r, 1, r * (0.6 + rd() * 0.5)));
+      blots.setMatrixAt(nb++, m4);
+    }
+  }
+  leaves.count = nl;
+  blots.count = nb;
+  root.add(leaves, blots);
 
   // ---- carried warmth: an ember glow at the fox's chest
   const warmGlow = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.85 }));
