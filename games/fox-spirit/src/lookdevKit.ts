@@ -195,11 +195,11 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             sepia = mix(sepia, hueAtPaper, uSketchTint * uLaneOn);
           }
           if (lane > 0.0) {
-            // ochre alone is the paper's own hue and vanishes into it: the verges are one sap-green family laid in
+            // ochre alone is the paper's own hue and vanishes into it: the verges are one olive / sap-green family (never lime) laid in
             // value (pigment settles in the paper's valleys), with crisp-edged gold autumn-grass islands and madder
             // flecks — washes with edges, never a rainbow airbrush
             float gran = lkNoise(xz * 5.3 + 2.0) * 0.6 + lkNoise(xz * 1.4 + 8.0) * 0.4;
-            vec3 wash = mix(vec3(0.38, 0.56, 0.22), vec3(0.5, 0.64, 0.3), gran);
+            vec3 wash = mix(vec3(0.44, 0.52, 0.22), vec3(0.56, 0.6, 0.3), gran);
             float gold = smoothstep(0.545, 0.565, lkFbm(xz * 0.16 + 7.0) + (lkNoise(xz * 1.9) - 0.5) * 0.06);
             wash = mix(wash, vec3(0.92, 0.66, 0.18) * (0.9 + 0.2 * gran), gold);
             // fallen-leaf rust flecks (madder red read as stains at chase distance)
@@ -209,7 +209,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             // laid a little darker than the paper and pushed past its own chroma: a pastel at paper value
             // washes out under the haze and tone map
             vec3 washC = wash * (0.8 * sl / dot(wash, lw));
-            washC = max(vec3(0.0), sl * 0.8 + (washC - sl * 0.8) * 1.8);
+            washC = max(vec3(0.0), sl * 0.8 + (washC - sl * 0.8) * 1.55);
             // the trodden middle is left as paper with a light warm-gold glaze, the way a watercolourist
             // saves the white of a road between painted verges
             washC = mix(washC, mix(sepia, vec3(0.98, 0.78, 0.42) * sl / 0.78, 0.5), laneCore * 0.85);
