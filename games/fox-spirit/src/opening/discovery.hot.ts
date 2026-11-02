@@ -7,32 +7,35 @@ const HINTS = ['Follow the loose page', 'Shift · dash to catch it', 'Space · h
 type Action = 'follow' | 'dash' | 'spring' | 'unfold' | 'jump' | 'wait';
 type ActionIndex = 0 | 1 | 2 | 3 | 4 | 5;
 const ACTIONS: readonly Action[] = ['follow', 'dash', 'spring', 'unfold', 'jump', 'wait'];
-type PageView = { readonly pos: THREE.Vector3; readonly catches: number; readonly kept: boolean };
+type PageView = { readonly pos: THREE.Vector3; readonly catches: number; readonly kept: boolean; readonly fleeing: boolean };
 type CanopyView = { readonly lastLeaf: string | null };
 type RuinView = { readonly firstOpen: boolean; readonly secondOpen: boolean; readonly opening: boolean };
 
 type Leg = 'page' | 'gate' | 'entry' | 'middle' | 'high' | 'roost' | 'grove' | 'fold1' | 'jump1' | 'fold2' | 'jump2' | 'jump3' | 'catch' | 'done';
 
-function invitationPaper(): THREE.CanvasTexture {
+function invitationLeaf(): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 96;
   const g = canvas.getContext('2d')!;
-  g.fillStyle = '#f0d395';
+  g.fillStyle = '#e2a64d';
   g.strokeStyle = '#c58c2d';
   g.lineWidth = 6;
   g.beginPath();
-  g.moveTo(5, 5); g.lineTo(58, 3); g.lineTo(57, 73);
-  g.lineTo(52, 89); g.lineTo(43, 83); g.lineTo(34, 91);
-  g.lineTo(22, 85); g.lineTo(8, 91); g.closePath();
+  g.moveTo(32, 5); g.lineTo(39, 27); g.lineTo(53, 17);
+  g.lineTo(50, 38); g.lineTo(60, 43); g.lineTo(48, 60);
+  g.lineTo(53, 76); g.lineTo(37, 72); g.lineTo(34, 92);
+  g.lineTo(29, 92); g.lineTo(28, 73); g.lineTo(10, 78);
+  g.lineTo(16, 60); g.lineTo(4, 47); g.lineTo(17, 38);
+  g.lineTo(14, 18); g.lineTo(25, 27); g.closePath();
   g.fill(); g.stroke();
   g.strokeStyle = '#694522';
   g.lineWidth = 2;
   g.stroke();
   g.beginPath();
-  g.moveTo(16, 28); g.lineTo(47, 24);
-  g.moveTo(16, 40); g.lineTo(41, 37);
-  g.moveTo(17, 52); g.lineTo(45, 50);
+  g.moveTo(32, 80); g.lineTo(32, 24);
+  g.moveTo(32, 53); g.lineTo(46, 36);
+  g.moveTo(32, 53); g.lineTo(18, 36);
   g.stroke();
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -45,7 +48,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   const target = new THREE.Vector3();
   let action: ActionIndex = 0;
   let active = true;
-  const scraps = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.28, 0.4), new THREE.MeshBasicMaterial({ map: invitationPaper(), side: THREE.DoubleSide, transparent: true, alphaTest: 0.05 }), 4);
+  const scraps = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.28, 0.4), new THREE.MeshBasicMaterial({ map: invitationLeaf(), side: THREE.DoubleSide, transparent: true, alphaTest: 0.05 }), 4);
   scraps.name = 'page-invitation';
   scraps.frustumCulled = false;
   ctx.scene.add(scraps);
@@ -114,7 +117,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
     }
     if (leg === 'page') {
       target.copy(page.pos);
-      action = 1;
+      action = page.fleeing && Math.hypot(page.pos.x - fox.x, page.pos.z - fox.z) < 2.6 ? 1 : 0;
     } else if (leg === 'gate') {
       followLine(TO_CANOPY);
     } else if (leg === 'entry' || leg === 'middle' || leg === 'high' || leg === 'roost') {
