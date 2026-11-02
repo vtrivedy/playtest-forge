@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import { WELL } from './layout';
 import { ashwaterE, HUB_ARCHES, hubArrival, outward, pressE, RETURN_ARCH_BACK, WORLDS, worldAt, type WorldId } from './worlds';
-import { rng, toon } from '../lookdevKit';
+import { RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { bakeCells } from './bake';
 import { box, C, cyl, Kit } from './village';
 
@@ -118,7 +118,7 @@ function buildWeather(scene: THREE.Scene) {
 }
 
 export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => boolean }) {
-  const { scene, groundH } = ctx;
+  const { scene, groundH, colliders } = ctx;
   const k = new Kit();
   const arches: Arch[] = [];
   const glowMat = (c: number) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
