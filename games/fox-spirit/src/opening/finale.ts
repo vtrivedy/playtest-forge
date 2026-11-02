@@ -601,7 +601,10 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       onward: (to: THREE.Vector3) => {
         rig.s.onwardLen = rebuildOnward(to);
       },
-      homeCaption: () => say('One page still holds the autumn.'),
+      homeCaption: () => {
+        say('One page still holds the autumn.');
+        ctx.audio.cue('homecoming-onward');
+      },
       snow: () => {
         ctx.audio.cue('finale-snow');
         say('Let the year turn.');
