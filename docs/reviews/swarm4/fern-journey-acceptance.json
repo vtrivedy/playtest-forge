@@ -1,0 +1,56 @@
+{
+  "sha": "050a7cc18e03a3e7c60f423710502653ad011061",
+  "scope": "Input-only opening through Keeping showcase; upper-left hearth teaching card",
+  "simulationHz": 30,
+  "seconds": 165,
+  "viewport": [
+    480,
+    270
+  ],
+  "motionFrames": 90,
+  "motionFps": 15,
+  "motionSeconds": [
+    94,
+    100
+  ],
+  "allMotionFramesReviewed": true,
+  "timedStillsReviewed": 10,
+  "all4950TraceRowsEqualPreHudBaseline": true,
+  "errors": [],
+  "state": {
+    "checks": {
+      "pageHome": true,
+      "steam": true,
+      "roots": true,
+      "bridge": true,
+      "onCrag": true
+    },
+    "pass": true
+  },
+  "route": {
+    "expectedBeat": "a leaf comes down",
+    "actualBeat": "a leaf comes down",
+    "pass": true
+  },
+  "camera": {
+    "foxSizeError": null,
+    "fromSeconds": 94,
+    "minChestDistance": 2.198988176412048,
+    "maxPitch": 28.079564312855464,
+    "maxStepSpeed": 15.982146288906307,
+    "maxGroundedFollowDistance": 3.1597480912249947,
+    "maxGroundedDistance": 5,
+    "minFollowFoxPixels": 31.930049017377137,
+    "minFoxPixels": 18,
+    "longestSmallFoxSeconds": 0,
+    "pass": true
+  },
+  "archive": "keeping-swarm4-captures/fern/journey-050a7cc.tgz",
+  "sha256": "3d94c620e210b8872c2d377747040acf36af973997b3fe4d1ef825b0dda8f071",
+  "limitations": [
+    "One initial wake teleport",
+    "Authored route, not unfamiliar-player discovery",
+    "Keeping endpoint, not Press finale",
+    "Offline silent SwiftShader capture; live GPU recorder divergence remains open"
+  ]
+}
