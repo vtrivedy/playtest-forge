@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 const args = process.argv.slice(2);
 const out = path.resolve(args[0] && !args[0].startsWith('--') ? args[0] : '/tmp/ashwater-probe');
 const frames = args.includes('--frames');
+const marshClip = args.includes('--marsh-clip');
 const pressRoute = args.includes('--press-route');
 const entryTour = args.includes('--entry-tour') || pressRoute;
 let tourPassed = false;
@@ -25,6 +26,7 @@ const page = await (await browser.newContext({ viewport: { width: 640, height: 3
 page.setDefaultTimeout(900000);
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
+page.on('console', (m) => { if(m.type()==='error') errors.push(`console: ${m.text()}`); });
 const log = [];
 const commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 let fi = 0;
@@ -111,6 +113,22 @@ try {
   if((await state()).hooks.opening.worlds.active!=='ashwater')throw Error('Hub arch did not enter Ashwater');
   if((await state()).game.opening.teach.showing==='Follow the warm light home')throw Error('Autumn hint leaked into Ashwater');
   await shot('00-landing');
+  if (marshClip) {
+    // Continuous walking review after physical hub arrival, before the puzzle route.
+    // 6 simulated seconds at 12 fps; input only, no placement or progress setters.
+    for (let f = 0; f < 72; f++) {
+      await page.evaluate(f => {
+        const h = window.__gameHooks;
+        h.setStick(f < 36 ? 0.45 : -0.45, 0.15);
+        h.setKeys([]);
+        h.advance(5, 1 / 60, true);
+      }, f);
+      await page.screenshot({path: path.join(out, `marsh-${String(f).padStart(4,'0')}.jpg`), type:'jpeg', quality:85});
+    }
+    await shot('00-marsh-walk');
+    await go(0,-46,{max:900});
+    await settle(60);
+  }
   if (entryTour) {
     const expectWorld = async (world, travels, name) => {
       await settle(150);
@@ -143,7 +161,17 @@ try {
   await go(-12.5, -35.2, { dash: true, dashAt: 2, max: 90, reach: 0.6 });
   await settle(240);
   await shot('02-drained');
-  for (const [x, z] of [[-3, -33], [0, -28.5], [0, -20], [0, -13]]) await go(x, z);
+  const westOnly = (await state()).ash;
+  if (!westOnly.damA || westOnly.damA2) throw Error('First sluice must drain only the west reach');
+  for (const [x, z] of [[-14, -29], [-30, -28.6], [-43.5, -28.0]]) await go(x, z, { max: 900 });
+  await settle(60);
+  await shot('02b-roof');
+  await go(-6, -28.5, { max: 900 });
+  await go(-0.9, -28.5, { dash: true, dashAt: 1, max: 60, reach: 0.6 });
+  await settle(240);
+  await shot('02c-east-reach');
+  if (!(await state()).ash.damA2) throw Error('Culvert did not drain east reach');
+  for (const [x, z] of [[-1.0, -28.5], [2.5, -28.5], [2.5, -20], [0, -13]]) await go(x, z, { max: 900 });
   await settle(90);
   await shot('03-reed-island');
   // Level 2, Reed Pond: running jumps mat to mat, the branch out to the islet first
@@ -195,6 +223,8 @@ try {
   await shot('08-seedwell');
   const completed = (await state()).hooks.opening.worlds.progress.worlds.ashwater;
   if(completed.ability!=='Reedskim' || completed.fill!==1 || completed.restored.length!==3)throw Error('Physical Ashwater completion did not earn Reedskim and fill Reed');
+  const secrets = (await state()).hooks.opening.worlds.progress.secrets;
+  if (!['ashwater-roof','ashwater-mooring'].every(id => secrets.includes(id))) throw Error('Physical side places did not earn both canonical memories');
   await page.keyboard.press('Tab');
   await shot('09-album');
   await page.keyboard.press('Tab');
@@ -204,6 +234,7 @@ try {
 } finally {
   const last = log.length ? log[log.length - 1][1] : null;
   fs.writeFileSync(path.join(out, 'log.json'), JSON.stringify({ commit, provenance:"Fresh boot; rendered invitation follower then movement only; no teleport or progress setters", log, errors, pass: errors.length===0 && !!last && (entryTour ? tourPassed : last.ash.done.length === 3) }, null, 1));
+  if (marshClip) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '12', '-i', path.join(out, 'marsh-%04d.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'marsh-walk.mp4')]);
   if (frames && fi > 0) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '6', '-i', path.join(out, 'f%04d.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'route.mp4')]);
   console.log(JSON.stringify({ errors, last:last?{pos:last.pos,ash:last.ash}:null }, null, 1));
   process.exitCode=errors.length===0 && (entryTour ? tourPassed : last?.ash.done.length===3) ? 0 : 1;

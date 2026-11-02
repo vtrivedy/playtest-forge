@@ -15,9 +15,10 @@ import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import { updateAshwater, type AshRig } from './ashwater.hot';
+import { buildAshwaterPuddles } from './ashwaterGround';
 
 const C = {
-  moss: new THREE.Color(0x3f7448), peat: new THREE.Color(0x3a3a2e), mud: new THREE.Color(0x3b3226), levee: new THREE.Color(0x8a7d5a), sedge: new THREE.Color(0x6f8f4a), bank: new THREE.Color(0x56705e),
+  moss: new THREE.Color(0x3c493d), peat: new THREE.Color(0x35352f), mud: new THREE.Color(0x3b322b), levee: new THREE.Color(0x74664e), sedge: new THREE.Color(0x505a40), bank: new THREE.Color(0x505e55),
   water: 0x2a6a74, reed: 0x6f8a3e, reedDry: 0xa08a4e, willow: 0x4f7f6a, pad: 0x5d8f3f, bloom: 0xf2e6c4, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
 };
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
@@ -41,6 +42,8 @@ export function buildAshwater(
   const rand = rng(7071);
   const root = new THREE.Group();
   root.name = 'ashwater';
+  /** tall pieces the chase camera may look through (the cistern walls, the weir pier, the mill) */
+  const occluders: THREE.Object3D[] = [];
   scene.add(root);
 
   // ---- ground: one sheet over the oval, vertex-coloured moss / sedge / peat by height and wetness
@@ -60,7 +63,7 @@ export function buildAshwater(
     const wet = 1 - THREE.MathUtils.smoothstep(h, -0.6, 0.12);
     const w = waterAt(x, z) !== null ? 1 : 0;
     c.copy(C.moss).lerp(C.sedge, 0.5 + 0.5 * Math.sin(x * 0.37 + z * 0.23));
-    c.lerp(C.mud, Math.max(wet, w * 0.8));
+    c.lerp(C.peat, wet * 0.6).lerp(C.mud, Math.max(wet * 0.7, w * 0.8));
     if (h > 0.32 && h < 0.75 && w === 0) c.lerp(C.levee, 0.35);
     if (h > 2) c.lerp(C.bank, 0.6);
     c.toArray(col, i * 3);
@@ -71,6 +74,7 @@ export function buildAshwater(
   ground.position.set(ASH_ORIGIN.x, 0, ASH_ORIGIN.z);
   ground.receiveShadow = true;
   root.add(ground);
+  root.add(buildAshwaterPuddles(geo));
 
   // ---- water: the channel and the pool drop when drained; the pond holds
   const waterMat = new THREE.MeshStandardMaterial({ color: C.water, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.86, emissive: 0x0d2a2e });
@@ -84,18 +88,48 @@ export function buildAshwater(
   };
   const water = { channel: waterMesh('channel'), channelE: waterMesh('channelE'), pond: waterMesh('pond'), pool: waterMesh('pool') };
 
-  // ---- reeds: blades along every bank, thick at the water's edge
+  // ---- reeds: clumps, not spikes — fanned sedge tufts everywhere wet, and cattail stands (brown heads on stalks)
+  // crowding the water's edge; vertex-coloured (dark base → lighter tips, brown heads), tinted per clump
   const blade = new THREE.ConeGeometry(0.05, 1.3, 4).translate(0, 0.65, 0);
-  const REEDS = 5200;
-  const reeds = new THREE.InstancedMesh(blade, marsh(C.reed), REEDS);
+  const paint = (g: THREE.BufferGeometry, base: THREE.Color, tip: THREE.Color, h: number) => {
+    const ps = g.getAttribute('position') as THREE.BufferAttribute;
+    const cs = new Float32Array(ps.count * 3);
+    const t = new THREE.Color();
+    for (let i = 0; i < ps.count; i++) t.copy(base).lerp(tip, Math.min(1, Math.max(0, ps.getY(i) / h))).toArray(cs, i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(cs, 3));
+    return g;
+  };
+  const sedgeBase = new THREE.Color(0x2f4a2a), sedgeTip = new THREE.Color(0x8aa35a);
+  const fan = (count: number, len: number, lean: number, w: number) =>
+    Array.from({ length: count }, (_, i) => {
+      const a = (i / count) * Math.PI * 2 + rand() * 0.5;
+      const l = len * (0.7 + rand() * 0.5);
+      const g = new THREE.ConeGeometry(w, l, 3).translate(0, l / 2, 0);
+      g.rotateX(lean * (0.5 + rand() * 0.6)).rotateY(a).translate(Math.sin(a) * 0.06, 0, Math.cos(a) * 0.06);
+      return paint(g, sedgeBase, sedgeTip, l);
+    });
+  const sedgeGeo = mergeGeometries(fan(9, 0.75, 0.55, 0.035))!;
+  const cattailParts = fan(6, 1.25, 0.25, 0.03);
+  for (let k = 0; k < 3; k++) {
+    const a = rand() * 6.28, r = 0.12;
+    const stalk = paint(new THREE.CylinderGeometry(0.012, 0.016, 1.7, 4).translate(Math.sin(a) * r, 0.85, Math.cos(a) * r), sedgeBase, new THREE.Color(0x6f7f45), 1.7);
+    const head = new THREE.CapsuleGeometry(0.045, 0.22, 2, 5).translate(Math.sin(a) * r, 1.62, Math.cos(a) * r);
+    paint(head, new THREE.Color(0x5a3a22), new THREE.Color(0x6b4529), 2);
+    cattailParts.push(stalk.toNonIndexed(), head.toNonIndexed());
+  }
+  const cattailGeo = mergeGeometries(cattailParts.map((g) => (g.index ? g.toNonIndexed() : g)))!;
+  const reedMat = marsh(0xffffff, { vertexColors: true });
+  const REEDS = 3400;
+  const sedges = new THREE.InstancedMesh(sedgeGeo, reedMat, REEDS);
+  const cattails = new THREE.InstancedMesh(cattailGeo, reedMat, 1400);
   const tint = new THREE.Color();
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
   const sc = new THREE.Vector3();
   const p = new THREE.Vector3();
-  let n = 0;
-  for (let tries = 0; n < REEDS && tries < REEDS * 12; tries++) {
+  let n = 0, nc = 0;
+  for (let tries = 0; n < REEDS && tries < REEDS * 14; tries++) {
     const lx = (rand() - 0.5) * 140;
     const lz = (rand() - 0.5) * 130;
     const x = ASH_ORIGIN.x + lx;
@@ -103,18 +137,26 @@ export function buildAshwater(
     const h = H(x, z);
     if (waterAt(x, z) !== null || h > 5 || h < -0.3) continue;
     // reeds crowd the water's edge and the rim; keep the walking line (lx ≈ 0) and the gates readable
-    const edge = h < 0.05 ? 1 : h > 1.5 ? 0.5 : 0.12;
+    const edge = h < 0.05 ? 1 : h > 1.5 ? 0.5 : 0.22;
     if (rand() > edge || (Math.abs(lx) < 4 && lz < 40) || Math.hypot(lx - DAM_A.lx, lz - DAM_A.lz) < 3.5) continue;
-    p.set(x, h - 0.05, z);
-    e.set((rand() - 0.5) * 0.35, rand() * 6.28, (rand() - 0.5) * 0.35);
+    p.set(x, h - 0.04, z);
+    e.set((rand() - 0.5) * 0.2, rand() * 6.28, (rand() - 0.5) * 0.2);
     q.setFromEuler(e);
-    sc.set(1, 0.6 + rand() * 0.9, 1);
-    reeds.setMatrixAt(n, m4.compose(p, q, sc));
-    reeds.setColorAt(n, tint.set(rand() < 0.3 ? C.reedDry : C.reed));
-    n++;
+    const big = 0.8 + rand() * 0.7;
+    sc.set(big, big * (0.8 + rand() * 0.5), big);
+    m4.compose(p, q, sc);
+    tint.setRGB(0.85 + rand() * 0.25, 0.85 + rand() * 0.25, 0.8 + rand() * 0.2);
+    if (h < 0.08 && nc < 1400 && rand() < 0.45) {
+      cattails.setMatrixAt(nc, m4);
+      cattails.setColorAt(nc++, tint);
+    } else {
+      sedges.setMatrixAt(n, m4);
+      sedges.setColorAt(n++, tint);
+    }
   }
-  reeds.count = n;
-  root.add(reeds);
+  sedges.count = n;
+  cattails.count = nc;
+  root.add(sedges, cattails);
 
   // ---- reed dams: a slumped stack of cut reeds on the sluice culvert and on the mill race islet
   const damBlade = new THREE.CylinderGeometry(0.06, 0.06, 1.6, 4).rotateZ(Math.PI / 2);
@@ -219,6 +261,7 @@ export function buildAshwater(
   wheel.rotation.y = Math.PI / 2;
   mill.add(wall, roof, wheel);
   root.add(mill);
+  occluders.push(mill);
   colliders.push({ kind: 'box', x: millAt.x, z: millAt.z, yaw: 0, hx: 3.3, hz: 2.8, top: WEIR.top + 3.4 });
 
   // ---- the Reed Seedwell on its ledge: a slate basin; restored, a teal column of light rises from it
@@ -244,6 +287,7 @@ export function buildAshwater(
     stone.rotation.set((rand() - 0.5) * 0.15, a, (rand() - 0.5) * 0.2);
     stone.castShadow = true;
     root.add(stone);
+    occluders.push(stone);
     colliders.push({ kind: 'post', x: stone.position.x, z: stone.position.z, r: 0.3 });
     for (let k = 0; k < 6; k++) {
       const b = new THREE.Mesh(blade, marsh(C.reed));
@@ -376,6 +420,7 @@ export function buildAshwater(
     m.position.set(a.x, (CISTERN.wallTop - 1.3) / 2, a.z);
     m.castShadow = m.receiveShadow = true;
     root.add(m);
+    occluders.push(m);
     colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx: (x1 - x0) / 2, hz: (z1 - z0) / 2, top: CISTERN.wallTop });
   };
   cWall(W.x0 - CISTERN.wall, W.x0, W.z0 - CISTERN.wall, WEIR.z0);
@@ -388,6 +433,7 @@ export function buildAshwater(
     pier.position.set(a.x, 2.5, a.z);
     pier.castShadow = true;
     root.add(pier);
+    occluders.push(pier);
     colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx, hz, top: 6.3 });
   }
   cWall(W.x0, CISTERN.gate.x0, W.z0 - CISTERN.wall, W.z0);
@@ -446,6 +492,7 @@ export function buildAshwater(
     door.position.set(at.x - 0.6, -0.95, at.z + 1.4);
     door.rotation.y = 0.4;
     root.add(roof, chimney, door);
+    occluders.push(roof, chimney);
     colliders.push({ kind: 'box', x: roof.position.x, z: roof.position.z, yaw: 0, hx: 2.0, hz: 1.2, top: 0.2 });
   }
   // the Ferrykeeper's mooring on the islet: a lantern that still burns on its stake
@@ -465,8 +512,9 @@ export function buildAshwater(
     teach: ctx.teach.offer,
     events: {
       secret: (which) => {
-        say(which === 0 ? 'A home, under the reeds.' : 'The last ferry never left.');
-        opts.onSecret?.(which === 0 ? 'ashwater-roof' : 'ashwater-mooring');
+        // the Album's page toast speaks the place's line (no caption on top of it)
+        if (opts.onSecret) opts.onSecret(which === 0 ? 'ashwater-roof' : 'ashwater-mooring');
+        else say(which === 0 ? 'A home, under the reeds.' : 'The last ferry never left.');
       },
       burstA: () => {
         ctx.audio.cue('millrace-burst');
@@ -490,7 +538,8 @@ export function buildAshwater(
         if (level === 1) say('The Ferrykeeper still waits.');
         if (level === 2) {
           ctx.audio.cue('finale-kindle');
-          say('The Scribe pressed the rain first.');
+          // (the Album's page toast carries the revelation line; the caption names the place)
+          say('The Reed Seedwell fills.');
         }
       },
       splash: () => ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.1, rate: 0.6 }),
@@ -542,6 +591,7 @@ export function buildAshwater(
   ctx.onUpdate((dt) => updateAshwater(rig, dt));
 
   return {
+    occluders,
     spawn: { x: spawnAt.x, z: spawnAt.z, yaw: ASH_SPAWN.yaw },
     state: () => ({
       damA: rig.s.burstA >= 0, damA2: rig.s.burstA2 >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2),

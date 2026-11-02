@@ -1,0 +1,924 @@
+{
+  "commit": "440f7d47efc5456acd805709e0881b6826edfcee",
+  "provenance": "Fresh boot; rendered invitation follower then movement only; no teleport or progress setters",
+  "pass": true,
+  "errors": [],
+  "beats": [
+    {
+      "name": "02-drained",
+      "pos": [
+        687.54,
+        -0.14,
+        44.8
+      ],
+      "timing": {
+        "totalSeconds": 159.21666666667272,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 24.200000000000074,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 3,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": false,
+        "damB": false,
+        "flood": false,
+        "channelY": -1.25,
+        "poolY": -0.15,
+        "secrets": 0,
+        "mats": 0,
+        "done": [],
+        "splashes": 1,
+        "glow": 0
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0.792,
+        "air": 0.767,
+        "timeToApex": 0.317
+      }
+    },
+    {
+      "name": "02b-roof",
+      "pos": [
+        656.37,
+        -1,
+        52.01
+      ],
+      "timing": {
+        "totalSeconds": 172.06666666668215,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 37.0499999999994,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 4,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": false,
+        "damB": false,
+        "flood": false,
+        "channelY": -1.25,
+        "poolY": -0.15,
+        "secrets": 1,
+        "mats": 0,
+        "done": [],
+        "splashes": 1,
+        "glow": 0
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0.792,
+        "air": 0.767,
+        "timeToApex": 0.317
+      }
+    },
+    {
+      "name": "02c-east-reach",
+      "pos": [
+        699.09,
+        -0.56,
+        51.5
+      ],
+      "timing": {
+        "totalSeconds": 189.35000000002606,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 54.33333333333198,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 4,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": true,
+        "damB": false,
+        "flood": false,
+        "channelY": -1.25,
+        "poolY": -0.15,
+        "secrets": 1,
+        "mats": 0,
+        "done": [],
+        "splashes": 1,
+        "glow": 0
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0.792,
+        "air": 0.767,
+        "timeToApex": 0.317
+      }
+    },
+    {
+      "name": "03b-mat-sank",
+      "pos": [
+        699.19,
+        -0.05,
+        71.66
+      ],
+      "timing": {
+        "totalSeconds": 203.20000000003324,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 68.18333333333146,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 5,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Reedskim",
+              "well": "Reed",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": true,
+        "damB": false,
+        "flood": false,
+        "channelY": -1.25,
+        "poolY": -0.15,
+        "secrets": 1,
+        "mats": 1,
+        "done": [
+          "teach"
+        ],
+        "splashes": 2,
+        "glow": 0
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0.742,
+        "air": 0.533,
+        "timeToApex": 0.267
+      }
+    },
+    {
+      "name": "07-weir",
+      "pos": [
+        699.75,
+        3.8,
+        112.78
+      ],
+      "timing": {
+        "totalSeconds": 286.18333333337796,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 151.16666666668004,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 7,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach",
+                "develop"
+              ],
+              "restored": [
+                "teach",
+                "develop"
+              ],
+              "ability": "Reedskim",
+              "well": "Reed",
+              "fill": 0.6666666666666666,
+              "next": "combine"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof",
+            "ashwater-mooring"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": true,
+        "damB": true,
+        "flood": false,
+        "channelY": -1.25,
+        "poolY": -1.25,
+        "secrets": 3,
+        "mats": 1,
+        "done": [
+          "teach",
+          "develop"
+        ],
+        "splashes": 3,
+        "glow": 0
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0.742,
+        "air": 0.4,
+        "timeToApex": 0.267
+      }
+    },
+    {
+      "name": "07b-flooded",
+      "pos": [
+        705.56,
+        4.4,
+        118.02
+      ],
+      "timing": {
+        "totalSeconds": 303.75000000003774,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 168.73333333335273,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 7,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach",
+                "develop"
+              ],
+              "restored": [
+                "teach",
+                "develop"
+              ],
+              "ability": "Reedskim",
+              "well": "Reed",
+              "fill": 0.6666666666666666,
+              "next": "combine"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof",
+            "ashwater-mooring"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": true,
+        "damB": true,
+        "flood": true,
+        "channelY": -1.25,
+        "poolY": 4.3,
+        "secrets": 3,
+        "mats": 1,
+        "done": [
+          "teach",
+          "develop"
+        ],
+        "splashes": 3,
+        "glow": 0
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0,
+        "air": 0.633,
+        "timeToApex": 0
+      }
+    },
+    {
+      "name": "07d-punt",
+      "pos": [
+        712.78,
+        4.52,
+        112.8
+      ],
+      "timing": {
+        "totalSeconds": 307.4833333333677,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 172.46666666668904,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 7,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach",
+                "develop"
+              ],
+              "restored": [
+                "teach",
+                "develop"
+              ],
+              "ability": "Reedskim",
+              "well": "Reed",
+              "fill": 0.6666666666666666,
+              "next": "combine"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof",
+            "ashwater-mooring"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": true,
+        "damB": true,
+        "flood": true,
+        "channelY": -1.25,
+        "poolY": 4.3,
+        "secrets": 3,
+        "mats": 1,
+        "done": [
+          "teach",
+          "develop"
+        ],
+        "splashes": 3,
+        "glow": 0
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0,
+        "air": 0.633,
+        "timeToApex": 0
+      }
+    },
+    {
+      "name": "07e-wall",
+      "pos": [
+        713.83,
+        4.7,
+        109.89
+      ],
+      "timing": {
+        "totalSeconds": 308.96666666669967,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 173.95000000002355,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 7,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach",
+                "develop"
+              ],
+              "restored": [
+                "teach",
+                "develop"
+              ],
+              "ability": "Reedskim",
+              "well": "Reed",
+              "fill": 0.6666666666666666,
+              "next": "combine"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof",
+            "ashwater-mooring"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          1,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": true,
+        "damB": true,
+        "flood": true,
+        "channelY": -1.25,
+        "poolY": 4.3,
+        "secrets": 3,
+        "mats": 1,
+        "done": [
+          "teach",
+          "develop"
+        ],
+        "splashes": 3,
+        "glow": 0
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0,
+        "air": 0.633,
+        "timeToApex": 0
+      }
+    },
+    {
+      "name": "08-seedwell",
+      "pos": [
+        717.87,
+        4.7,
+        106.64
+      ],
+      "timing": {
+        "totalSeconds": 315.20000000003034,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 180.1833333333592,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 8,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "restored": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "ability": "Reedskim",
+              "well": "Reed",
+              "fill": 1,
+              "next": null
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof",
+            "ashwater-mooring"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          1,
+          0,
+          0,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": true,
+        "damB": true,
+        "flood": true,
+        "channelY": -1.25,
+        "poolY": 4.3,
+        "secrets": 3,
+        "mats": 1,
+        "done": [
+          "teach",
+          "develop",
+          "combine"
+        ],
+        "splashes": 3,
+        "glow": 1
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0,
+        "air": 0.05,
+        "timeToApex": 0
+      }
+    },
+    {
+      "name": "09-album",
+      "pos": [
+        717.87,
+        4.7,
+        106.64
+      ],
+      "timing": {
+        "totalSeconds": 315.20000000003034,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 180.1833333333592,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 8,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "restored": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "ability": "Reedskim",
+              "well": "Reed",
+              "fill": 1,
+              "next": null
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "ashwater-roof",
+            "ashwater-mooring"
+          ]
+        },
+        "mapOpen": true,
+        "warden": [
+          0,
+          1,
+          0,
+          0,
+          1
+        ]
+      },
+      "ashwater": {
+        "damA": true,
+        "damA2": true,
+        "damB": true,
+        "flood": true,
+        "channelY": -1.25,
+        "poolY": 4.3,
+        "secrets": 3,
+        "mats": 1,
+        "done": [
+          "teach",
+          "develop",
+          "combine"
+        ],
+        "splashes": 3,
+        "glow": 1
+      },
+      "occlusion": null,
+      "lastJump": {
+        "apex": 0,
+        "air": 0.05,
+        "timeToApex": 0
+      }
+    }
+  ]
+}
