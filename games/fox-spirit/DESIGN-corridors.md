@@ -35,3 +35,14 @@ frames that read painted by eye.
 Controller, colliders, the opening hook (Hazel), ending (Cedar), recorder (Reed), collision (Thistle).
 Lanes stay where they are — painting a line never implies a new walkable route (KNOWLEDGE: painted lane ≠
 walkable lane).
+
+## Result (integrated keeping-d3 2f5af69, tools/corridor-colour.mjs, 11 views, 960×540 SwiftShader)
+| state | b4fa63a colour / tint | 2f5af69 colour / tint |
+|---|---|---|
+| cold (fresh start) | 0.039 / 0.020 | 0.088 / 0.122 |
+| story (beats forced) | 0.435 / 0.152 | 0.465 / 0.150 |
+Press lane in story 0.083 → 0.39 (restores run down the lane). The strict `colour` metric undercounts the olive
+verges (Reed's review moved them off lime on purpose); `tint` is the honest cold-state number (6×). GPU (T4) quick
+stills on 53ca803c and 431018bd show the painted lane network from every lane lens and the aerial.
+Also shipped under this design: Hermitage kept-colour leaves/desk, rounded stones, hearth bowl stones, and the
+world mask that keeps the fox inside the slice (worldBounds.ts).
