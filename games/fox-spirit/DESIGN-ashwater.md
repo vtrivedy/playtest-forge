@@ -8,15 +8,18 @@ physical gate the fox opens with what it has (two actions only: jump/glide, dash
 |---|---|---|---|
 | Low Sluice (`teach`) | the channel spans the marsh; deep water puts you back on the bank | dash through the reed dam choking the sluice | channel drains over 3 s; walk its bed to Reed Island → earns **Reedskim** |
 | Reed Pond (`develop`) | the pond spans the marsh | Reedskim raises 9 reed mats; jump (held into a glide) mat to mat | Mill Shore |
-| Weir Heart (`combine`) | the weir is a 3.6 m peat wall; its steps stand in the Mill Pool | mats out to the islet, dash its dam → pool drains → climb the steps → glide off the weir's east lip to the Seedwell ledge | Reed Seedwell fills (teal column) |
+| Weir Heart (`combine`) | the Seedwell ledge is higher than the weir and 3+ m from it; the Mill Pool is a walled cistern | mats out to the islet, dash its dam → the cistern drains → climb its steps onto the weir. Insight: the way up is the opposite — dash the weir's reed gate so the race FLOODS the cistern (4.3 m, 45 s); the Ferrykeeper's punt rises to the weir lip; walk aboard, onto the east shelf, along the wall to the ledge | Reed Seedwell fills; the Ferrykeeper unpresses and flies |
 
 Rules
+- No answer captions (Vivek 3:25 PM): the marsh never says what to do; captions name places and feelings only.
+- The flood washes out after its hold and the gate re-forms; a fox caught low just walks back up the drained steps.
 - Gates are physical (water level, mat colliders), never proximity. Levels complete on arrival beyond each gate;
   Hazel's store refuses out-of-order completion. Develop completes on standing on the Mill Shore by any route.
 - Wading: grounded on a bed still under water → back to the last dry spot (no drowning, no softlock).
 - Missing the glide drops you on low ground east of the pool; walk round, climb the steps again.
 - Per-frame code in `ashwater.hot.ts` (no allocation). Model: `tla/Ashwater.tla` — Gates, Monotone, Finishes
-  (a goal-directed player finishes from every reachable state). Negative control: no Reedskim earn → Gates fails.
+  (a goal-directed player finishes from every reachable state, flood timer modelled as a move budget `Hold`).
+  Negative controls: no Reedskim earn → Gates fails; `Hold = 0` (flood gone at once) → Finishes fails.
 
 Integration (Maple owns): `buildAshwater(ctx, { complete(level), hasReedskim() })`, `layout.groundH` → `H` for x > 400,
 `worldBounds` → `E < 2.5` there, spawn = `ashwater.spawn`. Look (rain, teal fog, cool key) is the integrator's.
