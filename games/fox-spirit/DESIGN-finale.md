@@ -33,7 +33,7 @@ Album captions (≤ 6 words, the slice's only words; `ctx.captions.say`), the wh
 
 ## Model
 
-`tla/Finale.tla` (+ `.cfg`): `tlc -workers 2 -config Finale.cfg Finale.tla` → 366 distinct states, no error. Broken variants (Kindle without the settled gate; Advance waiting on the ember) fail `Safe` / `EndsOnce` respectively.
+`tla/Finale.tla` (+ `.cfg`): `tlc -workers 2 -config Finale.cfg Finale.tla` → 540 distinct states, no error (incl. the hero lying / getting up: `NeverStuck`, a held controller is always released). Broken variants (Kindle without the settled gate; Advance waiting on the ember; no fairness on StoodUp) fail `Safe` / `EndsOnce` / `NeverStuck`.
 
 ## Hooks
 
