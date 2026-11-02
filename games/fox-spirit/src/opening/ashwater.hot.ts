@@ -39,6 +39,9 @@ export type AshRig = {
   };
 };
 
+/** footing at or above this is dry whatever the water does (full surface −0.15) */
+const DRY_Y = -0.05;
+
 const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 export function updateAshwater(rig: AshRig, dt: number): void {
@@ -89,7 +92,8 @@ export function updateAshwater(rig: AshRig, dt: number): void {
       s.splashes++;
       rig.events.splash();
       rig.teleport(rig.safe.x, rig.safe.z, s.safeYaw);
-    } else if (w === null) {
+    } else if (f.y > DRY_Y && (w === null || f.y > level + 0.05)) {
+      // only truly dry footing (not the drowned bank slope) is a place to put the fox back
       rig.safe.copy(f);
       s.safeYaw = rig.fox.rotation.y;
     }
