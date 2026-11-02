@@ -1,7 +1,8 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Hearthsong (offline listening render)</title></head>
 <body><script type="module">
-import { renderHearthsong } from './src/opening/music/render.ts';
+import { renderHearthsong, WALKS } from './src/opening/music/render.ts';
+window.WALKS = WALKS;
 window.renderHearthsong = renderHearthsong;
 import { recordWater } from './src/opening/music/sfxTest.ts';
 window.recordWater = recordWater;

@@ -26,6 +26,16 @@ export const WALK: Leg[] = [
   { t: 262, place: 'hollow', restored: 1, cue: true, kind: 3 },
 ];
 
+/** Millbrook: arrive, the dam bursts (cue), the orchard, the lookout */
+export const WALK_MILL: Leg[] = [
+  { t: 0, place: 'leaf-lane', restored: 0.6 },
+  { t: 20, place: 'millbrook', restored: 0.7 },
+  { t: 30, place: 'millbrook', restored: 0.8, cue: true },
+  { t: 90, place: 'orchard', restored: 0.9 },
+  { t: 140, place: 'lookout', restored: 1 },
+];
+export const WALKS: Record<string, Leg[]> = { main: WALK, mill: WALK_MILL };
+
 export async function renderHearthsong(seconds: number, walk: Leg[] = WALK, seed = 1): Promise<{ sr: number; l: string; r: string; marks: Leg[] }> {
   const sr = 48000;
   const ac = new OfflineAudioContext(2, Math.ceil(sr * seconds), sr);

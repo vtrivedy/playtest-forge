@@ -28,8 +28,6 @@ export const DRYING = {
   paintSecs: 3.6,
 };
 
-type Captions = { say: (text: string) => void };
-
 export function createDryingLines(ctx: OpeningCtx) {
   const F = DRYING;
   const H = HERMITAGE;
@@ -106,7 +104,6 @@ export function createDryingLines(ctx: OpeningCtx) {
   const paintAt = new THREE.Vector3(H.plateau.x, 0, H.plateau.z);
   const PAINT_OPTS = { edgeMax: 2.4 };
   const last = new THREE.Vector3().copy(ctx.fox.root.position);
-  const captions = (ctx as unknown as { captions?: Captions }).captions;
 
   function place(n: number): void {
     const o = n * 3;
@@ -146,7 +143,7 @@ export function createDryingLines(ctx: OpeningCtx) {
     last.copy(f);
     if (!captioned && Math.hypot(f.x - H.desk.x, f.z - H.desk.z) < 2.2) {
       captioned = true;
-      captions?.say('Here the Scribe kept every autumn');
+      ctx.captions.say('Here the Scribe kept every autumn');
     }
     if (speed > F.minSpeed) {
       for (let i = 0; i < L; i++) {

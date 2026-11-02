@@ -160,6 +160,17 @@ permits branch unmute; Vivek then hears the landed result on main.
 - Key: C major. Keep every synthesized chime in C (glyphs, page, homecoming already were); the hearth hum's B1 was
   moved to C2.
 
+- Staged in-game listening: `node tools/audio-scene.mjs --scene millbrook|finale --out DIR --seconds N` (teleport /
+  dev hook, sim paced to wall clock, pre-master stems + marks of swell/ending/finale phase each second).
+  Finale (local integration of all sw4 branches, 06:25): kindle → swell; coda ~44 s; digital silence ~60 s; then
+  epilogue after QuietBars. SwiftShader capture boxes drop ~5–20 % of ScriptProcessor audio under render load
+  (73 s recorded in 90 s wall) — a capture artefact present before Hearthsong too; don't read it as stutter.
+- Critic vocabulary → cause, found by A/B on the same window: "theremin" = 30 ms legato glide + early vibrato
+  (fix: 8 ms glide, tongue each note, vibrato after 0.4 s); "digital beeping" = 40 ms sine bubbles (few-ms
+  chirps read as water); "whip/sword strike" = a 0.35 s noise sweep to 1.8 kHz; "harsh/distorted" = FM bells at
+  ratio 3.5 / index 1.6 (ratio 4, index 0.8 = celesta); "ticking clock" = 6 ms-attack footsteps at a steady gait.
+- The model hallucinates (a "male voice", "alarm") on noise beds; confirm any flaw on the spectrogram before acting.
+
 ### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
 
 - Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
@@ -383,3 +394,20 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
 - A successful Vite build did **not** mean production could boot: default fox/model textures used raw `/assets/` URLs served only by configureServer. Import runtime assets with `?url`; the production preview now loads the bundled GLB. The new guard rejects absolute asset literals (12 negative findings). No new assets; existing source/license records retained.
 - When captures are interrupted, a final-only JSON loses the useful trace. The page runner now streams partial JSONL + atomic checkpoint files and atomically renames final results. Use a fresh output directory per named run; encode exactly `evidence.frames` to exclude stale frames. Codex plain-background nohup did not survive tool cleanup here; the accepted run used a live PTY at15fps.
 - Shared hot gate must handle unknown external function callbacks without crashing; Fern supplied the guard-order fix and positive query fixture. Roots include step/process plus non-factory exported functions, so renaming a frame entry cannot silently skip the check. Cold build/create/load/make factories remain setup; called helpers are still scanned if reached from hot code.
+
+## Press Hollow access — independent review (Sorrel)
+
+- A painted path is not automatically walkable: Wren057bd1b's south lane drove straight into the rim at(9.211,-.313,61.011). `pathDist` flattened the small swell but did not cut the additive rim. Two alternate approaches blocked too; the original glide-only ending probe missed this entrance failure.
+- Wren77d303a carves a terrain trough along the lane. Independent input-only retest passes all8 authored lane legs both ways, crag glide340frames, and3 walk-out legs. Evidence `/captures/sorrel/finale-access-fixed-77d303a/`; review+compact results `docs/reviews/swarm4/finale-access/`. No controller tuning; scene still sealed, no forced finale, no coal. Each case stages its initial position.
+- Keep authored lane heights and visible lane coordinates coupled, and test entry as well as exit. `tools/finale-access-probe.mjs` provides an independent route regression; `--production` uses the actual build, `--alternates` adds diagnostic approaches. This does not replace the carrying/finale/camera route or a continuous ending clip.
+## Finale / Press Hollow (Wren, swarm4)
+
+- A painted lane is not a walkable lane: PATHS/pathDist only flattens the swell term, the rim term still raises a cliff under the paint. Sorrel's input-only probe (057bd1b) stalled the authored south lane at (9.2, 61.0) and two alternate meadow approaches too. Carve terrain from the same line that paints it (`SOUTH_LANE` → PATHS + `southLane()` trough in layout.ts, 77d303a) and prove it with an input-only walk both ways (`tools/finale-lane-probe.mjs`, Sorrel's `tools/finale-access-probe.mjs`). The finale's story gate is the Press itself (sealed until the Keeping settles; TLA `Finale.tla`), not terrain.
+- Walk limits come from `moveTo`'s 0.28 m forward probe: a rise ≤ step + 0.15 = 0.37 m per 0.28 m (~53°) is walkable. Only steeper than ~1.3 rise/run blocks; a 1.85 m jump apex is the other bound.
+- Glide off the far crag (top 9.46) into the hollow (floor ≈ 0.5) carries ≈ 18 m horizontally with the ember in the mouth (finale-route trace, 308958d).
+- Carry places into a bowl only when the fox stands within `bowlReach` (1.6 m) on the same floor; otherwise it sets warmth at the feet. Route bots must stop ≤ ~0.9 m from a bowl.
+- A second ground sheet must abut the bowl sheet on its exact vertex columns (bowl: x −64..56 in 170 segs → 0.706 m) or edges crack; overlapping sheets z-fight.
+- Snow as `THREE.Points` falling in the vertex shader (mod-wrapped box round the camera) costs no CPU per frame; clamp `gl_PointSize` (1.6–7 px) or near flakes balloon into discs.
+- Hot-gate gap (fixed upstream request): roots were only `update/tick/frame/process` names — a `*.hot.ts` entry named `stepX` was never scanned. Name hot entries `update*` (or make every export a root).
+- This sandbox is 1 CPU: local SwiftShader continuous clips run ~0.5–1.8 fps at 640×360; run one probe at a time.
+- New builders draw from their own `rng(seed)`, never `ctx.rand`: each draw from the shared stream shifts every later builder's layout and the runtime stream replays depend on. The Crown's finale river (1800 draws) did exactly that until 1a28d58; Bramble's `tools/rand-fingerprint.mjs` (next ctx.rand values after boot) proves a change is stream-neutral.

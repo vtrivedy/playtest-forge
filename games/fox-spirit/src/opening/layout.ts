@@ -44,6 +44,9 @@ export const HOUSES = [
   { x: -37, z: 86, w: 5, d: 4, eave: 2.5, rise: 1.45, chimney: false },
 ] as const;
 
+/** The south lane's line, meadow → Press Hollow: painted by PATHS and carved through the rim by southLane() (one source) */
+export const SOUTH_LANE: ReadonlyArray<readonly [number, number]> = [[4.2, 75.6], [6.2, 69], [7.5, 63.5], [12.5, 53], [18.8, 44.2], [21.1, 40.2]];
+
 /** Lanes as segments [ax, az, bx, bz]; the last ones lead the opening route out to H-a */
 export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
   [-18, 95, -14, 95], [-14, 95, -12.5, 89.5], [-12.5, 89.5, -8, 88], [-29.2, 87.5, -24, 88.3], [-24, 88.3, -18.7, 87.2],
@@ -51,6 +54,8 @@ export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
   [-37.7, 88.7, -34, 90], [-34, 90, -32, 88.5], [-32, 88.5, -29.2, 87.5], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
   [12, 98, 8, 99], [8, 99, 0, 94], [0, 80, 9, 88], [9, 88, 25, 88],
   [-6, 92, -7.2, 87], [0, 80, 4.2, 75.6], [0, 80, -3, 62],
+  // the south lane out of the meadow, down into Press Hollow to the foot of the Press (DESIGN-finale.md)
+  ...SOUTH_LANE.slice(1).map((b, i) => [SOUTH_LANE[i]![0], SOUTH_LANE[i]![1], b[0], b[1]] as const),
 ];
 
 /** every lane the ground flattens and colours: the village's and Millbrook's (millbrookLayout.ts) */
@@ -99,6 +104,42 @@ export const VISTA = (() => {
   const len = Math.hypot(CRAG.x - HINGE.x, CRAG.z - HINGE.z);
   return { x: CRAG.x, z: CRAG.z, dx: (CRAG.x - HINGE.x) / len, dz: (CRAG.z - HINGE.z) / len, start: 2.4, half: 6, edge: 7, drop: 0.75, floor: -11 };
 })();
+/**
+ * The finale (DESIGN-finale.md): Press Hollow on the vista floor below the far crag, and the Scribe's Press near its
+ * far lip with the Still Crown behind it. `a` / `c` are the vista frame (along the fall line past the crag / across).
+ */
+export const FINALE = (() => {
+  const V = VISTA;
+  const at = (a: number, c: number) => ({ x: V.x + V.dx * a + V.dz * c, z: V.z + V.dz * a - V.dx * c });
+  const hollow = { y: 0.5, near: 9, lip: 34, fall: 14 };
+  // turned 3/4 to the crag so the frame's near post never stands between the lens and the book, or the Crown
+  const press = { ...at(29, 0), yaw: Math.atan2(-V.dx, -V.dz) + 0.6 };
+  /** Press-local (x across the book, z out of its foot toward the approach) → world */
+  const local = (lx: number, lz: number) => ({
+    x: press.x + lx * Math.cos(press.yaw) + lz * Math.sin(press.yaw),
+    z: press.z - lx * Math.sin(press.yaw) + lz * Math.cos(press.yaw),
+  });
+  // off the frame's near post (local x 0.3, z 2.05) so ember, kits and post never stack in one line of sight
+  const cradle = local(-0.95, 2.9);
+  const round = (r: number, ang: number) => ({ x: cradle.x + Math.sin(press.yaw + ang) * r, z: cradle.z + Math.cos(press.yaw + ang) * r });
+  return {
+    at,
+    local,
+    hollow,
+    /** the Press faces back up toward the crag, turned 3/4; its cradle sits at the foot of the book */
+    press,
+    cradle,
+    /** the Scribe's stool on the book's right (the cover opens to the left) */
+    stool: local(2.5, 1.2),
+    /** where the three pressed kits drift down, and the spot each curls up at round the cradle */
+    kits: [
+      { land: round(3.6, 0.9), curl: round(1.0, 0.75) },
+      { land: round(3.4, -0.7), curl: round(1.0, -0.6) },
+      { land: round(4.2, 0.1), curl: round(1.05, 1.9) },
+    ],
+  };
+})();
+
 /** true inside the vista gap (plus `margin` across): nothing tall may stand here */
 export function inVista(x: number, z: number, margin = 0): boolean {
   const V = VISTA;
@@ -112,8 +153,46 @@ function vistaCut(x: number, z: number, h: number): number {
   const c = Math.abs((x - V.x) * V.dz - (z - V.z) * V.dx);
   // widen as it runs out: a gap, not a corridor
   const open = (1 - THREE.MathUtils.smoothstep(c, V.half + a * 0.35, V.half + V.edge + a * 0.5)) * THREE.MathUtils.smoothstep(a, V.start - 1.5, V.start + 1.5);
-  const valley = Math.max(V.floor, 5 - Math.max(0, a - V.start) * V.drop) + Math.sin(x * 0.21) * Math.cos(z * 0.17) * 0.8;
-  return THREE.MathUtils.lerp(h, Math.min(h, valley), open);
+  // the saddle under the crag eases down into Press Hollow (DESIGN-finale.md), whose far lip drops into the deep valley
+  const F = FINALE.hollow;
+  const lip = THREE.MathUtils.smoothstep(a, F.lip, F.lip + F.fall);
+  const floor = THREE.MathUtils.lerp(5, F.y, THREE.MathUtils.smoothstep(a, V.start, F.near));
+  const valley = THREE.MathUtils.lerp(floor, V.floor, lip) + Math.sin(x * 0.21) * Math.cos(z * 0.17) * (0.3 + 0.5 * lip);
+  return southLane(x, z, THREE.MathUtils.lerp(h, Math.min(h, valley), open));
+}
+
+/**
+ * The south lane (DESIGN-finale.md) cuts a walkable trough through the rim between the meadow and Press Hollow: within
+ * `half` of its line the ground is pulled down to a profile that eases from the meadow (`from`) to the hollow floor
+ * (`to`), never raised. Walkable both ways (moveTo's probe allows ~1.3 rise/run; the trough walls stay well under it).
+ */
+/** carve from the lane's second point (the meadow side of the rim) to its second-last (inside the hollow) */
+const LANE = { pts: SOUTH_LANE.slice(1, -1), from: -0.45, to: 0.5, half: 1.9, wall: 4.2 };
+function southLane(x: number, z: number, h: number): number {
+  let best = Infinity;
+  let along = 0;
+  let run = 0;
+  let total = 0;
+  for (let i = 0; i + 1 < LANE.pts.length; i++) total += Math.hypot(LANE.pts[i + 1]![0] - LANE.pts[i]![0], LANE.pts[i + 1]![1] - LANE.pts[i]![1]);
+  for (let i = 0; i + 1 < LANE.pts.length; i++) {
+    const [ax, az] = LANE.pts[i]!;
+    const [bx, bz] = LANE.pts[i + 1]!;
+    const dx = bx - ax;
+    const dz = bz - az;
+    const len = Math.hypot(dx, dz);
+    const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / (len * len), 0, 1);
+    const d = Math.hypot(x - ax - t * dx, z - az - t * dz);
+    if (d < best) {
+      best = d;
+      along = (run + t * len) / total;
+    }
+    run += len;
+  }
+  if (best > LANE.wall) return h;
+  const floor = THREE.MathUtils.lerp(LANE.from, LANE.to, THREE.MathUtils.smoothstep(along, 0.15, 0.85)) + Math.sin(x * 0.7) * Math.cos(z * 0.6) * 0.06;
+  // banks rise from the lane's edge to the untouched rim over `wall`
+  const bank = floor + Math.max(0, best - LANE.half) * 1.05;
+  return Math.min(h, bank);
 }
 
 /** smooth min (polynomial, blend width k): where two rims meet they fillet instead of creasing */

@@ -17,7 +17,7 @@ declare class AudioWorkletProcessor {
 
 // cold:begin (types and constants)
 type Song = {
-  bpm: number; slots: number; key: number; bars: number; tunes: number; breathBars: number;
+  bpm: number; slots: number; key: number; bars: number; tunes: number; rotation: number; breathBars: number;
   tune: number[]; chords: number[]; shadeChords: number[];
   swell: { bars: number; fade: number; gap: number };
 };
@@ -37,6 +37,10 @@ const PLAYING = 0;
 const REQUESTED = 1;
 const CODA = 2;
 const DONE = 3;
+/** after the quiet, the song comes back softly from the top and never ends again */
+const EPILOGUE = 4;
+/** bars of silence after the coda before the epilogue (tla QuietBars), ≈45 s */
+const QUIET_BARS = 18;
 /** cue kinds (param `kind`, set with the cue) */
 const CUE_FORCE = 1;
 const CUE_REST = 3;
@@ -45,7 +49,12 @@ const MAX_FORCE = 2;
 /** the coda sings the tune's last line (tla CodaFrom = bars - 4) */
 const CODA_BARS = 4;
 
+/** semitones down to the diatonic third below a note (C major; semis = note above the key) */
+const THIRD_DOWN = Int8Array.from([3, 3, 3, 3, 4, 3, 4, 3, 4, 4, 4, 4]);
 // cold:end
+function thirdBelow(semis: number): number {
+  return THIRD_DOWN[((semis % 12) + 12) % 12]!;
+}
 function hz(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
@@ -53,8 +62,8 @@ function hz(m: number): number {
 class Hearthsong extends AudioWorkletProcessor {
   // cold:begin (construction only)
   static get parameterDescriptors() {
-    const k = (name: string, d: number) => ({ name, defaultValue: d, minValue: 0, maxValue: 1000, automationRate: 'k-rate' });
-    return [k('harp', 0.5), k('pad', 0), k('bass', 0), k('lead', 0), k('bells', 0), k('bright', 0.5), k('shade', 0), k('cue', 0), k('kind', 0), k('level', 0)];
+    const k = (name: string, d: number) => ({ name, defaultValue: d, minValue: -1, maxValue: 1000, automationRate: 'k-rate' });
+    return [k('harp', 0.5), k('pad', 0), k('bass', 0), k('lead', 0), k('bells', 0), k('bright', 0.5), k('shade', 0), k('cue', 0), k('kind', 0), k('level', 0), k('theme', -1)];
   }
 
   s: Song;
@@ -66,6 +75,9 @@ class Hearthsong extends AudioWorkletProcessor {
   slot = 0;
   breath = false;
   pass = 0;
+  /** the tune this pass plays (chosen at each pass start) */
+  tune = 0;
+  theme = -1;
   swell = IDLE;
   left = 0;
   since: number;
@@ -75,6 +87,7 @@ class Hearthsong extends AudioWorkletProcessor {
   forced = false;
   forces = MAX_FORCE;
   doneSlots = 0;
+  quiet = 0;
   chord = 0;
   // smoothed layer levels
   lv = new Float32Array(9);
@@ -129,7 +142,7 @@ class Hearthsong extends AudioWorkletProcessor {
   eL = new Float32Array(BELLS);
   eR = new Float32Array(BELLS);
   eNext = 0;
-  report = new Float64Array(8);
+  report = new Float64Array(9);
 
   constructor(options: { processorOptions: { song: Song; seed: number } }) {
     super(options);
@@ -198,7 +211,7 @@ class Hearthsong extends AudioWorkletProcessor {
     this.ePh[i] = 0;
     this.eMod[i] = 0;
     this.eAmp[i] = vel;
-    this.eIdx[i] = 1.6;
+    this.eIdx[i] = 0.8;
     this.pan(i, this.rand() * 1.2 - 0.6, this.eL, this.eR);
   }
 
@@ -217,6 +230,13 @@ class Hearthsong extends AudioWorkletProcessor {
       this.pInc[k * 3 + 2] = (TAU * f * 0.9968) / sampleRate;
       this.pTo[k] = v === 0 ? 0.9 : 0.7;
     }
+  }
+
+  /** at a pass start: the place's own tune (never twice running) while it leads, else the shared rotation */
+  pickTune(): void {
+    const s = this.s;
+    const th = this.theme;
+    this.tune = th >= 0 && th < s.tunes && this.tune !== th ? th : this.pass % s.rotation;
   }
 
   /** a bar line: tla/Hearthsong.tla `Bar` */
@@ -242,10 +262,22 @@ class Hearthsong extends AudioWorkletProcessor {
       this.reportState();
       return;
     }
-    if (this.ending === DONE) return;
+    if (this.ending === DONE) {
+      if (this.quiet + 1 < QUIET_BARS) this.quiet++;
+      else {
+        this.ending = EPILOGUE;
+        this.bar = 0;
+        this.breath = false;
+        this.pass = 0;
+        this.pickTune();
+        this.reportState();
+      }
+      this.since = tick;
+      return;
+    }
     this.bar++;
     if (!this.breath && this.bar >= s.bars) { this.bar = 0; this.breath = true; }
-    else if (this.breath && this.bar >= s.breathBars) { this.bar = 0; this.breath = false; this.pass++; }
+    else if (this.breath && this.bar >= s.breathBars) { this.bar = 0; this.breath = false; this.pass++; this.pickTune(); }
     if (this.swell === ARMED && !this.breath) { this.swell = SINGING; this.left = swell.bars; this.since = 0; this.forced = false; }
     else if (this.swell === SINGING && (this.left <= 1 || this.breath)) { this.swell = FADING; this.left = swell.fade; this.since = tick; }
     else if (this.swell === SINGING) { this.left--; this.since = tick; }
@@ -269,6 +301,7 @@ class Hearthsong extends AudioWorkletProcessor {
     r[5] = this.shaded ? 1 : 0;
     r[6] = this.ending;
     r[7] = this.forces;
+    r[8] = this.tune;
     this.port.postMessage(r); // lint-feel: ok once per bar (2.5 s): state for window.__game
   }
 
@@ -316,11 +349,13 @@ class Hearthsong extends AudioWorkletProcessor {
     }
     const chords = this.shaded ? s.shadeChords : s.chords;
     // which tune this pass plays (a breath belongs to the tune it follows)
-    const tb = (this.pass % s.tunes) * s.bars;
+    const tb = this.tune * s.bars;
     const cb = (tb + (this.breath ? s.bars - 1 : this.bar)) * 3;
     const root = chords[cb]!;
     const singing = this.swell === SINGING;
-    const human = 0.85 + this.rand() * 0.3;
+    // hairpins: each 4-bar phrase swells toward its middle and settles (dynamics, not a flat velocity)
+    const arc = Math.sin((Math.PI * ((this.bar & 3) + slot / s.slots)) / 4);
+    const human = (0.85 + this.rand() * 0.3) * (0.8 + 0.35 * arc);
     if (this.breath) {
       // a breath: the pad rests on the last chord; one high harp note to lead back in
       if (slot === 0 && this.bar === 0) this.padChord(chords, cb);
@@ -353,15 +388,20 @@ class Hearthsong extends AudioWorkletProcessor {
         if (n >= 0) {
           this.lIncTo = (TAU * hz(n)) / sampleRate;
           if (this.lGate === 0) this.lInc = this.lIncTo;
+          else this.lAmp *= 0.6; // tongue each note: a recorder re-articulates, a theremin slides
           this.lGate = 1;
           this.lAge = 0;
         } else if (n === -2) this.lGate = 0;
       } else {
         this.lGate = 0;
         const hint = this.pass % 4 === 2;
-        if (n >= 0 && (!hint || slot === 0)) this.pluck(n + 12, 0.5 * human, 0.025);
+        if (n >= 0 && (!hint || slot === 0)) {
+          this.pluck(n + 12, 0.5 * human, 0.025);
+          // later hearings are harmonized: a diatonic third under the tune (a second hand on the harp)
+          if (this.pass >= 2 && !hint && lv[0]! > 0.5) this.pluck(n + 12 - thirdBelow(n - s.key), 0.3 * human, 0.03);
+        }
       }
-      if (singing && lv[4]! > 0.02 && (slot === 0 || slot === 3) && this.rand() < 0.7) {
+      if ((singing ? lv[4]! > 0.02 : lv[4]! > 0.4) && (slot === 0 || slot === 3) && this.rand() < (singing ? 0.7 : 0.35)) {
         this.bell(s.key + 24 + chords[cb + Math.floor(this.rand() * 3)]!, 0.5 * human);
       }
     }
@@ -383,12 +423,13 @@ class Hearthsong extends AudioWorkletProcessor {
     lv[5]! += (p.bright![0]! - lv[5]!) * 0.05;
     lv[6]! += (p.shade![0]! - lv[6]!) * 0.05;
     lv[8]! += (p.level![0]! - lv[8]!) * 0.02;
+    this.theme = Math.round(p.theme![0]!);
     // a cue: tla/Hearthsong.tla `Cue` / `ForceCue` / `RestCue` (a plain cue sings only when idle and rested; else dropped)
     const cue = p.cue![0]!;
     if (cue !== this.lastCue) {
       const kind = p.kind![0]!;
-      if (this.ending !== PLAYING) { /* the song is ending: nothing new */ }
-      else if (kind === CUE_REST) this.ending = REQUESTED;
+      if (this.ending !== PLAYING && this.ending !== EPILOGUE) { /* the song is ending: nothing new */ }
+      else if (kind === CUE_REST) { if (this.ending === PLAYING) this.ending = REQUESTED; }
       else if (kind === CUE_FORCE) {
         // tla ForceCue: a finale moment sings even inside the gap (re-arms a fading swell)
         if ((this.swell === IDLE || this.swell === FADING) && this.forces > 0) { this.swell = ARMED; this.forced = true; this.forces--; }
@@ -402,9 +443,10 @@ class Hearthsong extends AudioWorkletProcessor {
     const bassG = 0.11 * lv[2]!;
     const leadG = 0.1 * Math.max(lv[3]!, singing ? 0.85 : 0);
     const bellG = 0.07 * Math.max(lv[4]!, swellGain * 0.6);
-    const master = lv[8]!;
+    // the epilogue is the song remembered: softer (it enters out of silence, so the step is never heard)
+    const master = lv[8]! * (this.ending === EPILOGUE ? 0.7 : 1);
     const bright = lv[5]!;
-    const harpLp = 1 - Math.exp((-TAU * (1800 + 4200 * bright)) / sampleRate);
+    const harpLp = 1 - Math.exp((-TAU * (1700 + 3600 * bright)) / sampleRate);
     const padLp = 1 - Math.exp((-TAU * (500 + 1300 * bright)) / sampleRate);
     const padAtk = 1 / (sampleRate * 1.4);
     const padRel = 1 / (sampleRate * 2.2);
@@ -412,7 +454,7 @@ class Hearthsong extends AudioWorkletProcessor {
     const bassAtk = 1 - Math.exp(-1 / (sampleRate * 0.02));
     const leadAtk = 1 - Math.exp(-1 / (sampleRate * 0.07));
     const leadRel = 1 - Math.exp(-1 / (sampleRate * 0.35));
-    const glide = 1 - Math.exp(-1 / (sampleRate * 0.03));
+    const glide = 1 - Math.exp(-1 / (sampleRate * 0.008)); // a 30 ms portamento read as a theremin
     const bellDec = Math.pow(0.001, 1 / (sampleRate * 2.6));
     const idxDec = Math.pow(0.001, 1 / (sampleRate * 0.9));
     const vibHz = (TAU * 5.1) / sampleRate;
@@ -501,7 +543,7 @@ class Hearthsong extends AudioWorkletProcessor {
         this.lAge += 1 / sampleRate;
         this.lVib += vibHz;
         if (this.lVib > TAU) this.lVib -= TAU;
-        const depth = 0.006 * Math.min(1, Math.max(0, (this.lAge - 0.25) * 2));
+        const depth = 0.0035 * Math.min(1, Math.max(0, (this.lAge - 0.4) * 2));
         this.lPh += this.lInc * (1 + depth * Math.sin(this.lVib));
         if (this.lPh > TAU) this.lPh -= TAU;
         this.lNoise += (this.rand() * 2 - 1 - this.lNoise) * 0.18;
@@ -511,12 +553,12 @@ class Hearthsong extends AudioWorkletProcessor {
         l += v * 0.9;
         r += v;
       }
-      // bells (FM, ratio 3.5: glassy)
+      // bells (FM, ratio 4, gentle index: a celesta; 3.5 read as harsh/distorted)
       for (let v = 0; v < BELLS; v++) {
         const a = this.eAmp[v]!;
         if (a < 1e-5) continue;
         this.ePh[v] = this.ePh[v]! + this.eInc[v]!;
-        this.eMod[v] = this.eMod[v]! + this.eInc[v]! * 3.5;
+        this.eMod[v] = this.eMod[v]! + this.eInc[v]! * 4;
         const e = Math.sin(this.ePh[v]! + this.eIdx[v]! * Math.sin(this.eMod[v]!)) * a * bellG;
         this.eAmp[v] = a * bellDec;
         this.eIdx[v] = this.eIdx[v]! * idxDec;

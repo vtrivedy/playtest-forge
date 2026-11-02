@@ -4,6 +4,7 @@
 //   node tools/lint-feel.mjs            (exit 1 on any finding)
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { lintHotSource, hotLintSelfTest } from './hot-path-lint.mjs';
 import { lintAssetSource, assetLintSelfTest } from './asset-path-lint.mjs';
 assetLintSelfTest();
@@ -49,6 +50,11 @@ function scanHot(dir) {
   }
 }
 scanHot('games/fox-spirit/src');
+// world checks that need the TypeScript layout (tools/checks/*.ts via tsx): painted lanes must be walkable (Wren 77d303a)
+for (const check of ['tools/checks/paths-walkable.ts']) {
+  const r = spawnSync(process.execPath, ['--import', 'tsx', check], { encoding: 'utf8' });
+  if (r.status !== 0) findings.push(`${check}  [world-check] ${(r.stdout + r.stderr).trim()}`);
+}
 if (findings.length) {
   console.log(findings.join('\n'));
   console.log(`\nlint-feel: ${findings.length} finding(s)`);
