@@ -39,6 +39,12 @@ finale stages release, ember pickup and crag arrival. Their recorded movement is
 real input, but these starts do not establish discovery or an uninterrupted
 whole-game completion.
 
+The Hermitage visual verdict covers its timed desk views and verified route
+outcomes. Independent 30–34 s review found a thin drying pole overlapping the
+tail at the release pause while the face and torso remain visible; registering
+that pole alone did not clear the overlap. Sorrel and Bramble are checking a local
+pole placement correction. This separate angle remains open in this review.
+
 ## Clearance and world occlusion
 
 Matched 1.8/1.9 m trials isolate the compressed ruin landing. At 1.8 m two frames

@@ -104,5 +104,18 @@
       "differentSamples": 0,
       "firstMismatch": []
     }
+  ],
+  "separateOpenFindings": [
+    {
+      "route": "Hermitage",
+      "timeSeconds": 32,
+      "independentSource": "fd98352",
+      "finding": "Thin drying pole overlaps tail; face and torso stay visible. Root registration alone did not fix this angle.",
+      "owners": [
+        "Sorrel",
+        "Bramble"
+      ],
+      "scope": "Outside the approved timed desk views; local placement retest pending."
+    }
   ]
 }
