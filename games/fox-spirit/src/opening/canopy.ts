@@ -90,6 +90,8 @@ export function buildCanopy(ctx: OpeningCtx) {
       lastLeaf = leaf.id;
       onRoute = true;
       if (leaf.id === 'roost') roostVisits++;
+      // a papery leaf-bounce, pitched up the canopy from the entry leaf to the roost
+      ctx.audio.play('cloth-2', { at: new THREE.Vector3(leaf.x, leaf.top, leaf.z), rate: 0.9 + leaves.indexOf(leaf) * 0.08, gain: 0.9 });
     }
     if (leaf.id === 'roost' || leaf.latched) return null;
     leaf.dwell = held ? leaf.dwell + dt : 0;
@@ -97,6 +99,7 @@ export function buildCanopy(ctx: OpeningCtx) {
     leaf.latched = true;
     leaf.pulse = 1;
     launches++;
+    ctx.audio.play('land-0', { at: new THREE.Vector3(leaf.x, leaf.top, leaf.z), rate: 0.7, gain: 0.5 });
     flight = { id: leaf.id, y: at.y, apex: at.y, time: 0, apexTime: 0 };
     return CANOPY_FEEL.launchSpeed;
   };
