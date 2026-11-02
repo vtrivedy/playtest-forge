@@ -75,3 +75,26 @@ Full fresh physical route repeats **PASS**, zero errors; identical final positio
 ## Two-reach acceptance design
 
 Repeat from a fresh physical opening with Cedar's two-reach sluice and Hazel's autumn save reconstruction integrated. Visit the drowned roof before cutting the culvert, assert the east reach remains flooded until that second action, then repeat sinking mats and the rising-punt crossing. Require both optional memories in the canonical store and all three earned Ashwater levels. Capture full game snapshots and review the new channel/roof and final shelf frames. This is route acceptance, not a blind insight or duration measurement.
+
+## Two-reach sluice + canonical side memories — 26672adb46bc452a17c8786695b8da520b5a3fe6
+
+Fresh physical opening → page home → hub arch → two-reach Ashwater: **PASS, zero page and console errors**.
+The first bank sluice opens only damA; damA2 remains closed. The route visits the drowned roof in the west
+bed, dashes the sill culvert, and reaches the east bank. Sinking-mat reset and rising-cistern assertions pass.
+The fox walks punt → shelf → Seedwell and earns all three canonical levels, Reedskim and Reed fill 1.
+Both `ashwater-roof` and `ashwater-mooring` are present in the canonical secret store. Three splashes total.
+
+Ashwater takes **171.55 simulation seconds**, including the side-place detour, deliberate sinking-mat test,
+and authored waits; autumn opening takes 135.017 s. This proves authored route solvability, not blind puzzle
+insight, a 10–15-minute world, or a 30–45-minute game. No continuous movie or zero-black-frame claim.
+
+Inspected [roof](reed-cistern/two-reach-roof.png), [second reach](reed-cistern/two-reach-culvert.png),
+[shelf](reed-cistern/two-reach-shelf.png), and [Album](reed-cistern/two-reach-album.png).
+The Album remains legible, with the rain-first revelation and onward reason. The roof barely reads at its
+trigger: fox and near slate dominate the frame. The tall pier still masks the fox's muzzle on the shelf.
+Cedar has the exact evidence for geometry follow-up; neither issue is called fixed here.
+
+Tesla T4/EGL, 640×360. Complete hook and `window.__game` snapshots plus PNGs:
+`/captures/reed/two-reach-26672adb/`; durable volume `keeping-swarm5-captures/reed/world-entry-26672adb46/`.
+TypeScript, production build, feel/camera/world lint and diff checks pass. Merge retained generic Album
+memory fields and the darker voice colour. No new production geometry, feel or audio changes in this acceptance.
