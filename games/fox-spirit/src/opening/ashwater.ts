@@ -282,8 +282,8 @@ export function buildAshwater(
   fg.fillStyle = grad;
   fg.fillRect(0, 0, 4, 128);
   const glowMat = new THREE.MeshBasicMaterial({ color: C.glow, alphaMap: new THREE.CanvasTexture(fade), transparent: true, opacity: 0.22, side: THREE.DoubleSide, toneMapped: false, depthWrite: false, blending: THREE.AdditiveBlending });
-  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 1.15, 14, 20, 1, true), glowMat);
-  glow.geometry.translate(0, 7, 0);
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.75, 12, 20, 1, true), glowMat);
+  glow.geometry.translate(0, 6, 0);
   glow.position.set(wellAt.x, LEDGE.top + 0.3, wellAt.z);
   root.add(glow);
   // its water (lit with the column) and a ring of leaning slates, like the vale's well stones, with reeds between
