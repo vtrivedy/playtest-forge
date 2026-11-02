@@ -105,7 +105,8 @@
       "firstMismatch": []
     }
   ],
-  "separateOpenFindings": [
+  "separateOpenFindings": [],
+  "resolvedSeparateFindings": [
     {
       "route": "Hermitage",
       "timeSeconds": 32,
@@ -115,7 +116,10 @@
         "Sorrel",
         "Bramble"
       ],
-      "scope": "Outside the approved timed desk views; local placement retest pending."
+      "scope": "50-second staged-start Hermitage route, 60 reviewed frames at 30\u201334 seconds; Fern independently reviewed both full-frame contact sheets and native 32-second still.",
+      "status": "Resolved by Bramble 74ce756; Sorrel replay 16e91bc32acf51ce6601bc34adffe24618541ccc",
+      "evidence": "keeping-swarm4-captures/sorrel/hermitage-pole-lateral-thin.tgz",
+      "result": "3/3 state checks, 60/60 strict body margins, numeric camera pass, no JS errors; pole clears fox through hold and turn."
     }
   ]
 }
