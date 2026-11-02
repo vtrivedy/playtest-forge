@@ -9,14 +9,15 @@
  * This file builds (allocations allowed); every per-frame step lives in ashwater.hot.ts.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
-import { ash, ASH_ORIGIN, ASH_SPAWN, DAM_A, DAM_B, H, ISLET, LEDGE, MAT_HALF, MATS, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
+import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import { updateAshwater, type AshRig } from './ashwater.hot';
 
 const C = {
-  moss: new THREE.Color(0x3f7448), peat: new THREE.Color(0x3a3a2e), sedge: new THREE.Color(0x6f8f4a), bank: new THREE.Color(0x56705e),
+  moss: new THREE.Color(0x3f7448), peat: new THREE.Color(0x3a3a2e), mud: new THREE.Color(0x3b3226), levee: new THREE.Color(0x8a7d5a), sedge: new THREE.Color(0x6f8f4a), bank: new THREE.Color(0x56705e),
   water: 0x2a6a74, reed: 0x6f8a3e, reedDry: 0xa08a4e, willow: 0x4f7f6a, pad: 0x5d8f3f, bloom: 0xf2e6c4, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
 };
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
@@ -47,9 +48,14 @@ export function buildAshwater(
     const z = pos.getZ(i) + ASH_ORIGIN.z;
     const h = H(x, z);
     pos.setY(i, h);
-    const wet = THREE.MathUtils.smoothstep(-h, 0.1, 0.8);
-    c.copy(C.moss).lerp(C.sedge, 0.5 + 0.5 * Math.sin(x * 0.37 + z * 0.23)).lerp(C.peat, wet);
-    if (h > 2) c.lerp(C.bank, 0.5);
+    // moss on the hummocks, sedge in the hollows, black-brown mud wherever the ground dips toward water,
+    // pale dug peat on the levees, slate-green on the weir and the rim
+    const wet = 1 - THREE.MathUtils.smoothstep(h, -0.6, 0.12);
+    const w = waterAt(x, z) !== null ? 1 : 0;
+    c.copy(C.moss).lerp(C.sedge, 0.5 + 0.5 * Math.sin(x * 0.37 + z * 0.23));
+    c.lerp(C.mud, Math.max(wet, w * 0.8));
+    if (h > 0.32 && h < 0.75 && w === 0) c.lerp(C.levee, 0.35);
+    if (h > 2) c.lerp(C.bank, 0.6);
     c.toArray(col, i * 3);
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -124,6 +130,7 @@ export function buildAshwater(
   };
   const damA = dam(DAM_A.lx, DAM_A.lz);
   const damB = dam(DAM_B.lx, DAM_B.lz);
+  const damC = dam(DAM_C.lx, DAM_C.lz);
   // the sluice culvert the dam chokes: a slate mouth on the channel bank behind it
   const slate = marsh(C.slate);
   const timber = marsh(C.timber);
@@ -141,18 +148,32 @@ export function buildAshwater(
   gate.position.set(sluiceAt.x, sluiceY - 0.2, sluiceAt.z);
   root.add(beam, gate);
 
-  // ---- reed mats over the pond (sunk until Reedskim)
-  const matGeo = new THREE.CylinderGeometry(MAT_HALF * 1.12, MAT_HALF * 1.2, 0.16, 9);
+  // ---- reed mats over the pond (sunk until Reedskim): bundles of cut reed lashed into a raft with a bound rim and
+  // a few green tips still standing; they ride low and sink under a fox that lingers
+  const strand = new THREE.CylinderGeometry(0.045, 0.045, MAT_HALF * 2.1, 5).rotateZ(Math.PI / 2);
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 26; i++) {
+    const g = strand.clone().rotateY((i / 26) * Math.PI + (rand() - 0.5) * 0.25);
+    g.translate((rand() - 0.5) * 0.2, 0.05 + (i % 3) * 0.04, (rand() - 0.5) * 0.2);
+    parts.push(g);
+  }
+  const matGeo = mergeGeometries(parts)!;
+  const rimGeo = new THREE.TorusGeometry(MAT_HALF * 0.92, 0.07, 5, 16).rotateX(Math.PI / 2).translate(0, 0.1, 0);
+  const tipGeo = mergeGeometries(Array.from({ length: 7 }, (_, i) => new THREE.ConeGeometry(0.03, 0.55 + (i % 3) * 0.15, 4).translate(Math.cos(i * 0.9) * MAT_HALF * 0.75, 0.32, Math.sin(i * 0.9) * MAT_HALF * 0.75)))!;
   const matMat = marsh(C.mat);
+  const rimMat = marsh(0x6b5a34);
+  const tipMat = marsh(C.reed);
   const mats: THREE.Object3D[] = [];
   const matCols: Extract<Collider, { kind: 'box' }>[] = [];
   for (const [lx, lz] of MATS) {
     const at = ash(lx, lz);
-    const mesh = new THREE.Mesh(matGeo, matMat);
+    const mesh = new THREE.Group();
+    const body = new THREE.Mesh(matGeo, matMat);
+    body.castShadow = body.receiveShadow = true;
+    mesh.add(body, new THREE.Mesh(rimGeo, rimMat), new THREE.Mesh(tipGeo, tipMat));
     mesh.position.set(at.x, WATER.pond.full - 0.6, at.z);
     mesh.rotation.y = rand() * 3;
     mesh.visible = false;
-    mesh.castShadow = true;
     root.add(mesh);
     mats.push(mesh);
     const col: Extract<Collider, { kind: 'box' }> = { kind: 'box', x: at.x, z: at.z, yaw: 0, hx: MAT_HALF, hz: MAT_HALF, top: -100 };
@@ -197,15 +218,36 @@ export function buildAshwater(
   basin.position.set(wellAt.x, LEDGE.top + 0.3, wellAt.z);
   root.add(basin);
   colliders.push({ kind: 'post', x: wellAt.x, z: wellAt.z, r: 1.5 });
-  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 14, 14, 1, true), new THREE.MeshBasicMaterial({ color: C.glow, transparent: true, opacity: 0.55, side: THREE.DoubleSide, toneMapped: false, depthWrite: false }));
+  const glowMat = new THREE.MeshBasicMaterial({ color: C.glow, transparent: true, opacity: 0.22, side: THREE.DoubleSide, toneMapped: false, depthWrite: false });
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 14, 14, 1, true), glowMat);
   glow.geometry.translate(0, 7, 0);
   glow.position.set(wellAt.x, LEDGE.top + 0.3, wellAt.z);
-  glow.visible = false;
   root.add(glow);
+  // its water (lit with the column) and a ring of leaning slates, like the vale's well stones, with reeds between
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(1.15, 18).rotateX(-Math.PI / 2), glowMat);
+  pool.position.set(wellAt.x, LEDGE.top + 0.42, wellAt.z);
+  root.add(pool);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.3;
+    const h = 1.3 + rand() * 0.9;
+    const stone = new THREE.Mesh(new THREE.BoxGeometry(0.55, h, 0.32), slate);
+    stone.position.set(wellAt.x + Math.sin(a) * 2.4, LEDGE.top + h / 2 - 0.1, wellAt.z + Math.cos(a) * 2.4);
+    stone.rotation.set((rand() - 0.5) * 0.15, a, (rand() - 0.5) * 0.2);
+    stone.castShadow = true;
+    root.add(stone);
+    colliders.push({ kind: 'post', x: stone.position.x, z: stone.position.z, r: 0.3 });
+    for (let k = 0; k < 6; k++) {
+      const b = new THREE.Mesh(blade, marsh(C.reed));
+      const ba = a + 0.5 + (rand() - 0.5) * 0.4;
+      b.position.set(wellAt.x + Math.sin(ba) * (2.0 + rand() * 0.6), LEDGE.top - 0.05, wellAt.z + Math.cos(ba) * (2.0 + rand() * 0.6));
+      b.scale.set(1, 0.6 + rand() * 0.6, 1);
+      root.add(b);
+    }
+  }
 
   // ---- lanterns along the way: warm notes in the rain, at each gate
   const lanternMat = new THREE.MeshBasicMaterial({ color: C.lantern, toneMapped: false });
-  for (const [lx, lz] of [[2.6, -40], [-8.5, -36.5], [2.6, -20], [-3.2, -10], [3.5, 16], [-17, 22], [17, 22], [19, 38], [27, 37.5]] as const) {
+  for (const [lx, lz] of [[2.6, -40], [-8.5, -36.5], [2.6, -20], [-3.2, -10], [3.5, 16], [-17, 22], [17, 22], [13.5, 36.5], [20.5, 22.5]] as const) {
     const at = ash(lx, lz);
     const y = H(at.x, at.z);
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.7, 5), timber);
@@ -267,6 +309,86 @@ export function buildAshwater(
     root.add(w);
   }
 
+  // ---- the Ferrykeeper (DESIGN-worlds story): a heron pressed flat mid-wade at the Mill Pool's edge, its bill on the
+  // pole of the last ferry. When the Seedwell fills it unpresses — paper gains depth and colour — and flies off north
+  const heronShape = new THREE.Shape();
+  heronShape.moveTo(-0.55, 0.95); // tail
+  heronShape.quadraticCurveTo(-0.2, 1.25, 0.25, 1.15); // back
+  heronShape.quadraticCurveTo(0.45, 1.35, 0.32, 1.55); // neck S
+  heronShape.quadraticCurveTo(0.25, 1.78, 0.42, 1.86); // crown
+  heronShape.lineTo(0.95, 1.78); // bill
+  heronShape.lineTo(0.42, 1.76);
+  heronShape.quadraticCurveTo(0.3, 1.6, 0.4, 1.42);
+  heronShape.quadraticCurveTo(0.42, 1.1, 0.22, 0.9); // breast
+  heronShape.lineTo(0.08, 0.86);
+  heronShape.lineTo(0.1, 0.0); // front leg
+  heronShape.lineTo(0.05, 0.0);
+  heronShape.lineTo(0.0, 0.84);
+  heronShape.lineTo(-0.1, 0.84);
+  heronShape.lineTo(-0.2, 0.0); // back leg
+  heronShape.lineTo(-0.25, 0.0);
+  heronShape.lineTo(-0.2, 0.86);
+  heronShape.quadraticCurveTo(-0.45, 0.88, -0.55, 0.95);
+  const heronGeo = new THREE.ExtrudeGeometry(heronShape, { depth: 0.26, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 1 }).translate(0, 0, -0.13);
+  const heronMat = marsh(0xd8cfb8);
+  const heron = new THREE.Mesh(heronGeo, heronMat);
+  const heronAt = ash(-6.5, 18.2);
+  heron.position.set(heronAt.x, H(heronAt.x, heronAt.z), heronAt.z);
+  heron.rotation.y = -0.4;
+  heron.scale.set(1.3, 1.3, 0.08);
+  heron.castShadow = true;
+  root.add(heron);
+  const heronCol: Extract<Collider, { kind: 'post' }> = { kind: 'post', x: heronAt.x, z: heronAt.z, r: 0.45 };
+  colliders.push(heronCol);
+  // the last ferry: a flat punt moored by the weir's east end; it rides whatever the cistern holds (PUNT)
+  const puntAt = ash(PUNT.lx, PUNT.lz);
+  const punt = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(PUNT.hx * 2, 0.3, PUNT.hz * 2), timber);
+  hull.position.y = -0.05;
+  const thwart = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, PUNT.hz * 2), marsh(0x6a5440));
+  thwart.position.set(0.4, 0.14, 0);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 3.4, 5), timber);
+  pole.position.set(-1.0, 0.9, 0.3);
+  pole.rotation.set(0.25, 0, 0.9);
+  punt.add(hull, thwart, pole);
+  punt.position.set(puntAt.x, WATER.pool.full + 0.05, puntAt.z);
+  hull.castShadow = true;
+  root.add(punt);
+  const puntCol: Extract<Collider, { kind: 'box' }> = { kind: 'box', x: puntAt.x, z: puntAt.z, yaw: 0, hx: PUNT.hx, hz: PUNT.hz, top: WATER.pool.full + PUNT.rise };
+  colliders.push(puntCol);
+
+  // ---- the cistern: slate walls west, south and east of the Mill Pool (the weir is its north side); the south wall's
+  // gate stands open over a dry or low pool and shuts as a flood rises
+  const wallMat = marsh(0x6c7880);
+  const W = WATER.pool, T2 = CISTERN.wall / 2;
+  const cWall = (x0: number, x1: number, z0: number, z1: number) => {
+    const a = ash((x0 + x1) / 2, (z0 + z1) / 2);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, CISTERN.wallTop + 1.3, z1 - z0), wallMat);
+    m.position.set(a.x, (CISTERN.wallTop - 1.3) / 2, a.z);
+    m.castShadow = m.receiveShadow = true;
+    root.add(m);
+    colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx: (x1 - x0) / 2, hz: (z1 - z0) / 2, top: CISTERN.wallTop });
+  };
+  cWall(W.x0 - CISTERN.wall, W.x0, W.z0 - CISTERN.wall, WEIR.z0);
+  cWall(W.x1, W.x1 + CISTERN.wall, W.z0 - CISTERN.wall, WEIR.z0);
+  cWall(W.x0, CISTERN.gate.x0, W.z0 - CISTERN.wall, W.z0);
+  cWall(CISTERN.gate.x1, W.x1, W.z0 - CISTERN.wall, W.z0);
+  const gateAt = ash(0, W.z0 - T2);
+  const cGate = new THREE.Mesh(new THREE.BoxGeometry(CISTERN.gate.x1 - CISTERN.gate.x0, CISTERN.wallTop + 1.3, CISTERN.wall * 0.6), marsh(0x5a4636));
+  cGate.position.set(gateAt.x, -4, gateAt.z);
+  root.add(cGate);
+  const gateCol: Extract<Collider, { kind: 'box' }> = { kind: 'box', x: gateAt.x, z: gateAt.z, yaw: 0, hx: (CISTERN.gate.x1 - CISTERN.gate.x0) / 2, hz: T2, top: -100 };
+  colliders.push(gateCol);
+  // a ramp from the gate down to the cistern floor, walkable when drained
+  for (let i = 0; i < 4; i++) {
+    const r = ash(0, W.z0 + 0.4 + i * 0.7);
+    const top = -0.2 - i * 0.25;
+    colliders.push({ kind: 'box', x: r.x, z: r.z, yaw: 0, hx: 2.0, hz: 0.35, top });
+    const step = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.3, 0.7), slate);
+    step.position.set(r.x, top - 0.15, r.z);
+    root.add(step);
+  }
+
   // ---- the rig
   const say = (t: string) => ctx.captions.say(t);
   const rig: AshRig = {
@@ -284,12 +406,17 @@ export function buildAshwater(
         ctx.audio.cue('millrace-burst');
         say('The mill pool lets go.');
       },
+      burstC: () => {
+        ctx.audio.cue('millrace-burst');
+        say('The race floods the cistern.');
+      },
       complete: (level) => {
         opts.complete(LEVEL_IDS[level]);
         if (level === 0) say('The reeds will hold you now.');
+        if (level === 1) say('The Ferrykeeper still waits.');
         if (level === 2) {
           ctx.audio.cue('finale-kindle');
-          say('The Reed Seedwell fills.');
+          say('The Scribe pressed the rain first.');
         }
       },
       splash: () => ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.1, rate: 0.6 }),
@@ -297,13 +424,24 @@ export function buildAshwater(
     waterMesh: water,
     damA: damA.g,
     damB: damB.g,
+    damC: damC.g,
     damACol: damA.col,
     damBCol: damB.col,
+    damCCol: damC.col,
+    punt,
+    puntCol,
+    cGate,
+    gateCol,
     mats,
     matCols,
+    matLoad: new Float32Array(MATS.length),
     glow,
+    glowMat,
+    heron,
+    heronMat,
+    heronCol,
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
-    s: { burstA: -1, burstB: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0 },
+    s: { burstA: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z },
   };
   // a saved game re-enters the marsh as it was left: drained channel / pool, burst dams, a lit Seedwell (no captions)
   const was = (l: (typeof LEVEL_IDS)[number]) => opts.isRestored?.(l) ?? false;
@@ -317,6 +455,8 @@ export function buildAshwater(
     rig.s.burstB = 999;
     rig.s.done |= 4;
     rig.s.glowK = 1;
+    // the Ferrykeeper already flew
+    rig.s.heronT = 99;
     damB.col.r = 0.001;
   }
   ctx.onUpdate((dt) => updateAshwater(rig, dt));
@@ -324,7 +464,7 @@ export function buildAshwater(
   return {
     spawn: { x: spawnAt.x, z: spawnAt.z, yaw: ASH_SPAWN.yaw },
     state: () => ({
-      damA: rig.s.burstA >= 0, damB: rig.s.burstB >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2),
+      damA: rig.s.burstA >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2),
       mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
     }),
   };
