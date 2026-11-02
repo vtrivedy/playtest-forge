@@ -18,7 +18,7 @@ type Fold = {
   housing?: THREE.Object3D;
 };
 
-export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unknown> } {
+export function buildPopUpRuin(ctx: OpeningCtx): { guide: { readonly firstOpen: boolean; readonly secondOpen: boolean; readonly opening: boolean; readonly reached: boolean }; state(): Record<string, unknown> } {
   const root = new THREE.Group();
   root.name = 'pop-up ruin';
   ctx.scene.add(root);
@@ -302,5 +302,5 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
       f.spindle.rotation.x = f.phase === 'open' ? 0.25 : 0;
     });
   });
-  return { state: () => ({ folds: folds.map(f => ({ phase: f.phase, progress: +Math.min(1, f.elapsed / RUIN_FEEL.unfold).toFixed(3) })), reached, returns, misses, tunables: { ...RUIN_FEEL } }) };
+  return { guide: { get opening() { return folds[0]!.phase === 'opening' || folds[1]!.phase === 'opening'; }, get firstOpen() { return folds[0]!.phase === 'open'; }, get secondOpen() { return folds[1]!.phase === 'open'; }, get reached() { return reached; } }, state: () => ({ folds: folds.map(f => ({ phase: f.phase, progress: +Math.min(1, f.elapsed / RUIN_FEEL.unfold).toFixed(3) })), reached, returns, misses, tunables: { ...RUIN_FEEL } }) };
 }

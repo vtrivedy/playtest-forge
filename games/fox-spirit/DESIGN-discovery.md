@@ -1,0 +1,11 @@
+# First five minutes — discovery repair
+
+The first task must read from the wake camera: a living, warm page in a still paper village. A player who misses its first flight must still see where to go and which of the two actions helps. Preserve all three catches, world collision, controller tuning and the spring/ruin puzzles.
+
+Use a small chain of fluttering gold paper scraps as a physical invitation. Before catch one, emphasize the real page with a larger breathing halo and a short contextual dash invitation. After a catch, the scraps point through the actual gate toward the next traversal entrance, rather than drawing a line through buildings. At a spring leaf, show the jump-hold verb; at a fold, show dash. The existing page remains the moving reward. Cues observe current page catches and actual traversal contacts; they never move the fox, catch the page, unlock a fold, or advance story state. A missed jump must still have a readable way back.
+
+Keep text compact, away from the fox, and useful only while the chase is active. Color and motion must work in the canvas recording as well as in the browser. No new inventory, controls, quest log or minimap.
+
+Verification separates corrected blind wander from a generic cue-following bot. The latter reads only the same public cue currently drawn to players and ordinary movement feedback; it has no authored route array, teleports, forced catches, or debug progression. Report both honestly. Keep the original slice route as a regression, record window.__game and named-build continuous clips, inspect wake/gate/leaf/ruin stills, fix the weakest read and retest.
+
+Formal scope: RunawayPage.tla checked before changes (24 generated/9 distinct states, no error). Discovery.tla checked before introducing the guide FSM (36 generated/14 distinct states, no error). A negative variant removing synchronization after a world catch fails MatchesWorld in two states. The guide has no write access to progression (readonly views). Its leg follows actual support contacts, not proximity in flight; a grounded floor retry resets to the accessible entry. This replaces the prototype's ambiguous position-only projection, which switched targets before landing. Continuous visibility/reach remains a playtest obligation; the model does not claim geometric reachability or guarantee catches from random inputs.
