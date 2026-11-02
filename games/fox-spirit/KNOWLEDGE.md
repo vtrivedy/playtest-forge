@@ -705,3 +705,8 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
   LRA 8.5 (the review's 4.8 was the full mix on a capture: ambience/SFX flatten it). The worklet's `mom` envelope
   (bed ×0.82, swell up to ×1.35, 2.5 s up / 4 s down, bass + brighter harp under it) → lift 8.0, LRA 12.7.
   Level-only changes leave the conductor (TLA Hearthsong) untouched; still run `npm run check:music`.
+- World edge (Maple, swarm5): outside the bowl's rims the terrain is only a gentle slope (bowlRim grows 14 per
+  rimK unit = ~0.35 m/m east/west), and the vista valley past Press Hollow's lip is walkable down. Closing one hole
+  with a rail just moved the leak (seed 1: lip → then east off the far crag). The fix class is a baked world mask
+  (`opening/worldBounds.ts`) read by the controller's `okAt` (`inWorld`): add new regions' shapes to `inside()`.
+  Check with `node tools/naive-explore.mjs --seconds 120 --seed 1..3` (final position must stay inside).

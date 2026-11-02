@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { buildDistance, buildMaple, buildRock, contactInk, hewn, inked, mapleLeafGeometry, toon, type TreeKind } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { OpeningCtx } from './scene';
 import { BOUNDS, bowlPathDist, HEARTH_A, HOUSES, inVista, JOGS, pathDist, rimK, SHELF, WELL } from './layout';
 import { westE } from './millbrookLayout';
@@ -100,6 +101,29 @@ function occluder<T extends THREE.Object3D>(ctx: OpeningCtx, o: T): T {
   return o;
 }
 
+/** one bowl-ring stone between angles a0..a1: bevelled all round, smooth-shaded, a little domed (no build rand) */
+function bowlStone(a0: number, a1: number, h: number): THREE.BufferGeometry {
+  const bev = 0.07;
+  const s = new THREE.Shape();
+  s.absarc(0, 0, 1.0 - bev, a0 + 0.03, a1 - 0.03, false);
+  s.absarc(0, 0, 0.66 + bev, a1 - 0.03, a0 + 0.03, true);
+  s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth: h - bev * 2, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 10 });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, bev, 0);
+  const m = mergeVertices(g.deleteAttribute('normal').deleteAttribute('uv'), 1e-3);
+  const p = m.getAttribute('position') as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    // crown the top: highest mid-stone, falling to the ends and edges
+    const r = Math.hypot(x, z);
+    const mid = 1 - Math.abs(r - 0.83) / 0.2;
+    if (y > h * 0.6) p.setY(i, y + 0.05 * Math.max(0, mid));
+  }
+  m.computeVertexNormals();
+  return m.toNonIndexed();
+}
+
 /**
  * H-a, the cold hearth: a two-step stone plinth carrying a ring of seven fire-blackened bowl stones
  * (rim ≈ ground + 1, around the reactor's ash bed at +0.92). It blocks like a low wall; the fox lights it
@@ -134,7 +158,10 @@ function buildHearth(ctx: OpeningCtx): void {
     const h = 0.5 + rand() * 0.14;
     const geo = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: false, curveSegments: 3 });
     geo.rotateX(-Math.PI / 2);
-    const stone = inked(hewn(geo, rand, 0.03), toon(new THREE.Color(0x5a4f46).multiplyScalar(0.85 + rand() * 0.25), { contour: 0.5 }), 0.022, true);
+    // the faceted segment is still hewn so the shared build rand advances as before (layout unchanged); the stone
+    // drawn is a rounded, bevelled bowl stone of the same footprint (Kit: "blocky hex stones")
+    hewn(geo, rand, 0.03);
+    const stone = inked(bowlStone(a0, a1, h), toon(new THREE.Color(0x5a4f46).multiplyScalar(0.85 + rand() * 0.25), { contour: 0.5 }), 0.022, true);
     stone.position.y = 0.5;
     g.add(stone);
   }
