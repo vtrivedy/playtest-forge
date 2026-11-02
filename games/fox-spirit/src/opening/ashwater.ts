@@ -16,8 +16,8 @@ import { ash, ASH_ORIGIN, ASH_SPAWN, DAM_A, DAM_B, H, ISLET, LEDGE, MAT_HALF, MA
 import { updateAshwater, type AshRig } from './ashwater.hot';
 
 const C = {
-  moss: new THREE.Color(0x5f8a5a), peat: new THREE.Color(0x4b4a3c), sedge: new THREE.Color(0x8a9a5b), bank: new THREE.Color(0x6e7a64),
-  water: 0x2f6f78, reed: 0x7f8f4c, reedDry: 0x9a8a55, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
+  moss: new THREE.Color(0x3f7448), peat: new THREE.Color(0x3a3a2e), sedge: new THREE.Color(0x6f8f4a), bank: new THREE.Color(0x56705e),
+  water: 0x2a6a74, reed: 0x6f8a3e, reedDry: 0xa08a4e, willow: 0x4f7f6a, pad: 0x5d8f3f, bloom: 0xf2e6c4, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
 };
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
 
@@ -27,7 +27,7 @@ const marsh = (color: THREE.ColorRepresentation, extra: THREE.MeshToonMaterialPa
 
 export function buildAshwater(
   ctx: OpeningCtx,
-  opts: { complete: (level: (typeof LEVEL_IDS)[number]) => boolean; hasReedskim: () => boolean },
+  opts: { complete: (level: (typeof LEVEL_IDS)[number]) => boolean; hasReedskim: () => boolean; isRestored?: (level: (typeof LEVEL_IDS)[number]) => boolean },
 ) {
   const { scene, colliders } = ctx;
   const rand = rng(7071);
@@ -73,7 +73,7 @@ export function buildAshwater(
 
   // ---- reeds: blades along every bank, thick at the water's edge
   const blade = new THREE.ConeGeometry(0.05, 1.3, 4).translate(0, 0.65, 0);
-  const REEDS = 2600;
+  const REEDS = 5200;
   const reeds = new THREE.InstancedMesh(blade, marsh(C.reed), REEDS);
   const tint = new THREE.Color();
   const m4 = new THREE.Matrix4();
@@ -90,7 +90,7 @@ export function buildAshwater(
     const h = H(x, z);
     if (waterAt(x, z) !== null || h > 5 || h < -0.3) continue;
     // reeds crowd the water's edge and the rim; keep the walking line (lx ≈ 0) and the gates readable
-    const edge = h < 0.05 ? 1 : 0.25;
+    const edge = h < 0.05 ? 1 : h > 1.5 ? 0.5 : 0.12;
     if (rand() > edge || (Math.abs(lx) < 4 && lz < 40) || Math.hypot(lx - DAM_A.lx, lz - DAM_A.lz) < 3.5) continue;
     p.set(x, h - 0.05, z);
     e.set((rand() - 0.5) * 0.35, rand() * 6.28, (rand() - 0.5) * 0.35);
@@ -110,9 +110,9 @@ export function buildAshwater(
     const at = ash(lx, lz);
     g.position.set(at.x, H(at.x, at.z), at.z);
     const mat = marsh(C.reedDry);
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < 90; i++) {
       const b = new THREE.Mesh(damBlade, mat);
-      b.position.set((rand() - 0.5) * 2.2, 0.15 + rand() * 1.1, (rand() - 0.5) * 1.4);
+      b.position.set((rand() - 0.5) * 2.6, 0.15 + rand() * 1.5 * (1 - Math.abs(rand() - 0.5)), (rand() - 0.5) * 1.8);
       b.rotation.set(rand() * 0.6, rand() * 3.14, (rand() - 0.5) * 0.5);
       b.castShadow = true;
       g.add(b);
@@ -127,10 +127,19 @@ export function buildAshwater(
   // the sluice culvert the dam chokes: a slate mouth on the channel bank behind it
   const slate = marsh(C.slate);
   const timber = marsh(C.timber);
-  const sluiceAt = ash(DAM_A.lx, WATER.channel.z0 - 0.3);
-  const sluice = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.2, 1.0), slate);
-  sluice.position.set(sluiceAt.x, H(sluiceAt.x, sluiceAt.z) - 0.2, sluiceAt.z);
-  root.add(sluice);
+  // the sluice gate the dam chokes: two timber posts and a plank gate on the channel bank behind it
+  const sluiceAt = ash(DAM_A.lx, WATER.channel.z0 - 0.2);
+  const sluiceY = H(sluiceAt.x, sluiceAt.z);
+  for (const sx of [-1.7, 1.7]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.6, 0.32), timber);
+    post.position.set(sluiceAt.x + sx, sluiceY + 0.5, sluiceAt.z);
+    root.add(post);
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.3, 0.34), timber);
+  beam.position.set(sluiceAt.x, sluiceY + 1.8, sluiceAt.z);
+  const gate = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.1, 0.14), marsh(0x6a5440));
+  gate.position.set(sluiceAt.x, sluiceY - 0.2, sluiceAt.z);
+  root.add(beam, gate);
 
   // ---- reed mats over the pond (sunk until Reedskim)
   const matGeo = new THREE.CylinderGeometry(MAT_HALF * 1.12, MAT_HALF * 1.2, 0.16, 9);
@@ -219,6 +228,45 @@ export function buildAshwater(
   stake.position.set(isletAt.x + 1.6, H(isletAt.x + 1.6, isletAt.z) + 1.1, isletAt.z);
   root.add(stake);
 
+  // ---- lily pads on the pond (clear of the mats' line) and willows hanging over the rim: the marsh's silhouette
+  const padGeo = new THREE.CircleGeometry(0.45, 9, 0.3, Math.PI * 1.85).rotateX(-Math.PI / 2);
+  const pads = new THREE.InstancedMesh(padGeo, marsh(C.pad, { side: THREE.DoubleSide }), 220);
+  let np = 0;
+  for (let tries = 0; np < 220 && tries < 3000; tries++) {
+    const lx = (rand() - 0.5) * 120;
+    const lz = WATER.pond.z0 + 0.8 + rand() * (WATER.pond.z1 - WATER.pond.z0 - 1.6);
+    if (Math.abs(lx) < 4 || (lz > -1.5 && lz < 2.5 && lx > 0 && lx < 26)) continue;
+    const at = ash(lx, lz);
+    if (waterAt(at.x, at.z) !== 'pond') continue;
+    p.set(at.x, WATER.pond.full + 0.02, at.z);
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * 6.28);
+    sc.setScalar(0.6 + rand() * 0.9);
+    pads.setMatrixAt(np++, m4.compose(p, q, sc));
+  }
+  pads.count = np;
+  root.add(pads);
+  const willowLeaf = marsh(C.willow);
+  for (let i = 0; i < 26; i++) {
+    const a = (i / 26) * Math.PI * 2 + rand() * 0.2;
+    const lx = Math.sin(a) * 58, lz = Math.cos(a) * 54;
+    const at = ash(lx, lz);
+    const y = H(at.x, at.z);
+    const w = new THREE.Group();
+    w.position.set(at.x, y, at.z);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.4, 3.4, 6).translate(0, 1.7, 0), timber);
+    trunk.rotation.z = (rand() - 0.5) * 0.3;
+    w.add(trunk);
+    for (let k = 0; k < 5; k++) {
+      // drooping curtains of leaves: tall soft lobes hanging off the crown
+      const lobe = new THREE.Mesh(new THREE.IcosahedronGeometry(1.3, 1).scale(0.8, 1.7, 0.8), willowLeaf);
+      lobe.position.set((rand() - 0.5) * 2.4, 3.0 + rand() * 0.8, (rand() - 0.5) * 2.4);
+      lobe.castShadow = true;
+      w.add(lobe);
+    }
+    w.scale.setScalar(1 + rand() * 0.6);
+    root.add(w);
+  }
+
   // ---- the rig
   const say = (t: string) => ctx.captions.say(t);
   const rig: AshRig = {
@@ -257,6 +305,20 @@ export function buildAshwater(
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
     s: { burstA: -1, burstB: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0 },
   };
+  // a saved game re-enters the marsh as it was left: drained channel / pool, burst dams, a lit Seedwell (no captions)
+  const was = (l: (typeof LEVEL_IDS)[number]) => opts.isRestored?.(l) ?? false;
+  if (was('teach')) {
+    rig.s.burstA = 999;
+    rig.s.done |= 1;
+    damA.col.r = 0.001;
+  }
+  if (was('develop')) rig.s.done |= 2;
+  if (was('combine')) {
+    rig.s.burstB = 999;
+    rig.s.done |= 4;
+    rig.s.glowK = 1;
+    damB.col.r = 0.001;
+  }
   ctx.onUpdate((dt) => updateAshwater(rig, dt));
 
   return {

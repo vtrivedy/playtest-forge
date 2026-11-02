@@ -751,3 +751,20 @@ The successful66 discovery clip is source-scoped. Rebuilt currente3f785b1/68-equ
 Follow-up18:50: retaining current controller and disabling ONLY onward teach restores all13 + realgroundeddone55.95s (/captures/hazel/recheck-current-no-onward-teach). Controller alters route but is able to recover; competing onward words prevent retries. f8442a9d adds canTeachOnward=discovery.finished to gate the offer, no controller changes. State/rendered candidate gates pending.
 
 Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedindependent c0ebT4production70s/15fps1050frames both all13/0JS/done55.95s. Fullstate, movie, inspectedretry+landing sheets under /captures/hazel/discovery-priority-f8442a9d-rendered-detached; Reedvolume reed/discovery-priority-c0eb9d41. Integrated c0ebstate65s all13,283sampledpositions identical to candidate. Onward words only afterdone; no controller rollback. Earlier foreground57framecapture interrupted and retained. Fullreview docs/reviews/swarm5/hazel-discovery.md; blindwander stillopen.
+
+## Building a world island (Cedar, swarm5 — Ashwater Reach)
+
+- `THREE.MathUtils.smoothstep(x, min, max)` with min > max does not invert — it returns 0 below min and 1 above
+  max, so `smoothstep(d, 0.7, -0.9)` was 1 almost everywhere and sank the whole marsh to the bed. Write
+  `1 - smoothstep(d, lo, hi)`. `tools/checks/ashwater-terrain.ts` (in lint:feel) pins the authored height at each gate.
+- Standing jumps carry ~1 m forward (air control is low); platform gaps must assume a running jump from the
+  platform you stand on. 2.3 m mats at 3 m centres work; 1.8 m mats at 4.6 m did not.
+- Terrain walls are not steps: from a 3.2 m box the fox would not get onto a 3.6 m terrain plateau over a steep
+  edge. End a stair with a box level with the top. Apply cliffs after water/bank cuts or the bank slope eats them.
+- A dash covers ~2 m; trigger dash-gates on "a dash ending within ~3 m" (the object's collider stops you at its
+  radius anyway).
+- Wading resets need a "dry footing" definition (y above the full water line), or the reset point lands on the
+  drowned bank and the fox is teleported every frame.
+- `tools/ashwater-probe.mjs` (staged landing start, then stick/keys): its `go()` helper with `jumpAt` (running jump)
+  and `land` is reusable for any world's route.
+- Authored reveal paths must frame from the fox, not from the landmark: the homecoming look framed off the Great Well put its roof between lens and fox. Pick the lens from a few angles round the fox with `cam.sightBlocked(lens, chest, feetY)` (as finale familyShot does) and look just past the fox so it sits slightly below centre.

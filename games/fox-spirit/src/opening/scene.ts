@@ -262,7 +262,7 @@ export async function runOpening(): Promise<void> {
   // world progress (Hazel's store, DESIGN-worlds.md) is the one truth for levels, abilities and the hub arches
   const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
   // world II (Ashwater Reach, x ≈ +700, Cedar): its levels report physical completion to the store
-  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater') });
+  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level) });
   // world III (the Scribe's Press, x ≈ −700, Thistle): its drafts join the updraft read the controller glides on
   const pressWorld = buildPress(ctx, { complete: (level) => progress.complete('press', level), hasInkstep: () => progress.hasAbility('press'), restored: (level) => progress.isRestored('press', level) });
   {
@@ -301,6 +301,9 @@ export async function runOpening(): Promise<void> {
     { world: 'ashwater', x: 3, z: 93, y: groundH(3, 93) },
     { world: 'press', x: -5, z: 95.2, y: groundH(-5, 95.2) },
   ]);
+  // re-entry from a save: a restored first level rebuilds its world state (the page is home, the well lit), so the
+  // open Ashwater arch never sits beside a page that is still running away
+  if (progress.isRestored('russetvale', 'teach') && !homecoming.isPinned()) homecoming.force();
   // Russetvale's levels from their physical truth: page home → Keeping settled → the Press kindled
   let progressT = 0;
   ctx.onUpdate((dt) => {
