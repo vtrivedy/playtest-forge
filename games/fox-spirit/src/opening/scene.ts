@@ -16,6 +16,7 @@ import { ALL_PATHS, FINALE, groundH, KEEPING, pathDist, SPAWN } from './layout';
 import { bakeLaneMap } from './lanePaint';
 import { buildWorldEdge } from './worldEdge';
 import { buildWorlds } from './worldsScene';
+import { buildWarden } from './warden';
 import { WORLDS } from './worlds';
 import { createWorldProgress } from '../worlds/progress';
 import { createPageMap } from '../worlds/pageMap';
@@ -297,6 +298,9 @@ export async function runOpening(): Promise<void> {
   });
   const pageMap = createPageMap(view, progress);
   worlds.attach(view);
+  // the Ash Warden, always one step ahead (DESIGN-worlds.md story)
+  const warden = buildWarden(ctx, progress);
+  ctx.onUpdate((dt) => warden.update(dt));
   buildSeedwells(scene, progress, [
     { world: 'russetvale', x: -4, z: 77.5, y: groundH(-4, 77.5) },
     { world: 'ashwater', x: 3, z: 93, y: groundH(3, 93) },
@@ -412,7 +416,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), captions: ctx.captions.state(), teach: ctx.teach.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), discovery: discovery.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state(), ashwater: ashwater.state(), press: pressWorld.state(), worlds: { active: worlds.active, travels: worlds.travels, progress: progress.snapshot(), mapOpen: pageMap.isOpen() } } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), captions: ctx.captions.state(), teach: ctx.teach.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), discovery: discovery.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state(), ashwater: ashwater.state(), press: pressWorld.state(), worlds: { active: worlds.active, travels: worlds.travels, progress: progress.snapshot(), mapOpen: pageMap.isOpen(), warden: warden.state() } } });
   const pxA = new THREE.Vector3();
   const pxB = new THREE.Vector3();
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
