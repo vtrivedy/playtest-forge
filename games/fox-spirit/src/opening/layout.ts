@@ -246,9 +246,9 @@ export const UNPRESSED = (() => {
   };
 })();
 
-/** Kickable leaf piles (DESIGN-leaf-piles.md): beside the canopy → grove jog, the gate, the plaza's west side and the lane to H-a */
+/** Kickable leaf piles (DESIGN-leaf-piles.md): under the drop off the canopy roost, beside the jog to the grove, the gate, the plaza's west side and the lane to H-a */
 export const LEAF_PILES: ReadonlyArray<{ x: number; z: number }> = [
-  { x: -5.2, z: 70.6 },
+  { x: -3.3, z: 66.0 },
   { x: -6.8, z: 75.0 },
   { x: -9.8, z: 80.4 },
   { x: -14.0, z: 81.0 },

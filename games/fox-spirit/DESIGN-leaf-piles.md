@@ -12,4 +12,5 @@ the burst is bigger. The scattered leaves can be kicked again. It's a toy, not a
   lands flat on the ground and rests there.
 - **Look:** the same maple leaf mesh and warm litter palette as the ground litter, painted by the aura like
   everything else.
+- **Landing:** a landing faster than 4 m/s (off the canopy, a heron fling, a long glide) puffs the leaves out within 1.5 m.
 - **Sound:** one soft leaf rustle (`soft-leaf`, quiet) per burst, at most every 0.4 s.

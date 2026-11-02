@@ -4,7 +4,7 @@
  * can be kicked again. A toy: no colliders, no counter.
  */
 import * as THREE from 'three';
-import { mapleLeafGeometry, toon } from '../lookdevKit';
+import { toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import { LEAF_PILES } from './layout';
 
@@ -21,10 +21,24 @@ export const LEAF_FEEL = {
   out: [1.2, 2.6] as const,
   up: [2.8, 4.6] as const,
   dash: 1.6,
+  /** a landing faster than this (m/s) puffs the leaves within landReach, at strength land */
+  landSpeed: 4,
+  landReach: 1.5,
+  land: 1.3,
   /** falling: drag toward a slow terminal flutter (m/s) and a side sway */
   terminal: 0.75,
   sway: 0.8,
 };
+/** a sharp-notched five-lobed maple leaf with a stem, flat in xz (reads as a leaf, not a confetti pentagon) */
+function leafGeometry(size: number): THREE.BufferGeometry {
+  const P = [[0, 0.26], [0.055, 0.13], [0.17, 0.2], [0.14, 0.07], [0.27, 0.08], [0.19, -0.03], [0.25, -0.1], [0.07, -0.13], [0.025, -0.17], [0.012, -0.3], [-0.012, -0.3], [-0.025, -0.17], [-0.07, -0.13], [-0.25, -0.1], [-0.19, -0.03], [-0.27, 0.08], [-0.14, 0.07], [-0.17, 0.2], [-0.055, 0.13]];
+  const sh = new THREE.Shape();
+  P.forEach(([x, y], i) => (i ? sh.lineTo(x! * size * 3.7, y! * size * 3.7) : sh.moveTo(x! * size * 3.7, y! * size * 3.7)));
+  sh.closePath();
+  const g = new THREE.ShapeGeometry(sh);
+  g.rotateX(-Math.PI / 2);
+  return g;
+}
 const COLOURS = [0xb4502e, 0xc8763c, 0x9a4a2a, 0xd09040, 0x8a5a34, 0xa83c24];
 
 export function buildLeafPiles(ctx: OpeningCtx) {
@@ -33,7 +47,7 @@ export function buildLeafPiles(ctx: OpeningCtx) {
   const N = LEAF_PILES.length * F.perPile;
   const mat = toon(0xffffff);
   mat.side = THREE.DoubleSide;
-  const mesh = new THREE.InstancedMesh(mapleLeafGeometry(0.075), mat, N);
+  const mesh = new THREE.InstancedMesh(leafGeometry(0.1), mat, N);
   mesh.frustumCulled = false;
   mesh.receiveShadow = true;
   scene.add(mesh);
@@ -76,16 +90,23 @@ export function buildLeafPiles(ctx: OpeningCtx) {
   let lastSound = -1;
   let clock = 0;
   let flying = 0;
+  let wasGrounded = true;
+  let fallSpeed = 0;
   ctx.onUpdate((dt) => {
     clock += dt;
-    const st = ctx.player?.state() as { speed?: number; dashing?: boolean; vel?: number[] } | undefined;
+    const st = ctx.player?.state() as { speed?: number; dashing?: boolean; grounded?: boolean; vel?: number[] } | undefined;
     const fox = ctx.fox.root.position;
     const speed = Math.hypot(st?.vel?.[0] ?? 0, st?.vel?.[2] ?? 0);
     const dashing = !!st?.dashing;
     let launched = 0;
-    if (speed > F.minSpeed || dashing) {
-      const reach = dashing ? F.dashReach : F.reach;
-      const k = dashing ? F.dash : 1;
+    // a hard landing puffs the leaves out all round the paws (off the canopy, a heron fling, a long glide)
+    const grounded = st?.grounded ?? true;
+    const landed = grounded && !wasGrounded && fallSpeed > F.landSpeed;
+    if (!grounded) fallSpeed = Math.max(0, -(st?.vel?.[1] ?? 0));
+    wasGrounded = grounded;
+    if (speed > F.minSpeed || dashing || landed) {
+      const reach = landed ? F.landReach : dashing ? F.dashReach : F.reach;
+      const k = landed ? F.land : dashing ? F.dash : 1;
       for (let j = 0; j < N; j++) {
         if (!resting[j]) continue;
         const dx = pos[j * 3]! - fox.x;
