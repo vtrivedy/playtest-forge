@@ -812,3 +812,5 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   receding flood can otherwise put the "last dry spot" under water and teleport every frame).
 - Boarding from a cliff edge: approach straight off the edge onto the platform; diagonal approaches near a terrain
   mask edge walk the fox off the side first. Put the platform's end against the cliff face.
+- Press clip: `tools/press-clip.mjs` (node-driven, every 2nd step rendered → 30 fps) runs ~0.6 frames/s on SwiftShader: 74 s of play took ~58 min. Start it from a pinned worktree early; if it is cut short, encode the frames already on disk.
+- Dressing must keep the first view busy: a spawn that faces an empty field with one ink blot reads as "empty" even if the island is full behind the camera. Place a few props in the arrival frustum deliberately, then scatter.
