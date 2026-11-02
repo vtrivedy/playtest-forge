@@ -4,6 +4,7 @@
 // Fixed 1/60 sim; renders a chase-cam jpg every `every` sim frames, encodes clip.mp4 at 60/every fps.
 // Writes route.json (beats, timings, stuck spans, final __game state) before encoding.
 import { chromium } from 'playwright';
+import { installStemTap } from './lib/stem-tap.mjs';
 import { createServer } from 'vite';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -116,21 +117,7 @@ try {
     await page.evaluate(() => { window.__listen = true; window.__gameHooks.setManual(true); });
     await page.keyboard.press('ShiftRight');
     await page.waitForFunction(() => window.__gameHooks.state().opening.audio.context === 'running', null, { timeout: 60000 });
-    await page.evaluate(() => {
-      const h = window.__gameHooks;
-      const ac = h.audioContext();
-      const b = h.audioBuses();
-      window.__stems = { music: [[], []], ambience: [[], []], sfx: [[], []] };
-      window.__keep = [];
-      for (const name of ['music', 'ambience', 'sfx']) {
-        const sp = ac.createScriptProcessor(4096, 2, 2);
-        sp.onaudioprocess = (e) => { for (let c = 0; c < 2; c++) window.__stems[name][c].push(e.inputBuffer.getChannelData(c).slice()); };
-        const mute = ac.createGain();
-        mute.gain.value = 0;
-        b[name].connect(sp).connect(mute).connect(ac.destination);
-        window.__keep.push(sp);
-      }
-    });
+    await page.evaluate(installStemTap, ['music', 'ambience', 'sfx']);
   }
   await page.evaluate((at) => {
     const h = window.__gameHooks;
