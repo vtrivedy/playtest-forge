@@ -107,7 +107,7 @@ const DASH_STROKE = { life: 6, strength: 1.5, radius: 1.6 };
 async function boot() {
   const hud = createHud();
   const realmTitle=document.getElementById('title-card');
-  hud.setStatus('Loading Russetvale…');
+  hud.setStatus('Loading legacy world…');
   const audio = createGameAudio();
 
   // Quality tier: ?q=low|med|high, else auto (software GL → low)
@@ -836,7 +836,7 @@ async function boot() {
       summitSeal = 0;
       shrineOn = false;
       status = 'playing';
-      hud.setStatus(`Sepia Russetvale · ${backend}`);
+      hud.setStatus(`Legacy world · ${backend}`);
       return { restored: shrineOn, phase: restore.phase };
     },
     getFoxPos() {
@@ -1090,12 +1090,12 @@ async function boot() {
     }
   }
 
-  hud.setStatus(`Sepia Russetvale · ${backend}`);
+  hud.setStatus(`Legacy world · ${backend}`);
   hud.setPrompt('WASD · Space jump / hold glide · Shift dash · drag to look · Reach the shrine');
   hud.hidePromptSoon(8);
 
   publishGame({
-    title: 'Fox Spirit',
+    title: 'Russet Vale',
     status: 'playing',
     score: 0,
     lives: 1,
@@ -1739,7 +1739,7 @@ async function boot() {
     if (reach.submergedAt(fox.position, fox.position.y - foxActor.feetOffset)) handleEvents([{type:'hazard',kind:'ink'}]);
     restore.update(dt);
     zone = reach.contains(fox.position) ? `Ashwater Reach · ${reach.state().level.toUpperCase()}` : world.zoneAt(fox.position.x, fox.position.z);
-    if(realmTitle)realmTitle.textContent=reach.contains(fox.position)?'ASHWATER REACH · THE DROWNED ORCHARD':'RUSSETVALE · EMBER WELLSPRING';
+    if(realmTitle)realmTitle.textContent=reach.contains(fox.position)?'ASHWATER REACH · THE DROWNED ORCHARD':'EMBER WELLSPRING';
     if (scene.fog instanceof THREE.FogExp2) scene.fog.density = THREE.MathUtils.damp(scene.fog.density, fog.density * (zone.includes('Reedmarsh') ? reedLook.fogScale : 1), 2, dt);
 
     // through a dash, keep the last estimate (the dash is short and gravity-free)
@@ -1862,7 +1862,7 @@ async function boot() {
     );
 
     publishGame({
-      title: 'Fox Spirit — Russetvale',
+      title: 'Russet Vale',
       status,
       score: lit * 250 + (shrineOn ? 1000 : 0),
       lives: shadeContact.wisps,
@@ -1959,10 +1959,10 @@ async function boot() {
   tick();
 }
 
-// Default boot: The Keeping opening (Lanternhollow → Arrival Meadow → H-a, opening/scene.ts).
-// `?lookdev=p0` = the P0 clearing lookdev stills; `?world=russetvale` = the old realistic Russetvale game.
+// Default boot: Russet Vale opening (Lanternhollow → Arrival Meadow → H-a, opening/scene.ts).
+// `?lookdev=p0` = the P0 clearing lookdev stills; `?world=legacy-realistic` = the old realistic world.
 const query = new URLSearchParams(location.search);
-(query.get('world') === 'russetvale'
+(query.get('world') === 'legacy-realistic'
   ? boot()
   : query.get('lookdev') === 'p0'
     ? import('./lookdevP0').then((m) => m.runLookdevP0())

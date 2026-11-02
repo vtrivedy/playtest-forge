@@ -550,7 +550,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     color: '#f6ead2', font: 'italic 54px Georgia,serif', letterSpacing: '0.04em', opacity: '0',
     textShadow: '0 2px 18px rgba(40,24,12,.55)',
   });
-  card.innerHTML = 'The Keeping<div style="font:18px Georgia,serif;letter-spacing:.12em;margin-top:14px;opacity:.8">and the year turned</div>';
+  card.innerHTML = 'Russet Vale<div style="font:18px Georgia,serif;letter-spacing:.12em;margin-top:14px;opacity:.8">and the year turned</div>';
   document.body.append(card);
   const say = (text: string) => ctx.captions.say(text);
 

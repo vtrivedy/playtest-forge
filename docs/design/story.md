@@ -1,4 +1,4 @@
-# Autumn Fox — Story
+# Russet Vale — Story
 
 > **One line:** *A world that refused to let autumn end was pressed flat and still, like a leaf in a book. A quiet fox of ember and fallen leaves walks through it, warms it back, and lets the year turn again.*
 > **Tone:** melancholic, beautiful, mostly wordless (Ghibli stillness · Ōkami restoration · Journey companionship). Grief and tenderness, not good vs. evil.
@@ -12,8 +12,8 @@ Companion docs: [`game-design.md`](game-design.md) · [`world-1.md`](world-1.md)
 | # | Question | Options | Recommendation |
 |---|----------|---------|----------------|
 | **S1** | **The fox's name** (§2.1) | Akane · Sorrel · Wick · Tinder · Rowan, or **unnamed** ("the fox") | **Unnamed in game**, named only in the title or Album. A shortlisted name could appear once, at the very end |
-| **S2** | **Working title** | *Autumn Fox* (`vision.md`) · *Color Fox* (`ART_LOCK.md`) · *The Keeping* · *Ember & Leaf* | *The Keeping* (names the story, not the mechanic) |
-| **S3** | **Realm name** | *Russetvale* (current) · *Emberfall* | Keep **Russetvale**. *Emberfall* collides with the Ember hue and Ember Burst |
+| **S2** | **Working title** | *Autumn Fox* · *Color Fox* · *The Keeping* · *Ember & Leaf* · **Russet Vale** | **Russet Vale** (chosen) |
+| **S3** | **Realm name** | *Russetvale* · *Emberfall* | Realm folded into the game title **Russet Vale** |
 | **S4** | **Are the Lost Kits the fox's own?** | (a) Its kits, pressed in the Keeping · (b) Other hearth-fox kits · (c) Left unsaid | **(c) Unsaid in W1**, implied (a) by W4. The fox lies beside each found kit for a beat |
 | **S5** | **Who is the Scribe?** | (a) A grieving archivist spirit · (b) An older form of the fox · (c) Autumn's own fear of ending | **(a)**, with a late hint of (c). Never a villain fight; the Scribe is met, not beaten |
 | **S6** | **How much dialogue?** | Quiet text lines (current) · fully wordless (Journey) | **Quiet text**, ≤ 2 lines per beat, ≤ 25 words per NPC visit, no voice (breath and murmur sounds only) |

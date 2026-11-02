@@ -1,4 +1,4 @@
-# Fox Spirit — autumn feel prototype
+# Russet Vale — autumn feel prototype
 
 See `docs/vision.md`. Refs: `assets/concept/fox-turnaround.jpg`, `world-keyart.jpg`.
 

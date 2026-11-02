@@ -1,4 +1,4 @@
-# Library credits — sources and licenses
+# Russet Vale — library credits
 
 Every file under `assets/library/` is CC0 or CC-BY as listed. Prefer CC0 for the shipped game; CC-BY requires attribution in-game or credits screen.
 

@@ -1,4 +1,4 @@
-# Fox Spirit — working knowledge
+# Russet Vale — working knowledge
 
 Keep durable findings here by topic. Name the tested SHA and evidence; separate source observations from played or watched results. This file records lessons, not outstanding-work approval.
 

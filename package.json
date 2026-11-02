@@ -3,7 +3,7 @@
   "private": false,
   "version": "0.1.0",
   "type": "module",
-  "description": "UHQ three.js Spyro-inspired creature platformer forge \u2014 agents design, build, playtest",
+  "description": "Russet Vale \u2014 UHQ three.js autumn creature platformer forge; agents design, build, playtest",
   "license": "MIT",
   "scripts": {
     "dev": "vite --config games/fox-spirit/vite.config.ts --port 5180",

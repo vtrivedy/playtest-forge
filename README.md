@@ -16,7 +16,7 @@ npm run playtest:feel       # short jump/glide/dash feel probe
 
 ## Layout
 
-- `games/fox-spirit` — the game (Russetvale). Design: `games/fox-spirit/DESIGN.md`, `docs/design/`.
+- `games/fox-spirit` — the game (Russet Vale). Design: `games/fox-spirit/DESIGN.md`, `docs/design/`.
 - `games/shared` — character-feel presets / jump feel and the `window.__game` publisher.
 - `src/render`, `src/audio` — render kit (renderer, ColorField paint, post stack, sky, water) and synthesized audio.
 - `tools/` — playtest, GPU capture (`tools/CAPTURE.md`), Blender scripts, unit tests (`npx tsx tools/tests/<name>.ts`).
