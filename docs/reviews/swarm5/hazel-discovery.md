@@ -122,3 +122,78 @@ obstruction and partial fox. Evidence:
 This approach therefore remains a separate camera finding after the stem fix;
 the mesh responsible has not yet been identified. It does not invalidate the
 independently approved13–16s cue-following stem improvement.
+
+## Blind-approach obstruction identified
+
+A read-only inspection replay on the same immutable `b13dfe15` source identifies
+the large foreground obstruction as terrain, not a canopy stem or tree.
+At20s, camera position is(-12.3058,5.3955,57.4716) and fox feet are
+(-10.4613,3.7253,57.9273). A45-ray screen grid hits the same unregistered
+`PlaneGeometry` terrain mesh(runtime id69) first on29 rays. The sample at
+NDC(-0.4,0) hits it only0.4630m from the lens. This is a ray sample count,
+not a pixel-area measurement.
+
+`before.png` reproduces the diagonal terrain sheet covering the left half of
+the shot and part of the fox. Hiding only mesh69 for `hidden-first.png` reveals
+the complete fox and removes the ground sheet elsewhere too. This isolates the
+visible blocker; it is a diagnostic intervention, not a proposed terrain-fade
+fix. Both stills were inspected. The control ends after20s with one catch,
+zeroJSerrors and unchanged gameplay input policy. No gameplay source changed.
+
+Evidence is uploaded and listed in Modal volume `keeping-swarm5-captures`,
+directory `hazel/blind-b13-mesh-diagnose`: full `window.__game` in `naive.json`,
+all ray hits in `mesh-diagnosis.json`, both stills and the exact temporary
+`probe.mjs`. The first two inspection attempts failed because Vite denied the
+probe's dynamic inspection import; the successful helper grants access only in
+its own temporary server configuration. Neither failed attempt is verification.
+
+Source observations for the camera owner: `lookdevGround.ts:buildGround` creates
+terrain as a deformed `PlaneGeometry`; opening meadow terrain is intentionally
+excluded from prop occlusion. `camera.ts:sweepBoom` can retain minimum body room
+past a blocking surface and report `boom.fade`, but prop cutouts exclude terrain.
+This is an investigation lead, not proof of which camera branch caused this
+specific pose. Thistle and Reed received the mesh, pose and diagnostic result.
+Reed independently reproduced the opaque terrain/partial-fox screenshot on an
+unchanged runtime equivalent to `b13dfe15`. The previously approved canopy stem
+fix remains a separate, narrower result. Blind discovery still fails.
+
+## Exact terrain owner and lens clearance
+
+A second read-only replay of immutable `b13dfe15`, unchanged blind seed2 at20s,
+records the blocker's geometry parameters: width120, height85,170×120 segments.
+These uniquely match the meadow `buildGround` call (`meadow.ts:247`,
+`BOUNDS.rx*3` and `BOUNDS.rz*3.4`), rather than Millbrook, Hermitage or finale
+ground. The final fox and camera positions exactly reproduce the earlier probe.
+
+The lens is above the terrain: cameraY5.395522, analytic groundY5.115522,
+rendered triangle groundY5.104050. Its analytic clearance is0.28m. Six samples
+between fox feet and lens show rising ground from3.725285 to5.115522. The
+inspected `before.png` still shows the same diagonal foreground sheet covering
+part of the fox. Thus an endpoint floor guarantee does not establish a clear
+sightline to the whole animal; this is not evidence that the lens is buried or
+that rendered and analytic terrain disagree substantially. The earlier
+`readableT` branch remains a source hypothesis, not an instrumented branch trace.
+
+Evidence: `/captures/hazel/blind-b13-owner/`, including `mesh-diagnosis.json`,
+`before.png`, diagnostic mesh-hidden still, exact temporary `probe.mjs` and
+full `window.__game` in `naive.json`.20s input-only replay, onecatch,
+2unsticks/1.37stuckseconds, zeroJSerrors. The owner metadata and endpoint
+measurements were sent to Thistle and Reed; no gameplay or camera code changed.
+
+## Deliberate ruin miss on integrated runtime
+
+Read-only `ef046268` replay, ordinary cue-following input, 1.5 s initial idle,
+`--mistake ruin`, 90 simulation seconds: all13 gameplay checks pass, including
+actual mistake injection, real overlook visit, kept page, grounded guidance
+completion and absence of competing homeward words. The injected miss starts
+at31.4833s and returns `jump2 -> jump1` on ordinary ground. Recovery reaches
+`jump2` again33.3333s, `jump3`34.6833s, catches the third page in flight35.8667s,
+and enters `done` only on grounded overlook support35.9s. ZeroJSerrors.
+
+Evidence: `/captures/hazel/discovery-ef046268-ruin-retry/` retains the complete
+trace and `window.__game` in completed `evidence.json`. This is an additional
+simulation recovery check, not continuous motion proof or a camera correction.
+The final `end.png` was inspected: the whole fox is visible on the overlook,
+and the homeward instruction appears after completion. No continuous frames
+were requested. Original blind-wander acceptance remains failed. No runtime
+code changed.

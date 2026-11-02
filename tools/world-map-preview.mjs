@@ -1,0 +1,34 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs/promises';
+const browser = await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-webgl']});
+const page = await browser.newPage({viewport:{width:1280,height:720}});
+// Explicit component fixture, never an integrated puzzle or portal acceptance run.
+const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+await page.goto('http://127.0.0.1:5180/?manual');
+await page.waitForFunction(()=>window.__gameHooks?.ready,{timeout:120000});
+await page.evaluate(()=>{window.__gameHooks.setStick(.6,0);window.__gameHooks.advance(60);window.__gameHooks.setStick(0,0);window.__gameHooks.advance(10)});
+await page.evaluate(async()=>{
+ const {createWorldProgress}=await import('/src/worlds/progress.ts');
+ const {createPageMap}=await import('/src/worlds/pageMap.ts');
+ const p=createWorldProgress();
+ p.visit('russetvale','teach');
+ p.complete('ashwater','teach'); p.complete('ashwater','develop');
+ p.complete('press','teach'); p.complete('press','develop'); p.complete('press','combine');
+ window.__mapPreview={progress:p,map:createPageMap(window.__opening.camera,p)};
+ window.__mapPreview.map.setOpen(true); window.__gameHooks.advance(1);
+});
+await fs.mkdir('/tmp/hazel-map-preview',{recursive:true});
+await page.screenshot({path:'/tmp/hazel-map-preview/album-1280.png'});
+await page.setViewportSize({width:960,height:540});
+await page.waitForTimeout(250);
+await page.evaluate(()=>{window.__mapPreview.map.step();window.__gameHooks.advance(2)});
+await page.waitForTimeout(100);
+await page.screenshot({path:'/tmp/hazel-map-preview/album-960.png'});
+await page.keyboard.press('Tab');
+const closed=await page.evaluate(()=>{window.__gameHooks.advance(1);return !window.__mapPreview.map.isOpen()});
+await page.screenshot({path:'/tmp/hazel-map-preview/closed-badge-960.png'});
+await page.keyboard.press('Tab');
+const open=await page.evaluate(()=>window.__mapPreview.map.isOpen());
+await fs.writeFile('/tmp/hazel-map-preview/state.json',JSON.stringify(await page.evaluate(()=>({game:window.__game.state(),progress:window.__mapPreview.progress.snapshot()})),null,2));
+if(errors.length || !closed || !open) throw Error(JSON.stringify({errors,closed,open}));
+console.log(JSON.stringify({errors,closed,open})); await browser.close();
