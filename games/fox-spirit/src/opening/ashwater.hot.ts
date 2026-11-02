@@ -5,7 +5,7 @@
  * still deep puts the fox back on the bank it left. Levels complete on arrival in the region beyond each gate.
  */
 import type * as THREE from 'three';
-import { ASH_ORIGIN, CISTERN, DAM_A, DAM_B, DAM_C, FLOOD, LEDGE, MATS, MAT_RISE, PUNT, WATER, waterAt } from './ashwaterLayout';
+import { ASH_ORIGIN, CISTERN, DAM_A, DAM_B, DAM_C, FLOOD, LEDGE, MATS, MAT_RISE, PUNT, SECRETS, WATER, waterAt } from './ashwaterLayout';
 import type { Collider } from '../lookdevPlay';
 
 export const ASH_TIMING = { drain: 3.2, matRise: 0.9, matStagger: 0.18, damFall: 1.1, glow: 2.5, matHold: 1.2, matSink: 0.7, matRecover: 0.8 };
@@ -20,7 +20,7 @@ export type AshRig = {
   hasReedskim: () => boolean;
   teleport: (x: number, z: number, yaw: number) => void;
   teach: (text: string) => void;
-  events: { burstA: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
+  events: { secret: (which: 0 | 1) => void; burstA: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
   waterMesh: { channel: THREE.Object3D; pond: THREE.Object3D; pool: THREE.Object3D };
   damA: THREE.Object3D;
   damB: THREE.Object3D;
@@ -46,7 +46,7 @@ export type AshRig = {
   safe: THREE.Vector3;
   s: {
     burstA: number; burstB: number; burstC: number; channelY: number; poolY: number; matK: number; glowK: number;
-    done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number; clock: number; lastSplash: number;
+    done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number; clock: number; lastSplash: number; secrets: number;
   };
 };
 
@@ -151,6 +151,17 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     }
   }
 
+  // side places: each tells its piece once, when the fox stands in it
+  if (s.inMarsh && grounded) {
+    if ((s.secrets & 1) === 0 && s.burstA > 2 && Math.hypot(lx - SECRETS.roof.lx, lz - SECRETS.roof.lz) < SECRETS.roof.r) {
+      s.secrets |= 1;
+      rig.events.secret(0);
+    }
+    if ((s.secrets & 2) === 0 && Math.hypot(lx - SECRETS.mooring.lx, lz - SECRETS.mooring.lz) < SECRETS.mooring.r) {
+      s.secrets |= 2;
+      rig.events.secret(1);
+    }
+  }
   // levels complete on arrival beyond each gate (the store also checks prerequisites)
   if (s.inMarsh && grounded) {
     if ((s.done & 1) === 0 && s.burstA > 0 && lz > -23 && lz < -9) {

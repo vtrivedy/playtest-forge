@@ -74,7 +74,11 @@ try {
   await go(-12.5, -35.2, { dash: true, dashAt: 2, max: 90, reach: 0.6 });
   await settle(240);
   await shot('02-drained');
-  for (const [x, z] of [[-3, -33], [0, -28.5], [0, -20], [0, -13]]) await go(x, z);
+  // side place: the drowned roof in the drained channel's west reach
+  for (const [x, z] of [[-14, -29], [-30, -28.6], [-43.5, -28.0]]) await go(x, z, { max: 900 });
+  await settle(60);
+  await shot('02b-roof');
+  for (const [x, z] of [[-20, -28.6], [0, -28.5], [0, -20], [0, -13]]) await go(x, z, { max: 900 });
   await settle(90);
   await shot('03-reed-island');
   // Level 2, Reed Pond: running jumps mat to mat, the branch out to the islet first
@@ -113,10 +117,11 @@ try {
   await settle(60 * 10);
   await shot('07b-flooded');
   // off the weir onto the risen punt, along it, onto the east wall, south to the Seedwell ledge
-  await go(11.5, 35.4);
+  await go(12.75, 35.4);
   log.push(['step', await state()]);
-  await go(12.4, 32.5, { jump: true, jumpAt: 1.8, hold: 16, max: 200, reach: 0.5, land: true });
+  await go(12.75, 32.3, { max: 200, reach: 0.5 });
   log.push(['step', await state()]);
+  await go(12.75, 30.1);
   await go(14.2, 30.0, { max: 200, reach: 0.4 });
   log.push(['step', await state()]);
   await go(14.2, 27.0);
@@ -129,7 +134,7 @@ try {
   errors.push(String(e?.stack ?? e));
 } finally {
   const last = log.length ? log[log.length - 1][1] : null;
-  fs.writeFileSync(path.join(out, 'log.json'), JSON.stringify({ log, errors, linger, pass: !!last && last.ash.done.length === 3 && !!linger && linger.splashesAfter > linger.splashesBefore }, null, 1));
+  fs.writeFileSync(path.join(out, 'log.json'), JSON.stringify({ log, errors, linger, pass: !!last && last.ash.done.length === 3 && !!linger && linger.splashesAfter > linger.splashesBefore && (last.ash.secrets & 3) === 3 }, null, 1));
   if (frames && fi > 0) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '6', '-i', path.join(out, 'f%04d.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'route.mp4')]);
   console.log(JSON.stringify({ errors, last }, null, 1));
   await browser.close();

@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
-import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SHELF, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
+import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SECRETS, SHELF, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import { updateAshwater, type AshRig } from './ashwater.hot';
 
 const C = {
@@ -370,7 +370,17 @@ export function buildAshwater(
     colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx: (x1 - x0) / 2, hz: (z1 - z0) / 2, top: CISTERN.wallTop });
   };
   cWall(W.x0 - CISTERN.wall, W.x0, W.z0 - CISTERN.wall, WEIR.z0);
-  cWall(W.x1, W.x1 + CISTERN.wall, W.z0 - CISTERN.wall, WEIR.z0);
+  cWall(W.x1, W.x1 + CISTERN.wall, W.z0 - CISTERN.wall, SHELF.z1);
+  // the east wall's north end rises into a tall slate pier beside the weir: nothing on the weir steps onto the wall
+  {
+    const a = ash((SHELF.x0 + W.x1 + CISTERN.wall) / 2, (SHELF.z1 + WEIR.z0) / 2);
+    const hx = (W.x1 + CISTERN.wall - SHELF.x0) / 2, hz = (WEIR.z0 - SHELF.z1) / 2;
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, 7.6, hz * 2), wallMat);
+    pier.position.set(a.x, 2.5, a.z);
+    pier.castShadow = true;
+    root.add(pier);
+    colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx, hz, top: 6.3 });
+  }
   cWall(W.x0, CISTERN.gate.x0, W.z0 - CISTERN.wall, W.z0);
   cWall(CISTERN.gate.x1, W.x1, W.z0 - CISTERN.wall, W.z0);
   cWall(SHELF.x0, SHELF.x1, SHELF.z0, SHELF.z1);
@@ -390,6 +400,26 @@ export function buildAshwater(
     root.add(step);
   }
 
+  // ---- the drowned roof in the channel's west reach: a slate ridge and a chimney, dry once the sluice runs
+  {
+    const at = ash(SECRETS.roof.lx, SECRETS.roof.lz);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.6, 4).rotateY(Math.PI / 4).scale(1, 1, 0.6), marsh(0x47545e));
+    roof.position.set(at.x, -0.55, at.z - 1.2);
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.4, 0.5), slate);
+    chimney.position.set(at.x + 1.2, 0.0, at.z - 1.0);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.12, 1.4), timber);
+    door.position.set(at.x - 0.6, -0.95, at.z + 1.4);
+    door.rotation.y = 0.4;
+    root.add(roof, chimney, door);
+    colliders.push({ kind: 'box', x: roof.position.x, z: roof.position.z, yaw: 0, hx: 2.0, hz: 1.2, top: 0.2 });
+  }
+  // the Ferrykeeper's mooring on the islet: a lantern that still burns on its stake
+  {
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.34, 0.28), new THREE.MeshBasicMaterial({ color: C.lantern, toneMapped: false }));
+    lamp.position.set(isletAt.x + 1.6, H(isletAt.x + 1.6, isletAt.z) + 2.25, isletAt.z);
+    root.add(lamp);
+  }
+
   // ---- the rig
   const say = (t: string) => ctx.captions.say(t);
   const rig: AshRig = {
@@ -399,6 +429,7 @@ export function buildAshwater(
     teleport: (x, z, yaw) => ctx.player?.teleport(x, z, yaw),
     teach: ctx.teach.offer,
     events: {
+      secret: (which) => say(which === 0 ? 'A home, under the reeds.' : 'The last ferry never left.'),
       burstA: () => {
         ctx.audio.cue('millrace-burst');
         say('The low sluice runs again.');
@@ -442,7 +473,7 @@ export function buildAshwater(
     heronMat,
     heronCol,
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
-    s: { burstA: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z, clock: 0, lastSplash: -9 },
+    s: { burstA: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z, clock: 0, lastSplash: -9, secrets: 0 },
   };
   // a saved game re-enters the marsh as it was left: drained channel / pool, burst dams, a lit Seedwell (no captions)
   const was = (l: (typeof LEVEL_IDS)[number]) => opts.isRestored?.(l) ?? false;
@@ -466,7 +497,7 @@ export function buildAshwater(
     spawn: { x: spawnAt.x, z: spawnAt.z, yaw: ASH_SPAWN.yaw },
     state: () => ({
       damA: rig.s.burstA >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2),
-      mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
+      secrets: rig.s.secrets, mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
     }),
   };
 }

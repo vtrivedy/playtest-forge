@@ -49,7 +49,7 @@ export const MAT_HALF = 1.15;
 export const MAT_RISE = 0.14;
 
 /** the weir plateau north of the Mill Pool, and the steps that climb out of the drained pool onto it */
-export const WEIR = { z0: 33.6, top: 4.4, xMax: 11.8 };
+export const WEIR = { z0: 33.6, top: 4.4, xMax: 13.4 };
 export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2, 3.8, 4.4].map((top, i) => ({ lz: 27.75 + i * 0.68, top }));
 export const STEP_HALF = { x: 1.6, z: 0.38 };
 
@@ -64,9 +64,17 @@ export const CISTERN = { wallTop: 4.7, wall: 0.5, gate: { x0: -2.2, x1: 2.2 } };
 export const FLOOD = { level: 4.3, rise: 9, hold: 45, fall: 6 };
 export const DAM_C = { lx: 5.5, lz: 37.2, reach: 3.2 };
 /** the last ferry, moored by the weir's east end; it floats on whatever the cistern holds */
-export const PUNT = { lx: 12.75, lz: 31.3, hx: 0.65, hz: 1.6, rise: 0.22 };
+export const PUNT = { lx: 12.75, lz: 31.6, hx: 0.65, hz: 2.0, rise: 0.22 };
 /** a slate shelf inside the cistern's east wall at wall height: the risen punt's flank touches it */
 export const SHELF = { x0: 13.4, x1: 15, z0: 24, z1: 30.5 };
+
+/** side places off the run line that tell the marsh's story once each (DESIGN-worlds: the flood that took a home) */
+export const SECRETS = {
+  /** a cottage roof drowned in the channel's west reach, dry only once the sluice runs */
+  roof: { lx: -46, lz: -28.5, r: 4.5 },
+  /** the Ferrykeeper's mooring post and lantern on the dam islet */
+  mooring: { lx: 23.6, lz: 1.0, r: 2.8 },
+} as const;
 
 /** spawn (and the return arch) on the landing, facing north */
 export const ASH_SPAWN = { lx: 0, lz: -46, yaw: Math.PI };
