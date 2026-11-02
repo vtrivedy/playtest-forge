@@ -25,6 +25,7 @@ const page = await (await browser.newContext({ viewport: { width: 640, height: 3
 page.setDefaultTimeout(900000);
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
+page.on('console', (m) => { if(m.type()==='error') errors.push(`console: ${m.text()}`); });
 const log = [];
 const commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 let fi = 0;
@@ -143,7 +144,17 @@ try {
   await go(-12.5, -35.2, { dash: true, dashAt: 2, max: 90, reach: 0.6 });
   await settle(240);
   await shot('02-drained');
-  for (const [x, z] of [[-3, -33], [0, -28.5], [0, -20], [0, -13]]) await go(x, z);
+  const westOnly = (await state()).ash;
+  if (!westOnly.damA || westOnly.damA2) throw Error('First sluice must drain only the west reach');
+  for (const [x, z] of [[-14, -29], [-30, -28.6], [-43.5, -28.0]]) await go(x, z, { max: 900 });
+  await settle(60);
+  await shot('02b-roof');
+  await go(-6, -28.5, { max: 900 });
+  await go(-0.9, -28.5, { dash: true, dashAt: 1, max: 60, reach: 0.6 });
+  await settle(240);
+  await shot('02c-east-reach');
+  if (!(await state()).ash.damA2) throw Error('Culvert did not drain east reach');
+  for (const [x, z] of [[-1.0, -28.5], [2.5, -28.5], [2.5, -20], [0, -13]]) await go(x, z, { max: 900 });
   await settle(90);
   await shot('03-reed-island');
   // Level 2, Reed Pond: running jumps mat to mat, the branch out to the islet first
@@ -195,6 +206,8 @@ try {
   await shot('08-seedwell');
   const completed = (await state()).hooks.opening.worlds.progress.worlds.ashwater;
   if(completed.ability!=='Reedskim' || completed.fill!==1 || completed.restored.length!==3)throw Error('Physical Ashwater completion did not earn Reedskim and fill Reed');
+  const secrets = (await state()).hooks.opening.worlds.progress.secrets;
+  if (!['ashwater-roof','ashwater-mooring'].every(id => secrets.includes(id))) throw Error('Physical side places did not earn both canonical memories');
   await page.keyboard.press('Tab');
   await shot('09-album');
   await page.keyboard.press('Tab');

@@ -71,3 +71,7 @@ Full `window.__game`, hook states and PNGs: `/captures/reed/cistern-d126bc50/`; 
 ### Pier fade experiment — 2848c0b4c3d680a31268173b82ee942b33099af8
 
 Full fresh physical route repeats **PASS**, zero errors; identical final positions, canonical rewards, four splashes and 146.483 Ashwater simulation seconds. However [the retested shelf frame](reed-cistern/pier-retest-07e-wall.png) still masks the front of the fox. Registration alone did not improve the observed frame, so it is removed from the final source. Do not call this a visual fix. The pier/camera silhouette issue remains open for its owner. TypeScript, production build, feel/camera/world lint pass. Full states/PNGs: `/captures/reed/cistern-pier-2848c0b4/`; volume `keeping-swarm5-captures/reed/world-entry-2848c0b4c3/`. No continuous-motion claim.
+
+## Two-reach acceptance design
+
+Repeat from a fresh physical opening with Cedar's two-reach sluice and Hazel's autumn save reconstruction integrated. Visit the drowned roof before cutting the culvert, assert the east reach remains flooded until that second action, then repeat sinking mats and the rising-punt crossing. Require both optional memories in the canonical store and all three earned Ashwater levels. Capture full game snapshots and review the new channel/roof and final shelf frames. This is route acceptance, not a blind insight or duration measurement.
