@@ -430,3 +430,12 @@ Chosen clearance:1.5m. Both1.5 and1.8 pass the missed-jump camera and skinned-bo
 framing gates;1.5 retains a larger creature in the tight view with adequate pounce
 margin. The normal2.45m follow distance remains the authored traversal setting.
 Expose body clearance in the existing camera GUI for further place-specific tests.
+
+### Ruin return fan visibility
+
+The folded southern return fan can cross the chase lens after a missed overlook
+jump. Register its complete pivot with the existing opening occlusion system so
+its paper treads and ink fade together, as the other ruin leaves do. Keep fold
+progression, terrain and camera tuning intact. Verify the original 90-second
+miss route, inspect the final clip frames that previously hid the fox, and retain
+camera gates plus window.__game evidence.

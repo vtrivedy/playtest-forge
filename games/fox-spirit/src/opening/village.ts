@@ -27,7 +27,8 @@ export const C = {
   slateDark: 0x4a4952,
   amber: 0xe6a65a,
   door: 0x6b4a32,
-  flag: 0x8d8471,
+  // warm sandstone: a grey-beige flag read as unpainted paper even inside a wash (Kit, eca465e)
+  flag: 0xa08460,
   bloom: [0x9a4f3c, 0xa8834a, 0x7d5a6a],
   leaf: 0x5d6040,
   cabbage: 0x6d7350,

@@ -163,15 +163,20 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           sepia = mix(sepia, uPaperInk * 1.25, max(l1 * 0.6, l2 * 0.65) * uLkHatchWeight);
           // painted cel on the same paper, wet sienna pigment bleeding at the front + dried tide-line inside it
           vec3 cel = outgoingLight * (0.95 + 0.08 * tooth) * (0.96 + 0.08 * lkNoise(xz * 2.3));
-          vec3 pigment = vec3(0.42, 0.18, 0.08) * (0.55 + 0.6 * t);
-          cel = mix(cel, pigment, tide * 0.45);
+          // painted ground wakes up light and warm, not as a dark spill (Kit: "reads like a scorch mark"): surfaces
+          // facing the sky are lifted and warmed; walls, trunks and props keep their authored cel
+          vec3 lkUp = normalize(cross(dFdx(vLkWorld), dFdy(vLkWorld)));
+          float ground = smoothstep(0.75, 0.95, abs(lkUp.y));
+          cel = mix(cel, cel * vec3(1.2, 1.14, 1.0) + vec3(0.045, 0.03, 0.0), ground * 0.85);
+          vec3 pigment = vec3(0.62, 0.36, 0.18) * (0.55 + 0.6 * t);
+          cel = mix(cel, pigment, tide * 0.3);
           float wet = paint * (1.0 - paint) * 4.0;
           sepia = mix(sepia, uPaper * 1.12, bloom * (1.0 - sh) * 0.55);
           // the bled halo: colour without the wet front (paler, part-way to paper), feathering the island's edge
           vec3 faded = mix(sepia, cel, 0.78);
           sepia = mix(sepia, faded, soft * (1.0 - paint));
           outgoingLight = mix(sepia, cel, paint);
-          outgoingLight = mix(outgoingLight, pigment, wet * 0.4);
+          outgoingLight = mix(outgoingLight, pigment, wet * 0.22);
           // brushy contour ink where the surface turns away from the eye
           float ndv = abs(dot(normalize(normal), normalize(vViewPosition)));
           float brush = 0.65 + 0.7 * lkNoise(xz * 2.0 + vLkWorld.y * 3.0);

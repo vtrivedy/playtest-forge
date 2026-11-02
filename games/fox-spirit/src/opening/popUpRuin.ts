@@ -6,8 +6,10 @@ import type { OpeningCtx } from './scene';
 import { POP_UP_RUIN as R } from './layout';
 
 export const RUIN_FEEL = { unfold: 0.55, hitRadius: 1.35 };
+// A fold can only enter the state machine after its camera cutout is registered.
+type FoldPivot = THREE.Group & { readonly isCameraFold: true };
 type Fold = {
-  pivot: THREE.Group;
+  pivot: FoldPivot;
   spindle: THREE.Group;
   x: number; z: number; y: number;
   elapsed: number; phase: 'folded' | 'opening' | 'open';
@@ -20,6 +22,13 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   const root = new THREE.Group();
   root.name = 'pop-up ruin';
   ctx.scene.add(root);
+
+  function makeFoldPivot(): FoldPivot {
+    const pivot = Object.assign(new THREE.Group(), { isCameraFold: true as const });
+    root.add(pivot);
+    ctx.occluders.push(pivot);
+    return pivot;
+  }
 
   const stone = toon(0x827263, { contour: 0.5, hatchWeight: 0.35 });
   const paper = toon(0xa99672, { contour: 0.4, hatchWeight: 0.15 });
@@ -133,12 +142,10 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
 
   R.leaves.forEach((p) => {
     // Approach edge is the hinge. The printed face is visible closed; the leaf opens away from the fox.
-    const pivot = new THREE.Group();
+    const pivot = makeFoldPivot();
     const ax = Math.cos(p.yaw), az = -Math.sin(p.yaw);
     pivot.position.set(p.x + ax * R.width / 2, p.top - 0.12, p.z + az * R.width / 2);
     pivot.rotation.set(0, p.yaw, -Math.PI / 2);
-    root.add(pivot);
-    ctx.occluders.push(pivot);
     // A torn illustrated page, rather than timber rails: its picture becomes the path.
     const outline = new THREE.Shape();
     const corners = [[-R.width, -R.depth / 2], [0, -R.depth / 2], [0, R.depth / 2], [-R.width, R.depth / 2]];
@@ -211,10 +218,9 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   });
 
   // Southern return: a paper fan becomes low steps only after an overlook dash.
-  const returnPivot = new THREE.Group();
+  const returnPivot = makeFoldPivot();
   returnPivot.position.set(O.x, O.top - 0.12, O.z + O.depth / 2);
   returnPivot.rotation.x = Math.PI / 2;
-  root.add(returnPivot);
   const steps = 20;
   const length = R.returnEnd.z - returnPivot.position.z;
   const endY = ctx.groundH(R.returnEnd.x, R.returnEnd.z) + 0.08;
