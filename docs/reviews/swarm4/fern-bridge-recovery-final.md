@@ -91,3 +91,21 @@ All directories above are under `/captures/fern/`, mirrored under
 `window.__game`, trace, checks, stills and source frames. Videos play the sampled
 frames at 15 fps, rendered offline with SwiftShader and no audio. They establish
 this bounded camera/visibility review, not real-time performance or audio quality.
+
+## Integrated world and paint recheck
+
+On `834881d` (clean merge of integrated `9b977fb`), the unchanged natural
+Keeping route again completes steam, root heat, bridge opening and crag arrival.
+All 60 crossing frames were visually reviewed: the fox and walking surface remain
+readable, and all skinned-body samples retain the 2% viewport margin. Maximum
+sustained grounded follow distance is 2.810 m; minimum hero height is 44.00 px at
+640×360, with no interval below the 24 px floor. There are no console/page errors.
+Typecheck, feel checks and production build pass. No additional camera tuning is
+needed for the integrated warm paint and occluder roots.
+
+Evidence: `/captures/fern/integrated-9b977fb-keeping/`, including the complete
+110-second simulation trace and `window.__game`, four timed stills, all 60 source
+frames, contact sheets and a four-second crossing clip. One initial placement
+beside the hearth precedes controller input and actual chemistry progression;
+there is no forced bridge release. The clip is offline 15 fps, silent SwiftShader
+capture. The separate Hermitage pole caveat remains outside this recheck.
