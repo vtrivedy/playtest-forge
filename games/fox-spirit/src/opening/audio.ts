@@ -1,10 +1,12 @@
 /**
- * The opening's one sound graph (docs/design/swarm3/audio-DESIGN.md): music → duck ┐
- *                                                                  ambience ──────┼→ master → limiter → out (+ record tap)
- *                                                                  sfx (3D) ──────┘
+ * The opening's one sound graph (docs/design/swarm3/audio-DESIGN.md): music (phrases) ┐
+ *                                                                  ambience ───────────┼→ master → limiter → out (+ record tap)
+ *                                                                  sfx (3D) ───────────┘
  * One AudioContext for the whole slice, created suspended and resumed on the first key/pointer. The listener is
- * the rendered camera. Samples live in `sfx/` (CC0, assets/library/CREDITS.md) and play by file name;
- * synth voices (hum, glyph chimes, creature shimmer) build on `ac` and connect to `sfx` or `at(pos)`.
+ * the rendered camera. Silence is the default (KNOWLEDGE.md § Quiet audio redesign): no music at boot or idle —
+ * one finite harp phrase arrives on a moment (`cue`) and is followed by quiet; wind is a soft synth breath
+ * shaped by height; birds are rare single distant calls once the colour is back. Samples live in `sfx/`
+ * (CC0, assets/library/CREDITS.md); synth voices build on `ac` and connect to `sfx` or `at(pos)`.
  */
 import * as THREE from 'three';
 
@@ -12,20 +14,19 @@ const FILES = import.meta.glob('./sfx/*.ogg', { eager: true, query: '?url', impo
 const URLS = Object.fromEntries(Object.entries(FILES).map(([k, v]) => [k.replace('./sfx/', '').replace('.ogg', ''), v]));
 
 export const MIX = {
-  master: 0, // muted by vivek (Nov 1): mix rejected as intrusive; the redo sets this back
-  /** the bed sits ~ −20 LUFS, effects on top */
-  music: 0.75,
-  ambience: 0.5,
+  master: 0, // muted by vivek (Nov 1): mix rejected as intrusive; unmuted only after an independent listening verdict
+  /** phrases are cut to −20 dBFS RMS; this puts them near −32 dBFS in the mix */
+  music: 0.25,
+  ambience: 1,
   sfx: 0.9,
-  /** music fades in over this after the first input (s) */
-  fadeIn: 4,
-  /** playlist crossfade (s) */
-  crossfade: 5,
-  playlist: ['music-hush-hamlet', 'music-apple-cider'],
-  /** the hush-hamlet edit is a seamless loop: play it twice before moving on */
-  repeats: { 'music-hush-hamlet': 2 } as Record<string, number>,
-  /** per-track trim to one loudness (sources: Hush Hamlet −17.3, Apple Cider −14.8 LUFS integrated) */
-  trim: { 'music-hush-hamlet': 1, 'music-apple-cider': 0.75 } as Record<string, number>,
+  /** a cue within this long of the last phrase's start is dropped (no backlog, no stacking) */
+  musicGap: 30,
+  /** moments → harp phrases (Meadow Thoughts, Écrivain, CC0); each plays once, then quiet */
+  cues: { hearth: ['phrase-hearth'], page: ['phrase-page-1', 'phrase-page-2'], keeping: ['phrase-keeping'], home: ['phrase-home'] } as Record<string, string[]>,
+  /** wind: gusts of soft pink noise that come and go (silent between them); faint on the ground, fuller up high */
+  wind: { ground: 0.006, high: 0.03, dark: 450, open: 2200 },
+  /** birds: single distant calls, only once the colour is back; gaps random in [min, max] s */
+  birds: { gain: 0.05, min: 28, max: 70, after: 0.3, near: 18, far: 34 },
 };
 
 export type PlayOpts = {
@@ -36,6 +37,8 @@ export type PlayOpts = {
   rate?: number;
   /** seconds from now */
   delay?: number;
+  /** route into this node instead of the sfx bus (e.g. a module's own filter); ignored with `at` */
+  out?: AudioNode;
 };
 
 export type OpeningAudio = ReturnType<typeof createOpeningAudio>;
@@ -62,11 +65,9 @@ export function createOpeningAudio() {
     g.connect(master);
     return g;
   };
-  const duckGain = ac.createGain();
-  duckGain.connect(master);
   const music = ac.createGain();
-  music.gain.value = 0;
-  music.connect(duckGain);
+  music.gain.value = MIX.music;
+  music.connect(master);
   const ambience = bus(MIX.ambience);
   const sfx = bus(MIX.sfx);
 
@@ -86,8 +87,8 @@ export function createOpeningAudio() {
     }
     return p;
   }
-  // the short effects decode up front; music decodes when it is first needed
-  for (const id of Object.keys(URLS)) if (!id.startsWith('music-')) void load(id);
+  // everything is short: decode it all up front
+  for (const id of Object.keys(URLS)) void load(id);
 
   /** a panner input at a world position (inverse distance, ~silent past 60 m) */
   function at(pos: THREE.Vector3, ref = 3): PannerNode {
@@ -107,16 +108,16 @@ export function createOpeningAudio() {
     src.playbackRate.value = o.rate ?? 1;
     const g = ac.createGain();
     g.gain.value = o.gain ?? 1;
-    const out = o.at ? at(o.at) : sfx;
+    const out = o.at ? at(o.at) : o.out ?? sfx;
     src.connect(g).connect(out);
     src.start(ac.currentTime + (o.delay ?? 0));
     src.onended = () => {
       g.disconnect();
-      if (out !== sfx) out.disconnect();
+      if (o.at) out.disconnect();
     };
     counts[id] = (counts[id] ?? 0) + 1;
     log.push({ id, t: +ac.currentTime.toFixed(2) });
-    if (log.length > 30) log.shift();
+    if (log.length > 600) log.shift();
   }
   /** pick one of `${base}-0..n-1` (never the same one twice running) */
   const last = new Map<string, number>();
@@ -145,64 +146,68 @@ export function createOpeningAudio() {
     return { gain: gain.gain, set: (v: number, tc = 0.2) => gain.gain.setTargetAtTime(v, ac.currentTime, tc) };
   }
 
-  // ambience beds
-  const wind = loop('amb-wind', ambience);
-  const birds = loop('amb-birds', ambience);
+  // wind: pink noise under a low-pass that opens as a gust rises; between gusts it falls away to nothing (a steady
+  // band of noise reads as a fan or an engine, not air)
+  const wn = ac.createBuffer(1, ac.sampleRate * 4, ac.sampleRate);
+  const wd = wn.getChannelData(0);
+  for (let i = 0, b0 = 0, b1 = 0, b2 = 0; i < wd.length; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = 0.99765 * b0 + w * 0.099046;
+    b1 = 0.963 * b1 + w * 0.2965164;
+    b2 = 0.57 * b2 + w * 1.0526913;
+    wd[i] = (b0 + b1 + b2 + w * 0.1848) * 0.11;
+  }
+  const windSrc = ac.createBufferSource();
+  windSrc.buffer = wn;
+  windSrc.loop = true;
+  const windLow = new BiquadFilterNode(ac, { type: 'lowpass', frequency: MIX.wind.dark, Q: 0.4 });
+  const windHigh = new BiquadFilterNode(ac, { type: 'highpass', frequency: 90 });
+  const wind = ac.createGain();
+  wind.gain.value = 0;
+  windSrc.connect(windHigh).connect(windLow).connect(wind).connect(ambience);
+  windSrc.start();
+  let gust = 0;
+  let gustTo = 0.5;
+  let lastTick = 0;
 
-  // music: a playlist that crossfades track to track; a repeat of a seamless loop edit starts exactly on its seam
-  const SEQ = MIX.playlist.flatMap((id) => Array<string>(MIX.repeats[id] ?? 1).fill(id));
-  let seqI = 0;
-  let nextAt = -1;
-  let scheduling = false;
-  let musicStarted = false;
-  let trackId = '';
-  async function schedule(): Promise<void> {
-    scheduling = true;
-    const id = SEQ[seqI % SEQ.length]!;
-    const prev = SEQ[(seqI + SEQ.length - 1) % SEQ.length]!;
-    const next = SEQ[(seqI + 1) % SEQ.length]!;
-    const buf = await load(id);
-    scheduling = false;
+  // birds: one call at a time, somewhere off to the side and far, with long random gaps
+  let nextBird = MIX.birds.min;
+  let lastBird = -1;
+  let birdCalls = 0;
+  const birdIds = Object.keys(URLS).filter((k) => k.startsWith('bird-'));
+
+  // music: finite phrases on moments; quiet otherwise
+  let lastCue = -Infinity;
+  let phraseId = '';
+  let phraseEnds = 0;
+  const cueCounts: Record<string, number> = {};
+  const cued: { cue: string; phrase: string; t: number }[] = [];
+  /** a moment happened (first hearth, a page caught, the Keeping, home): play its phrase if the music has rested */
+  function cue(name: string): void {
+    const list = MIX.cues[name];
+    if (!list || ac.state !== 'running' || ac.currentTime - lastCue < MIX.musicGap) return;
+    const n = cueCounts[name] ?? 0;
+    const id = list[n % list.length]!;
+    const buf = buffers.get(id);
     if (!buf) return;
-    const start = Math.max(ac.currentTime + 0.05, nextAt);
+    cueCounts[name] = n + 1;
+    const now = ac.currentTime;
+    lastCue = now;
     const src = ac.createBufferSource();
     src.buffer = buf;
     const g = ac.createGain();
-    const fadeIn = seqI > 0 && prev !== id;
-    const level = MIX.trim[id] ?? 1;
-    g.gain.setValueAtTime(fadeIn ? 0 : level, start);
-    if (fadeIn) g.gain.linearRampToValueAtTime(level, start + MIX.crossfade);
-    const end = start + buf.duration;
-    if (next !== id) {
-      g.gain.setValueAtTime(level, end - MIX.crossfade);
-      g.gain.linearRampToValueAtTime(0, end);
-    }
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(1, now + 0.4);
     src.connect(g).connect(music);
-    src.start(start);
+    src.start(now);
     src.onended = () => g.disconnect();
-    nextAt = next === id ? end : end - MIX.crossfade;
-    trackId = id;
-    seqI++;
+    phraseId = id;
+    phraseEnds = now + buf.duration;
+    cued.push({ cue: name, phrase: id, t: +now.toFixed(2) });
+    if (cued.length > 12) cued.shift();
   }
 
-  let duckUntil = 0;
-  /** dip the music under a key moment: down to `depth` (0..1 of full) for `hold` s, then back over 1.5 s */
-  function duck(depth = 0.45, hold = 1.5): void {
-    const now = ac.currentTime;
-    duckGain.gain.cancelScheduledValues(now);
-    duckGain.gain.setTargetAtTime(depth, now, 0.08);
-    duckUntil = Math.max(duckUntil, now + hold);
-  }
-
-  const unlock = () => {
-    void ac.resume().then(() => {
-      if (musicStarted) return;
-      musicStarted = true;
-      music.gain.setValueAtTime(0, ac.currentTime);
-      music.gain.linearRampToValueAtTime(MIX.music, ac.currentTime + MIX.fadeIn);
-      void schedule();
-    });
-  };
+  const unlock = () => void ac.resume();
   addEventListener('keydown', unlock);
   addEventListener('pointerdown', unlock);
 
@@ -214,13 +219,15 @@ export function createOpeningAudio() {
     ac,
     /** effects bus (in the head); `at(pos)` gives a 3D input that feeds it */
     sfx,
+    /** pre-master buses, for capture tools (stems work while the master is muted) */
+    buses: { music, ambience, sfx },
     at,
     record,
     play,
     playOne,
     loop,
-    duck,
-    /** per frame: listener = camera; ambience follows the colour and the fox's height; music scheduler */
+    cue,
+    /** per frame: listener = camera; wind follows height, birds wait for the colour */
     update(camera: THREE.Camera, o: { restored: number; height: number }): void {
       if (ac.state !== 'running') return;
       const now = ac.currentTime;
@@ -239,25 +246,38 @@ export function createOpeningAudio() {
       L.upZ.setTargetAtTime(up.z, now, 0.02);
       restored += (o.restored - restored) * 0.02;
       height += (o.height - height) * 0.05;
-      // sepia is wind-only and sparse; the birds come back with the colour
-      wind.set(0.55 + 0.45 * THREE.MathUtils.smoothstep(height, 1, 8), 0.8);
-      birds.set(0.15 + 0.85 * THREE.MathUtils.smoothstep(restored, 0.05, 0.6), 1.2);
-      // queue the next source a few seconds ahead so it starts sample-accurately on time
-      if (musicStarted && !scheduling && nextAt > 0 && now >= nextAt - 3) void schedule();
-      if (duckUntil && now >= duckUntil) {
-        duckUntil = 0;
-        duckGain.gain.cancelScheduledValues(now);
-        duckGain.gain.setTargetAtTime(1, now, 0.5);
-      }
+      // wind: a slow random walk; only its upper part is heard, so gusts arrive, swell and leave silence behind
+      if (Math.abs(gust - gustTo) < 0.02) gustTo = Math.random();
+      gust += (gustTo - gust) * (1 - Math.exp(-(now - lastTick) * 0.24));
+      lastTick = now;
+      const swell = Math.max(0, (gust - 0.35) / 0.65) ** 1.5;
+      const aloft = THREE.MathUtils.smoothstep(height, 1, 8);
+      wind.gain.setTargetAtTime(THREE.MathUtils.lerp(MIX.wind.ground, MIX.wind.high, aloft) * swell, now, 0.5);
+      windLow.frequency.setTargetAtTime(THREE.MathUtils.lerp(MIX.wind.dark, MIX.wind.open, Math.max(swell, aloft * 0.6)), now, 0.6);
+      // birds
+      if (restored > MIX.birds.after && now >= nextBird && birdIds.length) {
+        let i = Math.floor(Math.random() * birdIds.length);
+        if (i === lastBird) i = (i + 1) % birdIds.length;
+        lastBird = i;
+        const ang = Math.random() * Math.PI * 2;
+        const r = THREE.MathUtils.lerp(MIX.birds.near, MIX.birds.far, Math.random());
+        const at = new THREE.Vector3(p.x + Math.cos(ang) * r, p.y + 4 + Math.random() * 6, p.z + Math.sin(ang) * r);
+        play(birdIds[i]!, { at, gain: MIX.birds.gain * (0.7 + Math.random() * 0.5), rate: 0.94 + Math.random() * 0.12 });
+        birdCalls++;
+        nextBird = now + THREE.MathUtils.lerp(MIX.birds.min, MIX.birds.max, Math.random());
+      } else if (restored <= MIX.birds.after) nextBird = Math.max(nextBird, now + 8);
     },
     state: () => ({
       context: ac.state,
-      music: { track: trackId || null, gain: +music.gain.value.toFixed(3), duck: +duckGain.gain.value.toFixed(3) },
-      ambience: { wind: +wind.gain.value.toFixed(3), birds: +birds.gain.value.toFixed(3) },
+      master: MIX.master,
+      music: { phrase: ac.currentTime < phraseEnds ? phraseId : null, cued: cued.slice(-6) },
+      ambience: { wind: +wind.gain.value.toFixed(4), birdCalls, nextBirdIn: +Math.max(0, nextBird - ac.currentTime).toFixed(1) },
       loaded: buffers.size,
       files: Object.keys(URLS).length,
       counts: { ...counts },
       last: log.slice(-8),
+      /** every one-shot played since start (≤600), for capture tools */
+      log: log.slice(),
     }),
   };
 }

@@ -105,9 +105,9 @@ export function createHearthHum(opts: {
         gain.gain.setTargetAtTime(HUM.gain * lit * fall(f.distanceTo(h.base)), now, 0.25);
         crackle.set(HUM.crackle * lit * fall(f.distanceTo(h.base)), 0.4);
         if (h.reactor.restored && !v.lit) {
-          // a hearth catches: a soft whump of fire and the music makes room for it
+          // a hearth catches: a soft whump of fire, and a harp phrase if the music has rested
           audio.play('steam-1', { at: h.base, gain: 0.35, rate: 0.55 });
-          audio.duck(0.5, 2.5);
+          audio.cue('hearth');
         }
         v.lit = h.reactor.restored;
       }
@@ -130,28 +130,13 @@ export function createHearthHum(opts: {
           caught = pg.catches;
           audio.play('soft-paper', { at: pg.pos, gain: 0.3, rate: 0.75 });
           chime(pg.kept ? 4 : caught);
-          audio.duck(pg.kept ? 0.3 : 0.5, pg.kept ? 6 : 2);
+          audio.cue('page');
         }
       }
     },
-    /** the Keeping lets go: one rising open chord, swelling then fading over ~6 s (the music steps aside) */
+    /** the Keeping lets go: its harp phrase (one voice for the moment, no chord stacked under it) */
     swell(): void {
-      if (ac.state !== 'running') return;
-      audio.duck(0.35, 5);
-      const t = ac.currentTime;
-      [110, 164.8, 220, 277.2, 329.6].forEach((hz, i) => {
-        const o = ac.createOscillator();
-        o.type = 'sine';
-        o.frequency.setValueAtTime(hz * 0.98, t + i * 0.35);
-        o.frequency.linearRampToValueAtTime(hz, t + i * 0.35 + 2);
-        const g = ac.createGain();
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.05, t + i * 0.35 + 1.4);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.35 + 6.5);
-        o.connect(g).connect(audio.sfx);
-        o.start(t + i * 0.35);
-        o.stop(t + i * 0.35 + 7);
-      });
+      audio.cue('keeping');
     },
     state: () => ({ running: ac.state === 'running', voices: voices.map(({ h, gain }) => ({ id: h.spot.id, gain: +gain.gain.value.toFixed(4) })) }),
   };
