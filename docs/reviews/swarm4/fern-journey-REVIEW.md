@@ -49,3 +49,7 @@ node tools/camera-drop-probe.mjs /captures/fern/journey-hud-final 0 165 5198 \
 TypeScript, feel lint/camera release checks and production build pass. This is offline SwiftShader simulation with a sampled15fps motion segment and silent footage. Ember separately reports ordered audio cues and no audio blocker on b5196ff (#swarm:715); that is not A/V-sync approval. Kit's external live GPU dark-frame/frozen-plaza report remains open until a landing clip actually uses the new module and demonstrates its progression. This route does not establish that the old recorder divergence was repaired.
 
 Shared archive independently downloaded and SHA-256 matched: `3d94c620e210b8872c2d377747040acf36af973997b3fe4d1ef825b0dda8f071`. Compact acceptance: `fern-journey-acceptance.json`.
+
+## Main integration
+
+Kit landed the route and HUD on main `e1c9e579011c995064355c650a5674c5b5af0b40`. A read-only tree comparison against tested050a7cc finds no differences in `games/fox-spirit/src`, `games/shared` or `src`; the other integration changes are capture tools and review evidence. The retained runtime proof therefore applies to that game source without another broad replay. Sorrel's separate `tools/complete-journey-route.mjs` composes this route with onward Press traversal; its full wake-to-title outcome is outside this report and must use Sorrel's own replay result.
