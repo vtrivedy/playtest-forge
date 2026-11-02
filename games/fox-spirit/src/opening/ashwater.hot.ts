@@ -46,7 +46,7 @@ export type AshRig = {
   safe: THREE.Vector3;
   s: {
     burstA: number; burstB: number; burstC: number; channelY: number; poolY: number; matK: number; glowK: number;
-    done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number;
+    done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number; clock: number; lastSplash: number;
   };
 };
 
@@ -57,6 +57,7 @@ const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 export function updateAshwater(rig: AshRig, dt: number): void {
   const s = rig.s;
+  s.clock += dt;
   const f = rig.fox.position;
   const lx = f.x - ASH_ORIGIN.x;
   const lz = f.z - ASH_ORIGIN.z;
@@ -134,6 +135,13 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     if (w !== null && f.y < level - 0.2) {
       s.splashes++;
       rig.events.splash();
+      // a reset that lands straight back in water (the safe spot itself went under) falls back to the bank anchor
+      // of the stage the fox is in, so a reset can never loop
+      if (s.clock - s.lastSplash < 0.5) {
+        const ax = ASH_ORIGIN.x, az = ASH_ORIGIN.z + (lz > 14 ? 16.5 : lz > -24 ? -15 : -40);
+        rig.safe.set(ax, 0, az);
+      }
+      s.lastSplash = s.clock;
       rig.teleport(rig.safe.x, rig.safe.z, s.safeYaw);
     } else if (f.y > DRY_Y && (w === null || (w !== 'pond' && f.y > level + 0.05))) {
       // (never a reed mat: it may be the thing sinking under you)

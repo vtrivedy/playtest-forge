@@ -64,7 +64,7 @@ export const CISTERN = { wallTop: 5.0, wall: 0.5, gate: { x0: -2.2, x1: 2.2 } };
 export const FLOOD = { level: 4.3, rise: 9, hold: 45, fall: 6 };
 export const DAM_C = { lx: 5.5, lz: 37.2, reach: 3.2 };
 /** the last ferry, moored by the weir's east end; it floats on whatever the cistern holds */
-export const PUNT = { lx: 11.4, lz: 32.2, hx: 1.6, hz: 0.65, rise: 0.22 };
+export const PUNT = { lx: 13.1, lz: 32.2, hx: 1.6, hz: 0.65, rise: 0.22 };
 
 /** spawn (and the return arch) on the landing, facing north */
 export const ASH_SPAWN = { lx: 0, lz: -46, yaw: Math.PI };
