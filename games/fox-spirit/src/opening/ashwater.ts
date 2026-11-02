@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
-import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
+import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SHELF, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import { updateAshwater, type AshRig } from './ashwater.hot';
 
 const C = {
@@ -345,8 +345,8 @@ export function buildAshwater(
   const punt = new THREE.Group();
   const hull = new THREE.Mesh(new THREE.BoxGeometry(PUNT.hx * 2, 0.3, PUNT.hz * 2), timber);
   hull.position.y = -0.05;
-  const thwart = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, PUNT.hz * 2), marsh(0x6a5440));
-  thwart.position.set(0.4, 0.14, 0);
+  const thwart = new THREE.Mesh(new THREE.BoxGeometry(PUNT.hx * 2, 0.12, 0.16), marsh(0x6a5440));
+  thwart.position.set(0, 0.14, 0.4);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 3.4, 5), timber);
   pole.position.set(-1.0, 0.9, 0.3);
   pole.rotation.set(0.25, 0, 0.9);
@@ -373,6 +373,7 @@ export function buildAshwater(
   cWall(W.x1, W.x1 + CISTERN.wall, W.z0 - CISTERN.wall, WEIR.z0);
   cWall(W.x0, CISTERN.gate.x0, W.z0 - CISTERN.wall, W.z0);
   cWall(CISTERN.gate.x1, W.x1, W.z0 - CISTERN.wall, W.z0);
+  cWall(SHELF.x0, SHELF.x1, SHELF.z0, SHELF.z1);
   const gateAt = ash(0, W.z0 - T2);
   const cGate = new THREE.Mesh(new THREE.BoxGeometry(CISTERN.gate.x1 - CISTERN.gate.x0, CISTERN.wallTop + 1.3, CISTERN.wall * 0.6), marsh(0x5a4636));
   cGate.position.set(gateAt.x, -4, gateAt.z);
