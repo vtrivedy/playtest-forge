@@ -22,7 +22,7 @@ Past the Hearthtree bridge the far crag looks down the vista gap at the Still Cr
 
 Album captions (≤ 6 words, the slice's only words; `ctx.captions.say`), the whole arc: page kept — *A page escaped the Scribe's Album.*; Hearthtree settles — *The tree finished falling, at last.*; the Hermitage desk (Bramble) — *Here the Scribe kept every autumn*; unbinding — *The Scribe pressed the autumn shut*; release — *so it would never end.*; snow — *Let the year turn.* The sequence plays wide (a camera path rises behind the ember to frame Press, Album and Crown; any input after 5 s takes it back).
 
-7. **Rest:** when the fox stands still by the cradle (or after a grace timeout, so it's never missed), the camera eases out to a held composition — fox, kits, ember, the open Album, the bare Crown in snow — and a title card fades: *The Keeping*. It fades, play continues in the snow.
+7. **Rest:** the kits lie down round the ember (authored `lieDown`/`rest` clips, `tools/blender/scripts/hearth_fox_rest.py`); when the fox stands still by the cradle it lies down with them (asking to move plays the lie-down back while the controller is held, then hands control over — feel critic PASS 48a800b). When the fox rests (or after a grace timeout, so it's never missed) the camera eases out to a held composition — fox, kits, ember, the open Album, the bare Crown in snow — and a title card fades: *The Keeping*. It fades, play continues in the snow.
 
 ## Rules
 
