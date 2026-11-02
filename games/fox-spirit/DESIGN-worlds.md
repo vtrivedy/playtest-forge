@@ -121,3 +121,7 @@ claim. Record immutable commit in the JSON report. Use actual route simulation t
 Portal-circuit visual review on 053e9e0c found both home-return lenses almost wholly blocked despite camera
 `blocked:false`. Diagnose with staged world travel and centre-screen mesh intersections; compare return landing
 positions without changing the opening spawn. Fix the landing or missing occluder, then repeat physical circuit.
+
+Extend the physical portal circuit with optional Press puzzle-route acceptance. Reuse Thistle's documented movement
+sequence through a dedicated input helper after real hub entry; assert all three physical completion facts and earned
+Inkstep, then walk home. This proves solvability from the hub, not blind insight. Retain all intermediate frames.
