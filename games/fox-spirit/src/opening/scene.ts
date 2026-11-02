@@ -33,6 +33,7 @@ import { buildLeafPiles } from './leafPiles';
 import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
 import { buildMillbrook } from './millbrook';
+import { buildDressing } from './dressing';
 import { createMillrace } from './millrace.hot';
 import { buildKiln, buildWeir } from './millWeir';
 import { createMillWeir } from './millWeir.hot';
@@ -111,10 +112,14 @@ export async function runOpening(): Promise<void> {
 
   buildMeadow(ctx);
   buildVillage(ctx);
-  const millbrook = buildMillbrook(ctx);
-  const millrace = createMillrace(ctx, millbrook.mill.wheel);
-  const kilnParts = buildKiln(ctx);
-  const weirParts = buildWeir(ctx);
+  // Millbrook + dressing draw from their own seed so every older builder keeps its exact layout (and
+  // other teams' recorded input tapes keep replaying frame-for-frame)
+  const westCtx: OpeningCtx = { ...ctx, rand: rng(4217) };
+  const millbrook = buildMillbrook(westCtx);
+  const millrace = createMillrace(westCtx, millbrook.mill.wheel);
+  buildDressing(westCtx);
+  const kilnParts = buildKiln(westCtx);
+  const weirParts = buildWeir(westCtx);
   const canopy = buildCanopy(ctx);
   const keeping = createKeeping(ctx);
   const popUpRuin = buildPopUpRuin(ctx);
@@ -180,7 +185,7 @@ export async function runOpening(): Promise<void> {
       keeping.release();
     },
   });
-  const millWeir = createMillWeir(ctx, { ...kilnParts, ...weirParts }, hearth.updrafts.hearths.find((h) => h.spot.id === 'kiln')!, millrace);
+  const millWeir = createMillWeir(westCtx, { ...kilnParts, ...weirParts }, hearth.updrafts.hearths.find((h) => h.spot.id === 'kiln')!, millrace);
   const hum = createHearthHum({ audio: ctx.audio, hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position, page: runaway.voice });
   // the far Crown answers once the near tree has finished falling: attractor ladder resolves near → far
   // near → far: the settle swells the hum; the Crown answers when the fox steps out onto the far crag

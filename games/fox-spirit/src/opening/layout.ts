@@ -58,16 +58,27 @@ const ALL_PATHS = [...PATHS, ...WEST_PATHS];
 /** The bowl's play area (ellipse); the ground climbs into a cliffed rim outside it, except where Millbrook's lane breaks through */
 export const BOUNDS = { cx: -4, cz: 83, rx: 40, rz: 25 } as const;
 
-export function pathDist(x: number, z: number): number {
+function lanesDist(paths: ReadonlyArray<readonly [number, number, number, number]>, x: number, z: number): number {
   // plaza around the well
   let d = Math.max(0, Math.hypot(x - WELL.x, z - WELL.z) - 3.2);
-  for (const [ax, az, bx, bz] of ALL_PATHS) {
+  for (const [ax, az, bx, bz] of paths) {
     const dx = bx - ax;
     const dz = bz - az;
     const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
     d = Math.min(d, Math.hypot(x - ax - t * dx, z - az - t * dz));
   }
   return d;
+}
+/** distance to the nearest lane anywhere in the world (terrain flattening, ground colour, west scatter) */
+export function pathDist(x: number, z: number): number {
+  return lanesDist(ALL_PATHS, x, z);
+}
+/**
+ * The bowl's own lanes only. The bowl's random scatter (grass, litter) tests this one so its shared rand
+ * sequence, and with it every later builder's layout, stays exactly what it was before Millbrook.
+ */
+export function bowlPathDist(x: number, z: number): number {
+  return lanesDist(PATHS, x, z);
 }
 
 /** 0 inside the play ellipse, rising past 1 at the rim */

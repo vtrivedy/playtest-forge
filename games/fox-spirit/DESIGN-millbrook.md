@@ -29,18 +29,24 @@ world takes. One rule, no per-region special cases. `vistaCut` stays applied las
    - **Footbridge** where the lane crosses the brook.
    - **Stepping stones** further south (a jump line; fall = shallow water, wade out).
    - **Hay field** south-east bank: stooks, a hay wain, split-rail fence. Fills the beige run.
-3. **Orchard terraces** on the west bank, climbing to the **Lookout** hilltop (−101, 73), a lone great
+3. **Orchard** rows on the flat west of the brook; dry-stone terrace walls climb to the **Lookout** hilltop (−100.5, 71), a lone great
    maple and a stone seat looking back east over the whole world (village, Hearthtree, Crown in the SE).
 
-## The thing to do: unstick the mill (systemic, uses dash)
+## The thing to do: unstick the mill (systemic chain on shipped verbs)
 
-Dash through the leaf dam → it bursts (leaf-pile toy physics) → water runs down the race → the wheel
-turns, spray + sound → the valley paints (one restore) → the wheel's gearing drives a **hoist** basket on
-the mill's gable that lifts the fox to the orchard's upper terrace path (a traversal verb the restore
-unlocks; the long way up the switchback stays open). No counters, no orbs.
+1. **Dash** through the leaf dam (teach line when you linger beside it) → it bursts; leaves fly and float off.
+2. The water front runs down the dry bed (3.2 m/s); flecks ride the current; Ember's brook babble starts.
+3. Water reaches the **wheel** → it spins up, the valley paints (one restore, r 26 at the mill), music cue.
+4. The turning wheel works the **bellows** (lay shaft from the mill wall) → the cold **malting kiln** (the
+   shipped updraft `Hearth`, spot id `kiln`, column 12 m) takes and stays lit. Teach line: ride its warm air.
+5. **Jump + hold** in the column → rise → **glide** NW onto the **Weir Stones** (column shelf, top 6.6, cliff
+   sides ≥ 1.8 m above every walkable neighbour so it is glide-only). First landing paints the north edge.
+   The brook's spring pool sits on top and falls off the west lip into the brook head.
 
-State machine (TLA+ `tla/Millrace.tla`): `dammed → flowing → turning`, hoist `down ↔ up` only while
-`turning`; burst is idempotent; nothing un-turns.
+State machine (TLA+ `tla/Millrace.tla`): `dam held → burst`, front monotone D..N, `turning ⇔ painted`,
+`kiln lit ⇒ turning`, `reached ⇒ kiln lit`; liveness: burst ~> front = N ∧ turning ∧ kiln lit. Bad variants
+(turn without water; kindle without the wheel) fail `Inv`. Code: `millrace.hot.ts`, `millWeir.hot.ts`.
+Not built: the hoist basket (cut — an elevator with nothing up top; the kiln → Weir glide replaced it).
 
 ## Budget
 

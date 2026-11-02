@@ -282,33 +282,49 @@ function buildMill(ctx: OpeningCtx) {
   return { wheel, hubY, top: y0 + 0.4 + eave };
 }
 
-/** plank footbridge where the lane crosses the brook: a gentle arch, rails on posts */
+/**
+ * Plank footbridge where the lane crosses the brook: a low arch whose ends sit on the banks (each plank is
+ * its own walk box, so stepping on is never more than the controller's step), rails on posts.
+ */
 function buildBridge(ctx: OpeningCtx): void {
   const { rand, groundH, scene } = ctx;
   const B = MILLBROOK.bridge;
   const yaw = Math.atan2(-B.tz, B.tx); // local z across the brook
-  const len = 5.4;
-  const y0 = Math.max(groundH(B.x - B.tz * 2.7, B.z + B.tx * 2.7), groundH(B.x + B.tz * 2.7, B.z - B.tx * 2.7));
-  const deck = Math.max(y0 + 0.25, waterY(B.z) + 0.6);
+  const len = 6.0;
+  const nx = Math.sin(yaw);
+  const nz = Math.cos(yaw);
+  const endY = Math.min(groundH(B.x - nx * len / 2, B.z - nz * len / 2), groundH(B.x + nx * len / 2, B.z + nz * len / 2)) + 0.06;
+  const rise = 0.3;
+  const N = 12;
+  const plankY = (t: number) => endY + rise * (1 - 4 * t * t);
   const k = new Kit();
   k.at(B.x, 0, B.z, yaw, () => {
-    for (let i = 0; i < 11; i++) {
-      const t = (i + 0.5) / 11 - 0.5;
-      const yy = deck + (1 - 4 * t * t) * 0.18;
-      k.add(hewn(box(1.5, 0.1, len / 11 - 0.04), rand, 0.02), i % 2 ? C.timber : C.door, [0, yy, t * len], [Math.atan(-8 * t * 0.18 / len), (rand() - 0.5) * 0.04, 0], 0.012);
+    for (let i = 0; i < N; i++) {
+      const t = (i + 0.5) / N - 0.5;
+      k.add(hewn(box(1.5, 0.1, len / N - 0.04), rand, 0.02), i % 2 ? C.timber : C.door, [0, plankY(t), t * len], [Math.atan(-8 * t * rise / len), (rand() - 0.5) * 0.04, 0], 0.012);
     }
     for (const s of [-1, 1]) {
-      k.add(box(0.12, 0.2, len + 0.4), C.timberDark, [s * 0.7, deck - 0.12, 0]);
-      for (const t of [-0.5, -0.17, 0.17, 0.5]) k.add(cyl(0.06, 0.07, 1.0, 6), C.timber, [s * 0.78, deck + 0.4 + (1 - 4 * t * t) * 0.18, t * len], [0, 0, 0], 0.012);
-      k.add(jitter(new THREE.BoxGeometry(0.08, 0.08, len, 1, 1, 4), 0.02, rand), C.timberDark, [s * 0.78, deck + 0.85, 0], [0, 0, 0], 0.012);
+      for (const t of [-0.45, -0.15, 0.15, 0.45]) k.add(cyl(0.06, 0.07, 1.1, 6), C.timber, [s * 0.78, plankY(t) + 0.4, t * len], [0, 0, 0], 0.012);
+      // rails follow the arch in two pieces
+      for (const half of [-1, 1]) {
+        const t0 = half < 0 ? -0.45 : 0;
+        const t1 = half < 0 ? 0 : 0.45;
+        const y0 = plankY(t0) + 0.9;
+        const y1 = plankY(t1) + 0.9;
+        const l = Math.hypot((t1 - t0) * len, y1 - y0);
+        k.add(jitter(new THREE.BoxGeometry(0.08, 0.08, l, 1, 1, 3), 0.02, rand), C.timberDark, [s * 0.78, (y0 + y1) / 2, ((t0 + t1) / 2) * len], [-Math.atan2(y1 - y0, (t1 - t0) * len), 0, 0], 0.012);
+      }
     }
   });
   const g = k.build();
   g.name = 'footbridge';
   scene.add(g);
   ctx.occluders.push(g);
-  ctx.colliders.push({ kind: 'box', x: B.x, z: B.z, yaw, hx: 0.75, hz: len / 2, top: deck + 0.12 });
-  for (const s of [-1, 1]) ctx.colliders.push({ kind: 'box', x: B.x + Math.cos(yaw) * s * 0.82, z: B.z - Math.sin(yaw) * s * 0.82, yaw, hx: 0.06, hz: len / 2, top: deck + 1.0 });
+  for (let i = 0; i < N; i++) {
+    const t = (i + 0.5) / N - 0.5;
+    ctx.colliders.push({ kind: 'box', x: B.x + nx * t * len, z: B.z + nz * t * len, yaw, hx: 0.75, hz: len / N / 2 + 0.02, top: plankY(t) + 0.05 });
+  }
+  for (const s of [-1, 1]) ctx.colliders.push({ kind: 'box', x: B.x + Math.cos(yaw) * s * 0.82, z: B.z - Math.sin(yaw) * s * 0.82, yaw, hx: 0.06, hz: len * 0.45, top: endY + rise + 1.0 });
 }
 
 /** stepping stones across the brook south of the bridge (a hop line; slip and you wade out) */

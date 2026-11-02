@@ -48,8 +48,10 @@ const ROUTE = [
   ['drop to the valley', [-67.6, 101.0], { glide: true }],
   ['east of the mill', [-67.4, 93.0]],
   ['to the bridge', [-70, 87.6]],
-  ['bridge east', [-76.6, 87.4]],
-  ['bridge west', [-81.2, 86.4]],
+  ['bridge approach', [-75.0, 85.6]],
+  ['bridge east', [-76.2, 86.0]],
+  ['bridge west', [-81.8, 88.0]],
+  ['off the bridge', [-83.2, 88.2]],
   ['orchard', [-88, 84.5]],
   ['foot of the hill', [-93.5, 80.5]],
   ['climb', [-95.5, 75.5]],
@@ -78,6 +80,8 @@ try {
   await page.evaluate((at) => {
     const h = window.__gameHooks;
     h.setManual(true);
+    // silent visual probe: a live synth worklet would steal the 1-CPU box from the renderer
+    h.audioContext?.()?.suspend?.();
     h.teleport(at[0], at[1], at[2]);
     h.advance(30, 1 / 60, false);
   }, START.at);
