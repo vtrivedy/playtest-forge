@@ -29,8 +29,7 @@ Probe: `node tools/ashwater-probe.mjs OUT [--frames]` (staged landing start, the
 
 The roof trigger is on a bed at y=-1 while the two world-wide mist sheets stay at
 -0.12 and +0.12. These sheets can sit between the chase lens and the whole fox;
-roof occluder registration cannot affect them. First compare the same played
-frame with only the mist sheets hidden. If confirmed, retain the land atmosphere
+roof occluder registration cannot affect them. The matched frame with only mist sheets hidden confirms this. Retain the land atmosphere
 but feather its opacity to zero over the drainable channels and mill pool, using
 the canonical WATER bounds in world space. The mask must stay fixed while the
 mist texture drifts. Keep pond mist, weather, progression, collision and controls.
