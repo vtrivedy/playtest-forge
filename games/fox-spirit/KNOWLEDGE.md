@@ -317,3 +317,24 @@ Verification: all eight matched analyses exited0; duration29.9s; diagnostic PNGs
 reviewed for Summer Night, Hello?, Pine Grove, Beach Buds and full Hush. Python
 compile passed. This is a programmatic/visual audio critique, not a real-time
 listening claim or whole-game playtest. No runtime/mute changes in this slice.
+
+## World expansion and render budget (Bramble, swarm4)
+
+- The playable world is a union of shapes, not one ellipse: `groundH` = lerp(bowl base, `westBase`, `westK(x)`)
+  + smooth-min(bowl rim, `westRim`), with Wren's `vistaCut` applied last. Add a region by adding a shape to
+  `westE` (metres outside, negative inside) — rim, rim trees and grass masks follow automatically.
+- There is no hard world boundary: any slope under ~4 m/m is walkable (controller step 0.22 m per frame at
+  3.2 m/s). A place "reachable only by glide" needs column/cliff sides ≥ 1 m above every reachable
+  neighbour, not just height above the valley floor.
+- Two ground sheets that overlap z-fight (each triangulates groundH differently). Abut sheets on a shared edge
+  (bowl sheet x ≥ −64, Millbrook sheet x < −64).
+- Triangles, not draw calls, dominate SwiftShader time: leaf-card InstancedMeshes were ~1.1 M of the bowl's
+  1.3 M spawn triangles (renderer.info). `tools/world-stills.mjs` prints calls/tris per still; `--pre` runs JS
+  first (e.g. a tri breakdown by top-level group). Far scenery: `buildMaple(..., detail)` coarser lobes and
+  `bakeCells(..., thin)` keeps every n-th card.
+- `bake.ts` merges static props per material (toon materials carry a `userData.lk` key from patchPaint).
+  ~30 meshes per maple → ~7. Never bake an occluder group together with others: the chase-cam fade works per root.
+- Local SwiftShader screenshots of the west cost ~1.3 s each at 640×360; sim+render without readback is
+  ~5–10 ms/frame (`tools/perf-probe.mjs`). Budget input-route clips accordingly (~16× slower than real time).
+- `pkill -f <name>` from a Bash tool call matches the tool's own command line and kills it (exit 144). Use
+  `pgrep -af` and kill by pid.

@@ -32,6 +32,11 @@ import { buildHomecoming } from './homecoming';
 import { buildLeafPiles } from './leafPiles';
 import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
+import { buildMillbrook } from './millbrook';
+import { createMillrace } from './millrace.hot';
+import { buildKiln, buildWeir } from './millWeir';
+import { createMillWeir } from './millWeir.hot';
+import { MILLBROOK } from './millbrookLayout';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -96,7 +101,7 @@ export async function runOpening(): Promise<void> {
     colliders: [],
     cutout: [],
     occluders: [],
-    field: createColorField({ bounds: { minX: -60, maxX: 50, minZ: 40, maxZ: 125 } }),
+    field: createColorField({ bounds: { minX: -120, maxX: 50, minZ: 40, maxZ: 125 }, maskSize: 768 }),
     fox,
     player: null,
     onUpdate: (fn) => void updates.push(fn),
@@ -106,6 +111,10 @@ export async function runOpening(): Promise<void> {
 
   buildMeadow(ctx);
   buildVillage(ctx);
+  const millbrook = buildMillbrook(ctx);
+  const millrace = createMillrace(ctx, millbrook.mill.wheel);
+  const kilnParts = buildKiln(ctx);
+  const weirParts = buildWeir(ctx);
   const canopy = buildCanopy(ctx);
   const keeping = createKeeping(ctx);
   const popUpRuin = buildPopUpRuin(ctx);
@@ -129,6 +138,7 @@ export async function runOpening(): Promise<void> {
     extraSpots: [
       { id: 'steam', ...KEEPING.steam, height: 9, medium: 'steam', bedOffset: 0.03 },
       { id: 'root', ...KEEPING.root, height: 7, bedOffset: 0.03, quietMotes: true },
+      { id: 'kiln', x: MILLBROOK.kiln.x, z: MILLBROOK.kiln.z, y: groundH(MILLBROOK.kiln.x, MILLBROOK.kiln.z), height: MILLBROOK.kiln.height, bedOffset: 0.03 },
     ],
   });
   // the controller exists only after every build; its callbacks reach the carry through this binding
@@ -141,7 +151,10 @@ export async function runOpening(): Promise<void> {
     onGroundContact: (at, speed, jumpHeld, dt) => canopy.contact(at, speed, jumpHeld, dt) ?? unpressed.contact(at, speed, jumpHeld, dt),
     updrafts: hearth.updrafts,
     onInteract: () => carry?.interact(),
-    onDash: (lastGrounded) => carry?.beforeDash(lastGrounded),
+    onDash: (lastGrounded) => {
+      carry?.beforeDash(lastGrounded);
+      millrace.onDash();
+    },
     onFootfall: (at, hind) => foley.footfall(at, hind, (player.state() as { speed: number }).speed),
     onLand: (at, impact) => foley.land(at, impact),
   });
@@ -167,6 +180,7 @@ export async function runOpening(): Promise<void> {
       keeping.release();
     },
   });
+  const millWeir = createMillWeir(ctx, { ...kilnParts, ...weirParts }, hearth.updrafts.hearths.find((h) => h.spot.id === 'kiln')!, millrace);
   const hum = createHearthHum({ audio: ctx.audio, hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position, page: runaway.voice });
   // the far Crown answers once the near tree has finished falling: attractor ladder resolves near → far
   // near → far: the settle swells the hum; the Crown answers when the fox steps out onto the far crag
@@ -239,7 +253,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), millrace: millrace.state(), millWeir: millWeir.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -298,6 +312,8 @@ export async function runOpening(): Promise<void> {
     unpress: unpressed.unpress,
     /** dev: the homecoming as if the page were kept (pins it, sends the freed home) */
     homecoming: homecoming.force,
+    /** dev: burst Millbrook's leaf dam without the dash */
+    millBurst: millrace.burst,
     /** dev: open the glyph shrine without solving it */
     glyphSolve: glyphs.solve,
     /** dev: unfold the steam stair without the steam latch */

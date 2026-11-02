@@ -3,6 +3,7 @@
  * (regionLanternhollow.ts / russetvale.ts route + H-a placement). Every module places from here.
  */
 import * as THREE from 'three';
+import { WEST_PATHS, westBase, westK, westRim } from './millbrookLayout';
 
 /** wake spot by the plaza, facing down the hub lane toward the meadow (−3, 81) */
 export const SPAWN = { x: -5.2, z: 92.5, yaw: Math.atan2(2.2, -11.5) } as const;
@@ -51,13 +52,16 @@ export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
   [-6, 92, -7.2, 87], [0, 80, 4.2, 75.6], [0, 80, -3, 62],
 ];
 
-/** Play area (ellipse); the ground climbs into a cliffed rim outside it */
+/** every lane the ground flattens and colours: the village's and Millbrook's (millbrookLayout.ts) */
+const ALL_PATHS = [...PATHS, ...WEST_PATHS];
+
+/** The bowl's play area (ellipse); the ground climbs into a cliffed rim outside it, except where Millbrook's lane breaks through */
 export const BOUNDS = { cx: -4, cz: 83, rx: 40, rz: 25 } as const;
 
 export function pathDist(x: number, z: number): number {
   // plaza around the well
   let d = Math.max(0, Math.hypot(x - WELL.x, z - WELL.z) - 3.2);
-  for (const [ax, az, bx, bz] of PATHS) {
+  for (const [ax, az, bx, bz] of ALL_PATHS) {
     const dx = bx - ax;
     const dz = bz - az;
     const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
@@ -111,8 +115,14 @@ export function groundH(x: number, z: number): number {
   // the meadow dips gently south of the village toward the shelf
   const meadow = -0.6 * (1 - THREE.MathUtils.smoothstep(z, 70, 84));
   const r = rimK(x, z);
-  const rim = THREE.MathUtils.smoothstep(r, 0.92, 1.08) * 7 + Math.max(0, r - 1.08) * 14;
-  return vistaCut(x, z, swell * flat * 0.8 + meadow + rim);
+  const bowlRim = THREE.MathUtils.smoothstep(r, 0.92, 1.08) * 7 + Math.max(0, r - 1.08) * 14;
+  // the world is the union of the bowl and Millbrook: the lower rim wins, filleted where they meet
+  const a = bowlRim;
+  const b = westRim(x, z);
+  const k = Math.max(2 - Math.abs(a - b), 0) / 2;
+  const rim = Math.min(a, b) - k * k * 0.5;
+  const base = THREE.MathUtils.lerp(swell * flat * 0.8 + meadow, westBase(x, z), westK(x));
+  return vistaCut(x, z, base + rim);
 }
 
 /** shelf walk height (the H-a updraft's landing) */
