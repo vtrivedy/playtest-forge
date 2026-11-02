@@ -677,3 +677,19 @@ for long captures, making that mistaken clear claim fail automatically.
 - `tools/naive-explore.mjs` is the in-repo naive bot (seeded mulberry32, policy runs in-page per chunk; `--tether 14` = the review's well-plaza wander; `--legacy-stuck` reproduces the seed test). Stuck = pushing the stick but < 15% of expected travel over a 1 s window; re-fires each further stuck second.
 - The seed bot's stuck test (< 0.08 m per 1/60 s step for 45 steps) means < 4.8 m/s, faster than `PLAY.runSpeed` 3.2 m/s: it "unstuck" every 0.75 s whatever happened (106 / 90 s on b4fa63a, review said 131), and its random turns made the circling-the-well random walk. Check a bot's thresholds against the controller's real speeds before trusting a stuck count. It also sent `Shift` (no dash; the controller reads `ShiftLeft`).
 - Real cause of village stops: `moveTo`'s 0.28 m nose probe points along the facing, so any diagonal push into a wall fails BOTH per-axis moves — the fox stopped dead instead of sliding. The slide used to run only for round posts; it now runs for any blocker while the player steers into it (never off a ledge) and eases the facing to the travel (`PLAY.slideTurn`).
+
+## Stones, Hermitage colour and music dynamics (Maple, swarm5)
+
+- Replacing a prop's geometry without moving the world: keep building the old geometry (it draws the shared
+  build rand per vertex) and return a new one derived from it (`roundStone(src)` fills src's bounds, seeded from its
+  vertices; `roundSlab(lobes, …)` reuses the lobe table). Check with `tools/rand-fingerprint.mjs` on both trees.
+  New props get fixed offsets or their own rng — never `ctx.rand`.
+- Smooth-normal props must still be returned non-indexed (`toNonIndexed()` after `computeVertexNormals`) or
+  `mergeGeometries` in the Kit/bake rejects the mix with hewn (non-indexed) parts.
+- "Kept colour" inside sepia: plain `MeshToonMaterial({ gradientMap: RAMP_WORLD })` (no patchPaint) — used for the
+  Hermitage drying-line leaves, desk leaves and pigment cakes ("Here the Scribe kept every autumn").
+- Music dynamics: `python3 tools/music-dynamics.py hearthsong.wav` (after `tools/hearthsong-render.mjs`) gives
+  integrated LUFS, EBU LRA and sung-vs-bed lift from the conductor trace. Offline main walk on b4fa63a: lift 4.4 LU,
+  LRA 8.5 (the review's 4.8 was the full mix on a capture: ambience/SFX flatten it). The worklet's `mom` envelope
+  (bed ×0.82, swell up to ×1.35, 2.5 s up / 4 s down, bass + brighter harp under it) → lift 8.0, LRA 12.7.
+  Level-only changes leave the conductor (TLA Hearthsong) untouched; still run `npm run check:music`.
