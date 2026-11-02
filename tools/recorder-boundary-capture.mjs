@@ -1,7 +1,8 @@
 /** Hardware recorder diagnostic; production game stays unchanged. See DESIGN-recorder-boundary.md. */
 import {chromium} from 'playwright';
 import {installRecorderStaging} from './recorder-staging.mjs';
-import {createSliceRoute, SLICE_START} from './complete-journey-route.mjs';
+import {createRouteKeyEncoder} from './route-input.hot.ts';
+import {createSliceRoute, SLICE_START, verifySlice} from './complete-journey-route.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
@@ -16,7 +17,7 @@ const backend=arg('backend','egl'),paths=arg('paths','paired'),variant=arg('vari
 if(!['baseline','preserve','no-aa','finish'].includes(variant))throw Error('Unknown renderer variant');
 if(!['native','staged','paired','compositor'].includes(paths))throw Error('Unknown capture paths');
 fs.mkdirSync(out,{recursive:true});fs.mkdirSync(path.join(out,'compositor'),{recursive:true});
-const report={source:execFileSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),captureToolSha:createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'),fps,seconds,viewport:[width,height],backend,paths,variant,errors:[],compositor:[],label:'Matched native WebGL + persistent 2D MediaRecorder streams and independent CDP compositor JPEGs. One initial wake placement, fixed-clock inputs on a real-time rAF; no later teleports or forced progression.'};
+const report={source:execFileSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),captureToolSha:createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'),captureInputSha:createHash('sha256').update(fs.readFileSync(new URL('./route-input.hot.ts',import.meta.url))).digest('hex'),fps,seconds,viewport:[width,height],backend,paths,variant,errors:[],compositor:[],label:'Matched native WebGL + persistent 2D MediaRecorder streams and independent CDP compositor JPEGs. One initial wake placement, fixed-clock inputs on a real-time rAF; no later teleports or forced progression.'};
 const save=()=>fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));
 const types={'.js':'text/javascript','.html':'text/html','.css':'text/css','.glb':'model/gltf-binary','.ogg':'audio/ogg','.jpg':'image/jpeg','.png':'image/png'};
 const root=path.join(repo,'dist/fox-spirit');
@@ -59,7 +60,8 @@ try{
   cdp.send('Page.screencastFrameAck',{sessionId:event.sessionId}).catch(e=>report.errors.push(String(e)));
  });
  if(paths==='paired'||paths==='compositor')await cdp.send('Page.startScreencast',{format:'jpeg',quality:70,maxWidth:640,maxHeight:360,everyNthFrame:3});
- await page.evaluate(({stageSource,routeSource,fps,paths,variant})=>{
+ await page.evaluate(({stageSource,routeSource,inputSource,fps,paths,variant})=>{
+  const encodeKeys=new Function(`return (${inputSource})`)()();
   const h=window.__gameHooks,renderer=window.__opening.ctx.renderer,source=renderer.domElement,gl=renderer.getContext();
   h.advance(0,1/fps,true);
   const stage=(paths==='native'||paths==='compositor')?null:new Function(`return (${stageSource})`)()(source);
@@ -84,15 +86,14 @@ try{
    if(now-probe.last>=1000/fps-.5){
     probe.last=now;
     const input=probe.route(probe.ticks/fps,probe.state);
-    h.setStick(input.x,input.z);h.setKeys(input.jump?(input.dash?jumpDash:jump):(input.dash?dash:none));
+    h.setStick(input.x,input.z);h.setKeys(encodeKeys(input));
     probe.state=h.advance(1,1/fps,true);if(variant==='finish')gl.finish();if(stage)stage.push();probe.ticks++;
     if(probe.ticks%fps===0)saveSample();
    }
    probe.raf=requestAnimationFrame(tick);
   }
-  const jump=['Space'],dash=['ShiftLeft'],jumpDash=['Space','ShiftLeft'],none=[];
   probe.raf=requestAnimationFrame(tick);
- },{stageSource:installRecorderStaging.toString(),routeSource:createSliceRoute.toString(),fps,paths,variant});
+ },{stageSource:installRecorderStaging.toString(),routeSource:createSliceRoute.toString(),inputSource:createRouteKeyEncoder.toString(),fps,paths,variant});
  for(let elapsed=0;elapsed<seconds;elapsed+=10){await page.waitForTimeout(Math.min(10,seconds-elapsed)*1000);console.log('recorder wall seconds',Math.min(elapsed+10,seconds));}
  const result=await page.evaluate(async()=>{
   const p=window.__recorderBoundary;p.stop=true;cancelAnimationFrame(p.raf);
@@ -106,6 +107,9 @@ try{
  if(paths==='paired'||paths==='compositor')await cdp.send('Page.stopScreencast');
  for(const[key,data]of Object.entries(result.videos))fs.writeFileSync(path.join(out,key+'.webm'),Buffer.from(data,'base64'));
  delete result.videos;Object.assign(report,result);
+ report.routeChecks=verifySlice(result.game);
+ report.routeComplete=Object.values(report.routeChecks).every(Boolean);
  await page.evaluate(()=>window.__gameHooks.advance(0,1/30,true));await page.screenshot({path:path.join(out,'end.png')});
- save();console.log(JSON.stringify({ticks:report.ticks,simulationSeconds:report.simulationSeconds,compositorFrames:report.compositor.length,errors:report.errors}));
+ save();if(seconds>=230&&!report.routeComplete)throw Error('Full journey capture failed route-completion checks: '+JSON.stringify(report.routeChecks));
+ console.log(JSON.stringify({ticks:report.ticks,simulationSeconds:report.simulationSeconds,compositorFrames:report.compositor.length,errors:report.errors}));
 }finally{save();if(browser)await browser.close();server.close();}

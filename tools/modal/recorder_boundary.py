@@ -19,6 +19,7 @@ image = (modal.Image.from_registry('node:22-bookworm-slim', add_python='3.12')
 if modal.is_local():
     for module in sorted((ROOT / 'tools').glob('*.mjs')):
         image = image.add_local_file(module, f'/opt/browser/{module.name}')
+    image = image.add_local_file(ROOT / 'tools/route-input.hot.ts', '/opt/browser/route-input.hot.ts')
     image = image.add_local_file(ROOT / 'tools/check-black-frames.py', '/opt/check-black-frames.py')
 
 

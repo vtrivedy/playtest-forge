@@ -620,3 +620,11 @@ black by itself did not distinguish recording-triggered corruption from a game
 defect. The forge's fullscreen output surface does not need MSAA; SMAA already
 owns scene-edge smoothing. Actual constructor antialiasfalse is the selected fix;
 AST single-aa-owner lint rejects true, dynamic flags, overriding spreads/context.
+
+Actual constructor74c7db9 (no diagnostic context override),250s recording:
+native0/5604, staged0/6948, CDP0/2316 black; noJSerrors, minimum meanluma
+67.948/76.674/76.774. **Scope limit:** probe omitted interact so the page completes
+(3catches0skips) then the journey stalls at coal pickup; this is valid250s render
+output evidence, not an ending clear. Route replay now uses a pooled immutable
+jump/dash/interact encoder (including KeyE) and asserts canonical route completion
+for long captures, making that mistaken clear claim fail automatically.
