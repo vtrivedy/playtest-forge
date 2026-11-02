@@ -70,3 +70,9 @@ A failure is retained with the last position; later stages may not mask a failed
 Entry review found the finale's homeward guidance continuing in Ashwater after discovery had finished. Scope both its
 hint and mote trail to Russetvale; defer a pending homecoming caption until returning there. Foreign-world puzzle
 hints retain the shared teach panel. Verify via the fresh route's foreign-world screenshot/state after the change.
+
+### Independent portal circuit (Reed)
+Extend the fresh-boot acceptance with an optional entry-tour: after physical Ashwater entry, walk back through its
+return arch, cross the Press arch from the hub, return home, then re-enter Ashwater. Assert every active-world and
+travel-count transition and retain screenshots plus complete `window.__game`. This isolates portal reachability and
+re-entry from the evolving puzzle routes; it does not claim puzzle completion or blind discovery.
