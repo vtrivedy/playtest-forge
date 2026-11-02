@@ -7,7 +7,9 @@ import * as THREE from 'three';
 import { buildDistance, buildMaple, buildRock, contactInk, hewn, inked, mapleLeafGeometry, toon, type TreeKind } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import type { OpeningCtx } from './scene';
-import { BOUNDS, HEARTH_A, HOUSES, inVista, JOGS, pathDist, rimK, SHELF, WELL } from './layout';
+import { BOUNDS, bowlPathDist, HEARTH_A, HOUSES, inVista, JOGS, pathDist, rimK, SHELF, WELL } from './layout';
+import { westE } from './millbrookLayout';
+import { northE } from './hermitageLayout';
 
 /** Stone strata, base → cap: warm grey-ochre bands so the shelf reads as layered rock, not a crate */
 const STRATA = [0x6e5c4c, 0x8a7560, 0x7a6754, 0x93806a];
@@ -222,7 +224,7 @@ export function buildMeadow(ctx: OpeningCtx): void {
 
   // nothing grows on lanes, house pads, the well plaza or the hearth apron
   const clear = (x: number, z: number, r: number) =>
-    pathDist(x, z) > r &&
+    bowlPathDist(x, z) > r &&
     Math.hypot(x - WELL.x, z - WELL.z) > 4 + r &&
     Math.hypot(x - HEARTH_A.x, z - HEARTH_A.z) > 2.5 + r &&
     HOUSES.every((h) => Math.max(Math.abs(x - h.x) - h.w / 2, Math.abs(z - h.z) - h.d / 2) > r);
@@ -238,6 +240,8 @@ export function buildMeadow(ctx: OpeningCtx): void {
     const t = buildMaple(rand, 1.4 + rand() * 0.5, rand() < 0.4 ? 'tall' : 'grove', rand() < 0.6 ? 4 + (i & 1) : i & 3, y);
     t.position.set(x, y - 0.1, z);
     t.rotation.y = rand() * 6;
+    // built even where Millbrook's lane cuts the rim, so the shared rand sequence (and every later layout) is unchanged
+    if (westE(x, z) < 3 || northE(x, z) < 3) continue;
     scene.add(t);
   }
   // a second, deeper row of crowns up the slope, offset between the first
@@ -251,6 +255,7 @@ export function buildMeadow(ctx: OpeningCtx): void {
     const t = buildMaple(rand, 1.6 + rand() * 0.5, 'grove', 4 + (i & 1), y2);
     t.position.set(x2, y2 - 0.1, z2);
     t.rotation.y = rand() * 6;
+    if (westE(x2, z2) < 3 || northE(x2, z2) < 3) continue;
     scene.add(t);
   }
   for (const [x, z, sc, kind, pal] of TREES) {
@@ -271,20 +276,22 @@ export function buildMeadow(ctx: OpeningCtx): void {
   }
 
   // tufts over the play ellipse, thinning toward the rim; litter drifts under every crown
-  buildGrass(scene, rand, groundCtx, {
+  // scatter tests the bowl's own lanes (layout.ts bowlPathDist): same rand sequence as before Millbrook
+  const scatterCtx = { ...groundCtx, pathDist: bowlPathDist };
+  buildGrass(scene, rand, scatterCtx, {
     cx: BOUNDS.cx, cz: BOUNDS.cz, w: BOUNDS.rx * 2, d: BOUNDS.rz * 2, n: 2600,
     keep: (x, z) => clear(x, z, 0.6) && rimK(x, z) < 1 - rand() * 0.15,
   });
-  buildLeaves(scene, rand, groundCtx, {
+  buildLeaves(scene, rand, scatterCtx, {
     cx: BOUNDS.cx, cz: BOUNDS.cz, r: 30, n: 2600,
     drifts: TREES.map(([x, z, sc]) => [x, z, 1.6 + sc * 1.4] as const),
     keep: (x, z) => clear(x, z, 0.2),
   });
-  buildJogs(ctx, groundCtx, clear);
+  buildJogs(ctx, scatterCtx, clear);
   // no ridge in the vista gap past the far crag: the Crown is framed there
   buildDistance(scene, rand, {
     cx: BOUNDS.cx, cz: BOUNDS.cz, dir: -Math.PI / 2, arc: Math.PI * 1.9, count: 16, y: 2,
-    keep: (x, z) => !inVista(x, z, 18),
+    keep: (x, z) => !inVista(x, z, 18) && westE(x, z) > 22 && northE(x, z) > 22,
   });
 }
 
