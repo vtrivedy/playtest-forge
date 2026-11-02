@@ -512,6 +512,10 @@ A clear destination is not a clear connecting segment. Full staged finale route 
   Now each settled restore bleeds a paler feathered halo outward over ~40 s (`uRestoreBleed[i]`, set in scene.ts
   next to `uRestore`; ground only). Keep per-slot shader work to one value noise: the loop runs for up to 24 slots
   per fragment on every painted material.
+- A fresh wash read as a scorch mark: painted grass cel is dark olive and the wet front/tide were dark sienna.
+  Sky-facing painted surfaces (normal from dFdx/dFdy of the world position) are now lifted ~20% and warmed in
+  patchPaint; pigment lighter and halved. Grey-beige props (flagstones 0x8d8471) read as unpainted paper even
+  when painted: give them a warm hue.
 - Things that must read in colour inside sepia (falling lane leaves) need plain MeshToonMaterial; the paint patch
   turns them to paper and they vanish (first lane-wind try).
 - Controller slide (moveTo glides round round posts only — trunks, pillars — never boxes) must only act while the player steers at walk/run pace into the post. Scripted routes are chaotic: a 2 cm nudge against a fold at 951 frames flipped a later 180° turn's side and walked the fox off a page (30 Hz). Restricting the slide to posts makes the full slice trace bit-identical to slide-off (`PLAY.slide=false`) at 30 Hz. Earlier: authored routes and puzzles rely on momentum (dash, post-dash skid, coasting) stopping dead at a blocker — the pop-up ruin folds broke when a post-dash skid slid round the fold (Fern, b24bf90 → fixed). `PLAY.slide` toggles it for A/B; `node tools/page-motion-probe.mjs --out DIR` (sim-only, ~2 min) is the full-slice regression: 3 catches, kept, home.
