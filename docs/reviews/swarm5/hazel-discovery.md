@@ -64,3 +64,20 @@ Continuous verification is complete on two render backends:
 - Independent Reed T4 production `c0eb9d41`: 70 s /15fps, all1050 frames, all13 checks, zeroJSerrors, grounded done55.95 s after four ruin misses. He found zero active-discovery warm-hint samples and58 post-completion warm-hint samples, and inspected continuity plus the43–60 s retry sheet. Evidence volume `reed/discovery-priority-c0eb9d41` (same capture-directory name on Reed's workspace). His narrow source review confirms the callback is read-only and correctly gated.
 
 The first local 60 s/4fps foreground attempt was terminated after57 frames and remains under `discovery-priority-f8442a9d-rendered/` as incomplete negative capture evidence; it is not used as a successful replay. Blind-wander overlook discovery remains open.
+
+## Exact-tip blind control after recovery approval
+
+`2551ca124a8473b3d3476f6fa4be3277f9050915`, unchanged original blind policy,
+120 seconds, seed 1, corrected stuck detector: one catch, no overlook visit,
+minimum overlook distance 9.4178 m, 12 unsticks / 8.08 stuck seconds, zero JS
+errors. Full saved game state and trajectory:
+`/captures/hazel/blind-2551ca12-seed1/naive.json`. This is simulation-only evidence;
+it contains no screenshots or motion capture.
+
+The fox leaves the village and passes the canopy rather than taking its jumping
+route: position (-4.0,68.6) at10 s, (3.7,58.5) at20 s and (-16.4,57.1) at30 s.
+Eight unstick events cluster near the Millbrook edge (-67..-66,104) during60–74 s,
+outside the village test area. These coordinates identify a replay target, not
+a verified geometry cause. Sent to Thistle. This independently reproduces Kit's
+blind-control finding; it does not satisfy the unaided-overlook requirement.
+Discovery TLC recheck remains112 generated /38 distinct states, no errors.
