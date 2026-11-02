@@ -25,7 +25,7 @@ import { createKeeping } from './keeping';
 import { buildUnpressed } from './unpressed';
 import { buildGlyphs } from './glyphs';
 import { createHearthHum } from './hum';
-import { createOpeningAudio, type OpeningAudio } from './audio';
+import { createOpeningAudio, MIX, type OpeningAudio } from './audio';
 import { createFoxFoley } from './foley';
 import { buildRunawayPage } from './page';
 import { buildHomecoming } from './homecoming';
@@ -156,8 +156,7 @@ export async function runOpening(): Promise<void> {
     updrafts: hearth.updrafts, steamId: 'steam', rootId: 'root',
     coal: () => coal.heatSource(),
     onSteam: (at) => {
-      ctx.audio.playOne('steam', 3, { at, gain: 0.8 });
-      ctx.audio.duck(0.5, 2.5);
+      ctx.audio.playOne('steam', 3, { at, gain: 0.25, rate: 0.8 });
       field.restore(at, 7, 1.6, { edgeMax: 1.2 });
       keeping.reconnectSteam();
     },
@@ -249,6 +248,8 @@ export async function runOpening(): Promise<void> {
     audioTap: () => ctx.audio.record.stream,
     /** the audio context (capture tools read sampleRate / currentTime / resume it) */
     audioContext: () => ctx.audio.ac,
+    /** pre-master stems (music / ambience / sfx) and the mix gains, for capture tools */
+    audioBuses: () => ({ ...ctx.audio.buses, master: MIX.master }),
     setStick: player.setStick,
     setKeys: player.setKeys,
     teleport: player.teleport,

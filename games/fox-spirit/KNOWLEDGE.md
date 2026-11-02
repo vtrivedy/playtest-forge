@@ -125,6 +125,28 @@ permits branch unmute; Vivek then hears the landed result on main.
 - Recorder smoke evidence: `/captures/rook/audio-recorder-final/`. Two running contexts, 304 meter samples, no silent samples, peak 0.02207, no page errors; decoded track 7.94 s stereo Opus, -41.2 LUFS, -33.0 dBFS true peak. This proves capture plumbing, not a good mix, audible spatial placement, seamless music, or event coverage.
 - Metering and source audit cannot replace listening. Review a named runtime SHA with event coverage and a loop boundary before claiming music/SFX quality. Prefer a post-mix recording bus when the runtime exposes one, and use the rendered camera for the listener pose.
 
+### Machine listening and the full-mix capture (Flint, 2026-11-02)
+
+- `tools/mix-capture.mjs --out DIR --seconds 60`: plays the no-teleport slice route with the sim paced to the wall
+  clock and records the three **pre-master** stems (music / ambience / sfx) sample-for-sample, so it works while
+  `MIX.master` is 0. Writes `stem-*.wav`, `mix.wav` (stem sum, unity master, pre-limiter), `meter-50ms.json`,
+  `events.json` (every one-shot + music cue, recording-relative) and per-minute counts. Feed it straight into
+  `tools/audio-understand.py mix.wav --music stem-music.wav --sfx stem-sfx.wav --events events.json`.
+  Pull big PCM out of Playwright as base64 int16 per channel — JSON float arrays of a minute of 6-channel audio
+  exhaust the node heap.
+- `modal run tools/audio-listen.py --path a.wav[,b.wav] [--window 10]`: Qwen2-Audio-7B-Instruct on an A10G
+  describes each window. **Ask neutrally.** With a checklist prompt ("birds, wind, footsteps…") it reported birds
+  and footsteps in a solo harp track; with "describe only what is really present" it called the harp a harp, heard
+  the old mix as "music loud, covers the spectrum… birds four times… an increasing drone" (matching Vivek and the
+  hum/crackle bed Moss found), and heard the redo's paws as regular "generic impact sounds". It is poor at timing
+  (says "music throughout" for a window that is half silence) and hallucinates occasionally (a "male voice").
+  Use it for *what* is audible and how it reads, never for *when*/how loud — that is the meter's job.
+- Field recordings hide things: the CC0 park "wind" recording carried birds and, once low-passed, read as an engine
+  to the model (traffic rumble). The redo synthesises wind instead. Isolate bird calls by 2–8 kHz energy peaks
+  ≥14 dB over a running median with nothing else within ±1.5 s, then denoise (ffmpeg `afftdn`) and high-pass.
+- Our capture tool's wait loop once uploaded an MP4 while ffmpeg was still writing it (no moov atom): wait for the
+  process to exit, not for the file to appear, and decode-check after a volume round trip.
+
 ## Working agreement
 
 - Vivek's #swarm :1027 replaces fixed pitch rounds, required two-vote verdicts, and single-channel coordination. Choose a useful split and focused channels; deliver fun, beautiful work proven on a named build and clip.
