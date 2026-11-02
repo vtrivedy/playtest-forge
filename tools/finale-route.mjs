@@ -9,6 +9,7 @@ import { createServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { foxPx, gate } from './lib/fox-size.mjs';
 
 const args = process.argv.slice(2);
 const out = path.resolve(args[0] && !args[0].startsWith('--') ? args[0] : '/tmp/finale-route');
@@ -84,15 +85,10 @@ try {
         const keys = leg.jumpAt != null && n < leg.jumpAt * 60 ? [] : leg.keys;
         h.setKeys(keys);
         s = h.advance(2, 1 / 60, false);
-        // the fox's on-screen height (feet → ears, px) through the rendered lens: the payoff must stay in frame
-        const cam = window.__opening.camera;
-        cam.updateMatrixWorld();
-        const a = cam.position.clone().set(s.pos[0], s.pos[1], s.pos[2]).project(cam);
-        const b = cam.position.clone().set(s.pos[0], s.pos[1] + 0.55, s.pos[2]).project(cam);
-        const px = a.z < 1 && b.z < 1 ? Math.abs(b.y - a.y) * innerHeight / 2 : 0;
-        return { px, s: { pos: s.pos, grounded: s.grounded, gliding: s.gliding, speed: s.speed, opening: { carry: { carried: s.opening.carry.carried, position: s.opening.carry.position }, finale: s.opening.finale } }, d };
+        return { s: { pos: s.pos, grounded: s.grounded, gliding: s.gliding, speed: s.speed, opening: { carry: { carried: s.opening.carry.carried, position: s.opening.carry.position }, finale: s.opening.finale } }, d };
       }, [{ to: leg.to, keys: leg.keys, jumpAt: leg.jumpAt }, n]);
       frame += 2;
+      r.px = await page.evaluate(foxPx);
       const s = r.s;
       trace.push([frame, li, s.pos.map((v) => +v.toFixed(3)), +r.px.toFixed(1), s.grounded, s.gliding, s.opening.carry.carried, s.opening.finale.phase, s.opening.finale.card]);
       if (clip && frame % every === 0) {
@@ -104,9 +100,8 @@ try {
     // screen-height floor (Kit d03831b note: payoff played off-screen with the fox a 10 px speck): outside the
     // authored finale shots (leg 3) the fox may not stay under MIN_PX for more than a second
     if (li !== 3) {
-      let run = 0, worst = 0;
-      for (const t of trace) if (t[1] === li) { run = t[3] < MIN_PX ? run + 2 : 0; worst = Math.max(worst, run); }
-      if (worst > 60) throw new Error(`leg ${li}: fox under ${MIN_PX} px on screen for ${(worst / 60).toFixed(1)} s`);
+      const bad = gate(trace.filter((t) => t[1] === li).map((t) => t[3]), { dt: 2 / 60, height: size.height, min: MIN_PX * (size.height / 540) });
+      if (bad) throw new Error(`leg ${li}: ${bad}`);
     }
     notes.push([`leg${li}`, { done, frame, last: trace[trace.length - 1] }]);
     save();
