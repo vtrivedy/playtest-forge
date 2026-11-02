@@ -287,6 +287,7 @@ export function buildAshwater(
     stone.rotation.set((rand() - 0.5) * 0.15, a, (rand() - 0.5) * 0.2);
     stone.castShadow = true;
     root.add(stone);
+    occluders.push(stone);
     colliders.push({ kind: 'post', x: stone.position.x, z: stone.position.z, r: 0.3 });
     for (let k = 0; k < 6; k++) {
       const b = new THREE.Mesh(blade, marsh(C.reed));
@@ -491,6 +492,7 @@ export function buildAshwater(
     door.position.set(at.x - 0.6, -0.95, at.z + 1.4);
     door.rotation.y = 0.4;
     root.add(roof, chimney, door);
+    occluders.push(roof, chimney);
     colliders.push({ kind: 'box', x: roof.position.x, z: roof.position.z, yaw: 0, hx: 2.0, hz: 1.2, top: 0.2 });
   }
   // the Ferrykeeper's mooring on the islet: a lantern that still burns on its stake
