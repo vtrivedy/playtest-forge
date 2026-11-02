@@ -25,11 +25,21 @@ function groundTop(x0: number, x1: number, z0: number, z1: number): number {
 /** level 1 (teach): an ink ridge across the island; its one gate is sealed with frozen ink */
 export const RIDGE = { lz: 16, half: 0.9, xMax: 60, gate: 1.5, rise: 3.6 };
 export const RIDGE_BASE = groundTop(-RIDGE.xMax, RIDGE.xMax, RIDGE.lz - 1, RIDGE.lz + 1);
-/** braziers: warmth to carry (one on the margin, one on the shelf — tla/Press.tla needs both) */
-export const BRAZIER_A = { lx: -10, lz: 27, reach: 2.0 };
-export const BRAZIER_B = { lx: 12, lz: -14, reach: 2.0 };
-/** seconds of carried warmth: enough to walk brazier → seal / brazier → iced membrane, not to dawdle */
-export const WARM_S = 11;
+/**
+ * braziers: warmth to carry. Each world half has one lit brazier too far from its frozen gate to reach before the
+ * warmth fades, and a cold one between that carried warmth lights (relay): the puzzle is to see the chain.
+ * (tla/Press.tla abstracts the chain to "warmth reachable on this side"; lit braziers never go out.)
+ */
+export const BRAZIERS: ReadonlyArray<{ lx: number; lz: number; lit: boolean; shelf: boolean }> = [
+  { lx: -26, lz: 30, lit: true, shelf: false },
+  { lx: -6, lz: 30, lit: false, shelf: false },
+  { lx: 30, lz: -10, lit: true, shelf: true },
+  { lx: 16, lz: -24, lit: false, shelf: true },
+];
+export const BRAZIER_REACH = 2.0;
+/** seconds of carried warmth (≈ 21 m at a run): one relay leg (≤ 18 m), never lit brazier → gate (≥ 24 m), and
+ *  the relays stand off the straight line, so the chain has to be seen, not walked into */
+export const WARM_S = 6.5;
 
 /** level 2 (develop): the Archive shelf spans the island; a frozen membrane at its foot breaks into a glide draft */
 export const SHELF = { z0: -30, z1: -6, xMax: 60, rise: 4.4 };
