@@ -33,3 +33,45 @@ faint at smaller resolutions, as Reed independently noted. Reed owns a focused
 contrast follow-up; this diagnostic does not claim that readability issue fixed.
 TypeScript and progress checks pass after merge. Saved-autumn mechanism mapping
 and reconstruction remain explicitly outside this successful optional-memory test.
+
+## Four-secret integration — 81cf2be3
+
+Merged Maple `0a4201aa`, Cedar `b53e3dee` and Reed `60d78bfe`, including the
+two Ashwater memories and Reed's darker Album typography. The harness derives
+page count from `SECRET_IDS`, then checks six fixtures: none, each of the four
+secrets alone, and all four together. These are six selected fixtures, not all
+sixteen possible subsets.
+
+`/captures/hazel/memory-reload-four-secrets-integrated/evidence.json` PASS:
+twelve real scene reloads, forty-eight native-key Album screenshots, zero page
+or console errors. Every spread reveals only its own earned title; other
+unearned titles and missing-page placeholders behave correctly. Saved roof and
+mooring facts also reconstruct their independent physical Ashwater bit flags.
+No fixture grants level completion, an ability or Seedwell fill.
+
+Offline paragraph checks against the captured canvas text confirm all sixteen
+earned views contain their complete authored paragraph. They additionally check
+every closed-Album snapshot: secrets persist and all worlds still have zero
+completion/fill and no ability. Results are retained as `paragraph-checks.json`
+beside the runtime evidence. This checks text content; actual visual fit was
+reviewed separately in the four second-load singleton frames:
+[Stacks](four-secret-reload/stacks.png), [Loft](four-secret-reload/loft.png),
+[roof](four-secret-reload/roof.png), [mooring](four-secret-reload/mooring.png).
+The paragraphs and controls fit and remain readable at 960×540.
+
+The older component preview's hard-coded two-secret wrap assumption was a
+harness error, not a game-wrap defect. It now uses the declared secret count and
+requires all three Seedwell labels before naming a screenshot `map-return`.
+`/captures/hazel/map-preview-four-secrets/component-checks.json` PASS:
+native real-key Tab, component close/open, `secretCount:4`, `wrappedToMap:true`,
+zero page errors. This preview deliberately uses injected component facts;
+physical acquisition and portal reachability remain outside its claim.
+
+After merging landed `keeping-d3` `69da5af0` (game sources identical to this
+tested integration), the full saved-prefix diagnostic repeats successfully at
+`/captures/hazel/world-save-four-secrets-integrated/evidence.json`: autumn,
+Ashwater and Press reconstruction, saved opening and quiet arches all PASS for
+teach/develop/full; zero page or console errors. The autumn fix and fresh
+physical/production-opening evidence remain in [AUTUMN-SAVE-FIX.md](AUTUMN-SAVE-FIX.md).
+TypeScript, Vite build, feel/camera/world lint, progress checks, harness syntax
+and whitespace checks pass. No production changes accompany these diagnostics.
