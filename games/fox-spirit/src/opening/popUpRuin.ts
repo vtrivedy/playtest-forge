@@ -112,15 +112,15 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   // Narrow tapered remnants and a broken pointed arch; open sky stays between them.
   for (const side of [-1, 1]) {
     const pier = inked(hewn(new THREE.CylinderGeometry(0.24, 0.37, 1.85, 5, 3), ctx.rand, 0.045), stone, 0.014, true);
-    pier.position.set(O.x - 1.4, O.top + 0.925, O.z + side * 1.5);
+    pier.position.set(O.x + 1.3, O.top + 0.925, O.z + side * 1.5);
     pier.rotation.y = side * 0.2; root.add(pier);
     for (let i = 0; i < 3; i++) {
       const arch = box(0.33, 0.3, 0.5, stone, 0.035);
-      arch.position.set(O.x - 1.4, O.top + 1.83 + i * 0.27, O.z + side * (1.4 - i * 0.19));
+      arch.position.set(O.x + 1.3, O.top + 1.83 + i * 0.27, O.z + side * (1.4 - i * 0.19));
       arch.rotation.x = side * 0.54; root.add(arch);
     }
     const foot = box(0.7, 0.12, 0.8, undercroft, 0.03);
-    foot.position.set(O.x - 1.4, O.top + 0.06, O.z + side * 1.5); root.add(foot);
+    foot.position.set(O.x + 1.3, O.top + 0.06, O.z + side * 1.5); root.add(foot);
   }
 
   R.leaves.forEach((p) => {
