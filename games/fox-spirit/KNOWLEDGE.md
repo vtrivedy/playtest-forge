@@ -411,3 +411,11 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
 - Hot-gate gap (fixed upstream request): roots were only `update/tick/frame/process` names — a `*.hot.ts` entry named `stepX` was never scanned. Name hot entries `update*` (or make every export a root).
 - This sandbox is 1 CPU: local SwiftShader continuous clips run ~0.5–1.8 fps at 640×360; run one probe at a time.
 - New builders draw from their own `rng(seed)`, never `ctx.rand`: each draw from the shared stream shifts every later builder's layout and the runtime stream replays depend on. The Crown's finale river (1800 draws) did exactly that until 1a28d58; Bramble's `tools/rand-fingerprint.mjs` (next ctx.rand values after boot) proves a change is stream-neutral.
+- Shared build rand: every opening builder draws from one `ctx.rand` (rng 11). A new region that consumes
+  it, or a new `continue` before a rand call in an old loop, re-lays-out every later builder (and can break
+  other teams' recorded tapes). New regions get their own seed (`{ ...ctx, rand: rng(N) }`); check with
+  `tools/rand-fingerprint.mjs` on both trees (equal next values ⇒ identical layouts). Note `jitter()`
+  consumes rand per vertex, so changing a geometry's segment count shifts the sequence too.
+- Paint restores each need a shader slot (`RESTORE_SLOTS`, now 24; `uRestore` loop breaks at the count).
+  With page (4) + Keeping (3) + homecoming + ruin + finale (2) + Millbrook/Hermitage (5) the old 16 was
+  exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.
