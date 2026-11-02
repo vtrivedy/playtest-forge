@@ -27,6 +27,8 @@ export function createCarry(opts: {
   surfaceAt: (x: number, z: number) => number;
   /** Authored bowl beds on the same walkable floor; optional for other scenes. */
   bowls?: THREE.Vector3[];
+  /** Earned Hearthbound capability. Missing predicate preserves baseline safe-ground dash drops. */
+  canDashCarry?: () => boolean;
   /** the shared in-frame teach line (teach.ts) */
   teach: { offer: (text: string) => void };
 }) {
@@ -80,8 +82,8 @@ export function createCarry(opts: {
   let grounded = true;
   let dashing = false;
   let pulse = 0;
-  let pickups = 0, placements = 0, dashDrops = 0, recoveries = 0;
-  let lastAction: 'source' | 'pickup' | 'place' | 'dash-drop' | 'recover' = 'source';
+  let pickups = 0, placements = 0, dashDrops = 0, carriedDashes = 0, recoveries = 0;
+  let lastAction: 'source' | 'pickup' | 'place' | 'dash-drop' | 'bound-dash' | 'recover' = 'source';
   const position = opts.source.clone();
   const safe = opts.source.clone();
   const rollFrom = opts.source.clone();
@@ -172,7 +174,10 @@ export function createCarry(opts: {
     },
     beforeDash(lastGrounded: THREE.Vector3): void {
       safe.copy(lastGrounded);
-      if (carried) place(safe, 'dash-drop');
+      if (carried) {
+        if (opts.canDashCarry?.()) { carriedDashes++; lastAction = 'bound-dash'; }
+        else place(safe, 'dash-drop');
+      }
     },
     /** Call only after an actual fall/respawn, not during ordinary exploration. */
     recover(at: THREE.Vector3): void {
@@ -207,7 +212,7 @@ export function createCarry(opts: {
       return {
         carried, heat: 1, cooling: false, position: position.toArray(), lastGrounded: safe.toArray(),
         canPickup: grounded && !dashing && canPickup(), canPlace: carried && grounded && !dashing,
-        pickups, placements, dashDrops, recoveries, lastAction, rolling: rollTime > 0,
+        pickups, placements, dashDrops, carriedDashes, recoveries, lastAction, rolling: rollTime > 0,
       };
     },
   };
