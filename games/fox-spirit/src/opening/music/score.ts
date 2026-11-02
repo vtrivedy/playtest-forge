@@ -40,7 +40,20 @@ export const SONG = {
         "6 - - - 1' 6", '5 - - - 3 1', '2 - - - 7, 2', '1 - - - - .',
       ],
     },
-  ],
+    {
+      // Millbrook's own tune: more running eighths, like water; every other pass while the fox is in the valley
+      name: 'millbrook',
+      places: ['millbrook', 'orchard', 'lookout'],
+      chords: '1 5 6 4  1 5 4 4  6 3 4 1  2 5 1 1',
+      shade: '6 3 6 2  6 3 2 2  6 3 2 6  2 3 6 6',
+      bars: [
+        "1' 7 6 5 - 3", '2 - 5 - 7 -', "1' - 7 6 - 5", '6 - - - - .',
+        '5 6 5 3 - 1', '2 - 5 4 3 2', '1 - 6, - 1 -', '2 - - - - .',
+        "3 - 6 - 1' -", '7 - 5 - 3 -', "4 - 6 - 1' 6", '5 - - - - .',
+        '4 - 2 - 6 4', "5 - 7 - 2' -", "1' 7 1' 5 3 2", '1 - - - - .',
+      ],
+    },
+  ] as ReadonlyArray<{ name: string; places?: string[]; chords: string; shade: string; bars: string[] }>,
 };
 
 /** a sung swell: the lead joins for this many bars from the next bar line, then fades; ≥ gap bars between starts */
@@ -86,7 +99,10 @@ export function compileSong() {
   const shade: number[] = [];
   // per slot: MIDI note, -1 = hold, -2 = rest (tunes back to back)
   const tune: number[] = [];
+  let placed = false;
   for (const t of SONG.tunes) {
+    if (placed && !t.places) throw new Error(`Hearthsong: rotation tune ${t.name} must come before place tunes`);
+    placed ||= !!t.places;
     const c = t.chords.trim().split(/\s+/).map(Number);
     const sh = t.shade.trim().split(/\s+/).map(Number);
     if (t.bars.length !== bars || c.length !== bars || sh.length !== bars) throw new Error(`Hearthsong: tune ${t.name} needs ${bars} bars and chords`);
@@ -113,6 +129,8 @@ export function compileSong() {
     key: SONG.key,
     bars,
     tunes: SONG.tunes.length,
+    /** tunes without places rotate everywhere; a place tune takes every other pass while its place leads */
+    rotation: SONG.tunes.filter((t) => !t.places).length,
     breathBars: SONG.breathBars,
     tune,
     chords: chords.flatMap(triad),
@@ -121,3 +139,8 @@ export function compileSong() {
   };
 }
 export type CompiledSong = ReturnType<typeof compileSong>;
+
+/** the tune a place asks for (index into SONG.tunes), or -1 */
+export function themeOf(placeId: string): number {
+  return SONG.tunes.findIndex((t) => t.places?.includes(placeId));
+}

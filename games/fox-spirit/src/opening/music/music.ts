@@ -3,7 +3,9 @@
  * music bus. Loading is async (addModule); until the node exists `update` / `cue` do nothing.
  */
 import workletUrl from './hearthsong.worklet.hot.ts?worker&url';
-import { compileSong } from './score';
+import { compileSong, SONG } from './score';
+
+const SONG_NAMES = SONG.tunes.map((t) => t.name);
 import { createMusicDriver, type MusicDriver } from './music.hot';
 
 export type Music = ReturnType<typeof createMusic>;
@@ -30,7 +32,7 @@ function roomImpulse(ac: BaseAudioContext): AudioBuffer {
 export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
   const song = compileSong();
   let driver: MusicDriver | null = null;
-  const reported = { bar: -1, breath: false, swell: 'idle', pass: 0, since: 0, shaded: false, ending: 'playing', forces: 2 };
+  const reported = { bar: -1, breath: false, swell: 'idle', pass: 0, since: 0, shaded: false, ending: 'playing', forces: 2, tune: 'hearth' };
   const SWELLS = ['idle', 'armed', 'singing', 'fading'];
   const ENDINGS = ['playing', 'requested', 'coda', 'done', 'epilogue'];
   let cues = 0;
@@ -58,6 +60,7 @@ export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
         reported.shaded = r[5] === 1;
         reported.ending = ENDINGS[r[6]!] ?? '?';
         reported.forces = r[7]!;
+        reported.tune = SONG_NAMES[r[8]!] ?? '?';
       };
       driver = createMusicDriver(ac, node);
       return true;

@@ -26,7 +26,7 @@ try {
   const t0 = Date.now();
   // --sfx water: a real-time recording of the synthesized Millbrook water/wheel instead of the score
   const sfx = arg('sfx', '');
-  const r = sfx === 'water' ? { ...(await page.evaluate((s) => window.recordWater(s), seconds)), marks: [] } : await page.evaluate(([s, sd]) => window.renderHearthsong(s, undefined, sd), [seconds, seed]);
+  const r = sfx === 'water' ? { ...(await page.evaluate((s) => window.recordWater(s), seconds)), marks: [] } : await page.evaluate(([s, sd, w]) => window.renderHearthsong(s, window.WALKS[w], sd), [seconds, seed, arg('walk', 'main')]);
   const l = Buffer.from(r.l, 'base64');
   const rr = Buffer.from(r.r, 'base64');
   const n = l.length / 2;

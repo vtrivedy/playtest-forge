@@ -17,7 +17,7 @@ declare class AudioWorkletProcessor {
 
 // cold:begin (types and constants)
 type Song = {
-  bpm: number; slots: number; key: number; bars: number; tunes: number; breathBars: number;
+  bpm: number; slots: number; key: number; bars: number; tunes: number; rotation: number; breathBars: number;
   tune: number[]; chords: number[]; shadeChords: number[];
   swell: { bars: number; fade: number; gap: number };
 };
@@ -57,8 +57,8 @@ function hz(m: number): number {
 class Hearthsong extends AudioWorkletProcessor {
   // cold:begin (construction only)
   static get parameterDescriptors() {
-    const k = (name: string, d: number) => ({ name, defaultValue: d, minValue: 0, maxValue: 1000, automationRate: 'k-rate' });
-    return [k('harp', 0.5), k('pad', 0), k('bass', 0), k('lead', 0), k('bells', 0), k('bright', 0.5), k('shade', 0), k('cue', 0), k('kind', 0), k('level', 0)];
+    const k = (name: string, d: number) => ({ name, defaultValue: d, minValue: -1, maxValue: 1000, automationRate: 'k-rate' });
+    return [k('harp', 0.5), k('pad', 0), k('bass', 0), k('lead', 0), k('bells', 0), k('bright', 0.5), k('shade', 0), k('cue', 0), k('kind', 0), k('level', 0), k('theme', -1)];
   }
 
   s: Song;
@@ -70,6 +70,9 @@ class Hearthsong extends AudioWorkletProcessor {
   slot = 0;
   breath = false;
   pass = 0;
+  /** the tune this pass plays (chosen at each pass start) */
+  tune = 0;
+  theme = -1;
   swell = IDLE;
   left = 0;
   since: number;
@@ -134,7 +137,7 @@ class Hearthsong extends AudioWorkletProcessor {
   eL = new Float32Array(BELLS);
   eR = new Float32Array(BELLS);
   eNext = 0;
-  report = new Float64Array(8);
+  report = new Float64Array(9);
 
   constructor(options: { processorOptions: { song: Song; seed: number } }) {
     super(options);
@@ -224,6 +227,13 @@ class Hearthsong extends AudioWorkletProcessor {
     }
   }
 
+  /** at a pass start: the place's own tune (never twice running) while it leads, else the shared rotation */
+  pickTune(): void {
+    const s = this.s;
+    const th = this.theme;
+    this.tune = th >= 0 && th < s.tunes && this.tune !== th ? th : this.pass % s.rotation;
+  }
+
   /** a bar line: tla/Hearthsong.tla `Bar` */
   barLine(): void {
     const s = this.s;
@@ -254,6 +264,7 @@ class Hearthsong extends AudioWorkletProcessor {
         this.bar = 0;
         this.breath = false;
         this.pass = 0;
+        this.pickTune();
         this.reportState();
       }
       this.since = tick;
@@ -261,7 +272,7 @@ class Hearthsong extends AudioWorkletProcessor {
     }
     this.bar++;
     if (!this.breath && this.bar >= s.bars) { this.bar = 0; this.breath = true; }
-    else if (this.breath && this.bar >= s.breathBars) { this.bar = 0; this.breath = false; this.pass++; }
+    else if (this.breath && this.bar >= s.breathBars) { this.bar = 0; this.breath = false; this.pass++; this.pickTune(); }
     if (this.swell === ARMED && !this.breath) { this.swell = SINGING; this.left = swell.bars; this.since = 0; this.forced = false; }
     else if (this.swell === SINGING && (this.left <= 1 || this.breath)) { this.swell = FADING; this.left = swell.fade; this.since = tick; }
     else if (this.swell === SINGING) { this.left--; this.since = tick; }
@@ -285,6 +296,7 @@ class Hearthsong extends AudioWorkletProcessor {
     r[5] = this.shaded ? 1 : 0;
     r[6] = this.ending;
     r[7] = this.forces;
+    r[8] = this.tune;
     this.port.postMessage(r); // lint-feel: ok once per bar (2.5 s): state for window.__game
   }
 
@@ -332,7 +344,7 @@ class Hearthsong extends AudioWorkletProcessor {
     }
     const chords = this.shaded ? s.shadeChords : s.chords;
     // which tune this pass plays (a breath belongs to the tune it follows)
-    const tb = (this.pass % s.tunes) * s.bars;
+    const tb = this.tune * s.bars;
     const cb = (tb + (this.breath ? s.bars - 1 : this.bar)) * 3;
     const root = chords[cb]!;
     const singing = this.swell === SINGING;
@@ -402,6 +414,7 @@ class Hearthsong extends AudioWorkletProcessor {
     lv[5]! += (p.bright![0]! - lv[5]!) * 0.05;
     lv[6]! += (p.shade![0]! - lv[6]!) * 0.05;
     lv[8]! += (p.level![0]! - lv[8]!) * 0.02;
+    this.theme = Math.round(p.theme![0]!);
     // a cue: tla/Hearthsong.tla `Cue` / `ForceCue` / `RestCue` (a plain cue sings only when idle and rested; else dropped)
     const cue = p.cue![0]!;
     if (cue !== this.lastCue) {
