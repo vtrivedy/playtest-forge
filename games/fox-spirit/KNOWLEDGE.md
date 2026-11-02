@@ -390,3 +390,4 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
 - Snow as `THREE.Points` falling in the vertex shader (mod-wrapped box round the camera) costs no CPU per frame; clamp `gl_PointSize` (1.6–7 px) or near flakes balloon into discs.
 - Hot-gate gap (fixed upstream request): roots were only `update/tick/frame/process` names — a `*.hot.ts` entry named `stepX` was never scanned. Name hot entries `update*` (or make every export a root).
 - This sandbox is 1 CPU: local SwiftShader continuous clips run ~0.5–1.8 fps at 640×360; run one probe at a time.
+- New builders draw from their own `rng(seed)`, never `ctx.rand`: each draw from the shared stream shifts every later builder's layout and the runtime stream replays depend on. The Crown's finale river (1800 draws) did exactly that until 1a28d58; Bramble's `tools/rand-fingerprint.mjs` (next ctx.rand values after boot) proves a change is stream-neutral.
