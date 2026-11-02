@@ -776,7 +776,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     // the bound: hind legs drive, the body arcs, forelegs reach for the landing
     const g = c.gait;
     // a soft thump as the hind feet land, every bound
-    if (moving) beat(c, g + 1.2, (n) => ctx.audio.play(n % 2 ? 'land-1' : 'land-0', { at: c.holder.position, rate: 1.3, gain: 0.45 }));
+    if (moving) beat(c, g + 1.2, (n) => ctx.audio.play(n % 2 ? 'land-1' : 'land-0', { at: c.holder.position, rate: 1.3, gain: 0.25 }));
     const air = moving ? Math.max(0, Math.sin(g)) : 0;
     B(c, 'legB').rotation.z = moving ? -0.9 * Math.sin(g + 0.6) : 0;
     B(c, 'legF').rotation.z = moving ? 0.8 * Math.sin(g - 0.5) : 0;
