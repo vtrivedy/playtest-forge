@@ -261,7 +261,7 @@ export async function runOpening(): Promise<void> {
   // world progress (Hazel's store, DESIGN-worlds.md) is the one truth for levels, abilities and the hub arches
   const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
   // world II (Ashwater Reach, x ≈ +700, Cedar): its levels report physical completion to the store
-  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater') });
+  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level) });
   const finale = await buildFinale(ctx, {
     settled: () => settledAt >= 0,
     ember: coal,

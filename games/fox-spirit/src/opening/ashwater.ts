@@ -27,7 +27,7 @@ const marsh = (color: THREE.ColorRepresentation, extra: THREE.MeshToonMaterialPa
 
 export function buildAshwater(
   ctx: OpeningCtx,
-  opts: { complete: (level: (typeof LEVEL_IDS)[number]) => boolean; hasReedskim: () => boolean },
+  opts: { complete: (level: (typeof LEVEL_IDS)[number]) => boolean; hasReedskim: () => boolean; isRestored?: (level: (typeof LEVEL_IDS)[number]) => boolean },
 ) {
   const { scene, colliders } = ctx;
   const rand = rng(7071);
@@ -305,6 +305,20 @@ export function buildAshwater(
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
     s: { burstA: -1, burstB: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0 },
   };
+  // a saved game re-enters the marsh as it was left: drained channel / pool, burst dams, a lit Seedwell (no captions)
+  const was = (l: (typeof LEVEL_IDS)[number]) => opts.isRestored?.(l) ?? false;
+  if (was('teach')) {
+    rig.s.burstA = 999;
+    rig.s.done |= 1;
+    damA.col.r = 0.001;
+  }
+  if (was('develop')) rig.s.done |= 2;
+  if (was('combine')) {
+    rig.s.burstB = 999;
+    rig.s.done |= 4;
+    rig.s.glowK = 1;
+    damB.col.r = 0.001;
+  }
   ctx.onUpdate((dt) => updateAshwater(rig, dt));
 
   return {
