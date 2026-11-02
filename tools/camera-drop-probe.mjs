@@ -19,8 +19,16 @@ const sparseStills = process.argv.includes('--sparse-stills');
 const checkSilhouette = process.argv.includes('--check-silhouette');
 const option = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
 const routeModule = path.resolve(option('route-module', 'tools/opening-hero-route.mjs'));
-const { createSliceRoute, SLICE_START } = await import(pathToFileURL(routeModule).href);
+const { createSliceRoute, SLICE_START, prepareSlice, SLICE_STAGING } = await import(pathToFileURL(routeModule).href);
 if (typeof createSliceRoute !== 'function' || !SLICE_START || ![SLICE_START.x, SLICE_START.z, SLICE_START.yaw].every(Number.isFinite)) throw Error('Route module must export createSliceRoute and finite SLICE_START x/z/yaw');
+const cameraHeightRaw = option('camera-height', '');
+const cameraHeight = cameraHeightRaw === '' ? null : Number(cameraHeightRaw);
+if (cameraHeight !== null && (!Number.isFinite(cameraHeight) || cameraHeight < .3 || cameraHeight > 3)) throw Error('camera-height must be in [.3,3]');
+const startYawRaw = option('start-yaw', '');
+const startYaw = startYawRaw === '' ? SLICE_START.yaw : Number(startYawRaw);
+if (!Number.isFinite(startYaw)) throw Error('start-yaw must be finite');
+const sliceStart = {...SLICE_START,yaw:startYaw};
+if (prepareSlice !== undefined && typeof prepareSlice !== 'function') throw Error('prepareSlice must be a cold setup function');
 const expectedBeat = option('expect-beat', '');
 const checkFrom = Number(option('check-from', '60'));
 if (!Number.isFinite(checkFrom) || checkFrom < 0 || checkFrom >= seconds) throw Error('check-from must be nonnegative and less than seconds');
@@ -60,12 +68,14 @@ page.setDefaultTimeout(300000);
 try {
   await page.goto(`http://127.0.0.1:${port}/?manual=1`,{waitUntil:'domcontentloaded',timeout:180000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true);
-  await page.evaluate(({source,start,fallLag,testDt,minDistance})=>{
+  await page.evaluate(({source,start,fallLag,testDt,minDistance,cameraHeight,prepare})=>{
     const h=window.__gameHooks;
     h.setManual(true); h.camera.fallLag=fallLag; if(minDistance!==null)h.camera.minDistance=minDistance;
+    if (cameraHeight !== null) h.camera.height = cameraHeight;
+    if (prepare) new Function(`return (${prepare})`)()(h);
     h.teleport(start.x,start.z,start.yaw);
     window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1,silhouette:[]};
-  },{source:createSliceRoute.toString(),start:SLICE_START,fallLag,testDt,minDistance});
+  },{source:createSliceRoute.toString(),start:sliceStart,fallLag,testDt,minDistance,cameraHeight,prepare:prepareSlice?.toString()??null});
   let done=false, n=0, checkpoint=-1;
   while(!done){
     const result=await page.evaluate(({total,clip,clipBeat,clipFrames,testDt,stillFrames,clipFrom,missOverlook,sparseStills,checkSilhouette})=>{
@@ -131,7 +141,7 @@ try {
   }
   const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,silhouette:window.__cameraProbe.silhouette,cameraTunables:{...window.__gameHooks.camera},game:{mode:window.__game.mode,state:window.__game.state()}}));
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,routeModule:path.relative(process.cwd(),routeModule),checkFrom,staging:'one start teleport; controller input thereafter',clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,routeModule:path.relative(process.cwd(),routeModule),checkFrom,staging:SLICE_STAGING??'one start teleport; controller input thereafter',start:sliceStart,cameraHeight,clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
   if (expectedBeat) {
     const actualBeat = evidence.trace.at(-1)?.beat;
     const routeCheck = {expectedBeat,actualBeat,pass:actualBeat===expectedBeat};
