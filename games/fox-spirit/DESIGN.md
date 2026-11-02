@@ -444,3 +444,12 @@ its paper treads and ink fade together, as the other ruin leaves do. Keep fold
 progression, terrain and camera tuning intact. Verify the original 90-second
 miss route, inspect the final clip frames that previously hid the fox, and retain
 camera gates plus window.__game evidence.
+
+### Canopy stem visibility
+
+The discovery descent on 66dac775 passes the chase lens through a thick leaf
+stem around 15 seconds. The blade already fades but its separately built stem
+and ink remain opaque. Register each stem with the existing sight-blocker fade
+so the fox remains visible during descent. Keep support geometry and launch
+feel intact. Replay the rendered discovery follower, inspect descent frames and
+the jump retries, and retain screenshots plus window.__game and journey checks.
