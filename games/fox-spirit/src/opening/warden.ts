@@ -7,8 +7,9 @@
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import type { WorldProgress } from '../worlds/progress';
+import { KEEPING } from './layout';
 
-type Post = { x: number; z: number; yaw: number; show: () => boolean; gone: () => boolean };
+type Post = { x: number; z: number; yaw: number; show: () => boolean; gone: () => boolean; y?: number };
 
 function wardenFigure(): { root: THREE.Group; mats: THREE.MeshToonMaterial[] } {
   const ink = new THREE.MeshToonMaterial({ color: 0x15161b, transparent: true, opacity: 1 });
@@ -53,6 +54,8 @@ export function buildWarden(ctx: OpeningCtx, progress: WorldProgress) {
     // hub: beside the arch of the next world to open, watching the fox
     { x: 0.6, z: 92.4, yaw: -2.4, show: () => progress.isRestored('russetvale', 'teach') && !progress.isVisited('ashwater', 'teach'), gone: () => false },
     { x: -12.6, z: 94.4, yaw: 2.6, show: () => progress.isVisited('ashwater', 'teach') && !progress.isVisited('press', 'teach'), gone: () => false },
+    // Russetvale: glimpsed on the far crag once the Hearthtree has settled into a bridge, gone when the fox crosses
+    { x: KEEPING.crag.x + 1.2, z: KEEPING.crag.z - 1.0, y: KEEPING.crag.top, yaw: -2.6, show: () => progress.isRestored('russetvale', 'develop') && !progress.isVisited('ashwater', 'teach'), gone: () => progress.isRestored('russetvale', 'combine') },
     // Ashwater: above the weir, the one who froze the sluices
     { x: 712, z: 117, yaw: Math.PI, show: () => true, gone: () => progress.isRestored('ashwater', 'combine') },
     // the Press: beside the Press itself — the Scribe's own shadow
@@ -60,7 +63,7 @@ export function buildWarden(ctx: OpeningCtx, progress: WorldProgress) {
   ];
   const figs = posts.map((p) => {
     const f = wardenFigure();
-    f.root.position.set(p.x, groundH(p.x, p.z), p.z);
+    f.root.position.set(p.x, p.y ?? groundH(p.x, p.z), p.z);
     f.root.rotation.y = p.yaw;
     scene.add(f.root);
     return { ...f, fade: p.show() && !p.gone() ? 1 : 0 };
@@ -78,7 +81,7 @@ export function buildWarden(ctx: OpeningCtx, progress: WorldProgress) {
         f.root.visible = f.fade > 0.02;
         if (!f.root.visible) continue;
         for (const m of f.mats) m.opacity = f.fade;
-        f.root.position.y = groundH(p.x, p.z) + (1 - f.fade) * 1.2 + Math.sin(t * 0.9 + i) * 0.04;
+        f.root.position.y = (p.y ?? groundH(p.x, p.z)) + (1 - f.fade) * 1.2 + Math.sin(t * 0.9 + i) * 0.04;
         f.root.scale.setScalar(0.9 + 0.1 * f.fade);
       }
     },
