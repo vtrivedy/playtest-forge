@@ -31,7 +31,7 @@ export const HERMITAGE = {
   lines: [
     [-13.2, 131.4, -10.0, 127.9],
     [-1.6, 128.4, 2.0, 131.6],
-    [-12.0, 136.6, -12.6, 140.8],
+    [-13.7, 136.6, -12.6, 140.8],
   ] as ReadonlyArray<readonly [number, number, number, number]>,
   /** the ink pond, black and still */
   pond: { x: 0.6, z: 136.8, r: 2.1 },
