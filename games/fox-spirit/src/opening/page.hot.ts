@@ -12,9 +12,9 @@ const TUNE = {
   /** fox distance (m) at which a perched page bolts / stops fleeing and waits */
   spook: 4.5,
   wait: 9,
-  /** flee speed (m/s) far → near: just over the fox's 3.2 run, so running alone never closes the last metre */
+  /** First chase stays within reach at a trot. Contact still needs jump/dash; walking only skips it ahead. */
   slow: 1.6,
-  fast: 3.5,
+  fast: 2.7,
   /** catch: dash or airborne contact, horizontal / vertical reach from the fox's feet */
   reach: 1.35,
   reachY: 1.25,
@@ -22,8 +22,7 @@ const TUNE = {
   skip: 1.8,
   fling: 2.6,
   /** a dash launched from this far reads as a lunge it can see coming: it jinks aside unless winded.
-   *  Stage 1 lets a point-blank dash land (teach); later stages dodge every fresh lunge — bait, then catch */
-  dodgeFrom: [1.0, 0, 0],
+   *  The intro accepts every lunge; high stages dodge a fresh lunge — bait, then catch. */
   dodgeTo: 4.2,
   jink: 2.4,
   /** after a dodge it is winded for a moment: slower, glow dims — the opening (shrinks per stage) */
@@ -257,6 +256,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     prev.copy(pos);
     const d = Math.hypot(fox.x - pos.x, fox.z - pos.z);
     const dy = pos.y - fox.y;
+    const approaching = Math.hypot(fox.x - foxPrev.x, fox.z - foxPrev.z) > dt * 0.25;
     const dashStart = !!st.dashing && !wasDashing;
     wasDashing = !!st.dashing;
     // in the high stages a spring/jump toward it is the lunge it watches for
@@ -265,7 +265,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     const aloft = !st.grounded || !wasGrounded;
     wasGrounded = !!st.grounded;
     windedT = Math.max(0, windedT - dt);
-    if ((phase === 'perched' || phase === 'fleeing') && dashStart && windedT <= 0 && d > TUNE.dodgeFrom[stage]! && d < TUNE.dodgeTo) {
+    if (stage > 0 && (phase === 'perched' || phase === 'fleeing') && dashStart && windedT <= 0 && d > 0 && d < TUNE.dodgeTo) {
       // it sees the lunge: a quick jink across the fox's line and a little ahead
       dodges++;
       flaps++;
@@ -313,7 +313,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       sideGoal.set(0, 0.9, 0);
       for (let i = 0; i < 8; i++) emit(pos, 0.9, 1.4);
     }
-    if (phase === 'perched' && d < TUNE.spookAt[stage]! && !(TUNE.hop[stage] && windedT > 0)) {
+    if (phase === 'perched' && d < TUNE.spookAt[stage]! && !(TUNE.hop[stage] && windedT > 0) && (stage > 0 || approaching || dashStart || launchStart)) {
       phase = 'fleeing';
       flaps++;
       if (TUNE.hop[stage]) {

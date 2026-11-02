@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { updateTeach, type TeachState } from '../../games/fox-spirit/src/opening/teach.hot';
+import type { LetterPlane } from '../../games/fox-spirit/src/opening/lettering.hot';
+let redraws = 0;
+let published = 'follow';
+const t: TeachState = { plane: undefined as unknown as LetterPlane, cam: null, offered: 'jump', drawn: 'follow', o: 1, redraw(text) { published = text; redraws++; } };
+updateTeach(t, 1 / 60);
+assert.equal(published, 'jump', 'An opaque follow card must publish jump in the same frame, before the fox walks off the lip');
+assert.equal(t.drawn, 'jump');
+assert.equal(t.o, 1, 'Changing the instruction must not hide the teaching panel');
+t.offered = 'jump'; updateTeach(t, 1 / 60);
+assert.equal(redraws, 1, 'Holding the same instruction must not redraw it every frame');
+t.offered = 'unfold'; updateTeach(t, 1 / 60);
+assert.equal(published, 'unfold');
+assert.equal(t.drawn, 'unfold');
+updateTeach(t, 1);
+assert.equal(t.o, 0, 'An unoffered panel still fades away');
+console.log('teach choice: current control instruction is immediate; unchanged words reuse the texture');

@@ -5,12 +5,14 @@
  */
 import type * as THREE from 'three';
 import type { OpeningCtx } from './scene';
-import { createLetterPlane } from './lettering';
+import { createLetterPlane, type LetterLine } from './lettering';
 import { updateTeach, type TeachState } from './teach.hot';
 
 export function createTeach(ctx: OpeningCtx) {
   const plane = createLetterPlane(2560, 128, 0.075, 0.8, { x: -0.94, left: true, panel: true });
-  const t: TeachState = { plane, cam: null, offered: null, drawn: null, o: 0, redraw: (text) => plane.draw([{ text, px: 70 }]) };
+  const line: LetterLine = { text: '', px: 70 };
+  const lines = [line];
+  const t: TeachState = { plane, cam: null, offered: null, drawn: null, o: 0, redraw: (text) => { line.text = text; plane.draw(lines); } };
   return {
     /** fix the line to the rendered lens (the camera must be in the scene) */
     mount(cam: THREE.PerspectiveCamera): void {

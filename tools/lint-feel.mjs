@@ -39,7 +39,7 @@ const RULES = [
 ];
 
 const findings = [];
-for (const name of ['teach.ts', 'scene.ts']) {
+for (const name of ['teach.ts', 'teach.hot.ts', 'scene.ts']) {
   const file = path.join(ROOT, name);
   findings.push(...lintTeachOrderSource(file, fs.readFileSync(file, 'utf8')));
 }
