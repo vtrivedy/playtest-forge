@@ -9,6 +9,8 @@ export const FOX_PX = { min: 24, refHeight: 360, maxSeconds: 1 };
 
 /** page-side: pass to page.evaluate */
 export function foxPx() {
+  // the game's own definition (Bramble 21aae43: __gameHooks.foxScreenPx) wins; the fallback is the same math
+  if (typeof window.__gameHooks.foxScreenPx === 'function') return window.__gameHooks.foxScreenPx();
   const s = window.__gameHooks.state();
   const cam = window.__opening.camera;
   cam.updateMatrixWorld();
