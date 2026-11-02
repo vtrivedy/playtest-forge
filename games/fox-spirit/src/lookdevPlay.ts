@@ -653,15 +653,44 @@ export function createPlay(opts: {
   }
 
   /** horizontal move with step / wall blocking, per axis so the fox slides along walls */
+  /** last side the fox slid round a blocker on (+1 left / −1 right), so it doesn't dither between sides */
+  let slideSide = 1;
   function moveTo(nx: number, nz: number, feetY: number) {
     const tol = grounded ? P.step : 0.05;
     const fwdX = Math.sin(yaw) * 0.28;
     const fwdZ = Math.cos(yaw) * 0.28;
-    const ok = (x: number, z: number) => surface(x, z, true, feetY + tol + 0.15) <= feetY + tol && surface(x + fwdX, z + fwdZ, true, feetY + tol + 0.15) <= feetY + tol + 0.15;
+    const okAt = (x: number, z: number, px: number, pz: number) =>
+      surface(x, z, true, feetY + tol + 0.15) <= feetY + tol && surface(x + px, z + pz, true, feetY + tol + 0.15) <= feetY + tol + 0.15;
+    const ok = (x: number, z: number) => okAt(x, z, fwdX, fwdZ);
+    const dx = nx - pos.x;
+    const dz = nz - pos.z;
+    const len = Math.hypot(dx, dz);
     if (ok(nx, pos.z)) pos.x = nx;
     else vel.x = 0;
     if (ok(pos.x, nz)) pos.z = nz;
     else vel.z = 0;
+    // pinned on both axes (walking square into a post or a yawed corner): glide round it — try the step turned
+    // 30° then 60° to either side (last side first), probing ahead along the turned step, never through the blocker
+    const x0 = nx - dx;
+    const z0 = nz - dz;
+    if (grounded && len > 1e-5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5) {
+      {
+        for (const a of [0.52, 1.05, 1.4]) {
+          for (const side of [slideSide, -slideSide]) {
+            const c = Math.cos(a * side);
+            const sn = Math.sin(a * side);
+            const rx = (dx * c - dz * sn) * Math.cos(a);
+            const rz = (dx * sn + dz * c) * Math.cos(a);
+            if (okAt(x0 + rx, z0 + rz, (rx / len) * 0.28, (rz / len) * 0.28)) {
+              pos.x = x0 + rx;
+              pos.z = z0 + rz;
+              slideSide = side;
+              return;
+            }
+          }
+        }
+      }
+    }
   }
 
   function step(dt: number) {

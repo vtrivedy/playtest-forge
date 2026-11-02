@@ -20,9 +20,12 @@ export const MILLRACE = {
   /** wheel turn rate when running (rad/s) and spin-up rate (1/s) */
   wheelRate: 0.85,
   spinUp: 0.6,
-  /** permanent wash at the mill when the wheel takes the water */
-  paintR: 26,
-  paintSecs: 3.2,
+  /** permanent wash flooding out from the wheel over the whole valley floor when it takes the water */
+  paintR: 36,
+  paintSecs: 6,
+  /** the first colour: a small wash where the dam gives way */
+  burstR: 9,
+  burstSecs: 1.6,
   /** surface flecks riding the current */
   flecks: 70,
   flowSpeed: 1.5,
@@ -149,7 +152,8 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
   const v = new THREE.Vector3();
   const one = new THREE.Vector3(1, 1, 1);
   const scl = new THREE.Vector3();
-  const paintAt = new THREE.Vector3(M.mill.x, 0, M.mill.z);
+  const paintAt = new THREE.Vector3(M.wheel.x, 0, M.wheel.z);
+  const burstPaintAt = new THREE.Vector3(M.dam.x, 0, M.dam.z);
   const PAINT_OPTS = { edgeMax: 2.6 };
   // Ember's synthesized brook babble / wheel knocks / burst (waterSounds.hot.ts)
   const sounds = createWaterSounds({
@@ -200,6 +204,7 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
     phase = 'burst';
     burstAt = t;
     sounds.burst(damAt);
+    ctx.field.restore(burstPaintAt, F.burstR, F.burstSecs, PAINT_OPTS);
     ctx.audio.cue('millrace-burst');
     for (let i = 0; i < F.leaves; i++) {
       const o = i * 3;
