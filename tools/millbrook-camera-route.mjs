@@ -69,3 +69,8 @@ const ROUTE = [
     return {x:ix,z:iz,jump,dash,beat:name};
   };
 }
+
+export function verifySlice(s){
+  const o=s.opening;
+  return{turning:o.millrace.turning,painted:o.millrace.painted,kilnLit:o.millWeir.lit,rode:o.millWeir.rode,weirReached:o.millWeir.reached,lookoutPainted:o.millrace.lookoutPainted};
+}

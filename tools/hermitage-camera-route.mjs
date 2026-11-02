@@ -12,3 +12,5 @@ export function createSliceRoute(){
     return{x,z,jump:false,dash:false,beat};
   };
 }
+
+export function verifySlice(s){return{allLines:s.opening.hermitage.freed.every(Boolean),painted:s.opening.hermitage.painted,captioned:s.opening.hermitage.captioned};}

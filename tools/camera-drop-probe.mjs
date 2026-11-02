@@ -19,7 +19,7 @@ const sparseStills = process.argv.includes('--sparse-stills');
 const checkSilhouette = process.argv.includes('--check-silhouette');
 const option = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
 const routeModule = path.resolve(option('route-module', 'tools/opening-hero-route.mjs'));
-const { createSliceRoute, SLICE_START, prepareSlice, SLICE_STAGING } = await import(pathToFileURL(routeModule).href);
+const { createSliceRoute, SLICE_START, prepareSlice, SLICE_STAGING, verifySlice } = await import(pathToFileURL(routeModule).href);
 if (typeof createSliceRoute !== 'function' || !SLICE_START || ![SLICE_START.x, SLICE_START.z, SLICE_START.yaw].every(Number.isFinite)) throw Error('Route module must export createSliceRoute and finite SLICE_START x/z/yaw');
 const cameraHeightRaw = option('camera-height', '');
 const cameraHeight = cameraHeightRaw === '' ? null : Number(cameraHeightRaw);
@@ -146,6 +146,13 @@ try {
   const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,silhouette:window.__cameraProbe.silhouette,cameraTunables:{...window.__gameHooks.camera},game:{mode:window.__game.mode,state:window.__game.state()}}));
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
   fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,routeModule:path.relative(process.cwd(),routeModule),checkFrom,staging:SLICE_STAGING??'one start teleport; controller input thereafter',start:sliceStart,cameraHeight,clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
+  if (verifySlice) {
+    const checks=verifySlice(evidence.game.state);
+    const stateCheck={checks,pass:!!checks&&Object.keys(checks).length>0&&Object.values(checks).every(v=>v===true)};
+    fs.writeFileSync(path.join(out,'state-check.json'),JSON.stringify(stateCheck,null,2));
+    console.log('STATE',JSON.stringify(stateCheck));
+    if(!stateCheck.pass)process.exitCode=1;
+  }
   if (expectedBeat) {
     const actualBeat = evidence.trace.at(-1)?.beat;
     const routeCheck = {expectedBeat,actualBeat,pass:actualBeat===expectedBeat};
