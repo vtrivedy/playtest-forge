@@ -9,14 +9,14 @@ import type { OpeningAudio } from './audio';
 import { CANOPY, POP_UP_RUIN } from './layout';
 
 type Surface = 'grass' | 'leaf' | 'wood' | 'stone';
-export const FOLEY = { step: 0.025, jump: 0.05, land: 0.12, glide: 0.04, warmth: 1800, gap: 0.16 };
+export const FOLEY = { step: 0.025, jump: 0.05, land: 0.12, glide: 0.04, warmth: 1800, gap: 0.24 };
 /** pad colour per surface: low-pass (Hz), resonance, decay (s) */
 const PAD: Record<Surface, { lp: number; q: number; decay: number; gain: number }> = {
   // grass is silent underfoot (as it is): a run across the meadow leaves the quiet alone
   grass: { lp: 420, q: 0.5, decay: 0.05, gain: 0 },
   leaf: { lp: 900, q: 0.6, decay: 0.07, gain: 0.45 },
-  wood: { lp: 320, q: 0.9, decay: 0.07, gain: 0.6 },
-  stone: { lp: 650, q: 0.8, decay: 0.035, gain: 0.8 },
+  wood: { lp: 300, q: 0.7, decay: 0.07, gain: 0.35 },
+  stone: { lp: 520, q: 0.6, decay: 0.04, gain: 0.4 },
 };
 
 export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z: number) => number }) {
@@ -55,8 +55,9 @@ export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z:
     const lp = new BiquadFilterNode(ac, { type: 'lowpass', frequency: p.lp / deeper, Q: p.q });
     const g = ac.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(gain * p.gain, t + 0.006);
-    g.gain.setTargetAtTime(0, t + 0.006, p.decay * deeper);
+    // a 14 ms rise: a pad, not a click (Ember swarm4: 6 ms steps read as a ticking clock to the critic)
+    g.gain.linearRampToValueAtTime(gain * p.gain, t + 0.014);
+    g.gain.setTargetAtTime(0, t + 0.014, p.decay * deeper);
     src.connect(lp).connect(g).connect(warm);
     src.start(t, Math.random() * 0.1, 0.15 * deeper);
     src.onended = () => g.disconnect();
@@ -75,11 +76,13 @@ export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z:
   return {
     footfall(at: THREE.Vector3, hind: boolean, speed: number): void {
       const now = ac.currentTime;
-      // only the forepaws speak, and never two within 160 ms: a soft two-beat pad, not a four-beat patter
+      // only the forepaws speak, and never two within 240 ms: a soft two-beat pad, not a four-beat patter
       if (hind || now - lastStep < FOLEY.gap) return;
       lastStep = now;
       const s = surface(at);
       counts[s]++;
+      // paws on stone are as quiet as on grass: soloed, stone steps read as a ticking clock (Ember swarm4); landings still sound
+      if (s === 'stone') return;
       const pace = THREE.MathUtils.clamp(speed / 3.2, 0.35, 1.15);
       // uneven like real paws (a metronomic patter reads as a ticking clock)
       const gain = FOLEY.step * pace * (0.6 + Math.random() * 0.7);
