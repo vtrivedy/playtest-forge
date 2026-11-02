@@ -45,7 +45,7 @@ export const HOUSES = [
 ] as const;
 
 /** The south lane's line, meadow → Press Hollow: painted by PATHS and carved through the rim by southLane() (one source) */
-export const SOUTH_LANE: ReadonlyArray<readonly [number, number]> = [[4.2, 75.6], [6.2, 69], [7.5, 63.5], [12.5, 53], [18.8, 44.2], [21.1, 40.2]];
+export const SOUTH_LANE: ReadonlyArray<readonly [number, number]> = [[4.2, 75.6], [3.4, 72.4], [6.2, 69], [7.5, 63.5], [12.5, 53], [18.8, 44.2], [21.1, 40.2]];
 
 /** Lanes as segments [ax, az, bx, bz]; the last ones lead the opening route out to H-a */
 export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [

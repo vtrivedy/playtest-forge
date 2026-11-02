@@ -41,6 +41,7 @@ import { buildKiln, buildWeir } from './millWeir';
 import { createMillWeir } from './millWeir.hot';
 import { MILLBROOK } from './millbrookLayout';
 import { buildFinale } from './finale';
+import { laneBlocks } from './lanes';
 import { createCaptions, type Captions } from './captions';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
@@ -163,6 +164,9 @@ export async function runOpening(): Promise<void> {
   });
   // the controller exists only after every build; its callbacks reach the carry through this binding
   let carry: ReturnType<typeof createCarry> | null = null;
+  // every builder has run: nothing that blocks may stand on a painted lane (lanes.ts)
+  const blocked = laneBlocks(ctx.colliders, groundH);
+  if (blocked.length) console.warn(`lane blocked:\n${blocked.join('\n')}`);
   const player = createPlay({
     fox,
     groundH,
@@ -223,6 +227,7 @@ export async function runOpening(): Promise<void> {
     settled: () => settledAt >= 0,
     ember: coal,
     cam: player.cam,
+    player,
     crownLetGo: crown.letGo,
   });
   ctx.onUpdate((_dt, t) => {
