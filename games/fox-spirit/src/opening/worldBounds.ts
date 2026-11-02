@@ -41,6 +41,7 @@ export function bakeWorldBounds(): { inWorld: (x: number, z: number) => boolean;
     cells: w * h,
     inside: n,
     inWorld(x: number, z: number): boolean {
+      // Ashwater Reach (world II, x ≈ +700) is its own oval island (ashwaterLayout E)
       const i = Math.floor((x - B.minX) / B.cell);
       const j = Math.floor((z - B.minZ) / B.cell);
       return i >= 0 && j >= 0 && i < w && j < h && mask[j * w + i] === 1;

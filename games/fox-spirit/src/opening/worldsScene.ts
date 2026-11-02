@@ -6,8 +6,8 @@
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import { WELL } from './layout';
-import { ashwaterE, pressE, WORLDS, worldAt, type WorldId } from './worlds';
-import { buildRock, rng, toon, RAMP_WORLD } from '../lookdevKit';
+import { ashwaterE, outward, pressE, WORLDS, worldAt, type WorldId } from './worlds';
+import { rng, toon } from '../lookdevKit';
 import { bakeCells } from './bake';
 import { box, C, cyl, Kit } from './village';
 
@@ -125,62 +125,11 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
   // each island: a return arch behind its spawn (walk back out through it, south)
   for (const id of ['ashwater', 'press'] as const) {
     const w = WORLDS[id];
-    addArch(w.spawn.x, w.spawn.z + 3, 0, 1, 'russetvale', () => true);
+    const o = outward(id === 'ashwater' ? ashwaterE : pressE, w.spawn);
+    addArch(w.spawn.x + o.x * 3, w.spawn.z + o.z * 3, o.x, o.z, 'russetvale', () => true);
   }
 
-  // ---- Ashwater Reach: rain-dark marsh, reeds, drowned posts, pools
-  const A = WORLDS.ashwater.origin;
-  const mud = new THREE.Color(0x3e3a2c);
-  const reed = new THREE.Color(0x5a6440);
-  const moss = new THREE.Color(0x46573c);
-  const bank = new THREE.Color(0x5b5446);
-  islandGround(scene, A.x, A.z, 150, (x, z, h, c) => {
-    const n = Math.sin(x * 0.4 + Math.cos(z * 0.3) * 2) * 0.5 + 0.5;
-    c.copy(mud).lerp(reed, THREE.MathUtils.smoothstep(h, -0.4, 0.4)).lerp(moss, n * 0.4);
-    c.lerp(bank, THREE.MathUtils.smoothstep(ashwaterE(x, z), -2, 3));
-  }, groundH);
-  const water = new THREE.Mesh(new THREE.CircleGeometry(60, 48).rotateX(-Math.PI / 2), new THREE.MeshToonMaterial({ color: 0x4d6876, gradientMap: RAMP_WORLD, transparent: true, opacity: 0.86 }));
-  water.position.set(A.x, -0.32, A.z);
-  scene.add(water);
-  const ra = rng(5101);
-  const reedGeo = new THREE.ConeGeometry(0.035, 1.4, 4).translate(0, 0.7, 0);
-  const reedMesh = new THREE.InstancedMesh(reedGeo, new THREE.MeshToonMaterial({ color: 0x8a8a52, gradientMap: RAMP_WORLD }), 1400);
-  const m4 = new THREE.Matrix4();
-  const qq = new THREE.Quaternion();
-  const ee = new THREE.Euler();
-  let nReed = 0;
-  for (let i = 0; i < 260 && nReed < 1400; i++) {
-    const cx = A.x + (ra() - 0.5) * 80;
-    const cz = A.z + (ra() - 0.5) * 80;
-    if (ashwaterE(cx, cz) > -2 || Math.hypot(cx - WORLDS.ashwater.spawn.x, cz - WORLDS.ashwater.spawn.z) < 5) continue;
-    for (let j = 0; j < 6 && nReed < 1400; j++) {
-      const x = cx + (ra() - 0.5) * 1.6;
-      const z = cz + (ra() - 0.5) * 1.6;
-      m4.compose(new THREE.Vector3(x, groundH(x, z) - 0.05, z), qq.setFromEuler(ee.set((ra() - 0.5) * 0.3, ra() * 6, (ra() - 0.5) * 0.3)), new THREE.Vector3(1, 0.7 + ra() * 0.8, 1));
-      reedMesh.setMatrixAt(nReed++, m4);
-    }
-  }
-  reedMesh.count = nReed;
-  scene.add(reedMesh);
-  const ashRoots: THREE.Object3D[] = [];
-  for (let i = 0; i < 26; i++) {
-    const a = (i / 26) * Math.PI * 2;
-    const rr = 30 + ra() * 12;
-    const x = A.x + Math.cos(a) * rr;
-    const z = A.z + Math.sin(a) * rr;
-    if (ashwaterE(x, z) > 0) continue;
-    const rock = buildRock(ra, 0.6 + ra() * 0.9, true);
-    rock.position.set(x, groundH(x, z) + 0.1, z);
-    ashRoots.push(rock);
-  }
-  // drowned mooring posts with lanterns along the old ferry line
-  for (let i = 0; i < 9; i++) {
-    const x = A.x - 16 + i * 4;
-    const z = A.z - 6 + Math.sin(i * 0.9) * 3;
-    k.add(cyl(0.12, 0.15, 2.4, 6), C.timberDark, [x, groundH(x, z) + 0.9, z], [(ra() - 0.5) * 0.15, 0, (ra() - 0.5) * 0.15], 0.012);
-    if (i % 2 === 0) k.add(box(0.26, 0.32, 0.26), C.amber, [x, groundH(x, z) + 2.25, z]);
-  }
-  for (const g of bakeCells(ashRoots, 30, 'ashwater')) scene.add(g);
+  // Ashwater Reach's ground, water and puzzle are Cedar's (ashwater.ts); this module gives it the rain and sky
 
   // ---- The Scribe's Press: snowfield under ink spires, standing page slabs
   const P = WORLDS.press.origin;

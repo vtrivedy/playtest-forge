@@ -4,6 +4,7 @@
  * through the hub arches round the Great Well. Pure data + terrain; no three.js objects here.
  */
 import * as THREE from 'three';
+import { ash, ASH_ORIGIN, ASH_SPAWN, E as cedarAshE, H as cedarAshH } from './ashwaterLayout';
 
 export type WorldId = 'russetvale' | 'ashwater' | 'press';
 
@@ -31,17 +32,29 @@ export type WorldDef = {
 /** |x| beyond this is outside Russetvale: terrain, paint and look dispatch on it */
 export const WORLD_SPLIT = 350;
 
-const ASH = { x: 700, z: 85, r: 46 } as const;
 const PRESS = { x: -700, z: 85, r: 46 } as const;
+
+/** outward unit direction of an island shape at p (its E gradient): return arches stand that way */
+export function outward(E: (x: number, z: number) => number, p: { x: number; z: number }): { x: number; z: number } {
+  const gx = E(p.x + 1, p.z) - E(p.x - 1, p.z);
+  const gz = E(p.x, p.z + 1) - E(p.x, p.z - 1);
+  const l = Math.hypot(gx, gz) || 1;
+  return { x: gx / l, z: gz / l };
+}
+/** arrivals face into the island */
+function inwardYaw(E: (x: number, z: number) => number, p: { x: number; z: number }): number {
+  const o = outward(E, p);
+  return Math.atan2(-o.x, -o.z);
+}
 
 export const WORLDS: Record<WorldId, WorldDef> = {
   russetvale: { id: 'russetvale', name: 'Russetvale', origin: { x: -8, z: 85 }, spawn: { x: -5.2, z: 92.5, yaw: Math.atan2(2.2, -11.5) }, look: null },
   ashwater: {
-    id: 'ashwater', name: 'Ashwater Reach', origin: { x: ASH.x, z: ASH.z }, spawn: { x: ASH.x, z: ASH.z + ASH.r - 8, yaw: Math.PI },
+    id: 'ashwater', name: 'Ashwater Reach', origin: { x: ASH_ORIGIN.x, z: ASH_ORIGIN.z }, spawn: { ...ash(ASH_SPAWN.lx, ASH_SPAWN.lz), yaw: inwardYaw(cedarAshE, ash(ASH_SPAWN.lx, ASH_SPAWN.lz)) },
     look: { sky: [0x45525d, 0x6f7c84, 0x9aa5a3], mist: 0x7f8c8c, fog: 0.028, key: 0xb8c6d4, precip: 1 },
   },
   press: {
-    id: 'press', name: "The Scribe's Press", origin: { x: PRESS.x, z: PRESS.z }, spawn: { x: PRESS.x, z: PRESS.z + PRESS.r - 8, yaw: Math.PI },
+    id: 'press', name: "The Scribe's Press", origin: { x: PRESS.x, z: PRESS.z }, spawn: { x: PRESS.x, z: PRESS.z + PRESS.r - 8, yaw: inwardYaw((x, z) => pressE(x, z), { x: PRESS.x, z: PRESS.z + PRESS.r - 8 }) },
     look: { sky: [0x9aa6b8, 0xc4cad4, 0xe2e0dc], mist: 0xc9ccd2, fog: 0.016, key: 0xd8d6d2, precip: 2 },
   },
 };
@@ -61,16 +74,9 @@ function islandE(I: { x: number; z: number; r: number }, x: number, z: number, l
   return Math.hypot(dx, dz) - r;
 }
 
-/** Ashwater Reach: a low drowned marsh, hummocks between pools, a bank rising to a rain-dark rim */
-export function ashwaterE(x: number, z: number): number {
-  return islandE(ASH, x, z, 3, 1.3);
-}
-export function ashwaterH(x: number, z: number): number {
-  const e = ashwaterE(x, z);
-  const hum = Math.sin(x * 0.21) * Math.cos(z * 0.17) * 0.6 + Math.sin(x * 0.07 + z * 0.11) * 0.5;
-  const rim = smoothstep(e, -3, 4) * 6 + Math.max(0, e - 4) * 1.6;
-  return hum + rim;
-}
+/** Ashwater Reach terrain is Cedar's (ashwaterLayout.ts) */
+export const ashwaterE = cedarAshE;
+export const ashwaterH = cedarAshH;
 
 /** The Scribe's Press: a snowfield plateau under ink cliffs */
 export function pressE(x: number, z: number): number {

@@ -53,6 +53,7 @@ import { createMillWeir } from './millWeir.hot';
 import { MILLBROOK, WEST_PILES } from './millbrookLayout';
 import { NORTH_PILES } from './hermitageLayout';
 import { buildFinale } from './finale';
+import { buildAshwater } from './ashwater';
 import { laneBlocks } from './lanes';
 import { createCaptions, type Captions } from './captions';
 import { createTeach, type Teach } from './teach';
@@ -220,6 +221,9 @@ export async function runOpening(): Promise<void> {
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
     surfaceAt: player.surfaceAt,
     bowls: [...[KEEPING.steam, KEEPING.root].map(b => new THREE.Vector3(b.x, b.y, b.z)), new THREE.Vector3(FINALE.cradle.x, player.surfaceAt(FINALE.cradle.x, FINALE.cradle.z), FINALE.cradle.z)],
+    // Hearthbound (earned with Russetvale's first level): the dash keeps the carried ember (progress is built below;
+    // this runs only on a dash, after the scene is built)
+    canDashCarry: () => progress.hasAbility('russetvale'),
   });
   const coal = carry;
   const chemistry = createKeepingChemistry({
@@ -254,6 +258,10 @@ export async function runOpening(): Promise<void> {
     ctx.captions.say("A page escaped the Scribe's Album.");
   });
   // the finale (DESIGN-finale.md): warmth set in the Scribe's Press cradle once the Keeping has settled
+  // world progress (Hazel's store, DESIGN-worlds.md) is the one truth for levels, abilities and the hub arches
+  const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
+  // world II (Ashwater Reach, x ≈ +700, Cedar): its levels report physical completion to the store
+  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater') });
   const finale = await buildFinale(ctx, {
     settled: () => settledAt >= 0,
     ember: coal,
@@ -273,7 +281,6 @@ export async function runOpening(): Promise<void> {
   const view = player.cam.camera;
   // the other worlds (DESIGN-worlds.md). Progress (Hazel's store) is the one truth: Ashwater's arch opens when
   // Russetvale's first level (the page kept) is restored; the Press's once Ashwater has been entered.
-  const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
   const worlds = buildWorlds(ctx, {
     hubOpen: (to) => (to === 'ashwater' ? progress.isRestored('russetvale', 'teach') : progress.isVisited('ashwater', 'teach')),
   });
@@ -380,7 +387,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), captions: ctx.captions.state(), teach: ctx.teach.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), discovery: discovery.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state(), worlds: { active: worlds.active, travels: worlds.travels, progress: progress.snapshot(), mapOpen: pageMap.isOpen() } } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), captions: ctx.captions.state(), teach: ctx.teach.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), discovery: discovery.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state(), ashwater: ashwater.state(), worlds: { active: worlds.active, travels: worlds.travels, progress: progress.snapshot(), mapOpen: pageMap.isOpen() } } });
   const pxA = new THREE.Vector3();
   const pxB = new THREE.Vector3();
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
@@ -461,6 +468,8 @@ export async function runOpening(): Promise<void> {
     millBurst: millrace.burst,
     /** dev: free the Hermitage's drying lines without running under them */
     hermitageFree: dryingLines.freeAll,
+    /** dev: stand on Ashwater Reach's landing (world II) */
+    ashwater: () => player.teleport(ashwater.spawn.x, ashwater.spawn.z, ashwater.spawn.yaw),
     /** dev: the finale as if the Keeping had settled and the ember sat in the Press cradle */
     finale: finale.force,
     /** dev: open the glyph shrine without solving it */
