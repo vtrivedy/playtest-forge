@@ -184,6 +184,41 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
   ctx.occluders.push(built);
 
   const weather = buildWeather(scene);
+  // Ashwater's low mist line (Kit 21:56: "autumn with rain on, not a marsh"): soft sheets lying on the water a hand
+  // above the reeds' feet, drifting slowly; painted once into a canvas, never per frame
+  const mistTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const g = c.getContext('2d')!;
+    const r = rng(8812);
+    for (let i = 0; i < 70; i++) {
+      const x = r() * 256;
+      const y = r() * 256;
+      const rad = 18 + r() * 60;
+      const grd = g.createRadialGradient(x, y, 0, x, y, rad);
+      grd.addColorStop(0, 'rgba(255,255,255,0.32)');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 256, 256);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(3, 3);
+    return t;
+  })();
+  const mistSheets: THREE.Mesh[] = [];
+  // kept below the fox's chest (a veil over the hero is a fail): the sheets lie on the water, the fox stands through them
+  for (const [h, op, rot] of [[-0.12, 0.38, 0.3], [0.12, 0.2, 1.7]] as const) {
+    const m = new THREE.Mesh(
+      new THREE.CircleGeometry(70, 40).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ map: mistTex, color: 0xb9c6c4, transparent: true, opacity: op, depthWrite: false, fog: true }),
+    );
+    m.position.set(WORLDS.ashwater.origin.x, h, WORLDS.ashwater.origin.z);
+    m.rotation.y = rot;
+    m.renderOrder = 2;
+    scene.add(m);
+    mistSheets.push(m);
+  }
   // travelling turns a page: a paper wash covers the lens at the jump and clears over ~0.6 s
   const fadeMat = new THREE.MeshBasicMaterial({ color: 0xe9dfc8, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false, fog: false });
   const fade = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), fadeMat);
@@ -260,6 +295,10 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
         lastWorld = current;
       }
       blend = Math.min(1, blend + dt * 0.8);
+      for (let i = 0; i < mistSheets.length; i++) {
+        mistSheets[i]!.visible = current === 'ashwater';
+        mistSheets[i]!.rotation.y += dt * (0.004 + i * 0.003);
+      }
       for (const a of arches) (a.glow.material as THREE.MeshBasicMaterial).opacity = a.open() ? 0.28 + 0.1 * Math.sin(time * 2 + a.x) : 0;
       const look = WORLDS[current].look;
       if (!look) {
