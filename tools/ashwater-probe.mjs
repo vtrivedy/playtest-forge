@@ -24,7 +24,7 @@ const log = [];
 let fi = 0;
 let linger = null;
 const O = { x: 700, z: 80 };
-const state = () => page.evaluate(() => { const s = window.__gameHooks.state(); return { pos: s.pos.map((v) => +v.toFixed(2)), grounded: s.grounded, ash: s.opening.ashwater }; });
+const state = () => page.evaluate(() => { const s = window.__gameHooks.state(); return { pos: s.pos.map((v) => +v.toFixed(2)), grounded: s.grounded, ash: s.opening.ashwater, secrets: s.opening.worlds?.progress?.secrets ?? null, restored: s.opening.worlds?.progress?.worlds?.ashwater?.restored ?? null }; });
 const shot = async (name) => {
   await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
   await page.screenshot({ path: path.join(out, `${name}.png`) });
@@ -135,6 +135,11 @@ try {
   await go(18.0, 26.5);
   await settle(200);
   await shot('08-seedwell');
+  // the Album (Tab): Ashwater's spread and its two side-place pages
+  await page.keyboard.press('Tab');
+  await page.evaluate(() => window.__gameHooks.advance(2, 1 / 60, true));
+  await page.screenshot({ path: path.join(out, '09-album.png') });
+  log.push(['album', await state()]);
 } catch (e) {
   errors.push(String(e?.stack ?? e));
 } finally {
