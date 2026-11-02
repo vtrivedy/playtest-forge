@@ -28,3 +28,9 @@ export const WORLD_STORIES = {
     combine: { voice: 'The Scribe', title: 'The last season we were all here', text: '“I kept autumn because it was the last season we were all here.” The Warden folds into the Scribe’s shadow. The fox offers warmth; the Scribe lets the year turn.' },
   },
 } as const satisfies Record<WorldId, Record<LevelId, StoryMemory>>;
+
+export const LOFT_MEMORY: StoryMemory = {
+  title: 'The house before the rain',
+  voice: 'A page from the loft',
+  text: 'The Scribe’s own house, before the rain. Open windows, a roof warm from the afternoon, and footsteps on the stairs. No one thought to keep that ordinary day. Someone left this page where the light could still reach it.',
+};
