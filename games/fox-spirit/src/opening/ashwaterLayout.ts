@@ -80,7 +80,7 @@ export function waterAt(x: number, z: number): WaterId | null {
   const lz = z - ASH_ORIGIN.z;
   for (const id of WATER_IDS) {
     const w = WATER[id];
-    if (sdRect(lx, lz, w.x0, w.x1, w.z0, w.z1) < -0.35 && !(id === 'pond' && Math.hypot(lx - ISLET.lx, lz - ISLET.lz) < ISLET.r)) return id;
+    if (sdRect(lx, lz, w.x0, w.x1, w.z0, w.z1) < 0.3 && !(id === 'pond' && Math.hypot(lx - ISLET.lx, lz - ISLET.lz) < ISLET.r)) return id;
   }
   return null;
 }
