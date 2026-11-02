@@ -90,12 +90,14 @@ export function H(x: number, z: number): number {
   const lx = x - ASH_ORIGIN.x;
   const lz = z - ASH_ORIGIN.z;
   // low hummocks of moss and peat
-  let h = 0.22 * Math.sin(lx * 0.21 + 0.6) * Math.cos(lz * 0.17) + 0.12 * Math.sin(lx * 0.53 + lz * 0.41);
+  let h = 0.3 * Math.sin(lx * 0.21 + 0.6) * Math.cos(lz * 0.17) + 0.12 * Math.sin(lx * 0.53 + lz * 0.41);
   // channels and pools: soft banks down to a muddy bed
   for (const id of WATER_IDS) {
     const w = WATER[id];
     let d = sdRect(lx, lz, w.x0, w.x1, w.z0, w.z1);
     if (id === 'pond') d = Math.max(d, ISLET.r - Math.hypot(lx - ISLET.lx, lz - ISLET.lz));
+    // a low levee of dug peat along every bank, then the slope down to the bed
+    h += 0.32 * smoothstep(d, 0.6, 1.2) * (1 - smoothstep(d, 1.6, 3.2));
     h = THREE.MathUtils.lerp(h, BED, 1 - smoothstep(d, -0.9, 0.7));
   }
   // the weir plateau and the Seedwell ledge (after the water cut, so no bank slope eats the wall): sheer peat walls
