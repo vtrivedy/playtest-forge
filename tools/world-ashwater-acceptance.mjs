@@ -189,6 +189,11 @@ try {
   await go(18.0, 26.5);
   await settle(200);
   await shot('08-seedwell');
+  const completed = (await state()).hooks.opening.worlds.progress.worlds.ashwater;
+  if(completed.ability!=='Reedskim' || completed.fill!==1 || completed.restored.length!==3)throw Error('Physical Ashwater completion did not earn Reedskim and fill Reed');
+  await page.keyboard.press('Tab');
+  await shot('09-album');
+  await page.keyboard.press('Tab');
   }
 } catch (e) {
   errors.push(String(e?.stack ?? e));
