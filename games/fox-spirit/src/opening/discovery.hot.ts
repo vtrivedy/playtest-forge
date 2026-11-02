@@ -9,7 +9,7 @@ type ActionIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 const ACTIONS: readonly Action[] = ['follow', 'dash', 'spring', 'unfold', 'jump', 'wait', 'land'];
 type PageView = { readonly pos: THREE.Vector3; readonly catches: number; readonly kept: boolean; readonly fleeing: boolean };
 type CanopyView = { readonly lastLeaf: string | null };
-type RuinView = { readonly firstOpen: boolean; readonly secondOpen: boolean; readonly opening: boolean };
+type RuinView = { readonly firstOpen: boolean; readonly secondOpen: boolean; readonly opening: boolean; readonly overlookVisited: boolean };
 
 type Leg = 'page' | 'gate' | 'entry' | 'middle' | 'high' | 'roost' | 'grove' | 'fold1' | 'jump1' | 'fold2' | 'jump2' | 'jump3' | 'catch' | 'land' | 'done';
 
@@ -94,7 +94,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   }
 
   function readOverlookLanding(): typeof landingToken | null {
-    return onRuinLeaf(2) ? landingToken : null;
+    return ruin.overlookVisited && onRuinLeaf(2) ? landingToken : null;
   }
 
   function completeGuide(_contact: typeof landingToken): void {
@@ -121,7 +121,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
       else if (leg === 'high' && canopy.lastLeaf === 'high') leg = 'roost';
     }
     if (page.catches >= 2) {
-      if (leg === 'land' && ctx.player?.motion.grounded) {
+      if (leg === 'land' && ctx.player?.motion.grounded && !onRuinLeaf(2)) {
         if (onRuinLeaf(1)) leg = 'jump3';
         else if (onRuinLeaf(0)) leg = 'fold2';
         else leg = ruin.firstOpen ? 'jump1' : 'fold1';
