@@ -766,3 +766,4 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   drowned bank and the fox is teleported every frame.
 - `tools/ashwater-probe.mjs` (staged landing start, then stick/keys): its `go()` helper with `jumpAt` (running jump)
   and `land` is reusable for any world's route.
+- Authored reveal paths must frame from the fox, not from the landmark: the homecoming look framed off the Great Well put its roof between lens and fox. Pick the lens from a few angles round the fox with `cam.sightBlocked(lens, chest, feetY)` (as finale familyShot does) and look just past the fox so it sits slightly below centre.
