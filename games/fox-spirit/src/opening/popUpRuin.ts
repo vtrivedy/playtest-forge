@@ -215,6 +215,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   returnPivot.position.set(O.x, O.top - 0.12, O.z + O.depth / 2);
   returnPivot.rotation.x = Math.PI / 2;
   root.add(returnPivot);
+  ctx.occluders.push(returnPivot);
   const steps = 20;
   const length = R.returnEnd.z - returnPivot.position.z;
   const endY = ctx.groundH(R.returnEnd.x, R.returnEnd.z) + 0.08;
