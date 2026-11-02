@@ -68,3 +68,29 @@ the sampled movie, all twelve frames and full state. The movie plays at four
 times simulation speed and is not continuous motion evidence. A candidate
 camera correction must replay this seed and preserve the existing discovery
 landing/recovery checks; global terrain hiding is not a validated correction.
+
+## Finale motion audit: title-onset camera excursion
+
+An every-frame review of the existing native recording at source seconds
+211–235 adds a motion failure that the earlier snow +1/+15 stills missed.
+Two silent review clips preserve source variable frame timing: 211–223 has
+320 decoded frames and 223–235 has 360. All 680 retained frames were inspected
+in twelve numbered sheets. This is a review of the existing played capture,
+not a new gameplay run or audio verdict.
+
+The kits approach from distinct positions and remain separate from the hero
+through the inspected approach. However, the second clip changes abruptly
+between frames 69 and 70: the composed side view jumps to a high rear angle.
+Frames 70–83 swing back toward the original composition, briefly cropping the
+hero at the lower edge around frames 78–80. The camera then settles while the
+title fades in. A separate 640 px, every-frame sheet covers source seconds
+225.2–226.0 and confirms the same excursion. This is a visible motion defect;
+its camera-state cause has not been independently established here. The prior
+still-composition approval remains bounded and does not approve this transition.
+
+Evidence: `keeping-swarm5-captures/reed/finale-motion-b13/`, containing both
+clips, twelve complete sheets and indexes, `title-excursion.png`, and source
+metadata. The full original recording and `window.__game` remain in the parent
+capture linked above. Export with `-fps_mode passthrough`: FFmpeg otherwise
+interpreted this WebM as 1,000 fps and duplicated frames; that initial export
+was discarded and is not part of this evidence.
