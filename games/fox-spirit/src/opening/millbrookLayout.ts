@@ -166,3 +166,23 @@ export function westBase(x: number, z: number): number {
   }
   return h;
 }
+
+/** kickable leaf piles (leafPiles.ts) on the lane's line and up the hanger: something to run through between places */
+export const WEST_PILES: ReadonlyArray<{ x: number; z: number }> = (() => {
+  const out: Array<{ x: number; z: number }> = [];
+  const lanePiles = [6, 10, 14.5, 19, 23.5, 28];
+  let acc = 0;
+  for (let i = 0, j = 0; i + 1 < LANE.length && j < lanePiles.length; ) {
+    const [ax, az] = LANE[i]!;
+    const [bx, bz] = LANE[i + 1]!;
+    const len = Math.hypot(bx - ax, bz - az);
+    const s = lanePiles[j]! - acc;
+    if (s > len) { acc += len; i++; continue; }
+    const side = j % 2 ? 0.7 : -0.7;
+    out.push({ x: ax + ((bx - ax) * s) / len - ((bz - az) / len) * side, z: az + ((bz - az) * s) / len + ((bx - ax) / len) * side });
+    j++;
+  }
+  // the valley's paths: by the bridge, under the orchard
+  out.push({ x: -72.6, z: 87.9 }, { x: -86.0, z: 85.6 }, { x: -91.6, z: 82.4 });
+  return out;
+})();

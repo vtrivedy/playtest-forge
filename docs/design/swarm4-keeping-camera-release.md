@@ -24,3 +24,10 @@ folds during staged setup, then place the fox once on the second leaf and walk
 off toward the overlook without jumping. Record the fall and jump retries with
 normal follow camera; never force page catches, physics, folds or restoration.
 This is a regional collision/framing test, not a full-page completion claim.
+
+Integration selects Fern's camera envelope and release fixtures from `671a290`,
+superseding the independent Sorrel solver. Use the game's shared
+`__gameHooks.foxScreenPx()` and `tools/lib/fox-size.mjs` gate; remove the candidate's
+separate 0.8m projection. Retain trace-based regional checks and explicit
+missed-overlook coverage. Recheck natural Keeping and the staged ledge drop on
+the merged source, including the controller correction for the old route stall.

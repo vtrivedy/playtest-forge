@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { FOX_PX, gate as foxSizeGate } from './lib/fox-size.mjs';
 const out = path.resolve(process.argv[2]);
 const fallLag = Number(process.argv[3] ?? '0.07');
 const seconds = Number(process.argv[4] ?? '62');
@@ -33,6 +34,8 @@ if (!Number.isFinite(startYaw)) throw Error('start-yaw must be finite');
 const sliceStart = {...SLICE_START,yaw:startYaw};
 if (prepareSlice !== undefined && typeof prepareSlice !== 'function') throw Error('prepareSlice must be a cold setup function');
 const expectedBeat = option('expect-beat', '');
+const maxGroundedDistance=Number(option('max-grounded-distance','5'));
+if(!Number.isFinite(maxGroundedDistance)||maxGroundedDistance<=1)throw Error('max-grounded-distance must exceed1m');
 const checkFrom = Number(option('check-from', '60'));
 if (!Number.isFinite(checkFrom) || checkFrom < 0 || checkFrom >= seconds) throw Error('check-from must be nonnegative and less than seconds');
 const clipBeat = option('clip-beat', 'off the canopy');
@@ -46,6 +49,8 @@ const testDt = Number(option('dt', String(1 / 60)));
 if (!Number.isFinite(testDt) || testDt <= 0 || testDt > .05) throw Error('dt must be in (0, .05]');
 const stillFrames = option('stills-at', '').split(',').filter(Boolean).map(t => Math.round(Number(t) / testDt));
 const [width, height] = option('size', '1280x720').split('x').map(Number);
+const minFoxPixels=Number(option('min-fox-pixels',String(FOX_PX.min*height/FOX_PX.refHeight)));
+if(!Number.isFinite(minFoxPixels)||minFoxPixels<0||minFoxPixels>height)throw Error('min-fox-pixels must be within viewport height');
 if (![width, height].every(v => Number.isInteger(v) && v > 0) || !Number.isFinite(clipSeconds) || clipSeconds <= 0) throw Error('Invalid clip dimensions/duration');
 const clipFrames = Math.round(clipSeconds / testDt / 2) * 2;
 if (clip) fs.mkdirSync(path.join(out,'drop-frames'), {recursive:true});
@@ -78,6 +83,7 @@ try {
     if (sideBias !== null) h.camera.sideBias = sideBias;
     if (prepare) new Function(`return (${prepare})`)()(h);
     h.teleport(start.x,start.z,start.yaw);
+    if (typeof h.foxScreenPx !== 'function') throw Error('Integrated foxScreenPx hook is required');
     window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1,silhouette:[]};
   },{source:createSliceRoute.toString(),start:sliceStart,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare:prepareSlice?.toString()??null});
   let done=false, n=0, checkpoint=-1;
@@ -85,7 +91,6 @@ try {
     const result=await page.evaluate(({total,clip,clipBeat,clipFrames,testDt,stillFrames,clipFrom,missOverlook,sparseStills,checkSilhouette})=>{
       const p=window.__cameraProbe,h=window.__gameHooks,c=window.__opening.camera;
       let label='', captureFrame=null;
-      const bodyBase=c.position.clone(),bodyTop=c.position.clone();
       for(let i=0;i<60 && p.f<total;i++,p.f++){
         const f=p.f,prev=p.state,input=p.route(f*testDt,prev);
         // Explicit input variant: walk off the second page instead of jumping to the overlook.
@@ -105,11 +110,6 @@ try {
         const s=h.advance(1,testDt,shot||clipFrame);
         const lensPitch=-Math.asin(c.getWorldDirection(c.position.clone()).y)*180/Math.PI;
         p.state=s;
-        // Stable body-height proxy: catches a parked distant lens independently
-        // of pose/ear/tail animation. This is framing, not opaque visibility.
-        bodyBase.set(s.pos[0],s.pos[1],s.pos[2]).project(c);
-        bodyTop.set(s.pos[0],s.pos[1]+.8,s.pos[2]).project(c);
-        const projectedHeight=Math.abs(bodyTop.y-bodyBase.y)/2;
         if (clipFrame && checkSilhouette) {
           const point = c.position.clone();
           let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity,vertices=0;
@@ -123,7 +123,8 @@ try {
           });
           p.silhouette.push({f,vertices,minX,maxX,minY,maxY,inside:vertices>0&&minX>-.96&&maxX<.96&&minY>-.96&&maxY<.96});
         }
-        p.trace.push({f,beat:p.beat,pos:s.pos,vel:s.vel,grounded:s.grounded,camera:s.camera,lensPitch,projectedHeight,lastJump:s.lastJump,page:s.opening.page,canopy:s.opening.canopy,popUpRuin:s.opening.popUpRuin});
+        const foxPixels=h.foxScreenPx();
+        p.trace.push({f,foxPixels,beat:p.beat,pos:s.pos,vel:s.vel,grounded:s.grounded,camera:s.camera,lensPitch,lastJump:s.lastJump,page:s.opening.page,canopy:s.opening.canopy,popUpRuin:s.opening.popUpRuin});
         if(!prev.grounded&&s.grounded)p.touchdown=f;
         if(shot||clipFrame){
           if(shot)label=timed?`${(f * testDt).toFixed(2)}s`:detail?`drop-${f}`:apex?'apex':touch?'touchdown+2':p.beat;
@@ -178,10 +179,18 @@ try {
   const late = evidence.trace.filter(s => s.f * testDt >= checkFrom);
   if (late.length) {
     const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));
-    const minProjectedHeight = Math.min(...late.map(s => s.projectedHeight));
     const maxPitch = Math.max(...late.map(s => Math.abs(s.lensPitch)));
     const maxStepSpeed = Math.max(0, ...late.slice(1).map((s, i) => Math.hypot(...s.camera.pos.map((v, axis) => v - late[i].camera.pos[axis])) / testDt));
-    const cameraCheck = { fromSeconds: checkFrom, minChestDistance, minProjectedHeight, minProjectedHeightFloor:.05, projectionScope:'0.8m vertical body proxy / viewport height; excludes occlusion', maxPitch, maxStepSpeed, pass: minProjectedHeight >= .05 && minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && !errors.length };
+    let groundedTime=0,maxGroundedFollowDistance=0,smallFor=0,longestSmallFoxSeconds=0,minFollowFoxPixels=Infinity;
+    for(const s of evidence.trace){
+      groundedTime=s.grounded?groundedTime+testDt:0;
+      const follow=s.f*testDt>=checkFrom&&s.camera.boom.includes('shot=0.00');
+      if(follow){minFollowFoxPixels=Math.min(minFollowFoxPixels,s.foxPixels);smallFor=s.foxPixels<minFoxPixels?smallFor+testDt:0;longestSmallFoxSeconds=Math.max(longestSmallFoxSeconds,smallFor);}else smallFor=0;
+      if(!follow||groundedTime<1)continue;
+      maxGroundedFollowDistance=Math.max(maxGroundedFollowDistance,Math.hypot(s.camera.pos[0]-s.pos[0],s.camera.pos[1]-s.pos[1]-.6,s.camera.pos[2]-s.pos[2]));
+    }
+    const foxSizeFailure=foxSizeGate(evidence.trace.map(s=>s.f*testDt>=checkFrom&&s.camera.boom.includes('shot=0.00')?s.foxPixels:Infinity),{dt:testDt,height,min:minFoxPixels});
+    const cameraCheck = { fromSeconds: checkFrom, minChestDistance, maxPitch, maxStepSpeed, maxGroundedFollowDistance, maxGroundedDistance, minFollowFoxPixels, minFoxPixels, longestSmallFoxSeconds, foxSizeFailure, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && maxGroundedFollowDistance<=maxGroundedDistance && !foxSizeFailure && !errors.length };
     fs.writeFileSync(path.join(out, 'camera-check.json'), JSON.stringify(cameraCheck, null, 2));
     console.log('CAMERA', JSON.stringify(cameraCheck));
     if (process.argv.includes('--check-camera') && !cameraCheck.pass) process.exitCode = 1;

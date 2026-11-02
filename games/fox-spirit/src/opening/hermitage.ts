@@ -13,6 +13,13 @@ import { archSlab, box, C, cyl, gable, Kit } from './village';
 import { HERMITAGE, NORTH_LANE, northE } from './hermitageLayout';
 import { polyDist } from './millbrookLayout';
 
+/** a kept light: unlit and over-bright (HDR) so it blooms warm through the sepia before anything is painted */
+function glowMaterial(): THREE.MeshBasicMaterial {
+  const m = new THREE.MeshBasicMaterial({ fog: true });
+  m.color.setRGB(1.7, 0.72, 0.2);
+  return m;
+}
+
 type Tree = [number, number, number, TreeKind, number];
 /** the hanger: tall moss-crowned trees crowding both banks of the climb, one rust beacon at the top */
 const HANGER: Tree[] = [
@@ -165,6 +172,15 @@ function buildHouse(k: Kit, ctx: OpeningCtx): void {
     }
   });
   colliders.push({ kind: 'box', x: h.x, z: h.z, yaw: h.yaw, hx: w / 2 + 0.35, hz: d / 2 + 0.35, top: y0 + wallTop + rise });
+  // the study window still glows: unlit basic material, so it reads warm in the sepia world and draws the
+  // eye up the hill from the village before anything here is painted
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(0.5, 20), glowMaterial());
+  const c = Math.cos(h.yaw);
+  const sn = Math.sin(h.yaw);
+  const lz = d / 2 + 0.14;
+  glow.position.set(h.x + lz * sn, y0 + 0.5 + eave * 0.72, h.z + lz * c);
+  glow.rotation.y = h.yaw;
+  ctx.scene.add(glow);
 }
 
 /** the open-air desk: a slanted writing board on trestles under a little shingle lean-to, ink, quill, paper */

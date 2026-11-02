@@ -1,8 +1,14 @@
 # Keeping chase-camera release
 
-**Integration hold:** this is an independent candidate. Do not stack its camera
-solver or inline 0.8m measurement over Fern's broader recovery/shared fox-size
-gate. The staged ruin route and coverage checks can be picked separately.
+Final selection: merge `671a290` using its complete Fern camera envelope and
+release fixtures. The independent Sorrel solver and inline 0.8m measurement are
+superseded. The probe uses the game's `foxScreenPx()` and shared fox-size gate,
+retaining trace-based regional checks and required missed-jump coverage.
+
+The results below archive the independent candidate. They are not claims about
+the merged runtime; integrated replay results are recorded separately.
+
+## Archived independent candidate
 
 Runtime: `4626a72` on `sw4-sorrel`; baseline `ac3c711` inherits the camera from
 Kit's reported `d03831b`. The normal opening boom remains 2.45m and the effective
