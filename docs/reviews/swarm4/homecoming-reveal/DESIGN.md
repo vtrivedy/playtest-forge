@@ -1,0 +1,3 @@
+# Independent well reveal review
+
+On the exact merge of Wren c212345, stage freed creatures and page homecoming, then stop at the actual full-well transition. Record eight seconds of ordinary authored/chase camera with 30 Hz simulation and 15 fps capture: a stationary hold and a separate run with live stick input at two seconds. Save screenshots, camera path state, camera poses, window.__game and JS errors. Check that the reveal starts once, shows the outgoing gate/hearth direction, ends naturally, and yields after movement. Review sampled frames from the clips, then repeat if a runtime fix is necessary. Staged setup is not an unaided discovery, complete progression, audio or real-time performance verdict. Shared camera and controller remain unchanged.
