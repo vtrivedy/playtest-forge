@@ -1,0 +1,3733 @@
+{
+  "scope": "Developer travel and staged climb start; then input-only platforming. Not a hub route or unaided secret discovery.",
+  "errors": [],
+  "completed": true,
+  "climb": {
+    "k": 9,
+    "log": [
+      [
+        0,
+        [
+          -684,
+          1.06,
+          107.47
+        ]
+      ],
+      [
+        1,
+        [
+          -684.15,
+          1.61,
+          109.79
+        ]
+      ],
+      [
+        2,
+        [
+          -683.67,
+          2.17,
+          112.07
+        ]
+      ],
+      [
+        3,
+        [
+          -682.36,
+          2.71,
+          113.91
+        ]
+      ],
+      [
+        4,
+        [
+          -680.5,
+          3.27,
+          115.12
+        ]
+      ],
+      [
+        5,
+        [
+          -678.18,
+          3.81,
+          115.65
+        ]
+      ],
+      [
+        6,
+        [
+          -675.97,
+          4.37,
+          115.34
+        ]
+      ],
+      [
+        7,
+        [
+          -674.04,
+          4.92,
+          114.24
+        ]
+      ],
+      [
+        8,
+        [
+          -674.51,
+          5.42,
+          111.21
+        ]
+      ]
+    ],
+    "game": {
+      "pos": [
+        -674.599,
+        5.415,
+        110.809
+      ],
+      "vel": [
+        0,
+        0,
+        0
+      ],
+      "speed": 0,
+      "yaw": -2.925,
+      "grounded": true,
+      "gliding": false,
+      "dashing": false,
+      "dashesUsed": 0,
+      "lastDashDistance": 0,
+      "updraft": {
+        "hearths": [
+          {
+            "id": "H-a",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              5.6,
+              0.47024262712306353,
+              74.2
+            ],
+            "height": 9
+          },
+          {
+            "id": "steam",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              24.95187386065252,
+              4.986607380995244,
+              79.36271871937427
+            ],
+            "height": 9
+          },
+          {
+            "id": "root",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              28.310371506590094,
+              9.486607380995244,
+              76.19878231637375
+            ],
+            "height": 7
+          },
+          {
+            "id": "kiln",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              -65.64789605154716,
+              -1.1058396548043123,
+              96.13936055605392
+            ],
+            "height": 12
+          }
+        ],
+        "lastRide": null,
+        "tun": {
+          "threshold": 0.3,
+          "igniteTime": 0.25,
+          "holdTime": 3,
+          "gutterTime": 0.8,
+          "radius": 2.2,
+          "topFalloff": 2,
+          "maxRise": 6.5,
+          "liftResponse": 4,
+          "columnSteer": 0.65,
+          "centerPull": 1.5,
+          "fallLift": 0.35,
+          "probeRing": 0.9
+        }
+      },
+      "airTime": 0.7,
+      "apexY": 5.665,
+      "lastJump": {
+        "apex": 0.75,
+        "air": 0.7,
+        "timeToApex": 0.3
+      },
+      "anim": "idle",
+      "gait": "walk",
+      "playback": 0.6,
+      "stanceFeet": 4,
+      "maxSlide": 0.003,
+      "paws": {
+        "fpawL": [
+          -674.6730334931212,
+          5.437084712899657,
+          110.71738450138767
+        ],
+        "fpawR": [
+          -674.5710387081126,
+          5.437075101161746,
+          110.69509201265164
+        ],
+        "hpawL": [
+          -674.6335532941087,
+          5.43708746875575,
+          110.91348206814448
+        ],
+        "hpawR": [
+          -674.5245852129566,
+          5.437077126522938,
+          110.88938409945546
+        ]
+      },
+      "camera": {
+        "pos": [
+          -675.823,
+          6.765,
+          113.366
+        ],
+        "boom": "shot=0.00 boomT=1.00 lift=0.00 floorLift=0.00 focusY=5.42 lock=5.42 dist=2.78 scenery=1.00 limit=1.00 fade=0.00 lensUnresolved=false blocker=",
+        "blocked": false
+      },
+      "opening": {
+        "canopy": {
+          "launches": 0,
+          "contacts": 0,
+          "retries": 0,
+          "roostVisits": 0,
+          "lastLeaf": null,
+          "lastFlight": null,
+          "activeFlight": null,
+          "lensTucked": 0,
+          "profile": {
+            "launchSpeed": 8.66,
+            "loadTime": 0.12,
+            "bow": 0.19
+          },
+          "leaves": [
+            {
+              "id": "entry",
+              "x": -0.2,
+              "z": 71.5,
+              "top": -0.16081268242076513,
+              "touched": false
+            },
+            {
+              "id": "middle",
+              "x": -0.2,
+              "z": 69.3,
+              "top": 1.296937770277265,
+              "touched": false
+            },
+            {
+              "id": "high",
+              "x": 0.9,
+              "z": 67.1,
+              "top": 2.373411979422167,
+              "touched": false
+            },
+            {
+              "id": "roost",
+              "x": -1,
+              "z": 64.7,
+              "top": 2.8959259519471163,
+              "touched": false
+            }
+          ]
+        },
+        "hearth": {
+          "hearths": [
+            {
+              "id": "H-a",
+              "heat": 0,
+              "state": "cold",
+              "supply": 0,
+              "holdLeft": 0,
+              "restored": false,
+              "pos": [
+                5.6,
+                0.47024262712306353,
+                74.2
+              ],
+              "height": 9
+            },
+            {
+              "id": "steam",
+              "heat": 0,
+              "state": "cold",
+              "supply": 0,
+              "holdLeft": 0,
+              "restored": false,
+              "pos": [
+                24.95187386065252,
+                4.986607380995244,
+                79.36271871937427
+              ],
+              "height": 9
+            },
+            {
+              "id": "root",
+              "heat": 0,
+              "state": "cold",
+              "supply": 0,
+              "holdLeft": 0,
+              "restored": false,
+              "pos": [
+                28.310371506590094,
+                9.486607380995244,
+                76.19878231637375
+              ],
+              "height": 7
+            },
+            {
+              "id": "kiln",
+              "heat": 0,
+              "state": "cold",
+              "supply": 0,
+              "holdLeft": 0,
+              "restored": false,
+              "pos": [
+                -65.64789605154716,
+                -1.1058396548043123,
+                96.13936055605392
+              ],
+              "height": 12
+            }
+          ],
+          "lastRide": null,
+          "tun": {
+            "threshold": 0.3,
+            "igniteTime": 0.25,
+            "holdTime": 3,
+            "gutterTime": 0.8,
+            "radius": 2.2,
+            "topFalloff": 2,
+            "maxRise": 6.5,
+            "liftResponse": 4,
+            "columnSteer": 0.65,
+            "centerPull": 1.5,
+            "fallLift": 0.35,
+            "probeRing": 0.9
+          },
+          "latched": false,
+          "ignition": null,
+          "complete": false,
+          "hint": null
+        },
+        "captions": {
+          "showing": null,
+          "said": 1
+        },
+        "teach": {
+          "showing": null
+        },
+        "paint": {
+          "trailSamples": 75,
+          "supply": 1,
+          "distance": 26.552510189364217,
+          "restores": 0
+        },
+        "visibility": {
+          "occluders": 182,
+          "faded": 0
+        },
+        "restores": 0,
+        "carry": {
+          "carried": false,
+          "heat": 1,
+          "cooling": false,
+          "position": [
+            15.1,
+            4.956607380995243,
+            77.4
+          ],
+          "lastGrounded": [
+            -674.5994830258657,
+            5.4150811691070935,
+            110.80870812459318
+          ],
+          "canPickup": false,
+          "canPlace": false,
+          "pickups": 0,
+          "placements": 0,
+          "dashDrops": 0,
+          "carriedDashes": 0,
+          "recoveries": 0,
+          "lastAction": "source",
+          "rolling": false
+        },
+        "chemistry": {
+          "steam": {
+            "id": "steam",
+            "position": [
+              24.95187386065252,
+              4.956607380995243,
+              79.36271871937427
+            ],
+            "heat": 0,
+            "supply": 0,
+            "state": "cold",
+            "restored": false
+          },
+          "root": {
+            "id": "root",
+            "position": [
+              28.310371506590094,
+              9.456607380995244,
+              76.19878231637375
+            ],
+            "heat": 0,
+            "supply": 0,
+            "state": "cold",
+            "restored": false
+          },
+          "steamLatched": false,
+          "completed": false,
+          "steamReactions": 0,
+          "releases": 0
+        },
+        "crown": {
+          "released": false,
+          "release": 0,
+          "fall": -1,
+          "limb": -0.622,
+          "leaves": 0,
+          "heroLeaf": false
+        },
+        "keeping": {
+          "phase": "arrested",
+          "t": 0,
+          "angle": 0.95,
+          "bridge": false,
+          "answered": {
+            "kicked": 0,
+            "creaks": 0,
+            "resting": 0
+          },
+          "impact": false,
+          "impacts": 0,
+          "bridgeTop": 9.577,
+          "crownLobes": 10,
+          "stair": "pressed"
+        },
+        "unpressed": {
+          "flings": 0,
+          "found": [],
+          "creatures": [
+            {
+              "id": "hedgehog",
+              "phase": "pressed",
+              "t": 0,
+              "at": [
+                -6.74,
+                0.1,
+                85.95
+              ]
+            },
+            {
+              "id": "heron",
+              "phase": "pressed",
+              "t": 0,
+              "at": [
+                7.42,
+                0.53,
+                74.76
+              ]
+            },
+            {
+              "id": "deer",
+              "phase": "pressed",
+              "t": 0,
+              "at": [
+                24.46,
+                9.46,
+                64.54
+              ]
+            },
+            {
+              "id": "kit",
+              "phase": "pressed",
+              "t": 0,
+              "at": [
+                32.56,
+                0.3,
+                88.6
+              ]
+            },
+            {
+              "id": "hare",
+              "phase": "pressed",
+              "t": 0,
+              "at": [
+                -6.86,
+                -0.7,
+                70.26
+              ]
+            }
+          ]
+        },
+        "glyphs": {
+          "progress": 0,
+          "solved": false,
+          "gutters": 0,
+          "lastGutter": "",
+          "order": [
+            "moon",
+            "leaf",
+            "flame"
+          ],
+          "stones": [
+            {
+              "id": "leaf",
+              "painted": false,
+              "lit": false,
+              "reveal": 0
+            },
+            {
+              "id": "flame",
+              "painted": false,
+              "lit": false,
+              "reveal": 0
+            },
+            {
+              "id": "moon",
+              "painted": false,
+              "lit": false,
+              "reveal": 0
+            }
+          ]
+        },
+        "hum": {
+          "running": true,
+          "voices": [
+            {
+              "id": "H-a",
+              "gain": 0
+            },
+            {
+              "id": "steam",
+              "gain": 0
+            },
+            {
+              "id": "root",
+              "gain": 0
+            },
+            {
+              "id": "kiln",
+              "gain": 0
+            }
+          ]
+        },
+        "audio": {
+          "context": "running",
+          "master": 1,
+          "music": {
+            "ready": true,
+            "bar": -1,
+            "breath": false,
+            "swell": "idle",
+            "pass": 0,
+            "since": 0,
+            "shaded": false,
+            "ending": "playing",
+            "forces": 2,
+            "tune": "hearth",
+            "cues": 0,
+            "levels": {
+              "harp": 0.48,
+              "pad": 0.39,
+              "bass": 0,
+              "lead": 0,
+              "bells": 0,
+              "bright": 0.3,
+              "shade": 0
+            },
+            "cued": []
+          },
+          "ambience": {
+            "wind": 0.0007
+          },
+          "loaded": 13,
+          "files": 13,
+          "counts": {
+            "cloth-0": 2,
+            "cloth-2": 3,
+            "cloth-3": 3,
+            "cloth-1": 1
+          },
+          "last": [
+            {
+              "id": "cloth-2",
+              "t": 9.7
+            },
+            {
+              "id": "cloth-3",
+              "t": 9.78
+            },
+            {
+              "id": "cloth-1",
+              "t": 10.01
+            },
+            {
+              "id": "cloth-2",
+              "t": 10.11
+            },
+            {
+              "id": "cloth-3",
+              "t": 10.21
+            },
+            {
+              "id": "cloth-2",
+              "t": 10.35
+            },
+            {
+              "id": "cloth-0",
+              "t": 10.45
+            },
+            {
+              "id": "cloth-3",
+              "t": 10.61
+            }
+          ],
+          "log": [
+            {
+              "id": "cloth-0",
+              "t": 9.6
+            },
+            {
+              "id": "cloth-2",
+              "t": 9.7
+            },
+            {
+              "id": "cloth-3",
+              "t": 9.78
+            },
+            {
+              "id": "cloth-1",
+              "t": 10.01
+            },
+            {
+              "id": "cloth-2",
+              "t": 10.11
+            },
+            {
+              "id": "cloth-3",
+              "t": 10.21
+            },
+            {
+              "id": "cloth-2",
+              "t": 10.35
+            },
+            {
+              "id": "cloth-0",
+              "t": 10.45
+            },
+            {
+              "id": "cloth-3",
+              "t": 10.61
+            }
+          ],
+          "foley": {
+            "steps": {
+              "grass": 1,
+              "leaf": 0,
+              "wood": 0,
+              "stone": 4
+            },
+            "glide": 0.002
+          }
+        },
+        "page": {
+          "stage": 0,
+          "phase": "perched",
+          "catches": 0,
+          "skips": 0,
+          "dodges": 0,
+          "winded": false,
+          "yaw": -1.5403,
+          "droop": 0,
+          "s": 0,
+          "pos": [
+            -5.15,
+            1.1,
+            90.4
+          ]
+        },
+        "discovery": {
+          "active": true,
+          "visible": false,
+          "leg": "page",
+          "restoredAtLoad": false,
+          "completionAt": null,
+          "target": [
+            0,
+            0,
+            0
+          ],
+          "action": "follow",
+          "hint": "Follow the loose page"
+        },
+        "popUpRuin": {
+          "folds": [
+            {
+              "phase": "folded",
+              "progress": 0
+            },
+            {
+              "phase": "folded",
+              "progress": 0
+            },
+            {
+              "phase": "folded",
+              "progress": 0
+            }
+          ],
+          "reached": false,
+          "returns": 0,
+          "misses": 0,
+          "tunables": {
+            "unfold": 0.55,
+            "hitRadius": 1.35
+          }
+        },
+        "homecoming": {
+          "pinned": false,
+          "sent": false,
+          "home": [],
+          "lit": [],
+          "full": false
+        },
+        "leafPiles": {
+          "piles": 8,
+          "kicks": 0,
+          "flying": 0
+        },
+        "laneWind": {
+          "gusts": 0,
+          "flying": 0
+        },
+        "millrace": {
+          "phase": "held",
+          "front": 13,
+          "turning": false,
+          "painted": false,
+          "spin": 0,
+          "lookoutPainted": false
+        },
+        "millWeir": {
+          "lit": false,
+          "heat": 0,
+          "rode": false,
+          "reached": false
+        },
+        "hermitage": {
+          "freed": [
+            0,
+            0,
+            0
+          ],
+          "painted": false,
+          "captioned": false
+        },
+        "wayPiles": {
+          "piles": 12,
+          "kicks": 0,
+          "flying": 0
+        },
+        "finale": {
+          "phase": "sealed",
+          "t": 10.17,
+          "kindles": 0,
+          "cradle": [
+            20.79,
+            39.64
+          ],
+          "kits": [
+            "pressed",
+            "pressed",
+            "pressed"
+          ],
+          "card": "hidden",
+          "cardShows": 0,
+          "kitNear": 99,
+          "restShot": [],
+          "snow": 0,
+          "leaves": 0,
+          "onward": 0,
+          "still": 0
+        },
+        "ashwater": {
+          "damA": false,
+          "damB": false,
+          "flood": false,
+          "channelY": -0.15,
+          "poolY": -0.15,
+          "mats": 0,
+          "done": [],
+          "splashes": 0,
+          "glow": 0
+        },
+        "press": {
+          "lit": [
+            true,
+            false,
+            true,
+            false
+          ],
+          "warm": 0,
+          "sealOpen": false,
+          "draftA": false,
+          "iced": true,
+          "draftB": false,
+          "done": []
+        },
+        "worlds": {
+          "active": "press",
+          "travels": 1,
+          "progress": {
+            "activeWorld": "hub",
+            "revision": 1,
+            "worlds": {
+              "russetvale": {
+                "visited": [],
+                "restored": [],
+                "ability": null,
+                "well": "Kiln",
+                "fill": 0,
+                "next": "teach"
+              },
+              "ashwater": {
+                "visited": [],
+                "restored": [],
+                "ability": null,
+                "well": "Reed",
+                "fill": 0,
+                "next": "teach"
+              },
+              "press": {
+                "visited": [],
+                "restored": [],
+                "ability": null,
+                "well": "Maple",
+                "fill": 0,
+                "next": "teach"
+              }
+            },
+            "secrets": [
+              "press-stacks"
+            ]
+          },
+          "mapOpen": false,
+          "warden": [
+            0,
+            0,
+            0,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    "save": "{\"version\":1,\"worlds\":{\"russetvale\":{\"restored\":[],\"visited\":[]},\"ashwater\":{\"restored\":[],\"visited\":[]},\"press\":{\"restored\":[],\"visited\":[]}},\"secrets\":[\"press-stacks\"]}"
+  },
+  "album": {
+    "pos": [
+      -674.599,
+      5.415,
+      110.809
+    ],
+    "vel": [
+      0,
+      0,
+      0
+    ],
+    "speed": 0,
+    "yaw": -2.925,
+    "grounded": true,
+    "gliding": false,
+    "dashing": false,
+    "dashesUsed": 0,
+    "lastDashDistance": 0,
+    "updraft": {
+      "hearths": [
+        {
+          "id": "H-a",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            5.6,
+            0.47024262712306353,
+            74.2
+          ],
+          "height": 9
+        },
+        {
+          "id": "steam",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            24.95187386065252,
+            4.986607380995244,
+            79.36271871937427
+          ],
+          "height": 9
+        },
+        {
+          "id": "root",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            28.310371506590094,
+            9.486607380995244,
+            76.19878231637375
+          ],
+          "height": 7
+        },
+        {
+          "id": "kiln",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            -65.64789605154716,
+            -1.1058396548043123,
+            96.13936055605392
+          ],
+          "height": 12
+        }
+      ],
+      "lastRide": null,
+      "tun": {
+        "threshold": 0.3,
+        "igniteTime": 0.25,
+        "holdTime": 3,
+        "gutterTime": 0.8,
+        "radius": 2.2,
+        "topFalloff": 2,
+        "maxRise": 6.5,
+        "liftResponse": 4,
+        "columnSteer": 0.65,
+        "centerPull": 1.5,
+        "fallLift": 0.35,
+        "probeRing": 0.9
+      }
+    },
+    "airTime": 0.7,
+    "apexY": 5.665,
+    "lastJump": {
+      "apex": 0.75,
+      "air": 0.7,
+      "timeToApex": 0.3
+    },
+    "anim": "idle",
+    "gait": "walk",
+    "playback": 0.6,
+    "stanceFeet": 4,
+    "maxSlide": 0,
+    "paws": {
+      "fpawL": [
+        -674.6730339148374,
+        5.43708350913771,
+        110.71738462344004
+      ],
+      "fpawR": [
+        -674.5710749877385,
+        5.437076338706722,
+        110.69494068992142
+      ],
+      "hpawL": [
+        -674.6335538264696,
+        5.437085750633455,
+        110.91348226896245
+      ],
+      "hpawR": [
+        -674.5245632066483,
+        5.437078030444282,
+        110.88949054217981
+      ]
+    },
+    "camera": {
+      "pos": [
+        -675.811,
+        6.765,
+        113.344
+      ],
+      "boom": "shot=0.00 boomT=1.00 lift=0.00 floorLift=0.00 focusY=5.42 lock=5.42 dist=2.76 scenery=1.00 limit=1.00 fade=0.00 lensUnresolved=false blocker=",
+      "blocked": false
+    },
+    "opening": {
+      "canopy": {
+        "launches": 0,
+        "contacts": 0,
+        "retries": 0,
+        "roostVisits": 0,
+        "lastLeaf": null,
+        "lastFlight": null,
+        "activeFlight": null,
+        "lensTucked": 0,
+        "profile": {
+          "launchSpeed": 8.66,
+          "loadTime": 0.12,
+          "bow": 0.19
+        },
+        "leaves": [
+          {
+            "id": "entry",
+            "x": -0.2,
+            "z": 71.5,
+            "top": -0.16081268242076513,
+            "touched": false
+          },
+          {
+            "id": "middle",
+            "x": -0.2,
+            "z": 69.3,
+            "top": 1.296937770277265,
+            "touched": false
+          },
+          {
+            "id": "high",
+            "x": 0.9,
+            "z": 67.1,
+            "top": 2.373411979422167,
+            "touched": false
+          },
+          {
+            "id": "roost",
+            "x": -1,
+            "z": 64.7,
+            "top": 2.8959259519471163,
+            "touched": false
+          }
+        ]
+      },
+      "hearth": {
+        "hearths": [
+          {
+            "id": "H-a",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              5.6,
+              0.47024262712306353,
+              74.2
+            ],
+            "height": 9
+          },
+          {
+            "id": "steam",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              24.95187386065252,
+              4.986607380995244,
+              79.36271871937427
+            ],
+            "height": 9
+          },
+          {
+            "id": "root",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              28.310371506590094,
+              9.486607380995244,
+              76.19878231637375
+            ],
+            "height": 7
+          },
+          {
+            "id": "kiln",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              -65.64789605154716,
+              -1.1058396548043123,
+              96.13936055605392
+            ],
+            "height": 12
+          }
+        ],
+        "lastRide": null,
+        "tun": {
+          "threshold": 0.3,
+          "igniteTime": 0.25,
+          "holdTime": 3,
+          "gutterTime": 0.8,
+          "radius": 2.2,
+          "topFalloff": 2,
+          "maxRise": 6.5,
+          "liftResponse": 4,
+          "columnSteer": 0.65,
+          "centerPull": 1.5,
+          "fallLift": 0.35,
+          "probeRing": 0.9
+        },
+        "latched": false,
+        "ignition": null,
+        "complete": false,
+        "hint": null
+      },
+      "captions": {
+        "showing": null,
+        "said": 1
+      },
+      "teach": {
+        "showing": null
+      },
+      "paint": {
+        "trailSamples": 75,
+        "supply": 1,
+        "distance": 26.552510189364217,
+        "restores": 0
+      },
+      "visibility": {
+        "occluders": 182,
+        "faded": 0
+      },
+      "restores": 0,
+      "carry": {
+        "carried": false,
+        "heat": 1,
+        "cooling": false,
+        "position": [
+          15.1,
+          4.956607380995243,
+          77.4
+        ],
+        "lastGrounded": [
+          -674.5994830258657,
+          5.4150811691070935,
+          110.80870812459318
+        ],
+        "canPickup": false,
+        "canPlace": false,
+        "pickups": 0,
+        "placements": 0,
+        "dashDrops": 0,
+        "carriedDashes": 0,
+        "recoveries": 0,
+        "lastAction": "source",
+        "rolling": false
+      },
+      "chemistry": {
+        "steam": {
+          "id": "steam",
+          "position": [
+            24.95187386065252,
+            4.956607380995243,
+            79.36271871937427
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "root": {
+          "id": "root",
+          "position": [
+            28.310371506590094,
+            9.456607380995244,
+            76.19878231637375
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "steamLatched": false,
+        "completed": false,
+        "steamReactions": 0,
+        "releases": 0
+      },
+      "crown": {
+        "released": false,
+        "release": 0,
+        "fall": -1,
+        "limb": -0.621,
+        "leaves": 0,
+        "heroLeaf": false
+      },
+      "keeping": {
+        "phase": "arrested",
+        "t": 0,
+        "angle": 0.95,
+        "bridge": false,
+        "answered": {
+          "kicked": 0,
+          "creaks": 0,
+          "resting": 0
+        },
+        "impact": false,
+        "impacts": 0,
+        "bridgeTop": 9.577,
+        "crownLobes": 10,
+        "stair": "pressed"
+      },
+      "unpressed": {
+        "flings": 0,
+        "found": [],
+        "creatures": [
+          {
+            "id": "hedgehog",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.74,
+              0.1,
+              85.95
+            ]
+          },
+          {
+            "id": "heron",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              7.42,
+              0.53,
+              74.76
+            ]
+          },
+          {
+            "id": "deer",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              24.46,
+              9.46,
+              64.54
+            ]
+          },
+          {
+            "id": "kit",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              32.56,
+              0.3,
+              88.6
+            ]
+          },
+          {
+            "id": "hare",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.86,
+              -0.7,
+              70.26
+            ]
+          }
+        ]
+      },
+      "glyphs": {
+        "progress": 0,
+        "solved": false,
+        "gutters": 0,
+        "lastGutter": "",
+        "order": [
+          "moon",
+          "leaf",
+          "flame"
+        ],
+        "stones": [
+          {
+            "id": "leaf",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "flame",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "moon",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          }
+        ]
+      },
+      "hum": {
+        "running": true,
+        "voices": [
+          {
+            "id": "H-a",
+            "gain": 0
+          },
+          {
+            "id": "steam",
+            "gain": 0
+          },
+          {
+            "id": "root",
+            "gain": 0
+          },
+          {
+            "id": "kiln",
+            "gain": 0
+          }
+        ]
+      },
+      "audio": {
+        "context": "running",
+        "master": 1,
+        "music": {
+          "ready": true,
+          "bar": 4,
+          "breath": false,
+          "swell": "idle",
+          "pass": 0,
+          "since": 12,
+          "shaded": false,
+          "ending": "playing",
+          "forces": 2,
+          "tune": "hearth",
+          "cues": 0,
+          "levels": {
+            "harp": 0.48,
+            "pad": 0.39,
+            "bass": 0,
+            "lead": 0,
+            "bells": 0,
+            "bright": 0.3,
+            "shade": 0
+          },
+          "cued": []
+        },
+        "ambience": {
+          "wind": 0.0017
+        },
+        "loaded": 13,
+        "files": 13,
+        "counts": {
+          "cloth-0": 2,
+          "cloth-2": 3,
+          "cloth-3": 3,
+          "cloth-1": 1
+        },
+        "last": [
+          {
+            "id": "cloth-2",
+            "t": 9.7
+          },
+          {
+            "id": "cloth-3",
+            "t": 9.78
+          },
+          {
+            "id": "cloth-1",
+            "t": 10.01
+          },
+          {
+            "id": "cloth-2",
+            "t": 10.11
+          },
+          {
+            "id": "cloth-3",
+            "t": 10.21
+          },
+          {
+            "id": "cloth-2",
+            "t": 10.35
+          },
+          {
+            "id": "cloth-0",
+            "t": 10.45
+          },
+          {
+            "id": "cloth-3",
+            "t": 10.61
+          }
+        ],
+        "log": [
+          {
+            "id": "cloth-0",
+            "t": 9.6
+          },
+          {
+            "id": "cloth-2",
+            "t": 9.7
+          },
+          {
+            "id": "cloth-3",
+            "t": 9.78
+          },
+          {
+            "id": "cloth-1",
+            "t": 10.01
+          },
+          {
+            "id": "cloth-2",
+            "t": 10.11
+          },
+          {
+            "id": "cloth-3",
+            "t": 10.21
+          },
+          {
+            "id": "cloth-2",
+            "t": 10.35
+          },
+          {
+            "id": "cloth-0",
+            "t": 10.45
+          },
+          {
+            "id": "cloth-3",
+            "t": 10.61
+          }
+        ],
+        "foley": {
+          "steps": {
+            "grass": 1,
+            "leaf": 0,
+            "wood": 0,
+            "stone": 4
+          },
+          "glide": 0
+        }
+      },
+      "page": {
+        "stage": 0,
+        "phase": "perched",
+        "catches": 0,
+        "skips": 0,
+        "dodges": 0,
+        "winded": false,
+        "yaw": -1.5403,
+        "droop": 0,
+        "s": 0,
+        "pos": [
+          -5.15,
+          1.1,
+          90.4
+        ]
+      },
+      "discovery": {
+        "active": true,
+        "visible": false,
+        "leg": "page",
+        "restoredAtLoad": false,
+        "completionAt": null,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "action": "follow",
+        "hint": "Follow the loose page"
+      },
+      "popUpRuin": {
+        "folds": [
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          }
+        ],
+        "reached": false,
+        "returns": 0,
+        "misses": 0,
+        "tunables": {
+          "unfold": 0.55,
+          "hitRadius": 1.35
+        }
+      },
+      "homecoming": {
+        "pinned": false,
+        "sent": false,
+        "home": [],
+        "lit": [],
+        "full": false
+      },
+      "leafPiles": {
+        "piles": 8,
+        "kicks": 0,
+        "flying": 0
+      },
+      "laneWind": {
+        "gusts": 0,
+        "flying": 0
+      },
+      "millrace": {
+        "phase": "held",
+        "front": 13,
+        "turning": false,
+        "painted": false,
+        "spin": 0,
+        "lookoutPainted": false
+      },
+      "millWeir": {
+        "lit": false,
+        "heat": 0,
+        "rode": false,
+        "reached": false
+      },
+      "hermitage": {
+        "freed": [
+          0,
+          0,
+          0
+        ],
+        "painted": false,
+        "captioned": false
+      },
+      "wayPiles": {
+        "piles": 12,
+        "kicks": 0,
+        "flying": 0
+      },
+      "finale": {
+        "phase": "sealed",
+        "t": 10.22,
+        "kindles": 0,
+        "cradle": [
+          20.79,
+          39.64
+        ],
+        "kits": [
+          "pressed",
+          "pressed",
+          "pressed"
+        ],
+        "card": "hidden",
+        "cardShows": 0,
+        "kitNear": 99,
+        "restShot": [],
+        "snow": 0,
+        "leaves": 0,
+        "onward": 0,
+        "still": 0
+      },
+      "ashwater": {
+        "damA": false,
+        "damB": false,
+        "flood": false,
+        "channelY": -0.15,
+        "poolY": -0.15,
+        "mats": 0,
+        "done": [],
+        "splashes": 0,
+        "glow": 0
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      },
+      "worlds": {
+        "active": "press",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "hub",
+          "revision": 1,
+          "worlds": {
+            "russetvale": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Kiln",
+              "fill": 0,
+              "next": "teach"
+            },
+            "ashwater": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "press-stacks"
+          ]
+        },
+        "mapOpen": true,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    }
+  },
+  "reload": {
+    "pos": [
+      -5.2,
+      0,
+      92.5
+    ],
+    "vel": [
+      0,
+      0,
+      0
+    ],
+    "speed": 0,
+    "yaw": 2.953,
+    "grounded": true,
+    "gliding": false,
+    "dashing": false,
+    "dashesUsed": 0,
+    "lastDashDistance": 0,
+    "updraft": {
+      "hearths": [
+        {
+          "id": "H-a",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            5.6,
+            0.47024262712306353,
+            74.2
+          ],
+          "height": 9
+        },
+        {
+          "id": "steam",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            24.95187386065252,
+            4.986607380995244,
+            79.36271871937427
+          ],
+          "height": 9
+        },
+        {
+          "id": "root",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            28.310371506590094,
+            9.486607380995244,
+            76.19878231637375
+          ],
+          "height": 7
+        },
+        {
+          "id": "kiln",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            -65.64789605154716,
+            -1.1058396548043123,
+            96.13936055605392
+          ],
+          "height": 12
+        }
+      ],
+      "lastRide": null,
+      "tun": {
+        "threshold": 0.3,
+        "igniteTime": 0.25,
+        "holdTime": 3,
+        "gutterTime": 0.8,
+        "radius": 2.2,
+        "topFalloff": 2,
+        "maxRise": 6.5,
+        "liftResponse": 4,
+        "columnSteer": 0.65,
+        "centerPull": 1.5,
+        "fallLift": 0.35,
+        "probeRing": 0.9
+      }
+    },
+    "airTime": 0,
+    "apexY": 0,
+    "lastJump": {
+      "apex": 0,
+      "air": 0,
+      "timeToApex": 0
+    },
+    "anim": "idle",
+    "gait": "walk",
+    "playback": 0.6,
+    "stanceFeet": 4,
+    "maxSlide": 0,
+    "paws": {
+      "fpawL": [
+        -5.231541043681949,
+        0.022000013980857738,
+        92.38706192477223
+      ],
+      "fpawR": [
+        -5.129000574324955,
+        0.022000035445318977,
+        92.40667838390546
+      ],
+      "hpawL": [
+        -5.272656333241183,
+        0.02199998415922453,
+        92.58282328258461
+      ],
+      "hpawR": [
+        -5.163044095328249,
+        0.02199993798217622,
+        92.6037925901305
+      ]
+    },
+    "camera": {
+      "pos": [
+        -4.474,
+        1.35,
+        94.84
+      ],
+      "boom": "shot=0.00 boomT=1.00 lift=0.00 floorLift=0.00 focusY=0.00 lock=0.00 dist=2.45 scenery=1.00 limit=1.00 fade=0.00 lensUnresolved=false blocker=",
+      "blocked": false
+    },
+    "opening": {
+      "canopy": {
+        "launches": 0,
+        "contacts": 0,
+        "retries": 0,
+        "roostVisits": 0,
+        "lastLeaf": null,
+        "lastFlight": null,
+        "activeFlight": null,
+        "lensTucked": 0,
+        "profile": {
+          "launchSpeed": 8.66,
+          "loadTime": 0.12,
+          "bow": 0.19
+        },
+        "leaves": [
+          {
+            "id": "entry",
+            "x": -0.2,
+            "z": 71.5,
+            "top": -0.16081268242076513,
+            "touched": false
+          },
+          {
+            "id": "middle",
+            "x": -0.2,
+            "z": 69.3,
+            "top": 1.296937770277265,
+            "touched": false
+          },
+          {
+            "id": "high",
+            "x": 0.9,
+            "z": 67.1,
+            "top": 2.373411979422167,
+            "touched": false
+          },
+          {
+            "id": "roost",
+            "x": -1,
+            "z": 64.7,
+            "top": 2.8959259519471163,
+            "touched": false
+          }
+        ]
+      },
+      "hearth": {
+        "hearths": [
+          {
+            "id": "H-a",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              5.6,
+              0.47024262712306353,
+              74.2
+            ],
+            "height": 9
+          },
+          {
+            "id": "steam",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              24.95187386065252,
+              4.986607380995244,
+              79.36271871937427
+            ],
+            "height": 9
+          },
+          {
+            "id": "root",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              28.310371506590094,
+              9.486607380995244,
+              76.19878231637375
+            ],
+            "height": 7
+          },
+          {
+            "id": "kiln",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              -65.64789605154716,
+              -1.1058396548043123,
+              96.13936055605392
+            ],
+            "height": 12
+          }
+        ],
+        "lastRide": null,
+        "tun": {
+          "threshold": 0.3,
+          "igniteTime": 0.25,
+          "holdTime": 3,
+          "gutterTime": 0.8,
+          "radius": 2.2,
+          "topFalloff": 2,
+          "maxRise": 6.5,
+          "liftResponse": 4,
+          "columnSteer": 0.65,
+          "centerPull": 1.5,
+          "fallLift": 0.35,
+          "probeRing": 0.9
+        },
+        "latched": false,
+        "ignition": null,
+        "complete": false,
+        "hint": null
+      },
+      "captions": {
+        "showing": null,
+        "said": 0
+      },
+      "teach": {
+        "showing": "Follow the loose page"
+      },
+      "paint": {
+        "trailSamples": 8,
+        "supply": 1,
+        "distance": 0,
+        "restores": 0
+      },
+      "visibility": {
+        "occluders": 182,
+        "faded": 0
+      },
+      "restores": 0,
+      "carry": {
+        "carried": false,
+        "heat": 1,
+        "cooling": false,
+        "position": [
+          15.1,
+          4.956607380995243,
+          77.4
+        ],
+        "lastGrounded": [
+          -5.2,
+          0,
+          92.5
+        ],
+        "canPickup": false,
+        "canPlace": false,
+        "pickups": 0,
+        "placements": 0,
+        "dashDrops": 0,
+        "carriedDashes": 0,
+        "recoveries": 0,
+        "lastAction": "source",
+        "rolling": false
+      },
+      "chemistry": {
+        "steam": {
+          "id": "steam",
+          "position": [
+            24.95187386065252,
+            4.956607380995243,
+            79.36271871937427
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "root": {
+          "id": "root",
+          "position": [
+            28.310371506590094,
+            9.456607380995244,
+            76.19878231637375
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "steamLatched": false,
+        "completed": false,
+        "steamReactions": 0,
+        "releases": 0
+      },
+      "crown": {
+        "released": false,
+        "release": 0,
+        "fall": -1,
+        "limb": -0.618,
+        "leaves": 0,
+        "heroLeaf": false
+      },
+      "keeping": {
+        "phase": "arrested",
+        "t": 0,
+        "angle": 0.95,
+        "bridge": false,
+        "answered": {
+          "kicked": 0,
+          "creaks": 0,
+          "resting": 0
+        },
+        "impact": false,
+        "impacts": 0,
+        "bridgeTop": 9.577,
+        "crownLobes": 10,
+        "stair": "pressed"
+      },
+      "unpressed": {
+        "flings": 0,
+        "found": [],
+        "creatures": [
+          {
+            "id": "hedgehog",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.74,
+              0.1,
+              85.95
+            ]
+          },
+          {
+            "id": "heron",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              7.42,
+              0.53,
+              74.76
+            ]
+          },
+          {
+            "id": "deer",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              24.46,
+              9.46,
+              64.54
+            ]
+          },
+          {
+            "id": "kit",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              32.56,
+              0.3,
+              88.6
+            ]
+          },
+          {
+            "id": "hare",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.86,
+              -0.7,
+              70.26
+            ]
+          }
+        ]
+      },
+      "glyphs": {
+        "progress": 0,
+        "solved": false,
+        "gutters": 0,
+        "lastGutter": "",
+        "order": [
+          "moon",
+          "leaf",
+          "flame"
+        ],
+        "stones": [
+          {
+            "id": "leaf",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "flame",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "moon",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          }
+        ]
+      },
+      "hum": {
+        "running": true,
+        "voices": [
+          {
+            "id": "H-a",
+            "gain": 0
+          },
+          {
+            "id": "steam",
+            "gain": 0
+          },
+          {
+            "id": "root",
+            "gain": 0
+          },
+          {
+            "id": "kiln",
+            "gain": 0
+          }
+        ]
+      },
+      "audio": {
+        "context": "running",
+        "master": 1,
+        "music": {
+          "ready": true,
+          "bar": 0,
+          "breath": false,
+          "swell": "idle",
+          "pass": 0,
+          "since": 12,
+          "shaded": false,
+          "ending": "playing",
+          "forces": 2,
+          "tune": "hearth",
+          "cues": 0,
+          "levels": {
+            "harp": 0.6,
+            "pad": 0.58,
+            "bass": 0,
+            "lead": 0,
+            "bells": 0,
+            "bright": 0.27,
+            "shade": 0
+          },
+          "cued": []
+        },
+        "ambience": {
+          "wind": 0.0003
+        },
+        "loaded": 13,
+        "files": 13,
+        "counts": {},
+        "last": [],
+        "log": [],
+        "foley": {
+          "steps": {
+            "grass": 0,
+            "leaf": 0,
+            "wood": 0,
+            "stone": 0
+          },
+          "glide": 0
+        }
+      },
+      "page": {
+        "stage": 0,
+        "phase": "perched",
+        "catches": 0,
+        "skips": 0,
+        "dodges": 0,
+        "winded": false,
+        "yaw": -0.0234,
+        "droop": 0,
+        "s": 0,
+        "pos": [
+          -5.15,
+          1.1,
+          90.4
+        ]
+      },
+      "discovery": {
+        "active": true,
+        "visible": true,
+        "leg": "page",
+        "restoredAtLoad": false,
+        "completionAt": null,
+        "target": [
+          -5.15,
+          1.1,
+          90.4
+        ],
+        "action": "follow",
+        "hint": "Follow the loose page"
+      },
+      "popUpRuin": {
+        "folds": [
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          }
+        ],
+        "reached": false,
+        "returns": 0,
+        "misses": 0,
+        "tunables": {
+          "unfold": 0.55,
+          "hitRadius": 1.35
+        }
+      },
+      "homecoming": {
+        "pinned": false,
+        "sent": false,
+        "home": [],
+        "lit": [],
+        "full": false
+      },
+      "leafPiles": {
+        "piles": 8,
+        "kicks": 0,
+        "flying": 0
+      },
+      "laneWind": {
+        "gusts": 0,
+        "flying": 0
+      },
+      "millrace": {
+        "phase": "held",
+        "front": 13,
+        "turning": false,
+        "painted": false,
+        "spin": 0,
+        "lookoutPainted": false
+      },
+      "millWeir": {
+        "lit": false,
+        "heat": 0,
+        "rode": false,
+        "reached": false
+      },
+      "hermitage": {
+        "freed": [
+          0,
+          0,
+          0
+        ],
+        "painted": false,
+        "captioned": false
+      },
+      "wayPiles": {
+        "piles": 12,
+        "kicks": 0,
+        "flying": 0
+      },
+      "finale": {
+        "phase": "sealed",
+        "t": 1,
+        "kindles": 0,
+        "cradle": [
+          20.79,
+          39.64
+        ],
+        "kits": [
+          "pressed",
+          "pressed",
+          "pressed"
+        ],
+        "card": "hidden",
+        "cardShows": 0,
+        "kitNear": 99,
+        "restShot": [],
+        "snow": 0,
+        "leaves": 0,
+        "onward": 0,
+        "still": 0
+      },
+      "ashwater": {
+        "damA": false,
+        "damB": false,
+        "flood": false,
+        "channelY": -0.15,
+        "poolY": -0.15,
+        "mats": 0,
+        "done": [],
+        "splashes": 0,
+        "glow": 0
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      },
+      "worlds": {
+        "active": "russetvale",
+        "travels": 0,
+        "progress": {
+          "activeWorld": "hub",
+          "revision": 0,
+          "worlds": {
+            "russetvale": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Kiln",
+              "fill": 0,
+              "next": "teach"
+            },
+            "ashwater": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "press-stacks"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    }
+  },
+  "revisit": {
+    "pos": [
+      -674.5,
+      5.415,
+      111.1
+    ],
+    "vel": [
+      0,
+      0,
+      0
+    ],
+    "speed": 0,
+    "yaw": 0,
+    "grounded": true,
+    "gliding": false,
+    "dashing": false,
+    "dashesUsed": 0,
+    "lastDashDistance": 0,
+    "updraft": {
+      "hearths": [
+        {
+          "id": "H-a",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            5.6,
+            0.47024262712306353,
+            74.2
+          ],
+          "height": 9
+        },
+        {
+          "id": "steam",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            24.95187386065252,
+            4.986607380995244,
+            79.36271871937427
+          ],
+          "height": 9
+        },
+        {
+          "id": "root",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            28.310371506590094,
+            9.486607380995244,
+            76.19878231637375
+          ],
+          "height": 7
+        },
+        {
+          "id": "kiln",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            -65.64789605154716,
+            -1.1058396548043123,
+            96.13936055605392
+          ],
+          "height": 12
+        }
+      ],
+      "lastRide": null,
+      "tun": {
+        "threshold": 0.3,
+        "igniteTime": 0.25,
+        "holdTime": 3,
+        "gutterTime": 0.8,
+        "radius": 2.2,
+        "topFalloff": 2,
+        "maxRise": 6.5,
+        "liftResponse": 4,
+        "columnSteer": 0.65,
+        "centerPull": 1.5,
+        "fallLift": 0.35,
+        "probeRing": 0.9
+      }
+    },
+    "airTime": 0,
+    "apexY": 0,
+    "lastJump": {
+      "apex": 0,
+      "air": 0,
+      "timeToApex": 0
+    },
+    "anim": "idle",
+    "gait": "walk",
+    "playback": 0.6,
+    "stanceFeet": 4,
+    "maxSlide": 0,
+    "paws": {
+      "fpawL": [
+        -674.4478000198566,
+        5.437081134206232,
+        111.20499998421877
+      ],
+      "fpawR": [
+        -674.5522000009004,
+        5.437081183023557,
+        111.20500000096658
+      ],
+      "hpawL": [
+        -674.4441999906929,
+        5.437081166373064,
+        111.00500006284547
+      ],
+      "hpawR": [
+        -674.5557999974109,
+        5.437081138865421,
+        111.00500001055896
+      ]
+    },
+    "camera": {
+      "pos": [
+        -675.34,
+        6.765,
+        108.799
+      ],
+      "boom": "shot=0.00 boomT=1.00 lift=0.00 floorLift=0.00 focusY=5.42 lock=5.42 dist=2.45 scenery=1.00 limit=1.00 fade=0.00 lensUnresolved=false blocker=",
+      "blocked": false
+    },
+    "opening": {
+      "canopy": {
+        "launches": 0,
+        "contacts": 0,
+        "retries": 0,
+        "roostVisits": 0,
+        "lastLeaf": null,
+        "lastFlight": null,
+        "activeFlight": null,
+        "lensTucked": 0,
+        "profile": {
+          "launchSpeed": 8.66,
+          "loadTime": 0.12,
+          "bow": 0.19
+        },
+        "leaves": [
+          {
+            "id": "entry",
+            "x": -0.2,
+            "z": 71.5,
+            "top": -0.16081268242076513,
+            "touched": false
+          },
+          {
+            "id": "middle",
+            "x": -0.2,
+            "z": 69.3,
+            "top": 1.296937770277265,
+            "touched": false
+          },
+          {
+            "id": "high",
+            "x": 0.9,
+            "z": 67.1,
+            "top": 2.373411979422167,
+            "touched": false
+          },
+          {
+            "id": "roost",
+            "x": -1,
+            "z": 64.7,
+            "top": 2.8959259519471163,
+            "touched": false
+          }
+        ]
+      },
+      "hearth": {
+        "hearths": [
+          {
+            "id": "H-a",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              5.6,
+              0.47024262712306353,
+              74.2
+            ],
+            "height": 9
+          },
+          {
+            "id": "steam",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              24.95187386065252,
+              4.986607380995244,
+              79.36271871937427
+            ],
+            "height": 9
+          },
+          {
+            "id": "root",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              28.310371506590094,
+              9.486607380995244,
+              76.19878231637375
+            ],
+            "height": 7
+          },
+          {
+            "id": "kiln",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              -65.64789605154716,
+              -1.1058396548043123,
+              96.13936055605392
+            ],
+            "height": 12
+          }
+        ],
+        "lastRide": null,
+        "tun": {
+          "threshold": 0.3,
+          "igniteTime": 0.25,
+          "holdTime": 3,
+          "gutterTime": 0.8,
+          "radius": 2.2,
+          "topFalloff": 2,
+          "maxRise": 6.5,
+          "liftResponse": 4,
+          "columnSteer": 0.65,
+          "centerPull": 1.5,
+          "fallLift": 0.35,
+          "probeRing": 0.9
+        },
+        "latched": false,
+        "ignition": null,
+        "complete": false,
+        "hint": null
+      },
+      "captions": {
+        "showing": "Snow keeps the unfinished pages.",
+        "said": 1
+      },
+      "teach": {
+        "showing": null
+      },
+      "paint": {
+        "trailSamples": 9,
+        "supply": 1,
+        "distance": 0,
+        "restores": 0
+      },
+      "visibility": {
+        "occluders": 182,
+        "faded": 0
+      },
+      "restores": 0,
+      "carry": {
+        "carried": false,
+        "heat": 1,
+        "cooling": false,
+        "position": [
+          15.1,
+          4.956607380995243,
+          77.4
+        ],
+        "lastGrounded": [
+          -674.5,
+          5.4150811691070935,
+          111.1
+        ],
+        "canPickup": false,
+        "canPlace": false,
+        "pickups": 0,
+        "placements": 0,
+        "dashDrops": 0,
+        "carriedDashes": 0,
+        "recoveries": 0,
+        "lastAction": "source",
+        "rolling": false
+      },
+      "chemistry": {
+        "steam": {
+          "id": "steam",
+          "position": [
+            24.95187386065252,
+            4.956607380995243,
+            79.36271871937427
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "root": {
+          "id": "root",
+          "position": [
+            28.310371506590094,
+            9.456607380995244,
+            76.19878231637375
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "steamLatched": false,
+        "completed": false,
+        "steamReactions": 0,
+        "releases": 0
+      },
+      "crown": {
+        "released": false,
+        "release": 0,
+        "fall": -1,
+        "limb": -0.618,
+        "leaves": 0,
+        "heroLeaf": false
+      },
+      "keeping": {
+        "phase": "arrested",
+        "t": 0,
+        "angle": 0.95,
+        "bridge": false,
+        "answered": {
+          "kicked": 0,
+          "creaks": 0,
+          "resting": 0
+        },
+        "impact": false,
+        "impacts": 0,
+        "bridgeTop": 9.577,
+        "crownLobes": 10,
+        "stair": "pressed"
+      },
+      "unpressed": {
+        "flings": 0,
+        "found": [],
+        "creatures": [
+          {
+            "id": "hedgehog",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.74,
+              0.1,
+              85.95
+            ]
+          },
+          {
+            "id": "heron",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              7.42,
+              0.53,
+              74.76
+            ]
+          },
+          {
+            "id": "deer",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              24.46,
+              9.46,
+              64.54
+            ]
+          },
+          {
+            "id": "kit",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              32.56,
+              0.3,
+              88.6
+            ]
+          },
+          {
+            "id": "hare",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.86,
+              -0.7,
+              70.26
+            ]
+          }
+        ]
+      },
+      "glyphs": {
+        "progress": 0,
+        "solved": false,
+        "gutters": 0,
+        "lastGutter": "",
+        "order": [
+          "moon",
+          "leaf",
+          "flame"
+        ],
+        "stones": [
+          {
+            "id": "leaf",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "flame",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "moon",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          }
+        ]
+      },
+      "hum": {
+        "running": true,
+        "voices": [
+          {
+            "id": "H-a",
+            "gain": 0
+          },
+          {
+            "id": "steam",
+            "gain": 0
+          },
+          {
+            "id": "root",
+            "gain": 0
+          },
+          {
+            "id": "kiln",
+            "gain": 0
+          }
+        ]
+      },
+      "audio": {
+        "context": "running",
+        "master": 1,
+        "music": {
+          "ready": true,
+          "bar": 1,
+          "breath": false,
+          "swell": "idle",
+          "pass": 0,
+          "since": 12,
+          "shaded": false,
+          "ending": "playing",
+          "forces": 2,
+          "tune": "hearth",
+          "cues": 0,
+          "levels": {
+            "harp": 0.48,
+            "pad": 0.39,
+            "bass": 0,
+            "lead": 0,
+            "bells": 0,
+            "bright": 0.3,
+            "shade": 0
+          },
+          "cued": []
+        },
+        "ambience": {
+          "wind": 0.0008
+        },
+        "loaded": 13,
+        "files": 13,
+        "counts": {},
+        "last": [],
+        "log": [],
+        "foley": {
+          "steps": {
+            "grass": 0,
+            "leaf": 0,
+            "wood": 0,
+            "stone": 0
+          },
+          "glide": 0
+        }
+      },
+      "page": {
+        "stage": 0,
+        "phase": "perched",
+        "catches": 0,
+        "skips": 0,
+        "dodges": 0,
+        "winded": false,
+        "yaw": -1.5065,
+        "droop": 0,
+        "s": 0,
+        "pos": [
+          -5.15,
+          1.1,
+          90.4
+        ]
+      },
+      "discovery": {
+        "active": true,
+        "visible": false,
+        "leg": "page",
+        "restoredAtLoad": false,
+        "completionAt": null,
+        "target": [
+          -5.15,
+          1.1,
+          90.4
+        ],
+        "action": "follow",
+        "hint": "Follow the loose page"
+      },
+      "popUpRuin": {
+        "folds": [
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          }
+        ],
+        "reached": false,
+        "returns": 0,
+        "misses": 0,
+        "tunables": {
+          "unfold": 0.55,
+          "hitRadius": 1.35
+        }
+      },
+      "homecoming": {
+        "pinned": false,
+        "sent": false,
+        "home": [],
+        "lit": [],
+        "full": false
+      },
+      "leafPiles": {
+        "piles": 8,
+        "kicks": 0,
+        "flying": 0
+      },
+      "laneWind": {
+        "gusts": 0,
+        "flying": 0
+      },
+      "millrace": {
+        "phase": "held",
+        "front": 13,
+        "turning": false,
+        "painted": false,
+        "spin": 0,
+        "lookoutPainted": false
+      },
+      "millWeir": {
+        "lit": false,
+        "heat": 0,
+        "rode": false,
+        "reached": false
+      },
+      "hermitage": {
+        "freed": [
+          0,
+          0,
+          0
+        ],
+        "painted": false,
+        "captioned": false
+      },
+      "wayPiles": {
+        "piles": 12,
+        "kicks": 0,
+        "flying": 0
+      },
+      "finale": {
+        "phase": "sealed",
+        "t": 2,
+        "kindles": 0,
+        "cradle": [
+          20.79,
+          39.64
+        ],
+        "kits": [
+          "pressed",
+          "pressed",
+          "pressed"
+        ],
+        "card": "hidden",
+        "cardShows": 0,
+        "kitNear": 99,
+        "restShot": [],
+        "snow": 0,
+        "leaves": 0,
+        "onward": 0,
+        "still": 0
+      },
+      "ashwater": {
+        "damA": false,
+        "damB": false,
+        "flood": false,
+        "channelY": -0.15,
+        "poolY": -0.15,
+        "mats": 0,
+        "done": [],
+        "splashes": 0,
+        "glow": 0
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      },
+      "worlds": {
+        "active": "press",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "hub",
+          "revision": 0,
+          "worlds": {
+            "russetvale": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Kiln",
+              "fill": 0,
+              "next": "teach"
+            },
+            "ashwater": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "press-stacks"
+          ]
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    }
+  },
+  "reloadedAlbum": {
+    "pos": [
+      -674.5,
+      5.415,
+      111.1
+    ],
+    "vel": [
+      0,
+      0,
+      0
+    ],
+    "speed": 0,
+    "yaw": 0,
+    "grounded": true,
+    "gliding": false,
+    "dashing": false,
+    "dashesUsed": 0,
+    "lastDashDistance": 0,
+    "updraft": {
+      "hearths": [
+        {
+          "id": "H-a",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            5.6,
+            0.47024262712306353,
+            74.2
+          ],
+          "height": 9
+        },
+        {
+          "id": "steam",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            24.95187386065252,
+            4.986607380995244,
+            79.36271871937427
+          ],
+          "height": 9
+        },
+        {
+          "id": "root",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            28.310371506590094,
+            9.486607380995244,
+            76.19878231637375
+          ],
+          "height": 7
+        },
+        {
+          "id": "kiln",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            -65.64789605154716,
+            -1.1058396548043123,
+            96.13936055605392
+          ],
+          "height": 12
+        }
+      ],
+      "lastRide": null,
+      "tun": {
+        "threshold": 0.3,
+        "igniteTime": 0.25,
+        "holdTime": 3,
+        "gutterTime": 0.8,
+        "radius": 2.2,
+        "topFalloff": 2,
+        "maxRise": 6.5,
+        "liftResponse": 4,
+        "columnSteer": 0.65,
+        "centerPull": 1.5,
+        "fallLift": 0.35,
+        "probeRing": 0.9
+      }
+    },
+    "airTime": 0,
+    "apexY": 0,
+    "lastJump": {
+      "apex": 0,
+      "air": 0,
+      "timeToApex": 0
+    },
+    "anim": "idle",
+    "gait": "walk",
+    "playback": 0.6,
+    "stanceFeet": 4,
+    "maxSlide": 0,
+    "paws": {
+      "fpawL": [
+        -674.4478000170766,
+        5.437081132953407,
+        111.20500003418545
+      ],
+      "fpawR": [
+        -674.5521999938309,
+        5.437081193722385,
+        111.20500003554852
+      ],
+      "hpawL": [
+        -674.4441999951898,
+        5.437081151090067,
+        111.00500000523485
+      ],
+      "hpawR": [
+        -674.5557999978676,
+        5.437081129683723,
+        111.00500001387981
+      ]
+    },
+    "camera": {
+      "pos": [
+        -675.34,
+        6.765,
+        108.799
+      ],
+      "boom": "shot=0.00 boomT=1.00 lift=0.00 floorLift=0.00 focusY=5.42 lock=5.42 dist=2.45 scenery=1.00 limit=1.00 fade=0.00 lensUnresolved=false blocker=",
+      "blocked": false
+    },
+    "opening": {
+      "canopy": {
+        "launches": 0,
+        "contacts": 0,
+        "retries": 0,
+        "roostVisits": 0,
+        "lastLeaf": null,
+        "lastFlight": null,
+        "activeFlight": null,
+        "lensTucked": 0,
+        "profile": {
+          "launchSpeed": 8.66,
+          "loadTime": 0.12,
+          "bow": 0.19
+        },
+        "leaves": [
+          {
+            "id": "entry",
+            "x": -0.2,
+            "z": 71.5,
+            "top": -0.16081268242076513,
+            "touched": false
+          },
+          {
+            "id": "middle",
+            "x": -0.2,
+            "z": 69.3,
+            "top": 1.296937770277265,
+            "touched": false
+          },
+          {
+            "id": "high",
+            "x": 0.9,
+            "z": 67.1,
+            "top": 2.373411979422167,
+            "touched": false
+          },
+          {
+            "id": "roost",
+            "x": -1,
+            "z": 64.7,
+            "top": 2.8959259519471163,
+            "touched": false
+          }
+        ]
+      },
+      "hearth": {
+        "hearths": [
+          {
+            "id": "H-a",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              5.6,
+              0.47024262712306353,
+              74.2
+            ],
+            "height": 9
+          },
+          {
+            "id": "steam",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              24.95187386065252,
+              4.986607380995244,
+              79.36271871937427
+            ],
+            "height": 9
+          },
+          {
+            "id": "root",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              28.310371506590094,
+              9.486607380995244,
+              76.19878231637375
+            ],
+            "height": 7
+          },
+          {
+            "id": "kiln",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              -65.64789605154716,
+              -1.1058396548043123,
+              96.13936055605392
+            ],
+            "height": 12
+          }
+        ],
+        "lastRide": null,
+        "tun": {
+          "threshold": 0.3,
+          "igniteTime": 0.25,
+          "holdTime": 3,
+          "gutterTime": 0.8,
+          "radius": 2.2,
+          "topFalloff": 2,
+          "maxRise": 6.5,
+          "liftResponse": 4,
+          "columnSteer": 0.65,
+          "centerPull": 1.5,
+          "fallLift": 0.35,
+          "probeRing": 0.9
+        },
+        "latched": false,
+        "ignition": null,
+        "complete": false,
+        "hint": null
+      },
+      "captions": {
+        "showing": "Snow keeps the unfinished pages.",
+        "said": 1
+      },
+      "teach": {
+        "showing": null
+      },
+      "paint": {
+        "trailSamples": 9,
+        "supply": 1,
+        "distance": 0,
+        "restores": 0
+      },
+      "visibility": {
+        "occluders": 182,
+        "faded": 0
+      },
+      "restores": 0,
+      "carry": {
+        "carried": false,
+        "heat": 1,
+        "cooling": false,
+        "position": [
+          15.1,
+          4.956607380995243,
+          77.4
+        ],
+        "lastGrounded": [
+          -674.5,
+          5.4150811691070935,
+          111.1
+        ],
+        "canPickup": false,
+        "canPlace": false,
+        "pickups": 0,
+        "placements": 0,
+        "dashDrops": 0,
+        "carriedDashes": 0,
+        "recoveries": 0,
+        "lastAction": "source",
+        "rolling": false
+      },
+      "chemistry": {
+        "steam": {
+          "id": "steam",
+          "position": [
+            24.95187386065252,
+            4.956607380995243,
+            79.36271871937427
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "root": {
+          "id": "root",
+          "position": [
+            28.310371506590094,
+            9.456607380995244,
+            76.19878231637375
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "steamLatched": false,
+        "completed": false,
+        "steamReactions": 0,
+        "releases": 0
+      },
+      "crown": {
+        "released": false,
+        "release": 0,
+        "fall": -1,
+        "limb": -0.618,
+        "leaves": 0,
+        "heroLeaf": false
+      },
+      "keeping": {
+        "phase": "arrested",
+        "t": 0,
+        "angle": 0.95,
+        "bridge": false,
+        "answered": {
+          "kicked": 0,
+          "creaks": 0,
+          "resting": 0
+        },
+        "impact": false,
+        "impacts": 0,
+        "bridgeTop": 9.577,
+        "crownLobes": 10,
+        "stair": "pressed"
+      },
+      "unpressed": {
+        "flings": 0,
+        "found": [],
+        "creatures": [
+          {
+            "id": "hedgehog",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.74,
+              0.1,
+              85.95
+            ]
+          },
+          {
+            "id": "heron",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              7.42,
+              0.53,
+              74.76
+            ]
+          },
+          {
+            "id": "deer",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              24.46,
+              9.46,
+              64.54
+            ]
+          },
+          {
+            "id": "kit",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              32.56,
+              0.3,
+              88.6
+            ]
+          },
+          {
+            "id": "hare",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.86,
+              -0.7,
+              70.26
+            ]
+          }
+        ]
+      },
+      "glyphs": {
+        "progress": 0,
+        "solved": false,
+        "gutters": 0,
+        "lastGutter": "",
+        "order": [
+          "moon",
+          "leaf",
+          "flame"
+        ],
+        "stones": [
+          {
+            "id": "leaf",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "flame",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "moon",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          }
+        ]
+      },
+      "hum": {
+        "running": true,
+        "voices": [
+          {
+            "id": "H-a",
+            "gain": 0
+          },
+          {
+            "id": "steam",
+            "gain": 0
+          },
+          {
+            "id": "root",
+            "gain": 0
+          },
+          {
+            "id": "kiln",
+            "gain": 0
+          }
+        ]
+      },
+      "audio": {
+        "context": "running",
+        "master": 1,
+        "music": {
+          "ready": true,
+          "bar": 4,
+          "breath": false,
+          "swell": "idle",
+          "pass": 0,
+          "since": 12,
+          "shaded": false,
+          "ending": "playing",
+          "forces": 2,
+          "tune": "hearth",
+          "cues": 0,
+          "levels": {
+            "harp": 0.48,
+            "pad": 0.39,
+            "bass": 0,
+            "lead": 0,
+            "bells": 0,
+            "bright": 0.3,
+            "shade": 0
+          },
+          "cued": []
+        },
+        "ambience": {
+          "wind": 0.0013
+        },
+        "loaded": 13,
+        "files": 13,
+        "counts": {},
+        "last": [],
+        "log": [],
+        "foley": {
+          "steps": {
+            "grass": 0,
+            "leaf": 0,
+            "wood": 0,
+            "stone": 0
+          },
+          "glide": 0
+        }
+      },
+      "page": {
+        "stage": 0,
+        "phase": "perched",
+        "catches": 0,
+        "skips": 0,
+        "dodges": 0,
+        "winded": false,
+        "yaw": -1.5087,
+        "droop": 0,
+        "s": 0,
+        "pos": [
+          -5.15,
+          1.1,
+          90.4
+        ]
+      },
+      "discovery": {
+        "active": true,
+        "visible": false,
+        "leg": "page",
+        "restoredAtLoad": false,
+        "completionAt": null,
+        "target": [
+          -5.15,
+          1.1,
+          90.4
+        ],
+        "action": "follow",
+        "hint": "Follow the loose page"
+      },
+      "popUpRuin": {
+        "folds": [
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          }
+        ],
+        "reached": false,
+        "returns": 0,
+        "misses": 0,
+        "tunables": {
+          "unfold": 0.55,
+          "hitRadius": 1.35
+        }
+      },
+      "homecoming": {
+        "pinned": false,
+        "sent": false,
+        "home": [],
+        "lit": [],
+        "full": false
+      },
+      "leafPiles": {
+        "piles": 8,
+        "kicks": 0,
+        "flying": 0
+      },
+      "laneWind": {
+        "gusts": 0,
+        "flying": 0
+      },
+      "millrace": {
+        "phase": "held",
+        "front": 13,
+        "turning": false,
+        "painted": false,
+        "spin": 0,
+        "lookoutPainted": false
+      },
+      "millWeir": {
+        "lit": false,
+        "heat": 0,
+        "rode": false,
+        "reached": false
+      },
+      "hermitage": {
+        "freed": [
+          0,
+          0,
+          0
+        ],
+        "painted": false,
+        "captioned": false
+      },
+      "wayPiles": {
+        "piles": 12,
+        "kicks": 0,
+        "flying": 0
+      },
+      "finale": {
+        "phase": "sealed",
+        "t": 2.02,
+        "kindles": 0,
+        "cradle": [
+          20.79,
+          39.64
+        ],
+        "kits": [
+          "pressed",
+          "pressed",
+          "pressed"
+        ],
+        "card": "hidden",
+        "cardShows": 0,
+        "kitNear": 99,
+        "restShot": [],
+        "snow": 0,
+        "leaves": 0,
+        "onward": 0,
+        "still": 0
+      },
+      "ashwater": {
+        "damA": false,
+        "damB": false,
+        "flood": false,
+        "channelY": -0.15,
+        "poolY": -0.15,
+        "mats": 0,
+        "done": [],
+        "splashes": 0,
+        "glow": 0
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      },
+      "worlds": {
+        "active": "press",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "hub",
+          "revision": 0,
+          "worlds": {
+            "russetvale": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Kiln",
+              "fill": 0,
+              "next": "teach"
+            },
+            "ashwater": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": [
+            "press-stacks"
+          ]
+        },
+        "mapOpen": true,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    }
+  }
+}

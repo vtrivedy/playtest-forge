@@ -49,3 +49,25 @@ zero-black-frame claim follows from this run.
 
 Full evidence: `/captures/reed/cistern-26280aa3/`; persistent volume
 `keeping-swarm5-captures/reed/world-entry-26280aa30a/`.
+
+## New geometry acceptance plan
+
+Cedar's 5ac3f4fc changes the punt, shelf and wall heights. Repeat fresh default boot → physical invitation and homecoming → hub arch → all three puzzles. Use the new walkable punt/shelf coordinates from Cedar's probe without placement or progress setters. Keep the explicit lingering-mat, rising-flood and canonical reward assertions. Save screenshots and full game state on a pinned merged SHA; review the crossing and Album before reporting acceptance. This updates only the diagnostic route, not production geometry.
+
+### Pier camera follow-up design
+
+The new route passes on d126bc50, but 07e-wall shows the tall pier masking the fox. Register that solid mesh with the existing chase-camera occlusion fade, as Press already does for its solids. Preserve its collider and all puzzle coordinates/heights. Rerun the same pinned fresh hub route and compare 07e-wall before accepting the visual correction.
+
+## Walkable punt/shelf — d126bc503093fd514392b854390b7498e890f162
+
+Fresh physical boot → invitation/homecoming → hub arch → all three Ashwater puzzles: **PASS**, zero page JavaScript errors. The sinking-mat and rising-flood assertions pass. The fox walks from weir onto punt at [712.78, 4.52, 112.80], then shelf at [713.83, 4.70, 109.89], completing at [717.87, 4.70, 106.64]. All three local/canonical levels restored, Reedskim earned, Reed fill 1; native Tab opens the earned Ashwater Album. Four splashes total. No jump is needed for the rebuilt crossing. LastJump at completion reports apex 0, air .05 s, time-to-apex 0 (a step-down record, not a tuned jump result); seven cumulative dashes.
+
+Ashwater time is **146.483 simulation seconds** (including deliberate sinking-mat test and waits); opening time 135.017 s. This is an authored solvability route, not blind insight or requested-duration evidence. It passes the Ferrykeeper's mooring, but does not visit the drowned cottage roof; no two-side-place acceptance claim.
+
+Inspected [punt](reed-cistern/walk-07d-punt.png), [shelf](reed-cistern/walk-07e-wall.png), [completion](reed-cistern/walk-08-seedwell.png) and [Album](reed-cistern/walk-09-album.png). Rain/teal palette and earned Album read clearly; tall pier partly hides the fox on the shelf, large flat slate walls remain plain, and completion repeats the revelation in two captions. Pier fade retest follows; the other concerns stay open.
+
+Full `window.__game`, hook states and PNGs: `/captures/reed/cistern-d126bc50/`; durable volume `keeping-swarm5-captures/reed/world-entry-d126bc5030/`. Tesla T4/EGL, 640×360. No continuous movie was recorded and no zero-black-frame claim follows. TypeScript, production build, feel/camera/world lint and diff checks pass.
+
+### Pier fade experiment — 2848c0b4c3d680a31268173b82ee942b33099af8
+
+Full fresh physical route repeats **PASS**, zero errors; identical final positions, canonical rewards, four splashes and 146.483 Ashwater simulation seconds. However [the retested shelf frame](reed-cistern/pier-retest-07e-wall.png) still masks the front of the fox. Registration alone did not improve the observed frame, so it is removed from the final source. Do not call this a visual fix. The pier/camera silhouette issue remains open for its owner. TypeScript, production build, feel/camera/world lint pass. Full states/PNGs: `/captures/reed/cistern-pier-2848c0b4/`; volume `keeping-swarm5-captures/reed/world-entry-2848c0b4c3/`. No continuous-motion claim.
