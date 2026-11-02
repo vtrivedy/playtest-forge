@@ -143,7 +143,40 @@ function vistaCut(x: number, z: number, h: number): number {
   const lip = THREE.MathUtils.smoothstep(a, F.lip, F.lip + F.fall);
   const floor = THREE.MathUtils.lerp(5, F.y, THREE.MathUtils.smoothstep(a, V.start, F.near));
   const valley = THREE.MathUtils.lerp(floor, V.floor, lip) + Math.sin(x * 0.21) * Math.cos(z * 0.17) * (0.3 + 0.5 * lip);
-  return THREE.MathUtils.lerp(h, Math.min(h, valley), open);
+  return southLane(x, z, THREE.MathUtils.lerp(h, Math.min(h, valley), open));
+}
+
+/**
+ * The south lane (DESIGN-finale.md) cuts a walkable trough through the rim between the meadow and Press Hollow: within
+ * `half` of its line the ground is pulled down to a profile that eases from the meadow (`from`) to the hollow floor
+ * (`to`), never raised. Walkable both ways (moveTo's probe allows ~1.3 rise/run; the trough walls stay well under it).
+ */
+const LANE = { pts: [[6.2, 69], [7.5, 63.5], [12.5, 53], [18.8, 44.2]] as const, from: -0.45, to: 0.5, half: 1.9, wall: 4.2 };
+function southLane(x: number, z: number, h: number): number {
+  let best = Infinity;
+  let along = 0;
+  let run = 0;
+  let total = 0;
+  for (let i = 0; i + 1 < LANE.pts.length; i++) total += Math.hypot(LANE.pts[i + 1]![0] - LANE.pts[i]![0], LANE.pts[i + 1]![1] - LANE.pts[i]![1]);
+  for (let i = 0; i + 1 < LANE.pts.length; i++) {
+    const [ax, az] = LANE.pts[i]!;
+    const [bx, bz] = LANE.pts[i + 1]!;
+    const dx = bx - ax;
+    const dz = bz - az;
+    const len = Math.hypot(dx, dz);
+    const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / (len * len), 0, 1);
+    const d = Math.hypot(x - ax - t * dx, z - az - t * dz);
+    if (d < best) {
+      best = d;
+      along = (run + t * len) / total;
+    }
+    run += len;
+  }
+  if (best > LANE.wall) return h;
+  const floor = THREE.MathUtils.lerp(LANE.from, LANE.to, THREE.MathUtils.smoothstep(along, 0.15, 0.85)) + Math.sin(x * 0.7) * Math.cos(z * 0.6) * 0.06;
+  // banks rise from the lane's edge to the untouched rim over `wall`
+  const bank = floor + Math.max(0, best - LANE.half) * 1.05;
+  return Math.min(h, bank);
 }
 
 /** Base terrain (no props): gentle swells, flattened lanes and house pads, cliffed rim */

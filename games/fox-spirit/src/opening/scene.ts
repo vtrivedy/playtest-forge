@@ -54,6 +54,7 @@ const SHOTS: Record<string, { pos: [number, number, number]; look: [number, numb
   // the finale: Press Hollow from the far crag's lip, and the Press close up with the Crown behind
   hollow: { pos: [27.5, 9.5, 57.5], look: [19.3, 1.5, 37] },
   press: { pos: [21.6, 3.1, 47.0], look: [19.3, 1.6, 37.0] },
+  southlane: { pos: [4.6, 2.6, 71.5], look: [11.5, 0.4, 55] },
 };
 
 export interface OpeningCtx {
