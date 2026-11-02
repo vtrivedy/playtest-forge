@@ -8,7 +8,7 @@
  * (allocations allowed); every per-frame step lives in press.hot.ts.
  */
 import * as THREE from 'three';
-import { RAMP_WORLD } from '../lookdevKit';
+import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressH } from './worlds';
@@ -150,31 +150,87 @@ export function buildPress(
   lever.add(arm, grip);
   lever.rotation.x = 0.55;
   thePress.add(beam, screw, platen, bed, pressLight, lever);
-  // the Scribe: small and old, hooded in grey, ink-stained sleeves, bowed over the Press it has held shut
+  // the Scribe: small and old, in a flared ink-grey robe and a fox-eared hood (the Warden's shape, in daylight), a
+  // crimson scarf the eye finds against the snow, spectacles, ink to the elbows — bowed over the Press it held shut
   const scribe = new THREE.Group();
-  const robe = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.25, 9).translate(0, 0.62, 0), winter(0x7b7a86));
-  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8).translate(0, 1.18, 0), winter(0x6c6b77));
+  const robePts: THREE.Vector2[] = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    robePts.push(new THREE.Vector2(0.46 - 0.3 * Math.pow(t, 0.7) + 0.05 * Math.sin(t * 9) * (1 - t), t * 1.18));
+  }
+  const robe = new THREE.Mesh(new THREE.LatheGeometry(robePts, 14), winter(0x4c4f63));
+  const hem = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.04, 6, 18).rotateX(Math.PI / 2), winter(0xb9b4a6));
+  hem.position.y = 0.04;
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 9).translate(0, 1.16, 0), winter(0x43465a));
+  const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.065, 7, 14).rotateX(Math.PI / 2), winter(0xa8322a));
+  scarf.position.y = 1.3;
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.42, 0.04).translate(0, -0.21, 0), winter(0xa8322a));
+  tail.position.set(0.12, 1.28, 0.18);
+  tail.rotation.z = 0.2;
   const head = new THREE.Group();
-  head.position.set(0, 1.42, 0.06);
-  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), winter(0x5c5b66, { side: THREE.DoubleSide }));
-  const face = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), winter(0xd9c7b0));
-  face.position.set(0, -0.03, 0.06);
-  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 7).rotateX(Math.PI), winter(0xe6e3dc));
-  beard.position.set(0, -0.2, 0.12);
+  head.position.set(0, 1.44, 0.06);
+  const hoodMat = winter(0x5d6076, { side: THREE.DoubleSide });
+  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.64), hoodMat);
+  hood.rotation.x = -0.35;
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 4), hoodMat);
+    ear.position.set(side * 0.12, 0.2, -0.04);
+    ear.rotation.z = -side * 0.35;
+    head.add(ear);
+  }
+  const face = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 9), winter(0xe0ccb4));
+  face.position.set(0, -0.03, 0.08);
+  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.3, 8).rotateX(Math.PI), winter(0xeeebe4));
+  beard.position.set(0, -0.2, 0.13);
+  const lensMat = new THREE.MeshBasicMaterial({ color: 0x2b2a2e });
+  for (const side of [-1, 1]) {
+    const lens = new THREE.Mesh(new THREE.TorusGeometry(0.042, 0.009, 5, 12), lensMat);
+    lens.position.set(side * 0.05, 0.0, 0.2);
+    head.add(lens);
+  }
   head.add(hood, face, beard);
   const sleeveMat = winter(0x23252d);
-  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.55, 6).translate(0, -0.27, 0), sleeveMat);
-  armL.position.set(-0.28, 1.2, 0.05);
+  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.58, 7).translate(0, -0.28, 0), sleeveMat);
+  armL.position.set(-0.27, 1.2, 0.05);
   armL.rotation.x = -0.5;
   const armR = armL.clone();
-  armR.position.x = 0.28;
-  scribe.add(robe, shoulders, head, armL, armR);
+  armR.position.x = 0.27;
+  const quill = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.34, 4).translate(0, -0.6, 0.02), winter(0xf2efe6));
+  armL.add(quill);
+  scribe.add(robe, hem, shoulders, scarf, tail, head, armL, armR);
   const sAt = press(THE_PRESS.lx + 3.1, THE_PRESS.lz + 1.2);
   scribe.position.set(sAt.x, LEDGE_TOP, sAt.z);
   // facing the Press (west), bowed
   scribe.rotation.y = -Math.PI / 2 - 0.25;
   shoulders.rotation.x = 0.3;
   head.rotation.x = 0.45;
+  // the work surface: page stacks, ink pots, and the pressed autumn under the platen — one maple leaf, held flat
+  const stackMat = winter(0xd8d0bc);
+  for (const [dx, dz, h] of [[-2.3, 0.5, 0.5], [-2.0, -0.6, 0.32], [2.0, -0.9, 0.42], [-2.6, -0.1, 0.22]] as const) {
+    for (let k = 0; k < 3; k++) {
+      const pg = new THREE.Mesh(new THREE.BoxGeometry(0.62, h / 3 - 0.01, 0.46), k % 2 ? paperEdge : stackMat);
+      pg.position.set(dx + (k - 1) * 0.03, (h / 3) * (k + 0.5), dz);
+      pg.rotation.y = (k - 1) * 0.12 + dx;
+      thePress.add(pg);
+    }
+  }
+  const inkPot = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.18, 9), new THREE.MeshStandardMaterial({ color: 0x14161f, roughness: 0.1 }));
+  inkPot.position.set(-2.0, 0.42, -0.6);
+  thePress.add(inkPot);
+  const leafShape = new THREE.Shape();
+  for (let i = 0; i <= 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
+    const lobes = 0.55 + 0.45 * Math.pow(Math.abs(Math.cos(a * 2.5)), 0.6);
+    const r = 0.5 * lobes * (a > Math.PI * 1.35 && a < Math.PI * 1.65 ? 0.3 : 1);
+    const x = Math.cos(a + Math.PI / 2) * r;
+    const y = Math.sin(a + Math.PI / 2) * r;
+    if (i === 0) leafShape.moveTo(x, y);
+    else leafShape.lineTo(x, y);
+  }
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0xc8501e, roughness: 0.6, emissive: 0xff6a20, emissiveIntensity: 0.05, side: THREE.DoubleSide });
+  const pressedLeaf = new THREE.Mesh(new THREE.ShapeGeometry(leafShape).rotateX(-Math.PI / 2), leafMat);
+  pressedLeaf.position.y = 0.51;
+  thePress.add(pressedLeaf);
   root.add(scribe);
   colliders.push({ kind: 'post', x: sAt.x, z: sAt.z, r: 0.4 });
   root.add(thePress);
@@ -225,6 +281,85 @@ export function buildPress(
     root.add(g);
     return g;
   });
+
+  // ---- dressing: snow caps on every top edge, page edges on the shelf face, icicles under the ridge, loose pages and
+  // ink blots on the snow (instanced; own seed — never ctx.rand)
+  const rd = rng(9127);
+  const snowCap = winter(0xf1f2f4);
+  const m4 = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const e = new THREE.Euler();
+  const v = new THREE.Vector3();
+  const sc = new THREE.Vector3();
+  const caps: [number, number, number, number, number][] = [];
+  for (const side of [-1, 1]) caps.push([side < 0 ? -RIDGE.xMax : RIDGE.gate + 0.35, side < 0 ? -RIDGE.gate - 0.35 : RIDGE.xMax, RIDGE.lz, ridgeTop, RIDGE.half + 0.12]);
+  caps.push([-SHELF.xMax, SHELF.xMax, SHELF.z1, SHELF_TOP, 0.5]);
+  caps.push([LEDGE.x0, LEDGE.x1, LEDGE.z1, LEDGE_TOP, 0.45]);
+  for (const [x0, x1, lz, top, d] of caps) {
+    const c = press((x0 + x1) / 2, lz);
+    const cap = new THREE.Mesh(new THREE.CapsuleGeometry(d * 0.55, x1 - x0, 3, 8).rotateZ(Math.PI / 2), snowCap);
+    cap.scale.set(1, 0.42, 1);
+    cap.position.set(c.x, top + 0.04, c.z);
+    root.add(cap);
+  }
+  // page edges: thin dark strips across the shelf and ledge faces, staggered like a sheaf seen side-on
+  const edgeGeo = new THREE.BoxGeometry(1, 0.035, 0.05);
+  const EDGES = 520;
+  const edges = new THREE.InstancedMesh(edgeGeo, winter(0x6f6656), EDGES);
+  for (let i = 0; i < EDGES; i++) {
+    const onLedge = i > EDGES * 0.85;
+    const x0 = onLedge ? LEDGE.x0 : -SHELF.xMax + 2;
+    const x1 = onLedge ? LEDGE.x1 : SHELF.xMax - 2;
+    const lx = x0 + rd() * (x1 - x0);
+    const y = onLedge ? SHELF_TOP + 0.1 + rd() * (LEDGE.rise - 0.2) : RIDGE_BASE - 0.4 + rd() * (SHELF_TOP - RIDGE_BASE + 0.2);
+    const at = press(lx, (onLedge ? LEDGE.z1 : SHELF.z1) + 0.02 + (onLedge ? 0.3 : 0.35) * rd());
+    sc.set(1.5 + rd() * 6, 1, 1);
+    m4.compose(v.set(at.x, y, at.z), q.identity(), sc);
+    edges.setMatrixAt(i, m4);
+  }
+  root.add(edges);
+  // icicles under the ridge's lintel and along its north face
+  const icicle = new THREE.ConeGeometry(0.07, 0.6, 5).rotateX(Math.PI).translate(0, -0.3, 0);
+  const ICE = 160;
+  const icicles = new THREE.InstancedMesh(icicle, new THREE.MeshStandardMaterial({ color: 0xdbe6f2, roughness: 0.15, transparent: true, opacity: 0.85 }), ICE);
+  for (let i = 0; i < ICE; i++) {
+    let lx = (rd() * 2 - 1) * 40;
+    if (Math.abs(lx) < RIDGE.gate + 0.4) lx += Math.sign(lx || 1) * 2;
+    const at = press(lx, RIDGE.lz + (rd() > 0.5 ? 1 : -1) * (RIDGE.half + 0.06));
+    sc.set(1, 0.6 + rd() * 1.2, 1);
+    m4.compose(v.set(at.x, ridgeTop - 0.05, at.z), q.identity(), sc);
+    icicles.setMatrixAt(i, m4);
+  }
+  root.add(icicles);
+  // loose pages and ink blots lying in the snow (kept off the puzzle lanes' membranes)
+  const LEAVES = 140;
+  const leaves = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.42, 0.56).rotateX(-Math.PI / 2), winter(0xe2dccd, { side: THREE.DoubleSide }), LEAVES);
+  const BLOTS = 60;
+  const blots = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 9).rotateX(-Math.PI / 2), winter(0x262833), BLOTS);
+  let nl = 0;
+  let nb = 0;
+  for (let i = 0; i < 400 && (nl < LEAVES || nb < BLOTS); i++) {
+    const lx = (rd() * 2 - 1) * 38;
+    const lz = -40 + rd() * 78;
+    const onShelf = lz < SHELF.z1 && lz > SHELF.z0;
+    const at = press(lx, lz);
+    if (Math.hypot(lx - MEMBRANE_A.lx, lz - MEMBRANE_A.lz) < 3 || Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) < 3) continue;
+    if (Math.abs(lz - RIDGE.lz) < 1.6 || (lx > LEDGE.x0 - 1 && lx < LEDGE.x1 + 1 && lz < LEDGE.z1 + 1 && lz > LEDGE.z0)) continue;
+    const y = onShelf ? SHELF_TOP : pressH(at.x, at.z);
+    if (!onShelf && pressH(at.x, at.z) > RIDGE_BASE + 1.2) continue;
+    if (nl < LEAVES && rd() < 0.75) {
+      e.set((rd() - 0.5) * 0.3, rd() * 6.3, (rd() - 0.5) * 0.3);
+      m4.compose(v.set(at.x, y + 0.03, at.z), q.setFromEuler(e), sc.set(1, 1, 1));
+      leaves.setMatrixAt(nl++, m4);
+    } else if (nb < BLOTS) {
+      const r = 0.3 + rd() * 0.9;
+      m4.compose(v.set(at.x, y + 0.02, at.z), q.setFromEuler(e.set(0, rd() * 6.3, 0)), sc.set(r, 1, r * (0.6 + rd() * 0.5)));
+      blots.setMatrixAt(nb++, m4);
+    }
+  }
+  leaves.count = nl;
+  blots.count = nb;
+  root.add(leaves, blots);
 
   // ---- carried warmth: an ember glow at the fox's chest
   const warmGlow = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.85 }));
@@ -298,6 +433,7 @@ export function buildPress(
     scribe,
     scribeHead: head,
     scribeArm: armR,
+    leafMat,
     s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, hint: 0, arrived: 0, coda: -1, leverK: 0 },
   };
   // a saved world comes back as it was left, quietly: open seal, breathing drafts, melted ice, lit Press
