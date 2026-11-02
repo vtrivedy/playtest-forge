@@ -92,8 +92,8 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
     return t;
   })();
   const shaft = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.4, BEACON.height).translate(0, BEACON.height / 2 + 0.6, 0),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.3, 0.55), map: shaftTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false }),
+    new THREE.PlaneGeometry(3.2, BEACON.height).translate(0, BEACON.height / 2 + 0.6, 0),
+    new THREE.MeshBasicMaterial({ color: 0xff8424, map: shaftTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false }),
   );
   shaft.visible = false;
   frame.add(shaft);
@@ -179,7 +179,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       const b = THREE.MathUtils.smoothstep(pinned, 0, 1.5) * (1 - THREE.MathUtils.smoothstep(pinned, BEACON.secs - 4, BEACON.secs));
       shaft.visible = sparks.visible = b > 0.001;
       if (shaft.visible) {
-        (shaft.material as THREE.MeshBasicMaterial).opacity = b * (0.9 + 0.1 * Math.sin(clock * 1.7));
+        (shaft.material as THREE.MeshBasicMaterial).opacity = 0.85 * b * (0.9 + 0.1 * Math.sin(clock * 1.7));
         // turn the shaft to the camera (about its own vertical axis)
         const cam = ctx.player?.cam.camera;
         if (cam) shaft.rotation.y = Math.atan2(cam.position.x - H.well.x, cam.position.z - H.well.z) - H.well.yaw;
