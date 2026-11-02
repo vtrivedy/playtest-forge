@@ -195,7 +195,23 @@ export function createSliceRoute() {
     } },
     hold('the page opens', 1.8),
     hold('colour rolls out', 2.6),
-    hold('the meadow paints', Infinity),
+    hold('the meadow paints', 2.5),
+    walk('to the return fold', [-25, 71.4], 0.12, 0.6),
+    { beat: 'unfold the way home', run: (s) => ({
+      x: since < 0.6 ? 0.08 : since < 1.0 ? 1 : 0, z: 0,
+      dash: since > 0.75 && since < 0.95,
+      done: since > 1.5 && (s.opening?.popUpRuin?.returns ?? 0) > 0,
+    }) },
+    walk('onto the return steps', [-24.4, 72.1], 0.15, 0.6),
+    walk('down to the meadow', [-24.4, 75.7], 0.2, 0.7),
+    walk('back through the grove', [-20, 79], 0.4, 0.8),
+    walk('follow the homeward light', [-14, 80], 0.4, 0.8),
+    walk('homeward meadow', [-6, 77.5], 0.4, 0.8),
+    walk('back to the gate', [-3.2, 80.5], 0.4, 0.7),
+    walk('through the warm gate', [-3.2, 86.5], 0.4, 0.7),
+    walk('round the well', [-4, 88], 0.35, 0.6),
+    walk('the page is home', [-7.2, 88], 0.3, 0.5),
+    hold('homecoming', Infinity),
   ];
   return (t, state) => {
     since += Math.max(0, t - last);
