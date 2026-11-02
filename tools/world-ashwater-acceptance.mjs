@@ -186,7 +186,7 @@ try {
   await go(11.6, 32.2, { jump: true, jumpAt: 2.1, hold: 16, max: 200, reach: 0.5, land: true });
   await shot('07d-punt');
   await go(12.2, 32.2);
-  await go(15.25, 32.0, { jump: true, jumpAt: 1.9, hold: 16, max: 200, reach: 0.5, land: true });
+  await go(15.25, 32.0, { jump: true, jumpAt: 1.9, hold: 40, max: 200, reach: 0.5, land: true });
   await shot('07e-wall');
   await go(15.25, 28.5);
   await go(18.0, 26.5);
