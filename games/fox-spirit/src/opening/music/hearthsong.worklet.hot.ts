@@ -253,6 +253,17 @@ class Hearthsong extends AudioWorkletProcessor {
     }
   }
 
+  /** a quick run up the sounding chord over two octaves (~0.4 s), placed on the harp */
+  flourish(): void {
+    const s = this.s;
+    const chords = this.shaded ? s.shadeChords : s.chords;
+    const cb = (this.tune * s.bars + (this.breath ? s.bars - 1 : Math.max(0, this.bar))) * 3;
+    for (let k = 0; k < 7; k++) {
+      const tone = chords[cb + (k % 3)]! + 12 * Math.floor(k / 3);
+      this.pluck(s.key + tone, 0.3 - k * 0.015, 0.006, k * 0.055);
+    }
+  }
+
   /** at a pass start: the place's own tune (never twice running) while it leads, else the shared rotation */
   pickTune(): void {
     const s = this.s;
@@ -455,6 +466,8 @@ class Hearthsong extends AudioWorkletProcessor {
         // tla ForceCue: a finale moment sings even inside the gap (re-arms a fading swell)
         if ((this.swell === IDLE || this.swell === FADING) && this.forces > 0) { this.swell = ARMED; this.forced = true; this.forces--; }
       } else if (this.swell === IDLE && this.since >= this.s.swell.gap) this.swell = ARMED;
+      // every moment, sung or not, gets an immediate soft harp run up the current chord (juice that stays in key)
+      if (this.ending === PLAYING || this.ending === EPILOGUE) this.flourish();
       this.lastCue = cue;
     }
     const singing = this.swell === SINGING;
