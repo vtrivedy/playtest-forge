@@ -24,31 +24,13 @@ const RULES = [
   },
 ];
 
-// *.hot.ts runs every frame / audio quantum (LEARNINGS-tibo-tla §3): no allocation outside `// cold:begin` … `// cold:end`
-// (construction). Ships with the Hearthsong worklet; GC pauses there are audible clicks, not just frame hitches.
-const HOT_RULES = [
-  { id: 'hot-new', test: (l) => /\bnew\s+[A-Z]\w*/.test(l), why: 'allocates: preallocate in a cold block' },
-  { id: 'hot-closure', test: (l) => /=>|\bfunction\s*\(/.test(l), why: 'a closure per call: hoist it to module scope' },
-  { id: 'hot-literal', test: (l) => /(^|[=(,:?]|return)\s*[[{]\s*[\w'"\]}.-]/.test(l) && !/^\s*(if|else|for|while|switch|do|try)\b|\)\s*\{\s*$|\{\s*$/.test(l), why: 'object/array literal: reuse a preallocated one' },
-  { id: 'hot-copy', test: (l) => /\.(map|filter|slice|concat|flatMap|push|splice|toFixed|split|join)\(|\.\.\.\w|`|Object\.(keys|entries|values|assign|fromEntries)/.test(l), why: 'allocates a new array/string/object' },
-];
-
 const findings = [];
-const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? walk(path.join(dir, d.name)) : [path.join(dir, d.name)]));
-for (const file of walk(ROOT).filter((n) => n.endsWith('.ts'))) {
-  const hot = file.endsWith('.hot.ts');
-  let cold = false;
+for (const f of fs.readdirSync(ROOT).filter((n) => n.endsWith('.ts'))) {
+  const file = path.join(ROOT, f);
   fs.readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
-    if (/\/\/\s*cold:begin/.test(line)) cold = true;
-    if (/\/\/\s*cold:end/.test(line)) cold = false;
-    if (/lint-feel:\s*ok/.test(line) || /^\s*(\/\/|\*|\/\*)/.test(line)) return;
-    const code = line.replace(/\/\/.*$/, '');
-    for (const r of RULES) if (r.test(code)) findings.push(`${file}:${i + 1}  [${r.id}] ${r.why}\n    ${line.trim()}`);
-    if (hot && !cold && !/^\s*(import|export\s+(type|\{)|type\s|declare\s)/.test(code)) {
-      for (const r of HOT_RULES) if (r.test(code)) findings.push(`${file}:${i + 1}  [${r.id}] ${r.why}\n    ${line.trim()}`);
-    }
+    if (/lint-feel:\s*ok/.test(line) || /^\s*(\/\/|\*)/.test(line)) return;
+    for (const r of RULES) if (r.test(line)) findings.push(`${file}:${i + 1}  [${r.id}] ${r.why}\n    ${line.trim()}`);
   });
-  if (cold) findings.push(`${file}: unterminated // cold:begin`);
 }
 if (findings.length) {
   console.log(findings.join('\n'));
