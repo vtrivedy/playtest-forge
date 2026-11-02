@@ -66,3 +66,7 @@ corridor colour (`tools/corridor-colour.mjs`), ending, `check:stuck`, 0 black fr
 walks the kept page home and crosses the hub arch before replaying the Ashwater movement route. It records full hook
 and `window.__game` states at each beat. No teleport, progress setters or saved-unlock fixture count as route proof.
 A failure is retained with the last position; later stages may not mask a failed entry.
+
+Entry review found the finale's homeward guidance continuing in Ashwater after discovery had finished. Scope both its
+hint and mote trail to Russetvale; defer a pending homecoming caption until returning there. Foreign-world puzzle
+hints retain the shared teach panel. Verify via the fresh route's foreign-world screenshot/state after the change.

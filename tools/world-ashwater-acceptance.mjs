@@ -94,6 +94,7 @@ try {
   await settle(120);
   await shot('01-hub-entry');
   if((await state()).hooks.opening.worlds.active!=='ashwater')throw Error('Hub arch did not enter Ashwater');
+  if((await state()).game.opening.teach.showing==='Follow the warm light home')throw Error('Autumn hint leaked into Ashwater');
   await shot('00-landing');
   // Level 1, Low Sluice: try the channel first (it is deep: the fox is put back), then dash the dam
   await go(0, -31.5, { max: 400 });

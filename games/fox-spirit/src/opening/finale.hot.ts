@@ -4,6 +4,7 @@
  * allocate once. The phase sequence is latched and automatic after Kindle: it never waits on the ember.
  */
 import * as THREE from 'three';
+import { worldAt } from './worlds';
 import type { HearthFox } from '../lookdevFox';
 import { fitLetterPlane, type LetterPlane } from './lettering.hot';
 
@@ -404,8 +405,9 @@ function stepOnward(rig: FinaleRig, dt: number): void {
   const carried = rig.emberWhere(rig.emberAt);
   const f = rig.fox.position;
   const near = Math.hypot(f.x - rig.emberAt.x, f.z - rig.emberAt.z) < 5;
-  const want = s.phase === 0 && rig.homeReady() && !carried && !near;
-  if (s.phase === 0 && rig.homeReady() && !carried && s.homeSaid === 0) {
+  const local = worldAt(f.x) === 'russetvale';
+  const want = local && s.phase === 0 && rig.homeReady() && !carried && !near;
+  if (local && s.phase === 0 && rig.homeReady() && !carried && s.homeSaid === 0) {
     // Remote page completion leaves the reveal pending until the fox comes home.
     if (rig.events.homeCaption()) s.homeSaid = 1;
   }
