@@ -23,6 +23,8 @@ export type Collider =
 export const PLAY = {
   /** glide round posts / corners when a step is blocked on both axes (moveTo); off = the old pin */
   slide: true,
+  /** how fast (1/s) the facing eases to the slide's travel along a wall */
+  slideTurn: 6,
   runSpeed: 3.2,
   walkSpeed: 0.85,
   /** ground speed ease (1/s) up / down */
@@ -67,6 +69,8 @@ export const PLAY = {
   maxPelvisDrop: 0.08,
 };
 
+/** step turns (rad) the wall slide tries, nearest first */
+const SLIDE_TURNS = [0.52, 1.05, 1.4] as const;
 const TAU = Math.PI * 2;
 const wrap = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
 
@@ -655,11 +659,10 @@ export function createPlay(opts: {
   }
 
   /** horizontal move with step / wall blocking, per axis so the fox slides along walls */
-  /** a round post (trunk, pillar) right ahead: the only blocker the slide steers round — boxes (walls, the ruin's folds)
-   *  keep their authored stops, and scripted routes that lean on them stay exact */
-  const postAhead = (x: number, z: number) => opts.colliders.some((c) => c.kind === 'post' && Math.hypot(x - c.x, z - c.z) < c.r + 0.3);
   /** last side the fox slid round a blocker on (+1 left / −1 right), so it doesn't dither between sides */
   let slideSide = 1;
+  /** travel direction of this step's slide (NaN = no slide): the fox's facing eases toward it so it runs along the wall */
+  let slideYaw = Number.NaN;
   function moveTo(nx: number, nz: number, feetY: number) {
     const tol = grounded ? P.step : 0.05;
     const fwdX = Math.sin(yaw) * 0.28;
@@ -674,15 +677,17 @@ export function createPlay(opts: {
     else vel.x = 0;
     if (ok(pos.x, nz)) pos.z = nz;
     else vel.z = 0;
-    // pinned on both axes (walking square into a post or a yawed corner): glide round it — try the step turned
-    // 30° then 60° to either side (last side first), probing ahead along the turned step, never through the blocker
+    // pinned (walking into a post, a wall at an angle, a yawed corner — the nose probe stops both axes): glide along
+    // it — try the step turned 30°, 60°, 80° to either side (last side first), probing ahead along the turned step,
+    // never through the blocker. Swarm5 naive wander: without this a diagonal push into any house wall or low plaza
+    // wall stopped the fox dead (tools/naive-explore.mjs --tether 14 stuck events)
     const x0 = nx - dx;
     const z0 = nz - dz;
-    // only round posts, while the player is steering at walk/run pace INTO them (wish agrees with the step): momentum
-    // (post-dash skid, coasting, turning round) and walls/boxes still stop dead
-    if (P.slide && dashT <= 0 && wish.lengthSq() > 0.01 && speed <= P.runSpeed * 1.05 && grounded && len > 1e-5 && (wish.x * dx + wish.y * dz) / (wish.length() * len) > 0.5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5 && postAhead(x0 + dx / len * 0.28, z0 + dz / len * 0.28)) {
+    // only while the player is steering at walk/run pace INTO the blocker (wish agrees with the step): momentum
+    // (post-dash skid, coasting, turning round) still stops dead
+    if (P.slide && dashT <= 0 && wish.lengthSq() > 0.01 && speed <= P.runSpeed * 1.05 && grounded && len > 1e-5 && (wish.x * dx + wish.y * dz) / (wish.length() * len) > 0.5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5) {
       {
-        for (const a of [0.52, 1.05, 1.4]) {
+        for (const a of SLIDE_TURNS) {
           for (const side of [slideSide, -slideSide]) {
             const c = Math.cos(a * side);
             const sn = Math.sin(a * side);
@@ -693,6 +698,7 @@ export function createPlay(opts: {
               pos.x = x0 + rx;
               pos.z = z0 + rz;
               slideSide = side;
+              slideYaw = Math.atan2(rx, rz);
               return;
             }
           }
@@ -761,7 +767,10 @@ export function createPlay(opts: {
     const lift = opts.updrafts?.liftAt(pos.x, pos.y, pos.z);
     gliding = !grounded && jumpHeld && airT > 0.12 && (vel.y <= 0 || (lift?.k ?? 0) > 0.05);
     const feetY = pos.y;
+    slideYaw = Number.NaN;
     moveTo(pos.x + vel.x * dt, pos.z + vel.z * dt, feetY);
+    // sliding along a blocker: ease the facing round to the travel so the fox runs along the wall, not nose-first into it
+    if (!Number.isNaN(slideYaw)) yaw = wrap(yaw + wrap(slideYaw - yaw) * (1 - Math.exp(-P.slideTurn * dt)));
 
     let arrivalSpeed = 0;
     if (!grounded) {
