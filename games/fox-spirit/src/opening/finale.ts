@@ -7,7 +7,9 @@
  * This file builds (allocations allowed); every per-frame step lives in finale.hot.ts.
  */
 import * as THREE from 'three';
-import { buildMaple, buildRock, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import foxRestUrl from '../../../../assets/hero/hearth_fox_rest.glb?url';
+import { buildMaple, buildRock, CANOPY, CANOPY_MOSS, canopyPad, RAMP_CANOPY, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
@@ -75,6 +77,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   settled: () => boolean;
   ember: { restsAt: (x: number, y: number, z: number, r: number) => boolean };
   cam: FollowCamera;
+  player: { setMoveScale: (k: number) => void; intent: () => number };
   crownLetGo: () => void;
   onCard?: () => void;
 }) {
@@ -134,6 +137,55 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     slab.rotation.set((rand() - 0.5) * 0.12, Math.atan2(F.press.x - p.x, F.press.z - p.z) + dy, (rand() - 0.5) * 0.1);
     scene.add(slab);
     colliders.push({ kind: 'box', x: p.x, z: p.z, yaw: slab.rotation.y, hx: 0.5, hz: 0.16, top: y + h });
+  }
+
+  // ---- hollow dressing: low bramble/bracken clumps and aster patches round its slopes, never on the lane, the Press
+  // or the cradle's apron (same language as dressing.ts, which keeps out of the vista)
+  {
+    const bushMat = toon(0xffffff, { vertexColors: true, contour: 0.9, ramp: RAMP_CANOPY });
+    const clear = (x: number, z: number) => pathDist(x, z) > 2.2 && Math.hypot(x - F.press.x, z - F.press.z) > 6.5 && inHollow(x, z);
+    let placed = 0;
+    for (let i = 0; i < 600 && placed < 26; i++) {
+      const a = 6 + rand() * 26;
+      const c = (rand() - 0.5) * 34;
+      const p = F.at(a, c);
+      if (!clear(p.x, p.z)) continue;
+      placed++;
+      const tones = rand() < 0.65 ? CANOPY_MOSS[Math.floor(rand() * CANOPY_MOSS.length)]! : CANOPY[Math.floor(rand() * CANOPY.length)]!;
+      const scale = 0.8 + rand() * 0.6;
+      for (let k = 0, n = 2 + Math.floor(rand() * 3); k < n; k++) {
+        const r = (0.42 + rand() * 0.3) * scale;
+        const m = new THREE.Mesh(canopyPad(rand, r, r * 0.72, tones, 0.42), bushMat);
+        const t = rand() * 6.28;
+        m.position.set(p.x + Math.cos(t) * r * 0.8 * (k ? 1 : 0), groundH(p.x, p.z) - 0.05 + r * 0.38, p.z + Math.sin(t) * r * 0.8 * (k ? 1 : 0));
+        m.rotation.y = rand() * 6.28;
+        m.castShadow = m.receiveShadow = true;
+        scene.add(m);
+      }
+    }
+    // aster heads: one instanced batch of small ink-flecked blooms in patches
+    const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.035, 0), new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: RAMP_WORLD }), 420);
+    const mm = new THREE.Matrix4();
+    const col = new THREE.Color();
+    const BLOOM = [0x9a4f3c, 0xa8834a, 0x7d5a6a, 0xe6a65a];
+    let n = 0;
+    for (let i = 0; i < 400 && n < 420 - 20; i++) {
+      const p = F.at(5 + rand() * 28, (rand() - 0.5) * 30);
+      if (!clear(p.x, p.z)) continue;
+      const tone = BLOOM[Math.floor(rand() * BLOOM.length)]!;
+      for (let k = 0; k < 18 && n < 420; k++) {
+        const t = rand() * 6.28;
+        const r = Math.sqrt(rand()) * 0.7;
+        const x = p.x + Math.cos(t) * r;
+        const z = p.z + Math.sin(t) * r;
+        mm.makeTranslation(x, groundH(x, z) + 0.1 + rand() * 0.14, z);
+        heads.setMatrixAt(n, mm);
+        heads.setColorAt(n++, col.setHex(tone));
+      }
+      if (n > 380) break;
+    }
+    heads.count = n;
+    scene.add(heads);
   }
 
   // ---- the far lip: a standing row of the Album's stone leaves, closing the hollow above the drop into the deep valley
@@ -425,6 +477,27 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     return p;
   });
 
+  // ---- rest clips (tools/blender/scripts/hearth_fox_rest.py, same rig and bone names as the shipped fox): `lieDown`
+  // settles into a curled sphinx-down with the tail round the paws, `rest` breathes there. Kits play them through
+  // their own clip switch; the hero blends them over its controller (finale.hot.ts) only while it rests by the ember.
+  const restClips = (await new GLTFLoader().loadAsync(foxRestUrl)).animations;
+  const lieClip = restClips.find((c) => c.name === 'lieDown');
+  const restClip = restClips.find((c) => c.name === 'rest');
+  if (!lieClip || !restClip) throw new Error('hearth_fox_rest.glb is missing lieDown / rest');
+  const bindRest = (fox: HearthFox) => {
+    const lie = fox.mixer.clipAction(lieClip);
+    lie.setLoop(THREE.LoopOnce, 1);
+    lie.clampWhenFinished = true;
+    const rest = fox.mixer.clipAction(restClip);
+    fox.actions.set('lieDown', lie);
+    fox.actions.set('rest', rest);
+    return { lie, rest };
+  };
+  for (const k of kitFoxes) bindRest(k);
+  const hero = bindRest(ctx.fox);
+  hero.lie.setEffectiveWeight(0);
+  hero.rest.setEffectiveWeight(0);
+
   // ---- the way: once the Keeping has settled, a thin stream of warm motes runs from the root-hearth (where the
   // ember rests) across the bridge, off the crag's lip and down into the hollow to the cradle, until it is kindled
   const wayCurve = new THREE.CatmullRomCurve3([
@@ -537,7 +610,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    player: opts.player, heroLie: hero.lie, heroRest: hero.rest, lieDur: lieClip.duration,
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
     kitX: new Float32Array(F2.length),

@@ -1,0 +1,619 @@
+{
+  "sha": "85a5cfa00979c92f72ea28f994eaef4f5571c130",
+  "runtime": "vite-production-preview",
+  "staging": "Each case has an explicit initial teleport; no teleport after movement starts; no forced Hermitage state; no coal carried.",
+  "cases": [
+    {
+      "id": "north-lane-desk-lines-return",
+      "required": true,
+      "legs": [
+        {
+          "id": 0,
+          "goal": [
+            -12.6,
+            108.2
+          ],
+          "done": true,
+          "minDistance": 0.3560000000000061,
+          "pos": [
+            -12.444,
+            0.503,
+            107.88
+          ]
+        },
+        {
+          "id": 1,
+          "goal": [
+            -14.2,
+            114.6
+          ],
+          "done": false,
+          "minDistance": 4.233061539831416,
+          "pos": [
+            -13.241,
+            1.27,
+            110.477
+          ]
+        }
+      ],
+      "game": {
+        "mode": "opening",
+        "state": {
+          "pos": [
+            -13.25,
+            1.27,
+            110.477
+          ],
+          "vel": [
+            0,
+            0,
+            0
+          ],
+          "speed": 0.205,
+          "yaw": -0.229,
+          "grounded": true,
+          "gliding": false,
+          "dashing": false,
+          "dashesUsed": 0,
+          "lastDashDistance": 0,
+          "updraft": {
+            "hearths": [
+              {
+                "id": "H-a",
+                "heat": 0,
+                "state": "cold",
+                "supply": 0,
+                "holdLeft": 0,
+                "restored": false,
+                "pos": [
+                  5.6,
+                  0.4975295091744021,
+                  74.2
+                ],
+                "height": 9
+              },
+              {
+                "id": "steam",
+                "heat": 0,
+                "state": "cold",
+                "supply": 0,
+                "holdLeft": 0,
+                "restored": false,
+                "pos": [
+                  24.95187386065252,
+                  4.986607380995244,
+                  79.36271871937427
+                ],
+                "height": 9
+              },
+              {
+                "id": "root",
+                "heat": 0,
+                "state": "cold",
+                "supply": 0,
+                "holdLeft": 0,
+                "restored": false,
+                "pos": [
+                  28.310371506590094,
+                  9.486607380995244,
+                  76.19878231637375
+                ],
+                "height": 7
+              },
+              {
+                "id": "kiln",
+                "heat": 0,
+                "state": "cold",
+                "supply": 0,
+                "holdLeft": 0,
+                "restored": false,
+                "pos": [
+                  -65.64789605154716,
+                  -1.1058396548043123,
+                  96.13936055605392
+                ],
+                "height": 12
+              }
+            ],
+            "lastRide": null,
+            "tun": {
+              "threshold": 0.3,
+              "igniteTime": 0.25,
+              "holdTime": 3,
+              "gutterTime": 0.8,
+              "radius": 2.2,
+              "topFalloff": 2,
+              "maxRise": 6.5,
+              "liftResponse": 4,
+              "columnSteer": 0.65,
+              "centerPull": 1.5,
+              "fallLift": 0.35,
+              "probeRing": 0.9
+            }
+          },
+          "airTime": 0,
+          "apexY": 0,
+          "lastJump": {
+            "apex": 0,
+            "air": 0,
+            "timeToApex": 0
+          },
+          "anim": "loco",
+          "gait": "walk",
+          "playback": 0.6,
+          "stanceFeet": 2,
+          "maxSlide": 0,
+          "paws": {
+            "fpawL": [
+              -13.212514177675839,
+              1.3366354599819688,
+              110.5443191237834
+            ],
+            "fpawR": [
+              -13.3380830634291,
+              1.4217504384006228,
+              110.62364929765903
+            ],
+            "hpawL": [
+              -13.152912928309881,
+              1.2149562063260047,
+              110.30397551093517
+            ],
+            "hpawR": [
+              -13.290747764853267,
+              1.2443251198237253,
+              110.40360941923034
+            ]
+          },
+          "camera": {
+            "pos": [
+              -12.411,
+              2.62,
+              112.778
+            ],
+            "boom": "shot=0.00 boomT=1.00 lift=0.00 floorLift=0.00 focusY=1.27 lock=1.27 dist=2.45 scenery=1.00 limit=1.00 fade=0.00 lensUnresolved=false blocker=",
+            "blocked": false
+          },
+          "opening": {
+            "canopy": {
+              "launches": 0,
+              "contacts": 0,
+              "retries": 0,
+              "roostVisits": 0,
+              "lastLeaf": null,
+              "lastFlight": null,
+              "activeFlight": null,
+              "lensTucked": 0,
+              "profile": {
+                "launchSpeed": 8.66,
+                "loadTime": 0.12,
+                "bow": 0.19
+              },
+              "leaves": [
+                {
+                  "id": "entry",
+                  "x": -0.2,
+                  "z": 71.5,
+                  "top": -0.16081268242076513,
+                  "touched": false
+                },
+                {
+                  "id": "middle",
+                  "x": -0.2,
+                  "z": 69.3,
+                  "top": 1.296937770277265,
+                  "touched": false
+                },
+                {
+                  "id": "high",
+                  "x": 0.9,
+                  "z": 67.1,
+                  "top": 2.373411979422167,
+                  "touched": false
+                },
+                {
+                  "id": "roost",
+                  "x": -1,
+                  "z": 64.7,
+                  "top": 2.8959259519471163,
+                  "touched": false
+                }
+              ]
+            },
+            "hearth": {
+              "hearths": [
+                {
+                  "id": "H-a",
+                  "heat": 0,
+                  "state": "cold",
+                  "supply": 0,
+                  "holdLeft": 0,
+                  "restored": false,
+                  "pos": [
+                    5.6,
+                    0.4975295091744021,
+                    74.2
+                  ],
+                  "height": 9
+                },
+                {
+                  "id": "steam",
+                  "heat": 0,
+                  "state": "cold",
+                  "supply": 0,
+                  "holdLeft": 0,
+                  "restored": false,
+                  "pos": [
+                    24.95187386065252,
+                    4.986607380995244,
+                    79.36271871937427
+                  ],
+                  "height": 9
+                },
+                {
+                  "id": "root",
+                  "heat": 0,
+                  "state": "cold",
+                  "supply": 0,
+                  "holdLeft": 0,
+                  "restored": false,
+                  "pos": [
+                    28.310371506590094,
+                    9.486607380995244,
+                    76.19878231637375
+                  ],
+                  "height": 7
+                },
+                {
+                  "id": "kiln",
+                  "heat": 0,
+                  "state": "cold",
+                  "supply": 0,
+                  "holdLeft": 0,
+                  "restored": false,
+                  "pos": [
+                    -65.64789605154716,
+                    -1.1058396548043123,
+                    96.13936055605392
+                  ],
+                  "height": 12
+                }
+              ],
+              "lastRide": null,
+              "tun": {
+                "threshold": 0.3,
+                "igniteTime": 0.25,
+                "holdTime": 3,
+                "gutterTime": 0.8,
+                "radius": 2.2,
+                "topFalloff": 2,
+                "maxRise": 6.5,
+                "liftResponse": 4,
+                "columnSteer": 0.65,
+                "centerPull": 1.5,
+                "fallLift": 0.35,
+                "probeRing": 0.9
+              },
+              "latched": false,
+              "ignition": null,
+              "complete": false
+            },
+            "paint": {
+              "trailSamples": 86,
+              "supply": 1,
+              "distance": 9.316779031813969,
+              "restores": 0
+            },
+            "visibility": {
+              "occluders": 167,
+              "faded": 0
+            },
+            "restores": 0,
+            "carry": {
+              "carried": false,
+              "heat": 1,
+              "cooling": false,
+              "position": [
+                15.1,
+                4.956607380995243,
+                77.4
+              ],
+              "lastGrounded": [
+                -13.250417326122053,
+                1.269507570864178,
+                110.47689710132683
+              ],
+              "canPickup": false,
+              "canPlace": false,
+              "pickups": 0,
+              "placements": 0,
+              "dashDrops": 0,
+              "recoveries": 0,
+              "lastAction": "source",
+              "rolling": false
+            },
+            "chemistry": {
+              "steam": {
+                "id": "steam",
+                "position": [
+                  24.95187386065252,
+                  4.956607380995243,
+                  79.36271871937427
+                ],
+                "heat": 0,
+                "supply": 0,
+                "state": "cold",
+                "restored": false
+              },
+              "root": {
+                "id": "root",
+                "position": [
+                  28.310371506590094,
+                  9.456607380995244,
+                  76.19878231637375
+                ],
+                "heat": 0,
+                "supply": 0,
+                "state": "cold",
+                "restored": false
+              },
+              "steamLatched": false,
+              "completed": false,
+              "steamReactions": 0,
+              "releases": 0
+            },
+            "crown": {
+              "released": false,
+              "release": 0,
+              "limb": -0.621,
+              "leaves": 0,
+              "heroLeaf": false
+            },
+            "keeping": {
+              "phase": "arrested",
+              "t": 0,
+              "angle": 0.95,
+              "bridge": false,
+              "impact": false,
+              "impacts": 0,
+              "bridgeTop": 9.577,
+              "crownLobes": 10,
+              "stair": "pressed"
+            },
+            "unpressed": {
+              "flings": 0,
+              "found": [],
+              "creatures": [
+                {
+                  "id": "hedgehog",
+                  "phase": "pressed",
+                  "t": 0,
+                  "at": [
+                    -6.74,
+                    0.1,
+                    85.95
+                  ]
+                },
+                {
+                  "id": "heron",
+                  "phase": "pressed",
+                  "t": 0,
+                  "at": [
+                    7.42,
+                    0.53,
+                    74.76
+                  ]
+                },
+                {
+                  "id": "deer",
+                  "phase": "pressed",
+                  "t": 0,
+                  "at": [
+                    24.46,
+                    9.46,
+                    64.54
+                  ]
+                },
+                {
+                  "id": "kit",
+                  "phase": "pressed",
+                  "t": 0,
+                  "at": [
+                    32.56,
+                    0.3,
+                    88.6
+                  ]
+                },
+                {
+                  "id": "hare",
+                  "phase": "pressed",
+                  "t": 0,
+                  "at": [
+                    -6.86,
+                    -0.7,
+                    70.26
+                  ]
+                }
+              ]
+            },
+            "glyphs": {
+              "progress": 0,
+              "solved": false,
+              "gutters": 0,
+              "lastGutter": "",
+              "order": [
+                "moon",
+                "leaf",
+                "flame"
+              ],
+              "stones": [
+                {
+                  "id": "leaf",
+                  "painted": false,
+                  "lit": false,
+                  "reveal": 0
+                },
+                {
+                  "id": "flame",
+                  "painted": false,
+                  "lit": false,
+                  "reveal": 0
+                },
+                {
+                  "id": "moon",
+                  "painted": false,
+                  "lit": false,
+                  "reveal": 0
+                }
+              ]
+            },
+            "hum": {
+              "running": true,
+              "voices": [
+                {
+                  "id": "H-a",
+                  "gain": 0
+                },
+                {
+                  "id": "steam",
+                  "gain": 0
+                },
+                {
+                  "id": "root",
+                  "gain": 0
+                },
+                {
+                  "id": "kiln",
+                  "gain": 0
+                }
+              ]
+            },
+            "audio": {
+              "context": "running",
+              "master": 1,
+              "music": {
+                "ready": true,
+                "bar": -1,
+                "breath": false,
+                "swell": "idle",
+                "pass": 0,
+                "since": 0,
+                "shaded": false,
+                "ending": "playing",
+                "forces": 2,
+                "cues": 0,
+                "levels": {
+                  "harp": 0.48,
+                  "pad": 0.39,
+                  "bass": 0,
+                  "lead": 0,
+                  "bells": 0,
+                  "bright": 0.3,
+                  "shade": 0
+                },
+                "cued": []
+              },
+              "ambience": {
+                "wind": 0.001
+              },
+              "loaded": 0,
+              "files": 13,
+              "counts": {},
+              "last": [],
+              "log": [],
+              "foley": {
+                "steps": {
+                  "grass": 4,
+                  "leaf": 0,
+                  "wood": 0,
+                  "stone": 0
+                },
+                "glide": 0
+              }
+            },
+            "page": {
+              "stage": 0,
+              "phase": "perched",
+              "catches": 0,
+              "skips": 0,
+              "dodges": 0,
+              "winded": false,
+              "yaw": -0.4747,
+              "droop": 0,
+              "s": 0,
+              "pos": [
+                -1.8,
+                1.3254,
+                88.2
+              ]
+            },
+            "popUpRuin": {
+              "folds": [
+                {
+                  "phase": "folded",
+                  "progress": 0
+                },
+                {
+                  "phase": "folded",
+                  "progress": 0
+                },
+                {
+                  "phase": "folded",
+                  "progress": 0
+                }
+              ],
+              "reached": false,
+              "returns": 0,
+              "misses": 0,
+              "tunables": {
+                "unfold": 0.55,
+                "hitRadius": 1.35
+              }
+            },
+            "homecoming": {
+              "pinned": false,
+              "sent": false,
+              "home": [],
+              "lit": [],
+              "full": false
+            },
+            "leafPiles": {
+              "piles": 8,
+              "kicks": 0,
+              "flying": 0
+            },
+            "millrace": {
+              "phase": "held",
+              "front": 13,
+              "turning": false,
+              "painted": false,
+              "spin": 0,
+              "lookoutPainted": false
+            },
+            "millWeir": {
+              "lit": false,
+              "heat": 0,
+              "rode": false,
+              "reached": false
+            },
+            "hermitage": {
+              "freed": [
+                0,
+                0,
+                0
+              ],
+              "painted": false,
+              "captioned": false
+            }
+          }
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "checks": {
+    "allLegsComplete": false,
+    "finite": true,
+    "noErrors": true
+  }
+}

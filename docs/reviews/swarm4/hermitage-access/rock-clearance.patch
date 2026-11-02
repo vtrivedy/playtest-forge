@@ -1,0 +1,13 @@
+diff --git a/games/fox-spirit/src/opening/hermitage.ts b/games/fox-spirit/src/opening/hermitage.ts
+index b6efa74..833b0db 100644
+--- a/games/fox-spirit/src/opening/hermitage.ts
++++ b/games/fox-spirit/src/opening/hermitage.ts
+@@ -76,7 +76,7 @@ export function buildHermitage(ctx: OpeningCtx) {
+   buildPress(k, ctx);
+   buildStones(k, ctx);
+   // the lane's edge: a few root-steps of stone where the climb is steepest
+-  for (const [x, z, s] of [[-13.6, 111.2, 0.5], [-10.6, 112.4, 0.4], [-15.4, 117.2, 0.55], [-9.6, 122.6, 0.45]] as const) {
++  for (const [x, z, s] of [[-16.6, 111.2, 0.5], [-10.6, 112.4, 0.4], [-18.0, 117.2, 0.55], [-13.2, 122.6, 0.45]] as const) {
+     const r = buildRock(rand, s);
+     r.position.set(x, groundH(x, z) + s * 0.25, z);
+     background.push(r);

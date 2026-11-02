@@ -10,7 +10,8 @@
     "playtest": "tsx tools/playtest.ts --game fox-spirit --port 5180 --seconds 30 --script shrine",
     "playtest:feel": "tsx tools/playtest.ts --game fox-spirit --port 5180 --seconds 12 --script feel-probe",
     "fox:turntable": "tsx tools/fox-turntable.ts --fx 0 --anim idle",
-    "lint:feel": "node tools/lint-feel.mjs"
+    "lint:feel": "node tools/lint-feel.mjs",
+    "check:music": "node tools/hearthsong-render.mjs --out /tmp/hearthsong-check --walk cues --seconds 400"
   },
   "devDependencies": {
     "@playwright/mcp": "^0.0.83",
