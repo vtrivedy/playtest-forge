@@ -467,7 +467,7 @@ export function createPlay(opts: {
       distance: 2.45,
       runDistance: 2.35,
       // room to pull in front of a pier; a smaller 3/4 bias keeps the lens inside the arch opening
-      minDistance: 1.2,
+      minDistance: 1.5,
       sideBias: 0.35,
       height: 1.15,
       fallLag: 0.07,
@@ -519,6 +519,7 @@ export function createPlay(opts: {
       clip.add(P, 'maxLock', 0, 0.15, 0.005);
       const c = gui.addFolder('camera');
       c.add(cam.params, 'distance', 1.5, 7, 0.05);
+      c.add(cam.params, 'minDistance', 1.2, 2.1, 0.05).name('body clearance');
       c.add(cam.params, 'height', 0.3, 3, 0.05);
       c.add(cam.params, 'lag', 0, 0.5, 0.01);
       c.add(cam.params, 'fallLag', 0.02, 0.14, 0.005);

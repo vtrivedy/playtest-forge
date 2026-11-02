@@ -21,8 +21,9 @@ const clipBeat = option('clip-beat', 'off the canopy');
 const clipSeconds = Number(option('clip-seconds', '3'));
 const clipFrom = option('clip-from', '') === '' ? null : Number(option('clip-from', ''));
 if (clipFrom !== null && (!Number.isFinite(clipFrom) || clipFrom < 0)) throw Error('clip-from must be nonnegative');
-const minDistance = Number(option('min-distance', '1.2'));
-if (!Number.isFinite(minDistance) || minDistance < 1.2 || minDistance > 2.45) throw Error('min-distance must be in [1.2, 2.45]');
+const minDistanceRaw = option('min-distance', '');
+const minDistance = minDistanceRaw === '' ? null : Number(minDistanceRaw);
+if (minDistance !== null && (!Number.isFinite(minDistance) || minDistance < 1.2 || minDistance > 2.45)) throw Error('min-distance must be in [1.2, 2.45]');
 const testDt = Number(option('dt', String(1 / 60)));
 if (!Number.isFinite(testDt) || testDt <= 0 || testDt > .05) throw Error('dt must be in (0, .05]');
 const stillFrames = option('stills-at', '').split(',').filter(Boolean).map(t => Math.round(Number(t) / testDt));
@@ -53,7 +54,7 @@ try {
   await page.waitForFunction(()=>window.__gameHooks?.ready===true);
   await page.evaluate(({source,start,fallLag,testDt,minDistance})=>{
     const h=window.__gameHooks;
-    h.setManual(true); h.camera.fallLag=fallLag; h.camera.minDistance=minDistance;
+    h.setManual(true); h.camera.fallLag=fallLag; if(minDistance!==null)h.camera.minDistance=minDistance;
     h.teleport(start.x,start.z,start.yaw);
     window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1,silhouette:[]};
   },{source:createSliceRoute.toString(),start:SLICE_START,fallLag,testDt,minDistance});
@@ -92,7 +93,7 @@ try {
               minY=Math.min(minY,point.y);maxY=Math.max(maxY,point.y);vertices++;
             }
           });
-          p.silhouette.push({f,vertices,minX,maxX,minY,maxY,inside:vertices>0&&minX>-.98&&maxX<.98&&minY>-.98&&maxY<.98});
+          p.silhouette.push({f,vertices,minX,maxX,minY,maxY,inside:vertices>0&&minX>-.96&&maxX<.96&&minY>-.96&&maxY<.96});
         }
         p.trace.push({f,beat:p.beat,pos:s.pos,vel:s.vel,grounded:s.grounded,camera:s.camera,lensPitch,lastJump:s.lastJump,page:s.opening.page,canopy:s.opening.canopy,popUpRuin:s.opening.popUpRuin});
         if(!prev.grounded&&s.grounded)p.touchdown=f;
@@ -108,7 +109,7 @@ try {
     const bucket=Math.floor(result.f*testDt/10);
     if(bucket>checkpoint){
       checkpoint=bucket;
-      const partial=await page.evaluate(()=>({trace:window.__cameraProbe.trace,silhouette:window.__cameraProbe.silhouette,game:{mode:window.__game.mode,state:window.__game.state()}}));
+      const partial=await page.evaluate(()=>({trace:window.__cameraProbe.trace,silhouette:window.__cameraProbe.silhouette,cameraTunables:{...window.__gameHooks.camera},game:{mode:window.__game.mode,state:window.__game.state()}}));
       const pending=path.join(out,'checkpoint.json.tmp');
       fs.writeFileSync(pending,JSON.stringify({complete:false,frame:result.f,testDt,minDistance,missOverlook,...partial}));
       fs.renameSync(pending,path.join(out,'checkpoint.json'));
@@ -120,7 +121,7 @@ try {
       console.log(result.f,name);
     }
   }
-  const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,silhouette:window.__cameraProbe.silhouette,game:{mode:window.__game.mode,state:window.__game.state()}}));
+  const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,silhouette:window.__cameraProbe.silhouette,cameraTunables:{...window.__gameHooks.camera},game:{mode:window.__game.mode,state:window.__game.state()}}));
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
   fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
   const late = evidence.trace.filter(s => s.f * testDt >= 60);
@@ -135,7 +136,7 @@ try {
   }
   if (checkSilhouette) {
     const silhouettePass = evidence.silhouette.length > 0 && evidence.silhouette.every(s => s.inside);
-    console.log('SILHOUETTE', JSON.stringify({frames:evidence.silhouette.length,pass:silhouettePass,scope:'skinned geometry only; excludes shader wisps and occlusion'}));
+    console.log('SILHOUETTE', JSON.stringify({frames:evidence.silhouette.length,pass:silhouettePass,viewportMarginFraction:.02,scope:'skinned geometry only; excludes shader wisps and occlusion'}));
     if (!silhouettePass) process.exitCode=1;
   }
   if(clip)encodeDrop();

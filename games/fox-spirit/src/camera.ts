@@ -109,6 +109,7 @@ export type FollowCamera = {
   debug: { fox: [number, number]; landing: [number, number] | null; internals: () => string; blocked: () => boolean };
 };
 
+const SCENERY_SIDES = [0, -1, 1];
 const TAU = Math.PI * 2;
 const wrap = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
 
@@ -460,7 +461,7 @@ export function createFollowCamera(opts: {
     // Rough cliff faces can overhang within centimetres of the fox's chest.
     // The floor-aware cutout handles footing; do not skip these real blockers.
     sight.near = 0.03;
-    for (const side of [0, -1, 1]) {
+    for (const side of SCENERY_SIDES) {
       sightOrigin.copy(focus).addScaledVector(sightSide, side);
       sight.set(sightOrigin, sightDir);
       sight.far = nearest;

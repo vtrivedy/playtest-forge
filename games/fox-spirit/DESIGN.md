@@ -425,3 +425,8 @@ still traverses the village arch and ruin return. Formal camera mode model check
 that traversal output must pass through the body-envelope constraint after floor
 correction; authored shots keep their separate composition. Continuous failed-
 catch footage plus a successful return route, screenshots and __game are required.
+
+Chosen clearance:1.5m. Both1.5 and1.8 pass the missed-jump camera and skinned-body
+framing gates;1.5 retains a larger creature in the tight view with adequate pounce
+margin. The normal2.45m follow distance remains the authored traversal setting.
+Expose body clearance in the existing camera GUI for further place-specific tests.

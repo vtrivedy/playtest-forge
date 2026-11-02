@@ -347,3 +347,7 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
   periodically replaced `checkpoint.json` marked `complete:false`; require a
   final evidence file and clean DONE for a completion claim. `--sparse-stills`
   skips unrelated early images while keeping every simulation step and trace.
+- The envelope's supplied scenery callback still uses Three.js raycasts, whose
+  library internals allocate hit records. The extraction removes project-side
+  temporary candidate closures and collider query arrays; it is not a claim of
+  a completely allocation-free renderer or camera stack.
