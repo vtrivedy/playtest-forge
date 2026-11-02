@@ -221,6 +221,9 @@ export async function runOpening(): Promise<void> {
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
     surfaceAt: player.surfaceAt,
     bowls: [...[KEEPING.steam, KEEPING.root].map(b => new THREE.Vector3(b.x, b.y, b.z)), new THREE.Vector3(FINALE.cradle.x, player.surfaceAt(FINALE.cradle.x, FINALE.cradle.z), FINALE.cradle.z)],
+    // Hearthbound (earned with Russetvale's first level): the dash keeps the carried ember (progress is built below;
+    // this runs only on a dash, after the scene is built)
+    canDashCarry: () => progress.hasAbility('russetvale'),
   });
   const coal = carry;
   const chemistry = createKeepingChemistry({
