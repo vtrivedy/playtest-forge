@@ -9,6 +9,8 @@ import { lintHotSource, hotLintSelfTest } from './hot-path-lint.mjs';
 import { lintRenderSurface, renderSurfaceSelfTest } from './render-surface-lint.mjs';
 import { lintAssetSource, assetLintSelfTest } from './asset-path-lint.mjs';
 import { lintTeachOrderSource, teachOrderSelfTest } from './teach-order-lint.mjs';
+import { lintDiscoverySafety, discoverySafetySelfTest } from './discovery-safety-lint.mjs';
+discoverySafetySelfTest();
 teachOrderSelfTest();
 assetLintSelfTest();
 renderSurfaceSelfTest();
@@ -39,6 +41,7 @@ const RULES = [
 ];
 
 const findings = [];
+findings.push(...lintDiscoverySafety(`${ROOT}/discovery.hot.ts`,fs.readFileSync(`${ROOT}/discovery.hot.ts`,'utf8')));
 for (const name of ['teach.ts', 'teach.hot.ts', 'scene.ts']) {
   const file = path.join(ROOT, name);
   findings.push(...lintTeachOrderSource(file, fs.readFileSync(file, 'utf8')));

@@ -14,7 +14,7 @@ export function createDiscoveryPolicy() {
       const mag = Math.min(1, distance * 1.4);
       if (distance > 0.06) { x = dx / distance * mag; z = dz / distance * mag; }
       dash = ((cue.action === 'dash' && distance < 2.2) || (cue.action === 'unfold' && distance < 2.1)) && frame % 24 === 0;
-      jump = cue.action === 'spring' || (cue.action === 'jump' && distance < 4.2);
+      jump = cue.action === 'spring' || (cue.action === 'jump' && distance < 4.2) || (cue.action === 'land' && !movement.grounded);
       // Hold through spring loading; a deliberate fresh jump only after dwelling on ordinary ground.
       if (groundFrames > 24 && frame % 36 === 0) jump = false;
       const bearing = Math.atan2(dx, dz);
