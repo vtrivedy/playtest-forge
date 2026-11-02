@@ -160,6 +160,17 @@ permits branch unmute; Vivek then hears the landed result on main.
 - Key: C major. Keep every synthesized chime in C (glyphs, page, homecoming already were); the hearth hum's B1 was
   moved to C2.
 
+- Staged in-game listening: `node tools/audio-scene.mjs --scene millbrook|finale --out DIR --seconds N` (teleport /
+  dev hook, sim paced to wall clock, pre-master stems + marks of swell/ending/finale phase each second).
+  Finale (local integration of all sw4 branches, 06:25): kindle → swell; coda ~44 s; digital silence ~60 s; then
+  epilogue after QuietBars. SwiftShader capture boxes drop ~5–20 % of ScriptProcessor audio under render load
+  (73 s recorded in 90 s wall) — a capture artefact present before Hearthsong too; don't read it as stutter.
+- Critic vocabulary → cause, found by A/B on the same window: "theremin" = 30 ms legato glide + early vibrato
+  (fix: 8 ms glide, tongue each note, vibrato after 0.4 s); "digital beeping" = 40 ms sine bubbles (few-ms
+  chirps read as water); "whip/sword strike" = a 0.35 s noise sweep to 1.8 kHz; "harsh/distorted" = FM bells at
+  ratio 3.5 / index 1.6 (ratio 4, index 0.8 = celesta); "ticking clock" = 6 ms-attack footsteps at a steady gait.
+- The model hallucinates (a "male voice", "alarm") on noise beds; confirm any flaw on the spectrogram before acting.
+
 ### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
 
 - Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
@@ -345,6 +356,30 @@ reviewed for Summer Night, Hello?, Pine Grove, Beach Buds and full Hush. Python
 compile passed. This is a programmatic/visual audio critique, not a real-time
 listening claim or whole-game playtest. No runtime/mute changes in this slice.
 
+## Page hot-path audit and release framing (Sorrel, swarm4)
+
+- Baseline `f866379` full input replay: three catches at 4.267/17.867/44.517s, zero skips, returned home; no JS errors. Jump .792m apex/.317s to apex/.633s air, final dash1.998m. Evidence `/captures/sorrel/page-baseline-trace/evidence.json`. Only the initial wake spot is staged.
+- Continuous baseline 43–48s (150 frames, 480×270) is `/captures/sorrel/page-baseline-catch-rise/clip.mp4`. The final page grows5x and rises5.4m above the moving fox, leaving the chase view before its release fade. This is an offline fixed-step motion capture, not a real-time performance claim. Sampled sheets establish framing only; inspect adjacent frames for jitter.
+- `player.state()` is an allocating diagnostic snapshot (rounded arrays, paws, camera). Gameplay frame code should read `player.motion` for live grounded/dashing scalars. Page audio voice is now one reusable live view too. Do not reinstate snapshot calls in hot paths.
+- Hot lint follows named local helpers reached from registered frame callbacks and update/tick/frame functions; moving `new` into emit/caught does not evade it. Setup allocations and cold dev snapshots are permitted. `docs/reviews/swarm4/page/lint-negative.txt` records its findings on pre-fix page source; fixture negatives run on every lint invocation.
+- `?manual=1` starts the opening without a first rAF simulation step; capture tools must use it for exact replay comparisons. Calling setManual only after ready leaves a variable number of startup frames.
+- Page dodge RNG has a dedicated seeded stream separate from cosmetic flecks: changing particle density must not change the next gameplay dodge. This makes page pursuit repeatable, not the entire game's unrelated ambient systems.
+- TLC page model passes 24 generated/9 distinct states. Broken kept-after-one invariant fails at catches3 (six-state trace). Scope excludes continuous space, timing/reach geometry, camera, and debug stage resets; formal pass is never motion acceptance.
+
+### Final page proof and production assets — Sorrel,6f769d7
+
+- Final release anchors at the **page's** catch xz and its walkable perch, not the fox's catch pose. The rejected fox anchor brought the sheet toward the lens after landing. Chosen from three production variants: +1.05→1.2m,1→1.25x, radial halo, existing fade timing. It stays fully visible through the release.
+- Production85s input route on6f769d7:3catches/0skips/page pinned home/no JS or HTTP errors;60Hz jump .792/.317/.633 and dash1.998m unchanged.50ms route passes too. Exact tape replay matches rounded fox and page state on every frame (zero mismatches).
+- Motion evidence `/captures/sorrel/page-final-production-v2/clip.mp4`:90 consecutive15fps480×270 frames; all inspected in two adjacent-frame sheets.63 visible-sheet projected bounds samples pass3% margin (maxNDCy .85033). Scope: initial wake staged; offline/noaudio; no real-time performance/global gait verdict. Review + compact evidence: `docs/reviews/swarm4/page/`.
+- A successful Vite build did **not** mean production could boot: default fox/model textures used raw `/assets/` URLs served only by configureServer. Import runtime assets with `?url`; the production preview now loads the bundled GLB. The new guard rejects absolute asset literals (12 negative findings). No new assets; existing source/license records retained.
+- When captures are interrupted, a final-only JSON loses the useful trace. The page runner now streams partial JSONL + atomic checkpoint files and atomically renames final results. Use a fresh output directory per named run; encode exactly `evidence.frames` to exclude stale frames. Codex plain-background nohup did not survive tool cleanup here; the accepted run used a live PTY at15fps.
+- Shared hot gate must handle unknown external function callbacks without crashing; Fern supplied the guard-order fix and positive query fixture. Roots include step/process plus non-factory exported functions, so renaming a frame entry cannot silently skip the check. Cold build/create/load/make factories remain setup; called helpers are still scanned if reached from hot code.
+
+## Press Hollow access — independent review (Sorrel)
+
+- A painted path is not automatically walkable: Wren057bd1b's south lane drove straight into the rim at(9.211,-.313,61.011). `pathDist` flattened the small swell but did not cut the additive rim. Two alternate approaches blocked too; the original glide-only ending probe missed this entrance failure.
+- Wren77d303a carves a terrain trough along the lane. Independent input-only retest passes all8 authored lane legs both ways, crag glide340frames, and3 walk-out legs. Evidence `/captures/sorrel/finale-access-fixed-77d303a/`; review+compact results `docs/reviews/swarm4/finale-access/`. No controller tuning; scene still sealed, no forced finale, no coal. Each case stages its initial position.
+- Keep authored lane heights and visible lane coordinates coupled, and test entry as well as exit. `tools/finale-access-probe.mjs` provides an independent route regression; `--production` uses the actual build, `--alternates` adds diagnostic approaches. This does not replace the carrying/finale/camera route or a continuous ending clip.
 ## Finale / Press Hollow (Wren, swarm4)
 
 - A painted lane is not a walkable lane: PATHS/pathDist only flattens the swell term, the rim term still raises a cliff under the paint. Sorrel's input-only probe (057bd1b) stalled the authored south lane at (9.2, 61.0) and two alternate meadow approaches too. Carve terrain from the same line that paints it (`SOUTH_LANE` → PATHS + `southLane()` trough in layout.ts, 77d303a) and prove it with an input-only walk both ways (`tools/finale-lane-probe.mjs`, Sorrel's `tools/finale-access-probe.mjs`). The finale's story gate is the Press itself (sealed until the Keeping settles; TLA `Finale.tla`), not terrain.

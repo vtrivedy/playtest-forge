@@ -24,7 +24,9 @@ try {
   await page.goto(`http://127.0.0.1:${port}/hearthsong.html`);
   await page.waitForFunction(() => window.__hearthsongReady === true);
   const t0 = Date.now();
-  const r = await page.evaluate(([s, sd]) => window.renderHearthsong(s, undefined, sd), [seconds, seed]);
+  // --sfx water: a real-time recording of the synthesized Millbrook water/wheel instead of the score
+  const sfx = arg('sfx', '');
+  const r = sfx === 'water' ? { ...(await page.evaluate((s) => window.recordWater(s), seconds)), marks: [] } : await page.evaluate(([s, sd, w]) => window.renderHearthsong(s, window.WALKS[w], sd), [seconds, seed, arg('walk', 'main')]);
   const l = Buffer.from(r.l, 'base64');
   const rr = Buffer.from(r.r, 'base64');
   const n = l.length / 2;
@@ -34,7 +36,7 @@ try {
   hdr.write('RIFF', 0); hdr.writeUInt32LE(36 + data.length, 4); hdr.write('WAVE', 8); hdr.write('fmt ', 12);
   hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(2, 22); hdr.writeUInt32LE(r.sr, 24);
   hdr.writeUInt32LE(r.sr * 4, 28); hdr.writeUInt16LE(4, 32); hdr.writeUInt16LE(16, 34); hdr.write('data', 36); hdr.writeUInt32LE(data.length, 40);
-  fs.writeFileSync(path.join(out, 'hearthsong.wav'), Buffer.concat([hdr, data]));
+  fs.writeFileSync(path.join(out, sfx ? `${sfx}.wav` : 'hearthsong.wav'), Buffer.concat([hdr, data]));
   fs.writeFileSync(path.join(out, 'marks.json'), JSON.stringify({ seconds, seed, renderMs: Date.now() - t0, errors, events: r.marks.map((m) => ({ time_s: m.t, kind: m.cue ? `cue${m.kind ?? 0}:${m.place}` : m.snow ? "snow" : m.place })) }, null, 1));
   console.log(JSON.stringify({ out, seconds, renderMs: Date.now() - t0, errors }));
 } finally {
