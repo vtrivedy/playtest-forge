@@ -692,7 +692,7 @@ export function createPlay(opts: {
     const z0 = nz - dz;
     if (grounded && len > 1e-5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5) {
       {
-        for (const a of [0.52, 1.05]) {
+        for (const a of [0.52, 1.05, 1.4]) {
           for (const side of [slideSide, -slideSide]) {
             const c = Math.cos(a * side);
             const sn = Math.sin(a * side);
