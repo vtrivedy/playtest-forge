@@ -83,3 +83,26 @@ Render the map inside the game's canvas so screenshots and MediaRecorder contain
 ## Ownership proposal
 
 Hazel: progress IDs/schema, monotonic event store/save, Album map and progress evidence. One scene integrator owns portal routing and calls the store; world owners author their puzzle conditions and earned ability behavior. Do not split changes inside `opening/scene.ts` among all builders. Reed can independently review portal/progress captures if available. Final team assignment is recorded in `DESIGN-worlds.md`.
+
+## Source audit: existing autumn completion signals
+
+`opening/scene.ts` builds the whole autumn slice before creating the controller. `ctx.onUpdate` registers callbacks; `state()` methods allocate snapshot objects and must not be polled each tick by a new progress adapter. Add event callbacks at the mechanism's transition or expose cheap primitive predicates. Existing authoring seeds must stay unchanged so regression input tapes remain comparable.
+
+- `millrace.hot.ts`: dam burst is only an intermediate event; downstream water arrival / wheel running is the physical payoff.
+- `millWeir.hot.ts`: `lit`, `rode`, `reached` are distinct. Current `reached` tests height and xz but does not itself require `lit`/`rode`; a capstone completion must require its intended prerequisite and a grounded landing. Do not silently promote this marker into a fully solved level.
+- `hermitage.hot.ts`: `freeCount`/`painted` prove released lines. Current behavior mostly releases leaves and repaints; a claimed traversal puzzle needs an actual newly usable stair/bridge/route.
+- `keeping.ts`: the `bridge` phase and `onSettled` callback are useful authoritative physical events. A new progress listener must not overwrite an existing callback; support multiple subscribers or invoke progress in the existing scene callback.
+- `homecoming.ts`: `isPinned` proves the page was physically returned. Preserve the existing discovery real landing gate and the retained cue-recovery proof.
+
+Reed's design contribution `acb5ec8e` strengthens the recommendation: earn each contextual ability in level one, develop it in level two, combine in level three. This supersedes the earlier table's capstone-only earn timing. Proposed names Hearthbound / Reedskim / Inkstep remain unapproved until the shared design settles. Prefer new contextual target behavior over changing global jump/dash physics.
+
+## Save and event invariants to verify
+
+- At most nine restored puzzle facts for a three-by-three design; no duplicate restored entries or duplicate earned abilities.
+- A visited node never increments a Seedwell fill segment.
+- A restored capstone must have its prerequisites; malformed saved capstones cannot skip unlearned mechanics.
+- Load is normalization, not a gameplay completion event: no repeated celebration or duplicated geometry on reload.
+- Save failures (private browsing / quota) leave current-session progression working.
+- Unsubscribe/dispose removes UI listeners and texture resources if worlds reload in one page.
+- Opening Tab ignores repeated keydown, prevents browser focus hopping, and does not consume jump/dash input.
+- Fresh reset belongs to boot/session management, not to the shared save reader called by each world.
