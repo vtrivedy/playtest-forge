@@ -7,6 +7,13 @@ const errors=[]; page.on('pageerror',e=>errors.push(e.message));
 await page.goto('http://127.0.0.1:5180/?manual');
 await page.waitForFunction(()=>window.__gameHooks?.ready,{timeout:120000});
 await page.evaluate(()=>{window.__gameHooks.setStick(.6,0);window.__gameHooks.advance(60);window.__gameHooks.setStick(0,0);window.__gameHooks.advance(10)});
+const nativeMap=await page.evaluate(()=>typeof window.__game.state().opening.worlds?.mapOpen==='boolean');
+if(nativeMap){
+ await page.keyboard.press('Tab');
+ if(!await page.evaluate(()=>window.__game.state().opening.worlds.mapOpen))throw Error('native Album did not open');
+ await page.keyboard.press('Tab');
+ if(await page.evaluate(()=>window.__game.state().opening.worlds.mapOpen))throw Error('native Album did not close');
+}
 await page.evaluate(async()=>{
  const {createWorldProgress}=await import('/src/worlds/progress.ts');
  const {createPageMap}=await import('/src/worlds/pageMap.ts');
@@ -14,7 +21,8 @@ await page.evaluate(async()=>{
  p.visit('russetvale','teach');
  p.complete('ashwater','teach'); p.complete('ashwater','develop');
  p.complete('press','teach'); p.complete('press','develop'); p.complete('press','combine');
- window.__mapPreview={progress:p,map:createPageMap(window.__opening.camera,p)};
+ const keyTarget=new EventTarget();
+ window.__mapPreview={progress:p,keyTarget,map:createPageMap(window.__opening.camera,p,keyTarget)};
  window.__mapPreview.map.setOpen(true); window.__gameHooks.advance(1);
 });
 await fs.mkdir('/tmp/hazel-map-preview',{recursive:true});
@@ -24,10 +32,10 @@ await page.waitForTimeout(250);
 await page.evaluate(()=>{window.__mapPreview.map.step();window.__gameHooks.advance(2)});
 await page.waitForTimeout(100);
 await page.screenshot({path:'/tmp/hazel-map-preview/album-960.png'});
-await page.keyboard.press('Tab');
+await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
 const closed=await page.evaluate(()=>{window.__gameHooks.advance(1);return !window.__mapPreview.map.isOpen()});
 await page.screenshot({path:'/tmp/hazel-map-preview/closed-badge-960.png'});
-await page.keyboard.press('Tab');
+await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
 const open=await page.evaluate(()=>window.__mapPreview.map.isOpen());
 await page.evaluate(async()=>{
  const {buildSeedwells}=await import('/src/worlds/seedwells.ts');
@@ -44,5 +52,5 @@ await page.evaluate(async()=>{
 });
 await page.screenshot({path:'/tmp/hazel-map-preview/seedwells-960.png'});
 await fs.writeFile('/tmp/hazel-map-preview/state.json',JSON.stringify(await page.evaluate(()=>({game:window.__game.state(),progress:window.__mapPreview.progress.snapshot()})),null,2));
-if(errors.length || !closed || !open) throw Error(JSON.stringify({errors,closed,open}));
-console.log(JSON.stringify({errors,closed,open})); await browser.close();
+if(errors.length || !closed || !open) throw Error(JSON.stringify({errors,closed,open,nativeRealKeyboard:nativeMap}));
+console.log(JSON.stringify({errors,closed,open,nativeRealKeyboard:nativeMap})); await browser.close();
