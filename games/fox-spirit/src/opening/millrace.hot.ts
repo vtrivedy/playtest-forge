@@ -180,7 +180,10 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D, restoredA
   if (restoredAtLoad) {
     // Rebuild the completed water/paint quietly; no burst, wheel-start cue or airborne leaves.
     leaves.visible = false;
-    ctx.field.restore(paintAt, F.paintR, 0, PAINT_OPTS);
+    const wash = ctx.field.restore(paintAt, F.paintR, 0, PAINT_OPTS);
+    wash.radius = wash.targetRadius;
+    wash.age = wash.durationS + 40;
+    wash.t = 1;
   }
 
   function placeLeaf(i: number): void {

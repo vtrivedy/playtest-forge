@@ -385,6 +385,7 @@ export function createKeeping(ctx: OpeningCtx, restoredAtLoad = false) {
   stairRoot.position.set(K.terrace.x, 0, K.terrace.z);
   stairRoot.rotation.y = K.terrace.yaw;
   scene.add(stairRoot);
+  ctx.occluders.push(stairRoot);
   const STAIR = { x0: 2.5, x1: -2.55, z: -K.terrace.hz - 0.68, depth: 1.36, steps: 12 };
   const rise = (K.terrace.top - SHELF_TOP) / STAIR.steps;
   const tread = (STAIR.x0 - STAIR.x1) / STAIR.steps;
@@ -453,7 +454,9 @@ export function createKeeping(ctx: OpeningCtx, restoredAtLoad = false) {
   pivot.position.set(K.hinge.x, K.hinge.y, K.hinge.z);
   pivot.rotation.y = K.terrace.yaw;
   scene.add(pivot);
-  pivot.add(buildRoots(rand, K.terrace.top + 0.4));
+  const roots = buildRoots(rand, K.terrace.top + 0.4);
+  pivot.add(roots);
+  ctx.occluders.push(roots);
   const { tree, pads, crown } = buildHearthtree(rand, K.terrace.top);
   tree.scale.setScalar(TREE_SCALE);
   pivot.add(tree);
@@ -587,7 +590,10 @@ export function createKeeping(ctx: OpeningCtx, restoredAtLoad = false) {
       l.p.y = floorAt(l.p.x, l.p.z) + 0.02;
       l.state = 'rest';
     }
-    ctx.field.restore(new THREE.Vector3(K.root.x, K.root.y, K.root.z), 14, 0, { edgeMax: 1.6 });
+    const wash = ctx.field.restore(new THREE.Vector3(K.root.x, K.root.y, K.root.z), 14, 0, { edgeMax: 1.6 });
+    wash.radius = wash.targetRadius;
+    wash.age = wash.durationS + 40;
+    wash.t = 1;
   }
 
   function release(): void {
