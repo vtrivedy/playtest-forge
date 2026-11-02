@@ -23,7 +23,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
 
   const stone = toon(0x827263, { contour: 0.5, hatchWeight: 0.35 });
   const paper = toon(0xa99672, { contour: 0.4, hatchWeight: 0.15 });
-  const undercroft = toon(0x464d50, { contour: 0.7, hatchWeight: 0.4 });
+  const undercroft = toon(0x68716d, { contour: 0.5, hatchWeight: 0.25 });
   const ink = toon(0x48382b);
   // Original ink illustration. Transparent paper print takes the same light/fog as the world.
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 768;
@@ -102,25 +102,33 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
   terrace.position.set(O.x, O.top - 0.12, O.z);
   root.add(terrace);
   ctx.occluders.push(terrace);
+  // The overlook belongs to the same illustrated book as the opening leaves.
+  const overlookPrint = new THREE.Mesh(new THREE.PlaneGeometry(O.width - 0.28, O.depth - 0.28), printMaterial);
+  overlookPrint.rotation.x = -Math.PI / 2;
+  overlookPrint.position.set(0, 0.126, 0);
+  terrace.add(overlookPrint);
   ctx.colliders.push({ kind: 'box', x: O.x, z: O.z, yaw: 0, hx: O.width / 2, hz: O.depth / 2, top: O.top });
   for (const dz of [-1.2, 0, 1.2]) {
     const base = ctx.groundH(O.x, O.z + dz);
     const support = box(1.0, O.top - base - 0.24, 0.85, undercroft, 0.05);
     support.position.set(O.x - 0.7, (O.top + base - 0.24) / 2, O.z + dz);
     root.add(support);
+    ctx.cutout.push(support);
   }
-  // Narrow tapered remnants and a broken pointed arch; open sky stays between them.
+  // Unequal broken shoulders, beyond the landing: a ruin in a meadow, not a doorway.
   for (const side of [-1, 1]) {
-    const pier = inked(hewn(new THREE.CylinderGeometry(0.24, 0.37, 1.85, 5, 3), ctx.rand, 0.045), stone, 0.014, true);
-    pier.position.set(O.x + 1.3, O.top + 0.925, O.z + side * 1.5);
+    const height = side < 0 ? 0.78 : 1.32;
+    const pier = inked(hewn(new THREE.CylinderGeometry(0.20, 0.30, height, 5, 3), ctx.rand, 0.045), stone, 0.014, true);
+    pier.position.set(O.x + 1.55, O.top + height / 2, O.z + side * 1.5);
     pier.rotation.y = side * 0.2; root.add(pier);
-    for (let i = 0; i < 3; i++) {
-      const arch = box(0.33, 0.3, 0.5, stone, 0.035);
-      arch.position.set(O.x + 1.3, O.top + 1.83 + i * 0.27, O.z + side * (1.4 - i * 0.19));
-      arch.rotation.x = side * 0.54; root.add(arch);
+    ctx.cutout.push(pier);
+    for (let i = 0; i < (side < 0 ? 1 : 2); i++) {
+      const arch = box(0.28, 0.23, 0.42, stone, 0.035);
+      arch.position.set(O.x + 1.55, O.top + height + i * 0.20, O.z + side * (1.4 - i * 0.18));
+      arch.rotation.x = side * 0.54; root.add(arch); ctx.cutout.push(arch);
     }
-    const foot = box(0.7, 0.12, 0.8, undercroft, 0.03);
-    foot.position.set(O.x + 1.3, O.top + 0.06, O.z + side * 1.5); root.add(foot);
+    const foot = box(0.58, 0.10, 0.64, undercroft, 0.03);
+    foot.position.set(O.x + 1.55, O.top + 0.05, O.z + side * 1.5); root.add(foot); ctx.cutout.push(foot);
   }
 
   R.leaves.forEach((p) => {
@@ -194,6 +202,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
     }
     housing.position.set(gx, base + guard.h / 2, gz);
     root.add(housing);
+    ctx.cutout.push(housing);
     folds.push({
       pivot, spindle: marker, x: marker.position.x, y: p.top, z: marker.position.z,
       elapsed: 0, phase: 'folded', guard, housing,
