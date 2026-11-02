@@ -54,6 +54,15 @@ canopy stems. This replay does not independently identify that mesh, fix camera
 clearance, or establish the duration of obstruction between two-second samples.
 The earlier cue-route stem approval therefore does not cover this approach.
 
+Hazel's subsequent owner diagnosis (#swarm :299) maps the blocker uniquely to
+the meadow `buildGround` mesh: PlaneGeometry 120×85, 170×120 segments.
+Reported lens y is 5.39552, analytical ground 5.11552 and rendered ground
+5.10405. Thus the lens is about 0.28 m above terrain; my earlier chat description
+of “terrain/lens penetration” was inaccurate. The intervening hillside blocks
+the lower sightline to the fox. These ownership and height measurements are
+Hazel's evidence, not a new independent measurement here. A `readableT` branch
+cause or `floorAt` mismatch remains unproven.
+
 Artifacts: `keeping-swarm5-captures/reed/blind-b13-seed2-investigate/`, including
 the sampled movie, all twelve frames and full state. The movie plays at four
 times simulation speed and is not continuous motion evidence. A candidate
