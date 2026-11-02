@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import foxRestUrl from '../../../../assets/hero/hearth_fox_rest.glb?url';
-import { buildMaple, buildRock, CANOPY, CANOPY_MOSS, canopyPad, RAMP_CANOPY, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
+import { buildMaple, buildRock, roundStone, CANOPY, CANOPY_MOSS, canopyPad, RAMP_CANOPY, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
@@ -374,7 +374,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const sootMat = toon(0x4a3c34, { contour: 0.5 });
   for (let i = 0; i < 7; i++) {
     const a = (i / 7) * Math.PI * 2;
-    const s = inked(jitter(new THREE.DodecahedronGeometry(0.17, 0), 0.12, rand), sootMat, 0.012);
+    const s = inked(roundStone(jitter(new THREE.DodecahedronGeometry(0.17, 0), 0.12, rand)), sootMat, 0.012);
     s.position.set(Math.cos(a) * 0.5, 0.06, Math.sin(a) * 0.5);
     s.scale.set(1.2, 0.7, 1);
     cradle.add(s);

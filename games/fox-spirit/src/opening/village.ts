@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { hewn, inked, jitter, toon } from '../lookdevKit';
+import { hewn, inked, jitter, roundSlab, roundStone, toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import { HOUSES, PATHS, WELL } from './layout';
 
@@ -335,7 +335,7 @@ function firePit(k: Kit, ctx: OpeningCtx, x: number, z: number): void {
   k.at(x, ctx.groundH(x, z), z, 0, () => {
     for (let i = 0; i < 9; i++) {
       const a = (i / 9) * Math.PI * 2;
-      k.add(hewn(new THREE.DodecahedronGeometry(0.26, 0), rand, 0.15), i % 2 ? C.stone : C.stoneDark, [Math.sin(a) * 0.85, 0.08, Math.cos(a) * 0.85], [0, a, 0], 0.02, [1.2, 0.8, 1]);
+      k.add(roundStone(hewn(new THREE.DodecahedronGeometry(0.26, 0), rand, 0.15)), i % 2 ? C.stone : C.stoneDark, [Math.sin(a) * 0.85, 0.08, Math.cos(a) * 0.85], [0, a, 0], 0.02, [1.2, 0.8, 1]);
     }
     for (let i = 0; i < 4; i++) k.add(cyl(0.09, 0.11, 0.9, 7, 'x'), 0x2f2622, [0, 0.12, 0], [0.25, (i / 4) * Math.PI, 0.35], 0.012);
     // a log bench for the evenings nobody keeps any more
@@ -356,7 +356,10 @@ function flagstones(ctx: OpeningCtx): THREE.Group {
       p.setX(i, p.getX(i) * k);
       p.setZ(i, p.getZ(i) * k);
     }
-    return hewn(g, rand, 0.04);
+    // the hewn prism is still built so the shared build rand advances exactly as before (layout stays put);
+    // the slab drawn is the rounded pillow with the same lobed outline
+    hewn(g, rand, 0.04);
+    return roundSlab(lobes, 0.3, 0.33, 0.1);
   });
   const placed: THREE.Matrix4[][] = shapes.map(() => []);
   for (const [ax, az, bx, bz] of PATHS) {

@@ -202,8 +202,9 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             vec3 wash = mix(vec3(0.38, 0.56, 0.22), vec3(0.5, 0.64, 0.3), gran);
             float gold = smoothstep(0.545, 0.565, lkFbm(xz * 0.16 + 7.0) + (lkNoise(xz * 1.9) - 0.5) * 0.06);
             wash = mix(wash, vec3(0.92, 0.66, 0.18) * (0.9 + 0.2 * gran), gold);
-            float fleck = smoothstep(0.8, 0.83, lkNoise(xz * 1.1 + 2.0));
-            wash = mix(wash, vec3(0.86, 0.26, 0.2), fleck * 0.85);
+            // fallen-leaf rust flecks (madder red read as stains at chase distance)
+            float fleck = smoothstep(0.83, 0.86, lkNoise(xz * 1.1 + 2.0));
+            wash = mix(wash, vec3(0.88, 0.42, 0.16), fleck * 0.8);
             float sl = dot(sepia, lw);
             // laid a little darker than the paper and pushed past its own chroma: a pastel at paper value
             // washes out under the haze and tone map
@@ -317,6 +318,69 @@ export function hewn(geo: THREE.BufferGeometry, rand: () => number, amount = 0.0
   const g = jitter(geo, amount, rand, 1.1).toNonIndexed();
   g.computeVertexNormals();
   return g;
+}
+
+/** A deterministic seed from a geometry's first vertices (so a replaced stone keeps its own lumps per instance) */
+function geoSeed(geo: THREE.BufferGeometry): number {
+  const p = geo.getAttribute('position') as THREE.BufferAttribute;
+  let h = 2166136261;
+  for (let i = 0; i < Math.min(p.count, 12); i++) h = Math.imul(h ^ Math.round((p.getX(i) + p.getY(i) * 3 + p.getZ(i) * 7) * 1e4), 16777619);
+  return h >>> 0;
+}
+
+/**
+ * Field stone: a smooth, lumpy, flat-bottomed boulder filling `src`'s bounds. Replaces faceted dodecahedra (Kit:
+ * "blocky hex stones") without touching the shared build rand — callers still build `src` exactly as before.
+ */
+export function roundStone(src: THREE.BufferGeometry): THREE.BufferGeometry {
+  src.computeBoundingBox();
+  const bb = src.boundingBox!;
+  const size = bb.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+  const centre = bb.getCenter(new THREE.Vector3());
+  const r = rng(geoSeed(src));
+  const lumps = Array.from({ length: 4 }, () => [new THREE.Vector3(r() - 0.5, r() * 0.6, r() - 0.5).normalize(), 0.08 + r() * 0.12] as const);
+  const g = mergeVertices(new THREE.IcosahedronGeometry(1, 2).deleteAttribute('normal').deleteAttribute('uv'), 1e-4);
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    let k = 1;
+    for (const [d, a] of lumps) k += a * Math.max(0, v.dot(d)) ** 2;
+    v.multiplyScalar(k);
+    // a settled stone: broad flat underside, shoulders rounding into it
+    if (v.y < -0.35) v.y = -0.35 + (v.y + 0.35) * 0.2;
+    p.setXYZ(i, centre.x + v.x * size.x, centre.y + v.y * size.y, centre.z + v.z * size.z);
+  }
+  g.computeVertexNormals();
+  // smooth normals, then non-indexed like hewn() so kit merges and bakes mix them freely
+  return g.toNonIndexed();
+}
+
+/**
+ * Worn flagstone: a low pillow slab whose outline follows `lobes` (radius multipliers round the rim, interpolated
+ * smoothly — 24 sides, never a hexagon) with a softly domed top and rounded edge.
+ */
+export function roundSlab(lobes: ReadonlyArray<number>, rTop: number, rBottom: number, h: number): THREE.BufferGeometry {
+  const seg = 24;
+  const g = mergeVertices(new THREE.CylinderGeometry(1, 1, 1, seg, 1, false).deleteAttribute('normal').deleteAttribute('uv'), 1e-4);
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  const n = lobes.length;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const rad = Math.hypot(x, z);
+    const t = ((Math.atan2(z, x) + Math.PI) / (Math.PI * 2)) * n;
+    const i0 = Math.floor(t) % n;
+    const f = t - Math.floor(t);
+    const w = (1 - Math.cos(f * Math.PI)) / 2;
+    const k = lobes[i0]! * (1 - w) + lobes[(i0 + 1) % n]! * w;
+    const top = y > 0;
+    // the top rim tucks in and the cap domes: a pillow, not a die-cut prism
+    const rr = rad * k * (top ? rTop * 0.88 : rBottom);
+    const yy = top ? h * (0.5 + 0.35 * (1 - rad * rad)) - h * 0.15 * rad : -h * 0.5;
+    p.setXYZ(i, rad > 1e-6 ? (x / rad) * rr : 0, yy, rad > 1e-6 ? (z / rad) * rr : 0);
+  }
+  g.computeVertexNormals();
+  return g.toNonIndexed();
 }
 
 /**

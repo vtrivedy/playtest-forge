@@ -20,6 +20,11 @@ const out = path.resolve(arg('--out', '/tmp/corridor-colour'));
 const [W, H] = arg('--size', '960x540').split('x').map(Number);
 const which = arg('--state', 'both');
 const only = arg('--views', '').split(',').filter(Boolean);
+// --at name:x,z,tx,tz adds one extra (non-corridor) lens, e.g. to inspect a prop; pair with --views name to render
+// only it, so the corridor means stay comparable
+const VIEWS_EXTRA = [];
+const at = arg('--at', '');
+if (at) { const [n, c] = at.split(':'); VIEWS_EXTRA.push([n, ...c.split(',').map(Number)]); }
 fs.mkdirSync(out, { recursive: true });
 
 /** [name, fox x, z, look-toward x, z] — every authored corridor between the slice's places */
@@ -93,7 +98,7 @@ try {
       }
     }, state);
     const rows = [];
-    for (const [name, x, z, tx, tz] of VIEWS.filter((v) => !only.length || only.includes(v[0]))) {
+    for (const [name, x, z, tx, tz] of [...VIEWS, ...VIEWS_EXTRA].filter((v) => !only.length || only.includes(v[0]))) {
       await page.evaluate(([x, z, tx, tz]) => {
         const h = window.__gameHooks;
         h.teleport(x, z, Math.atan2(tx - x, tz - z));
