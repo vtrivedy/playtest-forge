@@ -11,7 +11,7 @@ import type { OpeningCtx } from './scene';
 import { HOUSES, PATHS, WELL } from './layout';
 
 /** Muted so the fox stays the hottest note: dusty plaster, umber timber, olive thatch, blue slate */
-const C = {
+export const C = {
   plaster: 0xd6c4a2,
   plasterWarm: 0xcdb48e,
   timber: 0x5a3f2e,
@@ -40,7 +40,7 @@ const tmpQ = new THREE.Quaternion();
 const tmpE = new THREE.Euler();
 
 /** Collects parts as vertex-coloured, world-placed geometry; one inked toon mesh per ink weight */
-class Kit {
+export class Kit {
   private buckets = new Map<number, THREE.BufferGeometry[]>();
   /** parent transform for following adds */
   frame = new THREE.Matrix4();
@@ -81,8 +81,8 @@ class Kit {
 let kitMat: THREE.MeshToonMaterial | null = null;
 const kitMaterial = () => (kitMat ??= toon(0xffffff, { vertexColors: true }));
 
-const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
-function cyl(rt: number, rb: number, h: number, seg = 8, axis: 'x' | 'y' | 'z' = 'y'): THREE.BufferGeometry {
+export const box = (w: number, h: number, d: number) => new THREE.BoxGeometry(w, h, d);
+export function cyl(rt: number, rb: number, h: number, seg = 8, axis: 'x' | 'y' | 'z' = 'y'): THREE.BufferGeometry {
   const g = new THREE.CylinderGeometry(rt, rb, h, seg);
   if (axis === 'x') g.rotateZ(Math.PI / 2);
   if (axis === 'z') g.rotateX(Math.PI / 2);
@@ -90,7 +90,7 @@ function cyl(rt: number, rb: number, h: number, seg = 8, axis: 'x' | 'y' | 'z' =
 }
 
 /** triangle prism across x: base `d` (z), apex `h`, thickness `t` */
-function gable(d: number, h: number, t: number): THREE.BufferGeometry {
+export function gable(d: number, h: number, t: number): THREE.BufferGeometry {
   const s = new THREE.Shape();
   s.moveTo(-d / 2, 0);
   s.lineTo(d / 2, 0);
@@ -103,7 +103,7 @@ function gable(d: number, h: number, t: number): THREE.BufferGeometry {
 }
 
 /** round-topped slab in the xy plane */
-function archSlab(w: number, h: number, t: number): THREE.BufferGeometry {
+export function archSlab(w: number, h: number, t: number): THREE.BufferGeometry {
   const s = new THREE.Shape();
   const r = w / 2;
   s.moveTo(-r, 0);
@@ -131,7 +131,7 @@ function windowUnit(k: Kit, rand: () => number, flowers: boolean): void {
 }
 
 /** thatch course slab (local z = down-slope when `sz` = +1): lumpy top, scalloped fringe at the eave end */
-function thatchCourse(w: number, t: number, len: number, sz: number, rand: () => number): THREE.BufferGeometry {
+export function thatchCourse(w: number, t: number, len: number, sz: number, rand: () => number): THREE.BufferGeometry {
   const g = new THREE.BoxGeometry(w, t, len, Math.ceil(w / 0.18), 1, 3);
   const p = g.getAttribute('position') as THREE.BufferAttribute;
   const o = rand() * 10;
@@ -417,7 +417,7 @@ function festoon(k: Kit, a: THREE.Vector3, b: THREE.Vector3, sag: number): void 
 }
 
 /** wattle fence run (posts + woven rails), returns its collider */
-function fence(k: Kit, ctx: OpeningCtx, ax: number, az: number, bx: number, bz: number): { x: number; z: number; yaw: number; hx: number; hz: number; top: number } {
+export function fence(k: Kit, ctx: OpeningCtx, ax: number, az: number, bx: number, bz: number): { x: number; z: number; yaw: number; hx: number; hz: number; top: number } {
   const len = Math.hypot(bx - ax, bz - az);
   const yaw = Math.atan2(bx - ax, bz - az);
   const n = Math.max(2, Math.round(len / 1.2));

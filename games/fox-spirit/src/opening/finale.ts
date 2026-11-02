@@ -7,6 +7,8 @@
  * This file builds (allocations allowed); every per-frame step lives in finale.hot.ts.
  */
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import foxRestUrl from '../../../../assets/hero/hearth_fox_rest.glb?url';
 import { buildMaple, buildRock, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
@@ -75,6 +77,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   settled: () => boolean;
   ember: { restsAt: (x: number, y: number, z: number, r: number) => boolean };
   cam: FollowCamera;
+  player: { setMoveScale: (k: number) => void; intent: () => number };
   crownLetGo: () => void;
   onCard?: () => void;
 }) {
@@ -425,6 +428,27 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     return p;
   });
 
+  // ---- rest clips (tools/blender/scripts/hearth_fox_rest.py, same rig and bone names as the shipped fox): `lieDown`
+  // settles into a curled sphinx-down with the tail round the paws, `rest` breathes there. Kits play them through
+  // their own clip switch; the hero blends them over its controller (finale.hot.ts) only while it rests by the ember.
+  const restClips = (await new GLTFLoader().loadAsync(foxRestUrl)).animations;
+  const lieClip = restClips.find((c) => c.name === 'lieDown');
+  const restClip = restClips.find((c) => c.name === 'rest');
+  if (!lieClip || !restClip) throw new Error('hearth_fox_rest.glb is missing lieDown / rest');
+  const bindRest = (fox: HearthFox) => {
+    const lie = fox.mixer.clipAction(lieClip);
+    lie.setLoop(THREE.LoopOnce, 1);
+    lie.clampWhenFinished = true;
+    const rest = fox.mixer.clipAction(restClip);
+    fox.actions.set('lieDown', lie);
+    fox.actions.set('rest', rest);
+    return { lie, rest };
+  };
+  for (const k of kitFoxes) bindRest(k);
+  const hero = bindRest(ctx.fox);
+  hero.lie.setEffectiveWeight(0);
+  hero.rest.setEffectiveWeight(0);
+
   // ---- the way: once the Keeping has settled, a thin stream of warm motes runs from the root-hearth (where the
   // ember rests) across the bridge, off the crag's lip and down into the hollow to the cradle, until it is kindled
   const wayCurve = new THREE.CatmullRomCurve3([
@@ -537,7 +561,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    player: opts.player, heroLie: hero.lie, heroRest: hero.rest, lieDur: lieClip.duration,
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
     kitX: new Float32Array(F2.length),

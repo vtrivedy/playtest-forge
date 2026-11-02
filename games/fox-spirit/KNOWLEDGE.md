@@ -171,6 +171,15 @@ permits branch unmute; Vivek then hears the landed result on main.
   ratio 3.5 / index 1.6 (ratio 4, index 0.8 = celesta); "ticking clock" = 6 ms-attack footsteps at a steady gait.
 - The model hallucinates (a "male voice", "alarm") on noise beds; confirm any flaw on the spectrogram before acting.
 
+- Place tunes: a `SONG.tunes` entry with `places: [...]` is taken at the next pass start while one of its places
+  leads (weight > 0.5), never twice running, alternating with the shared rotation. Add new regions' places to
+  `PLACES` and, if they deserve it, a tune. 15-minute offline render: stable level (−34…−30 dB RMS/min), no NaN.
+
+- Model ↔ code conformance: `npm run check:music` renders the stress walk offline and checks every worklet
+  bar-line report against the TLA spec's rules (render.ts `checkTrace`). Mutating the worklet (drop the gap
+  check) fails it; the first run caught a checker bug instead (an armed swell legitimately waits across a breath,
+  so judge the start against the state before arming). Run it after touching the conductor.
+
 ### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
 
 - Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
@@ -356,6 +365,26 @@ reviewed for Summer Night, Hello?, Pine Grove, Beach Buds and full Hush. Python
 compile passed. This is a programmatic/visual audio critique, not a real-time
 listening claim or whole-game playtest. No runtime/mute changes in this slice.
 
+## World expansion and render budget (Bramble, swarm4)
+
+- The playable world is a union of shapes, not one ellipse: `groundH` = lerp(bowl base, `westBase`, `westK(x)`)
+  + smooth-min(bowl rim, `westRim`), with Wren's `vistaCut` applied last. Add a region by adding a shape to
+  `westE` (metres outside, negative inside) — rim, rim trees and grass masks follow automatically.
+- There is no hard world boundary: any slope under ~4 m/m is walkable (controller step 0.22 m per frame at
+  3.2 m/s). A place "reachable only by glide" needs column/cliff sides ≥ 1 m above every reachable
+  neighbour, not just height above the valley floor.
+- Two ground sheets that overlap z-fight (each triangulates groundH differently). Abut sheets on a shared edge
+  (bowl sheet x ≥ −64, Millbrook sheet x < −64).
+- Triangles, not draw calls, dominate SwiftShader time: leaf-card InstancedMeshes were ~1.1 M of the bowl's
+  1.3 M spawn triangles (renderer.info). `tools/world-stills.mjs` prints calls/tris per still; `--pre` runs JS
+  first (e.g. a tri breakdown by top-level group). Far scenery: `buildMaple(..., detail)` coarser lobes and
+  `bakeCells(..., thin)` keeps every n-th card.
+- `bake.ts` merges static props per material (toon materials carry a `userData.lk` key from patchPaint).
+  ~30 meshes per maple → ~7. Never bake an occluder group together with others: the chase-cam fade works per root.
+- Local SwiftShader screenshots of the west cost ~1.3 s each at 640×360; sim+render without readback is
+  ~5–10 ms/frame (`tools/perf-probe.mjs`). Budget input-route clips accordingly (~16× slower than real time).
+- `pkill -f <name>` from a Bash tool call matches the tool's own command line and kills it (exit 144). Use
+  `pgrep -af` and kill by pid.
 ## Page hot-path audit and release framing (Sorrel, swarm4)
 
 - Baseline `f866379` full input replay: three catches at 4.267/17.867/44.517s, zero skips, returned home; no JS errors. Jump .792m apex/.317s to apex/.633s air, final dash1.998m. Evidence `/captures/sorrel/page-baseline-trace/evidence.json`. Only the initial wake spot is staged.
@@ -391,3 +420,11 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
 - Hot-gate gap (fixed upstream request): roots were only `update/tick/frame/process` names — a `*.hot.ts` entry named `stepX` was never scanned. Name hot entries `update*` (or make every export a root).
 - This sandbox is 1 CPU: local SwiftShader continuous clips run ~0.5–1.8 fps at 640×360; run one probe at a time.
 - New builders draw from their own `rng(seed)`, never `ctx.rand`: each draw from the shared stream shifts every later builder's layout and the runtime stream replays depend on. The Crown's finale river (1800 draws) did exactly that until 1a28d58; Bramble's `tools/rand-fingerprint.mjs` (next ctx.rand values after boot) proves a change is stream-neutral.
+- Shared build rand: every opening builder draws from one `ctx.rand` (rng 11). A new region that consumes
+  it, or a new `continue` before a rand call in an old loop, re-lays-out every later builder (and can break
+  other teams' recorded tapes). New regions get their own seed (`{ ...ctx, rand: rng(N) }`); check with
+  `tools/rand-fingerprint.mjs` on both trees (equal next values ⇒ identical layouts). Note `jitter()`
+  consumes rand per vertex, so changing a geometry's segment count shifts the sequence too.
+- Paint restores each need a shader slot (`RESTORE_SLOTS`, now 24; `uRestore` loop breaks at the count).
+  With page (4) + Keeping (3) + homecoming + ruin + finale (2) + Millbrook/Hermitage (5) the old 16 was
+  exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.

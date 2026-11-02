@@ -37,8 +37,10 @@ try {
   hdr.writeUInt32LE(16, 16); hdr.writeUInt16LE(1, 20); hdr.writeUInt16LE(2, 22); hdr.writeUInt32LE(r.sr, 24);
   hdr.writeUInt32LE(r.sr * 4, 28); hdr.writeUInt16LE(4, 32); hdr.writeUInt16LE(16, 34); hdr.write('data', 36); hdr.writeUInt32LE(data.length, 40);
   fs.writeFileSync(path.join(out, sfx ? `${sfx}.wav` : 'hearthsong.wav'), Buffer.concat([hdr, data]));
+  if (r.trace) fs.writeFileSync(path.join(out, 'trace.json'), JSON.stringify(r.trace));
   fs.writeFileSync(path.join(out, 'marks.json'), JSON.stringify({ seconds, seed, renderMs: Date.now() - t0, errors, events: r.marks.map((m) => ({ time_s: m.t, kind: m.cue ? `cue${m.kind ?? 0}:${m.place}` : m.snow ? "snow" : m.place })) }, null, 1));
-  console.log(JSON.stringify({ out, seconds, renderMs: Date.now() - t0, errors }));
+  console.log(JSON.stringify({ out, seconds, renderMs: Date.now() - t0, errors, reports: r.reports, conformance: r.check ?? 'n/a' }));
+  if (r.check?.length) process.exitCode = 1;
 } finally {
   await browser.close();
   await server.close();
