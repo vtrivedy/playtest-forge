@@ -1,6 +1,10 @@
 /** Earned Album testimony. Visibility derives from mechanism facts, never visits. */
 import type { WorldId, LevelId } from './progress';
 export interface StoryMemory { voice: string; title: string; text: string }
+export const STACKS_MEMORY: StoryMemory = {
+  voice: 'An unpressed page', title: 'Everyone, together, laughing',
+  text: 'A family gathers around a crooked table. Someone has spilled the ink, and everyone is laughing. The Scribe left this page unpressed. Even after all these years, its edges are free to curl.',
+};
 /** The spoken page lines stay short enough to read during the staged reveal. */
 export const WORLD_REVELATIONS = {
   russetvale: 'Here the Scribe kept every autumn.',

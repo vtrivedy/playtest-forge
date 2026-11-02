@@ -46,7 +46,8 @@ try {
     const savedOpeningMatches = boot.opening.homecoming.pinned && !boot.opening.discovery.active
       && boot.opening.page.phase === 'kept' && boot.opening.page.catches === 3
       && boot.opening.discovery.restoredAtLoad && boot.opening.discovery.completionAt === null;
-    evidence.cases.push({ restored, boot, marsh, press, cameraDistance, pressCameraDistance, pressMatchesSave, savedOpeningMatches, physicalMatchesSave: restored.every(level => marsh.opening.ashwater.done.includes(level)) });
+    const quietSavedArches = !boot.opening.captions.showing?.includes('arch has lit') && !boot.opening.captions.showing?.includes('arch north');
+    evidence.cases.push({ restored, boot, marsh, press, cameraDistance, pressCameraDistance, pressMatchesSave, savedOpeningMatches, quietSavedArches, physicalMatchesSave: restored.every(level => marsh.opening.ashwater.done.includes(level)) });
     await fs.writeFile(`${out}/evidence.partial.json`, JSON.stringify(evidence, null, 2));
     await context.close();
   }
@@ -57,6 +58,7 @@ try {
   assert.ok(evidence.cases.every(c => c.pressCameraDistance < 12), 'Press travel must relocate the lens');
   evidence.worldReconstructionCompleted = true;
   assert.ok(evidence.cases.every(c => c.savedOpeningMatches), 'saved returned page must not restart the discovery invitation');
+  assert.ok(evidence.cases.every(c => c.quietSavedArches), 'saved unlocked arches must not replay new-unlock announcements');
   evidence.completed = true;
 } finally {
   await fs.writeFile(`${out}/evidence.json`, JSON.stringify(evidence, null, 2));

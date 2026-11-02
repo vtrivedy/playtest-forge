@@ -308,7 +308,7 @@ export async function runOpening(): Promise<void> {
   if (progress.isRestored('russetvale', 'teach') && !homecoming.isPinned()) homecoming.force();
   // Russetvale's levels from their physical truth: page home → Keeping settled → the Press kindled
   let progressT = 0;
-  const archSaid = { ashwater: false, press: false };
+  const archSaid = { ashwater: progress.isRestored('russetvale', 'teach'), press: progress.isVisited('ashwater', 'teach') };
   ctx.onUpdate((dt) => {
     pageMap.step();
     progressT += dt;

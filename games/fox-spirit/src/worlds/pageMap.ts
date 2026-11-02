@@ -4,7 +4,7 @@ import { WORLD_IDS, LEVEL_IDS, WORLD_CATALOGUE, type WorldProgress, type WorldId
 import type { LetterPlane } from '../opening/lettering.hot';
 import { createLetterPlane } from '../opening/lettering';
 import { stepPageMap } from './pageMap.hot';
-import { WORLD_STORIES, WORLD_REVELATIONS } from './story';
+import { WORLD_STORIES, WORLD_REVELATIONS, STACKS_MEMORY } from './story';
 const WIDTH = 1440, HEIGHT = 880;
 const FONT = 'Georgia, "DejaVu Serif", serif';
 export interface PageMap {
@@ -29,6 +29,7 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
   camera.add(revelation.mesh);
   let pendingRevelation = false;
   const knownCombine = WORLD_IDS.map(world => progress.isRestored(world, 'combine'));
+  let knownStacks = progress.isSecretFound('press-stacks');
   let open = false;
   let spread = 0;
   function text(value: string, x: number, y: number, size: number, color = '#382b31') {
@@ -95,7 +96,17 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     g.textAlign = 'center'; text('The Hearthfox Album', WIDTH / 2, 90, 42);
     text('Restore the three Seedwells · Find the Wellspring', WIDTH / 2, 135, 23, '#75615c');
     if (spread > 0) {
-      drawStory(WORLD_IDS[spread - 1]);
+      if (spread < 4) drawStory(WORLD_IDS[spread - 1]);
+      else {
+        const found = progress.isSecretFound('press-stacks');
+        text('Unpressed pages', WIDTH / 2, 220, 36, '#302334');
+        g.fillStyle = '#e4d4b8'; g.beginPath(); g.roundRect(180, 295, 1080, 380, 16); g.fill();
+        text(found ? STACKS_MEMORY.title : 'A loose binding', WIDTH / 2, 355, 32, '#302334');
+        text(found ? STACKS_MEMORY.voice : 'There is room for another memory.', WIDTH / 2, 405, 24, '#625354');
+        g.textAlign = 'left';
+        wrap(found ? STACKS_MEMORY.text : 'Some moments were never pressed into the Album. An empty space waits between these pages.', 235, 475, 970, 28, '#302330');
+        g.textAlign = 'center';
+      }
       text('[ / ] · turn pages     Tab · close Album', WIDTH / 2, 844, 22);
       texture.needsUpdate = true;
       return;
@@ -128,7 +139,7 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     if (event.code === 'Tab') { event.preventDefault(); if (!event.repeat) setOpen(!open); }
     else if (open && (event.code === 'BracketLeft' || event.code === 'BracketRight')) {
       event.preventDefault();
-      if (!event.repeat) { spread = (spread + (event.code === 'BracketRight' ? 1 : 3)) % 4; draw(); }
+      if (!event.repeat) { spread = (spread + (event.code === 'BracketRight' ? 1 : 4)) % 5; draw(); }
     }
   }
   inputTarget.addEventListener('keydown', keydown);
@@ -142,6 +153,13 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
       }
       knownCombine[wi] = restored;
     }
+    const stacks = progress.isSecretFound('press-stacks');
+    if (stacks && !knownStacks) {
+      revelation.draw([{ text: 'A page never pressed: everyone, together, laughing.', px: 42 }, { text: 'A page returned · Tab to read', px: 25 }]);
+      pendingRevelation = !open;
+      spread = 4;
+    }
+    knownStacks = stacks;
     if (open) draw();
   });
   draw();
