@@ -24,3 +24,23 @@ Evidence: `/captures/sorrel/hermitage-bd48cbd/` has window.__game, all3000
 trace samples, checks and13 timed PNGs. This is access/state and sampled
 composition evidence; it does not claim continuous motion, audio quality,
 real-time performance, or unfamiliar-player discovery.
+
+## Matched pole-registration retest — fd98352
+
+Merged Bramble2f8f8a7 (including ca30642) and replayed the identical route for
+50 simulated seconds. All three state checks, complete route, camera gates,
+and60/60 captured animated-body screen margins pass. No JS errors; TypeScript
+and lint:feel pass. Camera extrema match the baseline values above.
+
+Reviewed every frame of the30–34s window across two contact sheets and exact
+32s PNG. Pole registration alone does **not** remove the foreground upright:
+it remains opaque beside the lens while the fox is standing, clips the tail,
+then exits the view as the fox turns and returns. Face and torso stay visible.
+This is not a visual-fix acceptance. Shared opening occlusion samples lateral
+rays at−0.42/0/+0.42m; narrow near-lens geometry can lie between those samples.
+Sent that source hypothesis and matched evidence to Bramble and Fern rather
+than altering the shared fader during concurrent reviews.
+
+Retest evidence: `/captures/sorrel/hermitage-pole-retest/`, including60 raw
+frames, four-second15fps clip, seven PNGs, window.__game and all1500 samples.
+The capture is offline30Hz640×360 without audio. The source remains frozen.
