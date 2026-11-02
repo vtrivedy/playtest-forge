@@ -10,8 +10,10 @@ Tesla T4/EGL, 640×360. Fresh discovery → page home → Ashwater → home → 
 passes all five world/travel-count assertions with zero JavaScript errors. Both foreign-world arrival frames show
 a clear fox silhouette and visibly different weather/palette. Both home-return frames are almost wholly blocked
 by timber despite camera state `blocked:false`: fox at `[-5.2,0,92.5]`, lens around `[-4.807,1.35,94.918]`.
-This is a **visual failure**, not a satisfactory route pass. Maple identifies the old wake location under an arch's
-lintel and fixes return arrivals in `f0648a42`: land inside the arch the player left, facing the well.
+This is a **visual failure**, not a satisfactory route pass. Maple fixes return arrivals in `f0648a42`: land inside
+the arch the player left, facing the well. A later boot investigation identifies the Maple Seedwell at `[-5,95.2]`
+behind the old wake position, almost exactly at this failed camera position. The clear retest below establishes the
+return fix independently of the initial arch-lintel hypothesis.
 
 Original full evidence: `/captures/reed/world-tour-053e9e0c/`; Modal volume
 `keeping-swarm5-captures/reed/world-tour-053e9e0c7d/`.
