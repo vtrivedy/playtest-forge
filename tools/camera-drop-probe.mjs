@@ -21,6 +21,7 @@ const option = (name, fallback) => { const i = process.argv.indexOf(`--${name}`)
 const routeModule = path.resolve(option('route-module', 'tools/opening-hero-route.mjs'));
 const { createSliceRoute, SLICE_START } = await import(pathToFileURL(routeModule).href);
 if (typeof createSliceRoute !== 'function' || !SLICE_START || ![SLICE_START.x, SLICE_START.z, SLICE_START.yaw].every(Number.isFinite)) throw Error('Route module must export createSliceRoute and finite SLICE_START x/z/yaw');
+const expectedBeat = option('expect-beat', '');
 const checkFrom = Number(option('check-from', '60'));
 if (!Number.isFinite(checkFrom) || checkFrom < 0 || checkFrom >= seconds) throw Error('check-from must be nonnegative and less than seconds');
 const clipBeat = option('clip-beat', 'off the canopy');
@@ -130,6 +131,13 @@ try {
   const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,silhouette:window.__cameraProbe.silhouette,cameraTunables:{...window.__gameHooks.camera},game:{mode:window.__game.mode,state:window.__game.state()}}));
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
   fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,routeModule:path.relative(process.cwd(),routeModule),checkFrom,staging:'one start teleport; controller input thereafter',clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
+  if (expectedBeat) {
+    const actualBeat = evidence.trace.at(-1)?.beat;
+    const routeCheck = {expectedBeat,actualBeat,pass:actualBeat===expectedBeat};
+    fs.writeFileSync(path.join(out,'route-check.json'),JSON.stringify(routeCheck,null,2));
+    console.log('ROUTE',JSON.stringify(routeCheck));
+    if(!routeCheck.pass)process.exitCode=1;
+  }
   const late = evidence.trace.filter(s => s.f * testDt >= checkFrom);
   if (late.length) {
     const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));
