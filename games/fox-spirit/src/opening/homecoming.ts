@@ -76,27 +76,34 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   const moteSeed = Array.from({ length: MOTES }, () => [ctx.rand() * 6.28, ctx.rand() * 0.8, ctx.rand() * 4] as const);
   const m4 = new THREE.Matrix4();
 
-  // a soft chime per lantern, rising a step each time
-  let ac: AudioContext | null = null;
-  const chime = (step: number) => {
-    try {
-      ac ??= new AudioContext();
-      const t = ac.currentTime;
-      for (const [mul, gain] of [[1, 0.06], [2, 0.02], [3.01, 0.01]] as const) {
-        const o = ac.createOscillator();
-        const g = ac.createGain();
-        o.type = 'sine';
-        o.frequency.value = [523, 587, 659, 784, 880][step]! * mul;
-        g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(gain, t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
-        o.connect(g).connect(ac.destination);
-        o.start(t);
-        o.stop(t + 2.3);
-      }
-    } catch {
-      /* no audio */
-    }
+  // sound (DESIGN-audio-moss.md): each kindling is a match-scratch then a glass chime a pentatonic step higher;
+  // the well filling swells a warm open chord and dips the music under it
+  const ac = ctx.audio.ac;
+  const world = new THREE.Vector3();
+  const at = (o: THREE.Object3D) => o.getWorldPosition(world).clone();
+  const STEPS = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3];
+  const kindleSound = (i: number) => {
+    const p = at(lanterns[i]!.body);
+    ctx.audio.play('kindle', { at: p, gain: 0.5, rate: 0.9 });
+    ctx.audio.play('chime', { at: p, gain: 0.8, rate: 0.8 * STEPS[i]!, delay: 0.12 });
+  };
+  const swell = () => {
+    if (ac.state !== 'running') return;
+    ctx.audio.duck(0.4, 4.5);
+    const t = ac.currentTime;
+    const out = ctx.audio.at(at(fill), 6);
+    [130.8, 196, 261.6, 329.6, 392].forEach((hz, i) => {
+      const o = ac.createOscillator();
+      o.type = i % 2 ? 'triangle' : 'sine';
+      o.frequency.value = hz;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.035, t + 0.4 + i * 0.25 + 1.2);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 6.5);
+      o.connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 6.6);
+    });
   };
 
   let forced = false;
@@ -116,6 +123,8 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
     if (pinned < 0) {
       pinned = 0;
       pin.visible = true;
+      ctx.audio.play('page-pin', { at: at(pin), gain: 0.9 });
+      ctx.audio.play('tack', { at: at(pin), gain: 0.5, rate: 1.2, delay: 0.18 });
       queue.push('page');
     }
     if (pinned >= 0) {
@@ -138,7 +147,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
     const next = queue.find((id) => !kindled.includes(id));
     if (next && since >= H.gap && kindled.length < lanterns.length) {
       lanterns[kindled.length]!.lit = 0;
-      chime(kindled.length);
+      kindleSound(kindled.length);
       kindled.push(next);
       since = 0;
     }
@@ -159,7 +168,10 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       glow += k * flick;
     }
     light.intensity = glow * 1.4;
-    if (full < 0 && kindled.length === lanterns.length && lanterns.every((l) => l.lit > 0.6)) full = 0;
+    if (full < 0 && kindled.length === lanterns.length && lanterns.every((l) => l.lit > 0.6)) {
+      full = 0;
+      swell();
+    }
     if (full >= 0) {
       full += dt;
       const k = THREE.MathUtils.smoothstep(full, 0, 3);

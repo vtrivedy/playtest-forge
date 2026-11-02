@@ -24,6 +24,8 @@ const log = [];
 try {
   await page.goto('http://127.0.0.1:5194/', { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
+  // a real key press starts the shared audio graph (autoplay rule), so the run also exercises the SFX
+  await page.keyboard.press('KeyM');
   log.push(['freed', await page.evaluate(() => {
     const h = window.__gameHooks;
     h.setManual(true);
@@ -84,6 +86,7 @@ try {
     execFileSync(ff, ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(dir, 'f%04d.jpg'), '-c:v', 'libx264', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, 'clip.mp4')]);
     log.push(['clip', n]);
   }
+  log.push(['audio', await page.evaluate(() => window.__gameHooks.state().opening.audio)]);
   log.push(['creatures', await page.evaluate(() => window.__gameHooks.state().opening.unpressed.creatures)]);
 } finally {
   fs.writeFileSync(path.join(out, 'evidence.json'), JSON.stringify({ log, errors }, null, 2));

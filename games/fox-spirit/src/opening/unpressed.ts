@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { RAMP_WORLD, inkMaterial, hullGeometry, plumeGeometry, hewn, toon, inked } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
+import type { OpeningAudio } from './audio';
 import type { Collider } from '../lookdevPlay';
 import { HOMECOMING, JOGS, KIT, UNPRESSED } from './layout';
 
@@ -402,33 +403,26 @@ type Phase = 'pressed' | 'popping' | 'performing' | 'alive';
  * Sound: a pressed drawing breathes a faint glassy shimmer you can find by ear; the pop is a paper "fwump"
  * and a two-note chime, then the creature's own voice. WebAudio starts on the first key, like the hearth hum.
  */
-function createUnpressedAudio() {
-  let ac: AudioContext | null = null;
-  let master: GainNode;
+function createUnpressedAudio(audio: OpeningAudio) {
+  const ac = audio.ac;
+  const master = ac.createGain();
+  master.gain.value = 0.6;
+  master.connect(audio.sfx);
   const shimmers = new Map<string, GainNode>();
-  const start = () => {
-    if (ac) return;
-    ac = new AudioContext();
-    master = ac.createGain();
-    master.gain.value = 0.6;
-    master.connect(ac.destination);
-  };
-  addEventListener('keydown', start, { once: true });
-  addEventListener('pointerdown', start, { once: true });
   const env = (g: GainNode, t0: number, peak: number, a: number, d: number) => {
     g.gain.setValueAtTime(0, t0);
     g.gain.linearRampToValueAtTime(peak, t0 + a);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
   };
   const tone = (f0: number, f1: number, type: OscillatorType, t0: number, peak: number, a: number, d: number, lp = 4000) => {
-    const o = ac!.createOscillator();
+    const o = ac.createOscillator();
     o.type = type;
     o.frequency.setValueAtTime(f0, t0);
     o.frequency.exponentialRampToValueAtTime(f1, t0 + a + d);
-    const f = ac!.createBiquadFilter();
+    const f = ac.createBiquadFilter();
     f.type = 'lowpass';
     f.frequency.value = lp;
-    const g = ac!.createGain();
+    const g = ac.createGain();
     env(g, t0, peak, a, d);
     o.connect(f).connect(g).connect(master);
     o.start(t0);
@@ -437,7 +431,7 @@ function createUnpressedAudio() {
   return {
     /** per-frame: shimmer loudness by distance to each still-pressed drawing (0 when found) */
     shimmer(id: string, k: number) {
-      if (!ac) return;
+      if (ac.state !== 'running') return;
       let g = shimmers.get(id);
       if (!g) {
         g = ac.createGain();
@@ -458,24 +452,13 @@ function createUnpressedAudio() {
       }
       g.gain.setTargetAtTime(0.018 * k, ac.currentTime, 0.2);
     },
-    pop(id: string) {
-      if (!ac) return;
+    pop(id: string, at: THREE.Vector3) {
+      if (ac.state !== 'running') return;
       const t = ac.currentTime;
-      // paper fwump: a short low-passed noise burst
-      const len = Math.floor(ac.sampleRate * 0.35);
-      const buf = ac.createBuffer(1, len, ac.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
-      const src = ac.createBufferSource();
-      src.buffer = buf;
-      const f = ac.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.setValueAtTime(2400, t);
-      f.frequency.exponentialRampToValueAtTime(300, t + 0.3);
-      const g = ac.createGain();
-      env(g, t, 0.35, 0.01, 0.32);
-      src.connect(f).connect(g).connect(master);
-      src.start(t);
+      // the page peels off the surface, then flicks as the body inflates; small creatures pitch up
+      const rate = id === 'hedgehog' ? 1.25 : id === 'hare' || id === 'kit' ? 1.12 : id === 'heron' ? 0.82 : 0.9;
+      audio.play('page-flip-0', { at, rate, gain: 1.1 });
+      audio.play('page-flip-2', { at, rate: rate * 1.05, gain: 0.8, delay: 0.32 });
       // two-note chime, a little different per creature
       const root = id === 'hedgehog' ? 784 : id === 'heron' ? 659 : 587;
       tone(root, root, 'sine', t + 0.08, 0.09, 0.01, 1.2);
@@ -484,7 +467,6 @@ function createUnpressedAudio() {
       if (id === 'hedgehog') for (const dt of [0.7, 0.86]) tone(1500, 2300, 'sine', t + dt, 0.05, 0.01, 0.07);
       if (id === 'heron') tone(420, 260, 'sawtooth', t + 1.0, 0.06, 0.02, 0.32, 1200);
       if (id === 'deer') tone(700, 520, 'triangle', t + 1.0, 0.05, 0.05, 0.5, 1800);
-      if (id === 'hare') for (const dt of [1.1, 1.32]) tone(190, 110, 'sine', t + dt, 0.09, 0.005, 0.12);
       shimmers.get(id)?.gain.setTargetAtTime(0, t, 0.1);
     },
   };
@@ -547,12 +529,12 @@ export function buildUnpressed(ctx: OpeningCtx) {
       });
     // the kit's page is sealed behind the glyph shrine's door until it opens
     paper.visible = spec.id !== 'kit';
-    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false, look: 0 };
+    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false, look: 0, beat: 0 };
   });
 
   const world = new THREE.Vector3();
   const local = new THREE.Vector3();
-  const audio = createUnpressedAudio();
+  const audio = createUnpressedAudio(ctx.audio);
 
   function unpress(id: string): boolean {
     const c = creatures.find((k) => k.spec.id === id);
@@ -560,7 +542,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     c.phase = 'popping';
     c.t = 0;
     c.root.visible = true;
-    audio.pop(c.spec.id);
+    audio.pop(c.spec.id, c.holder.position);
     for (const f of c.flakes) {
       f.m.visible = true;
       f.m.position.set((rand() - 0.2) * 0.8 * c.spec.scale, (0.2 + rand() * 1.3) * c.spec.scale, 0.05);
@@ -579,6 +561,15 @@ export function buildUnpressed(ctx: OpeningCtx) {
     const want = Math.abs(r) > lim + 0.5 ? Math.sign(c.look || r) * lim : THREE.MathUtils.clamp(r, -lim, lim);
     c.look = THREE.MathUtils.damp(c.look, want, 5, dt);
     return c.look;
+  }
+
+  /** once per cycle of a gait/wing phase (rad): a footfall or wingbeat one-shot */
+  function beat(c: (typeof creatures)[number], phase: number, fn: (n: number) => void): void {
+    const n = Math.floor(phase / (Math.PI * 2));
+    if (n !== c.beat) {
+      c.beat = n;
+      fn(n);
+    }
   }
 
   // ---- performances: t from the start of 'performing'; return true when done
@@ -626,6 +617,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       head.rotation.z = t < 0.8 ? Math.sin(t * 22) * 0.25 * (1 - t / 0.8) : 0;
       const open = smooth(0.8, 1.2, t) * (1 - smooth(2.6, 3.2, t));
       const flap = t > 1.2 && t < 2.7 ? Math.sin((t - 1.2) * 11) : 0;
+      if (t > 1.2 && t < 2.7) beat(c, (t - 1.2) * 11, (n) => ctx.audio.play(n % 2 ? 'cloth-1' : 'cloth-0', { at: c.holder.position, rate: 0.8, gain: 0.9 }));
       wl.rotation.x = -(0.15 + 1.25 * open + flap * 0.75 * open);
       wr.rotation.x = 0.15 + 1.25 * open + flap * 0.75 * open;
       B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = smooth(1.3, 1.6, t) * (1 - smooth(2.3, 2.6, t)) * 0.9;
@@ -723,6 +715,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     const wr = B(c, 'wingR');
     const open = smooth(0, 0.5, t) * (1 - smooth(F.secs - 0.6, F.secs, t));
     const flap = Math.sin(t * 7) * (0.5 + 0.5 * (1 - smooth(1.5, 3, t)) + 0.5 * smooth(F.secs - 2.5, F.secs - 1, t));
+    if (open > 0.3) beat(c, t * 7, (n) => ctx.audio.play(n % 2 ? 'cloth-1' : 'cloth-0', { at: c.holder.position, rate: 0.75, gain: 0.5 + 0.5 * Math.abs(flap) }));
     wl.rotation.x = -(0.15 + 1.25 * open + flap * 0.6 * open);
     wr.rotation.x = 0.15 + 1.25 * open + flap * 0.6 * open;
     B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = open * 1.1;
@@ -782,6 +775,8 @@ export function buildUnpressed(ctx: OpeningCtx) {
     } else c.gait = 0;
     // the bound: hind legs drive, the body arcs, forelegs reach for the landing
     const g = c.gait;
+    // a soft thump as the hind feet land, every bound
+    if (moving) beat(c, g + 1.2, (n) => ctx.audio.play(n % 2 ? 'land-1' : 'land-0', { at: c.holder.position, rate: 1.3, gain: 0.45 }));
     const air = moving ? Math.max(0, Math.sin(g)) : 0;
     B(c, 'legB').rotation.z = moving ? -0.9 * Math.sin(g + 0.6) : 0;
     B(c, 'legF').rotation.z = moving ? 0.8 * Math.sin(g - 0.5) : 0;

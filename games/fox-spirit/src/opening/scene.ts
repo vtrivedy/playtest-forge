@@ -25,6 +25,8 @@ import { createKeeping } from './keeping';
 import { buildUnpressed } from './unpressed';
 import { buildGlyphs } from './glyphs';
 import { createHearthHum } from './hum';
+import { createOpeningAudio, type OpeningAudio } from './audio';
+import { createFoxFoley } from './foley';
 import { buildRunawayPage } from './page';
 import { buildHomecoming } from './homecoming';
 import { buildCanopy } from './canopy';
@@ -61,6 +63,8 @@ export interface OpeningCtx {
   /** set once the controller exists (after every build) */
   player: PlayController | null;
   onUpdate: (fn: (dt: number, t: number) => void) => void;
+  /** the one sound graph (audio.ts): play samples, place voices in 3D, duck the music */
+  audio: OpeningAudio;
 }
 
 export async function runOpening(): Promise<void> {
@@ -95,6 +99,7 @@ export async function runOpening(): Promise<void> {
     fox,
     player: null,
     onUpdate: (fn) => void updates.push(fn),
+    audio: createOpeningAudio(),
   };
   const { field } = ctx;
 
@@ -135,7 +140,10 @@ export async function runOpening(): Promise<void> {
     updrafts: hearth.updrafts,
     onInteract: () => carry?.interact(),
     onDash: (lastGrounded) => carry?.beforeDash(lastGrounded),
+    onFootfall: (at, hind) => foley.footfall(at, hind, (player.state() as { speed: number }).speed),
+    onLand: (at, impact) => foley.land(at, impact),
   });
+  const foley = createFoxFoley({ audio: ctx.audio, groundH });
   ctx.player = player;
   carry = createCarry({
     scene, fox: fox.root,
@@ -148,6 +156,8 @@ export async function runOpening(): Promise<void> {
     updrafts: hearth.updrafts, steamId: 'steam', rootId: 'root',
     coal: () => coal.heatSource(),
     onSteam: (at) => {
+      ctx.audio.playOne('steam', 3, { at, gain: 0.8 });
+      ctx.audio.duck(0.5, 2.5);
       field.restore(at, 7, 1.6, { edgeMax: 1.2 });
       keeping.reconnectSteam();
     },
@@ -156,7 +166,7 @@ export async function runOpening(): Promise<void> {
       keeping.release();
     },
   });
-  const hum = createHearthHum({ hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position, page: runaway.voice });
+  const hum = createHearthHum({ audio: ctx.audio, hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position, page: runaway.voice });
   // the far Crown answers once the near tree has finished falling: attractor ladder resolves near → far
   // near → far: the settle swells the hum; the Crown answers when the fox steps out onto the far crag
   // and faces the vista gap (or after a while, so the response is never missed)
@@ -186,6 +196,9 @@ export async function runOpening(): Promise<void> {
     coal.update(dt, time, player.state() as { grounded: boolean; dashing?: boolean });
     chemistry.update(dt, time);
     hum.update();
+    const ps = player.state() as { grounded: boolean; gliding: boolean; vel: number[]; speed: number; pos: number[] };
+    foley.update(ps);
+    ctx.audio.update(view, { restored: Math.min(1, field.restores.reduce((a, r) => a + r.radius * r.radius, 0) / 260), height: ps.pos[1]! - groundH(ps.pos[0]!, ps.pos[2]!) });
     // the key's shadow frustum rides with the fox
     const p = fox.root.position;
     lights.key.target.position.set(p.x, 0, p.z);
@@ -225,13 +238,17 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
       return ready;
     },
     state,
+    /** post-limiter mix (exactly what the speakers get) for capture tools: MediaRecorder / analyser */
+    audioTap: () => ctx.audio.record.stream,
+    /** the audio context (capture tools read sampleRate / currentTime / resume it) */
+    audioContext: () => ctx.audio.ac,
     setStick: player.setStick,
     setKeys: player.setKeys,
     teleport: player.teleport,

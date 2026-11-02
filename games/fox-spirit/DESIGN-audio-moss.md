@@ -1,22 +1,22 @@
 # Audio: creatures, homecoming, ruin, canopy (Moss)
 
-Part of the opening audio pass (Kit :963; split Flint :987). Flint owns the shared graph (one AudioContext,
-master bus, music bed + ducking, 3D panner util). These events play through that bus, placed in 3D at their
-source. All samples are CC0 (Kenney RPG Audio / Impact Sounds / Interface Sounds; credited in CREDITS.md),
-stored in `src/opening/sfx/`, imported with `?url` so the build bundles them.
+Part of the opening audio pass (Kit :963; split Flint :987). Everything plays through Flint's one graph
+(`opening/audio.ts`, docs/design/swarm3/audio-DESIGN.md): `ctx.audio.play(file, { at })` places a one-shot in 3D;
+synth voices connect to `ctx.audio.sfx` or `ctx.audio.at(pos)`; `duck` dips the music. Samples are CC0 Kenney
+files in `src/opening/sfx/` (assets/library/CREDITS.md); where Flint's set already has the same source sound
+(page-flip = bookFlip, cloth, land = impactSoft) it is reused, not duplicated.
 
 ## Events
 
-| event | where | sample(s) | treatment |
+| event | where | sound | treatment |
 |---|---|---|---|
-| creature pop | the drawing | `paper-peel` + `paper-flick` | pitch by creature (hedgehog high, heron low); the peel, then the flick as it inflates |
-| hare bound | hare | `thump-1/2` | soft, alternating, every 2nd bound while it leads; quiet at range |
-| heron wings | heron | `wing-1/2` | on each downstroke of the hop down and the homecoming wheel |
-| canopy leaf | each leaf landing | `leaf-bounce` + `thump` low | pitch rises up the canopy (entry → roost) |
-| ruin unfold | each fold | `unfold` + `creak` | slowed a touch, low |
+| creature pop | the drawing | `page-flip-0` then `page-flip-2` + the two-note synth chime and the creature's voice | pitch by creature (hedgehog high, heron low) |
+| hare bound | hare | `land-0/1` | every bound, rate 1.3, quiet |
+| heron wings | heron | `cloth-0/1` | each wingbeat of the hop down and of the homecoming wheel |
+| canopy leaf | each leaf on first touch / launch | `cloth-2` / `land-0` low | touch pitch rises up the canopy (entry → roost) |
+| ruin unfold | each fold | `unfold` + `creak`, then `land-1` as it lands | slowed, low |
 | page pinned | well post | `page-pin` + `tack` | |
-| lantern kindle | each lantern | `kindle` then `chime` | chime pitched up a step per lantern (5 steps of a major pentatonic) |
-| well fills | the well | synth pad swell (Web Audio) | 3 s swell on all five lit; music ducks under it |
+| lantern kindle | each lantern | `kindle` then `chime` | chime a pentatonic step higher per lantern |
+| well fills | the well | synth open-chord swell (5 voices, 6.5 s) at the well | music ducks to 0.4 for 4.5 s |
 
-Rules: nothing above −6 dBFS at the bus; each event has a cooldown so a repeat can't machine-gun; the
-drawings' breath shimmer stays a quiet synth voice (no sample).
+The drawings' breath shimmer stays a quiet synth voice (no sample).
