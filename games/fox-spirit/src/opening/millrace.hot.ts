@@ -158,6 +158,9 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
     wheel: new THREE.Vector3(M.wheel.x, waterY(M.wheel.z) + 1.35, M.wheel.z),
   });
   const damAt = new THREE.Vector3(M.dam.x, waterY(M.dam.z), M.dam.z);
+  // arriving on the lookout washes the hilltop and the orchard below it (once)
+  const lookoutAt = new THREE.Vector3(M.lookout.x + 3, 0, M.lookout.z + 4);
+  let lookoutPainted = false;
 
   // one teach line, like the hearth's: only while standing by the held dam
   const hud = document.createElement('div');
@@ -223,6 +226,11 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
       if (phase === 'held' && Math.hypot(f.x - M.dam.x, f.z - M.dam.z) < F.reach) burst(t);
     }
     const fox = ctx.fox.root.position;
+    if (!lookoutPainted && Math.hypot(fox.x - M.lookout.x, fox.z - M.lookout.z) < M.lookout.r) {
+      lookoutPainted = true;
+      ctx.field.restore(lookoutAt, 19, 3.4, PAINT_OPTS);
+      ctx.audio.cue('lookout');
+    }
     const near = phase === 'held' && Math.hypot(fox.x - M.dam.x, fox.z - M.dam.z) < 7;
     nearT = near ? nearT + dt : 0;
     if (teaching !== nearT > 1.2) {
@@ -346,7 +354,7 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
       if (phase === 'held') burstAt = -2;
     },
     state() {
-      return { phase, front: Math.round(front * 10) / 10, turning, painted, spin: Math.round(spin * 100) / 100 };
+      return { phase, front: Math.round(front * 10) / 10, turning, painted, spin: Math.round(spin * 100) / 100, lookoutPainted };
     },
   };
 }
