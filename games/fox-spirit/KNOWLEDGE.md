@@ -26,6 +26,100 @@ Keep durable findings here by topic. Name the tested SHA and evidence; separate 
 
 ## Audio capture and review
 
+### Quiet audio redesign — research, 2026-11-02 (Tallow)
+
+Vivek rejected the 34c7054 soundtrack as intrusive and constant (#swarm :1144).
+Kit's correction in :1153 delegates listening to the team: main remains muted
+until a teammate independently listens and agrees the redo is gentle and fitting.
+Lowering master gain alone does
+not address repetition, bright attacks, competing voices, or misplaced music.
+These are source findings and proposed design criteria, not a listening verdict.
+
+**What the references actually teach**
+
+- **Alba:** Dan Pugsley, its sound designer/music mixer, describes removing birds
+  embedded in ambience recordings, separate environmental biomes, and different
+  attenuation for nearby shoreline and distant ocean. Most music was tied to
+  quest events so environmental ambience had room; the team played the whole
+  story to identify places to add emotion or strip music back. Application:
+  clean wind without hidden bird calls, authored place-dependent levels, distant
+  isolated wildlife, music for meaningful events rather than an endless playlist.
+  [Creator case study](https://www.cassinisound.com/casestudy-alba).
+- **A Short Hike:** Adam Robinson-Yu describes Mark Sparling's map-based score:
+  instruments fade by location, strings join flying, brass responds to boat
+  speed. Application: sound follows player experience and place; selecting two
+  pleasant files and crossfading them forever is not equivalent. This source
+  does not establish a numeric loudness or bird-density target.
+  [Developer write-up](https://blog.playstation.com/2021/08/05/crafting-a-tiny-open-world-a-look-behind-the-scenes-at-the-creation-of-a-short-hike/).
+- **Ori:** Gareth Coker says gameplay informs momentum, visuals inform timbre,
+  and a recurring theme/common instruments connect different places. His wooden
+  Ginso Tree sounds belong to that environment. Application: a small warm paper,
+  wood, breath palette matching our fox and painted autumn world; repeated
+  bell/chime rewards should not become a second score competing with music.
+  [Composer interview](https://vgmonline.net/garethcokerinterview/).
+- **Spiritfarer:** creative director Nicolas Guerin distinguishes the score's
+  subtle supporting role during relaxing action from leading at major moments.
+  Composer Max LL describes developing variations from one early theme.
+  Application: keep traversal understated and reserve the melodic statement for
+  care/restoration; reuse a modest motif instead of unrelated tracks.
+  [Director interview](https://www.gamedeveloper.com/design/inside-the-thoughtful-design-of-thunder-lotus-i-spiritfarer-i-),
+  [Composer interview](https://www.kittyonfirerecords.com/blogs/cybercenter/spiritfarer-ost-interview-with-max-ll).
+- **Silence:** LucasArts composer Jesse Harlin distinguishes player-caused and
+  independent sounds; their balance gives player actions weight. Application:
+  when idle, the world must leave space; do not fill gaps with more random sounds.
+  [The Weight of Silence, Game Developer Dec 2010, printed p41](https://media.gdcvault.com/GD_Mag_Archives/GDM_December_2010.pdf).
+- **Adaptive music:** Clint Bajakian's GDC 2010 slides distinguish states,
+  finite segments, and junctures. A juncture need not cause a musical change;
+  density, instrumentation, rhythm and intensity all affect transitions. A longer
+  stereo crossfade alone cannot guarantee musical coherence. Application: one
+  finite phrase per selected beat, with an authored ending and quiet afterward;
+  suppress competing triggers rather than stacking cues.
+  [Primary slides, pp13–22, 28–29, 54–55](https://media.gdcvault.com/gdc10/slides/Bajakian_Clint_Adaptive%20Music.pdf).
+- **Journey/Ghibli references:** mood references are not measured specifications.
+  The Journey-vs-Monaco GDC talk URL redirected to maintenance during this pass;
+  do not claim to have watched it. No Journey or Ghibli loudness, crest factor or
+  event frequency was measured here, and no reference recording is licensed for
+  inclusion in our game by virtue of being a reference.
+
+**Metering basis and proposed first listening candidate**
+
+Garry Taylor's **2013** GDC slides describe BS.1770 loudness, distinguish true
+peak from sample peak, give the historical Sony console reference of -23 LUFS
+and maximum -1 dBTP, and call for at least 30 minutes of representative gameplay.
+These are program-level engineering references, not proof of gentleness, current
+platform certification, or per-effect targets. A 60-second clip is a mix sample.
+[Primary slides, pp3–6, 10–12](https://media.gdcvault.com/gdc2013/slides/824764Garry_Taylor_Loudness_and_how.pdf);
+[ASWG maintained standard repository](https://github.com/Sony-ASWG/Loudness).
+
+The following are **authored starting targets**, to revise with Vivek's ear:
+
+| Measure | First-candidate target | Why / limitation |
+|---|---|---|
+| 60 s full-mix integrated loudness | approximately -30 to -26 LUFS; never normalize automatically upward | Deliberately quieter than the historic program reference; gated loudness can omit quiet space |
+| True peak | <= -6 dBTP design ceiling; always < -1 dBTP | More headroom for this gentle slice; peak ceiling alone says nothing about sharpness |
+| Idle ambience | roughly -44 to -36 dBFS RMS over 50 ms blocks, with local variation | An engineering starting point, not calibrated perceived loudness |
+| Wildlife | 0–2 calls/minute, >=20 s gap, one voice, distant | Count actual plays, including birds hidden inside assets; randomization cannot cure a busy recording |
+| Music | zero at boot/idle; one 8–16 s phrase at a selected event, >=30 s between starts | At least half a typical minute without music; no cue backlog or permanent loop |
+| Routine effects under music | event-window SFX RMS initially 6–12 dB below concurrent music RMS | Compare isolated bus stems over identical windows, not knob values; care cues may briefly lead |
+| Crest factor | report whole-clip and active 50 ms peak-minus-RMS; investigate routine SFX >18 dB | Diagnostic flag, not a pass/fail standard; sparse silence inflates whole-clip crest |
+
+Use decoded PCM for exact contiguous 50 ms windows: stereo sample peak, combined
+RMS, dBFS, crest, and timestamps. Browser setInterval analyser snapshots can skip
+transients and are not contiguous metering. Measure encoded delivery true peak
+and LUFS separately; retain the unnormalized listening file. Report music starts,
+wildlife calls, movement Foley and care cues separately per minute (footsteps are
+expected to track movement). Save event timestamps and bus stems where possible;
+one full-mix number cannot identify which sound masks another. Compare an idle
+minute and an active minute, including trigger collisions and fades.
+
+Before requesting approval: pin SHA and review-only unmute method, keep main
+muted, decode the final 60 s clip successfully, attach meter/events, stills and
+`window.__game`, and disclose staging/performance limits. Do not claim a musical,
+warm, unobtrusive result from arithmetic. Use real audio understanding, compare
+against gentle-game reference listening, and report heard intrusion, repetition
+and music/effect balance. Per :1153, independent teammate listening agreement
+permits branch unmute; Vivek then hears the landed result on main.
+
 - `tools/opening-audio-capture.mjs` (bec8d22) taps each AudioContext destination into one recorded review mix while preserving playback. It captures canvas VP8 + stereo Opus, a WAV export, metering, errors, and before/after `window.__game`.
 - Record gameplay with real-time inputs. Freeze only outside the recorded interval for stills; an end-still wait once extended the measured audio from about 8 seconds to 17.9 seconds.
 - Recorder smoke evidence: `/captures/rook/audio-recorder-final/`. Two running contexts, 304 meter samples, no silent samples, peak 0.02207, no page errors; decoded track 7.94 s stereo Opus, -41.2 LUFS, -33.0 dBFS true peak. This proves capture plumbing, not a good mix, audible spatial placement, seamless music, or event coverage.
