@@ -97,6 +97,8 @@ export type FollowCamera = {
   /** Manual orbit (radians); suspends auto-recentre for `recenterDelay` */
   orbit: (dYaw: number, dPitch?: number) => void;
   snapBehind: (yaw: number) => void;
+  /** drop any authored path / two-shot at once (a teleport or world travel must not leave a lens in the old place) */
+  cancelShots: () => void;
   /**
    * Steering yaw: the "behind" direction input is read against. The 3/4 framing bias is
    * applied on top when placing the lens, never here — otherwise holding forward while the
@@ -585,6 +587,10 @@ export function createFollowCamera(opts: {
     snapBehind(facing) {
       yaw = wrap(facing + Math.PI);
       initialized = false;
+    },
+    cancelShots() {
+      path = null;
+      shot = null;
     },
     getYaw: () => yaw,
     debug,

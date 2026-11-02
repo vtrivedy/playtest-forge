@@ -32,12 +32,16 @@ export type AshRig = {
   mats: THREE.Object3D[];
   matCols: Extract<Collider, { kind: 'box' }>[];
   glow: THREE.Object3D;
+  glowMat: THREE.MeshBasicMaterial;
   safe: THREE.Vector3;
   s: {
     burstA: number; burstB: number; channelY: number; poolY: number; matK: number; glowK: number;
     done: number; safeYaw: number; splashes: number; inMarsh: number;
   };
 };
+
+/** footing at or above this is dry whatever the water does (full surface −0.15) */
+const DRY_Y = -0.05;
 
 const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
@@ -89,7 +93,8 @@ export function updateAshwater(rig: AshRig, dt: number): void {
       s.splashes++;
       rig.events.splash();
       rig.teleport(rig.safe.x, rig.safe.z, s.safeYaw);
-    } else if (w === null) {
+    } else if (f.y > DRY_Y && (w === null || f.y > level + 0.05)) {
+      // only truly dry footing (not the drowned bank slope) is a place to put the fox back
       rig.safe.copy(f);
       s.safeYaw = rig.fox.rotation.y;
     }
@@ -111,8 +116,10 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     }
   }
   if ((s.done & 4) !== 0 && s.glowK < 1) s.glowK = Math.min(1, s.glowK + dt / T.glow);
-  rig.glow.visible = s.glowK > 0.001;
-  rig.glow.scale.set(1, Math.max(0.001, smooth(s.glowK)), 1);
+  // unrestored, a low teal shimmer marks the goal from the weir; restored, it rises into the full column
+  const g = smooth(s.glowK);
+  rig.glow.scale.set(1, 0.14 + 0.86 * g, 1);
+  rig.glowMat.opacity = 0.22 + 0.33 * g;
 
   // one teach line at a time, only where it applies
   if (!s.inMarsh) return;
