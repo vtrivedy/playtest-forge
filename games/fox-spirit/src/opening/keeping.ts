@@ -92,6 +92,49 @@ function plinth(ctx: OpeningCtx, box: { x: number; z: number; hx: number; hz: nu
   ctx.colliders.push({ kind: 'box', ...box });
 }
 
+/**
+ * Per-pixel bark on top of the paint patch: deep fissures that wander along the trunk (object space: the trunk
+ * runs along +y), broken plates and fine grain, so the log underfoot reads as wood at chase-cam range instead of
+ * a smooth painted tube ("glossy red plastic", Kit :106). Shading only; the paint/restore logic is untouched.
+ */
+function barkify(m: THREE.MeshToonMaterial): THREE.MeshToonMaterial {
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (shader, renderer) => {
+    prev.call(m, shader, renderer);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vBarkObj;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBarkObj = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vBarkObj;')
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+        {
+          float ba = atan(vBarkObj.z, vBarkObj.x);
+          float by = vBarkObj.y;
+          // furrows: ~26 round the trunk, wandering and splitting along it
+          float wob = 1.4 * sin(by * 0.8 + ba * 2.0) + (lkFbm(vec2(ba * 3.0, by * 1.2)) - 0.5) * 6.0;
+          float ridge = sin(ba * 26.0 + wob);
+          float furrow = 1.0 - smoothstep(-0.95, -0.35, ridge);
+          // plate edges catch light: a thin highlight on each ridge crest
+          float crest = smoothstep(0.75, 0.98, ridge);
+          // plates broken across by checks; grain inside the plates
+          float checks = smoothstep(0.58, 0.72, lkNoise(vec2(ba * 9.0, by * 5.0))) * (1.0 - smoothstep(0.1, 0.7, ridge));
+          float grain = lkNoise(vec2(ba * 40.0, by * 3.0));
+          float plate = 0.78 + 0.3 * lkFbm(vec2(ba * 6.0, by * 2.2)) + 0.12 * grain + 0.12 * crest;
+          vec3 c = diffuseColor.rgb * plate;
+          // greyer and a step darker than the painted body: weathered wood, not lacquer, and never a rival to the fox
+          c = mix(c, vec3(dot(c, vec3(0.3, 0.5, 0.2))), 0.42) * 0.86;
+          c = mix(c, c * 0.22, clamp(furrow + checks, 0.0, 1.0));
+          diffuseColor.rgb = c;
+        }`,
+      );
+  };
+  const key = m.customProgramCacheKey.bind(m);
+  m.customProgramCacheKey = () => key() + '|bark';
+  return m;
+}
+
 /** The Hearthtree in its fall frame: trunk along +y, falls toward +z (pivot.rotation.y = fall yaw) */
 function buildHearthtree(rand: () => number, baseY: number) {
   const tree = new THREE.Group();
@@ -123,7 +166,7 @@ function buildHearthtree(rand: () => number, baseY: number) {
     }
     trunkGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   }
-  tree.add(inked(trunkGeo, toon(0xffffff, { vertexColors: true, contour: 0.8, climbBase }), 0.026, true));
+  tree.add(inked(trunkGeo, barkify(toon(0xffffff, { vertexColors: true, contour: 0.8, climbBase })), 0.026, true));
   // ink bark strokes: broken lines along the grain, drawn on the trunk the way the kit inks rock strata
   const strokeMat = new THREE.MeshBasicMaterial({ color: INK, fog: true });
   for (let k = 0; k < 30; k++) {
@@ -493,6 +536,14 @@ export function createKeeping(ctx: OpeningCtx) {
   let bridge: Collider | null = null;
   let onSettled: (() => void) | null = null;
   let lastImpact = false;
+  const foxLast = new THREE.Vector3().copy(ctx.fox.root.position);
+  const creakAt = new THREE.Vector3();
+  let creakIn = 0;
+  let wasOn = false;
+  let kicked = 0;
+  let shakeAcc = 0;
+  let shakeNext = 0;
+  let creaks = 0;
   const bridgeBox = (): Collider => {
     const reach = K.span - K.crag.hz + 0.8;
     const s = reach / 2 - 0.3;
@@ -638,6 +689,58 @@ export function createKeeping(ctx: OpeningCtx) {
         l.state = 'rest';
       }
     }
+    // the bridge answers the fox (Kit :106 "nothing reacts while it stands there"): fallen leaves on the trunk
+    // skitter up from its paws, and the old wood gives a soft creak when it lands on it or walks it
+    if (phase === 'bridge' && bridge && bridge.kind === 'box') {
+      const f = ctx.fox.root.position;
+      const dx = f.x - bridge.x;
+      const dz = f.z - bridge.z;
+      const c = Math.cos(bridge.yaw);
+      const sn = Math.sin(bridge.yaw);
+      const across = dx * c - dz * sn;
+      const along = dx * sn + dz * c;
+      const on = Math.abs(across) < bridge.hx + 0.2 && Math.abs(along) < bridge.hz && Math.abs(f.y - bridge.top) < 0.3;
+      const speed = dt > 0 ? Math.hypot(f.x - foxLast.x, f.z - foxLast.z) / dt : 0;
+      const landed = on && !wasOn && foxLast.y - f.y > 0.02;
+      if (on && (speed > 0.6 || landed)) {
+        for (const l of leaf) {
+          if (l.state !== 'rest') continue;
+          const lx = l.p.x - f.x;
+          const lz = l.p.z - f.z;
+          const d2 = lx * lx + lz * lz;
+          if (d2 > (landed ? 1.4 : 0.6) || l.p.y < bridge.top - 0.3) continue;
+          const d = Math.sqrt(d2) + 0.05;
+          const kick = landed ? 1.3 : 0.5 + Math.min(1, speed / 6) * 0.6;
+          l.v.set((lx / d) * kick + (rand() - 0.5) * 0.3, 0.7 + rand() * kick, (lz / d) * kick + (rand() - 0.5) * 0.3);
+          l.state = 'falling';
+          kicked++;
+        }
+      }
+      // and leaves caught in the bark shake loose under its paws (recycled from far-off resting ones), ~3 a second
+      if (on && speed > 0.6) {
+        shakeAcc += dt * (2 + Math.min(1, speed / 5) * 2);
+        for (let tries = 0; shakeAcc >= 1 && tries < leaf.length; tries++) {
+          const l = leaf[shakeNext]!;
+          shakeNext = (shakeNext + 1) % leaf.length;
+          if (l.state !== 'rest' || Math.abs(l.p.x - f.x) + Math.abs(l.p.z - f.z) < 8) continue;
+          shakeAcc -= 1;
+          const side = rand() < 0.5 ? -1 : 1;
+          l.p.set(f.x + c * side * (0.35 + rand() * 0.25), bridge.top + 0.05, f.z - sn * side * (0.35 + rand() * 0.25));
+          l.v.set(c * side * (0.4 + rand() * 0.5), 0.9 + rand() * 0.8, -sn * side * (0.4 + rand() * 0.5));
+          l.state = 'falling';
+          kicked++;
+        }
+      } else shakeAcc = 0;
+      creakIn -= dt;
+      if (on && creakIn <= 0 && (landed || speed > 1.2)) {
+        creakIn = 3.5 + rand() * 3;
+        creakAt.copy(f);
+        creaks++;
+        ctx.audio.play('soft-pin', { at: creakAt, gain: landed ? 0.1 : 0.06, rate: 0.42 + rand() * 0.1 });
+      }
+      wasOn = on;
+    }
+    foxLast.copy(ctx.fox.root.position);
     syncLeaves();
     lastImpact = impact;
   });
@@ -655,6 +758,8 @@ export function createKeeping(ctx: OpeningCtx) {
         t: +t.toFixed(3),
         angle: +tree.rotation.x.toFixed(4),
         bridge: bridge !== null,
+        /** fox on the bridge: leaves kicked up, wood creaks */
+        answered: { kicked, creaks, resting: bridge?.kind === 'box' ? leaf.filter((l) => l.state === 'rest' && Math.abs(l.p.y - (bridge as { top: number }).top) < 0.15).length : 0 },
         impact: lastImpact,
         impacts,
         bridgeTop: +(K.terrace.top + 0.12).toFixed(3),
