@@ -547,7 +547,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       });
     // the kit's page is sealed behind the glyph shrine's door until it opens
     paper.visible = spec.id !== 'kit';
-    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false };
+    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false, look: 0 };
   });
 
   const world = new THREE.Vector3();
@@ -568,6 +568,17 @@ export function buildUnpressed(ctx: OpeningCtx) {
       f.s.set(rand() * 8, rand() * 8, rand() * 8);
     }
     return true;
+  }
+
+  /**
+   * a creature's head/neck turn toward a bearing (rad, relative to its facing), clamped to ±lim and damped; with
+   * the target behind it keeps the side it was already turned to, so a fox crossing behind never snaps the head
+   */
+  function lookToward(c: (typeof creatures)[number], rel: number, lim: number, dt: number): number {
+    const r = Math.atan2(Math.sin(rel), Math.cos(rel));
+    const want = Math.abs(r) > lim + 0.5 ? Math.sign(c.look || r) * lim : THREE.MathUtils.clamp(r, -lim, lim);
+    c.look = THREE.MathUtils.damp(c.look, want, 5, dt);
+    return c.look;
   }
 
   // ---- performances: t from the start of 'performing'; return true when done
@@ -782,7 +793,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     const sitTo = c.homing ? HOMECOMING.well : JOGS.look;
     const look = end ? sitTo : fox;
     const rel = Math.atan2(-(look.z - c.holder.position.z), look.x - c.holder.position.x) - c.holder.rotation.y;
-    B(c, 'head').rotation.y = THREE.MathUtils.clamp(Math.atan2(Math.sin(rel), Math.cos(rel)), -1.3, 1.3) * c.bow;
+    B(c, 'head').rotation.y = lookToward(c, rel, 1.3, dt) * c.bow;
     // the scut flashes white on every bound: what you follow at range
     B(c, 'tail').rotation.z = Math.sin(t * 6) * 0.2 + air * 0.7;
     B(c, 'tail').scale.setScalar(1 + air * 0.9);
@@ -857,7 +868,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       const wash = smooth(0, 0.25, Math.sin(t * 0.5 + c.idleSeed)) * (1 - c.bow);
       B(c, 'body').position.y = 0.2;
       B(c, 'body').rotation.z = 0.35 + c.bow * 0.15 + Math.sin(t * 2.4) * 0.015;
-      B(c, 'head').rotation.y = THREE.MathUtils.clamp(Math.atan2(Math.sin(rel), Math.cos(rel)), -1.3, 1.3) * c.bow;
+      B(c, 'head').rotation.y = lookToward(c, rel, 1.3, 1 / 60) * c.bow;
       B(c, 'head').rotation.z = -0.3 - c.bow * 0.12 - wash * 0.35 + Math.sin(t * 19) * 0.02;
       B(c, 'legF').rotation.z = wash * (1.4 + Math.sin(t * 9) * 0.25);
       const flick = Math.max(0, Math.sin(t * 1.3 + c.idleSeed * 2)) ** 12;
@@ -874,7 +885,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       const dz = fx.z - c.holder.position.z;
       const watch = 1 - THREE.MathUtils.smoothstep(Math.hypot(dx, dz), 3.5, 7);
       const rel = Math.atan2(-dz, dx) - c.holder.rotation.y;
-      const turn = THREE.MathUtils.clamp(Math.atan2(Math.sin(rel), Math.cos(rel)), -1.1, 1.1);
+      const turn = lookToward(c, rel, 1.1, 1 / 60);
       c.bow = THREE.MathUtils.damp(c.bow, watch, 3, 1 / 60);
       B(c, 'neck').rotation.y = turn * 0.6 * c.bow;
       B(c, 'head').rotation.y = turn * 0.4 * c.bow;
