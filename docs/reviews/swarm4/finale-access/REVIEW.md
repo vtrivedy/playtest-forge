@@ -22,3 +22,7 @@ node tools/finale-access-probe.mjs /tmp/finale-production --production
 # Optional alternate approaches are diagnostic; the authored lane and glide/exit are required:
 node tools/finale-access-probe.mjs /tmp/finale-alternates --alternates
 ```
+
+## Production integration retest — 6beb77b
+
+Merged Wren1a28d58 into Sorrel branch, retaining both knowledge sections. Rebuilt actual production assets and reran the same independent input route with `--production`. All8 authored lane legs,340gliding frames and3walk-out legs pass; finite transforms and zero JS errors. `window.__game` and full traces: `/captures/sorrel/finale-access-production-6beb77b/evidence.json`. Arrival and return screenshots reviewed: fox body remains visible; sealed hollow composition is readable at the arrival, and the return reaches the meadow. These are staged-start access checks, not a full ending, audio, motion-quality or performance claim. TypeScript, Vite production build and lint:feel pass. The page caption source waits for `runaway.settled()` (kept phase >4.6s), after the catch reveal.
