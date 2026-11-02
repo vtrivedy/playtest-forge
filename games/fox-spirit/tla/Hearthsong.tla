@@ -8,13 +8,13 @@
 \* never overlaps another, needs GapBars since the last start (unless forced by a finale moment), and always ends.
 EXTENDS Naturals
 
-CONSTANTS TuneBars, BreathBars, SingBars, FadeBars, GapBars, CodaFrom, MaxForce
+CONSTANTS TuneBars, BreathBars, SingBars, FadeBars, GapBars, CodaFrom, MaxForce, QuietBars
 
-VARIABLES bar, section, swell, left, since, startedOk, ending, forced, forces
+VARIABLES bar, section, swell, left, since, startedOk, ending, forced, forces, quiet
 
-vars == <<bar, section, swell, left, since, startedOk, ending, forced, forces>>
+vars == <<bar, section, swell, left, since, startedOk, ending, forced, forces, quiet>>
 Swells == {"idle", "armed", "singing", "fading"}
-Endings == {"none", "requested", "coda", "done"}
+Endings == {"none", "requested", "coda", "done", "epilogue"}
 
 Init ==
   /\ bar = 0 /\ section = "tune"
@@ -24,16 +24,17 @@ Init ==
   /\ ending = "none"
   /\ forced = FALSE
   /\ forces = MaxForce
+  /\ quiet = 0
 
 \* a moment (hearth lit, page caught, ...): accepted only when the music has rested; otherwise dropped (no backlog)
 Cue ==
-  /\ ending = "none" /\ swell = "idle" /\ since >= GapBars
+  /\ ending \in {"none", "epilogue"} /\ swell = "idle" /\ since >= GapBars
   /\ swell' = "armed"
   /\ UNCHANGED <<bar, section, left, since, startedOk, ending, forced, forces>>
 
 \* a finale moment: sings even inside the gap (re-arms a fading swell); only MaxForce per game
 ForceCue ==
-  /\ ending = "none" /\ swell \in {"idle", "fading"} /\ forces > 0
+  /\ ending \in {"none", "epilogue"} /\ swell \in {"idle", "fading"} /\ forces > 0
   /\ swell' = "armed" /\ forced' = TRUE /\ forces' = forces - 1
   /\ UNCHANGED <<bar, section, left, since, startedOk, ending>>
 
@@ -67,25 +68,33 @@ SwellStep(p) ==
     [] OTHER -> UNCHANGED <<swell, left, startedOk, forced>> /\ since' = Tick
 
 Bar ==
-  \/ /\ ending = "none"
+  \/ /\ ending \in {"none", "epilogue"}
      /\ LET p == NextPos IN /\ bar' = p[1] /\ section' = p[2] /\ SwellStep(p)
-     /\ UNCHANGED ending
+     /\ UNCHANGED <<ending, quiet>>
   \* the end is asked for: jump to the last line and let the lead sing it home
   \/ /\ ending = "requested"
      /\ bar' = CodaFrom /\ section' = "tune"
      /\ swell' = "singing" /\ left' = TuneBars - CodaFrom
      /\ since' = 0 /\ forced' = FALSE /\ UNCHANGED startedOk
-     /\ ending' = "coda"
+     /\ ending' = "coda" /\ UNCHANGED quiet
   \/ /\ ending = "coda" /\ bar + 1 < TuneBars
      /\ bar' = bar + 1 /\ left' = left - 1 /\ since' = Tick
-     /\ UNCHANGED <<section, swell, startedOk, ending, forced>>
+     /\ UNCHANGED <<section, swell, startedOk, ending, forced, quiet>>
   \/ /\ ending = "coda" /\ bar + 1 >= TuneBars
      /\ ending' = "done" /\ swell' = "idle" /\ left' = 0 /\ since' = Tick
-     /\ UNCHANGED <<bar, section, startedOk, forced>>
+     /\ UNCHANGED <<bar, section, startedOk, forced, quiet>>
+  \* after the ending: QuietBars of silence, then the song comes back softly from the top (the epilogue);
+  \* the finale's forced moments are spent, so only ordinary moments can make it sing
+  \/ /\ ending = "done" /\ quiet + 1 < QuietBars
+     /\ quiet' = quiet + 1 /\ since' = Tick
+     /\ UNCHANGED <<bar, section, swell, left, startedOk, ending, forced>>
+  \/ /\ ending = "done" /\ quiet + 1 >= QuietBars
+     /\ ending' = "epilogue" /\ bar' = 0 /\ section' = "tune" /\ since' = Tick
+     /\ UNCHANGED <<swell, left, startedOk, forced, quiet>>
 
-BarStep == ending # "done" /\ Bar /\ UNCHANGED forces
+BarStep == Bar /\ UNCHANGED forces
 
-Next == Cue \/ ForceCue \/ RestCue \/ BarStep
+Next == ((Cue \/ ForceCue \/ RestCue) /\ UNCHANGED quiet) \/ BarStep
 
 Spec == Init /\ [][Next]_vars /\ WF_vars(BarStep)
 
@@ -99,6 +108,7 @@ TypeOK ==
   /\ ending \in Endings
   /\ forced \in BOOLEAN
   /\ forces \in 0..MaxForce
+  /\ quiet \in 0..QuietBars
 
 Safe ==
   /\ TypeOK
@@ -107,7 +117,7 @@ Safe ==
   \* every swell that ever started respected the gap or was a finale moment
   /\ startedOk
   \* an unforced swell (sing + fade) is over before the next may be accepted
-  /\ (swell \in {"singing", "fading"} /\ ending = "none" => since < GapBars)
+  /\ (swell \in {"singing", "fading"} /\ ending \in {"none", "epilogue"} => since < GapBars \/ forced)
   \* the coda only ever plays the tune's last line, and once done nothing sings again
   /\ (ending = "coda" => bar >= CodaFrom /\ swell = "singing")
   /\ (ending = "done" => swell = "idle")
@@ -115,8 +125,10 @@ Safe ==
 ArmedSings == (swell = "armed" /\ ending = "none") ~> (swell = "singing" \/ ending # "none")
 SwellRests == (swell # "idle") ~> (swell = "idle")
 \* the song keeps going until it is asked to end
-SongContinues == []<>((section = "tune" /\ bar = 0) \/ ending # "none")
-\* asked to end, it ends
+SongContinues == []<>((section = "tune" /\ bar = 0) \/ ending \in {"requested", "coda", "done"})
+\* asked to end, it ends; and after the quiet, the song returns
 EndingEnds == (ending = "requested") ~> (ending = "done")
-DoneStays == [](ending = "done" => [](ending = "done"))
+QuietReturns == (ending = "done") ~> (ending = "epilogue")
+\* the ending happens once: no coda after the epilogue begins
+EndsOnce == [](ending = "epilogue" => [](ending = "epilogue"))
 =============================================================================

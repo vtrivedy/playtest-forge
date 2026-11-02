@@ -39,6 +39,7 @@ import { createMillrace } from './millrace.hot';
 import { buildKiln, buildWeir } from './millWeir';
 import { createMillWeir } from './millWeir.hot';
 import { MILLBROOK } from './millbrookLayout';
+import { createCaptions, type Captions } from './captions';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -77,6 +78,8 @@ export interface OpeningCtx {
   onUpdate: (fn: (dt: number, t: number) => void) => void;
   /** the one sound graph (audio.ts): play samples, place voices in 3D, duck the music */
   audio: OpeningAudio;
+  /** Album captions (captions.ts): `ctx.captions.say('≤ 6 words')` for a story beat */
+  captions: Captions;
 }
 
 export async function runOpening(): Promise<void> {
@@ -112,7 +115,10 @@ export async function runOpening(): Promise<void> {
     player: null,
     onUpdate: (fn) => void updates.push(fn),
     audio: createOpeningAudio(),
+    // bound just below: the caption line registers its fade through ctx.onUpdate
+    captions: null as unknown as Captions,
   };
+  ctx.captions = createCaptions(ctx);
   const { field } = ctx;
 
   buildMeadow(ctx);
@@ -199,6 +205,14 @@ export async function runOpening(): Promise<void> {
   keeping.onSettled(() => {
     settledAt = time;
     hum.swell();
+    ctx.captions.say('The tree finished falling, at last.');
+  });
+  // the Album's story in a few lines (DESIGN-finale.md captions): the runaway page is the first hint whose book it is
+  let pageSaid = false;
+  ctx.onUpdate(() => {
+    if (pageSaid || !runaway.settled()) return;
+    pageSaid = true;
+    ctx.captions.say("A page escaped the Scribe's Album.");
   });
   // the finale (DESIGN-finale.md): warmth set in the Scribe's Press cradle once the Keeping has settled
   const finale = await buildFinale(ctx, {
@@ -230,7 +244,7 @@ export async function runOpening(): Promise<void> {
     hum.update();
     const ps = player.state() as { grounded: boolean; gliding: boolean; vel: number[]; speed: number; pos: number[] };
     foley.update(ps);
-    ctx.audio.update(view, { restored: Math.min(1, field.restores.reduce((a, r) => a + r.radius * r.radius, 0) / 260), height: ps.pos[1]! - groundH(ps.pos[0]!, ps.pos[2]!), x: ps.pos[0]!, z: ps.pos[2]! });
+    ctx.audio.update(view, { restored: Math.min(1, field.restores.reduce((a, r) => a + r.radius * r.radius, 0) / 260), height: ps.pos[1]! - groundH(ps.pos[0]!, ps.pos[2]!), x: ps.pos[0]!, z: ps.pos[2]!, gliding: ps.gliding && !ps.grounded });
     // the key's shadow frustum rides with the fox
     const p = fox.root.position;
     lights.key.target.position.set(p.x, 0, p.z);

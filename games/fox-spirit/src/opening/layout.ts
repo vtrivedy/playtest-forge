@@ -43,6 +43,9 @@ export const HOUSES = [
   { x: -37, z: 86, w: 5, d: 4, eave: 2.5, rise: 1.45, chimney: false },
 ] as const;
 
+/** The south lane's line, meadow → Press Hollow: painted by PATHS and carved through the rim by southLane() (one source) */
+export const SOUTH_LANE: ReadonlyArray<readonly [number, number]> = [[4.2, 75.6], [6.2, 69], [7.5, 63.5], [12.5, 53], [18.8, 44.2], [21.1, 40.2]];
+
 /** Lanes as segments [ax, az, bx, bz]; the last ones lead the opening route out to H-a */
 export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
   [-18, 95, -14, 95], [-14, 95, -12.5, 89.5], [-12.5, 89.5, -8, 88], [-29.2, 87.5, -24, 88.3], [-24, 88.3, -18.7, 87.2],
@@ -51,7 +54,7 @@ export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
   [12, 98, 8, 99], [8, 99, 0, 94], [0, 80, 9, 88], [9, 88, 25, 88],
   [-6, 92, -7.2, 87], [0, 80, 4.2, 75.6], [0, 80, -3, 62],
   // the south lane out of the meadow, down into Press Hollow to the foot of the Press (DESIGN-finale.md)
-  [4.2, 75.6, 6.2, 69], [6.2, 69, 7.5, 63.5], [7.5, 63.5, 12.5, 53], [12.5, 53, 18.8, 44.2], [18.8, 44.2, 21.1, 40.2],
+  ...SOUTH_LANE.slice(1).map((b, i) => [SOUTH_LANE[i]![0], SOUTH_LANE[i]![1], b[0], b[1]] as const),
 ];
 
 /** every lane the ground flattens and colours: the village's and Millbrook's (millbrookLayout.ts) */
@@ -162,7 +165,8 @@ function vistaCut(x: number, z: number, h: number): number {
  * `half` of its line the ground is pulled down to a profile that eases from the meadow (`from`) to the hollow floor
  * (`to`), never raised. Walkable both ways (moveTo's probe allows ~1.3 rise/run; the trough walls stay well under it).
  */
-const LANE = { pts: [[6.2, 69], [7.5, 63.5], [12.5, 53], [18.8, 44.2]] as const, from: -0.45, to: 0.5, half: 1.9, wall: 4.2 };
+/** carve from the lane's second point (the meadow side of the rim) to its second-last (inside the hollow) */
+const LANE = { pts: SOUTH_LANE.slice(1, -1), from: -0.45, to: 0.5, half: 1.9, wall: 4.2 };
 function southLane(x: number, z: number, h: number): number {
   let best = Infinity;
   let along = 0;

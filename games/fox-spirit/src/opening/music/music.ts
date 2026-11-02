@@ -3,7 +3,9 @@
  * music bus. Loading is async (addModule); until the node exists `update` / `cue` do nothing.
  */
 import workletUrl from './hearthsong.worklet.hot.ts?worker&url';
-import { compileSong } from './score';
+import { compileSong, SONG } from './score';
+
+const SONG_NAMES = SONG.tunes.map((t) => t.name);
 import { createMusicDriver, type MusicDriver } from './music.hot';
 
 export type Music = ReturnType<typeof createMusic>;
@@ -30,9 +32,9 @@ function roomImpulse(ac: BaseAudioContext): AudioBuffer {
 export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
   const song = compileSong();
   let driver: MusicDriver | null = null;
-  const reported = { bar: -1, breath: false, swell: 'idle', pass: 0, since: 0, shaded: false, ending: 'playing', forces: 2 };
+  const reported = { bar: -1, breath: false, swell: 'idle', pass: 0, since: 0, shaded: false, ending: 'playing', forces: 2, tune: 'hearth' };
   const SWELLS = ['idle', 'armed', 'singing', 'fading'];
-  const ENDINGS = ['playing', 'requested', 'coda', 'done'];
+  const ENDINGS = ['playing', 'requested', 'coda', 'done', 'epilogue'];
   let cues = 0;
   const dry = ac.createGain();
   dry.gain.value = 0.8;
@@ -58,6 +60,7 @@ export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
         reported.shaded = r[5] === 1;
         reported.ending = ENDINGS[r[6]!] ?? '?';
         reported.forces = r[7]!;
+        reported.tune = SONG_NAMES[r[8]!] ?? '?';
       };
       driver = createMusicDriver(ac, node);
       return true;
@@ -69,8 +72,8 @@ export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
   return {
     ready,
     /** per frame: where the fox is and how much colour is back */
-    update(x: number, z: number, restored: number, at?: number): void {
-      driver?.update(x, z, restored, at);
+    update(x: number, z: number, restored: number, at?: number, glide = 0): void {
+      driver?.update(x, z, restored, at, glide);
     },
     /** a moment: the lead sings from the next bar line, if the music has rested (≥ SWELL.gap bars) */
     cue(kind = 0, at?: number): void {

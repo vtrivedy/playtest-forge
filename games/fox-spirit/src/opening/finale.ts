@@ -7,12 +7,12 @@
  * This file builds (allocations allowed); every per-frame step lives in finale.hot.ts.
  */
 import * as THREE from 'three';
-import { buildMaple, buildRock, contactInk, hewn, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, toon } from '../lookdevKit';
+import { buildMaple, buildRock, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
 import type { FollowCamera } from '../camera';
-import { CROWN, FINALE, KEEPING, pathDist } from './layout';
+import { CROWN, FINALE, KEEPING, pathDist, VISTA } from './layout';
 import { FINALE_TIMING, KIT_PHASES, PHASES, updateFinale, type FinaleRig } from './finale.hot';
 
 /** album paper, ink-frost, iron and the warm colours the hollow wakes into */
@@ -80,7 +80,9 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
 }) {
   let forced = false;
 
-  const { scene, rand, groundH, colliders } = ctx;
+  const { scene, groundH, colliders } = ctx;
+  // own seeded stream: building the finale never shifts the shared ctx.rand sequence other places (and replays) rely on
+  const rand = rng(0x5c41be);
   const F = FINALE;
   const yaw = F.press.yaw;
   /** Press-local → world (local +z faces the crag, local +x across) */
@@ -134,6 +136,41 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     colliders.push({ kind: 'box', x: p.x, z: p.z, yaw: slab.rotation.y, hx: 0.5, hz: 0.16, top: y + h });
   }
 
+  // ---- the far lip: a standing row of the Album's stone leaves, closing the hollow above the drop into the deep valley
+  // (one continuous collider line, taller than a jump, so the fox can't wander off down the endless vista floor)
+  {
+    const LIP = { a: 35.2, c0: -23, c1: 22.5 };
+    const n = Math.ceil((LIP.c1 - LIP.c0) / 0.7);
+    const slabGeo = hewn(new THREE.BoxGeometry(0.95, 1, 0.26, 2, 3, 1), rand, 0.05);
+    const slabs = new THREE.InstancedMesh(slabGeo, toon(0x7a6a58, { contour: 0.6 }), n);
+    const hull = new THREE.InstancedMesh(hullGeometry(slabGeo), inkMaterial(0.02), n);
+    const mm = new THREE.Matrix4();
+    const across = Math.atan2(VISTA.dx, VISTA.dz);
+    for (let i = 0; i < n; i++) {
+      const c = LIP.c0 + (i + 0.5) * ((LIP.c1 - LIP.c0) / n);
+      const p = F.at(LIP.a + Math.sin(c * 0.7) * 0.25, c);
+      const y = groundH(p.x, p.z);
+      // weathered and uneven, leaning every which way: a row of old standing leaves, not a built wall
+      const h = 1.05 + rand() * 1.0 + (rand() < 0.25 ? 0.7 : 0);
+      const w = 0.65 + rand() * 0.45;
+      mm.compose(
+        new THREE.Vector3(p.x, y + h / 2 - 0.2, p.z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler((rand() - 0.5) * 0.3, across + (rand() - 0.5) * 0.6, (rand() - 0.5) * 0.3)),
+        new THREE.Vector3(w, h, 0.8 + rand() * 0.5),
+      );
+      slabs.setMatrixAt(i, mm);
+      hull.setMatrixAt(i, mm);
+    }
+    slabs.castShadow = slabs.receiveShadow = true;
+    scene.add(slabs, hull);
+    // collider segments along the row, each top above the highest ground it spans + 2.2 m
+    for (let c = LIP.c0; c < LIP.c1; c += 3) {
+      const m = F.at(LIP.a, c + 1.5);
+      const top = Math.max(groundH(F.at(LIP.a, c).x, F.at(LIP.a, c).z), groundH(m.x, m.z), groundH(F.at(LIP.a, c + 3).x, F.at(LIP.a, c + 3).z)) + 2.3;
+      colliders.push({ kind: 'box', x: m.x, z: m.z, yaw: across, hx: 1.6, hz: 0.35, top });
+    }
+  }
+
   // ---- the Scribe's Press: the Album lies shut on a stone plinth under a timber book-press, its iron screw
   // driving a platen down on the cover. Spine along local z (toward the crag), so the cover opens right → left.
   const base = groundH(F.press.x, F.press.z);
@@ -145,6 +182,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   plinth.position.y = 0.25;
   press.add(plinth);
   const coverMat = new THREE.MeshToonMaterial({ color: FROST, gradientMap: RAMP_WORLD });
+  const ironMat = new THREE.MeshToonMaterial({ color: IRON, emissive: 0x000000, gradientMap: RAMP_WORLD });
   const BOOK = { y: 0.6, w: 2.5, d: 3.3, cover: 0.16, block: 0.42 };
   const back = inked(hewn(new THREE.BoxGeometry(BOOK.w, BOOK.cover, BOOK.d, 3, 1, 4), rand, 0.02), coverMat, 0.02);
   back.position.set(0, BOOK.y + BOOK.cover / 2, 0);
@@ -177,6 +215,19 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const emblem = new THREE.Mesh(mapleLeafGeometry(0.9).rotateX(-Math.PI / 2), emblemMat);
   emblem.position.set(0.15, BOOK.cover / 2 + 0.012, 0.35);
   front.add(emblem);
+  // iron corner caps on both covers and a rounded spine: it reads as a book, not a crate
+  const capGeo = new THREE.BoxGeometry(0.34, BOOK.cover + 0.04, 0.34);
+  for (const [cx, cz] of [[1, 1], [1, -1]] as const) {
+    for (const host of [front, back]) {
+      const cap = new THREE.Mesh(capGeo, ironMat);
+      cap.position.set(host === front ? cx * (BOOK.w / 2 - 0.15) : BOOK.w / 2 - 0.15, 0, cz * (BOOK.d / 2 - 0.15));
+      host.add(cap);
+    }
+  }
+  const spine = inked(new THREE.CylinderGeometry(0.42, 0.42, BOOK.d + 0.02, 12, 1, false, Math.PI, Math.PI).rotateX(Math.PI / 2), coverMat, 0.018);
+  spine.scale.set(0.42, 1, 1);
+  spine.position.set(-BOOK.w / 2, BOOK.y + BOOK.cover + BOOK.block / 2, 0);
+  press.add(spine);
   // where the open cover comes to rest: a low stone off the spine side
   const rest = buildRock(rand, 0.42, false);
   rest.position.set(-BOOK.w - 0.9, 0.18, 0);
@@ -218,7 +269,6 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     band.position.set(FRAME.x, FRAME.top, y);
     frame.add(band);
   }
-  const ironMat = new THREE.MeshToonMaterial({ color: IRON, emissive: 0x000000, gradientMap: RAMP_WORLD });
   // the screw assembly (thread + platen) slides up when the Press unbinds; the wheel turns on top of the beam
   const screw = new THREE.Group();
   screw.position.set(FRAME.x, 0, 0);
@@ -400,19 +450,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   });
   card.innerHTML = 'The Keeping<div style="font:18px Georgia,serif;letter-spacing:.12em;margin-top:14px;opacity:.8">and the year turned</div>';
   document.body.append(card);
-  // Album captions (seed DESIGN: ≤ 6 words, the only words in the slice): one per beat, lower third
-  const caption = document.createElement('div');
-  caption.dataset.finale = 'caption';
-  Object.assign(caption.style, {
-    position: 'fixed', left: '0', right: '0', bottom: '17%', textAlign: 'center', pointerEvents: 'none',
-    color: '#f4e5cb', font: 'italic 24px Georgia,serif', letterSpacing: '0.03em', opacity: '0',
-    textShadow: '0 1px 12px rgba(40,24,12,.7)',
-  });
-  document.body.append(caption);
-  const say = (text: string) => {
-    caption.textContent = text;
-    rig.s.capT = 0;
-  };
+  const say = (text: string) => ctx.captions.say(text);
 
   const F2 = F.kits;
   const toCrown = new THREE.Vector3(CROWN.x - F.press.x, 0, CROWN.z - F.press.z).normalize();
@@ -491,7 +529,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     },
     hinge, screw, wheel, coverMat, paperMat, ironMat, lampPaper, emblemMat, glowMat, light,
     wayMesh, wayLut, wayLen: wayCurve.getLength(),
-    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card, caption,
+    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
     cradle: new THREE.Vector3(F.cradle.x, cy, F.cradle.z),
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
     toCrown,
@@ -499,7 +537,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, capT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
     kitX: new Float32Array(F2.length),
