@@ -32,3 +32,11 @@ this authored waypoint test does not establish blind insight, meaningful explora
 Full evidence: `/captures/reed/press-route-d18bec0b/`; persistent Modal volume
 `keeping-swarm5-captures/reed/press-route-d18bec0bce/`. Source helper `tools/lib/press-input-route.mjs` includes
 explicit assertions for direct failure, each relay lighting, and three physical completion facts.
+
+## Validation
+
+TypeScript, production Vite build, `lint:feel` (including wall-clock-timer rule), and whitespace checks pass.
+`npm run check:stuck` on an isolated immutable `d18bec0b` worktree passes: seed 1 = 1.95 s stuck, seed 2 = 0.63 s,
+seed 3 = 1.40 s, mean **1.33 s / 90 s**, budget 4 s, zero JavaScript errors. Retained reports in
+`/captures/reed/stuck-d18bec0b/`. An earlier live-worktree check exited during seed 3 without a report; it is not
+counted as a pass. The isolated rerun avoids source reloads during ongoing integration and completes all seeds.
