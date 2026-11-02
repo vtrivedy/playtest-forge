@@ -8,6 +8,8 @@ const arg = (k, d) => process.argv.includes(`--${k}`) ? process.argv[process.arg
 const out = arg('out', '/captures/sorrel/page-motion');
 const dt = Number(arg('dt', '0.016666666666666666'));
 const seconds = Number(arg('seconds', '100'));
+const replayPath = arg('replay', '');
+const replay = replayPath ? JSON.parse(fs.readFileSync(replayPath, 'utf8')) : null;
 const frames = arg('frames', '0') === '1';
 const clipFrom = Number(arg('clip-from', '0'));
 const clipTo = Number(arg('clip-to', '999'));
@@ -24,23 +26,27 @@ const errors = []; page.on('pageerror', e => errors.push(String(e)));
 try {
   await page.goto('http://127.0.0.1:5211/?manual=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__gameHooks?.ready);
-  await page.evaluate(({ source, start }) => {
+  await page.evaluate(({ source, start, tape }) => {
     const h = window.__gameHooks;
     h.setManual(true); h.teleport(start.x, start.z, start.yaw);
-    window.__pageProbe = { route: new Function(`return (${source})`)()(), state: h.advance(60, 1 / 60, false), f: 0, trace: [] };
-  }, { source: createSliceRoute.toString(), start: SLICE_START });
+    window.__pageProbe = { route: new Function(`return (${source})`)()(), state: h.advance(60, 1 / 60, false), f: 0, trace: [], tape, mismatches: [] };
+  }, { source: createSliceRoute.toString(), start: SLICE_START, tape: replay?.trace ?? null });
   let image = 0, lastBeat = '', done = false;
   while (!done) {
     const r = await page.evaluate(({ dt, seconds, frames, clipFrom, clipTo, fps }) => {
       const p = window.__pageProbe, h = window.__gameHooks;
       let shot = false, beat = '';
       for (let i = 0; i < 60 && p.f * dt < seconds; i++) {
-        const input = p.route(p.f * dt, p.state);
+        const expected = p.tape?.[p.f];
+        const input = expected?.input ?? p.route(p.f * dt, p.state);
         h.setStick(input.x, input.z); h.setKeys([...(input.jump ? ['Space'] : []), ...(input.dash ? ['ShiftLeft'] : [])]);
         const capture = frames && p.f * dt >= clipFrom && p.f * dt < clipTo && (input.beat === 'the page bolts' || input.beat === 'it flings away' || input.beat === 'leap to the overlook' || input.beat === 'catch it on the overlook' || input.beat === 'the page opens' || input.beat === 'colour rolls out');
         shot = capture && p.f % Math.max(1, Math.round(1 / (fps * dt))) === 0;
         p.state = h.advance(1, dt, shot);
         const s = p.state;
+        if (expected && (JSON.stringify(s.opening.page) !== JSON.stringify(expected.opening.page) || JSON.stringify(s.pos) !== JSON.stringify(expected.pos))) {
+          if (p.mismatches.length < 10) p.mismatches.push({ frame: p.f, expected: expected.opening.page, actual: s.opening.page, expectedFox: expected.pos, actualFox: s.pos });
+        }
         p.trace.push({ frame: p.f++, input, pos: s.pos, vel: s.vel, grounded: s.grounded, dashesUsed: s.dashesUsed, lastJump: s.lastJump, lastDashDistance: s.lastDashDistance, camera: s.camera, opening: { page: s.opening.page } }); beat = input.beat;
         if (shot) break;
       }
@@ -50,9 +56,9 @@ try {
     if (r.shot) await page.screenshot({ path: `${out}/frames/f${String(image++).padStart(5, '0')}.jpg`, type: 'jpeg', quality: 88 });
     done = r.done;
   }
-  const evidence = await page.evaluate(() => ({ trace: window.__pageProbe.trace, game: { mode: window.__game.mode, state: window.__game.state() } }));
-  const checks = { catches: evidence.game.state.opening.page.catches === 3, kept: evidence.game.state.opening.page.phase === 'kept', noErrors: !errors.length, finite: evidence.trace.every(s => s.pos.every(Number.isFinite)) };
-  fs.writeFileSync(`${out}/evidence.json`, JSON.stringify({ sha, dt, staging: 'Initial wake position only; game input route; no forced catches or midroute teleport.', frames: image, errors, checks, ...evidence }, null, 2));
+  const evidence = await page.evaluate(() => ({ trace: window.__pageProbe.trace, mismatches: window.__pageProbe.mismatches, game: { mode: window.__game.mode, state: window.__game.state() } }));
+  const checks = { deterministicReplay: !replay || evidence.mismatches.length === 0, catches: evidence.game.state.opening.page.catches === 3, kept: evidence.game.state.opening.page.phase === 'kept', noErrors: !errors.length, finite: evidence.trace.every(s => s.pos.every(Number.isFinite)) };
+  fs.writeFileSync(`${out}/evidence.json`, JSON.stringify({ sha, dt, replay: replayPath || null, staging: 'Initial wake position only; game input route; no forced catches or midroute teleport.', frames: image, errors, checks, ...evidence }, null, 2));
   await page.evaluate(() => window.__gameHooks.advance(0, 0, true));
   await page.screenshot({ path: `${out}/final.png` });
   console.log(JSON.stringify(checks));

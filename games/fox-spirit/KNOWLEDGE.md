@@ -317,3 +317,13 @@ Verification: all eight matched analyses exited0; duration29.9s; diagnostic PNGs
 reviewed for Summer Night, Hello?, Pine Grove, Beach Buds and full Hush. Python
 compile passed. This is a programmatic/visual audio critique, not a real-time
 listening claim or whole-game playtest. No runtime/mute changes in this slice.
+
+## Page hot-path audit and release framing (Sorrel, swarm4)
+
+- Baseline `f866379` full input replay: three catches at 4.267/17.867/44.517s, zero skips, returned home; no JS errors. Jump .792m apex/.317s to apex/.633s air, final dash1.998m. Evidence `/captures/sorrel/page-baseline-trace/evidence.json`. Only the initial wake spot is staged.
+- Continuous baseline 43–48s (150 frames, 480×270) is `/captures/sorrel/page-baseline-catch-rise/clip.mp4`. The final page grows5x and rises5.4m above the moving fox, leaving the chase view before its release fade. This is an offline fixed-step motion capture, not a real-time performance claim. Sampled sheets establish framing only; inspect adjacent frames for jitter.
+- `player.state()` is an allocating diagnostic snapshot (rounded arrays, paws, camera). Gameplay frame code should read `player.motion` for live grounded/dashing scalars. Page audio voice is now one reusable live view too. Do not reinstate snapshot calls in hot paths.
+- Hot lint follows named local helpers reached from registered frame callbacks and update/tick/frame functions; moving `new` into emit/caught does not evade it. Setup allocations and cold dev snapshots are permitted. `docs/reviews/swarm4/page/lint-negative.txt` records its findings on pre-fix page source; fixture negatives run on every lint invocation.
+- `?manual=1` starts the opening without a first rAF simulation step; capture tools must use it for exact replay comparisons. Calling setManual only after ready leaves a variable number of startup frames.
+- Page dodge RNG has a dedicated seeded stream separate from cosmetic flecks: changing particle density must not change the next gameplay dodge. This makes page pursuit repeatable, not the entire game's unrelated ambient systems.
+- TLC page model passes 24 generated/9 distinct states. Broken kept-after-one invariant fails at catches3 (six-state trace). Scope excludes continuous space, timing/reach geometry, camera, and debug stage resets; formal pass is never motion acceptance.

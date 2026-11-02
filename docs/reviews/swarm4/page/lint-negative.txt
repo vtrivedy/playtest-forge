@@ -1,0 +1,40 @@
+Baseline f866379 treated as a hot module: 19 findings.
+
+pre-fix-page.hot.ts:214  [no-diagnostic-snapshot-in-hot] state() is a cold diagnostic snapshot; read a reusable live scalar view in frame code
+    const st = player.state() as { dashing?: boolean; grounded?: boolean };
+pre-fix-page.hot.ts:235  [no-unseeded-hot-random] use a seeded stream so gameplay replays from identical inputs
+    const sign = Math.random() < 0.5 ? -1 : 1;
+pre-fix-page.hot.ts:134  [no-unseeded-hot-random] use a seeded stream so gameplay replays from identical inputs
+    f.v.set((Math.random() - 0.5) * spread, -0.2 - Math.random() * 0.3, (Math.random() - 0.5) * spread);
+pre-fix-page.hot.ts:134  [no-unseeded-hot-random] use a seeded stream so gameplay replays from identical inputs
+    f.v.set((Math.random() - 0.5) * spread, -0.2 - Math.random() * 0.3, (Math.random() - 0.5) * spread);
+pre-fix-page.hot.ts:134  [no-unseeded-hot-random] use a seeded stream so gameplay replays from identical inputs
+    f.v.set((Math.random() - 0.5) * spread, -0.2 - Math.random() * 0.3, (Math.random() - 0.5) * spread);
+pre-fix-page.hot.ts:196  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.r, 4, { edgeMax: 3 });
+pre-fix-page.hot.ts:196  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.r, 4, { edgeMax: 3 });
+pre-fix-page.hot.ts:200  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.step, 2.5, { edgeMax: 2.5 });
+pre-fix-page.hot.ts:200  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.step, 2.5, { edgeMax: 2.5 });
+pre-fix-page.hot.ts:284  [no-alloc-in-hot] this method creates a temporary collection/object on the hot path
+    const ahead = L.perches.map((p) => (p - here + L.length) % L.length).filter((x) => x > 0.5);
+pre-fix-page.hot.ts:284  [no-alloc-in-hot] this method creates a temporary collection/object on the hot path
+    const ahead = L.perches.map((p) => (p - here + L.length) % L.length).filter((x) => x > 0.5);
+pre-fix-page.hot.ts:284  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    const ahead = L.perches.map((p) => (p - here + L.length) % L.length).filter((x) => x > 0.5);
+pre-fix-page.hot.ts:284  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    const ahead = L.perches.map((p) => (p - here + L.length) % L.length).filter((x) => x > 0.5);
+pre-fix-page.hot.ts:327  [no-unseeded-hot-random] use a seeded stream so gameplay replays from identical inputs
+    if (Math.random() < dt * 30) emit(pos, 3, 0.3);
+pre-fix-page.hot.ts:402  [no-unseeded-hot-random] use a seeded stream so gameplay replays from identical inputs
+    if (phase === 'fleeing' && Math.random() < dt * 14) emit(pos, 1.2, 0.5);
+pre-fix-page.hot.ts:404  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    const m = new THREE.Matrix4();
+pre-fix-page.hot.ts:405  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    const q = new THREE.Quaternion();
+pre-fix-page.hot.ts:406  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    const sc = new THREE.Vector3();
+pre-fix-page.hot.ts:413  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
+    q.setFromEuler(new THREE.Euler(f.age * 5, f.age * 3, 0));
