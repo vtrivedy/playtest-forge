@@ -23,3 +23,13 @@ ability, or Seedwell gain in any fixture. Evidence:
 Album PNGs. Personally inspected the second-load Stacks-only and Loft-only
 frames: each title and full paragraph fits, controls remain visible.
 TypeScript, world-progress checks, tool syntax, and diff whitespace pass.
+
+Integrated retest on `fdfa4388` (includes `keeping-d3` `4901c674`) also
+PASS: all four fixtures × two loads, zero page errors. Full states and sixteen
+frames: `/captures/hazel/memory-reload-integrated-retest/`. Personally inspected
+both second-load earned spreads: [Stacks](optional-memory-reload/stacks.png),
+[Loft](optional-memory-reload/loft.png). Their text fits; body and controls remain
+faint at smaller resolutions, as Reed independently noted. Reed owns a focused
+contrast follow-up; this diagnostic does not claim that readability issue fixed.
+TypeScript and progress checks pass after merge. Saved-autumn mechanism mapping
+and reconstruction remain explicitly outside this successful optional-memory test.
