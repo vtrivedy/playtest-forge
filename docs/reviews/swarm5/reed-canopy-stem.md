@@ -21,4 +21,21 @@ Visual comparison at 13–16 seconds: the previously opaque stem fades, the fox
 remains visible, and the scenery recovers after the lens clears it. Retained
 before/after descent sheets are in the captures volume under
 `reed/discovery-stem-quartersec/`. TypeScript, production build and `lint:feel`
-pass. Full traversal result is recorded below when the replay finishes.
+pass.
+
+Full 50-second development capture result: 3 catches and page kept, zero JS
+errors, but the final overlook landing fails and guidance correctly remains
+active. The fox misses the support after catch three. The state-only development
+90-second and production 60-second controls also remain at `jump1`; their full
+simulation traces and final game state were saved before stopping the expensive
+final SwiftShader snapshot. These controls have no completed-capture claim.
+Hazel independently reproduced the landing miss without the stem fix on current
+source and is isolating the controller changes. This patch does not claim to
+repair discovery or reproduce the older 66dac775 successful landing.
+
+A focused 15fps production attempt was stopped during slow SwiftShader rendering
+before its first retained descent frame; it supplies no visual verdict. The
+positive visibility verdict comes from the completed quarter-second development
+capture and its before/after descent sheets. Its later ruin retry sheet remains
+readable. Evidence also includes source hashes, the exact tested patch, all 200
+frames, the 50-second movie, final screenshot and `window.__game` in evidence.json.
