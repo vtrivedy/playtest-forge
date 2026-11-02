@@ -1,6 +1,6 @@
 // Real-time listening of one staged scene (disclosed staging): the sim is paced to the wall clock and the three
 // pre-master stems are recorded sample-for-sample, like tools/mix-capture.mjs, but from a teleport + dev hook.
-//   node tools/audio-scene.mjs --scene millbrook|finale --out DIR [--seconds 40]
+//   node tools/audio-scene.mjs --scene millbrook|finale|lane --out DIR [--seconds 40]
 // millbrook: stand on the bank near the dam, burst it (dev hook), listen to the brook start and the wheel turn.
 // finale: force the finale (dev hook) beside the cradle, listen through the coda to silence.
 import { chromium } from 'playwright';
@@ -30,7 +30,10 @@ try {
   await page.waitForFunction(() => window.__gameHooks.state().opening.audio.context === 'running', null, { timeout: 60000 });
   const staged = await page.evaluate((scene) => {
     const h = window.__gameHooks;
-    if (scene === 'millbrook') {
+    if (scene === 'lane') {
+      h.teleport(-45, 90.4, -1.4);
+      h.advance(30, 1 / 60, false);
+    } else if (scene === 'millbrook') {
       h.teleport(-70, 96, 0);
       h.advance(30, 1 / 60, false);
     } else {
@@ -82,7 +85,7 @@ try {
   for (const k of Object.keys(S)) wav(`stem-${k}`, (i) => S[k][0][i], (i) => S[k][1][i]);
   wav('mix', (i) => S.music[0][i] + S.ambience[0][i] + S.sfx[0][i], (i) => S.music[1][i] + S.ambience[1][i] + S.sfx[1][i]);
   fs.writeFileSync(path.join(out, 'marks.json'), JSON.stringify({ marks }));
-  fs.writeFileSync(path.join(out, 'evidence.json'), JSON.stringify({ scene, staging: scene === 'millbrook' ? 'teleport to the bank (-70,96) + millBurst() dev hook at 3 s' : 'finale() dev hook', staged, seconds, wallSeconds: (Date.now() - wall0) / 1000, audioSeconds: n / sr, errors }, null, 1));
+  fs.writeFileSync(path.join(out, 'evidence.json'), JSON.stringify({ scene, staging: scene === 'lane' ? 'teleport onto the sunken lane (-45,90.4), standing' : scene === 'millbrook' ? 'teleport to the bank (-70,96) + millBurst() dev hook at 3 s' : 'finale() dev hook', staged, seconds, wallSeconds: (Date.now() - wall0) / 1000, audioSeconds: n / sr, errors }, null, 1));
   console.log(JSON.stringify({ scene, staged, audioSeconds: n / sr, errors }));
 } finally {
   await browser.close();
