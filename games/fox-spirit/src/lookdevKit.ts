@@ -45,6 +45,8 @@ export const paintU = {
   ...createTrailUniforms(),
   uRestore: { value: Array.from({ length: RESTORE_SLOTS }, () => new THREE.Vector4()) },
   uRestoreCount: { value: 0 },
+  /** per restore: how far (m) its colour has bled out past the washed front (grows for a while after it settles) */
+  uRestoreBleed: { value: new Float32Array(RESTORE_SLOTS) },
   uPaper: { value: new THREE.Color(0.8, 0.66, 0.47) },
   uPaperInk: { value: new THREE.Color(0.2, 0.13, 0.08) },
   /** first snow (finale): 0 none → 1 a full dusting on every upward-facing painted surface */
@@ -97,6 +99,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
         varying vec3 vLkWorld;
         uniform vec4 uRestore[${RESTORE_SLOTS}];
         uniform int uRestoreCount;
+        uniform float uRestoreBleed[${RESTORE_SLOTS}];
         ${TRAIL_DECLARATIONS}
         uniform vec3 uPaper;
         uniform vec3 uPaperInk;
@@ -115,7 +118,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           float rag = (lkFbm(xz * 0.11) - 0.5) * 5.0 + (lkFbm(xz * 0.55 + 3.7) - 0.5) * 1.8 + (lkFbm(xz * 2.2 + 9.1) - 0.5) * 0.9 + (lkNoise(xz * 9.0) - 0.5) * 0.22;
           float lift = max(0.0, vLkWorld.y - uLkClimb.x) * uLkClimb.y;
           float drops = smoothstep(0.7, 0.78, lkNoise(xz * 1.3 + 11.0)) * (1.0 - step(0.2, lift));
-          float paint = 0.0, tide = 0.0, bloom = 0.0;
+          float paint = 0.0, tide = 0.0, bloom = 0.0, soft = 0.0;
           for (int i = 0; i < ${RESTORE_SLOTS}; i++) {
             if (i >= uRestoreCount) break;
             vec4 r = uRestore[i];
@@ -126,8 +129,16 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             // stray pigment drops just past the front (ground level only)
             p = max(p, drops * (1.0 - smoothstep(0.0, 2.2, d)) * step(0.5, r.z));
             paint = max(paint, p);
+            // the colour keeps seeping out past the front as a soft, feathered halo (Kit: restored places should
+            // bleed outward so the world visibly warms; no hard island edge). Ground level only.
+            float bl = uRestoreBleed[i];
+            if (bl > 0.0) {
+              float hd = d + (lkNoise(xz * 0.17 + float(i) * 3.1) - 0.5) * bl * 0.6;
+              soft = max(soft, (1.0 - smoothstep(-0.2 * bl, bl, hd)) * (1.0 - step(0.2, lift)));
+            }
             // pigment pools in a dark line just inside the front; water pushes a pale paper bloom ahead of it
-            tide = max(tide, exp(-pow((d + e * 0.9) / (e * 0.9), 2.0)));
+            // ...and the dried tide-line softens as the colour seeps past it
+            tide = max(tide, exp(-pow((d + e * 0.9) / (e * 0.9), 2.0)) * (1.0 - 0.65 * smoothstep(0.0, 4.0, uRestoreBleed[i])));
             bloom = max(bloom, exp(-pow((d - 0.35 - 0.25 * lkNoise(xz * 1.7)) / 0.3, 2.0)) * step(0.5, r.z));
           }
           ${TRAIL_BLEND}
@@ -153,9 +164,12 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           // painted cel on the same paper, wet sienna pigment bleeding at the front + dried tide-line inside it
           vec3 cel = outgoingLight * (0.95 + 0.08 * tooth) * (0.96 + 0.08 * lkNoise(xz * 2.3));
           vec3 pigment = vec3(0.42, 0.18, 0.08) * (0.55 + 0.6 * t);
-          cel = mix(cel, pigment, tide * 0.7);
+          cel = mix(cel, pigment, tide * 0.45);
           float wet = paint * (1.0 - paint) * 4.0;
           sepia = mix(sepia, uPaper * 1.12, bloom * (1.0 - sh) * 0.55);
+          // the bled halo: colour without the wet front (paler, part-way to paper), feathering the island's edge
+          vec3 faded = mix(sepia, cel, 0.78);
+          sepia = mix(sepia, faded, soft * (1.0 - paint));
           outgoingLight = mix(sepia, cel, paint);
           outgoingLight = mix(outgoingLight, pigment, wet * 0.4);
           // brushy contour ink where the surface turns away from the eye
