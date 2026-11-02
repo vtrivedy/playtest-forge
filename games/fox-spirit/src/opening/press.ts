@@ -141,7 +141,42 @@ export function buildPress(
   bed.position.y = 0.25;
   const pressLight = new THREE.PointLight(0xffc27a, 0, 14, 1.4);
   pressLight.position.y = 2;
-  thePress.add(beam, screw, platen, bed, pressLight);
+  // the lever the Scribe lifts at the end (pivots at the beam's east end)
+  const lever = new THREE.Group();
+  lever.position.set(1.7, 2.9, 0);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.6).translate(0, 0, 0.8), timber);
+  const grip = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), stone);
+  grip.position.z = 1.6;
+  lever.add(arm, grip);
+  lever.rotation.x = 0.55;
+  thePress.add(beam, screw, platen, bed, pressLight, lever);
+  // the Scribe: small and old, hooded in grey, ink-stained sleeves, bowed over the Press it has held shut
+  const scribe = new THREE.Group();
+  const robe = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.25, 9).translate(0, 0.62, 0), winter(0x7b7a86));
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8).translate(0, 1.18, 0), winter(0x6c6b77));
+  const head = new THREE.Group();
+  head.position.set(0, 1.42, 0.06);
+  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), winter(0x5c5b66, { side: THREE.DoubleSide }));
+  const face = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), winter(0xd9c7b0));
+  face.position.set(0, -0.03, 0.06);
+  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 7).rotateX(Math.PI), winter(0xe6e3dc));
+  beard.position.set(0, -0.2, 0.12);
+  head.add(hood, face, beard);
+  const sleeveMat = winter(0x23252d);
+  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.55, 6).translate(0, -0.27, 0), sleeveMat);
+  armL.position.set(-0.28, 1.2, 0.05);
+  armL.rotation.x = -0.5;
+  const armR = armL.clone();
+  armR.position.x = 0.28;
+  scribe.add(robe, shoulders, head, armL, armR);
+  const sAt = press(THE_PRESS.lx + 3.1, THE_PRESS.lz + 1.2);
+  scribe.position.set(sAt.x, LEDGE_TOP, sAt.z);
+  // facing the Press (west), bowed
+  scribe.rotation.y = -Math.PI / 2 - 0.25;
+  shoulders.rotation.x = 0.3;
+  head.rotation.x = 0.45;
+  root.add(scribe);
+  colliders.push({ kind: 'post', x: sAt.x, z: sAt.z, r: 0.4 });
   root.add(thePress);
   colliders.push({ kind: 'box', x: pa.x, z: pa.z, yaw: 0, hx: 1.6, hz: 0.8, top: LEDGE_TOP + 0.5 });
 
@@ -206,7 +241,7 @@ export function buildPress(
     hasInkstep: opts.hasInkstep,
     teach: ctx.teach.offer,
     events: {
-      arrive: () => say(opts.restored('combine') ? 'The Press keeps its warmth.' : 'Snow keeps the pages the Scribe never finished.'),
+      arrive: () => say(opts.restored('combine') ? 'The Press keeps its warmth.' : 'Snow keeps the unfinished pages.'),
       warmed: () => ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.08, rate: 0.5 }),
       kindled: () => {
         ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.12, rate: 0.7 });
@@ -221,15 +256,31 @@ export function buildPress(
         say('The ink breathes.');
       },
       meltIce: () => say('The ice runs off the ink.'),
-      coda: () => say('Far off, the Ash Warden lets one winter go.'),
+      coda: () => say('The Warden was the Scribe’s shadow.'),
       complete: (level) => {
         opts.complete(LEVEL_IDS[level]);
-        if (level === 0) say('Inkstep · the frozen ink will break under you now.');
+        if (level === 0) say('Inkstep · frozen ink breaks now.');
         if (level === 1) say('The Folded Archive opens.');
         if (level === 2) {
           pressLight.intensity = 2.2;
           ctx.audio.cue('finale-kindle');
-          say('The Press wakes. The Maple Seedwell fills.');
+          say('The Scribe lifts the lever.');
+          // a held two-shot: the Scribe at the Press, the fox in front — from off the ledge's north lip, looking south
+          const cam = ctx.player?.cam;
+          if (cam) {
+            const look = new THREE.Vector3(sAt.x - 1.4, LEDGE_TOP + 1.1, sAt.z - 0.6);
+            const lens = press(THE_PRESS.lx + 4.2, LEDGE.z1 + 3.2);
+            const at = new THREE.Vector3(lens.x, LEDGE_TOP + 2.0, lens.z);
+            const look0 = cam.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.camera.position);
+            cam.playPath({
+              keys: [
+                { t: 0, pos: cam.camera.position.clone(), look: look0 },
+                { t: 1.6, pos: at, look },
+                { t: 6.5, pos: at.clone().add(new THREE.Vector3(-0.8, 0.2, -0.9)), look },
+              ],
+              blendInS: 0.8, blendOutS: 2, lockS: 3.5,
+            });
+          }
         }
       },
     },
@@ -242,7 +293,12 @@ export function buildPress(
     membranes,
     ice,
     drafts,
-    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, hint: 0, arrived: 0, coda: -1 },
+    lever,
+    platen,
+    scribe,
+    scribeHead: head,
+    scribeArm: armR,
+    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, hint: 0, arrived: 0, coda: -1, leverK: 0 },
   };
   // a saved world comes back as it was left, quietly: open seal, breathing drafts, melted ice, lit Press
   if (opts.restored('teach')) {
@@ -266,6 +322,8 @@ export function buildPress(
     rig.s.done |= 4;
     ice.visible = false;
     pressLight.intensity = 2.2;
+    rig.s.leverK = 1;
+    rig.s.coda = -2;
   }
   ctx.onUpdate((dt) => updatePress(rig, dt));
 

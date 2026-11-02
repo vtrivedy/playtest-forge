@@ -784,3 +784,13 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
 - `Object.assign(mesh, { position })` throws at boot (read-only Object3D props) — boot-test every builder.
 - Integration: merge all sw5-* into one tip, resolve, then run `tools/ashwater-probe.mjs` + `tools/press-probe.mjs`
   + a hub walk on that exact tip before asking Kit to land.
+
+## The Scribe's Press levels (Thistle, swarm5)
+
+- `opening/pressLayout.ts` (data, local lx/lz from (−700, 85)), `press.ts` (build), `press.hot.ts` (per frame), `tla/Press.tla` (TypeOK, Caused, Monotone, Finishes; negative control without the shelf brazier fails Finishes), `tools/press-probe.mjs` (one staged travel, then stick/Space/Shift; reloads to check save reconstruction).
+- Heights on an island must be sampled inside it: `groundTop` over ±60 m first took the rim (rises 9 m) and floated the whole ridge and seal at rim height — the opened gate was still a wall.
+- Extra glide drafts join the controller through the one updraft read: scene wraps `hearth.updrafts.liftAt` once and folds `press.liftAt` into the same `Lift` (hearth = null, so ride logging skips them).
+- A cracked draft takes ~0.9 s to build and the air-dash carries the fox past the column: the play is crack → land → step back in → jump and hold glide. Probes must do that too.
+- Warmth relay is the puzzle: warmth fades in 6.5 s (~21 m); each lit brazier is ≥ 24 m from its gate and the cold relay stands OFF the straight line (on the line, players solve it by accident).
+- Point lights on near-white toon paper + bloom wash the fox out: braziers ≤ 1.6, the fox's warmth ≤ 0.9, paper ≤ 0xcfc6b2.
+- `lint:feel` wall-clock-timer: setTimeout/setInterval in opening/ fires at a different sim moment under the manual clock; put beats on onUpdate dt.

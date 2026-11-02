@@ -34,11 +34,17 @@ export type PressRig = {
   membranes: THREE.Object3D[];
   ice: THREE.Object3D;
   drafts: THREE.Object3D[];
+  lever: THREE.Object3D;
+  platen: THREE.Object3D;
+  scribe: THREE.Object3D;
+  scribeHead: THREE.Object3D;
+  scribeArm: THREE.Object3D;
   s: {
     /** lit braziers (bit i = BRAZIERS[i]) */ lit: number; wasWarm: number;
     /** carried warmth 0..1 */ warm: number; sealK: number; thawed: number;
     /** per membrane: −1 frozen, ≥ 0 seconds since it cracked */ crackA: number; crackB: number;
     iceK: number; iced: number; done: number; dashWasAir: number; time: number; hint: number; arrived: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
+    /** 0 bowed over the shut Press → 1 lever lifted, the Scribe turned to the fox */ leverK: number;
   };
 };
 
@@ -165,6 +171,19 @@ export function updatePress(rig: PressRig, dt: number): void {
       rig.events.coda();
     }
   }
+
+  // the Scribe: bowed until the Press wakes, then turns, reaches, and lifts the lever (the platen rises off the pages)
+  if ((s.done & 4) !== 0 && s.leverK < 1) s.leverK = Math.min(1, s.leverK + dt / 2.4);
+  const lk = smooth(s.leverK);
+  const reach = smooth(Math.min(1, s.leverK * 2));
+  const lift = smooth(Math.max(0, s.leverK * 2 - 1));
+  rig.scribeHead.rotation.x = 0.45 * (1 - reach) - 0.15 * lift;
+  rig.scribeArm.rotation.x = -0.5 - 1.6 * reach + 0.9 * lift;
+  rig.lever.rotation.x = 0.55 - 1.5 * lift;
+  rig.platen.position.y = 1.5 + 0.7 * lift;
+  rig.scribe.rotation.y = -Math.PI / 2 - 0.25 + 0.9 * lk;
+  // breathing while bowed (sim time, no allocation)
+  rig.scribe.scale.y = 1 + 0.012 * Math.sin(s.time * 1.3) * (1 - lk);
 
   // drafts: rise in after the crack, then breathe
   if (s.crackA >= 0) s.crackA += dt;
