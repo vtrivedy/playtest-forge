@@ -34,6 +34,7 @@ import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
 import { buildMillbrook } from './millbrook';
 import { buildDressing } from './dressing';
+import { unfadedBlockers } from './blockers';
 import { buildHermitage } from './hermitage';
 import { createDryingLines } from './hermitage.hot';
 import { createMillrace } from './millrace.hot';
@@ -157,6 +158,10 @@ export async function runOpening(): Promise<void> {
 
   const paint = createOpeningPaint({ field, renderer, uniforms: paintU, groundH });
   const occlusion = createOpeningOcclusion([...ctx.occluders, ...ctx.cutout]);
+  {
+    const unfaded = unfadedBlockers(ctx.colliders, [...ctx.occluders, ...ctx.cutout], groundH);
+    if (unfaded.length) console.error(`unfaded blocker:\n${unfaded.join('\n')}`);
+  }
   const hearth = createOpeningHearth({
     scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p),
     onIgnite: (at) => field.restore(at, 12, 1.8, { edgeMax: 1.4 }),
