@@ -14,12 +14,13 @@ if(!production)await server.listen();
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-webgl','--ignore-gpu-blocklist','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:640,height:360}});page.setDefaultTimeout(180000);
 const errors=[];page.on('pageerror',e=>errors.push(String(e)));
-const evidence={sha,runtime:production?'vite-production-preview':'vite-dev',staging:'Each case has an explicit initial teleport; no teleport after movement starts; no forced Hermitage state; no coal carried.',cases:[],errors};
+const sourceDiff=execFileSync('git',['diff','--','games/fox-spirit','games/shared','src'],{encoding:'utf8'});
+const evidence={sha,sourceDiff,runtime:production?'vite-production-preview':'vite-dev',staging:'Each case has an explicit initial teleport; no teleport after movement starts; no forced Hermitage state; no coal carried.',cases:[],errors};
 try {
  await page.goto('http://127.0.0.1:5223/?manual=1',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__gameHooks?.ready);
  await page.evaluate(()=>window.__gameHooks.setManual(true));
  const cases=[
- {id:'north-lane-desk-lines-return',start:[-9.7,102.3],legs:[[-12.6,108.2],[-14.2,114.6],[-11.4,120.8],[-7.6,124.6],[-7,129.4],[-8.2,134],[-8.6,135.4],[-11.6,129.65],[-7,129.4],[.2,130],[-7,129.4],[-10,134],[-12.3,138.7],[-10,134],[-7,129.4],[-7.6,124.6],[-11.4,120.8],[-14.2,114.6],[-12.6,108.2],[-9.7,102.3]],arrival:6},
+ {id:'north-lane-desk-lines-return',start:[-9.7,102.3],legs:[[-12.6,108.2],[-14.2,114.6],[-11.4,120.8],[-7.6,124.6],[-7,129.4],[-8.2,134],[-8.2,134.2],[-11.6,129.65],[-7,129.4],[.2,130],[-7,129.4],[-10,134],[-12.3,138.7],[-10,134],[-7,129.4],[-7.6,124.6],[-11.4,120.8],[-14.2,114.6],[-12.6,108.2],[-9.7,102.3]],arrival:6},
  ];
  for(const test of cases){
   const result=await page.evaluate(test=>{
