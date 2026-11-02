@@ -14,16 +14,23 @@ export function prepareSlice(h) {
   h.setStick(0, 0);
   h.setKeys([]);
   h.advance(90, 1 / 60, false);
+  // A fold waits for the fox to leave its sweep before installing its collider.
+  // Retreat with input so the next fold becomes eligible before the next dash.
+  h.setStick(1, 0);
+  h.advance(120, 1 / 60, false);
+  h.setStick(0, 0);
+  h.advance(30, 1 / 60, false);
   h.teleport(-28.2, 74.8, Math.PI);
   h.advance(30, 1 / 60, false);
   h.setStick(0, -1);
   h.setKeys(['ShiftLeft']);
   h.advance(15, 1 / 60, false);
-  h.setStick(0, 0);
+  h.setStick(0, -.4);
   h.setKeys([]);
   h.advance(90, 1 / 60, false);
+  h.setStick(0, 0);
   const folds = h.state().opening.popUpRuin.folds;
-  if (folds[0].phase !== 'open' || folds[1].phase !== 'open') throw Error('Staged real dashes did not open both ruin folds');
+  if (folds[0].phase !== 'open' || folds[1].phase !== 'open') throw Error('Staged real dashes did not open both ruin folds: '+JSON.stringify({folds,pos:h.state().pos,dashes:h.state().dashesUsed}));
 }
 
 export function createSliceRoute() {
@@ -36,11 +43,14 @@ export function createSliceRoute() {
   };
 }
 
-export function verifySlice(s) {
+export function verifySlice(s, trace) {
   return {
     firstFold: s.opening.popUpRuin.folds[0].phase === 'open',
     secondFold: s.opening.popUpRuin.folds[1].phase === 'open',
     belowLeaf: s.pos[1] < .3,
     grounded: s.grounded,
+    startedOnLeaf: Math.abs(trace[0].pos[1] - .47) < .05,
+    realFall: trace.some(f => f.beat === 'walk off toward overlook' && !f.grounded && f.pos[1] < .3),
+    realJumpRetry: trace.some(f => f.beat === 'jump retries below overlook' && f.vel[1] > 1),
   };
 }
