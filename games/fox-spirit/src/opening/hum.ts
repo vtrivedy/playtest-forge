@@ -35,7 +35,7 @@ export function createHearthHum(opts: {
     lp.type = 'lowpass';
     lp.frequency.value = 420;
     lp.connect(gain).connect(audio.at(h.base, HUM.far));
-    const base = [55, 61.7, 49][i % 3]!;
+    const base = [55, 65.4, 49][i % 3]!; // A1, C2, G1: in Hearthsong's C major
     for (const [mul, amp, det] of [[1, 0.5, 0], [1, 0.35, 0.6], [1.5, 0.22, -0.4], [2, 0.12, 0.3]] as const) {
       const o = ac.createOscillator();
       o.type = mul === 1 ? 'sine' : 'triangle';

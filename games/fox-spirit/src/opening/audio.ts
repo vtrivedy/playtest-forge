@@ -1,33 +1,29 @@
 /**
- * The opening's one sound graph (docs/design/swarm3/audio-DESIGN.md): music (phrases) ┐
+ * The opening's one sound graph (docs/design/swarm3/audio-DESIGN.md): music (Hearthsong) ┐
  *                                                                  ambience ───────────┼→ master → limiter → out (+ record tap)
  *                                                                  sfx (3D) ───────────┘
  * One AudioContext for the whole slice, created suspended and resumed on the first key/pointer. The listener is
- * the rendered camera. Silence is the default (KNOWLEDGE.md § Quiet audio redesign): no music at boot or idle —
- * one finite harp phrase arrives on a moment (`cue`) and is followed by quiet; wind is a soft synth breath
- * shaped by height; birds are rare single distant calls once the colour is back. Samples live in `sfx/`
+ * the rendered camera. Music is Hearthsong (music/, DESIGN-music-ember.md): one synthesized lullaby that plays
+ * throughout, leaning into each place and filling in as the colour returns; a moment (`cue`) lets its lead sing.
+ * Wind is a soft synth breath shaped by height. No birds (Vivek: "constant birds"). Samples live in `sfx/`
  * (CC0, assets/library/CREDITS.md); synth voices build on `ac` and connect to `sfx` or `at(pos)`.
  */
 import * as THREE from 'three';
+import { createMusic } from './music/music';
 
-const FILES = import.meta.glob('./sfx/*.ogg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+// the old harp phrases and bird calls stay on disk (provenance) but are not shipped
+const FILES = import.meta.glob(['./sfx/*.ogg', '!./sfx/bird-*.ogg', '!./sfx/phrase-*.ogg'], { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const URLS = Object.fromEntries(Object.entries(FILES).map(([k, v]) => [k.replace('./sfx/', '').replace('.ogg', ''), v]));
 
 export const MIX = {
-  /** unity: the level every review capture was measured at (Tallow :1631 "gentle and fitting" on 5247b90) */
+  /** unity: the level every review capture is measured at */
   master: 1,
-  /** phrases are cut to −20 dBFS RMS; this puts them near −32 dBFS in the mix */
-  music: 0.25,
+  /** Hearthsong bus (its own levels live in music/score.ts + the worklet) */
+  music: 0.32,
   ambience: 1,
   sfx: 0.9,
-  /** a cue within this long of the last phrase's start is dropped (no backlog, no stacking) */
-  musicGap: 30,
-  /** moments → harp phrases (Meadow Thoughts, Écrivain, CC0); each plays once, then quiet */
-  cues: { hearth: ['phrase-hearth'], page: ['phrase-page-1', 'phrase-page-2'], keeping: ['phrase-keeping'], home: ['phrase-home'] } as Record<string, string[]>,
   /** wind: gusts of soft pink noise that come and go (silent between them); faint on the ground, fuller up high */
   wind: { ground: 0.006, high: 0.03, dark: 450, open: 2200 },
-  /** birds: single distant calls, only once the colour is back; gaps random in [min, max] s */
-  birds: { gain: 0.05, min: 28, max: 70, after: 0.3, near: 18, far: 34 },
 };
 
 export type PlayOpts = {
@@ -171,40 +167,17 @@ export function createOpeningAudio() {
   let gustTo = 0.5;
   let lastTick = 0;
 
-  // birds: one call at a time, somewhere off to the side and far, with long random gaps
-  let nextBird = MIX.birds.min;
-  let lastBird = -1;
-  let birdCalls = 0;
-  const birdIds = Object.keys(URLS).filter((k) => k.startsWith('bird-'));
-
-  // music: finite phrases on moments; quiet otherwise
-  let lastCue = -Infinity;
-  let phraseId = '';
-  let phraseEnds = 0;
-  const cueCounts: Record<string, number> = {};
-  const cued: { cue: string; phrase: string; t: number }[] = [];
-  /** a moment happened (first hearth, a page caught, the Keeping, home): play its phrase if the music has rested */
+  const song = createMusic(ac, music);
+  const cued: { cue: string; t: number }[] = [];
+  /**
+   * a moment happened (first hearth, a page caught, the Keeping, home): the song's lead may sing. The finale's
+   * moments are stronger: kindle/open sing even inside the rest gap, snow thins the song, rest plays it home and ends it.
+   */
   function cue(name: string): void {
-    const list = MIX.cues[name];
-    if (!list || ac.state !== 'running' || ac.currentTime - lastCue < MIX.musicGap) return;
-    const n = cueCounts[name] ?? 0;
-    const id = list[n % list.length]!;
-    const buf = buffers.get(id);
-    if (!buf) return;
-    cueCounts[name] = n + 1;
-    const now = ac.currentTime;
-    lastCue = now;
-    const src = ac.createBufferSource();
-    src.buffer = buf;
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(1, now + 0.4);
-    src.connect(g).connect(music);
-    src.start(now);
-    src.onended = () => g.disconnect();
-    phraseId = id;
-    phraseEnds = now + buf.duration;
-    cued.push({ cue: name, phrase: id, t: +now.toFixed(2) });
+    if (ac.state !== 'running') return;
+    if (name === 'finale-snow') song.snow();
+    else song.cue(name === 'finale-rest' ? 3 : name === 'finale-kindle' || name === 'finale-open' ? 1 : 0);
+    cued.push({ cue: name, t: +ac.currentTime.toFixed(2) });
     if (cued.length > 12) cued.shift();
   }
 
@@ -228,8 +201,8 @@ export function createOpeningAudio() {
     playOne,
     loop,
     cue,
-    /** per frame: listener = camera; wind follows height, birds wait for the colour */
-    update(camera: THREE.Camera, o: { restored: number; height: number }): void {
+    /** per frame: listener = camera; wind follows height; the song follows the fox and the colour */
+    update(camera: THREE.Camera, o: { restored: number; height: number; x: number; z: number }): void {
       if (ac.state !== 'running') return;
       const now = ac.currentTime;
       const L = ac.listener;
@@ -255,24 +228,13 @@ export function createOpeningAudio() {
       const aloft = THREE.MathUtils.smoothstep(height, 1, 8);
       wind.gain.setTargetAtTime(THREE.MathUtils.lerp(MIX.wind.ground, MIX.wind.high, aloft) * swell, now, 0.5);
       windLow.frequency.setTargetAtTime(THREE.MathUtils.lerp(MIX.wind.dark, MIX.wind.open, Math.max(swell, aloft * 0.6)), now, 0.6);
-      // birds
-      if (restored > MIX.birds.after && now >= nextBird && birdIds.length) {
-        let i = Math.floor(Math.random() * birdIds.length);
-        if (i === lastBird) i = (i + 1) % birdIds.length;
-        lastBird = i;
-        const ang = Math.random() * Math.PI * 2;
-        const r = THREE.MathUtils.lerp(MIX.birds.near, MIX.birds.far, Math.random());
-        const at = new THREE.Vector3(p.x + Math.cos(ang) * r, p.y + 4 + Math.random() * 6, p.z + Math.sin(ang) * r);
-        play(birdIds[i]!, { at, gain: MIX.birds.gain * (0.7 + Math.random() * 0.5), rate: 0.94 + Math.random() * 0.12 });
-        birdCalls++;
-        nextBird = now + THREE.MathUtils.lerp(MIX.birds.min, MIX.birds.max, Math.random());
-      } else if (restored <= MIX.birds.after) nextBird = Math.max(nextBird, now + 8);
+      song.update(o.x, o.z, restored);
     },
     state: () => ({
       context: ac.state,
       master: MIX.master,
-      music: { phrase: ac.currentTime < phraseEnds ? phraseId : null, cued: cued.slice(-6) },
-      ambience: { wind: +wind.gain.value.toFixed(4), birdCalls, nextBirdIn: +Math.max(0, nextBird - ac.currentTime).toFixed(1) },
+      music: { ...song.state(), cued: cued.slice(-6) },
+      ambience: { wind: +wind.gain.value.toFixed(4) },
       loaded: buffers.size,
       files: Object.keys(URLS).length,
       counts: { ...counts },

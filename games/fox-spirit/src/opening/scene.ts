@@ -213,7 +213,7 @@ export async function runOpening(): Promise<void> {
     hum.update();
     const ps = player.state() as { grounded: boolean; gliding: boolean; vel: number[]; speed: number; pos: number[] };
     foley.update(ps);
-    ctx.audio.update(view, { restored: Math.min(1, field.restores.reduce((a, r) => a + r.radius * r.radius, 0) / 260), height: ps.pos[1]! - groundH(ps.pos[0]!, ps.pos[2]!) });
+    ctx.audio.update(view, { restored: Math.min(1, field.restores.reduce((a, r) => a + r.radius * r.radius, 0) / 260), height: ps.pos[1]! - groundH(ps.pos[0]!, ps.pos[2]!), x: ps.pos[0]!, z: ps.pos[2]! });
     // the key's shadow frustum rides with the fox
     const p = fox.root.position;
     lights.key.target.position.set(p.x, 0, p.z);
