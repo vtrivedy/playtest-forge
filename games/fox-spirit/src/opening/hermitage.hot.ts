@@ -42,7 +42,12 @@ export function createDryingLines(ctx: OpeningCtx) {
     for (const [x, z, j] of [[ax, az, 0], [bx, bz, 1]] as const) {
       const y = groundH(x, z);
       lineY[i * 2 + j] = y + F.height + 0.1;
-      k.add(cyl(0.05, 0.06, F.height + 0.3, 6), C.timber, [x, y + (F.height + 0.3) / 2, z], [(rand() - 0.5) * 0.08, 0, (rand() - 0.5) * 0.08], 0.012);
+      // each pole its own chase-cam fade root: the lens can end up right beside one (Sorrel, 32 s hold)
+      const pk = new Kit();
+      pk.add(cyl(0.05, 0.06, F.height + 0.3, 6), C.timber, [x, y + (F.height + 0.3) / 2, z], [(rand() - 0.5) * 0.08, 0, (rand() - 0.5) * 0.08], 0.012);
+      const pole = pk.build();
+      scene.add(pole);
+      ctx.occluders.push(pole);
       ctx.colliders.push({ kind: 'post', x, z, r: 0.1 });
     }
     const a = new THREE.Vector3(ax, lineY[i * 2]!, az);

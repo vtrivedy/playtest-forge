@@ -119,7 +119,7 @@ export const WEST_PATHS: ReadonlyArray<readonly [number, number, number, number]
   chain(LANE);
   chain([LANE[LANE.length - 1]!, [-70, 87.6], [B.x + 2.2, B.z + 0.4]]);
   chain([[B.x - 2.2, B.z - 0.6], [-88, 84.5], [-93.5, 80.5], [-95.5, 75.5], [L.x + 2.6, L.z + 1.6]]);
-  chain([[-70, 87.6], [M.x + 0.5, M.z - 3.6]]);
+  chain([[-70, 87.6], [M.x + 0.7, M.z - 4.4]]);
   chain([[-70, 87.6], [-73.4, 80.4], [S.x + 2.4, S.z + 0.3]]);
   chain([[S.x - 2.4, S.z - 0.2], [-90, 75.5], [-95.5, 75.5]]);
   return segs;
