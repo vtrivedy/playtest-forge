@@ -6,7 +6,7 @@ physical gate the fox opens with what it has (two actions only: jump/glide, dash
 
 | Level (store id) | Gate | What the player does | Result |
 |---|---|---|---|
-| Low Sluice (`teach`) | the channel spans the marsh; deep water puts you back on the bank | dash through the reed dam choking the sluice | channel drains over 3 s; walk its bed to Reed Island → earns **Reedskim** |
+| Low Sluice (`teach`) | the channel spans the marsh in two reaches split by a slate sill; the west reach's north bank is a reed thicket | dash the bank sluice's reeds → the west reach drains; go down into its bed (the drowned roof is out west), east to the sill, dash its culvert's reeds → the east reach drains; climb its bank | Reed Island → earns **Reedskim** |
 | Reed Pond (`develop`) | the pond spans the marsh | Reedskim raises 9 reed mats; jump (held into a glide) mat to mat | Mill Shore |
 | Weir Heart (`combine`) | the Seedwell ledge is higher than the weir and 3+ m from it; the Mill Pool is a walled cistern | mats out to the islet, dash its dam → the cistern drains → climb its steps onto the weir. Insight: the way up is the opposite — dash the weir's reed gate so the race FLOODS the cistern (4.3 m, 45 s); the Ferrykeeper's punt rises to the weir lip; walk aboard, onto the east shelf, along the wall to the ledge | Reed Seedwell fills; the Ferrykeeper unpresses and flies |
 
