@@ -16,6 +16,7 @@ type EnvelopeOptions = {
 export function createCameraEnvelope(opts: EnvelopeOptions) {
   const freeLens = new THREE.Vector3();
   const candidateLens = new THREE.Vector3();
+  const goalLens = new THREE.Vector3();
   const previousLens = opts.previousLens;
   const params = opts.params;
   let focus = previousLens, lens = previousLens;
@@ -27,17 +28,53 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
   function bodyClear(point: THREE.Vector3): boolean {
     return Math.hypot(point.x - focus.x, point.z - focus.z) >= bodyRadius(point) - .00001;
   }
-  function floorClear(point: THREE.Vector3): boolean {
-    const floor = opts.surfaceAt?.(point.x, point.z, point.y + 1.5);
-    return floor === undefined || !Number.isFinite(floor) || point.y >= floor + params.clearance * .8 - .00001;
+  function floorClearAt(x: number, y: number, z: number): boolean {
+    const floor = opts.surfaceAt?.(x, z, y + 1.5);
+    return floor === undefined || !Number.isFinite(floor) || y >= floor + params.clearance * .8 - .00001;
   }
-  function check(x: number, z: number): void {
+  function floorClear(point: THREE.Vector3): boolean {
+    return floorClearAt(point.x, point.y, point.z);
+  }
+  function liftCandidate(maximumStep: number): void {
+    const floor = opts.surfaceAt?.(candidateLens.x, candidateLens.z, candidateLens.y + 1.5);
+    if (floor === undefined || !Number.isFinite(floor) || candidateLens.y >= floor + params.clearance * .8) return;
+    const needed = floor + params.clearance * .8 + .01;
+    if (previousLens.y < needed) {
+      candidateLens.copy(previousLens);
+      candidateLens.y += Math.min(maximumStep, needed - previousLens.y);
+    } else candidateLens.y = needed;
+    const travel = candidateLens.distanceTo(previousLens);
+    if (travel > maximumStep) candidateLens.lerpVectors(previousLens, candidateLens, maximumStep / travel);
+  }
+  function pathClear(): boolean {
+    const steps = Math.max(1, Math.ceil(candidateLens.distanceTo(previousLens) / .1));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const x = THREE.MathUtils.lerp(previousLens.x, candidateLens.x, t);
+      const y = THREE.MathUtils.lerp(previousLens.y, candidateLens.y, t);
+      const z = THREE.MathUtils.lerp(previousLens.z, candidateLens.z, t);
+      if (opts.lensBlocked!(x, y, z, .2) || !floorClearAt(x, y, z)) return false;
+    }
+    return true;
+  }
+  function check(x: number, z: number, standoff = .35, local = false): void {
     const blocked = opts.lensBlocked!;
-    // Escape laterally at the last clear height before descending past a platform.
-    candidateLens.set(x, previousFree ? Math.max(lens.y, previousLens.y) : lens.y, z);
+    // Validate the intended destination before clipping the step. Otherwise an
+    // impossible goal can keep winning with small oscillations near a wall.
+    goalLens.set(x, lens.y, z);
+    const floor = opts.surfaceAt?.(x, z, goalLens.y + 1.5);
+    if (floor !== undefined && Number.isFinite(floor)) goalLens.y = Math.max(goalLens.y, floor + params.clearance * .8);
+    const gx = goalLens.x - focus.x, gz = goalLens.z - focus.z, gr = Math.hypot(gx, gz), room = bodyRadius(goalLens);
+    if (gr < room) {
+      goalLens.x = focus.x + (gr > .01 ? gx / gr : ux) * room;
+      goalLens.z = focus.z + (gr > .01 ? gz / gr : uz) * room;
+    }
+    if (!floorClear(goalLens) || blocked(goalLens.x, goalLens.y, goalLens.z, standoff)) return;
+    candidateLens.copy(goalLens);
     if (previousFree) {
       const travel = candidateLens.distanceTo(previousLens), maximumStep = Math.max(.08, 16 * dt);
       if (travel > maximumStep) candidateLens.lerpVectors(previousLens, candidateLens, maximumStep / travel);
+      liftCandidate(maximumStep);
     }
     const cx = candidateLens.x - focus.x, cz = candidateLens.z - focus.z;
     const cr = Math.hypot(cx, cz), minimumRoom = bodyRadius(candidateLens);
@@ -45,17 +82,16 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
       candidateLens.x = focus.x + (cr > .01 ? cx / cr : ux) * minimumRoom;
       candidateLens.z = focus.z + (cr > .01 ? cz / cr : uz) * minimumRoom;
     }
-    const cost = candidateLens.distanceToSquared(lens) * .2 + (previousFree ? candidateLens.distanceToSquared(previousLens) * .8 : 0);
-    if (cost >= best || !floorClear(candidateLens) || blocked(candidateLens.x, candidateLens.y, candidateLens.z, .35)) return;
-    if (previousFree) {
-      const steps = Math.ceil(candidateLens.distanceTo(previousLens) / .1);
-      for (let i = 1; i < steps; i++) {
-        const t = i / steps;
-        if (blocked(THREE.MathUtils.lerp(previousLens.x, candidateLens.x, t),
-          THREE.MathUtils.lerp(previousLens.y, candidateLens.y, t),
-          THREE.MathUtils.lerp(previousLens.z, candidateLens.z, t), .2)) return;
-      }
+    let cost = candidateLens.distanceToSquared(lens) * .2 + goalLens.distanceToSquared(lens) * .2 + (previousFree ? candidateLens.distanceToSquared(previousLens) * .8 : 0);
+    if (local) {
+      const sx = candidateLens.x - previousLens.x, sz = candidateLens.z - previousLens.z;
+      const tx = lens.x - previousLens.x, tz = lens.z - previousLens.z;
+      const length = Math.hypot(sx, sz) * Math.hypot(tx, tz);
+      const turn = length > .00001 ? (-sx * tz + sz * tx) / length : 0;
+      cost += (1 - turn * (params.sideBias < 0 ? -1 : 1)) * params.minDistance * .1;
     }
+    if (cost >= best || !floorClear(candidateLens) || blocked(candidateLens.x, candidateLens.y, candidateLens.z, standoff)) return;
+    if (previousFree && !pathClear()) return;
     const visibility = opts.sightFraction(focus, candidateLens);
     const visibleCost = cost + (1 - visibility) * params.distance * params.distance * 4;
     if (visibleCost >= best) return;
@@ -66,7 +102,7 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
     const blocked = opts.lensBlocked;
     if (!blocked) return false;
     focus = nextFocus; lens = nextLens; dt = nextDt;
-    const desiredFree = !blocked(lens.x, lens.y, lens.z, .35) && bodyClear(lens);
+    const desiredFree = !blocked(lens.x, lens.y, lens.z, .35) && bodyClear(lens) && floorClear(lens);
     if (desiredFree) {
       // Release an elevated escape pose along a checked segment instead of
       // dropping straight back to the unconstrained spring in one frame.
@@ -74,14 +110,8 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
       if (!firstFrame && travel > maximumStep && bodyClear(previousLens) && floorClear(previousLens)
         && !blocked(previousLens.x, previousLens.y, previousLens.z, .2)) {
         candidateLens.lerpVectors(previousLens, lens, maximumStep / travel);
-        let clear = bodyClear(candidateLens) && floorClear(candidateLens);
-        const steps = Math.ceil(maximumStep / .1);
-        for (let i = 1; clear && i <= steps; i++) {
-          const t = i / steps;
-          clear = !blocked(THREE.MathUtils.lerp(previousLens.x, candidateLens.x, t),
-            THREE.MathUtils.lerp(previousLens.y, candidateLens.y, t),
-            THREE.MathUtils.lerp(previousLens.z, candidateLens.z, t), .2);
-        }
+        liftCandidate(maximumStep);
+        const clear = bodyClear(candidateLens) && floorClear(candidateLens) && pathClear();
         if (clear) { lens.copy(candidateLens); return true; }
       }
       if (firstFrame || travel <= maximumStep) return false;
@@ -102,6 +132,15 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
     for (let i = 0; i < ESCAPE_ANGLES.length; i++) {
       const a = THREE.MathUtils.degToRad(ESCAPE_ANGLES[i]!), c = Math.cos(a), s = Math.sin(a);
       check(focus.x + (ux * c + uz * s) * sideRange, focus.z + (uz * c - ux * s) * sideRange);
+    }
+    // A nearby post can block every direction aimed around the distant fox.
+    // Try a local detour before falling back to the previous clear pose.
+    if (!Number.isFinite(best) && previousFree) {
+      const step = Math.max(.08, 16 * dt);
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4;
+        check(previousLens.x + Math.sin(a) * step, previousLens.z + Math.cos(a) * step, .2, true);
+      }
     }
     if (Number.isFinite(best)) lens.copy(freeLens);
     else if (previousClear && floorClear(previousLens)) { lens.copy(previousLens); return true; }

@@ -75,3 +75,8 @@ export function northRise(x: number, z: number): number {
   const pond = -0.45 * (1 - smoothstep(Math.hypot(x - D.x, z - D.z), D.r - 0.4, D.r + 0.6));
   return (P.rise * smoothstep(z, 104, 125) + dish * smoothstep(z, 120, 126) + pond) * across;
 }
+
+/** kickable leaf piles up the hanger lane (leafPiles.ts) */
+export const NORTH_PILES: ReadonlyArray<{ x: number; z: number }> = [
+  { x: -11.4, z: 105.6 }, { x: -13.9, z: 111.0 }, { x: -12.6, z: 118.0 }, { x: -9.2, z: 123.0 },
+];
