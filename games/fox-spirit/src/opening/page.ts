@@ -168,6 +168,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const pos = new THREE.Vector3();
   const prev = new THREE.Vector3();
   const flingFrom = new THREE.Vector3();
+  /** the page's velocity at the catch: carried into the fling / kept rise and bled off, so leaving the line never steps */
+  const kick = new THREE.Vector3();
+  const carried = new THREE.Vector3();
   const flingTo = new THREE.Vector3();
   const tmp = new THREE.Vector3();
   /** flight points carry height above the base terrain (props and raised places are authored into the height) */
@@ -181,6 +184,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   function caught(): void {
     catches++;
     flingFrom.copy(pos);
+    kick.copy(vel);
     for (let i = 0; i < 24; i++) emit(pos, 1.6, 2.4);
     if (catches >= PAGE.stages.length) {
       phase = 'kept';
@@ -297,7 +301,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       const k = Math.min(1, flingT / TUNE.fling);
       const e = k * k * (3 - 2 * k);
       pos.lerpVectors(flingFrom, flingTo, e);
-      pos.y += Math.sin(k * Math.PI) * (6 + flingFrom.distanceTo(flingTo) * 0.15);
+      pos.y += Math.sin(e * Math.PI) * (6 + flingFrom.distanceTo(flingTo) * 0.15);
+      pos.addScaledVector(carried.copy(kick), 0.15 * (1 - Math.exp(-flingT / 0.15)) * (1 - e));
       if (Math.random() < dt * 30) emit(pos, 3, 0.3);
       if (dt > 0) vel.subVectors(pos, prev).divideScalar(dt);
       if (k >= 1) phase = 'perched';
@@ -306,7 +311,10 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       // the page rises over the fox, opens wide, then sinks into the ground as the wash spreads
       const k = Math.min(1, keptAt / 2.5);
       // rises well clear of the fox and opens, then lets go
-      pos.set(fox.x, fox.y + 1.4 + 4 * Math.sin(Math.min(1, keptAt / 2) * Math.PI * 0.5), fox.z);
+      tmp.set(fox.x, fox.y + 1.4 + 4 * Math.sin(Math.min(1, keptAt / 2) * Math.PI * 0.5), fox.z);
+      // from where it was caught (still drifting on its own momentum) into the rise over the fox
+      carried.copy(flingFrom).addScaledVector(kick, 0.15 * (1 - Math.exp(-keptAt / 0.15)));
+      pos.lerpVectors(carried, tmp, THREE.MathUtils.smoothstep(keptAt, 0, 0.7));
       body.scale.setScalar(1 + k * 4);
       (page.material as THREE.MeshBasicMaterial).opacity = 1 - THREE.MathUtils.smoothstep(keptAt, 2.5, 4.5);
       (glow.material as THREE.MeshBasicMaterial).opacity = 0.35 * (1 - THREE.MathUtils.smoothstep(keptAt, 2, 4));
@@ -330,7 +338,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     const rateGoal = phase === 'kept' ? 0.5 : windedT > 0 ? 0.6 : 0.9 + nerve * 2.1;
     beatRate = THREE.MathUtils.damp(beatRate, rateGoal, 4, dt);
     beat += dt * beatRate;
-    const fold = phase === 'kept' ? 0.04 : (0.15 + 0.45 * nerve) * (0.55 + 0.45 * Math.sin(beat * Math.PI * 2));
+    // a kept page eases its wings open flat (no snap from mid-beat)
+    const fold = THREE.MathUtils.lerp((0.15 + 0.45 * nerve) * (0.55 + 0.45 * Math.sin(beat * Math.PI * 2)), 0.04, phase === 'kept' ? THREE.MathUtils.smoothstep(keptAt, 0, 0.4) : 0);
     const arr = geo.getAttribute('position') as THREE.BufferAttribute;
     for (let i = 0; i < arr.count; i++) {
       const x = base[i * 3]!;
