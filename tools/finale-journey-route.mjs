@@ -3,9 +3,9 @@ export const SLICE_START = KEEPING_START;
 export const SLICE_STAGING = 'One initial hearth placement; original Keeping route then live pickup, bridge crossing, glide and placement. No forced progression or camera.';
 
 // Embed the shared factory so browser-side probes can serialize the complete input route.
-export const createSliceRoute = new Function(`return function createFinaleJourneyRoute() {
+export const createSliceRoute = new Function(`return function createFinaleJourneyRoute(startAtBridge = false) {
   const keeping = (${createKeepingRoute.toString()})();
-  let onward = false, step = 0, since = 0, last = 0;
+  let onward = startAtBridge, step = 0, since = 0, last = 0;
   const legs = [
     {beat:'return over the bridge',to:[27.8,72.6]},
     {beat:'round the root bowl',to:[29.7,75.3]},
