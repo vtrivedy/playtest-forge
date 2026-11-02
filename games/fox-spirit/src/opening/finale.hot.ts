@@ -88,7 +88,9 @@ export function dampAngle(current: number, target: number, lambda: number, dt: n
   return current + d * (1 - Math.exp(-lambda * dt));
 }
 
-const smooth = THREE.MathUtils.smoothstep;
+function smooth(x: number, a: number, b: number): number {
+  return THREE.MathUtils.smoothstep(x, a, b);
+}
 const m4 = new THREE.Matrix4();
 const q = new THREE.Quaternion();
 const e = new THREE.Euler();
