@@ -65,6 +65,7 @@ export type FinaleRig = {
   onwardFrom: THREE.Vector3;
   emberAt: THREE.Vector3;
   homeReady: () => boolean;
+  canTeachOnward: () => boolean;
   emberWhere: (out: THREE.Vector3) => boolean;
   pageMeshes: THREE.InstancedMesh[];
   leafMesh: THREE.InstancedMesh;
@@ -411,7 +412,7 @@ function stepOnward(rig: FinaleRig, dt: number): void {
   if (want && (rig.emberAt.distanceToSquared(rig.onwardAt) > 1 || f.distanceToSquared(rig.onwardFrom) > 16)) rig.events.onward(rig.emberAt);
   s.onwardT = want ? Math.min(3, s.onwardT + dt) : Math.max(0, s.onwardT - dt * 2);
   // say it too: a first-timer stood on the overlook after the catch with nothing pointing onward (Kit, 2f5af69)
-  if (want && s.onwardT > 0.5) rig.teach(ONWARD_HINT);
+  if (want && s.onwardT > 0.5 && rig.canTeachOnward()) rig.teach(ONWARD_HINT);
   const on = smooth(s.onwardT, 0.5, 3);
   if (on <= 0.001) {
     mesh.count = 0;

@@ -67,6 +67,7 @@ export function buildCanopy(ctx: OpeningCtx) {
     const stem = inked(new THREE.TubeGeometry(curve, 16, 0.24, 8, false), stemMat, 0.012, true);
     stem.castShadow = true;
     ctx.scene.add(stem);
+    ctx.occluders.push(stem);
     return { ...a, top, root, blade, veins, material, touched: false, contact: false, latched: false, dwell: 0, compression: 0, pulse: 0, lensScale: 1 };
   });
   let launches = 0, contacts = 0, retries = 0, roostVisits = 0;

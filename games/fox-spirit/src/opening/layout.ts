@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { WEST_PATHS, westBase, westK, westRim } from './millbrookLayout';
 import { NORTH_PATHS, northRim, northRise } from './hermitageLayout';
+import { ashwaterH, pressH, WORLD_SPLIT } from './worlds';
 
 /** wake spot by the plaza, facing down the hub lane toward the meadow (−3, 81) */
 export const SPAWN = { x: -5.2, z: 92.5, yaw: Math.atan2(2.2, -11.5) } as const;
@@ -202,6 +203,9 @@ function smin(a: number, b: number, k: number): number {
 
 /** Base terrain (no props): gentle swells, flattened lanes and house pads, cliffed rim */
 export function groundH(x: number, z: number): number {
+  // the other worlds are islands far along x (worlds.ts, DESIGN-worlds.md)
+  if (x > WORLD_SPLIT) return ashwaterH(x, z);
+  if (x < -WORLD_SPLIT) return pressH(x, z);
   const swell = Math.sin(x * 0.11) * Math.cos(z * 0.09) * 0.7 + Math.sin(x * 0.31 + z * 0.17) * 0.18;
   let flat = THREE.MathUtils.smoothstep(pathDist(x, z), 1.2, 5);
   for (const h of HOUSES) {
