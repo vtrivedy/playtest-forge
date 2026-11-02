@@ -35,10 +35,10 @@ export function createOpeningHearth(opts: {
   const hud = document.createElement('div');
   hud.dataset.openingTeach = 'heat';
   Object.assign(hud.style, {
-    position: 'fixed', left: '50%', bottom: '7%', transform: 'translateX(-50%)',
+    position: 'fixed', left: '12px', top: '12px',
     color: '#f4e5cb', background: 'rgba(43,35,30,.76)', padding: '10px 18px',
     borderRadius: '5px', font: '16px Georgia,serif', textAlign: 'center',
-    pointerEvents: 'none', maxWidth: '80vw', transition: 'opacity .4s',
+    pointerEvents: 'none', maxWidth: 'min(240px, 32vw)', transition: 'opacity .4s',
   });
   document.body.append(hud);
   let elapsed = 0;

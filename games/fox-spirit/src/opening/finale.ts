@@ -525,9 +525,15 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   scene.add(onwardMesh);
   const onwardLut = new Float32Array(WAY_N * 3);
   const onwardAt = new THREE.Vector3(Infinity, 0, 0);
+  const onwardFrom = new THREE.Vector3(Infinity, 0, 0);
   const rebuildOnward = (to: THREE.Vector3): number => {
     onwardAt.copy(to);
-    const pts = [[WELL.x - 0.6, groundH(WELL.x, WELL.z) + 1.4, WELL.z - 1.2], [-3, groundH(-3, 81) + 1.1, 81], [0.5, groundH(0.5, 80) + 1.1, 80]];
+    // the stream starts at the fox's feet (Kit: the ending has to find the player, not wait at the well), then out
+    // through the gate if it is still in the village
+    const f = ctx.fox.root.position;
+    onwardFrom.copy(f);
+    const pts = [[f.x, f.y + 0.9, f.z]];
+    if (f.z > 82) pts.push([-3, groundH(-3, 81) + 1.1, 81], [0.5, groundH(0.5, 80) + 1.1, 80]);
     // up the shelf: the motes ride the hearth's warm column, as the fox will
     if (to.y > 2.5) pts.push([HEARTH_A.x - 0.6, groundH(HEARTH_A.x, HEARTH_A.z) + 1.6, HEARTH_A.z + 0.8], [HEARTH_A.x + 0.4, to.y + 2.2, HEARTH_A.z - 0.3]);
     pts.push([to.x, to.y + 0.7, to.z]);
@@ -652,7 +658,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     },
     hinge, screw, wheel, coverMat, paperMat, ironMat, lampPaper, emblemMat, glowMat, light,
     wayMesh, wayLut, wayLen: wayCurve.getLength(),
-    onwardMesh, onwardLut, emberAt: new THREE.Vector3(), onwardAt,
+    onwardMesh, onwardLut, emberAt: new THREE.Vector3(), onwardAt, onwardFrom,
     homeReady: opts.homeReady,
     emberWhere: (out: THREE.Vector3) => opts.ember.where(out),
     pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
