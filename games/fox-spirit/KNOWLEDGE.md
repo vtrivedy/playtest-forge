@@ -817,3 +817,5 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   marsh. `mergeGeometries` needs matching index-ness: convert everything with `.toNonIndexed()` first.
 - A probe `--clip` mode: run the in-page steering in 6-frame chunks and screenshot between chunks for a continuous
   10 fps route film without changing the route logic (tools/ashwater-probe.mjs).
+- Press clip: `tools/press-clip.mjs` (node-driven, every 2nd step rendered → 30 fps) runs ~0.6 frames/s on SwiftShader: 74 s of play took ~58 min. Start it from a pinned worktree early; if it is cut short, encode the frames already on disk.
+- Dressing must keep the first view busy: a spawn that faces an empty field with one ink blot reads as "empty" even if the island is full behind the camera. Place a few props in the arrival frustum deliberately, then scatter.

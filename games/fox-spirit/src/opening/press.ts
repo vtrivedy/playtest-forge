@@ -351,6 +351,7 @@ export function buildPress(
     const onShelf = lz < SHELF.z1 && lz > SHELF.z0;
     const at = press(lx, lz);
     if (Math.hypot(lx - MEMBRANE_A.lx, lz - MEMBRANE_A.lz) < 3 || Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) < 3) continue;
+    if (Math.hypot(lx, lz - 38) < 7) continue;
     if (Math.abs(lz - RIDGE.lz) < 1.6 || (lx > LEDGE.x0 - 1 && lx < LEDGE.x1 + 1 && lz < LEDGE.z1 + 1 && lz > LEDGE.z0)) continue;
     const y = onShelf ? SHELF_TOP : pressH(at.x, at.z);
     if (!onShelf && pressH(at.x, at.z) > RIDGE_BASE + 1.2) continue;
@@ -370,9 +371,14 @@ export function buildPress(
 
   // ---- the floor as a place: ink trees with page-leaf crowns heavy with snow, giant books half sunk in drifts,
   // lantern posts marking the way between braziers (all off the lanes, the braziers' legs and the gates)
+  const onShelfTop = (lx: number, lz: number, pad: number) =>
+    lz < SHELF.z1 - 3 - pad && lz > SHELF.z0 + 1 + pad && !(lx > LEDGE.x0 - 4 - pad && lx < LEDGE.x1 + 4 + pad) &&
+    segD(lx, lz, BRAZIERS[2]!.lx, BRAZIERS[2]!.lz, BRAZIERS[3]!.lx, BRAZIERS[3]!.lz) > 3 + pad &&
+    segD(lx, lz, BRAZIERS[3]!.lx, BRAZIERS[3]!.lz, MEMBRANE_B.lx, MEMBRANE_B.lz) > 3 + pad &&
+    Math.hypot(lx - BRAZIERS[2]!.lx, lz - BRAZIERS[2]!.lz) > 4 && Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) > 5 && pressE(press(lx, lz).x, press(lx, lz).z) < -5;
   const clearOf = (lx: number, lz: number, pad: number) => {
     if (Math.abs(lz - RIDGE.lz) < 3 + pad) return false;
-    if (lz < SHELF.z1 + 2.5 + pad && lz > SHELF.z0 - 2) return false;
+    if (lz < SHELF.z1 + 2.5 + pad && lz > SHELF.z0 - 2) return onShelfTop(lx, lz, pad);
     if (Math.abs(lx) < 5 + pad && lz > SHELF.z1 && lz < 40) return false;
     for (const B of BRAZIERS) if (Math.hypot(lx - B.lx, lz - B.lz) < 4 + pad) return false;
     // the relay legs (lit → cold → gate) stay open
@@ -384,12 +390,14 @@ export function buildPress(
   const crownMat = winter(0xe9ecf2);
   const crownTint = winter(0xc9cfe0);
   let trees = 0;
-  for (let i = 0; i < 300 && trees < 26; i++) {
-    const lx = (rd() * 2 - 1) * 40;
-    const lz = -40 + rd() * 80;
+  // three placed in the arrival view first (the spawn faces south down the margin), then the scatter
+  const PLACED: ReadonlyArray<readonly [number, number]> = [[9, 31], [13.5, 27.5], [-12, 35.5]];
+  for (let i = 0; i < 340 && trees < 34; i++) {
+    const lx = i < PLACED.length ? PLACED[i]![0] : (rd() * 2 - 1) * 40;
+    const lz = i < PLACED.length ? PLACED[i]![1] : -40 + rd() * 80;
     if (!clearOf(lx, lz, 0.5)) continue;
     const at = press(lx, lz);
-    const y = pressH(at.x, at.z);
+    const y = lz < SHELF.z1 && lz > SHELF.z0 ? SHELF_TOP : pressH(at.x, at.z);
     const h = 2.4 + rd() * 2.2;
     const tree = new THREE.Group();
     tree.position.set(at.x, y, at.z);
@@ -409,12 +417,12 @@ export function buildPress(
   }
   const coverMats = [winter(0x5b2f2a), winter(0x2f3d55), winter(0x4a4033)];
   let books = 0;
-  for (let i = 0; i < 300 && books < 7; i++) {
-    const lx = (rd() * 2 - 1) * 34;
-    const lz = -38 + rd() * 74;
+  for (let i = 0; i < 300 && books < 8; i++) {
+    const lx = i === 0 ? 14 : (rd() * 2 - 1) * 34;
+    const lz = i === 0 ? 33 : -38 + rd() * 74;
     if (!clearOf(lx, lz, 2.5)) continue;
     const at = press(lx, lz);
-    const y = pressH(at.x, at.z);
+    const y = lz < SHELF.z1 && lz > SHELF.z0 ? SHELF_TOP : pressH(at.x, at.z);
     const w = 2.6 + rd() * 1.6;
     const d = 1.8 + rd() * 1.0;
     const t = 0.6 + rd() * 0.5;
