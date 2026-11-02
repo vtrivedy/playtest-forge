@@ -11,10 +11,18 @@ const nativeMap=await page.evaluate(()=>typeof window.__game.state().opening.wor
 if(nativeMap){
  await page.keyboard.press('Tab');
  if(!await page.evaluate(()=>window.__game.state().opening.worlds.mapOpen))throw Error('native Album did not open');
+ await page.keyboard.press('BracketRight');
+ await page.evaluate(()=>window.__gameHooks.advance(1));
+ await fs.mkdir('/tmp/hazel-map-preview',{recursive:true});
+ await page.screenshot({path:'/tmp/hazel-map-preview/native-story-1280.png'});
+ await page.keyboard.press('BracketLeft');
  await page.keyboard.press('Tab');
  if(await page.evaluate(()=>window.__game.state().opening.worlds.mapOpen))throw Error('native Album did not close');
 }
 await page.evaluate(async()=>{
+ window.__albumText=[];
+ const originalFillText=CanvasRenderingContext2D.prototype.fillText;
+ CanvasRenderingContext2D.prototype.fillText=function(value,...args){window.__albumText.push(String(value));return originalFillText.call(this,value,...args)};
  const {createWorldProgress}=await import('/src/worlds/progress.ts');
  const {createPageMap}=await import('/src/worlds/pageMap.ts');
  const p=createWorldProgress();
@@ -32,6 +40,23 @@ await page.waitForTimeout(250);
 await page.evaluate(()=>{window.__mapPreview.map.step();window.__gameHooks.advance(2)});
 await page.waitForTimeout(100);
 await page.screenshot({path:'/tmp/hazel-map-preview/album-960.png'});
+const storyChecks=[];
+for(const world of ['russetvale','ashwater','press']){
+ await page.evaluate(()=>{window.__albumText=[]});
+ await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'BracketRight'})));
+ await page.evaluate(()=>window.__gameHooks.advance(1));
+ await page.screenshot({path:`/tmp/hazel-map-preview/story-${world}-960.png`});
+ const visibleText=await page.evaluate(()=>window.__albumText);
+ const missing=visibleText.filter(t=>t==='A page still missing').length;
+ const expectedMissing={russetvale:3,ashwater:1,press:0}[world];
+ const spoiler=world==='ashwater'&&visibleText.includes('Upstream');
+ storyChecks.push({world,missing,expectedMissing,spoiler,visibleText});
+ if(missing!==expectedMissing||spoiler)throw Error(`story reveal invariant failed: ${world}`);
+}
+await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'BracketRight'})));
+await page.evaluate(()=>window.__gameHooks.advance(1));
+await page.screenshot({path:'/tmp/hazel-map-preview/map-return-960.png'});
+
 await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
 const closed=await page.evaluate(()=>{window.__gameHooks.advance(1);return !window.__mapPreview.map.isOpen()});
 await page.screenshot({path:'/tmp/hazel-map-preview/closed-badge-960.png'});
@@ -52,5 +77,6 @@ await page.evaluate(async()=>{
 });
 await page.screenshot({path:'/tmp/hazel-map-preview/seedwells-960.png'});
 await fs.writeFile('/tmp/hazel-map-preview/state.json',JSON.stringify(await page.evaluate(()=>({game:window.__game.state(),progress:window.__mapPreview.progress.snapshot()})),null,2));
+await fs.writeFile('/tmp/hazel-map-preview/story-checks.json',JSON.stringify(storyChecks,null,2));
 if(errors.length || !closed || !open) throw Error(JSON.stringify({errors,closed,open,nativeRealKeyboard:nativeMap}));
 console.log(JSON.stringify({errors,closed,open,nativeRealKeyboard:nativeMap})); await browser.close();
