@@ -128,10 +128,30 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   ctx.scene.add(flecks);
   const fleck = Array.from({ length: FLECKS }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), age: 99, life: 1 }));
   let nextFleck = 0;
+  // Separate gameplay and cosmetic streams: fleck density never changes the next dodge.
+  let dodgeSeed = 0x70616765;
+  let fleckSeed = 0x666c6563;
+  function dodgeRandom(): number {
+    dodgeSeed = (Math.imul(dodgeSeed, 1664525) + 1013904223) >>> 0;
+    return dodgeSeed / 4294967296;
+  }
+  function fleckRandom(): number {
+    fleckSeed = (Math.imul(fleckSeed, 1664525) + 1013904223) >>> 0;
+    return fleckSeed / 4294967296;
+  }
+  const fleckMatrix = new THREE.Matrix4();
+  const fleckRotation = new THREE.Quaternion();
+  const fleckScale = new THREE.Vector3();
+  const fleckEuler = new THREE.Euler();
+  const catchWashes = PAGE.stages.map((_, i) => ({
+    center: new THREE.Vector3(), targetRadius: i === PAGE.stages.length - 1 ? PAGE.payoff.r : PAGE.payoff.step,
+    radius: 0, durationS: i === PAGE.stages.length - 1 ? 4 : 2.5,
+    age: 0, t: 0, edgeMax: i === PAGE.stages.length - 1 ? 3 : 2.5, rim: 0,
+  }));
   const emit = (at: THREE.Vector3, life: number, spread: number) => {
     const f = fleck[nextFleck++ % FLECKS]!;
     f.p.copy(at);
-    f.v.set((Math.random() - 0.5) * spread, -0.2 - Math.random() * 0.3, (Math.random() - 0.5) * spread);
+    f.v.set((fleckRandom() - 0.5) * spread, -0.2 - fleckRandom() * 0.3, (fleckRandom() - 0.5) * spread);
     f.age = 0;
     f.life = life;
   };
@@ -174,6 +194,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   /** the page's velocity at the catch: carried into the fling / kept rise and bled off, so leaving the line never steps */
   const kick = new THREE.Vector3();
   const carried = new THREE.Vector3();
+  const releaseAnchor = new THREE.Vector3();
   const flingTo = new THREE.Vector3();
   const tmp = new THREE.Vector3();
   /** flight points carry height above the base terrain (props and raised places are authored into the height) */
@@ -186,18 +207,21 @@ export function buildRunawayPage(ctx: OpeningCtx) {
 
   function caught(): void {
     catches++;
+    // The wash is pooled too: a catch never allocates inside the frame callback.
+    const wash = catchWashes[catches - 1]!;
+    wash.center.set(pos.x, 0, pos.z);
+    wash.radius = wash.age = wash.t = wash.rim = 0;
+    if (!ctx.field.restores.includes(wash)) ctx.field.restores.push(wash);
     flingFrom.copy(pos);
     kick.copy(vel);
     for (let i = 0; i < 24; i++) emit(pos, 1.6, 2.4);
     if (catches >= PAGE.stages.length) {
       phase = 'kept';
       keptAt = 0;
-      // the colour comes back from where you caught it, rolling out over the whole slice
-      ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.r, 4, { edgeMax: 3 });
+      releaseAnchor.copy(ctx.fox.root.position);
+      releaseAnchor.y = Math.max(releaseAnchor.y, ctx.groundH(releaseAnchor.x, releaseAnchor.z));
       return;
     }
-    // every catch gives a slice back: a warm wash around where it was caught (the last one gives the whole slice)
-    ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.step, 2.5, { edgeMax: 2.5 });
     stage = catches;
     s = 0;
     sOwed = 0;
@@ -211,7 +235,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   ctx.onUpdate((dt, t) => {
     const player = ctx.player;
     if (!player) return;
-    const st = player.state() as { dashing?: boolean; grounded?: boolean };
+    const st = player.motion;
     const fox = ctx.fox.root.position;
     if (!foxSeen) foxPrev.copy(fox);
     foxSeen = true;
@@ -232,7 +256,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       flaps++;
       windedT = TUNE.winded[stage]!;
       const ax = pos.x - fox.x, az = pos.z - fox.z, al = Math.hypot(ax, az) || 1;
-      const sign = Math.random() < 0.5 ? -1 : 1;
+      const sign = dodgeRandom() < 0.5 ? -1 : 1;
       sideGoal.set((-az / al) * sign * TUNE.jink, 0, (ax / al) * sign * TUNE.jink);
       // on a lap it also darts ahead; a hopping page keeps to its perch (only the jink)
       if (!TUNE.hop[stage]) sOwed += 0.8;
@@ -281,8 +305,12 @@ export function buildRunawayPage(ctx: OpeningCtx) {
         // pick the next perch along the loop
         const L = stages[stage]!;
         const here = ((s % L.length) + L.length) % L.length;
-        const ahead = L.perches.map((p) => (p - here + L.length) % L.length).filter((x) => x > 0.5);
-        hopTo = s + Math.min(...ahead);
+        let ahead = Infinity;
+        for (let i = 0; i < L.perches.length; i++) {
+          const distance = (L.perches[i]! - here + L.length) % L.length;
+          if (distance > 0.5 && distance < ahead) ahead = distance;
+        }
+        hopTo = s + ahead;
       }
     }
     if (phase === 'fleeing' && TUNE.hop[stage] && s >= hopTo) {
@@ -324,19 +352,19 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       pos.lerpVectors(flingFrom, flingTo, e);
       pos.y += Math.sin(e * Math.PI) * (6 + flingFrom.distanceTo(flingTo) * 0.15);
       pos.addScaledVector(carried.copy(kick), 0.15 * (1 - Math.exp(-flingT / 0.15)) * (1 - e));
-      if (Math.random() < dt * 30) emit(pos, 3, 0.3);
+      if (fleckRandom() < dt * 30) emit(pos, 3, 0.3);
       if (dt > 0) vel.subVectors(pos, prev).divideScalar(dt);
       if (k >= 1) phase = 'perched';
     } else if (keptAt >= 0) {
       keptAt += dt;
-      // the page rises over the fox, opens wide, then sinks into the ground as the wash spreads
+      // The release stays at the catch, independent of subsequent landing/turning motion.
       const k = Math.min(1, keptAt / 2.5);
-      // rises well clear of the fox and opens, then lets go
-      tmp.set(fox.x, fox.y + 1.4 + 4 * Math.sin(Math.min(1, keptAt / 2) * Math.PI * 0.5), fox.z);
+      // A readable, modest unfold inside the chase frame; the world wash carries the large payoff.
+      tmp.set(releaseAnchor.x, releaseAnchor.y + 1.25 + 0.45 * Math.sin(Math.min(1, keptAt / 2) * Math.PI * 0.5), releaseAnchor.z);
       // from where it was caught (still drifting on its own momentum) into the rise over the fox
       carried.copy(flingFrom).addScaledVector(kick, 0.15 * (1 - Math.exp(-keptAt / 0.15)));
       pos.lerpVectors(carried, tmp, THREE.MathUtils.smoothstep(keptAt, 0, 0.7));
-      body.scale.setScalar(1 + k * 4);
+      body.scale.setScalar(1 + k * 0.8);
       (page.material as THREE.MeshBasicMaterial).opacity = 1 - THREE.MathUtils.smoothstep(keptAt, 2.5, 4.5);
       (glow.material as THREE.MeshBasicMaterial).opacity = 0.35 * (1 - THREE.MathUtils.smoothstep(keptAt, 2, 4));
       holder.visible = keptAt < 4.6;
@@ -399,26 +427,25 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     body.position.y = THREE.MathUtils.damp(body.position.y, windedT > 0 ? -0.22 : 0, 5, dt);
     // upright and facing you while it watches; tipped forward into its flight like a moth when it runs
     body.rotation.x = THREE.MathUtils.damp(body.rotation.x, phase === 'fleeing' || phase === 'flung' ? -1.0 : 0, 4, dt);
-    if (phase === 'fleeing' && Math.random() < dt * 14) emit(pos, 1.2, 0.5);
+    if (phase === 'fleeing' && fleckRandom() < dt * 14) emit(pos, 1.2, 0.5);
     // flecks
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const sc = new THREE.Vector3();
     let n = 0;
     for (const f of fleck) {
       if (f.age >= f.life) continue;
       f.age += dt;
       f.v.y -= dt * 0.6;
       f.p.addScaledVector(f.v, dt);
-      q.setFromEuler(new THREE.Euler(f.age * 5, f.age * 3, 0));
-      sc.setScalar(1 - f.age / f.life);
-      flecks.setMatrixAt(n++, m.compose(f.p, q, sc));
+      fleckEuler.set(f.age * 5, f.age * 3, 0);
+      fleckRotation.setFromEuler(fleckEuler);
+      fleckScale.setScalar(Math.max(0, 1 - f.age / f.life));
+      flecks.setMatrixAt(n++, fleckMatrix.compose(f.p, fleckRotation, fleckScale));
     }
     flecks.count = n;
     foxPrev.copy(fox);
     flecks.instanceMatrix.needsUpdate = true;
   });
 
+  const voice = { pos, get fleeing() { return phase === 'fleeing' || phase === 'flung'; }, get catches() { return catches; }, get flaps() { return flaps; }, get kept() { return phase === 'kept'; } };
   return {
     /** dev: jump to a stage's start perch (review stills) */
     toStage(n: number): void {
@@ -437,7 +464,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     /** true once the third catch keeps it and its rise-and-fade has finished */
     settled: () => phase === 'kept' && keptAt > 4.6,
     /** for the hum: where it is, whether it's in flight, how many times it's been caught */
-    voice: () => ({ pos, fleeing: phase === 'fleeing' || phase === 'flung', catches, flaps, kept: phase === 'kept' }),
+    voice: () => voice,
     state: () => ({ stage, phase, catches, skips, dodges, winded: windedT > 0, yaw: +holder.rotation.y.toFixed(4), droop: +(body.position.y).toFixed(3), s: +s.toFixed(2), pos: pos.toArray().map((v) => +v.toFixed(4)) }),
   };
 }
