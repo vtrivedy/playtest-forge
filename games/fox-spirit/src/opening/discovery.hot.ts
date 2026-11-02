@@ -196,6 +196,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
     scraps.instanceMatrix.needsUpdate = true;
   });
   return {
+    get finished() { return leg === 'done'; },
     state: () => ({ active, leg, completionAt: leg === 'done' ? completionAt.toArray() : null, target: target.toArray(), action: ACTIONS[action], hint: HINTS[action] }),
   };
 }
