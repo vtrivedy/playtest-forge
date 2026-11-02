@@ -1,0 +1,446 @@
+{
+  "sha": "628d1b79bdc6c9e90de984b4968f2af9c0c93256",
+  "runtime": "vite-production-preview",
+  "complete": true,
+  "route": "millbrook",
+  "every": 60,
+  "beats": [
+    {
+      "beat": "wake",
+      "t": 1.52,
+      "pos": [
+        -5.2,
+        0,
+        92.5
+      ],
+      "shot": 2,
+      "arrived": true
+    },
+    {
+      "beat": "plaza west",
+      "t": 4.18,
+      "pos": [
+        -11.7,
+        0,
+        89.73
+      ],
+      "shot": 5,
+      "arrived": true
+    },
+    {
+      "beat": "cottage lane",
+      "t": 6.22,
+      "pos": [
+        -17.87,
+        0,
+        87.67
+      ],
+      "shot": 7,
+      "arrived": true
+    },
+    {
+      "beat": "west cottages",
+      "t": 20.7,
+      "pos": [
+        -25.56,
+        0,
+        87.6
+      ],
+      "shot": 21,
+      "arrived": false
+    },
+    {
+      "beat": "last cottage",
+      "t": 23.87,
+      "pos": [
+        -34.62,
+        -0.5,
+        89.06
+      ],
+      "shot": 24,
+      "arrived": true
+    },
+    {
+      "beat": "into the lane",
+      "t": 27.17,
+      "pos": [
+        -45.11,
+        -0.18,
+        90.3
+      ],
+      "shot": 28,
+      "arrived": true
+    },
+    {
+      "beat": "lane bend",
+      "t": 30.03,
+      "pos": [
+        -54.13,
+        -0.87,
+        88.86
+      ],
+      "shot": 31,
+      "arrived": true
+    },
+    {
+      "beat": "lane mouth",
+      "t": 32.77,
+      "pos": [
+        -62.65,
+        -0.94,
+        86.9
+      ],
+      "shot": 33,
+      "arrived": true
+    },
+    {
+      "beat": "valley opens",
+      "t": 34.67,
+      "pos": [
+        -68.64,
+        -1.05,
+        87.49
+      ],
+      "shot": 35,
+      "arrived": true
+    },
+    {
+      "beat": "mill door",
+      "t": 36.02,
+      "pos": [
+        -70.97,
+        -1.12,
+        90.61
+      ],
+      "shot": 37,
+      "arrived": true
+    },
+    {
+      "beat": "mill east wall",
+      "t": 37.15,
+      "pos": [
+        -69.19,
+        -1.07,
+        91.64
+      ],
+      "shot": 38,
+      "arrived": true
+    },
+    {
+      "beat": "past the kiln",
+      "t": 39.03,
+      "pos": [
+        -63.97,
+        -1.09,
+        94.56
+      ],
+      "shot": 40,
+      "arrived": true
+    },
+    {
+      "beat": "north of the mill",
+      "t": 41.5,
+      "pos": [
+        -67.46,
+        -0.17,
+        99.93
+      ],
+      "shot": 42,
+      "arrived": true
+    },
+    {
+      "beat": "above the dam",
+      "t": 42.67,
+      "pos": [
+        -70.76,
+        -0.55,
+        101.33
+      ],
+      "shot": 43,
+      "arrived": true
+    },
+    {
+      "beat": "dash the dam",
+      "t": 43.33,
+      "pos": [
+        -74.05,
+        -1.66,
+        101.42
+      ],
+      "shot": 44,
+      "arrived": true
+    },
+    {
+      "beat": "watch it run",
+      "t": 49.85,
+      "pos": [
+        -75.49,
+        -1.77,
+        101.36
+      ],
+      "shot": 50,
+      "arrived": true
+    },
+    {
+      "beat": "to the kiln",
+      "t": 53.35,
+      "pos": [
+        -67.2,
+        -1.15,
+        97.75
+      ],
+      "shot": 54,
+      "arrived": true
+    },
+    {
+      "beat": "kiln waking",
+      "t": 57.37,
+      "pos": [
+        -66.64,
+        -1.15,
+        97.51
+      ],
+      "shot": 58,
+      "arrived": true
+    },
+    {
+      "beat": "onto the kiln",
+      "t": 57.38,
+      "pos": [
+        -66.64,
+        -1.15,
+        97.51
+      ],
+      "shot": 58,
+      "arrived": true
+    },
+    {
+      "beat": "ride the warm air",
+      "t": 59.03,
+      "pos": [
+        -66.38,
+        7.44,
+        97.23
+      ],
+      "shot": 60,
+      "arrived": true
+    },
+    {
+      "beat": "glide to the weir",
+      "t": 63.23,
+      "pos": [
+        -69.1,
+        6.6,
+        103.28
+      ],
+      "shot": 64,
+      "arrived": true
+    },
+    {
+      "beat": "on the weir",
+      "t": 66.25,
+      "pos": [
+        -69.26,
+        6.6,
+        103.62
+      ],
+      "shot": 67,
+      "arrived": true
+    },
+    {
+      "beat": "drop to the valley",
+      "t": 68.02,
+      "pos": [
+        -68.07,
+        5.74,
+        101.74
+      ],
+      "shot": 69,
+      "arrived": true
+    },
+    {
+      "beat": "east of the mill",
+      "t": 70.93,
+      "pos": [
+        -67.43,
+        -1.08,
+        93.86
+      ],
+      "shot": 71,
+      "arrived": true
+    },
+    {
+      "beat": "to the bridge",
+      "t": 72.8,
+      "pos": [
+        -69.63,
+        -1.08,
+        88.41
+      ],
+      "shot": 73,
+      "arrived": true
+    },
+    {
+      "beat": "bridge approach",
+      "t": 74.5,
+      "pos": [
+        -74.19,
+        -1.34,
+        85.95
+      ],
+      "shot": 75,
+      "arrived": true
+    },
+    {
+      "beat": "bridge east",
+      "t": 74.88,
+      "pos": [
+        -75.34,
+        -1.4,
+        85.76
+      ],
+      "shot": 75,
+      "arrived": true
+    },
+    {
+      "beat": "bridge west",
+      "t": 76.77,
+      "pos": [
+        -80.99,
+        -1.18,
+        87.72
+      ],
+      "shot": 77,
+      "arrived": true
+    },
+    {
+      "beat": "off the bridge",
+      "t": 77.2,
+      "pos": [
+        -82.33,
+        -1.41,
+        88.06
+      ],
+      "shot": 78,
+      "arrived": true
+    },
+    {
+      "beat": "orchard",
+      "t": 79.12,
+      "pos": [
+        -87.3,
+        -1.3,
+        85.01
+      ],
+      "shot": 80,
+      "arrived": true
+    },
+    {
+      "beat": "foot of the hill",
+      "t": 81.23,
+      "pos": [
+        -92.77,
+        -0.22,
+        81.03
+      ],
+      "shot": 82,
+      "arrived": true
+    },
+    {
+      "beat": "climb",
+      "t": 82.93,
+      "pos": [
+        -95.16,
+        3.94,
+        76.29
+      ],
+      "shot": 83,
+      "arrived": true
+    },
+    {
+      "beat": "lookout",
+      "t": 84.05,
+      "pos": [
+        -97.32,
+        4.99,
+        73.49
+      ],
+      "shot": 85,
+      "arrived": true
+    },
+    {
+      "beat": "the view",
+      "t": 84.3,
+      "pos": [
+        -97.87,
+        4.95,
+        72.91
+      ],
+      "shot": 85,
+      "arrived": true
+    },
+    {
+      "beat": "look back east",
+      "t": 88.32,
+      "pos": [
+        -97.56,
+        4.94,
+        72.63
+      ],
+      "shot": 89,
+      "arrived": true
+    }
+  ],
+  "stuck": [
+    {
+      "beat": "west cottages",
+      "from": 11.7,
+      "to": 20.7
+    }
+  ],
+  "errors": [],
+  "final": {
+    "pos": [
+      -97.56,
+      4.936,
+      72.628
+    ],
+    "millrace": {
+      "phase": "burst",
+      "front": 61.7,
+      "turning": true,
+      "painted": true,
+      "spin": 0.85,
+      "lookoutPainted": true
+    },
+    "millWeir": {
+      "lit": true,
+      "heat": 1,
+      "rode": true,
+      "reached": true
+    },
+    "hermitage": {
+      "freed": [
+        0,
+        0,
+        0
+      ],
+      "painted": false,
+      "captioned": false
+    },
+    "restores": 3
+  },
+  "simSeconds": 88.31666666666666,
+  "from": "village",
+  "checks": {
+    "complete": true,
+    "allArrived": false,
+    "finite": true,
+    "noErrors": true
+  },
+  "evidence": {
+    "capture": "88.3 simulated seconds, one frame per second, 640x360, silent offline input replay",
+    "staging": "One initial village teleport; stick/dash/jump thereafter; no forced interactions",
+    "full": "/captures/sorrel/millbrook-production-628d1b7-retest/"
+  }
+}
