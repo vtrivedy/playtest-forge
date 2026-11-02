@@ -23,8 +23,6 @@ export type Collider =
 export const PLAY = {
   /** glide round posts / corners when a step is blocked on both axes (moveTo); off = the old pin */
   slide: true,
-  /** how fast (1/s) the facing eases to the slide's travel along a wall */
-  slideTurn: 6,
   runSpeed: 3.2,
   walkSpeed: 0.85,
   /** ground speed ease (1/s) up / down */
@@ -663,8 +661,16 @@ export function createPlay(opts: {
   /** horizontal move with step / wall blocking, per axis so the fox slides along walls */
   /** last side the fox slid round a blocker on (+1 left / −1 right), so it doesn't dither between sides */
   let slideSide = 1;
-  /** travel direction of this step's slide (NaN = no slide): the fox's facing eases toward it so it runs along the wall */
+  /** travel direction of the last slide (NaN = none): while the stick still pushes into the blocker the fox faces
+   *  along it (runs along the wall) instead of nose-first into it, sliding sideways */
   let slideYaw = Number.NaN;
+  /** a blocker 0.45 m out along the stick (the fox is still pushing into the wall it slid on) */
+  const pushingIntoBlocker = () => {
+    const k = 0.45 / (wish.length() || 1);
+    const x = pos.x + wish.x * k;
+    const z = pos.z + wish.y * k;
+    return surface(x, z, true, pos.y + P.step + 0.15) > pos.y + P.step;
+  };
   function moveTo(nx: number, nz: number, feetY: number) {
     const tol = grounded ? P.step : 0.05;
     const fwdX = Math.sin(yaw) * 0.28;
@@ -676,12 +682,16 @@ export function createPlay(opts: {
     const dx = nx - pos.x;
     const dz = nz - pos.z;
     const len = Math.hypot(dx, dz);
-    if (ok(nx, pos.z)) pos.x = nx;
+    const blockX = !ok(nx, pos.z);
+    if (!blockX) pos.x = nx;
     else vel.x = 0;
-    if (ok(pos.x, nz)) pos.z = nz;
+    const blockZ = !ok(pos.x, nz);
+    if (!blockZ) pos.z = nz;
     else vel.z = 0;
+    // one axis held by a wall, the other free: the fox is running along it — face the travel, not the wall
+    if (grounded && blockX !== blockZ && Math.abs(blockX ? dz : dx) > 1e-4) slideYaw = blockX ? (dz > 0 ? 0 : Math.PI) : dx > 0 ? Math.PI / 2 : -Math.PI / 2;
     // pinned (walking into a post, a wall at an angle, a yawed corner — the nose probe stops both axes): glide along
-    // it — try the step turned 30°, 60°, 80° to either side (last side first), probing ahead along the turned step,
+    // it — try the step turned 30°, 60°, 80° to either side (the stick's side first), probing ahead along the turned step,
     // never through the blocker. Swarm5 naive wander: without this a diagonal push into any house wall or low plaza
     // wall stopped the fox dead (tools/naive-explore.mjs --tether 14 stuck events)
     const x0 = nx - dx;
@@ -690,8 +700,13 @@ export function createPlay(opts: {
     // (post-dash skid, coasting, turning round) still stops dead
     if (P.slide && dashT <= 0 && wish.lengthSq() > 0.01 && speed <= P.runSpeed * 1.05 && grounded && len > 1e-5 && (wish.x * dx + wish.y * dz) / (wish.length() * len) > 0.5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5) {
       {
+        // turn first toward the side the stick leans to along the blocker (+1 turns toward (−dz, dx)); the remembered
+        // side only breaks a square-on tie — otherwise pushing up a wall could slide the fox down it
+        const lean = (wish.y * dx - wish.x * dz) / (wish.length() * len);
+        const first = lean > 0.05 ? 1 : lean < -0.05 ? -1 : slideSide;
         for (const a of SLIDE_TURNS) {
-          for (const side of [slideSide, -slideSide]) {
+          for (let k = 0; k < 2; k++) {
+            const side = k === 0 ? first : -first;
             const c = Math.cos(a * side);
             const sn = Math.sin(a * side);
             const rx = (dx * c - dz * sn) * Math.cos(a);
@@ -708,6 +723,8 @@ export function createPlay(opts: {
         }
       }
     }
+    // pinned in a corner with no way along: let go of the along-wall facing so the fox turns to the stick again
+    if (len > 1e-5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.25) slideYaw = Number.NaN;
   }
 
   function step(dt: number) {
@@ -720,8 +737,10 @@ export function createPlay(opts: {
     const want = wish.length();
 
     // facing: bounded, eased yaw rate (slower when fast); travel along the facing on the ground
+    // hold the along-wall facing only while the stick still leans that way along the wall and pushes into it
+    if (!Number.isNaN(slideYaw) && !(grounded && want > 0.01 && Math.abs(wrap(Math.atan2(wish.x, wish.y) - slideYaw)) < Math.PI / 2 && pushingIntoBlocker())) slideYaw = Number.NaN;
     if (want > 0.01) {
-      const target = Math.atan2(wish.x, wish.y);
+      const target = Number.isNaN(slideYaw) ? Math.atan2(wish.x, wish.y) : slideYaw;
       const err = wrap(target - yaw);
       const max = THREE.MathUtils.lerp(P.turnSlow, P.turnFast, THREE.MathUtils.clamp(speed / P.runSpeed, 0, 1));
       const rate = max * Math.tanh((err * 6) / max);
@@ -770,10 +789,7 @@ export function createPlay(opts: {
     const lift = opts.updrafts?.liftAt(pos.x, pos.y, pos.z);
     gliding = !grounded && jumpHeld && airT > 0.12 && (vel.y <= 0 || (lift?.k ?? 0) > 0.05);
     const feetY = pos.y;
-    slideYaw = Number.NaN;
     moveTo(pos.x + vel.x * dt, pos.z + vel.z * dt, feetY);
-    // sliding along a blocker: ease the facing round to the travel so the fox runs along the wall, not nose-first into it
-    if (!Number.isNaN(slideYaw)) yaw = wrap(yaw + wrap(slideYaw - yaw) * (1 - Math.exp(-P.slideTurn * dt)));
 
     let arrivalSpeed = 0;
     if (!grounded) {

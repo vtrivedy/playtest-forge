@@ -74,6 +74,8 @@ export type FinaleRig = {
   kitFoxes: HearthFox[];
   kitPages: THREE.Mesh[];
   card: LetterPlane;
+  /** the shared in-frame teach line (teach.ts) */
+  teach: (text: string) => void;
   /** fixed points */
   cradle: THREE.Vector3;
   bookTop: THREE.Vector3;
@@ -393,6 +395,8 @@ function stepHeroRest(rig: FinaleRig, dt: number): void {
 }
 
 /** onward: after the page comes home, motes stream from the well to wherever the ember rests, until it is carried or kindled */
+const ONWARD_HINT = 'Follow the warm light home';
+
 function stepOnward(rig: FinaleRig, dt: number): void {
   const s = rig.s;
   const mesh = rig.onwardMesh;
@@ -406,6 +410,8 @@ function stepOnward(rig: FinaleRig, dt: number): void {
   }
   if (want && (rig.emberAt.distanceToSquared(rig.onwardAt) > 1 || f.distanceToSquared(rig.onwardFrom) > 16)) rig.events.onward(rig.emberAt);
   s.onwardT = want ? Math.min(3, s.onwardT + dt) : Math.max(0, s.onwardT - dt * 2);
+  // say it too: a first-timer stood on the overlook after the catch with nothing pointing onward (Kit, 2f5af69)
+  if (want && s.onwardT > 0.5) rig.teach(ONWARD_HINT);
   const on = smooth(s.onwardT, 0.5, 3);
   if (on <= 0.001) {
     mesh.count = 0;
