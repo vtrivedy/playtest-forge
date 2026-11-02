@@ -91,6 +91,17 @@ Read the store before building the opening. Initialize a saved returned page dir
 three catches accounted for and its release already settled; initialize its invitation as finished
 without inventing a current landing contact. Fresh games still use the three catches and grounded
 overlook proof. Saved initialization emits no new catch wash, release, or page-origin caption.
+An arch already unlocked in the save starts with its announcement accounted for. Only an unlock
+earned in this session announces a newly lit arch; reload keeps the hub quiet and leaves its
+existing destination signs and Album available for orientation.
+
+### Optional memory — the Scribe’s Stacks
+The side climb rewards an unpressed family page: a moment allowed to stay unfinished. Its
+physical reading stand reports one typed secret, `press-stacks`, persisted beside world facts.
+Finding it never completes a level, fills a Seedwell or grants an ability. The Album adds an
+“Unpressed pages” spread with the earned memory, and a short returned-page notice points to
+Tab. On reload both stand and Album retain the discovery without replaying its notice. Old
+version-one saves without secrets load unchanged; unknown secret ids are discarded.
 
 ## Who builds what
 - **Maple** — scene integration: worlds registry, terrain dispatch, mask, arches, travel, per-world look/weather,

@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import type { WorldProgress } from '../worlds/progress';
 import { KEEPING } from './layout';
+import { LEDGE_TOP, press, THE_PRESS } from './pressLayout';
 
 type Post = { x: number; z: number; yaw: number; show: () => boolean; gone: () => boolean; y?: number };
 
@@ -59,7 +60,8 @@ export function buildWarden(ctx: OpeningCtx, progress: WorldProgress) {
     // Ashwater: above the weir, the one who froze the sluices
     { x: 712, z: 117, yaw: Math.PI, show: () => true, gone: () => progress.isRestored('ashwater', 'combine') },
     // the Press: beside the Press itself — the Scribe's own shadow
-    { x: -704, z: 58.5, yaw: 0.3, show: () => true, gone: () => progress.isRestored('press', 'combine') },
+    // ...looming behind the bowed Scribe as its shadow (Thistle's coda names it), gone once the Scribe lifts the lever
+    { x: press(THE_PRESS.lx + 4.5, THE_PRESS.lz + 1.6).x, z: press(THE_PRESS.lx + 4.5, THE_PRESS.lz + 1.6).z, y: LEDGE_TOP, yaw: -Math.PI / 2 - 0.25, show: () => true, gone: () => progress.isRestored('press', 'combine') },
   ];
   const figs = posts.map((p) => {
     const f = wardenFigure();

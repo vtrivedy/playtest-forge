@@ -17,12 +17,20 @@ export function lintSavedOpening(source) {
   if (!fact || !ts.isCallExpression(fact) || !ts.isPropertyAccessExpression(fact.expression)
     || fact.expression.name.text !== 'isRestored' || fact.arguments[0]?.text !== 'russetvale' || fact.arguments[1]?.text !== 'teach'
     || fact.pos > page.pos || fact.pos > discovery.pos) return ['scene.ts [saved-opening] Initialization must read restored Russetvale teach before building page and discovery.'];
+  const arch = bindings.get('archSaid');
+  if (!arch || !ts.isObjectLiteralExpression(arch)) return ['scene.ts [saved-opening] Initialize arch announcements from persisted unlocks.'];
+  for (const [name, method, world] of [['ashwater', 'isRestored', 'russetvale'], ['press', 'isVisited', 'ashwater']]) {
+    const entry = arch.properties.find(p => ts.isPropertyAssignment(p) && p.name.getText(sf) === name);
+    const call = entry?.initializer;
+    if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)
+      || call.expression.name.text !== method || call.arguments[0]?.text !== world || call.arguments[1]?.text !== 'teach') return ['scene.ts [saved-opening] Saved arch announcements must match their unlock predicates.'];
+  }
   return [];
 }
 
 export function savedOpeningSelfTest() {
-  const good = "const saved=progress.isRestored('russetvale','teach');buildRunawayPage(ctx,saved);buildDiscovery(ctx,page,canopy,ruin,saved);";
-  for (const bad of [good.replace('ctx,saved', 'ctx'), good.replace('ruin,saved', 'ruin,false'), good.replace("'teach'", "'combine'")]) {
+  const good = "const saved=progress.isRestored('russetvale','teach');buildRunawayPage(ctx,saved);buildDiscovery(ctx,page,canopy,ruin,saved);const archSaid={ashwater:progress.isRestored('russetvale','teach'),press:progress.isVisited('ashwater','teach')};";
+  for (const bad of [good.replace('ctx,saved', 'ctx'), good.replace('ruin,saved', 'ruin,false'), good.replace("'teach'", "'combine'"), good.replace("press:progress.isVisited('ashwater','teach')", 'press:false')]) {
     if (!lintSavedOpening(bad).length) throw new Error('Saved opening negative control escaped');
   }
   if (lintSavedOpening(good).length) throw new Error('Saved opening positive control failed');
