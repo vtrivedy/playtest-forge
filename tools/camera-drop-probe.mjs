@@ -55,9 +55,10 @@ const browser = await chromium.launch({headless:true,args:['--use-gl=angle','--u
 const page = await (await browser.newContext({viewport:{width,height}})).newPage();
 const errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
+page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 page.setDefaultTimeout(300000);
 try {
-  await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'domcontentloaded',timeout:180000});
+  await page.goto(`http://127.0.0.1:${port}/?manual=1`,{waitUntil:'domcontentloaded',timeout:180000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true);
   await page.evaluate(({source,start,fallLag,testDt,minDistance})=>{
     const h=window.__gameHooks;

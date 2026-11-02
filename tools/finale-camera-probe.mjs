@@ -22,13 +22,14 @@ const page = await (await browser.newContext({ viewport: { width: 480, height: 2
 page.setDefaultTimeout(600000);
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
+page.on('console', m => { if(m.type()==='error') errors.push(m.text()); });
 const trace = [];
 const sha = execFileSync('git', ['rev-parse','HEAD'], {encoding:'utf8'}).trim();
 const notes = [];
 let frame = 0;
 const save = () => fs.writeFileSync(path.join(out, 'trace.json'), JSON.stringify({ sha, staging: "Keeping dev-release; ember pickup; teleport to far crag; controller thereafter", notes, errors, trace }, null, 0));
 try {
-  await page.goto('http://127.0.0.1:5196/', { waitUntil: 'domcontentloaded', timeout: 300000 });
+  await page.goto('http://127.0.0.1:5196/?manual=1', { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
   await page.keyboard.press('KeyM');
   // staged: settle the Keeping, pick up the ember on the shelf, stand on the far crag facing the vista
