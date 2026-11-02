@@ -5,6 +5,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { lintHotSource, hotLintSelfTest } from './hot-path-lint.mjs';
+import { lintAssetSource, assetLintSelfTest } from './asset-path-lint.mjs';
+assetLintSelfTest();
 hotLintSelfTest();
 
 const ROOT = 'games/fox-spirit/src/opening';
@@ -39,7 +41,11 @@ function scanHot(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const file = path.join(dir, entry.name);
     if (entry.isDirectory()) scanHot(file);
-    else if (entry.name.endsWith('.hot.ts')) findings.push(...lintHotSource(file, fs.readFileSync(file, 'utf8')));
+    else if (entry.name.endsWith('.ts')) {
+      const source = fs.readFileSync(file, 'utf8');
+      findings.push(...lintAssetSource(file, source));
+      if (entry.name.endsWith('.hot.ts')) findings.push(...lintHotSource(file, source));
+    }
   }
 }
 scanHot('games/fox-spirit/src');
