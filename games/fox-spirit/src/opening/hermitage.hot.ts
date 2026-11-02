@@ -5,7 +5,7 @@
  * plateau paints. At the desk a caption names the place, once. No per-frame allocation.
  */
 import * as THREE from 'three';
-import { mapleLeafGeometry, toon } from '../lookdevKit';
+import { mapleLeafGeometry, RAMP_WORLD, toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import { box, C, cyl, Kit } from './village';
 import { HERMITAGE } from './hermitageLayout';
@@ -57,8 +57,10 @@ export function createDryingLines(ctx: OpeningCtx) {
   });
   scene.add(k.build());
 
-  // the pressed leaves: flat, hung by their stems, each with a little peg
-  const leafMat = toon(0xffffff);
+  // the pressed leaves: flat, hung by their stems, each with a little peg. "Here the Scribe kept every autumn":
+  // pressed, they keep their colour on the sepia plateau — plain toon, no paper patch (DESIGN-corridors.md), so
+  // the Hermitage shows a line of red-gold from the hanger lane and the village
+  const leafMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: RAMP_WORLD });
   leafMat.side = THREE.DoubleSide;
   const leafGeo = mapleLeafGeometry(0.26).rotateX(Math.PI / 2).translate(0, -0.26, 0);
   const leaves = new THREE.InstancedMesh(leafGeo, leafMat, N);
