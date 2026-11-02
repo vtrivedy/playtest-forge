@@ -83,6 +83,11 @@ Typed ids `russetvale|ashwater|press` × `teach|develop|combine`; monotonic `vis
 save, canvas Album page-map (Tab) and the three hub Seedwells (Kiln = Russetvale, Reed = Ashwater, Maple = Press).
 Completion only from physical puzzle truth, never from coordinates. The scene calls `setWorld` on travel.
 
+Saved-game acceptance also checks the opening invitation: once the page is already home, reload must not
+restart its chase or display its old instructions. Keep the complete boot state and screenshot alongside
+the foreign-world reconstruction checks; a clear travel camera does not establish a clear initial lens.
+The saved-page contract is pinned homecoming plus inactive discovery, independently of later world facts.
+
 ## Who builds what
 - **Maple** — scene integration: worlds registry, terrain dispatch, mask, arches, travel, per-world look/weather,
   island ground/dressing; then hub arch gating via Hazel's store; then Press level 1 if free.
