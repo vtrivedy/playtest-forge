@@ -93,7 +93,7 @@ try {
   await shot('06-mill-shore');
   // the drained pool and its steps
   await go(0, 26.8);
-  for (let i = 0; i < 7; i++) await go(0, 27.8 + i * 0.86, { jump: true, hold: 14, max: 120, reach: 0.4, land: true });
+  for (let i = 0; i < 8; i++) await go(0, 27.8 + i * 0.86, { jump: true, hold: 14, max: 120, reach: 0.4, land: true });
   await go(0, 36.5, { jump: true, hold: 14, max: 120, land: true });
   await shot('07-weir');
   await go(14, 40);

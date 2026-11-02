@@ -50,7 +50,7 @@ export const MAT_RISE = 0.14;
 
 /** the weir plateau north of the Mill Pool, and the steps that climb out of the drained pool onto it */
 export const WEIR = { z0: 33.6, top: 3.6, xMax: 18 };
-export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2].map((top, i) => ({ lz: 27.8 + i * 0.86, top }));
+export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2, 3.6].map((top, i) => ({ lz: 27.8 + i * 0.86, top }));
 export const STEP_HALF = { x: 1.6, z: 0.48 };
 
 /** the Reed Seedwell on its own ledge east of the weir: reached by gliding off the plateau's east lip */
