@@ -671,14 +671,23 @@ export function createPlay(opts: {
     const z = pos.z + wish.y * k;
     return surface(x, z, true, pos.y + P.step + 0.15) > pos.y + P.step;
   };
+  // per-step probe inputs, set at the top of moveTo (hoisted so the per-frame move allocates no closures)
+  let probeFeet = 0;
+  let probeTol = 0;
+  let fwdX = 0;
+  let fwdZ = 0;
+  /** (x, z) and the nose point (x + px, z + pz) are in the world and at most a step up from the feet */
+  function okAt(x: number, z: number, px: number, pz: number) {
+    const ceil = probeFeet + probeTol + 0.15;
+    return (!opts.inWorld || opts.inWorld(x, z)) && surface(x, z, true, ceil) <= probeFeet + probeTol && surface(x + px, z + pz, true, ceil) <= ceil;
+  }
+  const ok = (x: number, z: number) => okAt(x, z, fwdX, fwdZ);
   function moveTo(nx: number, nz: number, feetY: number) {
     const tol = grounded ? P.step : 0.05;
-    const fwdX = Math.sin(yaw) * 0.28;
-    const fwdZ = Math.cos(yaw) * 0.28;
-    const okAt = (x: number, z: number, px: number, pz: number) =>
-      (!opts.inWorld || opts.inWorld(x, z)) &&
-      surface(x, z, true, feetY + tol + 0.15) <= feetY + tol && surface(x + px, z + pz, true, feetY + tol + 0.15) <= feetY + tol + 0.15;
-    const ok = (x: number, z: number) => okAt(x, z, fwdX, fwdZ);
+    probeFeet = feetY;
+    probeTol = tol;
+    fwdX = Math.sin(yaw) * 0.28;
+    fwdZ = Math.cos(yaw) * 0.28;
     const dx = nx - pos.x;
     const dz = nz - pos.z;
     const len = Math.hypot(dx, dz);
@@ -759,10 +768,10 @@ export function createPlay(opts: {
       coyoteT = P.coyote;
     } else {
       coyoteT -= dt;
-      const desired = new THREE.Vector2(wish.x, wish.y).multiplyScalar(Math.max(speed, P.runSpeed * 0.6));
+      const desired = Math.max(speed, P.runSpeed * 0.6);
       const k = 1 - Math.exp(-P.airControl * dt);
-      vel.x += (desired.x - vel.x) * k * Math.min(1, want);
-      vel.z += (desired.y - vel.z) * k * Math.min(1, want);
+      vel.x += (wish.x * desired - vel.x) * k * Math.min(1, want);
+      vel.z += (wish.y * desired - vel.z) * k * Math.min(1, want);
       speed = Math.hypot(vel.x, vel.z);
     }
 
