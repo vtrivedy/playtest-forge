@@ -5,7 +5,7 @@
  * lets go — it settles into a relaxed arc and sheds a stream of warm leaves; one leaf drifts down by the fox.
  */
 import * as THREE from 'three';
-import { canopyPad, inked, jitter, mapleLeafGeometry, plumeGeometry } from '../lookdevKit';
+import { canopyPad, inked, jitter, mapleLeafGeometry, plumeGeometry, rng } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import { CROWN, VISTA } from './layout';
 
@@ -145,7 +145,9 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
   river.count = 0;
   root.add(river);
   const riverSeed = new Float32Array(FALL * 5);
-  for (let i = 0; i < FALL; i++) riverSeed.set([Math.floor(rand() * pads.length), rand(), rand(), rand(), rand()], i * 5);
+  // own seeded stream: the finale's river must not shift the shared ctx.rand sequence later builders (and replays) use
+  const riverRand = rng(0xc20f4);
+  for (let i = 0; i < FALL; i++) riverSeed.set([Math.floor(riverRand() * pads.length), riverRand(), riverRand(), riverRand(), riverRand()], i * 5);
   const padScale = pads.map((p) => p.scale.x);
   let fallT = -1;
   const rv = new THREE.Vector3();

@@ -7,7 +7,7 @@
  * This file builds (allocations allowed); every per-frame step lives in finale.hot.ts.
  */
 import * as THREE from 'three';
-import { buildMaple, buildRock, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, toon } from '../lookdevKit';
+import { buildMaple, buildRock, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
@@ -80,7 +80,9 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
 }) {
   let forced = false;
 
-  const { scene, rand, groundH, colliders } = ctx;
+  const { scene, groundH, colliders } = ctx;
+  // own seeded stream: building the finale never shifts the shared ctx.rand sequence other places (and replays) rely on
+  const rand = rng(0x5c41be);
   const F = FINALE;
   const yaw = F.press.yaw;
   /** Press-local → world (local +z faces the crag, local +x across) */
