@@ -59,7 +59,7 @@ export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
 ];
 
 /** every lane the ground flattens and colours: the village's and Millbrook's (millbrookLayout.ts) */
-const ALL_PATHS = [...PATHS, ...WEST_PATHS, ...NORTH_PATHS];
+export const ALL_PATHS = [...PATHS, ...WEST_PATHS, ...NORTH_PATHS];
 
 /** The bowl's play area (ellipse); the ground climbs into a cliffed rim outside it, except where Millbrook's lane breaks through */
 export const BOUNDS = { cx: -4, cz: 83, rx: 40, rz: 25 } as const;
