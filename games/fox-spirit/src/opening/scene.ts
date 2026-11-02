@@ -271,6 +271,8 @@ export async function runOpening(): Promise<void> {
   // world progress (Hazel's store, DESIGN-worlds.md) is the one truth for levels, abilities and the hub arches
   // world II (Ashwater Reach, x ≈ +700, Cedar): its levels report physical completion to the store
   const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level), secretFound: (id) => progress.isSecretFound(id), onSecret: (id) => void progress.findSecret(id) });
+  // the marsh's tall walls and the weir pier fade like the vale's cottages when they come between lens and fox
+  for (const o of ashwater.occluders) occlusion.add(o);
   // world III (the Scribe's Press, x ≈ −700, Thistle): its drafts join the updraft read the controller glides on
   const pressWorld = buildPress(ctx, { complete: (level) => progress.complete('press', level), hasInkstep: () => progress.hasAbility('press'), restored: (level) => progress.isRestored('press', level) });
   // a side climb in the Press: the Scribe's Stacks (secret page above the ridge)
