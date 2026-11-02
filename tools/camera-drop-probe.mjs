@@ -33,6 +33,8 @@ if (!Number.isFinite(startYaw)) throw Error('start-yaw must be finite');
 const sliceStart = {...SLICE_START,yaw:startYaw};
 if (prepareSlice !== undefined && typeof prepareSlice !== 'function') throw Error('prepareSlice must be a cold setup function');
 const expectedBeat = option('expect-beat', '');
+const maxGroundedDistance=Number(option('max-grounded-distance','5'));
+if(!Number.isFinite(maxGroundedDistance)||maxGroundedDistance<=1)throw Error('max-grounded-distance must exceed1m');
 const checkFrom = Number(option('check-from', '60'));
 if (!Number.isFinite(checkFrom) || checkFrom < 0 || checkFrom >= seconds) throw Error('check-from must be nonnegative and less than seconds');
 const clipBeat = option('clip-beat', 'off the canopy');
@@ -46,6 +48,8 @@ const testDt = Number(option('dt', String(1 / 60)));
 if (!Number.isFinite(testDt) || testDt <= 0 || testDt > .05) throw Error('dt must be in (0, .05]');
 const stillFrames = option('stills-at', '').split(',').filter(Boolean).map(t => Math.round(Number(t) / testDt));
 const [width, height] = option('size', '1280x720').split('x').map(Number);
+const minFoxPixels=Number(option('min-fox-pixels',String(height/15)));
+if(!Number.isFinite(minFoxPixels)||minFoxPixels<0||minFoxPixels>height)throw Error('min-fox-pixels must be within viewport height');
 if (![width, height].every(v => Number.isInteger(v) && v > 0) || !Number.isFinite(clipSeconds) || clipSeconds <= 0) throw Error('Invalid clip dimensions/duration');
 const clipFrames = Math.round(clipSeconds / testDt / 2) * 2;
 if (clip) fs.mkdirSync(path.join(out,'drop-frames'), {recursive:true});
@@ -72,13 +76,13 @@ try {
   await page.goto(`http://127.0.0.1:${port}/?manual=1`,{waitUntil:'domcontentloaded',timeout:180000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true);
   await page.evaluate(({source,start,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare})=>{
-    const h=window.__gameHooks;
+    const h=window.__gameHooks,c=window.__opening.camera;
     h.setManual(true); h.camera.fallLag=fallLag; if(minDistance!==null)h.camera.minDistance=minDistance;
     if (cameraHeight !== null) h.camera.height = cameraHeight;
     if (sideBias !== null) h.camera.sideBias = sideBias;
     if (prepare) new Function(`return (${prepare})`)()(h);
     h.teleport(start.x,start.z,start.yaw);
-    window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1,silhouette:[]};
+    window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1,silhouette:[],head:c.position.clone(),feet:c.position.clone()};
   },{source:createSliceRoute.toString(),start:sliceStart,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare:prepareSlice?.toString()??null});
   let done=false, n=0, checkpoint=-1;
   while(!done){
@@ -117,7 +121,10 @@ try {
           });
           p.silhouette.push({f,vertices,minX,maxX,minY,maxY,inside:vertices>0&&minX>-.96&&maxX<.96&&minY>-.96&&maxY<.96});
         }
-        p.trace.push({f,beat:p.beat,pos:s.pos,vel:s.vel,grounded:s.grounded,camera:s.camera,lensPitch,lastJump:s.lastJump,page:s.opening.page,canopy:s.opening.canopy,popUpRuin:s.opening.popUpRuin});
+        p.head.set(s.pos[0],s.pos[1]+.6,s.pos[2]).project(c);
+        p.feet.set(s.pos[0],s.pos[1],s.pos[2]).project(c);
+        const foxPixels=p.head.z< -1||p.head.z>1||p.feet.z< -1||p.feet.z>1?0:Math.abs(p.head.y-p.feet.y)*innerHeight/2;
+        p.trace.push({f,foxPixels,beat:p.beat,pos:s.pos,vel:s.vel,grounded:s.grounded,camera:s.camera,lensPitch,lastJump:s.lastJump,page:s.opening.page,canopy:s.opening.canopy,popUpRuin:s.opening.popUpRuin});
         if(!prev.grounded&&s.grounded)p.touchdown=f;
         if(shot||clipFrame){
           if(shot)label=timed?`${(f * testDt).toFixed(2)}s`:detail?`drop-${f}`:apex?'apex':touch?'touchdown+2':p.beat;
@@ -165,7 +172,15 @@ try {
     const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));
     const maxPitch = Math.max(...late.map(s => Math.abs(s.lensPitch)));
     const maxStepSpeed = Math.max(0, ...late.slice(1).map((s, i) => Math.hypot(...s.camera.pos.map((v, axis) => v - late[i].camera.pos[axis])) / testDt));
-    const cameraCheck = { fromSeconds: checkFrom, minChestDistance, maxPitch, maxStepSpeed, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && !errors.length };
+    let groundedTime=0,maxGroundedFollowDistance=0,smallFor=0,longestSmallFoxSeconds=0,minFollowFoxPixels=Infinity;
+    for(const s of evidence.trace){
+      groundedTime=s.grounded?groundedTime+testDt:0;
+      const follow=s.f*testDt>=checkFrom&&s.camera.boom.includes('shot=0.00');
+      if(follow){minFollowFoxPixels=Math.min(minFollowFoxPixels,s.foxPixels);smallFor=s.foxPixels<minFoxPixels?smallFor+testDt:0;longestSmallFoxSeconds=Math.max(longestSmallFoxSeconds,smallFor);}else smallFor=0;
+      if(!follow||groundedTime<1)continue;
+      maxGroundedFollowDistance=Math.max(maxGroundedFollowDistance,Math.hypot(s.camera.pos[0]-s.pos[0],s.camera.pos[1]-s.pos[1]-.6,s.camera.pos[2]-s.pos[2]));
+    }
+    const cameraCheck = { fromSeconds: checkFrom, minChestDistance, maxPitch, maxStepSpeed, maxGroundedFollowDistance, maxGroundedDistance, minFollowFoxPixels, minFoxPixels, longestSmallFoxSeconds, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && maxGroundedFollowDistance<=maxGroundedDistance && longestSmallFoxSeconds<=1 && !errors.length };
     fs.writeFileSync(path.join(out, 'camera-check.json'), JSON.stringify(cameraCheck, null, 2));
     console.log('CAMERA', JSON.stringify(cameraCheck));
     if (process.argv.includes('--check-camera') && !cameraCheck.pass) process.exitCode = 1;

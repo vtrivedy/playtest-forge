@@ -40,7 +40,8 @@ import { createDryingLines } from './hermitage.hot';
 import { createMillrace } from './millrace.hot';
 import { buildKiln, buildWeir } from './millWeir';
 import { createMillWeir } from './millWeir.hot';
-import { MILLBROOK } from './millbrookLayout';
+import { MILLBROOK, WEST_PILES } from './millbrookLayout';
+import { NORTH_PILES } from './hermitageLayout';
 import { buildFinale } from './finale';
 import { laneBlocks } from './lanes';
 import { createCaptions, type Captions } from './captions';
@@ -130,11 +131,14 @@ export async function runOpening(): Promise<void> {
   // Millbrook + dressing draw from their own seed so every older builder keeps its exact layout (and
   // other teams' recorded input tapes keep replaying frame-for-frame)
   const westCtx: OpeningCtx = { ...ctx, rand: rng(4217) };
+  // the controller is created after every build: read it through to the shared ctx
+  Object.defineProperty(westCtx, 'player', { get: () => ctx.player });
   const millbrook = buildMillbrook(westCtx);
   const millrace = createMillrace(westCtx, millbrook.mill.wheel);
   buildHermitage(westCtx);
   const dryingLines = createDryingLines(westCtx);
   buildDressing(westCtx);
+  const wayPiles = buildLeafPiles(westCtx, [...WEST_PILES, ...NORTH_PILES]);
   const kilnParts = buildKiln(westCtx);
   const weirParts = buildWeir(westCtx);
   const canopy = buildCanopy(ctx);
@@ -306,7 +310,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), finale: finale.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state() } });
   const pxA = new THREE.Vector3();
   const pxB = new THREE.Vector3();
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
