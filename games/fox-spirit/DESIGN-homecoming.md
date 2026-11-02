@@ -9,7 +9,9 @@ did. No UI, no counters, no new systems: the unpressed creature kit, the page, a
 
 1. **The page comes home.** When the Runaway Page is kept and its rise-and-fade ends, a small album page
    (the same inked tree / sun / hills art, in colour) is pinned to the well's west post at eye height, facing
-   the lane mouth. It stirs in the wind.
+   the lane mouth. It stirs in the wind. As it is pinned a warm light shaft and sparks rise out of the well
+   for ~14 s, tall enough (16 m) to be seen over the trees from the ruin's overlook where the page was kept:
+   the slice's end points you home.
 2. **The freed come home.** Creatures you have unpressed gather at the well, each in its own way:
    - hedgehog: already lives by the well (no change);
    - kit: already trots home and curls by the well (no change);

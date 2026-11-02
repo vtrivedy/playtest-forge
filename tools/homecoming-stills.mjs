@@ -61,6 +61,10 @@ try {
   await lens('01-well-before', CAM, WELL);
   await page.evaluate(() => window.__gameHooks.homecoming());
   await lens('02-pinned', CAM, WELL, 70);
+  // the beacon from the ruin's overlook, where the page is kept (fox on the overlook, chase cam toward home)
+  await page.evaluate(() => { const h = window.__gameHooks; h.teleport(-24.4, 71.2, Math.atan2(16.4, 13.8)); h.advance(60, 1 / 60, true); });
+  await page.screenshot({ path: path.join(out, '02a-beacon-from-overlook.png') });
+  await page.evaluate(() => { window.__gameHooks.teleport(-3.0, 90.5, 0); window.__gameHooks.advance(20, 1 / 60, false); });
   await lens('02b-page-close', [-7.6, 1.2, 87.4], [-9.2, 1.0, 85.4]);
   await lens('03-heron-wheel', [-1.6, 1.4, 92.0], [-8, 5.0, 84], 300);
   await lens('04-hare-home', CAM, [-9.6, 0.6, 87.0], 300);
