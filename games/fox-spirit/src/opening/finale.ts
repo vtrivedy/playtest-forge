@@ -447,12 +447,20 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
           blendInS: 0.8, blendOutS: 2.5, lockS: 5,
         });
       },
-      unbind: () => say('The Scribe pressed the autumn shut'),
-      open: () => ctx.audio.cue('finale-open'),
+      unbind: () => {
+        say('The Scribe pressed the autumn shut');
+        // a low wooden give as the screw lets go
+        ctx.audio.play('soft-pin', { at: rig.bookTop.clone().setY(base + 4.4), gain: 0.12, rate: 0.6 });
+      },
+      open: () => {
+        ctx.audio.cue('finale-open');
+        ctx.audio.play('soft-unfold', { at: rig.bookTop, gain: 0.25, rate: 0.75 });
+      },
       release: () => {
         // the year the Album held lets go: the hollow floods with colour and the Crown sheds everything
         ctx.field.restore(new THREE.Vector3(F.press.x, base, F.press.z), 34, 2.2, { edgeMax: 3 });
         opts.crownLetGo();
+        for (let i = 0; i < 3; i++) ctx.audio.play('soft-paper', { at: rig.bookTop, gain: 0.12, rate: 0.85 + i * 0.07, delay: i * 0.35 });
         say('so it would never end.');
       },
       snow: () => {
