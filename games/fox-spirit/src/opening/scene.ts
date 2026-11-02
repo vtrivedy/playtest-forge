@@ -296,6 +296,7 @@ export async function runOpening(): Promise<void> {
     hubOpen: (to) => (to === 'ashwater' ? progress.isRestored('russetvale', 'teach') : progress.isVisited('ashwater', 'teach')),
   });
   const pageMap = createPageMap(view, progress);
+  worlds.attach(view);
   buildSeedwells(scene, progress, [
     { world: 'russetvale', x: -4, z: 77.5, y: groundH(-4, 77.5) },
     { world: 'ashwater', x: 3, z: 93, y: groundH(3, 93) },
@@ -306,6 +307,7 @@ export async function runOpening(): Promise<void> {
   if (progress.isRestored('russetvale', 'teach') && !homecoming.isPinned()) homecoming.force();
   // Russetvale's levels from their physical truth: page home → Keeping settled → the Press kindled
   let progressT = 0;
+  const archSaid = { ashwater: false, press: false };
   ctx.onUpdate((dt) => {
     pageMap.step();
     progressT += dt;
@@ -314,6 +316,15 @@ export async function runOpening(): Promise<void> {
     if (homecoming.isPinned()) progress.complete('russetvale', 'teach');
     if (settledAt >= 0) progress.complete('russetvale', 'develop');
     if ((finale.state() as { kindles: number }).kindles > 0) progress.complete('russetvale', 'combine');
+    // tell the player when a hub arch opens (the arches stand north of the well, behind the wake spot)
+    if (!archSaid.ashwater && progress.isRestored('russetvale', 'teach') && worlds.active === 'russetvale') {
+      archSaid.ashwater = true;
+      ctx.captions.say('An arch north of the well has lit · Ashwater Reach');
+    }
+    if (!archSaid.press && progress.isVisited('ashwater', 'teach') && worlds.active === 'russetvale') {
+      archSaid.press = true;
+      ctx.captions.say("The second arch has lit · the Scribe's Press");
+    }
   });
   // the lens carries the in-frame lettering (captions, end card), so it joins the scene graph
   scene.add(view);
