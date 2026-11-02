@@ -11,3 +11,11 @@ Evidence: `/captures/sorrel/millbrook-colour-payoff-93ae360/` (five 800×450 PNG
 Reproduce: `node tools/millbrook-colour-probe.mjs --out /tmp/millbrook-colour`. The earlier world-stills diagnostic at `/captures/sorrel/millbrook-colour-before/` is pre-release composition reference only.
 
 Validation: `node --check tools/millbrook-colour-probe.mjs`, `git diff --check`, and the actual browser probe (exit 0). No renderer, controller or gameplay state machine was changed.
+
+## Independent expanded-wash retest — 583ca4c
+
+PASS on 583ca4c (Bramble 29e847c merged into the same Sorrel baseline). Same staged start, real stick/Shift input, fixed 800×450 view and timing as baseline. Dam restore is already radius 3.59 at dash end, reaches 9; the wheel wash is 11.19 two seconds later, 30.01 after another two seconds, and settles at 36. Wheel turns, painted is true, zero JS/console errors. Complete window.__game, hook states and radii are in expanded-583ca4c.json.
+
+Reviewed dash, wash and settled screenshots: the mill gains warm plaster and golden thatch as before; the expanded wash also reaches the background hill and trees that remained sepia in the baseline. The fixed lens crops the dam, so its immediate colour response is supported by state here; this view does not establish the dam's chase-camera readability, continuous motion, audio or unfamiliar-player discovery. Evidence: /captures/sorrel/millbrook-colour-expanded-29e847c/. Bramble owns the continuous route clip.
+
+TypeScript, production Vite build and lint:feel all pass on 583ca4c. No additional runtime changes were needed.
