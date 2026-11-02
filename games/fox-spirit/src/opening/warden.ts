@@ -56,7 +56,7 @@ export function buildWarden(ctx: OpeningCtx, progress: WorldProgress) {
     { x: 0.6, z: 92.4, yaw: -2.4, show: () => progress.isRestored('russetvale', 'teach') && !progress.isVisited('ashwater', 'teach'), gone: () => false },
     { x: -12.6, z: 94.4, yaw: 2.6, show: () => progress.isVisited('ashwater', 'teach') && !progress.isVisited('press', 'teach'), gone: () => false },
     // Russetvale: glimpsed on the far crag once the Hearthtree has settled into a bridge, gone when the fox crosses
-    { x: KEEPING.crag.x + 1.2, z: KEEPING.crag.z - 1.0, y: KEEPING.crag.top, yaw: -2.6, show: () => progress.isRestored('russetvale', 'develop') && !progress.isVisited('ashwater', 'teach'), gone: () => progress.isRestored('russetvale', 'combine') },
+    { x: KEEPING.crag.x + 1.2, z: KEEPING.crag.z - 1.0, y: KEEPING.crag.top, yaw: -2.6, show: () => progress.isRestored('russetvale', 'combine') && !progress.isVisited('ashwater', 'teach'), gone: () => false },
     // Ashwater: above the weir, the one who froze the sluices
     { x: 712, z: 117, yaw: Math.PI, show: () => true, gone: () => progress.isRestored('ashwater', 'combine') },
     // the Press: beside the Press itself — the Scribe's own shadow
