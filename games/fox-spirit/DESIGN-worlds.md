@@ -27,19 +27,56 @@ One scene, one fox / controller / camera / paint / save — no second runtime (l
 - Arches open once the runaway page is home (homecoming pinned) — the existing chase stays the first hook (baseline
   discovery bar). Dev hook `__gameHooks.travel(id)` exists for captures only; players walk.
 
-## Worlds, levels, abilities (3 levels each: teach → develop → combine)
-Russetvale (autumn) — exists: (1) Runaway Page chase + canopy + ruin overlook, (2) Millbrook leaf dam / kiln,
-(3) Hearthtree Keeping → bridge → Press Hollow. Ability already earned: ember dash ignites + updraft glide.
+## Story (Vivek 3:25 PM: "a real story" — characters + turns; every beat works text-off, Album pages carry words)
+**Premise.** The Scribe loved one autumn so much that they pressed the world flat into the Album so it would never
+end. Pressing stops time: things that are pressed can't finish (the tree can't fall, the brook can't run, the year
+can't turn). The last hearth-fox wakes in the sepia, and every place it helps *finish its moment* gets its colour back.
 
-Ashwater Reach (rain) — **Reedskim** (dash across a reed bed without sinking; before it, reed beds are soft):
-(1) Ferryman's Sluice — dash the sluice wheel: water LOW exposes a passage, HIGH floats the ferry raft;
-(2) Drowned Orchard — choose which channel gets the water; drain one to reach the second handle;
-(3) Bell Cistern — combine sluice + raft + reed footing to ring the bell → the **Reed** Seedwell fills.
+| world | someone to meet | revelation (Album page earned on the combine level) | reason to go on |
+|---|---|---|---|
+| Russetvale (autumn) | the runaway **page** (it is a page of the Album trying to get home) and the four pressed creatures; at the Keeping, the **Ash Warden**'s silhouette watches from the far crag | page 1 *"Here the Scribe kept every autumn"*: the Album is real and the valley is one of its pages | the Warden leaves its ink footprints toward the **marsh arch** — something was pressed there first |
+| Ashwater Reach (rain) | the **Ferrykeeper** — a heron pressed mid-wade who has held the last ferry for years; the Warden is the one who froze the sluices | page 2 *"The Scribe pressed the rain first"*: the marsh was the Scribe's home; they pressed the flood that took their house, then could not stop pressing | the Ferrykeeper's lantern points to the **winter arch**: the Scribe went to the Press to press the last season, winter, so the year could never turn |
+| The Scribe's Press (winter ink) | the **Scribe** at last, small and old at the Press; the Ash Warden turns out to be the Scribe's own shadow — the ink of every pressed moment | page 3 (the turn) *"I kept autumn because it was the last season we were all here"*: the Scribe pressed the world to keep the people they lost; the fox sets warmth in the Press and the Scribe chooses to let the year turn | the ending already built: snow, the kits, *"and the year turned"*; the hub's three Seedwells full |
 
-The Scribe's Press (winter ink) — **Inkbreak** (air-dash cracks a frozen ink membrane into a glide draft):
-(1) White Margin — thaw the first seal with carried warmth (existing Carry) — page ribs become a path;
-(2) Folded Archive — dash a fold hinge to swap ramp ↔ bridge, keeping a way back;
-(3) Wellspring Press — warmth + fold + Inkbreak glide to the Press; Ash Warden lets go → **Maple** Seedwell.
+No dialogue system: the page words are ≤ 12 words each, staged as Album pages (Hazel) at the moment of the
+revelation; characters act (the heron poles the ferry once the water is right; the Scribe lifts the Press lever).
+
+## Worlds, levels, puzzles (teach → develop → combine; no caption tells the answer)
+Rules for every level: one distinct world system + the world's ability; the combine level needs the *insight* that
+two earlier rules interact; a cue-following bot must not finish it from captions alone (captions name the place
+and the feeling, never the action). Each level is a place with a landmark you walk to, a side path and a secret.
+
+**Russetvale — autumn (ability: Hearthbound — the dash keeps a carried ember)**
+1. *Lanternhollow* — the runaway page chase through canopy and ruin (exists). Secret: glyph shrine.
+2. *Millbrook Kiln* — leaf dam → brook → wheel → kiln updraft to the lookout (exists).
+3. *Hearthtree Keeping* — carry the coal to steam, then root; the tree falls into a bridge (exists); with
+   Hearthbound the coal survives a dash across the steam stair — the faster route.
+
+**Ashwater Reach — rain marsh (system: water levels; ability: Reedskim — reed mats hold you)** (Cedar)
+1. *Low Sluice* — the marsh is too deep to wade; burst the right dam and the channel drains to expose footing.
+   Insight: which dam drains *which* pool (water runs downhill along visible channels).
+2. *Reed Pond* — reed mats only bear weight once Reedskim is earned; chain jumps, then drain the islet pool from
+   above (the second dam is only reachable from the mats).
+3. *Weir Heart* — the weir steps are under water until BOTH pools are drained *in the right order* (draining the
+   pond first floods the channel again); the Ferrykeeper poles across once the weir shows → Reed Seedwell.
+
+**The Scribe's Press — winter ink (system: warmth melts ink, ink freezes; ability: Inkstep — an air-dash breaks a
+frozen membrane into a glide draft)** (Thistle)
+1. *White Margin* — the seal in the ink ridge melts only to warmth carried from the brazier before it fades (11 s):
+   route-finding against a clock you can see (the ember dims).
+2. *Folded Archive* — the membrane over the shelf is solid; Inkstep (jump + air-dash) breaks it into a draft;
+   ride it onto the 4.4 m Archive shelf.
+3. *Wellspring Press* — the iced membrane must first be warmed (Press brazier) AND then broken with Inkstep while
+   gliding — warmth and ink together; the Scribe lifts the lever → Maple Seedwell, the ending.
+
+**Hub** — Lanternhollow's well: three Seedwells fill, arches light as worlds open, Album (Tab) shows pages earned.
+
+## Honest scope for 6 PM
+All nine levels exist as playable code (Russetvale 3 shipped; Ashwater 3 and Press 3 pushed with input-only
+probes). Bigger *walkable area* (10–15 min per world) and the story pages/characters are the next work, in that
+order: characters + pages (Hazel: Album pages; Cedar: Ferrykeeper; Thistle: Scribe at the Press; Maple: Ash Warden
+footprints across worlds + hub), then side paths/secrets per world. Placeholder art (disc mats, flat lawn, glass
+tubes) is not done — each builder replaces theirs before calling a level shipped.
 
 ## Progress (Hazel)
 Typed ids `russetvale|ashwater|press` × `teach|develop|combine`; monotonic `visit / restore / earn` store, versioned
@@ -60,3 +97,27 @@ Builders: register colliders/occluders through `ctx`; add new walkable shapes to
 Real build `/`: chase → page home → walk through each hub arch → island (frames differ: rain marsh vs winter ink vs
 autumn) → solve ≥1 puzzle → progress visible (Album / Seedwell) → return arch home. Baselines: cue discovery,
 corridor colour (`tools/corridor-colour.mjs`), ending, `check:stuck`, 0 black frames. Honest duration measured.
+
+### Independent Ashwater acceptance harness (Reed)
+`tools/world-ashwater-acceptance.mjs` starts fresh, follows the rendered discovery invitation with ordinary stick/jump/dash,
+walks the kept page home and crosses the hub arch before replaying the Ashwater movement route. It records full hook
+and `window.__game` states at each beat. No teleport, progress setters or saved-unlock fixture count as route proof.
+A failure is retained with the last position; later stages may not mask a failed entry.
+
+Entry review found the finale's homeward guidance continuing in Ashwater after discovery had finished. Scope both its
+hint and mote trail to Russetvale; defer a pending homecoming caption until returning there. Foreign-world puzzle
+hints retain the shared teach panel. Verify via the fresh route's foreign-world screenshot/state after the change.
+
+### Independent portal circuit (Reed)
+Extend the fresh-boot acceptance with an optional entry-tour: after physical Ashwater entry, walk back through its
+return arch, cross the Press arch from the hub, return home, then re-enter Ashwater. Assert every active-world and
+travel-count transition and retain screenshots plus complete `window.__game`. This isolates portal reachability and
+re-entry from the evolving puzzle routes; it does not claim puzzle completion or blind discovery.
+
+Measure breadth from the same baked one-metre movement mask used by the controller. Report permitted footprint and
+bounds per world; these include water, obstacles and disconnected cells, so are not a reachable-area or duration
+claim. Record immutable commit in the JSON report. Use actual route simulation time separately from capture wall time.
+
+Portal-circuit visual review on 053e9e0c found both home-return lenses almost wholly blocked despite camera
+`blocked:false`. Diagnose with staged world travel and centre-screen mesh intersections; compare return landing
+positions without changing the opening spawn. Fix the landing or missing occluder, then repeat physical circuit.

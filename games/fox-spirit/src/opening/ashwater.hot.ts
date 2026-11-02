@@ -8,11 +8,11 @@ import type * as THREE from 'three';
 import { ASH_ORIGIN, DAM_A, DAM_B, LEDGE, MAT_RISE, MATS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import type { Collider } from '../lookdevPlay';
 
-export const ASH_TIMING = { drain: 3.2, matRise: 0.9, matStagger: 0.18, damFall: 1.1, glow: 2.5 };
+export const ASH_TIMING = { drain: 3.2, matRise: 0.9, matStagger: 0.18, damFall: 1.1, glow: 2.5, matHold: 1.2, matSink: 0.7, matRecover: 0.8 };
 const T = ASH_TIMING;
 
 export const HINT_DAM = 'The reeds have dammed the sluice · Shift dash through them';
-export const HINT_MATS = 'Reedskim · jump from mat to mat across the pond';
+export const HINT_MATS = 'Reedskim · keep hopping — the mats sink under you';
 export const HINT_DAM_B = 'The mill race is choked · dash the islet’s reeds';
 export const HINT_GLIDE = 'Space · jump off the weir, hold to glide';
 
@@ -31,7 +31,10 @@ export type AshRig = {
   damBCol: Extract<Collider, { kind: 'post' }>;
   mats: THREE.Object3D[];
   matCols: Extract<Collider, { kind: 'box' }>[];
+  /** seconds the fox has stood on each mat (it sinks past `matHold`, recovers once left) */
+  matLoad: Float32Array;
   glow: THREE.Object3D;
+  glowMat: THREE.MeshBasicMaterial;
   safe: THREE.Vector3;
   s: {
     burstA: number; burstB: number; channelY: number; poolY: number; matK: number; glowK: number;
@@ -78,10 +81,17 @@ export function updateAshwater(rig: AshRig, dt: number): void {
   if (rig.hasReedskim() && s.matK < 1 + MATS.length * T.matStagger) s.matK += dt / T.matRise;
   for (let i = 0; i < rig.mats.length; i++) {
     const k = smooth(s.matK - i * T.matStagger);
-    const top = WATER.pond.full + MAT_RISE;
-    rig.mats[i]!.position.y = top - 0.08 - (1 - k) * 0.6;
-    rig.mats[i]!.visible = k > 0.001;
-    rig.matCols[i]!.top = k > 0.6 ? top : -100;
+    const col = rig.matCols[i]!;
+    // a fox standing on a mat loads it; past `matHold` it sinks below the surface (keep moving or get wet)
+    const on = grounded && Math.abs(f.x - col.x) < col.hx && Math.abs(f.z - col.z) < col.hz && f.y > WATER.pond.full - 0.3;
+    rig.matLoad[i] = on ? rig.matLoad[i]! + dt : Math.max(0, rig.matLoad[i]! - dt / T.matRecover);
+    const sink = smooth((rig.matLoad[i]! - T.matHold) / T.matSink) * 0.55;
+    const top = WATER.pond.full + MAT_RISE - sink;
+    const mat = rig.mats[i]!;
+    mat.position.y = top - 0.18 - (1 - k) * 0.6;
+    mat.rotation.z = on ? Math.sin(rig.matLoad[i]! * 9) * 0.03 * (1 + sink * 4) : 0;
+    mat.visible = k > 0.001;
+    col.top = k > 0.6 ? top : -100;
   }
 
   // wading: standing on a bed still under water puts the fox back where it last stood dry
@@ -92,7 +102,8 @@ export function updateAshwater(rig: AshRig, dt: number): void {
       s.splashes++;
       rig.events.splash();
       rig.teleport(rig.safe.x, rig.safe.z, s.safeYaw);
-    } else if (f.y > DRY_Y && (w === null || f.y > level + 0.05)) {
+    } else if (f.y > DRY_Y && (w === null || (w !== 'pond' && f.y > level + 0.05))) {
+      // (never a reed mat: it may be the thing sinking under you)
       // only truly dry footing (not the drowned bank slope) is a place to put the fox back
       rig.safe.copy(f);
       s.safeYaw = rig.fox.rotation.y;
@@ -115,8 +126,10 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     }
   }
   if ((s.done & 4) !== 0 && s.glowK < 1) s.glowK = Math.min(1, s.glowK + dt / T.glow);
-  rig.glow.visible = s.glowK > 0.001;
-  rig.glow.scale.set(1, Math.max(0.001, smooth(s.glowK)), 1);
+  // unrestored, a low teal shimmer marks the goal from the weir; restored, it rises into the full column
+  const g = smooth(s.glowK);
+  rig.glow.scale.set(1, 0.14 + 0.86 * g, 1);
+  rig.glowMat.opacity = 0.22 + 0.33 * g;
 
   // one teach line at a time, only where it applies
   if (!s.inMarsh) return;
