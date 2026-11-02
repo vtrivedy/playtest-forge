@@ -1,0 +1,48 @@
+{
+  "recorder-staging": {
+    "runtimeSHA": "2189900b2a486a9f0aac148cbc12dafa9e75bbc4",
+    "viewport": [
+      480,
+      270
+    ],
+    "elapsed": 21.717,
+    "ticks": 10,
+    "pushes": 10,
+    "errors": [],
+    "streams": {
+      "native": {
+        "frames": 6,
+        "minMeanLuma": 139.53463645833332,
+        "darkFrames": 0
+      },
+      "staged": {
+        "frames": 6,
+        "minMeanLuma": 136.0520388888889,
+        "darkFrames": 0
+      }
+    }
+  },
+  "recorder-staging-small": {
+    "runtimeSHA": "2189900b2a486a9f0aac148cbc12dafa9e75bbc4",
+    "viewport": [
+      160,
+      90
+    ],
+    "elapsed": 40.02769999999926,
+    "ticks": 33,
+    "pushes": 33,
+    "errors": [],
+    "streams": {
+      "native": {
+        "frames": 29,
+        "minMeanLuma": 139.87300833333333,
+        "darkFrames": 0
+      },
+      "staged": {
+        "frames": 30,
+        "minMeanLuma": 136.2343420138889,
+        "darkFrames": 0
+      }
+    }
+  }
+}

@@ -569,3 +569,15 @@ checks and screenshots under `/captures/fern/`, mirrored in
 camera reviews; they do not certify real-time performance or audio.
 - Gate story hand-offs on the beat every route actually reaches, not the optional maximum: the homecoming→finale stream first waited for all five lanterns (every creature freed), which no slice route does, so the ending never appeared in Kit's clips (Fern fixed: page pin starts it). Check new gates against the shared slice route (`tools/page-motion-probe.mjs` / Kit's landing route), not a staged "everything done" state.
 - Isolated single black frames in a real-time capture with bright neighbours, evenly spread, are a recorder/drawing-buffer artifact, not the render: `tools/blink-scan.mjs --from T --every 2` reads the live WebGL canvas in-page over the slice route (617ad72: 2400 frames, min luma 112, zero dark) — prove in-canvas before chasing shaders.
+
+## Showcase continuation and teaching overlays — Fern050a7cc
+
+A capture route ending in `hold(homecoming, Infinity)` intentionally spends the rest of a long clip in the plaza. Use `tools/journey-camera-route.mjs` for the160s opening→Keeping showcase:10s reveal hold, walk to hearth, then canonical Keeping inputs. The factory is self-contained for capture tools transferring `toString()`, while its maintained opening/Keeping definitions remain shared. An authored route does not prove unfamiliar-player discovery, and changing it does not explain the separate live recorder divergence.
+
+Review timed UI overlays in motion: a bottom-center teaching card covered the fox's legs between beat screenshots. The hearth card now occupies the upper-left corner with a32vw/240px content cap. Final050a7cc165s30Hz route passes all story/endpoint/camera gates,0JS; all90 corrected94–100s motion frames and ten stills reviewed. All4950 recorded gameplay/camera rows equal the pre-HUD baseline. Full scoped report: `docs/reviews/swarm4/fern-journey-REVIEW.md`; captures `/captures/fern/journey-hud-final/`. These are offline480×270/15fps segment results, not a live GPU recorder or whole-game feel verdict.
+
+## Capture staging experiment (Fern, Nov 2 12:52 UTC)
+
+- Kit's e1c9e57 live GPU clip still has23isolated black frames; previous no-dark immediate in-canvas scans and buffer-flag A/B do not by themselves prove which external capture stage fails. External landing-recorder source was requested, not supplied in this checkout.
+- Optional `tools/recorder-staging.mjs` copies a freshly rendered WebGL frame synchronously into a persistent2D canvas and calls requestFrame on captureStream(0). It is not enabled anywhere automatically. Call push immediately after render; an unrelated timer can still read a cleared source.
+- Local simultaneous native/staged browser recordings on unchanged2189900 game source decode6/6frames at480×270 and29/30frames at160×90, all bright/no JS errors. Software throughput is low and pushes coalesce; this is helper feasibility, not reproduction or repair of the GPU blink. See `docs/reviews/swarm4/recorder-staging-REVIEW.md` and compact results. Keep the GPU issue open pending hardware A/B.

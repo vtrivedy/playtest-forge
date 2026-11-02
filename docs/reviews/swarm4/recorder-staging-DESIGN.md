@@ -1,0 +1,5 @@
+# Recorder staging experiment
+
+Kit's live GPU landing clip still contains isolated black frames after reverting preserveDrawingBuffer. Existing immediate in-canvas scans are bright, so keep this as a capture hypothesis, not a proven game-render defect.
+
+Test a recorder-only staging canvas: copy the WebGL canvas synchronously immediately after the existing render callback, then explicitly request a captured frame from a persistent 2D canvas. This avoids asking the browser's asynchronous stream sampler to read the transient WebGL default framebuffer after presentation. No renderer flags or player runtime changes. Expose an installable browser helper whose `push()` is called by the capture loop after rendering, with a clean stop. Capture native and staged streams together over the same controller input run, decode every frame and retain per-stream black-frame counts, screenshots and window.__game. A software result only verifies the method locally; Kit's hardware recorder needs its own rerun before calling the GPU issue fixed.
