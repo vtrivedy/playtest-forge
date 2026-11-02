@@ -273,7 +273,7 @@ export async function runOpening(): Promise<void> {
   const stacks = buildPressStacks(ctx, { foundAtLoad: progress.isSecretFound('press-stacks'), onFound: () => { progress.findSecret('press-stacks'); } });
   ctx.onUpdate((dt) => stacks.update(dt, fox.root.position));
   // a Russetvale secret: the Loft on the east cottage's ridge
-  const loft = buildValeLoft(ctx, { foundAtLoad: false, onFound: () => {} });
+  const loft = buildValeLoft(ctx, { foundAtLoad: progress.isSecretFound('vale-loft'), onFound: () => { progress.findSecret('vale-loft'); } });
   ctx.onUpdate((dt) => loft.update(dt, fox.root.position));
   {
     const hearthLift = hearth.updrafts.liftAt;
@@ -323,8 +323,9 @@ export async function runOpening(): Promise<void> {
     if (progressT < 0.5) return;
     progressT = 0;
     if (homecoming.isPinned()) progress.complete('russetvale', 'teach');
-    if (settledAt >= 0) progress.complete('russetvale', 'develop');
-    if ((finale.state() as { kindles: number }).kindles > 0) progress.complete('russetvale', 'combine');
+    // Hazel's catalogue: develop = Millbrook Kiln (the kiln lit), combine = Hearthtree Keeping (settled into the bridge)
+    if ((millWeir.state() as { lit: boolean }).lit) progress.complete('russetvale', 'develop');
+    if (settledAt >= 0) progress.complete('russetvale', 'combine');
     // tell the player when a hub arch opens (the arches stand north of the well, behind the wake spot)
     if (!archSaid.ashwater && progress.isRestored('russetvale', 'teach') && worlds.active === 'russetvale') {
       archSaid.ashwater = true;
