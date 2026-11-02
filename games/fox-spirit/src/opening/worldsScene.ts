@@ -178,17 +178,7 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
     spire.rotation.set((rp() - 0.5) * 0.15, rp() * 6, (rp() - 0.5) * 0.15);
     scene.add(spire);
   }
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2;
-    const rr = 14 + rp() * 16;
-    const x = P.x + Math.cos(a) * rr;
-    const z = P.z + Math.sin(a) * rr;
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.4, 0.18), pageMat);
-    slab.position.set(x, groundH(x, z) + 1.5, z);
-    slab.rotation.set((rp() - 0.5) * 0.25, a + Math.PI / 2, (rp() - 0.5) * 0.2);
-    scene.add(slab);
-    ctx.colliders.push({ kind: 'box', x, z, yaw: a + Math.PI / 2, hx: 1.2, hz: 0.15, top: groundH(x, z) + 3.2 });
-  }
+  // the Press's interior (ridge, shelf, ledge, page dressing) is press.ts; only the rim spires stand here
   const built = k.build();
   scene.add(built);
   ctx.occluders.push(built);

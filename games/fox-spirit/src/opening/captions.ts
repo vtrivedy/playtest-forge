@@ -22,7 +22,8 @@ export function createCaptions(ctx: OpeningCtx) {
     },
     /** show one line now (replaces any line still showing) */
     say(text: string): void {
-      plane.draw([{ text, px: 84, italic: true, spacing: 0.03 }]);
+      // a warm-dark stroke under every caption: white-on-snow in the Press was unreadable (Kit :560)
+      plane.draw([{ text, px: 84, italic: true, spacing: 0.03, outline: 0.1 }]);
       showing = text;
       c.t = 0;
       said.push(text);
