@@ -435,19 +435,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   });
   card.innerHTML = 'The Keeping<div style="font:18px Georgia,serif;letter-spacing:.12em;margin-top:14px;opacity:.8">and the year turned</div>';
   document.body.append(card);
-  // Album captions (seed DESIGN: ≤ 6 words, the only words in the slice): one per beat, lower third
-  const caption = document.createElement('div');
-  caption.dataset.finale = 'caption';
-  Object.assign(caption.style, {
-    position: 'fixed', left: '0', right: '0', bottom: '17%', textAlign: 'center', pointerEvents: 'none',
-    color: '#f4e5cb', font: 'italic 24px Georgia,serif', letterSpacing: '0.03em', opacity: '0',
-    textShadow: '0 1px 12px rgba(40,24,12,.7)',
-  });
-  document.body.append(caption);
-  const say = (text: string) => {
-    caption.textContent = text;
-    rig.s.capT = 0;
-  };
+  const say = (text: string) => ctx.captions.say(text);
 
   const F2 = F.kits;
   const toCrown = new THREE.Vector3(CROWN.x - F.press.x, 0, CROWN.z - F.press.z).normalize();
@@ -526,7 +514,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     },
     hinge, screw, wheel, coverMat, paperMat, ironMat, lampPaper, emblemMat, glowMat, light,
     wayMesh, wayLut, wayLen: wayCurve.getLength(),
-    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card, caption,
+    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
     cradle: new THREE.Vector3(F.cradle.x, cy, F.cradle.z),
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
     toCrown,
@@ -534,7 +522,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, capT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
     kitX: new Float32Array(F2.length),

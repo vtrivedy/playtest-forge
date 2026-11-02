@@ -16,8 +16,6 @@ export const FINALE_TIMING = {
   /** the card: fox still this long by the cradle (within `restR`), or `timeout` s after snow begins */
   rest: 1.6, restR: 4.2, timeout: 24, cardIn: 2.5, cardHold: 7.5, cardOut: 2.5,
   snowRamp: 14,
-  /** each Album caption: fade in, hold, fade out (s) */
-  capIn: 1.0, capHold: 3.6, capOut: 1.2,
 };
 const T = FINALE_TIMING;
 
@@ -61,7 +59,6 @@ export type FinaleRig = {
   kitFoxes: HearthFox[];
   kitPages: THREE.Mesh[];
   card: HTMLElement;
-  caption: HTMLElement;
   /** fixed points */
   cradle: THREE.Vector3;
   bookTop: THREE.Vector3;
@@ -72,7 +69,7 @@ export type FinaleRig = {
   cover0: THREE.Color; cover1: THREE.Color; paper0: THREE.Color; paper1: THREE.Color; ember: THREE.Color; emblem0: THREE.Color;
   /** mutable state (numbers only) */
   s: {
-    phase: number; t: number; clock: number; snowT: number; still: number; settledT: number; capT: number;
+    phase: number; t: number; clock: number; snowT: number; still: number; settledT: number;
     card: 0 | 1 | 2; cardT: number; foxX: number; foxZ: number; kindles: number; cardShows: number; wheel: number; leavesOut: number;
   };
   kitPhase: Int8Array;
@@ -338,12 +335,6 @@ export function updateFinale(rig: FinaleRig, dt: number): void {
       s.cardShows++;
       rig.events.card();
     }
-  }
-  if (s.capT >= 0) {
-    s.capT += dt;
-    const o = smooth(s.capT, 0, T.capIn) * (1 - smooth(s.capT, T.capIn + T.capHold, T.capIn + T.capHold + T.capOut));
-    rig.caption.style.opacity = o.toFixed(3);
-    if (s.capT > T.capIn + T.capHold + T.capOut) s.capT = -1;
   }
   s.foxX = rig.fox.position.x;
   s.foxZ = rig.fox.position.z;

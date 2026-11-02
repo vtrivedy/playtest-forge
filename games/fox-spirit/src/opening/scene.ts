@@ -33,6 +33,7 @@ import { buildLeafPiles } from './leafPiles';
 import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
 import { buildFinale } from './finale';
+import { createCaptions, type Captions } from './captions';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -71,6 +72,8 @@ export interface OpeningCtx {
   onUpdate: (fn: (dt: number, t: number) => void) => void;
   /** the one sound graph (audio.ts): play samples, place voices in 3D, duck the music */
   audio: OpeningAudio;
+  /** Album captions (captions.ts): `ctx.captions.say('≤ 6 words')` for a story beat */
+  captions: Captions;
 }
 
 export async function runOpening(): Promise<void> {
@@ -106,7 +109,10 @@ export async function runOpening(): Promise<void> {
     player: null,
     onUpdate: (fn) => void updates.push(fn),
     audio: createOpeningAudio(),
+    // bound just below: the caption line registers its fade through ctx.onUpdate
+    captions: null as unknown as Captions,
   };
+  ctx.captions = createCaptions(ctx);
   const { field } = ctx;
 
   buildMeadow(ctx);
