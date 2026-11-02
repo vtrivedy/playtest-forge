@@ -31,6 +31,36 @@ Prefer explicit contextual targets and generous geometric margins to hidden
 input sequences. New verbs must work in authored space, not merely appear in HUD.
 If another design wins, retain these teach/develop/combine and recovery contracts.
 
+### Capability correction after Hazel's review
+
+Hearth ignition and updraft/glide already exist in the opening. The Hearthbound
+row above is therefore insufficient as an earned ability. Replace that reward
+with persistent warmth pickup/place, building on the existing carry behavior:
+one coal can retain an activated mechanism while the fox leaves it and traverses
+another route. A level must require that separation, rather than deliver a coal
+to a nearby socket. Teach placement beside a visible lift; develop it with two
+routes where the fox cannot dash while retaining the coal; combine lift placement
+with a recoverable glide and permanent bridge latch. Existing pickup controls
+must be reconciled with the two-action rule by the canonical design owner before
+implementation, not silently add another action key.
+
+Likewise Reedskim must grant actual crossing support or extend reach, and Inkstep
+must create collision support or break an otherwise impassable membrane. Each
+reward needs a before-unlock failure and after-unlock success using the same
+input and target. Merely lighting an ability icon is not acceptance.
+
+### Minimum integration evidence contract
+
+The scene integrator should expose the active world, portal destination and
+return position in `window.__game`; Hazel's progress contract supplies level,
+ability and well truth. Portal entry must consume ordinary movement, preserve
+completed mechanisms, clear transient input, and place the fox on supported
+ground with a useful camera. Returning through an arch must put the player
+outside its activation volume to prevent immediate reentry. Pause/map cannot
+advance puzzles; standing at a finish before satisfying its mechanism cannot
+complete the level. These are played negative cases, not reasons to award
+completion through a diagnostic hook.
+
 ## Layout and pacing
 
 `hub → [teach W→B] → [develop W→lift/bridge] → [combine W→return arch] → hub`
