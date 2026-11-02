@@ -51,11 +51,12 @@ export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z:
       const s = surface(at);
       counts[s]++;
       const pace = THREE.MathUtils.clamp(speed / 3.2, 0.35, 1.15);
-      const gain = FOLEY.step * pace;
-      const rate = 0.94 + Math.random() * 0.12;
+      // uneven like real paws (a metronomic patter reads as a ticking clock)
+      const gain = FOLEY.step * pace * (0.6 + Math.random() * 0.7);
+      const rate = 0.9 + Math.random() * 0.2;
       if (s === 'leaf') audio.playOne('step-grass', 5, { gain: gain * 0.8, rate: rate * 1.25, out: warm });
       // soft ground is nearly silent; wood and stone a touch more present
-      else audio.playOne(`step-${s}`, 5, { gain: s === 'grass' ? gain * 0.6 : gain * 0.8, rate, out: warm });
+      else audio.playOne(`step-${s}`, 5, { gain: s === 'grass' ? gain * 0.6 : gain * 0.65, rate, out: warm });
     },
     update(st: { grounded: boolean; gliding: boolean; vel: number[]; speed: number }): void {
       if (ac.state !== 'running') return;

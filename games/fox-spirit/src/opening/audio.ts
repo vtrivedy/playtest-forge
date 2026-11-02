@@ -23,8 +23,8 @@ export const MIX = {
   musicGap: 30,
   /** moments → harp phrases (Meadow Thoughts, Écrivain, CC0); each plays once, then quiet */
   cues: { hearth: ['phrase-hearth'], page: ['phrase-page-1', 'phrase-page-2'], keeping: ['phrase-keeping'], home: ['phrase-home'] } as Record<string, string[]>,
-  /** wind: soft band-limited noise; ~−44 dBFS on the ground, up to ~−38 high up */
-  wind: { ground: 0.012, high: 0.024, centre: 420 },
+  /** wind: gusts of soft pink noise that come and go (silent between them); faint on the ground, fuller up high */
+  wind: { ground: 0.006, high: 0.03, dark: 450, open: 2200 },
   /** birds: single distant calls, only once the colour is back; gaps random in [min, max] s */
   birds: { gain: 0.05, min: 28, max: 70, after: 0.3, near: 18, far: 34 },
 };
@@ -146,22 +146,29 @@ export function createOpeningAudio() {
     return { gain: gain.gain, set: (v: number, tc = 0.2) => gain.gain.setTargetAtTime(v, ac.currentTime, tc) };
   }
 
-  // wind: pink-ish noise through a soft band-pass whose level and centre drift in slow gusts (no recording: the
-  // field recordings carried traffic rumble and hidden birds)
+  // wind: pink noise under a low-pass that opens as a gust rises; between gusts it falls away to nothing (a steady
+  // band of noise reads as a fan or an engine, not air)
   const wn = ac.createBuffer(1, ac.sampleRate * 4, ac.sampleRate);
   const wd = wn.getChannelData(0);
-  for (let i = 0, b = 0; i < wd.length; i++) wd[i] = b = b * 0.985 + (Math.random() * 2 - 1) * 0.12;
+  for (let i = 0, b0 = 0, b1 = 0, b2 = 0; i < wd.length; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = 0.99765 * b0 + w * 0.099046;
+    b1 = 0.963 * b1 + w * 0.2965164;
+    b2 = 0.57 * b2 + w * 1.0526913;
+    wd[i] = (b0 + b1 + b2 + w * 0.1848) * 0.11;
+  }
   const windSrc = ac.createBufferSource();
   windSrc.buffer = wn;
   windSrc.loop = true;
-  const windBand = new BiquadFilterNode(ac, { type: 'bandpass', frequency: MIX.wind.centre, Q: 0.6 });
-  const windLow = new BiquadFilterNode(ac, { type: 'lowpass', frequency: 1400 });
+  const windLow = new BiquadFilterNode(ac, { type: 'lowpass', frequency: MIX.wind.dark, Q: 0.4 });
+  const windHigh = new BiquadFilterNode(ac, { type: 'highpass', frequency: 90 });
   const wind = ac.createGain();
   wind.gain.value = 0;
-  windSrc.connect(windBand).connect(windLow).connect(wind).connect(ambience);
+  windSrc.connect(windHigh).connect(windLow).connect(wind).connect(ambience);
   windSrc.start();
   let gust = 0;
   let gustTo = 0.5;
+  let lastTick = 0;
 
   // birds: one call at a time, somewhere off to the side and far, with long random gaps
   let nextBird = MIX.birds.min;
@@ -239,13 +246,14 @@ export function createOpeningAudio() {
       L.upZ.setTargetAtTime(up.z, now, 0.02);
       restored += (o.restored - restored) * 0.02;
       height += (o.height - height) * 0.05;
-      // wind: slow gusts (a random walk toward a new target every few seconds), louder and brighter up high
+      // wind: a slow random walk; only its upper part is heard, so gusts arrive, swell and leave silence behind
       if (Math.abs(gust - gustTo) < 0.02) gustTo = Math.random();
-      gust += (gustTo - gust) * 0.004;
+      gust += (gustTo - gust) * (1 - Math.exp(-(now - lastTick) * 0.24));
+      lastTick = now;
+      const swell = Math.max(0, (gust - 0.35) / 0.65) ** 1.5;
       const aloft = THREE.MathUtils.smoothstep(height, 1, 8);
-      const level = THREE.MathUtils.lerp(MIX.wind.ground, MIX.wind.high, aloft) * (0.6 + 0.6 * gust);
-      wind.gain.setTargetAtTime(level, now, 0.6);
-      windBand.frequency.setTargetAtTime(MIX.wind.centre * (0.8 + 0.5 * gust + 0.4 * aloft), now, 0.8);
+      wind.gain.setTargetAtTime(THREE.MathUtils.lerp(MIX.wind.ground, MIX.wind.high, aloft) * swell, now, 0.5);
+      windLow.frequency.setTargetAtTime(THREE.MathUtils.lerp(MIX.wind.dark, MIX.wind.open, Math.max(swell, aloft * 0.6)), now, 0.6);
       // birds
       if (restored > MIX.birds.after && now >= nextBird && birdIds.length) {
         let i = Math.floor(Math.random() * birdIds.length);
