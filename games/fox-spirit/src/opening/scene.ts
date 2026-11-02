@@ -300,6 +300,8 @@ export async function runOpening(): Promise<void> {
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
   const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), finale: finale.state() } });
+  const pxA = new THREE.Vector3();
+  const pxB = new THREE.Vector3();
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -358,6 +360,16 @@ export async function runOpening(): Promise<void> {
     unpress: unpressed.unpress,
     /** dev: the homecoming as if the page were kept (pins it, sends the freed home) */
     homecoming: homecoming.force,
+    /**
+     * The fox's on-screen height (px, feet → ears 0.6 m) through the rendered lens; 0 when behind the lens.
+     * One definition for every route tool's legibility gate (a speck = the camera lost her).
+     */
+    foxScreenPx() {
+      const f = fox.root.position;
+      pxA.copy(f).project(view);
+      pxB.copy(f).setY(f.y + 0.6).project(view);
+      return pxA.z > 1 || pxB.z > 1 ? 0 : (Math.abs(pxB.y - pxA.y) * renderer.domElement.clientHeight) / 2;
+    },
     /** dev: burst Millbrook's leaf dam without the dash */
     millBurst: millrace.burst,
     /** dev: free the Hermitage's drying lines without running under them */
