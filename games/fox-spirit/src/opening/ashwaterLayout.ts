@@ -49,7 +49,7 @@ export const MAT_HALF = 1.15;
 export const MAT_RISE = 0.14;
 
 /** the weir plateau north of the Mill Pool, and the steps that climb out of the drained pool onto it */
-export const WEIR = { z0: 33.6, top: 4.4, xMax: 11.8 };
+export const WEIR = { z0: 33.6, top: 4.4, xMax: 13.4 };
 export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2, 3.8, 4.4].map((top, i) => ({ lz: 27.75 + i * 0.68, top }));
 export const STEP_HALF = { x: 1.6, z: 0.38 };
 

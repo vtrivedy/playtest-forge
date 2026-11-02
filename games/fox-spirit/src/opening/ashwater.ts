@@ -370,7 +370,17 @@ export function buildAshwater(
     colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx: (x1 - x0) / 2, hz: (z1 - z0) / 2, top: CISTERN.wallTop });
   };
   cWall(W.x0 - CISTERN.wall, W.x0, W.z0 - CISTERN.wall, WEIR.z0);
-  cWall(W.x1, W.x1 + CISTERN.wall, W.z0 - CISTERN.wall, WEIR.z0);
+  cWall(W.x1, W.x1 + CISTERN.wall, W.z0 - CISTERN.wall, SHELF.z1);
+  // the east wall's north end rises into a tall slate pier beside the weir: nothing on the weir steps onto the wall
+  {
+    const a = ash((SHELF.x0 + W.x1 + CISTERN.wall) / 2, (SHELF.z1 + WEIR.z0) / 2);
+    const hx = (W.x1 + CISTERN.wall - SHELF.x0) / 2, hz = (WEIR.z0 - SHELF.z1) / 2;
+    const pier = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, 7.6, hz * 2), wallMat);
+    pier.position.set(a.x, 2.5, a.z);
+    pier.castShadow = true;
+    root.add(pier);
+    colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx, hz, top: 6.3 });
+  }
   cWall(W.x0, CISTERN.gate.x0, W.z0 - CISTERN.wall, W.z0);
   cWall(CISTERN.gate.x1, W.x1, W.z0 - CISTERN.wall, W.z0);
   cWall(SHELF.x0, SHELF.x1, SHELF.z0, SHELF.z1);
