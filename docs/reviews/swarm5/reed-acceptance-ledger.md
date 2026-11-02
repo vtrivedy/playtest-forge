@@ -74,3 +74,17 @@ Next independent camera replay should retain the unchanged blind seed 2 case
 at 20 simulation seconds, the cue-policy missed-landing recovery, and the authored
 journey's homecoming and finale shots. Camera ownership remains with Thistle;
 no gameplay change or global terrain fade is proposed by this ledger.
+
+
+## Drained-bed mist follow-up — runtime 3b559ea6
+
+Reed isolated the roof-trigger grey veil to two horizontal mist sheets above the
+drained channel bed, then added a world-space soft mask using canonical water
+bounds. Exact-source fresh T4 physical opening → hub → full Ashwater/all three
+levels/both memories/Reedskim/Reed fill 1 passes with zero page/console errors.
+Matched roof frame now has saturated fox and muddy bed; cropped roof composition
+remains open. Arrival atmosphere and shelf/Seedwell corrections hold. Six-second
+12fps walk has 0 black frames / 72 decoded; all-frame sheet personally inspected.
+TS/Vite/feel gates green. [Report, frames, state and movie](reed-mist/REVIEW.md).
+Seedwell close-up art, sparse/geometric landscape, requested duration and blind
+puzzle insight remain open.
