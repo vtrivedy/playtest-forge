@@ -91,8 +91,9 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
 
   // ---- ground: the hollow and the drop past its lip continue the meadow ground south of its mesh edge
   const groundCtx = { groundH, pathDist, toon, mapleLeafGeometry };
-  const patch = buildGround(scene, groundCtx, { cx: 19, cz: 27, w: 52, d: 27.8, seg: 80 });
-  patch.position.y = -0.012;
+  // abuts the bowl sheet (meadow.ts: x −64..56 in 170 segments, z from 40.5) on its exact vertex columns: no overlap, no cracks
+  const step = 120 / 170;
+  buildGround(scene, groundCtx, { cx: -64 + (81 + 37) * step, cz: 40.5 - 13.5, w: 74 * step, d: 27, seg: 74 });
   const inHollow = (x: number, z: number) => {
     const V = FINALE;
     const p = { x: x - V.press.x, z: z - V.press.z };
