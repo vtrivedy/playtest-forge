@@ -41,10 +41,10 @@ function leafGeometry(size: number): THREE.BufferGeometry {
 }
 const COLOURS = [0xb4502e, 0xc8763c, 0x9a4a2a, 0xd09040, 0x8a5a34, 0xa83c24];
 
-export function buildLeafPiles(ctx: OpeningCtx) {
+export function buildLeafPiles(ctx: OpeningCtx, piles: ReadonlyArray<{ x: number; z: number }> = LEAF_PILES) {
   const { scene, rand, groundH } = ctx;
   const F = LEAF_FEEL;
-  const N = LEAF_PILES.length * F.perPile;
+  const N = piles.length * F.perPile;
   const mat = toon(0xffffff);
   mat.side = THREE.DoubleSide;
   const mesh = new THREE.InstancedMesh(leafGeometry(0.1), mat, N);
@@ -60,7 +60,7 @@ export function buildLeafPiles(ctx: OpeningCtx) {
   const resting = new Uint8Array(N).fill(1);
   const phase = new Float32Array(N);
   let i = 0;
-  for (const p of LEAF_PILES) {
+  for (const p of piles) {
     for (let k = 0; k < F.perPile; k++, i++) {
       const a = rand() * Math.PI * 2;
       const r = Math.sqrt(rand()) * F.radius;
@@ -166,5 +166,5 @@ export function buildLeafPiles(ctx: OpeningCtx) {
     mesh.instanceMatrix.needsUpdate = true;
   });
 
-  return { state: () => ({ piles: LEAF_PILES.length, kicks, flying }) };
+  return { state: () => ({ piles: piles.length, kicks, flying }) };
 }
