@@ -156,3 +156,26 @@ specific pose. Thistle and Reed received the mesh, pose and diagnostic result.
 Reed independently reproduced the opaque terrain/partial-fox screenshot on an
 unchanged runtime equivalent to `b13dfe15`. The previously approved canopy stem
 fix remains a separate, narrower result. Blind discovery still fails.
+
+## Exact terrain owner and lens clearance
+
+A second read-only replay of immutable `b13dfe15`, unchanged blind seed2 at20s,
+records the blocker's geometry parameters: width120, height85,170×120 segments.
+These uniquely match the meadow `buildGround` call (`meadow.ts:247`,
+`BOUNDS.rx*3` and `BOUNDS.rz*3.4`), rather than Millbrook, Hermitage or finale
+ground. The final fox and camera positions exactly reproduce the earlier probe.
+
+The lens is above the terrain: cameraY5.395522, analytic groundY5.115522,
+rendered triangle groundY5.104050. Its analytic clearance is0.28m. Six samples
+between fox feet and lens show rising ground from3.725285 to5.115522. The
+inspected `before.png` still shows the same diagonal foreground sheet covering
+part of the fox. Thus an endpoint floor guarantee does not establish a clear
+sightline to the whole animal; this is not evidence that the lens is buried or
+that rendered and analytic terrain disagree substantially. The earlier
+`readableT` branch remains a source hypothesis, not an instrumented branch trace.
+
+Evidence: `/captures/hazel/blind-b13-owner/`, including `mesh-diagnosis.json`,
+`before.png`, diagnostic mesh-hidden still, exact temporary `probe.mjs` and
+full `window.__game` in `naive.json`.20s input-only replay, onecatch,
+2unsticks/1.37stuckseconds, zeroJSerrors. The owner metadata and endpoint
+measurements were sent to Thistle and Reed; no gameplay or camera code changed.
