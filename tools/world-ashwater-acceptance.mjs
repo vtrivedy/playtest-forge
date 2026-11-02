@@ -16,7 +16,7 @@ fs.mkdirSync(out, { recursive: true });
 const port = 5251;
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
 await server.listen();
-const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+const browser = await chromium.launch({ headless: true, args: process.env.FOX_TEST_GPU==='1' ? ['--use-gl=angle','--use-angle=gl-egl','--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const page = await (await browser.newContext({ viewport: { width: 640, height: 360 } })).newPage();
 page.setDefaultTimeout(900000);
 const errors = [];
@@ -30,6 +30,7 @@ const shot = async (name) => {
   await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
   await page.screenshot({ path: path.join(out, `${name}.png`) });
   log.push([name, await state()]);
+  fs.writeFileSync(path.join(out,'partial.json'),JSON.stringify({commit,log,errors,completed:false},null,1));
   console.log(JSON.stringify({beat:name,pos:log.at(-1)[1].pos,elapsedSeconds:(Date.now()-started)/1000}));
 };
 /** steer (world stick) toward local (lx, lz); optional jump (held = glide) / dash; returns when within reach */
@@ -67,6 +68,9 @@ try {
   await page.keyboard.press('KeyM');
   await page.evaluate(() => { const h = window.__gameHooks; h.setManual(true); });
   console.log('boot-ready');
+  const gl=await page.evaluate(()=>{const gl=window.__opening.ctx.renderer.getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
+  console.log(JSON.stringify({renderer:gl}));
+  if(process.env.FOX_TEST_GPU==='1'&&!/nvidia/i.test(gl))throw Error('Hardware GPU required');
   await page.evaluate(({policy,observer})=>{
     const h=window.__gameHooks, follow=new Function(`return (${policy})`)()(), observe=new Function(`return (${observer})`)()(window.__opening.ctx.scene,window.__opening.camera,window.__opening.ctx.fox.root);
     for(let f=0;f<5400;f++){
@@ -79,7 +83,14 @@ try {
   await shot('00-discovery');
   if(!(await state()).hooks.opening.popUpRuin.reached)throw Error('Fresh discovery did not finish');
   // World-space route home; ordinary steering through the clearing to the hub arch.
-  for(const [x,z] of [[-23,76],[-15,81],[-8,85],[-4,87],[-2,90],[-1,93]])await go(x-O.x,z-O.z);
+  await go(-25.7-O.x,69.6-O.z,{speed:.08,reach:.45});
+  await settle(30);
+  await page.evaluate(()=>{const h=window.__gameHooks;h.setStick(.057,.057);h.advance(36,1/60,false);h.setKeys(['ShiftLeft']);h.advance(4,1/60,false);h.setKeys([]);h.setStick(0,0);h.advance(100,1/60,false);});
+  for(const [x,z] of [[-24.4,72.1],[-24.4,75.7],[-20,79],[-14,80],[-6,77.5],[-3.2,80.5],[-3.2,86.5],[-4,88],[-7.2,88]])await go(x-O.x,z-O.z,{speed:.6,reach:.5});
+  await settle(600);
+  await shot('00-homecoming');
+  if(!(await state()).hooks.opening.homecoming.pinned)throw Error('Page not physically home');
+  for(const [x,z] of [[-4,88],[-2,90],[-1,93]])await go(x-O.x,z-O.z);
   await settle(120);
   await shot('01-hub-entry');
   if((await state()).hooks.opening.worlds.active!=='ashwater')throw Error('Hub arch did not enter Ashwater');
