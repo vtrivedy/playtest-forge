@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { inked, toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import { HOMECOMING, POP_UP_RUIN } from './layout';
+import { pluck } from './pluck';
 
 type Page = { art: THREE.Texture; settled: () => boolean };
 type Unpressed = { goHome: (id: 'hare' | 'heron') => boolean; home: () => string[]; state: () => { creatures: { id: string; phase: string }[] } };
@@ -124,7 +125,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   const moteSeed = Array.from({ length: MOTES }, () => [ctx.rand() * 6.28, ctx.rand() * 0.8, ctx.rand() * 4] as const);
   const m4 = new THREE.Matrix4();
 
-  // sound (DESIGN-audio-moss.md): each kindling is one quiet sine bell a pentatonic step higher;
+  // sound (DESIGN-audio-moss.md): each kindling is one quiet harp pluck a pentatonic step higher;
   // the well filling swells a warm open chord and dips the music under it
   const ac = ctx.audio.ac;
   const world = new THREE.Vector3();
@@ -132,24 +133,16 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   const STEPS = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3];
   const kindleSound = (i: number) => {
     if (ac.state !== 'running') return;
-    // a soft sine bell: slow-ish attack, long gentle tail, low-passed, one pentatonic step higher per lantern
-    const t = ac.currentTime;
-    const out = ctx.audio.at(at(lanterns[i]!.body));
-    for (const [mul, amp] of [[1, 0.028], [2, 0.006]] as const) {
-      const o = ac.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = 392 * STEPS[i]! * mul;
-      const f = ac.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.value = 1600;
-      const g = ac.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(amp, t + 0.04);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
-      o.connect(f).connect(g).connect(out);
-      o.start(t);
-      o.stop(t + 2.7);
-    }
+    // a soft harp pluck, one pentatonic step higher per lantern (sits with the music's solo-harp phrases)
+    const src = ac.createBufferSource();
+    src.buffer = pluck(ac, 392 * STEPS[i]!);
+    const f = ac.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 2200;
+    const g = ac.createGain();
+    g.gain.value = 0.05;
+    src.connect(f).connect(g).connect(ctx.audio.at(at(lanterns[i]!.body)));
+    src.start();
   };
   const swell = () => {
     if (ac.state !== 'running') return;

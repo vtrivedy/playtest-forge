@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { RAMP_WORLD, inkMaterial, hullGeometry, plumeGeometry, hewn, toon, inked } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import type { OpeningAudio } from './audio';
+import { pluck } from './pluck';
 import type { Collider } from '../lookdevPlay';
 import { HOMECOMING, JOGS, KIT, UNPRESSED } from './layout';
 
@@ -401,7 +402,7 @@ type Phase = 'pressed' | 'popping' | 'performing' | 'alive';
 
 /**
  * Sound (DESIGN-audio-moss.md): gentle and sparse. Pressed drawings are silent (no locator drone). The pop is
- * one soft, low paper turn at the drawing and a single quiet sine note, slow-attacked and low-passed; no creature
+ * one soft, low paper turn at the drawing and a single quiet harp pluck (pluck.ts); no creature
  * calls. Movement sounds are limited to a few soft wingbeats on the heron's hop.
  */
 function createUnpressedAudio(audio: OpeningAudio) {
@@ -412,20 +413,16 @@ function createUnpressedAudio(audio: OpeningAudio) {
     pop(id: string, at: THREE.Vector3) {
       if (ac.state !== 'running') return;
       audio.play('soft-paper', { at, rate: 0.8, gain: 0.35 });
-      const t = ac.currentTime + 0.15;
-      const o = ac.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = NOTE[id] ?? 440;
+      // one soft harp pluck per creature (sits with the music's harp phrases)
+      const src = ac.createBufferSource();
+      src.buffer = pluck(ac, NOTE[id] ?? 440, 2);
       const f = ac.createBiquadFilter();
       f.type = 'lowpass';
-      f.frequency.value = 1400;
+      f.frequency.value = 2000;
       const g = ac.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.03, t + 0.12);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
-      o.connect(f).connect(g).connect(audio.at(at));
-      o.start(t);
-      o.stop(t + 1.9);
+      g.gain.value = 0.05;
+      src.connect(f).connect(g).connect(audio.at(at));
+      src.start(ac.currentTime + 0.15);
     },
   };
 }
