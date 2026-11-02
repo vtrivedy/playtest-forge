@@ -83,6 +83,41 @@ export const VISTA = (() => {
   const len = Math.hypot(CRAG.x - HINGE.x, CRAG.z - HINGE.z);
   return { x: CRAG.x, z: CRAG.z, dx: (CRAG.x - HINGE.x) / len, dz: (CRAG.z - HINGE.z) / len, start: 2.4, half: 6, edge: 7, drop: 0.75, floor: -11 };
 })();
+/**
+ * The finale (DESIGN-finale.md): Press Hollow on the vista floor below the far crag, and the Scribe's Press near its
+ * far lip with the Still Crown behind it. `a` / `c` are the vista frame (along the fall line past the crag / across).
+ */
+export const FINALE = (() => {
+  const V = VISTA;
+  const at = (a: number, c: number) => ({ x: V.x + V.dx * a + V.dz * c, z: V.z + V.dz * a - V.dx * c });
+  const hollow = { y: 0.5, near: 9, lip: 34, fall: 14 };
+  // turned 3/4 to the crag so the frame's near post never stands between the lens and the book, or the Crown
+  const press = { ...at(29, 0), yaw: Math.atan2(-V.dx, -V.dz) + 0.6 };
+  /** Press-local (x across the book, z out of its foot toward the approach) → world */
+  const local = (lx: number, lz: number) => ({
+    x: press.x + lx * Math.cos(press.yaw) + lz * Math.sin(press.yaw),
+    z: press.z - lx * Math.sin(press.yaw) + lz * Math.cos(press.yaw),
+  });
+  const cradle = local(0, 2.75);
+  const round = (r: number, ang: number) => ({ x: cradle.x + Math.sin(press.yaw + ang) * r, z: cradle.z + Math.cos(press.yaw + ang) * r });
+  return {
+    at,
+    local,
+    hollow,
+    /** the Press faces back up toward the crag, turned 3/4; its cradle sits at the foot of the book */
+    press,
+    cradle,
+    /** the Scribe's stool on the book's right (the cover opens to the left) */
+    stool: local(2.5, 1.2),
+    /** where the three pressed kits drift down, and the spot each curls up at round the cradle */
+    kits: [
+      { land: round(3.6, 0.9), curl: round(1.0, 0.75) },
+      { land: round(3.4, -0.7), curl: round(1.0, -0.6) },
+      { land: round(4.2, 0.1), curl: round(1.05, 1.9) },
+    ],
+  };
+})();
+
 /** true inside the vista gap (plus `margin` across): nothing tall may stand here */
 export function inVista(x: number, z: number, margin = 0): boolean {
   const V = VISTA;
@@ -96,7 +131,11 @@ function vistaCut(x: number, z: number, h: number): number {
   const c = Math.abs((x - V.x) * V.dz - (z - V.z) * V.dx);
   // widen as it runs out: a gap, not a corridor
   const open = (1 - THREE.MathUtils.smoothstep(c, V.half + a * 0.35, V.half + V.edge + a * 0.5)) * THREE.MathUtils.smoothstep(a, V.start - 1.5, V.start + 1.5);
-  const valley = Math.max(V.floor, 5 - Math.max(0, a - V.start) * V.drop) + Math.sin(x * 0.21) * Math.cos(z * 0.17) * 0.8;
+  // the saddle under the crag eases down into Press Hollow (DESIGN-finale.md), whose far lip drops into the deep valley
+  const F = FINALE.hollow;
+  const lip = THREE.MathUtils.smoothstep(a, F.lip, F.lip + F.fall);
+  const floor = THREE.MathUtils.lerp(5, F.y, THREE.MathUtils.smoothstep(a, V.start, F.near));
+  const valley = THREE.MathUtils.lerp(floor, V.floor, lip) + Math.sin(x * 0.21) * Math.cos(z * 0.17) * (0.3 + 0.5 * lip);
   return THREE.MathUtils.lerp(h, Math.min(h, valley), open);
 }
 
