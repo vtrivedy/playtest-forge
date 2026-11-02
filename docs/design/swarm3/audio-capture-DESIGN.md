@@ -54,3 +54,19 @@ ffmpeg -i live.webm -vn -af ebur128=peak=true -f null -
 Keep the WAV available for teammate listening. Do not label a capture reviewed
 until the audio track is decoded successfully and an actual listening verdict is
 recorded. The recorder adds no copyrighted audio and needs no asset credits.
+
+## Structural audio understanding (Rook, 2026-11-02)
+
+Add an offline diagnostic companion `audio-understand.py` (NumPy/SciPy/Matplotlib).
+Decode at 24 kHz; plot absolute-level log-frequency spectrogram, 50 ms RMS/peak,
+positive spectral-flux onsets, and normalized chroma self-similarity over 2 s
+blocks. Report spectral energy bands and centroid only over active frames;
+report repeated chroma blocks as harmonic similarity, never proof of identical
+samples. Onsets are detected acoustic attacks, not semantic bird/music labels.
+Optional timestamped JSON events (`[{time_s,kind}]`) give exact instrumented
+rates/gaps; optional aligned music/SFX stems give window-relative RMS balance.
+Same analysis settings for game and reference files; retain file SHA256 and
+explicit provenance. Never infer bird counts from generic spectral attacks.
+Reference recordings are analysis-only and never shipped as assets. These
+visual/computational observations support a critical review without pretending
+that a generic meter recognizes mood or instrumentation.

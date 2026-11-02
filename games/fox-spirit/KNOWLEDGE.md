@@ -157,3 +157,39 @@ permits branch unmute; Vivek then hears the landed result on main.
 
 - Kenney (CC0) zips: the page's `data-download-id` → `GET https://kenney.nl/download-link/<id>` with `Referer: https://kenney.nl/assets/<pack>` returns a signed URL; without the Referer it returns nothing. Each zip has a License.txt (CC0).
 - Import sound/texture files from `src/` with `?url` so the production build bundles them; the `/assets/` middleware only serves in dev.
+
+### Computational audio review tool (Rook, 2026-11-02)
+
+`tools/audio-understand.py INPUT --out DIRECTORY --provenance 'named SHA / reference'`
+requires NumPy, SciPy, Matplotlib and FFmpeg (or imageio-ffmpeg). It produces
+`diagnostics.png` and `analysis.json`: fixed-scale absolute spectrogram, contiguous
+50ms mono RMS, spectral-flux attacks, frequency-band energy, active centroid,
+2s chroma recurrence and RMS-envelope autocorrelation. Run `audio-meter.py` too:
+mono spectral downmix values differ from stereo delivery peaks/RMS/LUFS.
+Optional `--events events.json` accepts recording-relative `{time_s,kind}` rows,
+reports per-kind counts/rates/gaps, and rejects timestamps outside the recording.
+Optional `--music music.wav --sfx sfx.wav` compares aligned 50ms stem RMS. Stems
+must share the same start; matching length alone cannot establish alignment.
+
+First diagnostic: Moss64d5207 staged SFX-only capture, input SHA256
+`6428d0cd11312656300a80e6b20349f997da78c025c838579eb63be9727e53fc`,
+51.18s; `/captures/rook/audio-understand-64d5207/`. Stereo delivery meter previously
+found -39.3LUFS, -10.1dBTP, -43.256dBFS RMS. Spectral analysis finds 37.5 generic
+attacks/minute and median active centroid2556Hz; energy fractions: <150Hz36.7%,
+150–500Hz32.4%, 500–2000Hz6.0%, 2–6kHz23.3%, >6kHz1.7%. These describe the
+whole probe, including page sounds outside Moss's marked cues. They do not
+isolate his effects. The diagnostic image shows repeated broadband pulses in
+the quiet ~8–31s interval and a sustained low-frequency swell ~38–42s. These are
+specific review candidates despite low integrated loudness; causal attribution
+requires isolated stems or exact event trace. This is computational/visual audio
+review, not a claim to have heard the clip or recognized bird calls.
+
+Chroma similarity can be high for constant noise/rumble as well as repeated
+harmony: do not label it loop detection. Generic attacks cannot establish bird
+counts; use exact instrumented wildlife events and check embedded ambience
+separately. Spectral centroid depends on active threshold, frequency range and
+mix; no universal 2kHz ceiling follows from these numbers. Same settings and
+source provenance are required for reference comparisons (Tallow owns those).
+Validation: synthetic1kHz sine centroid within10Hz and >99% energy in500–2000Hz;
+digital silence produces zero onsets, no active centroid or recurrence pairs.
+No game runtime or mute policy changed; no new game-play or listening signoff.
