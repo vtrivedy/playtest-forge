@@ -24,7 +24,7 @@ and hidden birds, four-paw Kenney footsteps). The redo makes silence the default
   burst of noise under a surface low-pass: grass silent, leaf 900 Hz, wood 320, stone 650) — recorded footsteps
   read as taps/clicks/a ticking clock in every listening pass (Tallow :1388). Landing = a deeper, longer pad.
 - **No ducking.** Music only exists at moments, so there is nothing to duck under them.
-- `MIX.master` stays 0 on main until a teammate independently listens and agrees (Kit :1153).
+- `MIX.master` = 1 (unmuted 2026-11-02 after Tallow :1631 judged the 5247b90 mix gentle and fitting against the Alba / A Short Hike references).
 
 ## Graph (one AudioContext, `opening/audio.ts`)
 music phrases · ambience (wind, birds) · sfx (samples + synth voices, HRTF panners via `at(pos)`) → master →

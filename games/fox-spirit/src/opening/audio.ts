@@ -14,7 +14,8 @@ const FILES = import.meta.glob('./sfx/*.ogg', { eager: true, query: '?url', impo
 const URLS = Object.fromEntries(Object.entries(FILES).map(([k, v]) => [k.replace('./sfx/', '').replace('.ogg', ''), v]));
 
 export const MIX = {
-  master: 0, // muted by vivek (Nov 1): mix rejected as intrusive; unmuted only after an independent listening verdict
+  /** unity: the level every review capture was measured at (Tallow :1631 "gentle and fitting" on 5247b90) */
+  master: 1,
   /** phrases are cut to −20 dBFS RMS; this puts them near −32 dBFS in the mix */
   music: 0.25,
   ambience: 1,
