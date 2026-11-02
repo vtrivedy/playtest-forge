@@ -21,7 +21,7 @@ const STAND = (() => {
   return { lx: C.lx + Math.cos(a) * (C.r - 2.4), lz: C.lz + Math.sin(a) * (C.r - 2.4), rise: 0.55 * 8 + 0.5, half: 1.4 };
 })();
 
-export function buildPressStacks(ctx: OpeningCtx) {
+export function buildPressStacks(ctx: OpeningCtx, memory: { foundAtLoad: boolean; onFound: () => void }) {
   const { scene, groundH, colliders } = ctx;
   const g = new THREE.Group();
   g.name = 'press-stacks';
@@ -71,7 +71,8 @@ export function buildPressStacks(ctx: OpeningCtx) {
   scene.add(g);
   ctx.occluders.push(g);
 
-  let found = false;
+  let found = memory.foundAtLoad;
+  if (found) light.intensity = 3;
   let t = 0;
   return {
     state: () => ({ found }),
@@ -81,7 +82,7 @@ export function buildPressStacks(ctx: OpeningCtx) {
       page.position.y = stand.top + 0.1 + Math.sin(t * 1.6) * 0.03;
       if (!found && Math.hypot(fox.x - stand.x, fox.z - stand.z) < STAND.half + 0.3 && fox.y > stand.top - 0.3) {
         found = true;
-        ctx.captions.say('A page never pressed: everyone, together, laughing.');
+        memory.onFound();
         light.intensity = 3;
       }
     },
