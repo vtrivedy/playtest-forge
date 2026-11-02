@@ -106,6 +106,8 @@ class Hearthsong extends AudioWorkletProcessor {
   shaded = false;
   ending = PLAYING;
   forced = false;
+  /** the moment's dynamic: 0 the bed → 1 a sung swell, eased (s) so a moment arrives as a crescendo, not a step */
+  mom = 0;
   forces = MAX_FORCE;
   doneSlots = 0;
   quiet = 0;
@@ -395,7 +397,7 @@ class Hearthsong extends AudioWorkletProcessor {
     } else {
       if (slot === 0) {
         this.padChord(chords, cb);
-        if (lv[2]! > 0.01) {
+        if (lv[2]! > 0.01 || this.mom > 0.2) {
           this.bInc = (TAU * hz(s.key - 24 + root)) / sampleRate;
           this.bAtk = 1;
         }
@@ -472,15 +474,22 @@ class Hearthsong extends AudioWorkletProcessor {
     }
     const singing = this.swell === SINGING;
     const swellGain = singing ? 1 : this.swell === FADING ? 0.5 : 0;
+    // dynamics for the big moments (review: LRA 4.8, "too flat to carry"): the bed sits back ~1.7 dB and a sung swell
+    // crescendos ~+4.3 dB over ~2.5 s with the bass under it, then ebbs over the fade. Main walk render
+    // (tools/music-dynamics.py): sung-vs-bed lift 4.4 → 8.0 LU, LRA 8.5 → 12.7 LU, integrated −33.3 → −32.6 LUFS.
+    const momTo = singing ? 1 : this.swell === FADING ? 0.35 : 0;
+    this.mom += (momTo - this.mom) * (1 - Math.exp(-n / (sampleRate * (momTo > this.mom ? 2.5 : 4))));
+    const dyn = 0.82 * (1 + 0.65 * this.mom * this.mom * (3 - 2 * this.mom));
     const harpG = 0.32 * Math.min(1, 0.4 + lv[0]!);
     const padG = 0.048 * lv[1]! * (1 + 0.3 * swellGain);
-    const bassG = 0.11 * lv[2]!;
+    // a moment brings the bass in under the tune even in the sepia world (it is otherwise held back until colour returns)
+    const bassG = 0.11 * Math.max(lv[2]!, 0.55 * this.mom);
     const leadG = 0.1 * Math.max(lv[3]!, singing ? 0.85 : 0);
     const bellG = 0.07 * Math.max(lv[4]!, swellGain * 0.6);
     // the epilogue is the song remembered: softer (it enters out of silence, so the step is never heard)
-    const master = lv[8]! * (this.ending === EPILOGUE ? 0.7 : 1);
+    const master = lv[8]! * dyn * (this.ending === EPILOGUE ? 0.7 : 1);
     const bright = lv[5]!;
-    const harpLp = 1 - Math.exp((-TAU * (1700 + 3600 * bright)) / sampleRate);
+    const harpLp = 1 - Math.exp((-TAU * (1700 + 3600 * Math.min(1, bright + 0.3 * this.mom))) / sampleRate);
     const padLp = 1 - Math.exp((-TAU * (500 + 1300 * bright)) / sampleRate);
     const padAtk = 1 / (sampleRate * 1.4);
     const padRel = 1 / (sampleRate * 2.2);
