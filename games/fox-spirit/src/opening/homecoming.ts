@@ -153,7 +153,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   };
   const swell = () => {
     if (ac.state !== 'running') return;
-    ctx.audio.duck(0.4, 4.5);
+    ctx.audio.cue('home');
     const t = ac.currentTime;
     const out = ctx.audio.at(at(fill), 6);
     [130.8, 196, 261.6, 329.6, 392].forEach((hz, i) => {

@@ -25,10 +25,11 @@ import { createKeeping } from './keeping';
 import { buildUnpressed } from './unpressed';
 import { buildGlyphs } from './glyphs';
 import { createHearthHum } from './hum';
-import { createOpeningAudio, type OpeningAudio } from './audio';
+import { createOpeningAudio, MIX, type OpeningAudio } from './audio';
 import { createFoxFoley } from './foley';
 import { buildRunawayPage } from './page';
 import { buildHomecoming } from './homecoming';
+import { buildLeafPiles } from './leafPiles';
 import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
 
@@ -113,6 +114,7 @@ export async function runOpening(): Promise<void> {
   const crown = createCrown(ctx, sky.mist);
   const runaway = buildRunawayPage(ctx);
   const homecoming = buildHomecoming(ctx, runaway, unpressed);
+  const leafPiles = buildLeafPiles(ctx);
 
   const contact = buildContactShadow();
   contact.position.set(0, 0.03, -0.15);
@@ -156,8 +158,7 @@ export async function runOpening(): Promise<void> {
     updrafts: hearth.updrafts, steamId: 'steam', rootId: 'root',
     coal: () => coal.heatSource(),
     onSteam: (at) => {
-      ctx.audio.playOne('steam', 3, { at, gain: 0.8 });
-      ctx.audio.duck(0.5, 2.5);
+      ctx.audio.playOne('steam', 3, { at, gain: 0.25, rate: 0.8 });
       field.restore(at, 7, 1.6, { edgeMax: 1.2 });
       keeping.reconnectSteam();
     },
@@ -238,7 +239,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = false;
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -249,6 +250,8 @@ export async function runOpening(): Promise<void> {
     audioTap: () => ctx.audio.record.stream,
     /** the audio context (capture tools read sampleRate / currentTime / resume it) */
     audioContext: () => ctx.audio.ac,
+    /** pre-master stems (music / ambience / sfx) and the mix gains, for capture tools */
+    audioBuses: () => ({ ...ctx.audio.buses, master: MIX.master }),
     setStick: player.setStick,
     setKeys: player.setKeys,
     teleport: player.teleport,

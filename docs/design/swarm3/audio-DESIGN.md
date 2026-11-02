@@ -1,48 +1,33 @@
-# Opening audio — shared graph, music, ambience, fox & page SFX (swarm 3)
+# Opening audio — shared graph, music, ambience, fox foley (swarm 3, gentle redo)
 
-Owner: Flint (graph, music, ambience, fox, page, coal, hearth, steam). Moss: creatures, homecoming, lanterns,
-ruin, canopy leaves — on this bus (`DESIGN-audio-moss.md`). Capture/verify tooling: Rook (`audio-capture-DESIGN.md`).
+Owner: Flint (graph, music, ambience, fox foley). Moss: creatures, homecoming, lanterns, ruin, canopy, hearth/coal/page
+beds in hum.ts (`DESIGN-audio-moss.md`). Research and targets: `KNOWLEDGE.md § Quiet audio redesign` (Tallow);
+diagnostics: `tools/audio-understand.py` (Rook); capture: `tools/mix-capture.mjs`; listening: `tools/audio-listen.py`.
 
-## Point
-Warm, quiet, autumnal. The slice should sound like a late-afternoon village in October: a soft acoustic
-town theme under distant wind and birds, the fox's paws on grass/wood/stone, paper that flutters and snaps,
-hearths that hum and crackle. Sound tells you where things are (hearths by ear, the page by its flutter).
+## Why the redo
+Vivek (:1144) on the first mix: intrusive, wall-to-wall music, constant birds, no sound-design craft. The first
+version filled every second (two looping tracks, a looping bird bed, a recorded wind bed that carried traffic rumble
+and hidden birds, four-paw Kenney footsteps). The redo makes silence the default.
+
+## Rules
+- **Music only on moments.** No music at boot or while exploring. A moment (`audio.cue`) plays one finite solo-harp
+  phrase (Meadow Thoughts, Écrivain, CC0; 8–20 s, whole phrases with their natural decay) and then it is quiet
+  again. A cue within 30 s of the last phrase is dropped — no backlog, no stacking. Moments: first hearth lit
+  (`hearth`), a page caught (`page`, alternating two phrases), the Keeping (`keeping`, its own long phrase replaces
+  the old synth chord), home at the well (`home`). One instrument = one voice for the slice.
+- **Wind is a breath, not a recording.** Band-limited synth noise (~420 Hz, Q 0.6, low-passed 1.4 kHz) drifting in
+  slow gusts, ~−50 dBFS RMS on the ground, louder and brighter with height (gliding, canopy).
+- **Birds are rare and far.** Single calls (five isolated, denoised calls), only once the colour is back
+  (restored > 0.3), 28–70 s apart, 18–34 m away in a random direction, never the same call twice running.
+- **Foley is soft.** Forepaws only, ≥160 ms apart, everything through one 1.8 kHz low-pass; grass nearly silent,
+  wood/stone a little more; quiet take-off cloth and landing thud.
+- **No ducking.** Music only exists at moments, so there is nothing to duck under them.
+- `MIX.master` stays 0 on main until a teammate independently listens and agrees (Kit :1153).
 
 ## Graph (one AudioContext, `opening/audio.ts`)
-```
-music (playlist, crossfades) ─ duck ─┐
-ambience (wind + birds loops) ───────┼─ master ─ limiter ─ destination
-sfx (samples + synth voices; 3D) ────┘                   └─ record tap (MediaStream, post-limiter)
-```
-- Created at scene build, suspended; resumes on the first key/pointer (browser autoplay rule). Music fades in over 4 s.
-- Listener = the rendered camera (position + forward/up) each frame. World sounds go through an HRTF
-  `PannerNode` (inverse distance, ref 3 m, max 60 m); the fox's own paws/jumps are near-centre.
-- `duck(depth, hold)`: the music dips (attack 0.25 s, release 1.5 s) under catches, ignitions, homecoming.
-- Limiter (DynamicsCompressor −6 dB threshold, ratio 20, 3 ms attack) after a −3 dB master: no clipping.
-- Every module that makes sound (hum, glyphs, unpressed, homecoming) builds its voices on this context and
-  connects to `audio.sfx` (or a panner from `audio.at(pos)`). No module creates its own AudioContext.
+music phrases · ambience (wind, birds) · sfx (samples + synth voices, HRTF panners via `at(pos)`) → master →
+limiter → out, with a post-limiter `record` tap and pre-master `buses` for stems. Listener = rendered camera.
 
-## Music
-CC0 recordings, alternated with 5 s crossfades: *Hush Hamlet* (loop edit, 96 s) then *Apple Cider* (3:20),
-both Zane Little Music. Bed level ~ −22 LUFS so effects sit on top.
-
-## Ambience
-Wind across the open field and birds in a copse (Thimras park ambiences, CC0), cut into 40 s seamless loops
-(3 s equal-power crossfade, one fixed gain). Wind swells with height (gliding, canopy); birds come up as the
-colour returns (restored fraction).
-
-## Events (mine)
-| event | source | treatment |
-|---|---|---|
-| footfall | Kenney footstep grass/wood/concrete ×5 | per paw plant (IK stance), alternating samples, pitch ±6%, hind paws softer; surface: terrain = grass, canopy leaf = grass bright, ruin flaps = wood, village/shelf/crag props = stone |
-| jump / land | cloth flick / impactSoft + footstep pair | land scales with impact |
-| glide | synth wind (band noise) | gain + brightness by air speed while gliding |
-| page | Kenney bookFlip ×3 / bookClose | flips on skips/dodges/hops (3D at the page); catch = flip + close + chime, music ducks; existing synth flutter stays as its findable-by-ear voice |
-| hearth | hum chord (existing synth) + crackle loop (AntumDeluge, CC0) | crackle 3D at each lit hearth; ignite = swell + duck |
-| coal carry | crackle loop at the coal | follows the coal |
-| steam | bart steam hisses ×3 (CC0) | on the steam latch, 3D at the vent |
-
-## Verification
-- `__game.state().opening.audio`: context state, bus gains, music track/time, last events.
-- Rook's recorder (`tools/opening-audio-capture.mjs`) on a named SHA: integrated LUFS, true peak < −1 dBFS,
-  no silent gaps in music across a crossfade/loop seam, event list vs trace. Two teammate verdicts on sound/feel.
+## Measured (r3, `tools/mix-capture.mjs`, 60 s of the no-teleport slice route paced to wall clock)
+−31.3 LUFS integrated, peak −17.7 dBFS (pre-limiter, master at unity); music 2 phrases/min (page catches at
+~10 s and ~51 s; the 18 s catch is dropped by the 30 s rest); birds ≤ 2/min; footfalls ~110/min while moving.

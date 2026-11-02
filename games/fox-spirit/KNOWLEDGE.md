@@ -16,6 +16,14 @@ Keep durable findings here by topic. Name the tested SHA and evidence; separate 
 - That audit's first four fixed-lens seconds had grayscale 320×180 difference mean 0.359 and maximum 0.530. These are clip-specific observations, not universal pass thresholds. Evidence: `/captures/rook/homecoming-frame-audit-57a0fdf/` (`metrics.json`, fixed frame sheets, highest-motion neighbors).
 - Label teleports and staged starts. Real keyboard control after a staged start verifies that segment, not an uninterrupted route or unfamiliar-player discovery.
 
+## Ruin camera composition and capture routes
+
+- Separate the old static ending from a new route failure. On5e07e9e, the original110s capture held the ruin view for about61s after completion; independent late traces showed no boom/floor fault. On ca7bafe/db277f7, the new eastward return dash coasted off the overlook, then the script walked into its raised side indefinitely. The reproduced late view reached69.106° down with2937/3000 late frames blocked. It was not cleared by the older clean camera trace.
+- Preserve movement physics when fixing a capture path. b6b5c82 uses the same dash on the overlook's diagonal runway and waits for the actual return latch. Full input replay:4651frames/77.517s,3 catches/0 skips, all3 folds open, return1, finalgrounded atwell, pinnedpage, no logged errors. Late lens-to-chest angle max27.596°, floorLift0;33 blocked frames at the gate. Groundjump apex0.792m/tApex0.317s/air0.667s retained;4 dashes, finaldash1.998m. Evidence: `/reviews/rook-ruin-homecoming-b6b5c82/` on keeping-swarm3-captures. Continuous6s/180-frame exit evidence is `/reviews/rook-ruin-exit-b6b5c82-motion/`; Rook and Tallow independently inspected all retained frames and accepted the bounded return correction (CLEARLY BETTER), without a real-time playback/global gait claim.
+- View corridors are coupled. Moving the maple from(-22,74) to(-19.2,70.6) cleared the ruin entry but blocked the overlook vista. Moving it north toz64.8 was only MARGINALLY better: another crown remained. Shifting decorative arch remnants from the near west edge to the far east edge freed foreground room, but the horizon still has trees. Do not claim these bounded improvements make the entire place BEAUTIFUL.
+- Captures need an authored end. `createSliceRoute` now exposes `complete` after4s at the homecoming; `lookdev-play-smoke` stops, saves the final still/state, and reports actual duration/frame count. The requested duration is an upper budget. The route visits the pinnedpage/well; it does not rescue every creature or claim five-lit homecoming. Its current final frame keeps the fox comfortable but leaves the pinnedpage offleft.
+- A staged start is an iteration aid, not full-route evidence. `tools/ruin-return-probe.mjs` uses the same route with a named starting beat and stages only initial overlook position. Its5/5 result established safe return geometry quickly; the full village replay above supplied acceptance. Commit before launching, or explicitly distinguish the loaded runtime SHA from a git HEAD sampled later.
+
 ## Capture throughput and hero timeouts
 
 - Measure actual render throughput before scheduling long captures. Flint reported roughly 58 frames/minute and a Modal 1800-second timeout for default 3300-frame hero jobs (#swarm :921). At that speed 3300 frames needs about 57 minutes; the 30-minute job cannot finish. The hero path reportedly ignored route-seconds and retained its default 110 s / 3300 frames; verify the effective frame count before submitting again. Reduce frame count/resolution or choose an appropriate runner; do not repeatedly submit the same impossible budget.
@@ -124,6 +132,28 @@ permits branch unmute; Vivek then hears the landed result on main.
 - Record gameplay with real-time inputs. Freeze only outside the recorded interval for stills; an end-still wait once extended the measured audio from about 8 seconds to 17.9 seconds.
 - Recorder smoke evidence: `/captures/rook/audio-recorder-final/`. Two running contexts, 304 meter samples, no silent samples, peak 0.02207, no page errors; decoded track 7.94 s stereo Opus, -41.2 LUFS, -33.0 dBFS true peak. This proves capture plumbing, not a good mix, audible spatial placement, seamless music, or event coverage.
 - Metering and source audit cannot replace listening. Review a named runtime SHA with event coverage and a loop boundary before claiming music/SFX quality. Prefer a post-mix recording bus when the runtime exposes one, and use the rendered camera for the listener pose.
+
+### Machine listening and the full-mix capture (Flint, 2026-11-02)
+
+- `tools/mix-capture.mjs --out DIR --seconds 60`: plays the no-teleport slice route with the sim paced to the wall
+  clock and records the three **pre-master** stems (music / ambience / sfx) sample-for-sample, so it works while
+  `MIX.master` is 0. Writes `stem-*.wav`, `mix.wav` (stem sum, unity master, pre-limiter), `meter-50ms.json`,
+  `events.json` (every one-shot + music cue, recording-relative) and per-minute counts. Feed it straight into
+  `tools/audio-understand.py mix.wav --music stem-music.wav --sfx stem-sfx.wav --events events.json`.
+  Pull big PCM out of Playwright as base64 int16 per channel — JSON float arrays of a minute of 6-channel audio
+  exhaust the node heap.
+- `modal run tools/audio-listen.py --path a.wav[,b.wav] [--window 10]`: Qwen2-Audio-7B-Instruct on an A10G
+  describes each window. **Ask neutrally.** With a checklist prompt ("birds, wind, footsteps…") it reported birds
+  and footsteps in a solo harp track; with "describe only what is really present" it called the harp a harp, heard
+  the old mix as "music loud, covers the spectrum… birds four times… an increasing drone" (matching Vivek and the
+  hum/crackle bed Moss found), and heard the redo's paws as regular "generic impact sounds". It is poor at timing
+  (says "music throughout" for a window that is half silence) and hallucinates occasionally (a "male voice").
+  Use it for *what* is audible and how it reads, never for *when*/how loud — that is the meter's job.
+- Field recordings hide things: the CC0 park "wind" recording carried birds and, once low-passed, read as an engine
+  to the model (traffic rumble). The redo synthesises wind instead. Isolate bird calls by 2–8 kHz energy peaks
+  ≥14 dB over a running median with nothing else within ±1.5 s, then denoise (ffmpeg `afftdn`) and high-pass.
+- Our capture tool's wait loop once uploaded an MP4 while ffmpeg was still writing it (no moov atom): wait for the
+  process to exit, not for the file to appear, and decode-check after a volume round trip.
 
 ## Working agreement
 
