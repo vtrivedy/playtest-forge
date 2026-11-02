@@ -18,7 +18,7 @@ for _stage in ("build", "rig", "anim"):
 # head low on the paws, tail wrapped round the front (`wrap` = tail yaw per joint)
 LIE = dict(hip_up=-0.24, hip_fwd=-0.03, hips=-0.04, spine=0.04, chest=0.1, neck=0.32, head=-0.12, tail=0.3, curl=0.32, ear=0.12,
            F=(0.2, 0.0, 1.35), H=(0.13, 0.0, 1.45))
-WRAP = 0.55
+WRAP = 0.7
 
 
 def lie_pose(keys, f, wrap, breath=0.0, flick=0.0, stir=0.0):
@@ -33,7 +33,9 @@ def lie_pose(keys, f, wrap, breath=0.0, flick=0.0, stir=0.0):
     rot("ear.R", pitch=p["ear"])
     for i in range(1, 7):
         k = 0.4 + 0.6 * i / 6
-        rot(f"tail{i}", pitch=(p["tail"] if i == 1 else 0.0) + p["curl"] * k, yaw=wrap * k + (0.05 * stir if i > 4 else 0.0))
+        # the last two joints curl on round the flank and the flame tip lies down along it (feel critic 48a800b)
+        tip = (i - 4) / 2 if i > 4 else 0.0
+        rot(f"tail{i}", pitch=(p["tail"] if i == 1 else 0.0) + p["curl"] * k + 0.3 * tip * (wrap / WRAP), yaw=wrap * k * (1 + 0.35 * tip) + (0.05 * stir if i > 4 else 0.0))
     for s in "LR":
         for leg, (fw, up, tilt) in (("f", p["F"]), ("h", p["H"])):
             paw(f"ctl_{leg}paw.{s}", fw, up, tilt)
