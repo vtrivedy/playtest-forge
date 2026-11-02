@@ -150,31 +150,87 @@ export function buildPress(
   lever.add(arm, grip);
   lever.rotation.x = 0.55;
   thePress.add(beam, screw, platen, bed, pressLight, lever);
-  // the Scribe: small and old, hooded in grey, ink-stained sleeves, bowed over the Press it has held shut
+  // the Scribe: small and old, in a flared ink-grey robe and a fox-eared hood (the Warden's shape, in daylight), a
+  // crimson scarf the eye finds against the snow, spectacles, ink to the elbows — bowed over the Press it held shut
   const scribe = new THREE.Group();
-  const robe = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.25, 9).translate(0, 0.62, 0), winter(0x7b7a86));
-  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8).translate(0, 1.18, 0), winter(0x6c6b77));
+  const robePts: THREE.Vector2[] = [];
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    robePts.push(new THREE.Vector2(0.46 - 0.3 * Math.pow(t, 0.7) + 0.05 * Math.sin(t * 9) * (1 - t), t * 1.18));
+  }
+  const robe = new THREE.Mesh(new THREE.LatheGeometry(robePts, 14), winter(0x4c4f63));
+  const hem = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.04, 6, 18).rotateX(Math.PI / 2), winter(0xb9b4a6));
+  hem.position.y = 0.04;
+  const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 9).translate(0, 1.16, 0), winter(0x43465a));
+  const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.065, 7, 14).rotateX(Math.PI / 2), winter(0xa8322a));
+  scarf.position.y = 1.3;
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.42, 0.04).translate(0, -0.21, 0), winter(0xa8322a));
+  tail.position.set(0.12, 1.28, 0.18);
+  tail.rotation.z = 0.2;
   const head = new THREE.Group();
-  head.position.set(0, 1.42, 0.06);
-  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.21, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.62), winter(0x5c5b66, { side: THREE.DoubleSide }));
-  const face = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), winter(0xd9c7b0));
-  face.position.set(0, -0.03, 0.06);
-  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.26, 7).rotateX(Math.PI), winter(0xe6e3dc));
-  beard.position.set(0, -0.2, 0.12);
+  head.position.set(0, 1.44, 0.06);
+  const hoodMat = winter(0x5d6076, { side: THREE.DoubleSide });
+  const hood = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.64), hoodMat);
+  hood.rotation.x = -0.35;
+  for (const side of [-1, 1]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 4), hoodMat);
+    ear.position.set(side * 0.12, 0.2, -0.04);
+    ear.rotation.z = -side * 0.35;
+    head.add(ear);
+  }
+  const face = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 9), winter(0xe0ccb4));
+  face.position.set(0, -0.03, 0.08);
+  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.3, 8).rotateX(Math.PI), winter(0xeeebe4));
+  beard.position.set(0, -0.2, 0.13);
+  const lensMat = new THREE.MeshBasicMaterial({ color: 0x2b2a2e });
+  for (const side of [-1, 1]) {
+    const lens = new THREE.Mesh(new THREE.TorusGeometry(0.042, 0.009, 5, 12), lensMat);
+    lens.position.set(side * 0.05, 0.0, 0.2);
+    head.add(lens);
+  }
   head.add(hood, face, beard);
   const sleeveMat = winter(0x23252d);
-  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.55, 6).translate(0, -0.27, 0), sleeveMat);
-  armL.position.set(-0.28, 1.2, 0.05);
+  const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.58, 7).translate(0, -0.28, 0), sleeveMat);
+  armL.position.set(-0.27, 1.2, 0.05);
   armL.rotation.x = -0.5;
   const armR = armL.clone();
-  armR.position.x = 0.28;
-  scribe.add(robe, shoulders, head, armL, armR);
+  armR.position.x = 0.27;
+  const quill = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.34, 4).translate(0, -0.6, 0.02), winter(0xf2efe6));
+  armL.add(quill);
+  scribe.add(robe, hem, shoulders, scarf, tail, head, armL, armR);
   const sAt = press(THE_PRESS.lx + 3.1, THE_PRESS.lz + 1.2);
   scribe.position.set(sAt.x, LEDGE_TOP, sAt.z);
   // facing the Press (west), bowed
   scribe.rotation.y = -Math.PI / 2 - 0.25;
   shoulders.rotation.x = 0.3;
   head.rotation.x = 0.45;
+  // the work surface: page stacks, ink pots, and the pressed autumn under the platen — one maple leaf, held flat
+  const stackMat = winter(0xd8d0bc);
+  for (const [dx, dz, h] of [[-2.3, 0.5, 0.5], [-2.0, -0.6, 0.32], [2.0, -0.9, 0.42], [-2.6, -0.1, 0.22]] as const) {
+    for (let k = 0; k < 3; k++) {
+      const pg = new THREE.Mesh(new THREE.BoxGeometry(0.62, h / 3 - 0.01, 0.46), k % 2 ? paperEdge : stackMat);
+      pg.position.set(dx + (k - 1) * 0.03, (h / 3) * (k + 0.5), dz);
+      pg.rotation.y = (k - 1) * 0.12 + dx;
+      thePress.add(pg);
+    }
+  }
+  const inkPot = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.18, 9), new THREE.MeshStandardMaterial({ color: 0x14161f, roughness: 0.1 }));
+  inkPot.position.set(-2.0, 0.42, -0.6);
+  thePress.add(inkPot);
+  const leafShape = new THREE.Shape();
+  for (let i = 0; i <= 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
+    const lobes = 0.55 + 0.45 * Math.pow(Math.abs(Math.cos(a * 2.5)), 0.6);
+    const r = 0.5 * lobes * (a > Math.PI * 1.35 && a < Math.PI * 1.65 ? 0.3 : 1);
+    const x = Math.cos(a + Math.PI / 2) * r;
+    const y = Math.sin(a + Math.PI / 2) * r;
+    if (i === 0) leafShape.moveTo(x, y);
+    else leafShape.lineTo(x, y);
+  }
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0xc8501e, roughness: 0.6, emissive: 0xff6a20, emissiveIntensity: 0.05, side: THREE.DoubleSide });
+  const pressedLeaf = new THREE.Mesh(new THREE.ShapeGeometry(leafShape).rotateX(-Math.PI / 2), leafMat);
+  pressedLeaf.position.y = 0.51;
+  thePress.add(pressedLeaf);
   root.add(scribe);
   colliders.push({ kind: 'post', x: sAt.x, z: sAt.z, r: 0.4 });
   root.add(thePress);
@@ -377,6 +433,7 @@ export function buildPress(
     scribe,
     scribeHead: head,
     scribeArm: armR,
+    leafMat,
     s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, hint: 0, arrived: 0, coda: -1, leverK: 0 },
   };
   // a saved world comes back as it was left, quietly: open seal, breathing drafts, melted ice, lit Press
