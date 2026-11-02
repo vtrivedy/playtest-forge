@@ -12,7 +12,7 @@ import { RAMP_WORLD } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressH } from './worlds';
-import { BRAZIER_A, BRAZIER_B, DRAFT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, press, RIDGE, RIDGE_BASE, SHELF, SHELF_TOP, THE_PRESS } from './pressLayout';
+import { BRAZIER_REACH, BRAZIERS, DRAFT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, press, RIDGE, RIDGE_BASE, SHELF, SHELF_TOP, THE_PRESS } from './pressLayout';
 import { pressLift, updatePress, type PressRig } from './press.hot';
 
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
@@ -81,30 +81,30 @@ export function buildPress(
   root.add(seal);
   const sealCol = solid(-RIDGE.gate, RIDGE.gate, RIDGE.lz - RIDGE.half * 0.6, RIDGE.lz + RIDGE.half * 0.6, ridgeTop);
 
-  // ---- braziers: iron bowls of embers on stone, the only warm light in the white
+  // ---- braziers: iron bowls of embers on stone, the only warm light in the white; the cold ones wait for a flame
   const braziers: THREE.PointLight[] = [];
-  const emberMat = new THREE.MeshBasicMaterial({ color: 0xffa040 });
-  const brazier = (lx: number, lz: number, y: number) => {
-    const at = press(lx, lz);
+  const coalsOf: THREE.MeshStandardMaterial[] = [];
+  for (const B of BRAZIERS) {
+    const at = press(B.lx, B.lz);
     const g = new THREE.Group();
-    g.position.set(at.x, y, at.z);
+    g.position.set(at.x, B.shelf ? SHELF_TOP : pressH(at.x, at.z), at.z);
     const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.55, 7), stone);
     plinth.position.y = 0.27;
     const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.3, 0.32, 9, 1, true), timber);
     bowl.position.y = 0.7;
-    const coals = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0), emberMat);
+    const coalMat = new THREE.MeshStandardMaterial({ color: 0x2b2522, roughness: 0.9, emissive: 0xff7a2a, emissiveIntensity: B.lit ? 1.6 : 0 });
+    const coals = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0), coalMat);
     coals.scale.y = 0.45;
     coals.position.y = 0.8;
-    const light = new THREE.PointLight(0xff8a3a, 1.6, 7, 1.8);
+    const light = new THREE.PointLight(0xff8a3a, B.lit ? 1.6 : 0, 7, 1.8);
     light.position.y = 1.4;
     g.add(plinth, bowl, coals, light);
     root.add(g);
     braziers.push(light);
+    coalsOf.push(coalMat);
     colliders.push({ kind: 'post', x: at.x, z: at.z, r: 0.45 });
-  };
-  const ba = press(BRAZIER_A.lx, BRAZIER_A.lz);
-  brazier(BRAZIER_A.lx, BRAZIER_A.lz, pressH(ba.x, ba.z));
-  brazier(BRAZIER_B.lx, BRAZIER_B.lz, SHELF_TOP);
+  }
+  void BRAZIER_REACH;
 
   // ---- level 2: the Archive shelf, a sheaf of pages the height of a house
   const shelfBase = RIDGE_BASE - 3;
@@ -206,7 +206,12 @@ export function buildPress(
     hasInkstep: opts.hasInkstep,
     teach: ctx.teach.offer,
     events: {
+      arrive: () => say(opts.restored('combine') ? 'The Press keeps its warmth.' : 'Snow keeps the pages the Scribe never finished.'),
       warmed: () => ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.08, rate: 0.5 }),
+      kindled: () => {
+        ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.12, rate: 0.7 });
+        say('A cold brazier takes the flame.');
+      },
       thawSeal: () => {
         ctx.audio.cue('millrace-burst');
         say('The frozen ink lets go.');
@@ -216,6 +221,7 @@ export function buildPress(
         say('The ink breathes.');
       },
       meltIce: () => say('The ice runs off the ink.'),
+      coda: () => say('Far off, the Ash Warden lets one winter go.'),
       complete: (level) => {
         opts.complete(LEVEL_IDS[level]);
         if (level === 0) say('Inkstep · the frozen ink will break under you now.');
@@ -232,13 +238,15 @@ export function buildPress(
     warmGlow,
     warmLight,
     braziers,
+    coals: coalsOf,
     membranes,
     ice,
     drafts,
-    s: { warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, hint: 0 },
+    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, hint: 0, arrived: 0, coda: -1 },
   };
   // a saved world comes back as it was left, quietly: open seal, breathing drafts, melted ice, lit Press
   if (opts.restored('teach')) {
+    rig.s.lit |= 0b0011;
     rig.s.thawed = 1;
     rig.s.sealK = 1;
     rig.s.done |= 1;
@@ -251,6 +259,7 @@ export function buildPress(
     rig.s.done |= 2;
   }
   if (opts.restored('combine')) {
+    rig.s.lit |= 0b1100;
     rig.s.iced = 0;
     rig.s.iceK = 1;
     rig.s.crackB = 5;
@@ -264,6 +273,7 @@ export function buildPress(
     /** fold the drafts into a lift sample (the controller's updraft read) */
     liftAt: (x: number, feetY: number, z: number, out: { k: number; radialK: number; ax: number; az: number }) => pressLift(rig, x, feetY, z, out),
     state: () => ({
+      lit: BRAZIERS.map((_, i) => (rig.s.lit & (1 << i)) !== 0),
       warm: +rig.s.warm.toFixed(2), sealOpen: rig.s.sealK >= 1, draftA: rig.s.crackA >= 0, iced: rig.s.iced === 1, draftB: rig.s.crackB >= 0,
       done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0),
     }),
