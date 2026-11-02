@@ -17,6 +17,8 @@ import { bakeLaneMap } from './lanePaint';
 import { buildWorldEdge } from './worldEdge';
 import { buildWorlds } from './worldsScene';
 import { buildWarden } from './warden';
+import { buildPressStacks } from './pressStacks';
+import { buildValeLoft } from './valeLoft';
 import { SEEDWELLS, WORLDS } from './worlds';
 import { createWorldProgress } from '../worlds/progress';
 import { createPageMap } from '../worlds/pageMap';
@@ -51,6 +53,7 @@ import { createDryingLines } from './hermitage.hot';
 import { createMillrace } from './millrace.hot';
 import { buildKiln, buildWeir } from './millWeir';
 import { createMillWeir } from './millWeir.hot';
+import { syncAutumnProgress } from './autumnProgress.hot';
 import { MILLBROOK, WEST_PILES } from './millbrookLayout';
 import { NORTH_PILES } from './hermitageLayout';
 import { buildFinale } from './finale';
@@ -143,6 +146,10 @@ export async function runOpening(): Promise<void> {
   ctx.captions = createCaptions(ctx);
   ctx.teach = createTeach(ctx);
   const { field } = ctx;
+  const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
+  const savedPage = progress.isRestored('russetvale', 'teach');
+  const savedMill = progress.isRestored('russetvale', 'develop');
+  const savedKeeping = progress.isRestored('russetvale', 'combine');
 
   buildMeadow(ctx);
   buildVillage(ctx);
@@ -152,7 +159,7 @@ export async function runOpening(): Promise<void> {
   // the controller is created after every build: read it through to the shared ctx
   Object.defineProperty(westCtx, 'player', { get: () => ctx.player });
   const millbrook = buildMillbrook(westCtx);
-  const millrace = createMillrace(westCtx, millbrook.mill.wheel);
+  const millrace = createMillrace(westCtx, millbrook.mill.wheel, savedMill);
   buildHermitage(westCtx);
   const dryingLines = createDryingLines(westCtx);
   buildDressing(westCtx);
@@ -160,12 +167,12 @@ export async function runOpening(): Promise<void> {
   const kilnParts = buildKiln(westCtx);
   const weirParts = buildWeir(westCtx);
   const canopy = buildCanopy(ctx);
-  const keeping = createKeeping(ctx);
+  const keeping = createKeeping(ctx, savedKeeping);
   const popUpRuin = buildPopUpRuin(ctx);
   const unpressed = buildUnpressed(ctx);
   const glyphs = buildGlyphs(ctx, { onSolved: () => unpressed.unlock('kit') });
   const crown = createCrown(ctx, sky.mist);
-  const runaway = buildRunawayPage(ctx);
+  const runaway = buildRunawayPage(ctx, savedPage);
   const homecoming = buildHomecoming(ctx, runaway, unpressed);
   const leafPiles = buildLeafPiles(ctx);
   const laneWind = createLaneWind(ctx);
@@ -217,7 +224,7 @@ export async function runOpening(): Promise<void> {
   });
   const foley = createFoxFoley({ audio: ctx.audio, groundH });
   ctx.player = player;
-  const discovery = buildDiscovery(ctx, runaway.voice(), canopy.guide, popUpRuin.guide);
+  const discovery = buildDiscovery(ctx, runaway.voice(), canopy.guide, popUpRuin.guide, savedPage);
   carry = createCarry({
     scene, fox: fox.root, teach: ctx.teach,
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
@@ -229,6 +236,7 @@ export async function runOpening(): Promise<void> {
   });
   const coal = carry;
   const chemistry = createKeepingChemistry({
+    restoredAtLoad: savedKeeping,
     updrafts: hearth.updrafts, steamId: 'steam', rootId: 'root',
     coal: () => coal.heatSource(),
     onSteam: (at) => {
@@ -241,19 +249,19 @@ export async function runOpening(): Promise<void> {
       keeping.release();
     },
   });
-  const millWeir = createMillWeir(westCtx, { ...kilnParts, ...weirParts }, hearth.updrafts.hearths.find((h) => h.spot.id === 'kiln')!, millrace);
+  const millWeir = createMillWeir(westCtx, { ...kilnParts, ...weirParts }, hearth.updrafts.hearths.find((h) => h.spot.id === 'kiln')!, millrace, savedMill);
   const hum = createHearthHum({ audio: ctx.audio, hearths: hearth.updrafts.hearths, fox: fox.root, coal: () => coal.heatSource().position, page: runaway.voice });
   // the far Crown answers once the near tree has finished falling: attractor ladder resolves near → far
   // near → far: the settle swells the hum; the Crown answers when the fox steps out onto the far crag
   // and faces the vista gap (or after a while, so the response is never missed)
-  let settledAt = -1;
+  let settledAt = savedKeeping ? 0 : -1;
   keeping.onSettled(() => {
     settledAt = time;
     hum.swell();
     ctx.captions.say('The tree finished falling, at last.');
   });
   // the Album's story in a few lines (DESIGN-finale.md captions): the runaway page is the first hint whose book it is
-  let pageSaid = false;
+  let pageSaid = savedPage;
   ctx.onUpdate(() => {
     if (pageSaid || !runaway.settled()) return;
     pageSaid = true;
@@ -261,11 +269,16 @@ export async function runOpening(): Promise<void> {
   });
   // the finale (DESIGN-finale.md): warmth set in the Scribe's Press cradle once the Keeping has settled
   // world progress (Hazel's store, DESIGN-worlds.md) is the one truth for levels, abilities and the hub arches
-  const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
   // world II (Ashwater Reach, x ≈ +700, Cedar): its levels report physical completion to the store
-  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level) });
+  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level), secretFound: (id) => progress.isSecretFound(id), onSecret: (id) => void progress.findSecret(id) });
   // world III (the Scribe's Press, x ≈ −700, Thistle): its drafts join the updraft read the controller glides on
   const pressWorld = buildPress(ctx, { complete: (level) => progress.complete('press', level), hasInkstep: () => progress.hasAbility('press'), restored: (level) => progress.isRestored('press', level) });
+  // a side climb in the Press: the Scribe's Stacks (secret page above the ridge)
+  const stacks = buildPressStacks(ctx, { foundAtLoad: progress.isSecretFound('press-stacks'), onFound: () => { progress.findSecret('press-stacks'); } });
+  ctx.onUpdate((dt) => stacks.update(dt, fox.root.position));
+  // a Russetvale secret: the Loft on the east cottage's ridge
+  const loft = buildValeLoft(ctx, { foundAtLoad: progress.isSecretFound('vale-loft'), onFound: () => { progress.findSecret('vale-loft'); } });
+  ctx.onUpdate((dt) => loft.update(dt, fox.root.position));
   {
     const hearthLift = hearth.updrafts.liftAt;
     hearth.updrafts.liftAt = (x, feetY, z, out) => {
@@ -286,7 +299,7 @@ export async function runOpening(): Promise<void> {
   // the hollow's far lip: a rail so the vista valley stays a view, not a walk off the world
   buildWorldEdge(ctx);
   ctx.onUpdate((_dt, t) => {
-    if (settledAt < 0) return;
+    if (savedKeeping || settledAt < 0) return;
     const f = fox.root.position;
     if (Math.hypot(f.x - KEEPING.crag.x, f.z - KEEPING.crag.z) < 3.2 || t - settledAt > 25) crown.respond();
   });
@@ -305,17 +318,15 @@ export async function runOpening(): Promise<void> {
   // re-entry from a save: a restored first level rebuilds its world state (the page is home, the well lit), so the
   // open Ashwater arch never sits beside a page that is still running away
   if (progress.isRestored('russetvale', 'teach') && !homecoming.isPinned()) homecoming.force();
-  // Russetvale's levels from their physical truth: page home → Keeping settled → the Press kindled
+  // Canonical autumn levels: page home → Millbrook kiln → Hearthtree bridge.
   let progressT = 0;
-  const archSaid = { ashwater: false, press: false };
+  const archSaid = { ashwater: progress.isRestored('russetvale', 'teach'), press: progress.isVisited('ashwater', 'teach') };
   ctx.onUpdate((dt) => {
     pageMap.step();
     progressT += dt;
     if (progressT < 0.5) return;
     progressT = 0;
-    if (homecoming.isPinned()) progress.complete('russetvale', 'teach');
-    if (settledAt >= 0) progress.complete('russetvale', 'develop');
-    if ((finale.state() as { kindles: number }).kindles > 0) progress.complete('russetvale', 'combine');
+    syncAutumnProgress(progress, homecoming.isPinned(), millWeir.lit, keeping.settled);
     // tell the player when a hub arch opens (the arches stand north of the well, behind the wake spot)
     if (!archSaid.ashwater && progress.isRestored('russetvale', 'teach') && worlds.active === 'russetvale') {
       archSaid.ashwater = true;

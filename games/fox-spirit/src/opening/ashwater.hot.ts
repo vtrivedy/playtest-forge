@@ -5,7 +5,7 @@
  * still deep puts the fox back on the bank it left. Levels complete on arrival in the region beyond each gate.
  */
 import type * as THREE from 'three';
-import { ASH_ORIGIN, CISTERN, DAM_A, DAM_B, DAM_C, FLOOD, LEDGE, MATS, MAT_RISE, PUNT, WATER, waterAt } from './ashwaterLayout';
+import { ASH_ORIGIN, CISTERN, DAM_A, DAM_A2, DAM_B, DAM_C, FLOOD, LEDGE, MATS, MAT_RISE, PUNT, SECRETS, WATER, waterAt } from './ashwaterLayout';
 import type { Collider } from '../lookdevPlay';
 
 export const ASH_TIMING = { drain: 3.2, matRise: 0.9, matStagger: 0.18, damFall: 1.1, glow: 2.5, matHold: 1.2, matSink: 0.7, matRecover: 0.8 };
@@ -20,12 +20,14 @@ export type AshRig = {
   hasReedskim: () => boolean;
   teleport: (x: number, z: number, yaw: number) => void;
   teach: (text: string) => void;
-  events: { burstA: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
-  waterMesh: { channel: THREE.Object3D; pond: THREE.Object3D; pool: THREE.Object3D };
+  events: { secret: (which: 0 | 1) => void; burstA: () => void; burstA2: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
+  waterMesh: { channel: THREE.Object3D; channelE: THREE.Object3D; pond: THREE.Object3D; pool: THREE.Object3D };
   damA: THREE.Object3D;
+  damA2: THREE.Object3D;
   damB: THREE.Object3D;
   damC: THREE.Object3D;
   damACol: Extract<Collider, { kind: 'post' }>;
+  damA2Col: Extract<Collider, { kind: 'post' }>;
   damBCol: Extract<Collider, { kind: 'post' }>;
   damCCol: Extract<Collider, { kind: 'post' }>;
   /** the Ferrykeeper's punt rides the cistern's water; the cistern's south gate shuts while it is flooded */
@@ -45,8 +47,8 @@ export type AshRig = {
   heronCol: Extract<Collider, { kind: 'post' }>;
   safe: THREE.Vector3;
   s: {
-    burstA: number; burstB: number; burstC: number; channelY: number; poolY: number; matK: number; glowK: number;
-    done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number; clock: number; lastSplash: number;
+    burstA: number; burstA2: number; burstB: number; burstC: number; channelY: number; channelEY: number; poolY: number; matK: number; glowK: number;
+    done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number; clock: number; lastSplash: number; secrets: number;
   };
 };
 
@@ -72,6 +74,12 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     rig.damACol.r = 0.001;
     rig.events.burstA();
   }
+  // the sill's culvert: only reachable from the drained west bed (its dam faces west, below the bank)
+  if (s.burstA2 < 0 && s.burstA > 0 && dashing && f.y < -0.3 && Math.hypot(lx - DAM_A2.lx, lz - DAM_A2.lz) < DAM_A2.reach) {
+    s.burstA2 = 0;
+    rig.damA2Col.r = 0.001;
+    rig.events.burstA2();
+  }
   if (s.burstB < 0 && dashing && Math.hypot(lx - DAM_B.lx, lz - DAM_B.lz) < DAM_B.reach) {
     s.burstB = 0;
     rig.damBCol.r = 0.001;
@@ -84,6 +92,7 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     rig.events.burstC();
   }
   if (s.burstA >= 0) s.burstA += dt;
+  if (s.burstA2 >= 0) s.burstA2 += dt;
   if (s.burstB >= 0) s.burstB += dt;
   if (s.burstC >= 0) s.burstC += dt;
   if (s.burstC > FLOOD.rise + FLOOD.hold + FLOOD.fall) {
@@ -94,7 +103,9 @@ export function updateAshwater(rig: AshRig, dt: number): void {
   const base = WATER.pool.full + (WATER.pool.drained - WATER.pool.full) * smooth(s.burstB / T.drain);
   const flood = s.burstC < 0 ? 0 : smooth(s.burstC / FLOOD.rise) * (1 - smooth((s.burstC - FLOOD.rise - FLOOD.hold) / FLOOD.fall));
   s.poolY = base + (FLOOD.level - base) * flood;
+  s.channelEY = WATER.channelE.full + (WATER.channelE.drained - WATER.channelE.full) * smooth(s.burstA2 / T.drain);
   rig.waterMesh.channel.position.y = s.channelY;
+  rig.waterMesh.channelE.position.y = s.channelEY;
   rig.waterMesh.pool.position.y = s.poolY;
   // the punt floats (resting on the floor when dry); the gate shuts once water stands in the cistern
   const puntY = Math.max(s.poolY, -0.95);
@@ -104,6 +115,7 @@ export function updateAshwater(rig: AshRig, dt: number): void {
   rig.gateCol.top = shut ? CISTERN.wallTop : -100;
   rig.cGate.position.y = shut ? (CISTERN.wallTop - 1.3) / 2 : -4;
   stepDam(rig.damA, s.burstA);
+  stepDam(rig.damA2, s.burstA2);
   stepDam(rig.damB, s.burstB);
   stepDam(rig.damC, s.burstC);
   if (s.burstC < 0) {
@@ -131,7 +143,7 @@ export function updateAshwater(rig: AshRig, dt: number): void {
   // wading: standing on a bed still under water puts the fox back where it last stood dry
   if (s.inMarsh && grounded) {
     const w = waterAt(f.x, f.z);
-    const level = w === 'channel' ? s.channelY : w === 'pool' ? s.poolY : w === 'pond' ? WATER.pond.full : 0;
+    const level = w === 'channel' ? s.channelY : w === 'channelE' ? s.channelEY : w === 'pool' ? s.poolY : w === 'pond' ? WATER.pond.full : 0;
     if (w !== null && f.y < level - 0.2) {
       s.splashes++;
       rig.events.splash();
@@ -151,9 +163,20 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     }
   }
 
+  // side places: each tells its piece once, when the fox stands in it
+  if (s.inMarsh && grounded) {
+    if ((s.secrets & 1) === 0 && s.burstA > 2 && Math.hypot(lx - SECRETS.roof.lx, lz - SECRETS.roof.lz) < SECRETS.roof.r) {
+      s.secrets |= 1;
+      rig.events.secret(0);
+    }
+    if ((s.secrets & 2) === 0 && Math.hypot(lx - SECRETS.mooring.lx, lz - SECRETS.mooring.lz) < SECRETS.mooring.r) {
+      s.secrets |= 2;
+      rig.events.secret(1);
+    }
+  }
   // levels complete on arrival beyond each gate (the store also checks prerequisites)
   if (s.inMarsh && grounded) {
-    if ((s.done & 1) === 0 && s.burstA > 0 && lz > -23 && lz < -9) {
+    if ((s.done & 1) === 0 && s.burstA2 > 0 && lz > -23 && lz < -9) {
       s.done |= 1;
       rig.events.complete(0);
     }

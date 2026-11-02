@@ -151,6 +151,12 @@ try {
   const M = [[-0.8, -6.0], [0.8, -3.0], [0, 0]];
   const B = [[3.2, 0.5], [6.4, 0.2], [9.6, 0.7], [12.8, 0.4], [16.0, 0.8], [19.2, 0.6], [22.6, 1.0]];
   await go(-0.8, -10.2);
+  await hop(M[0][0], M[0][1]);
+  const splashesBefore = (await state()).ash.splashes;
+  await settle(200);
+  await shot('03b-mat-sank');
+  if ((await state()).ash.splashes <= splashesBefore) throw Error('Standing on a reed mat did not sink it and return the fox');
+  await go(-0.8, -10.2);
   for (const [x, z] of M) await hop(x, z);
   await shot('04-mats');
   for (const [x, z] of B) await hop(x, z);
@@ -161,15 +167,37 @@ try {
   for (const [x, z] of [...B.slice(0, -1).reverse(), [0, 0], [-0.9, 3.0], [0.6, 6.0], [-0.5, 9.0], [0.4, 12.0], [0, 15.2]]) await hop(x, z);
   await go(0, 17.5);
   await shot('06-mill-shore');
-  // the drained pool and its steps
-  await go(0, 26.8);
-  for (let i = 0; i < 8; i++) await go(0, 27.8 + i * 0.86, { jump: true, hold: 14, max: 120, reach: 0.4, land: true });
-  await go(0, 36.5, { jump: true, hold: 14, max: 120, land: true });
+  // Enter the drained cistern and climb the weir before flooding it from inside.
+  await go(0, 19.6);
+  await go(0, 22.8);
+  await go(0, 26.9);
+  for (let i = 0; i < 9; i++) await go(0, 27.75 + i * 0.68, { jump: true, hold: 14, max: 120, reach: 0.4, land: true });
+  await go(0, 35.2, { jump: true, hold: 14, max: 120, land: true });
   await shot('07-weir');
-  await go(14, 40);
-  await go(26.5, 40.5, { jump: true, jumpAt: 8.6, hold: 200, max: 400, reach: 0.8, land: true });
+  const drainedPool = (await state()).ash.poolY;
+  await go(2.0, 37.2);
+  await go(6.5, 37.2, { dash: true, dashAt: 1, max: 60, reach: 0.6 });
+  await settle(600);
+  await shot('07b-flooded');
+  const flooded = (await state()).ash;
+  if (!flooded.flood || flooded.poolY <= drainedPool + 1) throw Error('Weir gate did not raise the cistern');
+  await go(12.75, 35.4);
+  await shot('07c-weir-edge');
+  await go(12.75, 32.3, { max: 200, reach: 0.5 });
+  await shot('07d-punt');
+  await go(12.75, 30.1);
+  await go(14.2, 30.0, { max: 200, reach: 0.4 });
+  await shot('07e-wall');
+  await go(14.2, 27.0);
+  await go(15.3, 26.0);
+  await go(18.0, 26.5);
   await settle(200);
   await shot('08-seedwell');
+  const completed = (await state()).hooks.opening.worlds.progress.worlds.ashwater;
+  if(completed.ability!=='Reedskim' || completed.fill!==1 || completed.restored.length!==3)throw Error('Physical Ashwater completion did not earn Reedskim and fill Reed');
+  await page.keyboard.press('Tab');
+  await shot('09-album');
+  await page.keyboard.press('Tab');
   }
 } catch (e) {
   errors.push(String(e?.stack ?? e));

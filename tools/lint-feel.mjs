@@ -10,6 +10,10 @@ import { lintRenderSurface, renderSurfaceSelfTest } from './render-surface-lint.
 import { lintAssetSource, assetLintSelfTest } from './asset-path-lint.mjs';
 import { lintTeachOrderSource, teachOrderSelfTest } from './teach-order-lint.mjs';
 import { lintDiscoverySafety, discoverySafetySelfTest } from './discovery-safety-lint.mjs';
+import { lintSavedOpening, savedOpeningSelfTest } from './saved-opening-lint.mjs';
+import { lintAutumnSave, autumnSaveSelfTest } from './autumn-save-lint.mjs';
+autumnSaveSelfTest();
+savedOpeningSelfTest();
 discoverySafetySelfTest();
 teachOrderSelfTest();
 assetLintSelfTest();
@@ -46,6 +50,8 @@ const RULES = [
 ];
 
 const findings = [];
+findings.push(...lintSavedOpening(fs.readFileSync(`${ROOT}/scene.ts`, 'utf8')));
+findings.push(...lintAutumnSave(fs.readFileSync(`${ROOT}/scene.ts`, 'utf8'), fs.readFileSync(`${ROOT}/autumnProgress.hot.ts`, 'utf8')));
 findings.push(...lintDiscoverySafety(`${ROOT}/discovery.hot.ts`,fs.readFileSync(`${ROOT}/discovery.hot.ts`,'utf8')));
 for (const name of ['teach.ts', 'teach.hot.ts', 'scene.ts']) {
   const file = path.join(ROOT, name);

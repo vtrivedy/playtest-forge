@@ -71,12 +71,13 @@ frozen membrane into a glide draft)** (Thistle)
 
 **Hub** — Lanternhollow's well: three Seedwells fill, arches light as worlds open, Album (Tab) shows pages earned.
 
-## Honest scope for 6 PM
-All nine levels exist as playable code (Russetvale 3 shipped; Ashwater 3 and Press 3 pushed with input-only
-probes). Bigger *walkable area* (10–15 min per world) and the story pages/characters are the next work, in that
-order: characters + pages (Hazel: Album pages; Cedar: Ferrykeeper; Thistle: Scribe at the Press; Maple: Ash Warden
-footprints across worlds + hub), then side paths/secrets per world. Placeholder art (disc mats, flat lawn, glass
-tubes) is not done — each builder replaces theirs before calling a level shipped.
+## Honest scope for 6 PM (updated 21:40 UTC)
+Built and probed on the integration tip (sw5-maple b4cb20c8): hub arches + travel + return; Ashwater three levels
+(Low Sluice in two reaches, Reed Pond, Weir Heart with flood + punt; Ferrykeeper; drowned roof + mooring lantern side
+places); the Press three levels (warmth relays, Inkstep membranes, the Scribe and the coda) + the Scribe's Stacks secret;
+Russetvale's three levels + the Loft secret; the Ash Warden in every world; Album with nine earned memories and two
+secret pages; Seedwells; saved re-entry. Measured play length (Kit/Reed): Russetvale ~4.7 min, Ashwater ~2.6 min,
+Press ~1.5 min — far short of 10–15 min per world; worlds are still small places, not large explorable ones.
 
 ## Progress (Hazel)
 Typed ids `russetvale|ashwater|press` × `teach|develop|combine`; monotonic `visit / restore / earn` store, versioned
@@ -87,6 +88,21 @@ Saved-game acceptance also checks the opening invitation: once the page is alrea
 restart its chase or display its old instructions. Keep the complete boot state and screenshot alongside
 the foreign-world reconstruction checks; a clear travel camera does not establish a clear initial lens.
 The saved-page contract is pinned homecoming plus inactive discovery, independently of later world facts.
+Read the store before building the opening. Initialize a saved returned page directly as kept, with all
+three catches accounted for and its release already settled; initialize its invitation as finished
+without inventing a current landing contact. Fresh games still use the three catches and grounded
+overlook proof. Saved initialization emits no new catch wash, release, or page-origin caption.
+An arch already unlocked in the save starts with its announcement accounted for. Only an unlock
+earned in this session announces a newly lit arch; reload keeps the hub quiet and leaves its
+existing destination signs and Album available for orientation.
+
+### Optional memory — the Scribe’s Stacks
+The side climb rewards an unpressed family page: a moment allowed to stay unfinished. Its
+physical reading stand reports one typed secret, `press-stacks`, persisted beside world facts.
+Finding it never completes a level, fills a Seedwell or grants an ability. The Album adds an
+“Unpressed pages” spread with the earned memory, and a short returned-page notice points to
+Tab. On reload both stand and Album retain the discovery without replaying its notice. Old
+version-one saves without secrets load unchanged; unknown secret ids are discarded.
 
 ## Who builds what
 - **Maple** — scene integration: worlds registry, terrain dispatch, mask, arches, travel, per-world look/weather,
@@ -130,3 +146,24 @@ positions without changing the opening spawn. Fix the landing or missing occlude
 Extend the physical portal circuit with optional Press puzzle-route acceptance. Reuse Thistle's documented movement
 sequence through a dedicated input helper after real hub entry; assert all three physical completion facts and earned
 Inkstep, then walk home. This proves solvability from the hub, not blind insight. Retain all intermediate frames.
+
+Update independent Ashwater acceptance for the Weir Heart cistern: retain the physical fresh-boot entry, then test
+that standing on a reed mat sinks it and returns the fox to dry footing. After draining the mill pool, enter the
+cistern, climb the weir and dash its third reed gate. Assert a risen pool and active flood before using the punt
+and east wall to reach the Seedwell. Retain full states at the drained, flooded and completed beats; this is
+solvability evidence, not blind puzzle discovery or a duration target.
+
+Both foreign-world physical routes must assert canonical earned ability and full Seedwell fill as well as local
+puzzle facts. Capture the Album with native Tab at completion and close it before return travel. On the Press route,
+retain two later stationary scene frames across the Scribe's lever/coda hold; sampled frames do not prove animation.
+
+### Optional memory — the Russetvale Loft
+The east cottage roof climb returns `vale-loft`, a second independent secret.
+Each optional memory has its own Album spread, discovered notice and persisted fact.
+The Loft remembers the Scribe’s house before the rain; it grants no world completion,
+Seedwell fill or ability. Reload keeps both optional pages and replays neither notice.
+
+Optional-memory reload verification uses four independent saved fixtures: neither
+page, Stacks only, Loft only, and both. Native Tab/bracket navigation must show
+only earned prose, preserve zero level/ability/well gains, and stay quiet after a
+second load. Injected fixtures verify reconstruction only, not either physical climb.

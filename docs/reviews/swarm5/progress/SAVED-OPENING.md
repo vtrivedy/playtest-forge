@@ -31,3 +31,50 @@ canonical reconstruction/landing fix; this change adds no gameplay path.
 TypeScript and lint:feel passed on the merged runtime; tool syntax and diff
 checks passed after the regression addition. No claim of a fixed opening until
 the owner patch passes a new played capture.
+
+## Fixed and replayed
+
+`8bc5f66c` initializes the opening from the existing canonical saved teach fact
+before its builders run. The restored page starts stage2/kept/catches3 with its
+release settled and mesh hidden. Discovery starts done/inactive, marks
+`restoredAtLoad:true`, and leaves `completionAt:null`; it does not fabricate a
+current landing proof. The old page-origin caption is already considered read.
+Fresh initialization and runtime catch/landing guards remain unchanged.
+
+`d00c74c0` merges Maple `b171044c`, moving the obstructing Maple Seedwell clear
+of the wake lens. Final staged replay at
+`/captures/hazel/world-save-kept-lens-final/evidence.json` passes all three saved
+opening, Ashwater and Press snapshots with zero JS errors. Inspected teach/full
+hub screenshots show the whole fox and the village; the chase instruction is
+gone. Already unlocked arch announcements still appear on load, a separate
+presentation concern. Saved autumn develop/combine reconstruction remains
+outside this fix.
+
+Fresh input-only replay on `d00c74c0`:
+`/captures/hazel/discovery-saved-init-fresh/evidence.json`, 90 simulation seconds
+after 1.5 seconds idle, all 13 checks pass, zero JS errors. Three catches still
+lead to a real grounded overlook completion (`restoredAtLoad:false` and actual
+completion contact). The inspected end screenshot shows the fox fully on the
+overlook with homeward guidance. No continuous motion claim is made by this
+stills-and-state check; animation code was not changed.
+
+`saved-opening-lint.mjs` now guards construction from the same persisted teach
+fact, with negative controls for omitted initialization, a literal false and
+the wrong level. Arrival geometry has Maple's independent lint. TypeScript,
+production build, lint:feel, Discovery112/38, RunawayPage24/9 and TeachOrder4/4
+pass. The models still cover fresh play; saved initialization has the separate
+runtime fixture and updated skill sync notes.
+
+## Quiet saved arch announcements
+
+`37ac2e37` initializes each arch's announcement flag from its existing unlock
+predicate (`russetvale.teach` restored, or `ashwater.teach` visited). It leaves
+the runtime unlock checks intact. `af559797` saved replay:
+`/captures/hazel/world-save-quiet-arches/evidence.json`, all three saved cases
+PASS with zero JS errors, including quiet arch announcements, opening and
+physical Ashwater/Press reconstruction. Inspected full hub frame: no new-arch
+caption, whole fox visible. Existing onward warmth teaching remains present;
+this change does not claim to remove valid onward guidance or reconstruct the
+original autumn Keeping/finale. The saved-opening AST lint now rejects a false
+arch flag or a mismatched unlock predicate; runtime fixtures assert silence
+separately from physical reconstruction.

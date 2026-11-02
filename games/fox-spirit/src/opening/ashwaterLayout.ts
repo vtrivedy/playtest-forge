@@ -19,8 +19,10 @@ const RZ = 62;
 
 /** water rectangles in local coords [x0, x1, z0, z1]; `full` = surface height when held, `drained` = after the sluice */
 export const WATER = {
-  /** level 1: the Low Sluice channel spans the whole marsh, landing ↔ Reed Island */
-  channel: { x0: -80, x1: 80, z0: -33, z1: -24, full: -0.15, drained: -1.25 },
+  /** level 1: the Low Sluice channel spans the marsh, landing ↔ Reed Island, in two reaches split by a sill: the west
+   * reach (its north bank a reed thicket) drains at the bank sluice; the east reach only through the sill's culvert */
+  channel: { x0: -80, x1: -0.35, z0: -33, z1: -24, full: -0.15, drained: -1.25 },
+  channelE: { x0: 0.35, x1: 80, z0: -33, z1: -24, full: -0.15, drained: -1.25 },
   /** level 2: Reed Pond spans the marsh, Reed Island ↔ Mill Shore; only the earned reed mats cross it */
   pond: { x0: -80, x1: 80, z0: -8, z1: 14, full: -0.15, drained: -0.15 },
   /** level 3: the Mill Pool below the weir; its steps only stand clear once it is drained */
@@ -28,12 +30,17 @@ export const WATER = {
 } as const;
 export type WaterId = keyof typeof WATER;
 /** fixed iteration order (module-level: no array literal per call on the hot path) */
-export const WATER_IDS: ReadonlyArray<WaterId> = ['channel', 'pond', 'pool'];
+export const WATER_IDS: ReadonlyArray<WaterId> = ['channel', 'channelE', 'pond', 'pool'];
 /** channel / pond / pool bed height (below a full surface, above a drained one) */
 export const BED = -1.0;
 
 /** the Low Sluice's reed dam (on the landing bank, west of the path) and the mill race's dam (on an islet in the pond) */
 export const DAM_A = { lx: -11, lz: -35.2, reach: 3.2 };
+/** the sill between the reaches and the reed-choked culvert on its west face (reached from the drained west bed) */
+export const SILL = { x0: -0.35, x1: 0.35, top: -0.8 };
+export const DAM_A2 = { lx: -1.5, lz: -28.5, reach: 3.2 };
+/** the west reach's north bank: a reed thicket the fox cannot climb (box), so the way on is east along the bed */
+export const THICKET = { x0: -66, x1: 0.7, z0: -23.9, z1: -23.2, top: 2.4 };
 export const ISLET = { lx: 23.6, lz: 1.0, r: 2.6 };
 export const DAM_B = { lx: 24.4, lz: 1.0, reach: 3.2 };
 
@@ -49,22 +56,32 @@ export const MAT_HALF = 1.15;
 export const MAT_RISE = 0.14;
 
 /** the weir plateau north of the Mill Pool, and the steps that climb out of the drained pool onto it */
-export const WEIR = { z0: 33.6, top: 4.4, xMax: 12 };
+export const WEIR = { z0: 33.6, top: 4.4, xMax: 13.4 };
 export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2, 3.8, 4.4].map((top, i) => ({ lz: 27.75 + i * 0.68, top }));
 export const STEP_HALF = { x: 1.6, z: 0.38 };
 
 /** the Reed Seedwell on its own ledge east of the weir: reached by gliding off the plateau's east lip */
 /** the Seedwell ledge stands against the cistern's east wall, higher than the weir and too far to glide to: only the
  * Ferrykeeper's punt, lifted by a flooded cistern, reaches it */
-export const LEDGE = { x0: 15.5, x1: 22, z0: 21, z1: 30, top: 5.0 };
+export const LEDGE = { x0: 15.5, x1: 22, z0: 21, z1: 30, top: 4.7 };
 export const SEEDWELL = { lx: 19, lz: 25.5 };
 /** the Mill Pool is a walled cistern (slate walls W/S/E; the weir is its north side); its south gate shuts in a flood */
-export const CISTERN = { wallTop: 5.0, wall: 0.5, gate: { x0: -2.2, x1: 2.2 } };
+export const CISTERN = { wallTop: 4.7, wall: 0.5, gate: { x0: -2.2, x1: 2.2 } };
 /** dashing the weir's reed gate floods the cistern to `level` for `hold` s, then it washes out and the gate re-forms */
 export const FLOOD = { level: 4.3, rise: 9, hold: 45, fall: 6 };
 export const DAM_C = { lx: 5.5, lz: 37.2, reach: 3.2 };
 /** the last ferry, moored by the weir's east end; it floats on whatever the cistern holds */
-export const PUNT = { lx: 11.4, lz: 32.2, hx: 1.6, hz: 0.65, rise: 0.22 };
+export const PUNT = { lx: 12.75, lz: 31.6, hx: 0.65, hz: 2.0, rise: 0.22 };
+/** a slate shelf inside the cistern's east wall at wall height: the risen punt's flank touches it */
+export const SHELF = { x0: 13.4, x1: 15, z0: 24, z1: 30.5 };
+
+/** side places off the run line that tell the marsh's story once each (DESIGN-worlds: the flood that took a home) */
+export const SECRETS = {
+  /** a cottage roof drowned in the channel's west reach, dry only once the sluice runs */
+  roof: { lx: -46, lz: -28.5, r: 4.5 },
+  /** the Ferrykeeper's mooring post and lantern on the dam islet */
+  mooring: { lx: 23.6, lz: 1.0, r: 2.8 },
+} as const;
 
 /** spawn (and the return arch) on the landing, facing north */
 export const ASH_SPAWN = { lx: 0, lz: -46, yaw: Math.PI };

@@ -37,4 +37,23 @@ assert.equal(createWorldProgress(broken).complete('press', 'teach'), true, 'stor
 unsubscribe(); progress.reset(); assert.equal(notifications, 11);
 assert.equal(progress.snapshot().worlds.press.fill, 0);
 assert.equal(PROGRESS_SAVE_KEY, 'russet-vale-worlds-v1');
+raw = null;
+const secretOnly = createWorldProgress(storage);
+assert.equal(secretOnly.findSecret('press-stacks'), true);
+const secretRevision = secretOnly.snapshot().revision;
+assert.equal(secretOnly.findSecret('press-stacks'), false);
+assert.equal(secretOnly.snapshot().revision, secretRevision, 'repeat discovery is quiet');
+for (const world of WORLD_IDS) {
+  assert.equal(secretOnly.snapshot().worlds[world].fill, 0, 'secret cannot fill a Seedwell');
+  assert.equal(secretOnly.hasAbility(world), false, 'secret cannot unlock an ability');
+}
+assert.deepEqual(createWorldProgress(storage).snapshot().secrets, ['press-stacks'], 'secret persists independently');
+raw = JSON.stringify({ version: 1, worlds: {}, secrets: ['unknown', 'press-stacks', 'press-stacks'] });
+assert.deepEqual(createWorldProgress(storage).snapshot().secrets, ['press-stacks'], 'unknown and duplicate secret ids normalize');
+assert.equal(secretOnly.findSecret('vale-loft'), true);
+assert.deepEqual(createWorldProgress(storage).snapshot().secrets, ['press-stacks', 'vale-loft'], 'both optional memories persist independently');
+assert.equal(createWorldProgress(storage).snapshot().worlds.russetvale.fill, 0, 'loft does not restore autumn');
+secretOnly.reset();
+assert.deepEqual(createWorldProgress(storage).snapshot().secrets, [], 'reset clears persisted secrets');
+assert.deepEqual(createWorldProgress(broken).snapshot().secrets, [], 'storage failure starts without secrets');
 console.log('PASS world progress: prerequisites, idempotence, normalization, reload, fresh, storage failure, unsubscribe');

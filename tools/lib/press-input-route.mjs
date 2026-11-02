@@ -55,13 +55,13 @@ const breakAndRide = (dir, center, glideTo, holdS) => page.evaluate(({ dir, cent
 }, { dir, center, glideTo, holdS });
 await shot('00-spawn');
 // the direct try: lit brazier → seal fades on the way (the puzzle's lesson), then the relay
-await walk(L(-24.6, 29), { r: 0.3 });
+await walk(L(-20.6, 27.4), { r: 0.3 });
 await shot('01-brazier');
 await walk(L(0, 18), { r: 0.4 });
 await shot('01b-faded-at-seal');
 const failedDirect = await page.evaluate(()=>window.__gameHooks.state().opening.press);
 if(failedDirect.warm>0 || failedDirect.sealOpen)throw Error('Direct brazier-to-seal bypassed the relay puzzle');
-await walk(L(-24.6, 29), { r: 0.3 });
+await walk(L(-20.6, 27.4), { r: 0.3 });
 await walk(L(-7.6, 29.8), { r: 0.3 });
 await shot('01c-relay-lit');
 if(!await page.evaluate(()=>window.__gameHooks.state().opening.press.lit[1]))throw Error('First warmth relay did not light');
@@ -95,5 +95,14 @@ await shot('09-the-press');
 
 const final = await page.evaluate(()=>window.__gameHooks.state());
 if(final.opening.press.done.length!==3)throw Error('Physical Press input route did not restore all three levels');
+const progress = final.opening.worlds.progress.worlds.press;
+if(progress.ability!=='Inkstep' || progress.fill!==1 || progress.restored.length!==3)throw Error('Physical Press completion did not earn Inkstep and fill Maple');
+await page.evaluate(()=>window.__gameHooks.advance(120,1/60,false));
+await shot('10-scribe-hold');
+await page.evaluate(()=>window.__gameHooks.advance(120,1/60,false));
+await shot('11-scribe-coda');
+await page.keyboard.press('Tab');
+await shot('12-album');
+await page.keyboard.press('Tab');
 return final;
 }

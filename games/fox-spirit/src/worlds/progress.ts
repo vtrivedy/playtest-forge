@@ -1,6 +1,8 @@
 /** World progress: mechanism facts are canonical; abilities and Seedwells are derived. */
 export const WORLD_IDS = ['russetvale', 'ashwater', 'press'] as const;
 export const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
+export const SECRET_IDS = ['press-stacks', 'vale-loft', 'ashwater-roof', 'ashwater-mooring'] as const;
+export type SecretId = typeof SECRET_IDS[number];
 export type WorldId = typeof WORLD_IDS[number];
 export type LevelId = typeof LEVEL_IDS[number];
 export type ActiveWorld = WorldId | 'hub';
@@ -14,6 +16,7 @@ export interface ProgressStorage { getItem(key: string): string | null; setItem(
 export interface WorldProgressSnapshot {
   activeWorld: ActiveWorld;
   revision: number;
+  secrets: SecretId[];
   worlds: Record<WorldId, { visited: LevelId[]; restored: LevelId[]; ability: string | null; well: string; fill: number; next: LevelId | null }>;
 }
 export interface WorldProgress {
@@ -23,6 +26,8 @@ export interface WorldProgress {
   isVisited(world: WorldId, level: LevelId): boolean;
   isRestored(world: WorldId, level: LevelId): boolean;
   hasAbility(world: WorldId): boolean;
+  findSecret(secret: SecretId): boolean;
+  isSecretFound(secret: SecretId): boolean;
   snapshot(): WorldProgressSnapshot;
   subscribe(fn: () => void): () => void;
   reset(): void;
@@ -33,6 +38,7 @@ const prerequisites = { teach: 0, develop: 1, combine: 3 } as const;
 export function createWorldProgress(storage?: ProgressStorage, fresh = false): WorldProgress {
   const restored: Record<WorldId, number> = { russetvale: 0, ashwater: 0, press: 0 };
   const visited: Record<WorldId, number> = { russetvale: 0, ashwater: 0, press: 0 };
+  const secrets = new Set<SecretId>();
   let activeWorld: ActiveWorld = 'hub';
   let revision = 0;
   const listeners = new Set<() => void>();
@@ -42,6 +48,7 @@ export function createWorldProgress(storage?: ProgressStorage, fresh = false): W
       const raw = storage?.getItem(PROGRESS_SAVE_KEY);
       const parsed: unknown = raw ? JSON.parse(raw) : null;
       if (parsed && typeof parsed === 'object' && 'version' in parsed && parsed.version === 1 && 'worlds' in parsed && parsed.worlds && typeof parsed.worlds === 'object') {
+        if ('secrets' in parsed && Array.isArray(parsed.secrets)) for (const secret of SECRET_IDS) if (parsed.secrets.includes(secret)) secrets.add(secret);
         for (const world of WORLD_IDS) {
           const entry = (parsed.worlds as Record<string, unknown>)[world];
           if (!entry || typeof entry !== 'object') continue;
@@ -60,7 +67,7 @@ export function createWorldProgress(storage?: ProgressStorage, fresh = false): W
   function save() {
     try {
       const worlds = Object.fromEntries(WORLD_IDS.map(world => [world, { restored: LEVEL_IDS.filter(level => (restored[world] & bit[level]) !== 0), visited: LEVEL_IDS.filter(level => (visited[world] & bit[level]) !== 0) }]));
-      storage?.setItem(PROGRESS_SAVE_KEY, JSON.stringify({ version: 1, worlds }));
+      storage?.setItem(PROGRESS_SAVE_KEY, JSON.stringify({ version: 1, worlds, secrets: [...secrets] }));
     } catch { /* current-session progress remains authoritative */ }
   }
   function changed(persist: boolean) {
@@ -82,15 +89,17 @@ export function createWorldProgress(storage?: ProgressStorage, fresh = false): W
     isVisited: (world, level) => (visited[world] & bit[level]) !== 0,
     isRestored: (world, level) => (restored[world] & bit[level]) !== 0,
     hasAbility: world => (restored[world] & bit.teach) !== 0,
+    findSecret(secret) { if (secrets.has(secret)) return false; secrets.add(secret); changed(true); return true; },
+    isSecretFound: secret => secrets.has(secret),
     snapshot() {
       const worlds = {} as WorldProgressSnapshot['worlds'];
       for (const world of WORLD_IDS) {
         const solved = LEVEL_IDS.filter(level => (restored[world] & bit[level]) !== 0);
         worlds[world] = { visited: LEVEL_IDS.filter(level => (visited[world] & bit[level]) !== 0), restored: solved, ability: restored[world] & 1 ? WORLD_CATALOGUE[world].ability : null, well: WORLD_CATALOGUE[world].well, fill: solved.length / LEVEL_IDS.length, next: LEVEL_IDS.find(level => !(restored[world] & bit[level])) ?? null };
       }
-      return { activeWorld, revision, worlds };
+      return { activeWorld, revision, worlds, secrets: [...secrets] };
     },
     subscribe(fn) { listeners.add(fn); return () => { listeners.delete(fn); }; },
-    reset() { for (const world of WORLD_IDS) { restored[world] = 0; visited[world] = 0; } activeWorld = 'hub'; changed(true); },
+    reset() { for (const world of WORLD_IDS) { restored[world] = 0; visited[world] = 0; } secrets.clear(); activeWorld = 'hub'; changed(true); },
   };
 }

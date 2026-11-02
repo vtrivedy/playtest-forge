@@ -1,6 +1,10 @@
 /** Earned Album testimony. Visibility derives from mechanism facts, never visits. */
 import type { WorldId, LevelId } from './progress';
 export interface StoryMemory { voice: string; title: string; text: string }
+export const STACKS_MEMORY: StoryMemory = {
+  voice: 'An unpressed page', title: 'Everyone, together, laughing',
+  text: 'A family gathers around a crooked table. Someone has spilled the ink, and everyone is laughing. The Scribe left this page unpressed. Even after all these years, its edges are free to curl.',
+};
 /** The spoken page lines stay short enough to read during the staged reveal. */
 export const WORLD_REVELATIONS = {
   russetvale: 'Here the Scribe kept every autumn.',
@@ -24,3 +28,19 @@ export const WORLD_STORIES = {
     combine: { voice: 'The Scribe', title: 'The last season we were all here', text: '“I kept autumn because it was the last season we were all here.” The Warden folds into the Scribe’s shadow. The fox offers warmth; the Scribe lets the year turn.' },
   },
 } as const satisfies Record<WorldId, Record<LevelId, StoryMemory>>;
+
+export const ROOF_MEMORY: StoryMemory = {
+  title: 'The roof under the reeds',
+  voice: 'Found in the drained channel',
+  text: 'The flood came up the channel in one night. A family climbed onto this roof and waited in the rain for the ferry. The ferry came. The Scribe pressed the water flat before it could take anything else, and the house went under the reeds.',
+};
+export const MOORING_MEMORY: StoryMemory = {
+  title: 'The last ferry',
+  voice: 'Found at the Ferrykeeper’s mooring',
+  text: 'Every night of the flood the Ferrykeeper waited at this post with the lantern lit, poling neighbours across to the weir. The last crossing never set out: the Scribe pressed the rain mid-fall, and the heron with it.',
+};
+export const LOFT_MEMORY: StoryMemory = {
+  title: 'The house before the rain',
+  voice: 'A page from the loft',
+  text: 'The Scribe’s own house, before the rain. Open windows, a roof warm from the afternoon, and footsteps on the stairs. No one thought to keep that ordinary day. Someone left this page where the light could still reach it.',
+};

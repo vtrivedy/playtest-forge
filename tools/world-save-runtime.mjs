@@ -15,6 +15,7 @@ try {
     await context.addInitScript(restored => localStorage.setItem('russet-vale-worlds-v1', JSON.stringify({ version: 1, worlds: { russetvale: { restored }, ashwater: { restored }, press: { restored } } })), restored);
     const page = await context.newPage();
     page.on('pageerror', e => evidence.errors.push(String(e)));
+    page.on('console', m => { if (m.type() === 'error') evidence.errors.push(m.text()); });
     await page.goto('http://127.0.0.1:5198/?manual=1');
     await page.waitForFunction(() => window.__gameHooks?.ready, null, { timeout: 120000 });
     const boot = await page.evaluate(() => window.__gameHooks.advance(60, 1 / 60, true));
@@ -43,8 +44,18 @@ try {
     const pressState = press.opening.press;
     const full = restored.includes('combine');
     const pressMatchesSave = restored.every(level => pressState.done.includes(level)) && pressState.sealOpen && pressState.draftA === restored.includes('develop') && pressState.draftB === full && pressState.iced === !full;
-    const savedOpeningMatches = boot.opening.homecoming.pinned && !boot.opening.discovery.active;
-    evidence.cases.push({ restored, boot, marsh, press, cameraDistance, pressCameraDistance, pressMatchesSave, savedOpeningMatches, physicalMatchesSave: restored.every(level => marsh.opening.ashwater.done.includes(level)) });
+    const savedOpeningMatches = boot.opening.homecoming.pinned && !boot.opening.discovery.active
+      && boot.opening.page.phase === 'kept' && boot.opening.page.catches === 3
+      && boot.opening.discovery.restoredAtLoad && boot.opening.discovery.completionAt === null;
+    const quietSavedArches = !boot.opening.captions.showing?.includes('arch has lit') && !boot.opening.captions.showing?.includes('arch north');
+    // Canonical autumn levels: page home -> Millbrook kiln -> Hearthtree bridge.
+    const autumnMatchesSave = boot.opening.millWeir.lit === restored.includes('develop')
+      && boot.opening.millrace.turning === restored.includes('develop')
+      && boot.opening.keeping.bridge === full && boot.opening.chemistry.completed === full
+      && boot.opening.keeping.stair === (full ? 'open' : 'pressed')
+      && boot.opening.finale.kindles === 0 && boot.opening.keeping.impacts === 0
+      && boot.opening.chemistry.releases === 0 && boot.opening.chemistry.steamReactions === 0;
+    evidence.cases.push({ restored, boot, marsh, press, cameraDistance, pressCameraDistance, pressMatchesSave, savedOpeningMatches, quietSavedArches, autumnMatchesSave, physicalMatchesSave: restored.every(level => marsh.opening.ashwater.done.includes(level)) });
     await fs.writeFile(`${out}/evidence.partial.json`, JSON.stringify(evidence, null, 2));
     await context.close();
   }
@@ -54,7 +65,10 @@ try {
   assert.ok(evidence.cases.every(c => c.pressMatchesSave), 'saved Press facts must reconstruct seal, drafts and ice');
   assert.ok(evidence.cases.every(c => c.pressCameraDistance < 12), 'Press travel must relocate the lens');
   evidence.worldReconstructionCompleted = true;
+  evidence.autumnReconstructionCompleted = evidence.cases.every(c => c.autumnMatchesSave);
+  assert.ok(evidence.autumnReconstructionCompleted, 'saved autumn facts must rebuild kiln and Keeping without replaying events');
   assert.ok(evidence.cases.every(c => c.savedOpeningMatches), 'saved returned page must not restart the discovery invitation');
+  assert.ok(evidence.cases.every(c => c.quietSavedArches), 'saved unlocked arches must not replay new-unlock announcements');
   evidence.completed = true;
 } finally {
   await fs.writeFile(`${out}/evidence.json`, JSON.stringify(evidence, null, 2));
