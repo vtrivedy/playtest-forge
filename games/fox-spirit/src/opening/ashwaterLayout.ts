@@ -33,9 +33,9 @@ export const WATER_IDS: ReadonlyArray<WaterId> = ['channel', 'pond', 'pool'];
 export const BED = -1.0;
 
 /** the Low Sluice's reed dam (on the landing bank, west of the path) and the mill race's dam (on an islet in the pond) */
-export const DAM_A = { lx: -11, lz: -35.2, reach: 2.4 };
+export const DAM_A = { lx: -11, lz: -35.2, reach: 3.2 };
 export const ISLET = { lx: 24, lz: 3.4, r: 2.6 };
-export const DAM_B = { lx: 24, lz: 3.4, reach: 2.6 };
+export const DAM_B = { lx: 24, lz: 3.4, reach: 3.2 };
 
 /** reed mats over Reed Pond (the main crossing) and the branch out to the dam islet: [lx, lz] centres, 1.8 m square */
 export const MATS: ReadonlyArray<readonly [number, number]> = [
