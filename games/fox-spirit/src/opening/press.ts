@@ -11,11 +11,18 @@ import * as THREE from 'three';
 import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
-import { pressH } from './worlds';
+import { pressE, pressH } from './worlds';
 import { BRAZIER_REACH, BRAZIERS, DRAFT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, press, RIDGE, RIDGE_BASE, SHELF, SHELF_TOP, THE_PRESS } from './pressLayout';
 import { pressLift, updatePress, type PressRig } from './press.hot';
 
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
+/** distance from (px, pz) to the segment a → b */
+const segD = (px: number, pz: number, ax: number, az: number, bx: number, bz: number) => {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz)));
+  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
+};
 const winter = (color: THREE.ColorRepresentation, extra: THREE.MeshToonMaterialParameters = {}) =>
   new THREE.MeshToonMaterial({ color, gradientMap: RAMP_WORLD, ...extra });
 
@@ -360,6 +367,96 @@ export function buildPress(
   leaves.count = nl;
   blots.count = nb;
   root.add(leaves, blots);
+
+  // ---- the floor as a place: ink trees with page-leaf crowns heavy with snow, giant books half sunk in drifts,
+  // lantern posts marking the way between braziers (all off the lanes, the braziers' legs and the gates)
+  const clearOf = (lx: number, lz: number, pad: number) => {
+    if (Math.abs(lz - RIDGE.lz) < 3 + pad) return false;
+    if (lz < SHELF.z1 + 2.5 + pad && lz > SHELF.z0 - 2) return false;
+    if (Math.abs(lx) < 5 + pad && lz > SHELF.z1 && lz < 40) return false;
+    for (const B of BRAZIERS) if (Math.hypot(lx - B.lx, lz - B.lz) < 4 + pad) return false;
+    // the relay legs (lit → cold → gate) stay open
+    if (segD(lx, lz, BRAZIERS[0]!.lx, BRAZIERS[0]!.lz, BRAZIERS[1]!.lx, BRAZIERS[1]!.lz) < 3 + pad || segD(lx, lz, BRAZIERS[1]!.lx, BRAZIERS[1]!.lz, 0, 18) < 3 + pad) return false;
+    const at = press(lx, lz);
+    return pressE(at.x, at.z) < -4 - pad && pressH(at.x, at.z) < RIDGE_BASE + 0.8;
+  };
+  const trunkMat = winter(0x1f2128);
+  const crownMat = winter(0xe9ecf2);
+  const crownTint = winter(0xc9cfe0);
+  let trees = 0;
+  for (let i = 0; i < 300 && trees < 26; i++) {
+    const lx = (rd() * 2 - 1) * 40;
+    const lz = -40 + rd() * 80;
+    if (!clearOf(lx, lz, 0.5)) continue;
+    const at = press(lx, lz);
+    const y = pressH(at.x, at.z);
+    const h = 2.4 + rd() * 2.2;
+    const tree = new THREE.Group();
+    tree.position.set(at.x, y, at.z);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, h, 6).translate(0, h / 2, 0), trunkMat);
+    trunk.rotation.z = (rd() - 0.5) * 0.12;
+    tree.add(trunk);
+    for (let k = 0; k < 4; k++) {
+      const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55 + rd() * 0.45, 0), k % 2 ? crownTint : crownMat);
+      c.position.set((rd() - 0.5) * 1.1, h - 0.2 + (rd() - 0.3) * 0.8, (rd() - 0.5) * 1.1);
+      c.scale.y = 0.7;
+      c.rotation.set(rd() * 3, rd() * 3, 0);
+      tree.add(c);
+    }
+    solids.add(tree);
+    colliders.push({ kind: 'post', x: at.x, z: at.z, r: 0.28 });
+    trees++;
+  }
+  const coverMats = [winter(0x5b2f2a), winter(0x2f3d55), winter(0x4a4033)];
+  let books = 0;
+  for (let i = 0; i < 300 && books < 7; i++) {
+    const lx = (rd() * 2 - 1) * 34;
+    const lz = -38 + rd() * 74;
+    if (!clearOf(lx, lz, 2.5)) continue;
+    const at = press(lx, lz);
+    const y = pressH(at.x, at.z);
+    const w = 2.6 + rd() * 1.6;
+    const d = 1.8 + rd() * 1.0;
+    const t = 0.6 + rd() * 0.5;
+    const yaw = rd() * Math.PI;
+    const tilt = 0.25 + rd() * 0.35;
+    const book = new THREE.Group();
+    book.position.set(at.x, y - 0.2, at.z);
+    book.rotation.set(0, yaw, tilt);
+    const cover = new THREE.Mesh(new THREE.BoxGeometry(w, t, d), coverMats[books % 3]!);
+    const block = new THREE.Mesh(new THREE.BoxGeometry(w - 0.12, t - 0.12, d + 0.02), paperMat);
+    block.position.x = 0.05;
+    const drift = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), snowCap);
+    drift.scale.set(w * 0.55, 0.35, d * 0.7);
+    drift.position.y = -t * 0.3;
+    drift.rotation.z = -tilt;
+    book.add(cover, block, drift);
+    solids.add(book);
+    colliders.push({ kind: 'box', x: at.x, z: at.z, yaw, hx: (w / 2) * Math.cos(tilt), hz: d / 2, top: y - 0.2 + Math.sin(tilt) * w * 0.5 + t * 0.5 });
+    books++;
+  }
+  // lantern posts along the relay legs: a warm dot every few metres says "this way" without words
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xffc27a });
+  const postMat = winter(0x2a2b31);
+  const [A, A2, B, B2] = BRAZIERS as [typeof BRAZIERS[0], typeof BRAZIERS[0], typeof BRAZIERS[0], typeof BRAZIERS[0]];
+  for (const [ax, az, bx, bz] of [[A.lx, A.lz, A2.lx, A2.lz], [A2.lx, A2.lz, 0, 19], [B.lx, B.lz, B2.lx, B2.lz], [B2.lx, B2.lz, MEMBRANE_B.lx + 1.5, MEMBRANE_B.lz]] as const) {
+    const n = Math.max(2, Math.floor(Math.hypot(bx - ax, bz - az) / 6));
+    for (let k = 1; k < n; k++) {
+      const f = k / n;
+      const side = k % 2 ? 1.4 : -1.4;
+      const nx = -(bz - az) / Math.hypot(bx - ax, bz - az);
+      const nz = (bx - ax) / Math.hypot(bx - ax, bz - az);
+      const lx = ax + (bx - ax) * f + nx * side;
+      const lz = az + (bz - az) * f + nz * side;
+      const at = press(lx, lz);
+      const y = lz < SHELF.z1 ? SHELF_TOP : pressH(at.x, at.z);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.1, 5).translate(0, 0.55, 0), postMat);
+      post.position.set(at.x, y, at.z);
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), lampMat);
+      lamp.position.set(at.x, y + 1.15, at.z);
+      root.add(post, lamp);
+    }
+  }
 
   // ---- carried warmth: an ember glow at the fox's chest
   const warmGlow = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.85 }));
