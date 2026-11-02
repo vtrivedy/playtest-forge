@@ -63,7 +63,7 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
     mix[0] = mix[0]! * (0.6 + 0.4 * ramp(restored, 0, 0.35));
     mix[1] = mix[1]! * (0.65 + 0.35 * ramp(restored, 0.02, 0.3));
     mix[2] = mix[2]! * ramp(restored, 0.15, 0.5);
-    mix[3] = mix[3]! * ramp(restored, 0.3, 0.7);
+    mix[3] = mix[3]! * ramp(restored, 0.15, 0.5);
     mix[5] = mix[5]! * (0.6 + 0.4 * ramp(restored, 0, 0.6));
     if (snow > 0) {
       mix[0] = mix[0]! * (1 - 0.6 * snow);
