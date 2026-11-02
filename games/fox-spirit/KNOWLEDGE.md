@@ -568,7 +568,7 @@ checks and screenshots under `/captures/fern/`, mirrored in
 `keeping-swarm4-captures/fern/` volume. These are offline, sampled 15 fps, silent
 camera reviews; they do not certify real-time performance or audio.
 - Gate story hand-offs on the beat every route actually reaches, not the optional maximum: the homecoming→finale stream first waited for all five lanterns (every creature freed), which no slice route does, so the ending never appeared in Kit's clips (Fern fixed: page pin starts it). Check new gates against the shared slice route (`tools/page-motion-probe.mjs` / Kit's landing route), not a staged "everything done" state.
-- Isolated single black frames in a real-time capture with bright neighbours, evenly spread, are a recorder/drawing-buffer artifact, not the render: `tools/blink-scan.mjs --from T --every 2` reads the live WebGL canvas in-page over the slice route (617ad72: 2400 frames, min luma 112, zero dark) — prove in-canvas before chasing shaders.
+- Earlier software-only scans (617ad72: 2400 frames, min luma112, zero dark) did NOT establish that the GPU flashes were recorder-only. Reed swarm5 hardware comparison below supersedes that conclusion: native, staged and independent CDP output all flash, including one synchronous source sample. Reproduce on the affected GPU path before assigning the cause.
 
 ## Showcase continuation and teaching overlays — Fern050a7cc
 
@@ -587,9 +587,93 @@ Review timed UI overlays in motion: a bottom-center teaching card covered the fo
 - `tools/complete-journey-route.mjs` composes the canonical wake-to-Keeping journey with the same finale factory in bridge-start mode; it stays transferable with `toString()`. Production `56d2469` completes all 13 checks at 30 Hz with one initial wake placement and no later teleports or forced progression: homecoming at 73.033 s, final placement at 180.467 s, first title sample at 209 s, title done at 222 s. Use 230 s for a full ending capture; 160 s is the shorter Keeping showcase. The original opening regression intentionally holds forever at homecoming.
 - Bowl-center waypoints are not pickup positions: stop when Carry reports `canPickup`. Press placement must be within the authored 1.6 m bowl reach; the tested approach target (21.0, 40.7) with a 0.15 m stop radius snaps warmth into the cradle. A point 1.65 m out silently places on the ground and leaves the finale sealed. Review/state/evidence: `docs/reviews/swarm4/finale-journey/`. This authored offline route does not prove unaided discovery or fix the external GPU recorder.
 
+## Words on screen must be in the canvas (Cedar, swarm5)
+
+- DOM overlays (captions, end card, teach prompts) never reach canvas recordings (MediaRecorder / canvas
+  captureStream). Kit's b4fa63a review clip had no ending title at all for that reason, while page.screenshot stills
+  did show DOM text — so "it's in the screenshot" does not prove "it's in the clip". Draw words with
+  `opening/lettering.ts` (camera-fixed CanvasTexture plane, redraw on change, `fitLetterPlane` per frame), or use
+  `ctx.captions.say` (bottom band) / `ctx.teach.offer` (upper-left hint, offered every frame it should show).
+  `lint:feel` rule `dom-text` bans `createElement('div')` / `.textContent =` / `.innerHTML =` in `src/opening`.
+- Camera children only render if the camera is in the scene: `scene.ts` does `scene.add(view)`.
+- Planes on the lens go through the whole post stack (bloom, grade, ACES in OutputPass); `toneMapped:false` on the
+  material does not bypass the OutputPass tone map. Set `userData.forgeSkipAO` so GTAO ignores them.
+- Editing source while a Vite-served probe runs reloads the page mid-run (HMR) and the run dies with
+  `__gameHooks undefined`. Run long probes from a pinned worktree: `git worktree add /tmp/wt-<sha> <sha>` +
+  symlink node_modules.
+
+## Finale kits and the rest shot (Cedar, swarm5)
+
+- The "duplicate foxes" at the end were the authored kits curling 1.0 m from the cradle while the hero stood in it.
+  Kits now take the free slot (ring of 9 on the cradle's open side, r 1.35) farthest from the hero and siblings, are
+  0.42× scale, and a curled kit the standing hero comes within 0.95 m of shuffles to a new slot, steering round the
+  fox. Staged probe (`tools/finale-ending-probe.mjs`): closest kit during the held rest shot 0.95 m (was overlapping).
+- TLA caught a real starvation: if a disturbed kit went back to `trotting`, a player weaving through the kits could
+  keep one uncurled forever and the end card never shows (EndsOnce violated). A separate `shuffling` phase that
+  still counts as home fixes it; WF suffices.
+- The rest shot frames hero + cradle (45% toward the fox) from the approach side, ~3.5 m back, and holds with a 90 s
+  slow push until the player moves (after the card's lock). Fox ≈ 140-160 px tall at 720p.
+
+## Opening discovery — Hazel, swarm5
+
+- The review's naive bot threshold `.08 m/frame` exceeds this controller's ordinary run displacement (`3.2 m/s / 60 = .053 m/frame`), so ~120 false unsticks per90s are predictable even in open space. Thistle owns correcting the tool. Keep old and corrected measurements separate; random wandering and public-cue following answer different questions.
+- A guide that chooses the next ruin page from position alone can turn in midair before landing. The paper invitation now advances from actual support contact (`grounded`, footprint and height), with grounded floor retries. Canopy's live guide view returns no last leaf after `onRoute` clears on a floor landing; historical diagnostic `lastLeaf` remains unchanged. Readonly page/support views keep guidance unable to perform catches/unlocks.
+- `Discovery.tla` passes36generated/14distinct states; removing catch synchronization fails MatchesWorld in two states. It checks guide/world synchronization and kept stability, assuming real Arrive guards. It does not prove continuous geometry, visibility or unfamiliar-player discovery. `.agents/skills/verify-discovery/SKILL.md` preserves recheck and negative control.
+- `tools/discovery-probe.mjs` follows only the current drawn invitation plus ordinary movement feedback, never an authored route table or progression controls. Pre-lettering simulation on e32b927 reaches roost+overlook and keeps3catches at~33s; this is a cue-following input test, not blind-wander or human-fun proof. Named visual evidence/retest is required before landing.
+- A dash follows the visible fox heading, so cue followers must turn before dashing; otherwise the second ruin tab gets a westward dash while the requested movement points north. Hold jump through the spring's0.12s load; repeated grounded jump taps can replace the intended spring with a small ordinary jump.
+- Independent visual review by Maple:20tiny moving gold scraps read as exhaust. Four larger cream/ink paper fragments anchored ahead read as an invitation on7f9eb23; add a warm gold edge and lower their ground hover a little to separate them from paper props at the gate. Shared teach lettering is now legible in canvas frames, not DOM-only.
+- `ctx.teach` must consume offers after the providers. Registering its updater when createTeach runs makes the early hearth/coal calls overwrite the prior frame's chase offer before consumption. Register in mount after builders instead; tools/teach-order-lint.mjs bans the old placement and late ctx builders. TeachOrder.tla4/4 passes; allowing early Publish fails LatestOfferWins in two states. The fade itself is outside that model.
+- Baseline productioncf48b75 cue-following clip:40s,640×360,10fps offline screenshots, silent; all3catches+roost+overlook+kept+noErrors true. Sampled catches at1.5/12.75/32s, overlook31s. This is route-independent visible-cue following, not blind random wander. Original110s regression on43c4f90:3catches,kept,pinnedhome,finite,noErrors alltrue.
+- Limitation found by injected-input retry test43c4f90: after deliberately walking off the second ruin jump, the guide resets to the first leaf and the bot eventually keeps the page (~70s), but takes11misses and catches it before visiting the overlook (strict overlook check false). Preserve that failure; do not describe this as robust recovery or a full-route retry pass. Floor-to-leaf approaches remain awkward with the old controller; Thistle's collision fix is independent and needs joint retest.
+## Recorder boundary investigation — Reed, swarm5
+
+- b4fa63a review reports 21 isolated native GPU MediaRecorder flashes. Existing
+  software staging probes and synchronous canvas scans do not establish the GPU
+  cause. Keep this issue open until matched hardware recordings reproduce it.
+- `tools/check-black-frames.py` scans decoded frames with actual PTS, including
+  VFR clips, and fails even one near-black frame. The bright / single-flash /
+  blank negative controls are `python3 tools/tests/black-frame-gate.py` (ffmpeg
+  required, imageio-ffmpeg optional fallback). Existing fixed-clock hub gate stays
+  valid; this diagnostic handles real-time VFR recordings.
+- RecorderBoundary.tla checks synchronous render→copy→publish ordering (11 states).
+  RecorderBoundaryBad.cfg deliberately permits discard before copy and fails
+  NoBlackPublication. It proves ordering only, not GPU/browser correctness.
+
+Hardware reproduction on diagnostic764b338 (game source identical to b4fa63a):
+T4/EGL1280×720,120s wall recording, native20/2545 black frames, synchronous
+2D staging33/3400, independent CDP compositor11/1133. Stage read at simulation
+tick3000 is0luma. Independent compositor frame00007 is fully black. This proves black pixels
+exist before encoding and that2D staging does not repair the shared output. Artifacts
+`keeping-swarm5-captures/reed/boundary-764b33881c-154213-24ad01`; source/tool hashes,
+actual frame PTS, GPU attributes, screenshots and __game are preserved. Context has
+preserveDrawingBufferfalse and antialiastrue. Cause still open; flag A/B underway.
+
+Controlled follow-up on0a4862d: preserveDrawingBuffertrue still18 native/23
+staged/7 CDP flashes. Canvas antialiasfalse alone:0/2643 native,0/3422 staged,
+0/1141 CDP, minimum mean luma71.2/80.2/80.3; full SMAA/bloom/grade preserved.
+Critically, baselineMSAAtrue with NO MediaRecorder or captureStream attached
+(CDP-only8495afb) is clean0/1156. This isolates a recording-triggered GPU
+canvas/MSAA interaction rather than an autonomous game fade. Paired compositor
+black by itself did not distinguish recording-triggered corruption from a game
+defect. The forge's fullscreen output surface does not need MSAA; SMAA already
+owns scene-edge smoothing. Actual constructor antialiasfalse is the selected fix;
+AST single-aa-owner lint rejects true, dynamic flags, overriding spreads/context.
+
+Actual constructor74c7db9 (no diagnostic context override),250s recording:
+native0/5604, staged0/6948, CDP0/2316 black; noJSerrors, minimum meanluma
+67.948/76.674/76.774. **Scope limit:** probe omitted interact so the page completes
+(3catches0skips) then the journey stalls at coal pickup; this is valid250s render
+output evidence, not an ending clear. Route replay now uses a pooled immutable
+jump/dash/interact encoder (including KeyE) and asserts canonical route completion
+for long captures, making that mistaken clear claim fail automatically.
 ## Painted corridors & colour coverage (Maple, swarm5 fix 2)
 
 - Measure colour with `node tools/corridor-colour.mjs [--state cold|story] [--views a,b]` (11 corridor views, real chase lens; `--images` scores any frames). Two numbers per frame: `colour` (strict, sat>0.45 off the sepia axis; review frames naive-mid .025 / end-160 .383 / t060 .728) and `tint` (any visible hue off sepia, pale washes included). Plain HSV saturation is useless here: sepia paper itself has sat ~0.35–0.42.
 - Ochre/beige is the paper's own hue: a "painted" beige lane or an ochre wash at paper value reads as unpainted sepia in frames. Anything meant to read as colour inside the sketch needs hue *off* the sepia axis (greens, madder) and must be laid darker than paper value and pushed past its chroma (~1.8×) — pastels at paper value vanish under ACES + the haze.
 - `opening/lanePaint.ts` bakes a half-float lane distance/terrain-height map (0.5 m) once from `ALL_PATHS`/`pathDist`; `patchPaint` reads it once per fragment. Uses: lane underpainting (green verges, saved-paper road), restores reaching `uLaneReach × bleed` further along lanes (story Press lane .083 → .39), and `uSketchTint` (sketch keeps 30 % of authored hue at paper value). Gate wall coverage by surface up-ness (dFdx normal), or the wash paints rainbow stripes up house walls.
 - Never run a Vite-served probe from /work while editing src — HMR reloads mid-run. Pin a worktree (`git worktree add -f /tmp/wt-x HEAD`, symlink node_modules, copy src in).
+## Naive wander and village stuck rate (Thistle, swarm5)
+
+- `tools/naive-explore.mjs` is the in-repo naive bot (seeded mulberry32, policy runs in-page per chunk; `--tether 14` = the review's well-plaza wander; `--legacy-stuck` reproduces the seed test). Stuck = pushing the stick but < 15% of expected travel over a 1 s window; re-fires each further stuck second.
+- The seed bot's stuck test (< 0.08 m per 1/60 s step for 45 steps) means < 4.8 m/s, faster than `PLAY.runSpeed` 3.2 m/s: it "unstuck" every 0.75 s whatever happened (106 / 90 s on b4fa63a, review said 131), and its random turns made the circling-the-well random walk. Check a bot's thresholds against the controller's real speeds before trusting a stuck count. It also sent `Shift` (no dash; the controller reads `ShiftLeft`).
+- Real cause of village stops: `moveTo`'s 0.28 m nose probe points along the facing, so any diagonal push into a wall fails BOTH per-axis moves — the fox stopped dead instead of sliding. The slide used to run only for round posts; it now runs for any blocker while the player steers into it (never off a ledge) and eases the facing to the travel (`PLAY.slideTurn`).
