@@ -12,6 +12,9 @@ import { execFileSync } from 'node:child_process';
 
 const out = path.resolve(process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : '/tmp/homecoming-stills');
 const clip = process.argv.includes('--clip');
+// --beacon: right after the page is pinned, a continuous 6 s chase-cam clip from the ruin's overlook (the beacon
+// rising over the trees) to beacon.mp4
+const beacon = process.argv.includes('--beacon');
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5194, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
 await server.listen();
@@ -60,6 +63,18 @@ try {
   const WELL = [-8, 1.3, 85];
   await lens('01-well-before', CAM, WELL);
   await page.evaluate(() => window.__gameHooks.homecoming());
+  if (beacon) {
+    const dir = path.join(out, 'beacon-frames');
+    fs.mkdirSync(dir, { recursive: true });
+    await page.evaluate(() => { const h = window.__gameHooks; h.teleport(-24.4, 71.2, Math.atan2(16.4, 13.8)); h.advance(2, 1 / 60, false); });
+    for (let i = 0; i < 180; i++) {
+      await page.evaluate(() => window.__gameHooks.advance(2, 1 / 60, true));
+      await page.screenshot({ path: path.join(dir, `f${String(i).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 90 });
+    }
+    const ff = execFileSync('python3', ['-c', 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
+    execFileSync(ff, ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(dir, 'f%04d.jpg'), '-c:v', 'libx264', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path.join(out, 'beacon.mp4')]);
+    await page.evaluate(() => { window.__gameHooks.teleport(-3.0, 90.5, 0); window.__gameHooks.advance(20, 1 / 60, false); });
+  }
   await lens('02-pinned', CAM, WELL, 70);
   // the beacon from the ruin's overlook, where the page is kept (fox on the overlook, chase cam toward home)
   await page.evaluate(() => { const h = window.__gameHooks; h.teleport(-24.4, 71.2, Math.atan2(16.4, 13.8)); h.advance(60, 1 / 60, true); });
