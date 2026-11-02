@@ -65,3 +65,24 @@ Evidence: `/captures/sorrel/hermitage-pole-moved/`:60raw frames,4s15fps clip,
 7timed PNGs, window.__game,1500trace samples and state/route/camera checks.
 Offline30Hz640×360, staged lane-mouth start, ordinary controller thereafter;
 no audio or real-time-performance verdict.
+
+## Matched wide-collider retest — c701933 (Bramble f4f59bb)
+
+Restored line-three position plus r0.38 pole camera colliders clears the opaque
+upright from the fox at32s, but introduces a framing regression. All60 frames
+of30–34s reviewed in two sheets and exact32s native PNG: lower body is cropped
+during the hold, then recovers as the fox turns. Only23/60 strict animated-body
+viewport margins pass; failures span simulation frames900–972 (30–32.4s).
+This candidate is **NOT YET** visually accepted. Recommended Bramble's local
+fallback of suspending line three from existing scenery without its poles.
+
+Same staged lane-mouth start, ordinary controller input,50simulated seconds,
+30Hz640×360, silent offline capture. All3state checks and complete route pass,
+0JS errors. Numeric camera gates still pass: min chest1.942m, max pitch35.248°,
+max sustained grounded range2.790m, min projected fox74.627px. These aggregate
+gates do not establish full-body framing. TypeScript, lint:feel and production
+build pass. Shared camera remains unchanged.
+
+Evidence: `/captures/sorrel/hermitage-pole-fat/`,60raw frames,4s15fps clip,
+all-frame sheets, timed PNGs, full window.__game and1500trace samples. Exact
+32s PNG is `19-32.00s.png`; named runtime c701933d21ef306526214444774358e35fcd6145.
