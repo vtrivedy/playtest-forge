@@ -685,6 +685,11 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
 - The seed bot's stuck test (< 0.08 m per 1/60 s step for 45 steps) means < 4.8 m/s, faster than `PLAY.runSpeed` 3.2 m/s: it "unstuck" every 0.75 s whatever happened (106 / 90 s on b4fa63a, review said 131), and its random turns made the circling-the-well random walk. Check a bot's thresholds against the controller's real speeds before trusting a stuck count. It also sent `Shift` (no dash; the controller reads `ShiftLeft`).
 - Real cause of village stops: `moveTo`'s 0.28 m nose probe points along the facing, so any diagonal push into a wall fails BOTH per-axis moves — the fox stopped dead instead of sliding. The slide used to run only for round posts; it now runs for any blocker while the player steers into it (never off a ledge) and eases the facing to the travel (`PLAY.slideTurn`).
 
+## Discovery observer and control teaching follow-up — Hazel
+
+- Rendered-observer audit: game0289998, steering only from fragment instance positions inside the camera viewport and shown teach text, reaches thirdcatch42.7s and actualoverlook43s, including real spring retries. This uses geometry observation, not pixel vision or an occlusion guarantee. Its final still timed out; retained evidence has the completed trajectory/game state but capture `completed:false`. Do not label that run a completed visual capture.
+- On integrated22bfeb4 the same observer stalls after missing the second ruin jump. Root teaching defect: fading the old words out before redrawing delays the new jump instruction by~0.8s, long enough to walk off the lip. Control words now replace immediately while the panel still fades in/out. `teach-choice.ts` and the AST opacity-dependency negative guard prevent the old delay; TeachOrder's deferred-redraw negative fails at publication. Caption/story fades stay separate.
+
 ## Stones, Hermitage colour and music dynamics (Maple, swarm5)
 
 - Replacing a prop's geometry without moving the world: keep building the old geometry (it draws the shared
@@ -714,3 +719,8 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
 - The snow beat must not hand back to the follow lens: the kindle wide holds until snow, then eases (2.2 s) to the
   family shot, so 'Let the year turn.' lands on the family.
 - `tools/finale-journey-probe.mjs OUT --motion` is the cheapest real-route check (~10 min on swiftshader).
+- World edge (Maple, swarm5): outside the bowl's rims the terrain is only a gentle slope (bowlRim grows 14 per
+  rimK unit = ~0.35 m/m east/west), and the vista valley past Press Hollow's lip is walkable down. Closing one hole
+  with a rail just moved the leak (seed 1: lip → then east off the far crag). The fix class is a baked world mask
+  (`opening/worldBounds.ts`) read by the controller's `okAt` (`inWorld`): add new regions' shapes to `inside()`.
+  Check with `node tools/naive-explore.mjs --seconds 120 --seed 1..3` (final position must stay inside).

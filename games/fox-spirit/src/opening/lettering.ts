@@ -59,7 +59,8 @@ export function createLetterPlane(cw: number, ch: number, heightFrac: number, y:
         g.fill();
       }
       g.textBaseline = 'middle';
-      const total = lines.reduce((a, l) => a + l.px * 1.25, 0);
+      let total = 0;
+      for (const l of lines) total += l.px * 1.25;
       let at = (ch - total) / 2;
       for (const l of lines) {
         at += l.px * 0.625;

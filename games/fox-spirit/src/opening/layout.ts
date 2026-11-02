@@ -16,12 +16,12 @@ export const HEARTH_A = { x: 5.6, z: 74.2, r: 0.82, top: 1.0 } as const;
 export const SHELF = { x: 13, z: 75.5, w: 9, d: 9, yaw: 0.12, rise: 5 } as const;
 
 /**
- * Runaway Page flight loops, one per stage: [x, height above base terrain (groundH), z]. Stage 1 starts east of the well (the hedgehog has the well's face), in the wake view, and
- * circles the plaza; stages 2–3 circle over the canopy chain and the pop-up ruin high enough that only those reach it. `payoff.step` / `payoff.r` = radius of the permanent wash at each catch / when the page is kept.
+ * Runaway Page flight loops, one per stage: [x, height above base terrain (groundH), z]. Stage 1 waits directly ahead in the wake view, then
+ * leads down the exit lane; stages 2–3 circle over the canopy chain and the pop-up ruin high enough that only those reach it. `payoff.step` / `payoff.r` = radius of the permanent wash at each catch / when the page is kept.
  */
 export const PAGE = {
   stages: [
-    [[-1.8, 1.3, 88.2], [-2, 1.1, 91], [-1, 1.2, 95.5], [-5, 1.1, 97.2], [-10.5, 1.2, 95.5], [-13.2, 1.2, 90.2], [-12.5, 1.2, 86.8], [-10.5, 1.1, 82.8], [-5.2, 1.1, 84.2]],
+    [[-5.15, 1.1, 90.4], [-5.2, 1.1, 88.2], [-4.9, 1.1, 85.5], [-3.2, 1.1, 81.5], [-0.6, 1.1, 78.5], [1.0, 1.2, 81.5], [-0.8, 1.1, 85.5], [-2.7, 1.1, 89.0]],
     // stage 2 shuttles 1.6 m above the canopy's roost and high leaf (Tallow CANOPY rise 3.5 / 3.0): landing on a leaf
     // can't reach it, a spring launch through it can; hops arc out wide so it never flies into the fox
     [[-1, 5.1, 64.7], [2.6, 6.4, 64.6], [0.9, 4.6, 67.1], [-3, 6.2, 67.4]],

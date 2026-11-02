@@ -14,6 +14,8 @@ import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import { createPlay, PLAY, type Collider, type PlayController } from '../lookdevPlay';
 import { ALL_PATHS, FINALE, groundH, KEEPING, pathDist, SPAWN } from './layout';
 import { bakeLaneMap } from './lanePaint';
+import { buildWorldEdge } from './worldEdge';
+import { bakeWorldBounds } from './worldBounds';
 import { buildMeadow } from './meadow';
 import { buildVillage } from './village';
 import { createOpeningHearth } from './hearth';
@@ -187,10 +189,13 @@ export async function runOpening(): Promise<void> {
   // every builder has run: nothing that blocks may stand on a painted lane (lanes.ts)
   const blocked = laneBlocks(ctx.colliders, groundH);
   if (blocked.length) console.warn(`lane blocked:\n${blocked.join('\n')}`);
+  // the fox may not leave the slice (worldBounds.ts): naive wander walked off the far lip and off the far crag
+  const bounds = bakeWorldBounds();
   const player = createPlay({
     fox,
     groundH,
     colliders: ctx.colliders,
+    inWorld: bounds.inWorld,
     start: SPAWN,
     onGroundContact: (at, speed, jumpHeld, dt) => canopy.contact(at, speed, jumpHeld, dt) ?? unpressed.contact(at, speed, jumpHeld, dt),
     updrafts: hearth.updrafts,
@@ -252,6 +257,8 @@ export async function runOpening(): Promise<void> {
     player,
     crownLetGo: crown.letGo,
   });
+  // the hollow's far lip: a rail so the vista valley stays a view, not a walk off the world
+  buildWorldEdge(ctx);
   ctx.onUpdate((_dt, t) => {
     if (settledAt < 0) return;
     const f = fox.root.position;
