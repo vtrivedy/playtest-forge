@@ -80,3 +80,7 @@ re-entry from the evolving puzzle routes; it does not claim puzzle completion or
 Measure breadth from the same baked one-metre movement mask used by the controller. Report permitted footprint and
 bounds per world; these include water, obstacles and disconnected cells, so are not a reachable-area or duration
 claim. Record immutable commit in the JSON report. Use actual route simulation time separately from capture wall time.
+
+Portal-circuit visual review on 053e9e0c found both home-return lenses almost wholly blocked despite camera
+`blocked:false`. Diagnose with staged world travel and centre-screen mesh intersections; compare return landing
+positions without changing the opening spawn. Fix the landing or missing occluder, then repeat physical circuit.
