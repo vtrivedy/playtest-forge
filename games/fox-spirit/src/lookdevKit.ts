@@ -40,7 +40,7 @@ export const RAMP_CANOPY = toonRamp([118, 178, 255]);
 
 /** Shared paint uniforms: restores as (x, z, radius, edge) */
 /** permanent restore regions the paint shader reads (H-a, steam, root, ruin, page… — one slot each) */
-export const RESTORE_SLOTS = 8;
+export const RESTORE_SLOTS = 16;
 export const paintU = {
   ...createTrailUniforms(),
   uRestore: { value: Array.from({ length: RESTORE_SLOTS }, () => new THREE.Vector4()) },
@@ -70,6 +70,8 @@ export const NOISE_GLSL = /* glsl */ `
  * `climbBase` makes the front climb from that height so canopies paint bottom-up, never speckled.
  */
 export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBase: number | null, hatchWeight = 1): void {
+  // bake key (opening/bake.ts): materials with equal params render alike (climb to the nearest 0.5 m)
+  mat.userData.lk = `${contour}|${climbBase === null ? 'n' : Math.round(climbBase * 2) / 2}|${hatchWeight}`;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, paintU);
     shader.uniforms.uLkContour = { value: contour };
@@ -252,8 +254,8 @@ export function hewn(geo: THREE.BufferGeometry, rand: () => number, amount = 0.0
  * body); the toon ramp then bands the light on top of it, so the underside is a single shade band.
  */
 export type CanopyTones = [number, number, number];
-export function canopyPad(rand: () => number, radius: number, height: number, tones: CanopyTones): THREE.BufferGeometry {
-  const g = new THREE.SphereGeometry(1, 40, 18);
+export function canopyPad(rand: () => number, radius: number, height: number, tones: CanopyTones, detail = 1): THREE.BufferGeometry {
+  const g = new THREE.SphereGeometry(1, Math.round(40 * detail), Math.round(18 * detail));
   const p = g.getAttribute('position') as THREE.BufferAttribute;
   const ph = Array.from({ length: 6 }, () => rand() * 6.28);
   for (let i = 0; i < p.count; i++) {
@@ -341,7 +343,8 @@ export const RIM_LEAF = (() => {
 })();
 
 /** Gnarled maple: flared, leaning trunk forking into limbs at staggered heights, each ending in a canopy lobe. */
-export function buildMaple(rand: () => number, scale: number, kind: TreeKind, palette: number, baseY: number): THREE.Group {
+/** `detail` < 1 builds coarser canopy lobes (far scenery: same silhouette, fewer triangles) */
+export function buildMaple(rand: () => number, scale: number, kind: TreeKind, palette: number, baseY: number, detail = 1): THREE.Group {
   const g = new THREE.Group();
   const climbBase = baseY + 0.4;
   const bark = toon(0x4a3326, { contour: 0.8, climbBase });
@@ -405,7 +408,7 @@ export function buildMaple(rand: () => number, scale: number, kind: TreeKind, pa
   }
   pads.forEach((pd, i) => {
     const tones = canopyTones(palette, kind, i);
-    const geo = canopyPad(rand, pd.r, pd.h, tones);
+    const geo = canopyPad(rand, pd.r, pd.h, tones, detail);
     const pad = inked(geo, toon(0xffffff, { vertexColors: true, contour: 0.9, climbBase, ramp: RAMP_CANOPY }), 0.028, true);
     pad.position.copy(pd.at);
     pad.rotation.set((rand() - 0.5) * 0.6, rand() * 6.28, (rand() - 0.5) * 0.6);

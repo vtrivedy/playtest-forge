@@ -405,3 +405,23 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
 ## Free camera release continuity — Fern, swarm4
 
 A clear destination is not a clear connecting segment. Full staged finale route on c330e89 exposed lens release steps1.024m leaving the crag and2.444m on return to meadow. Checking only blocked candidate motion leaves the free-pose early return unconstrained; limiting direct release but falling back to the destination when the intermediate segment is blocked is also wrong. cff7a25 keeps the escape search active until swept gradual release is safe, with12m/s release bound selected over16m/s. Full affected route and ruin success/intentional miss pass (integration2afb162); see docs/reviews/swarm4/fern-finale-cff7a25.md. Regression checks now run under lint:feel at30/60/120Hz and fail against the previous solver. The nine-state CameraEnvelope model verifies ordering only, not this continuous geometry. Emergency relocation can still exceed the release bound when no continuous safe pose is available.
+## World expansion and render budget (Bramble, swarm4)
+
+- The playable world is a union of shapes, not one ellipse: `groundH` = lerp(bowl base, `westBase`, `westK(x)`)
+  + smooth-min(bowl rim, `westRim`), with Wren's `vistaCut` applied last. Add a region by adding a shape to
+  `westE` (metres outside, negative inside) — rim, rim trees and grass masks follow automatically.
+- There is no hard world boundary: any slope under ~4 m/m is walkable (controller step 0.22 m per frame at
+  3.2 m/s). A place "reachable only by glide" needs column/cliff sides ≥ 1 m above every reachable
+  neighbour, not just height above the valley floor.
+- Two ground sheets that overlap z-fight (each triangulates groundH differently). Abut sheets on a shared edge
+  (bowl sheet x ≥ −64, Millbrook sheet x < −64).
+- Triangles, not draw calls, dominate SwiftShader time: leaf-card InstancedMeshes were ~1.1 M of the bowl's
+  1.3 M spawn triangles (renderer.info). `tools/world-stills.mjs` prints calls/tris per still; `--pre` runs JS
+  first (e.g. a tri breakdown by top-level group). Far scenery: `buildMaple(..., detail)` coarser lobes and
+  `bakeCells(..., thin)` keeps every n-th card.
+- `bake.ts` merges static props per material (toon materials carry a `userData.lk` key from patchPaint).
+  ~30 meshes per maple → ~7. Never bake an occluder group together with others: the chase-cam fade works per root.
+- Local SwiftShader screenshots of the west cost ~1.3 s each at 640×360; sim+render without readback is
+  ~5–10 ms/frame (`tools/perf-probe.mjs`). Budget input-route clips accordingly (~16× slower than real time).
+- `pkill -f <name>` from a Bash tool call matches the tool's own command line and kills it (exit 144). Use
+  `pgrep -af` and kill by pid.
