@@ -18,8 +18,8 @@ const FADE = 0.4;
 export function updateTeach(t: TeachState, dt: number): void {
   const want = t.offered;
   t.offered = null;
-  // a new line waits for the old one to fade out before it is drawn
-  if (want !== null && want !== t.drawn && t.o <= 0.01) {
+  // Control words change immediately; only the panel appearance/disappearance fades.
+  if (want !== null && want !== t.drawn) {
     t.redraw(want);
     t.drawn = want;
   }

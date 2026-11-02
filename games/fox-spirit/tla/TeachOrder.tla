@@ -1,7 +1,7 @@
 ---------------------------- MODULE TeachOrder ----------------------------
 EXTENDS Integers, TLC
 \* One active-chase frame near H-a. The late page offer must beat the earlier hearth offer.
-\* This models offer consumption order, not text fade or canvas drawing.
+\* chosen models this frame's drawn instruction. Panel opacity is outside the model and must not defer choosing the current words.
 VARIABLES cursor, pending, chosen, published
 vars == <<cursor, pending, chosen, published>>
 Init == cursor = 0 /\ pending = "none" /\ chosen = "none" /\ published = FALSE
