@@ -389,7 +389,10 @@ export function createFollowCamera(opts: {
       return floor === undefined || !Number.isFinite(floor) || point.y >= floor + params.clearance * .8 - .00001;
     };
     const check = (x: number, z: number) => {
-      candidateLens.set(x, lens.y, z);
+      // Escape horizontally at the last clear height before descending off a
+      // platform. Lowering every candidate into its side can pin the old lens
+      // forever while the fox walks underneath it.
+      candidateLens.set(x, previousClear ? Math.max(lens.y, previousLens.y) : lens.y, z);
       if (previousClear) {
         const travel = candidateLens.distanceTo(previousLens), maximumStep = Math.max(.08, 16 * dt);
         if (travel > maximumStep) candidateLens.lerpVectors(previousLens, candidateLens, maximumStep / travel);

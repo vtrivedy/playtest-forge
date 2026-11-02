@@ -1,6 +1,6 @@
 // Camera regression: full-slice input, chase stills and per-frame lens metrics.
 // node tools/camera-drop-probe.mjs <out> [fallLag=0.07] [seconds=62] [port=5198] [--clip|--encode-only]
-// Optional: --clip-beat 'unfold the way home' --clip-seconds 6 --size 640x360
+// Optional: --dt 0.03333333333333333 --stills-at 65,72,80,89 --clip-beat 'unfold the way home' --clip-seconds 6 --size 640x360
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import { createSliceRoute, SLICE_START } from './opening-hero-route.mjs';
@@ -15,9 +15,12 @@ const clip = process.argv.includes('--clip');
 const option = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
 const clipBeat = option('clip-beat', 'off the canopy');
 const clipSeconds = Number(option('clip-seconds', '3'));
+const testDt = Number(option('dt', String(1 / 60)));
+if (!Number.isFinite(testDt) || testDt <= 0 || testDt > .05) throw Error('dt must be in (0, .05]');
+const stillFrames = option('stills-at', '').split(',').filter(Boolean).map(t => Math.round(Number(t) / testDt));
 const [width, height] = option('size', '1280x720').split('x').map(Number);
 if (![width, height].every(v => Number.isInteger(v) && v > 0) || !Number.isFinite(clipSeconds) || clipSeconds <= 0) throw Error('Invalid clip dimensions/duration');
-const clipFrames = Math.round(clipSeconds * 60 / 2) * 2;
+const clipFrames = Math.round(clipSeconds / testDt / 2) * 2;
 if (clip) fs.mkdirSync(path.join(out,'drop-frames'), {recursive:true});
 function encodeDrop() {
   // Playwright ships a VP9 encoder with Chromium; no system ffmpeg install needed.
@@ -26,7 +29,7 @@ function encodeDrop() {
   if(!version)throw new Error('Playwright ffmpeg bundle missing');
   const frames=fs.readdirSync(path.join(out,'drop-frames')).filter(n=>/^f\d{3}\.jpg$/.test(n)).sort();
   if(frames.length!==clipFrames/2)throw new Error(`Expected ${clipFrames/2} clip frames; found ${frames.length}`);
-  execFileSync(path.join(cache,version,'ffmpeg-linux'),['-y','-v','error','-f','image2pipe','-framerate','30','-vcodec','mjpeg','-i','pipe:0','-c:v','libvpx-vp9','-b:v','0','-crf','18','-deadline','realtime','-cpu-used','4','-pix_fmt','yuv420p',path.join(out,clipBeat === 'off the canopy' ? 'drop.webm' : 'clip.webm')],{input:Buffer.concat(frames.map(n=>fs.readFileSync(path.join(out,'drop-frames',n))))});
+  execFileSync(path.join(cache,version,'ffmpeg-linux'),['-y','-v','error','-f','image2pipe','-framerate',String(1 / (2 * testDt)),'-vcodec','mjpeg','-i','pipe:0','-c:v','libvpx-vp9','-b:v','0','-crf','18','-deadline','realtime','-cpu-used','4','-pix_fmt','yuv420p',path.join(out,clipBeat === 'off the canopy' ? 'drop.webm' : 'clip.webm')],{input:Buffer.concat(frames.map(n=>fs.readFileSync(path.join(out,'drop-frames',n))))});
 }
 if(process.argv.includes('--encode-only')){encodeDrop();process.exit(0);}
 fs.mkdirSync(out, {recursive:true});
@@ -40,43 +43,44 @@ page.setDefaultTimeout(300000);
 try {
   await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'domcontentloaded',timeout:180000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true);
-  await page.evaluate(({source,start,fallLag})=>{
+  await page.evaluate(({source,start,fallLag,testDt})=>{
     const h=window.__gameHooks;
     h.setManual(true); h.camera.fallLag=fallLag;
     h.teleport(start.x,start.z,start.yaw);
-    window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,1/60,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1};
-  },{source:createSliceRoute.toString(),start:SLICE_START,fallLag});
+    window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1};
+  },{source:createSliceRoute.toString(),start:SLICE_START,fallLag,testDt});
   let done=false, n=0;
   while(!done){
-    const result=await page.evaluate(({total,clip,clipBeat,clipFrames})=>{
+    const result=await page.evaluate(({total,clip,clipBeat,clipFrames,testDt,stillFrames})=>{
       const p=window.__cameraProbe,h=window.__gameHooks,c=window.__opening.camera;
       let label='', captureFrame=null;
       for(let i=0;i<60 && p.f<total;i++,p.f++){
-        const f=p.f,prev=p.state,input=p.route(f/60,prev);
+        const f=p.f,prev=p.state,input=p.route(f*testDt,prev);
         if(prev.grounded)p.apex=false;
-        const apex=!p.apex&&!prev.grounded&&prev.vel[1]>0&&prev.vel[1]-15/60<=0;
+        const apex=!p.apex&&!prev.grounded&&prev.vel[1]>0&&prev.vel[1]-15*testDt<=0;
         if(apex)p.apex=true;
         const touch=p.touchdown>=0&&f===p.touchdown+2;
         const detail=input.beat==='off the canopy'&&f%8===0;
         if(input.beat===clipBeat&&p.clipStart<0)p.clipStart=f;
-        const shot=input.beat!==p.beat||apex||touch||detail;
+        const timed = stillFrames.includes(f);
+        const shot=input.beat!==p.beat||apex||touch||detail||timed;
         const clipFrame=clip&&p.clipStart>=0&&f-p.clipStart<clipFrames&&(f-p.clipStart)%2===0;
         p.beat=input.beat;
         h.setStick(input.x,input.z);
         h.setKeys([...(input.jump?['Space']:[]),...(input.dash?['ShiftLeft']:[])]);
-        const s=h.advance(1,1/60,shot||clipFrame);
+        const s=h.advance(1,testDt,shot||clipFrame);
         const lensPitch=-Math.asin(c.getWorldDirection(c.position.clone()).y)*180/Math.PI;
         p.state=s;
         p.trace.push({f,beat:p.beat,pos:s.pos,vel:s.vel,grounded:s.grounded,camera:s.camera,lensPitch,lastJump:s.lastJump,page:s.opening.page,canopy:s.opening.canopy,popUpRuin:s.opening.popUpRuin});
         if(!prev.grounded&&s.grounded)p.touchdown=f;
         if(shot||clipFrame){
-          if(shot)label=detail?`drop-${f}`:apex?'apex':touch?'touchdown+2':p.beat;
+          if(shot)label=timed?`${(f * testDt).toFixed(2)}s`:detail?`drop-${f}`:apex?'apex':touch?'touchdown+2':p.beat;
           if(clipFrame)captureFrame=(f-p.clipStart)/2;
           p.f++;break;
         }
       }
       return {done:p.f>=total,f:p.f,label,beat:p.beat,captureFrame};
-    },{total:Math.round(seconds*60),clip,clipBeat,clipFrames});
+    },{total:Math.round(seconds/testDt),clip,clipBeat,clipFrames,testDt,stillFrames});
     done=result.done;
     if(result.captureFrame!==null)await page.screenshot({path:path.join(out,'drop-frames',`f${String(result.captureFrame).padStart(3,'0')}.jpg`),type:'jpeg',quality:92});
     if(result.label){
@@ -87,7 +91,16 @@ try {
   }
   const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,game:{mode:window.__game.mode,state:window.__game.state()}}));
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,seconds,sha,clipBeat,clipSeconds,viewport:[width,height]},null,2));
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,testDt,seconds,sha,clipBeat,clipSeconds,viewport:[width,height]},null,2));
+  const late = evidence.trace.filter(s => s.f * testDt >= 60);
+  if (late.length) {
+    const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));
+    const maxPitch = Math.max(...late.map(s => Math.abs(s.lensPitch)));
+    const cameraCheck = { fromSeconds: 60, minChestDistance, maxPitch, pass: minChestDistance >= 1.1 && maxPitch < 70 && !errors.length };
+    fs.writeFileSync(path.join(out, 'camera-check.json'), JSON.stringify(cameraCheck, null, 2));
+    console.log('CAMERA', JSON.stringify(cameraCheck));
+    if (process.argv.includes('--check-camera') && !cameraCheck.pass) process.exitCode = 1;
+  }
   if(clip)encodeDrop();
   console.log('DONE',JSON.stringify({errors,final:evidence.game.state.opening.page}));
 }finally{await browser.close();await server.close();}
