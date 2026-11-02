@@ -60,7 +60,7 @@ def capture(ref: str, seconds: int, job: str, variant: str, paths: str):
                 if audit.returncode not in [0, 1]:
                     raise RuntimeError(audit.stderr)
                 audits[stream] = json.loads(audit.stdout)
-            if paths == 'paired':
+            if paths in {'paired', 'compositor'}:
                 run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-framerate', '10', '-i', str(out / 'compositor/frame-%05d.jpg'), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', str(out / 'compositor-sampled.mp4')])
                 compositor = subprocess.run(['python3', '/opt/check-black-frames.py', str(out / 'compositor-sampled.mp4'), '--out', str(out / 'compositor-blackcheck.json')], text=True, capture_output=True)
                 if compositor.returncode not in [0, 1]:
@@ -84,7 +84,7 @@ def main(ref: str, seconds: int = 120, variant: str = 'baseline', paths: str = '
         raise ValueError('Use an immutable 40-character pushed SHA')
     if not os.environ.get('GH_TOKEN'):
         raise ValueError('GH_TOKEN required in environment (passed only as ephemeral Modal secret)')
-    if variant not in {'baseline', 'preserve', 'no-aa', 'finish'} or paths not in {'native', 'staged', 'paired'}:
+    if variant not in {'baseline', 'preserve', 'no-aa', 'finish'} or paths not in {'native', 'staged', 'paired', 'compositor'}:
         raise ValueError('Invalid diagnostic variant or paths')
     job = f'boundary-{variant}-{ref[:10]}-{time.strftime("%H%M%S")}-{uuid.uuid4().hex[:6]}'
     print('Artifacts: keeping-swarm5-captures/reed/' + job, flush=True)

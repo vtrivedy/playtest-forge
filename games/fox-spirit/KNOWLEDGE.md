@@ -568,7 +568,7 @@ checks and screenshots under `/captures/fern/`, mirrored in
 `keeping-swarm4-captures/fern/` volume. These are offline, sampled 15 fps, silent
 camera reviews; they do not certify real-time performance or audio.
 - Gate story hand-offs on the beat every route actually reaches, not the optional maximum: the homecoming→finale stream first waited for all five lanterns (every creature freed), which no slice route does, so the ending never appeared in Kit's clips (Fern fixed: page pin starts it). Check new gates against the shared slice route (`tools/page-motion-probe.mjs` / Kit's landing route), not a staged "everything done" state.
-- Isolated single black frames in a real-time capture with bright neighbours, evenly spread, are a recorder/drawing-buffer artifact, not the render: `tools/blink-scan.mjs --from T --every 2` reads the live WebGL canvas in-page over the slice route (617ad72: 2400 frames, min luma 112, zero dark) — prove in-canvas before chasing shaders.
+- Earlier software-only scans (617ad72: 2400 frames, min luma112, zero dark) did NOT establish that the GPU flashes were recorder-only. Reed swarm5 hardware comparison below supersedes that conclusion: native, staged and independent CDP output all flash, including one synchronous source sample. Reproduce on the affected GPU path before assigning the cause.
 
 ## Showcase continuation and teaching overlays — Fern050a7cc
 
@@ -600,3 +600,12 @@ Review timed UI overlays in motion: a bottom-center teaching card covered the fo
 - RecorderBoundary.tla checks synchronous render→copy→publish ordering (11 states).
   RecorderBoundaryBad.cfg deliberately permits discard before copy and fails
   NoBlackPublication. It proves ordering only, not GPU/browser correctness.
+
+Hardware reproduction on diagnostic764b338 (game source identical to b4fa63a):
+T4/EGL1280×720,120s wall recording, native20/2545 black frames, synchronous
+2D staging33/3400, independent CDP compositor11/1133. Stage read at simulation
+tick3000 is0luma. Independent compositor frame00007 is fully black. This falsifies
+the MediaRecorder-only claim and the proposed2D staging fix on this path. Artifacts
+`keeping-swarm5-captures/reed/boundary-764b33881c-154213-24ad01`; source/tool hashes,
+actual frame PTS, GPU attributes, screenshots and __game are preserved. Context has
+preserveDrawingBufferfalse and antialiastrue. Cause still open; flag A/B underway.

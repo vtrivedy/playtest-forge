@@ -14,7 +14,7 @@ const seconds=Number(arg('route-seconds','120')),fps=Number(arg('fps','30'));
 const [width,height]=arg('size','1280x720').split('x').map(Number);
 const backend=arg('backend','egl'),paths=arg('paths','paired'),variant=arg('variant','baseline');
 if(!['baseline','preserve','no-aa','finish'].includes(variant))throw Error('Unknown renderer variant');
-if(!['native','staged','paired'].includes(paths))throw Error('Unknown capture paths');
+if(!['native','staged','paired','compositor'].includes(paths))throw Error('Unknown capture paths');
 fs.mkdirSync(out,{recursive:true});fs.mkdirSync(path.join(out,'compositor'),{recursive:true});
 const report={source:execFileSync('git',['-C',repo,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),captureToolSha:createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'),fps,seconds,viewport:[width,height],backend,paths,variant,errors:[],compositor:[],label:'Matched native WebGL + persistent 2D MediaRecorder streams and independent CDP compositor JPEGs. One initial wake placement, fixed-clock inputs on a real-time rAF; no later teleports or forced progression.'};
 const save=()=>fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));
@@ -58,13 +58,13 @@ try{
   report.compositor.push({file,timestamp:event.metadata.timestamp});
   cdp.send('Page.screencastFrameAck',{sessionId:event.sessionId}).catch(e=>report.errors.push(String(e)));
  });
- if(paths==='paired')await cdp.send('Page.startScreencast',{format:'jpeg',quality:70,maxWidth:640,maxHeight:360,everyNthFrame:3});
+ if(paths==='paired'||paths==='compositor')await cdp.send('Page.startScreencast',{format:'jpeg',quality:70,maxWidth:640,maxHeight:360,everyNthFrame:3});
  await page.evaluate(({stageSource,routeSource,fps,paths,variant})=>{
   const h=window.__gameHooks,renderer=window.__opening.ctx.renderer,source=renderer.domElement,gl=renderer.getContext();
   h.advance(0,1/fps,true);
-  const stage=paths==='native'?null:new Function(`return (${stageSource})`)()(source);
+  const stage=(paths==='native'||paths==='compositor')?null:new Function(`return (${stageSource})`)()(source);
   const streams={},records={};
-  if(paths!=='staged')streams.native=source.captureStream(fps);
+  if(paths==='native'||paths==='paired')streams.native=source.captureStream(fps);
   if(stage)streams.staged=stage.stream;
   for(const[key,video]of Object.entries(streams)){
    const stream=new MediaStream([...video.getVideoTracks(),...h.audioTap().getAudioTracks()]);
@@ -103,7 +103,7 @@ try{
    v.video.getTracks().forEach(track=>track.stop());
   }if(p.stage)p.stage.stop();return{videos,startEpochMs:performance.timeOrigin+p.started,ticks:p.ticks,simulationSeconds:p.ticks/p.fps,stagedFrames:p.stage?p.stage.frames:0,samples:p.samples,game:window.__gameHooks.state(),wallSeconds:(performance.now()-p.started)/1000};
  });
- if(paths==='paired')await cdp.send('Page.stopScreencast');
+ if(paths==='paired'||paths==='compositor')await cdp.send('Page.stopScreencast');
  for(const[key,data]of Object.entries(result.videos))fs.writeFileSync(path.join(out,key+'.webm'),Buffer.from(data,'base64'));
  delete result.videos;Object.assign(report,result);
  await page.evaluate(()=>window.__gameHooks.advance(0,1/30,true));await page.screenshot({path:path.join(out,'end.png')});
