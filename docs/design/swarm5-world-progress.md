@@ -154,3 +154,9 @@ Canonical story wording and character identities must follow Maple's shared outl
 Verification: open and navigate with real keyboard, inspect 1280 and 960 viewport captures, confirm locked/visited/restored differences and no leaked future text, retain __game plus exact progress fixture. Review the worst readability issue, fix, recapture. This component proof does not establish an in-world character encounter or 10–15 minute route.
 
 Canonical story alignment: Maple a9ed01c3 supplies the Ferrykeeper, the first pressed flood, the Warden as the Scribe's shadow and the final loss. Nine memory entries now follow that outline. Each world's combine also reveals a short returned-page line over the game; Tab dismisses it into the relevant full story spread. The snapshot of known combine facts is initialized from the save, so loading a completed world does not replay its revelation. Presentation has no new gameplay/save flags. The final stage line is twelve words: “I kept autumn. It was the last season we were all here.” The expanded memory retains Maple's original quotation.
+
+Returned-page notices expire after seven simulation seconds (Cedar's climb review
+found a notice still covering the view after25s). The earned page remains selected
+and readable with Tab after expiry. Opening the Album dismisses the notice at once;
+reloads and repeated discovery do not replay it. Pass actual dt from the scene,
+keep the countdown in the existing hot fitting module, and add no save flags.

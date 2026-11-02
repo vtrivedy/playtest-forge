@@ -1,0 +1,16 @@
+{
+  "video": "/work/docs/reviews/swarm5/reed-mist/marsh-walk-3b559ea6.mp4",
+  "sha256": "ed506d372e089a5b6d518c7703ad8e0e844fae75eae0477d52b3d3adbf072073",
+  "decodedFrames": 72,
+  "firstPts": 0.0,
+  "lastPts": 5.916667,
+  "minimumMeanLuma": 91.457,
+  "thresholds": {
+    "meanLuma": 12,
+    "pixelLuma": 16,
+    "fraction": 0.98
+  },
+  "darkFrameCount": 0,
+  "darkFrames": [],
+  "pass": true
+}

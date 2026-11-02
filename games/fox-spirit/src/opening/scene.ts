@@ -324,7 +324,7 @@ export async function runOpening(): Promise<void> {
   let progressT = 0;
   const archSaid = { ashwater: progress.isRestored('russetvale', 'teach'), press: progress.isVisited('ashwater', 'teach') };
   ctx.onUpdate((dt) => {
-    pageMap.step();
+    pageMap.step(dt);
     progressT += dt;
     if (progressT < 0.5) return;
     progressT = 0;

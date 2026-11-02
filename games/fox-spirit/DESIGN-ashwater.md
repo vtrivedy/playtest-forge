@@ -24,3 +24,14 @@ Rules
 Integration (Maple owns): `buildAshwater(ctx, { complete(level), hasReedskim() })`, `layout.groundH` → `H` for x > 400,
 `worldBounds` → `E < 2.5` there, spawn = `ashwater.spawn`. Look (rain, teal fog, cool key) is the integrator's.
 Probe: `node tools/ashwater-probe.mjs OUT [--frames]` (staged landing start, then stick/keys only).
+
+## Final framing follow-up: low mist and drained beds (Reed, Nov 2)
+
+The roof trigger is on a bed at y=-1 while the two world-wide mist sheets stay at
+-0.12 and +0.12. These sheets can sit between the chase lens and the whole fox;
+roof occluder registration cannot affect them. The matched frame with only mist sheets hidden confirms this. Retain the land atmosphere
+but feather its opacity to zero over the drainable channels and mill pool, using
+the canonical WATER bounds in world space. The mask must stay fixed while the
+mist texture drifts. Keep pond mist, weather, progression, collision and controls.
+Verify the matched roof view, full physical route and existing build/feel gates.
+The large Seedwell close-up and sparse terrain remain separate open art issues.
