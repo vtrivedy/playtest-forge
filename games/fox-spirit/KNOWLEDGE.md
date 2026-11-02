@@ -726,3 +726,12 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
   with a rail just moved the leak (seed 1: lip → then east off the far crag). The fix class is a baked world mask
   (`opening/worldBounds.ts`) read by the controller's `okAt` (`inWorld`): add new regions' shapes to `inside()`.
   Check with `node tools/naive-explore.mjs --seconds 120 --seed 1..3` (final position must stay inside).
+
+
+## Discovery safe completion — Hazel, swarm5 follow-up
+
+- An idle-at-wake1.5s trial on7a4cecdd caught the third page during ascent from the second ruin leaf (x−27.24,y0.55), before reaching the overlook. Guidance hid immediately; the bot released jump, jumpCut halved its rise, and it fell short. The overlook assertion correctly failed. That capture was stopped and retained with STATUS.md; it is not a completed final clip.
+- Guidance now remains in `land` after a third catch until CURRENT grounded contact on the overlook. It advises Hold Space, preserving the jump/glide, and a floor miss can reuse opened-leaf guidance. Page progression is unchanged. `readOverlookLanding()` returns a private unique-symbol token; only `completeGuide(token)` may set done/inactive. `discovery-safety-lint.mjs` rejects old phase-based hiding, direct done assignments and raw-token completion.
+- Discovery.tla112generated/38distinct passes; removing Finish's current-contact guard fails DoneAfterLanding in a five-state trace. This checks completion safety and stable done, not physical reachability. Probe assertions now require completed guidance and a grounded done transition as well as kept page + real overlook event.
+- Matched blind controls on591e04b9 vs4f67f9ac (same f1ffac3 random policy, manual clock fixed,120s,seeds1–3): first catches0/0/0→1/1/0; all still0overlook. Rendered-cue following is a separate policy with no hidden goal/action/leg steering, not a claim that random wandering solves platform puzzles.
+- Safe-completion trial934a6d38 landed at x−25.9017,y1.02,z71.5088: grounded on the actual pad, but1.7mm outside the ruin's authored arrival trigger. The strict same-frame arrival assertion failed correctly. The contact token now requires BOTH the ruin's authoritative `overlookVisited` milestone and current physical support; standing on the outer pad keeps the landing cue toward its centre. No copied arrival threshold or weakened assertion. The historical milestone alone never completes guidance.

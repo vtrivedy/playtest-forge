@@ -63,7 +63,7 @@ await page.evaluate(({ seed, legacy, tether, policy, policySource, observerSourc
   const W = {
     lastMag: 0.85, step: 0, heading: Math.PI, stuckFor: 0, stuck: false, legacyStuck: 0, last: null,
     unsticks: 0, stuckFrames: 0, events: [], path: [],
-    disc: { catches: 0, stageMax: 0, kept: false, overlookMin: Infinity, overlook: false, millbrook: false, hermitage: false, pressHollow: false, leftVillage: false, captions: [] },
+    disc: { catches: 0, stageMax: 0, kept: false, guidanceFinished: false, overlookMin: Infinity, overlook: false, millbrook: false, hermitage: false, pressHollow: false, leftVillage: false, captions: [] },
   };
   window.__naive = W;
   W.run = (n) => {
@@ -116,6 +116,7 @@ await page.evaluate(({ seed, legacy, tether, policy, policySource, observerSourc
       const dOver = Math.hypot(x + 24.4, z - 71);
       W.disc.overlookMin = Math.min(W.disc.overlookMin, dOver);
       if (op?.popUpRuin?.reached) W.disc.overlook = true;
+      if(op?.discovery?.leg==='done'&&!op.discovery.active) W.disc.guidanceFinished=true;
       if (x < -60 && z > 70 && z < 120) W.disc.millbrook = true;
       if (z > 120) W.disc.hermitage = true;
       if (z < 50 && x > 10 && x < 35) W.disc.pressHollow = true;
@@ -171,4 +172,4 @@ const { events, path: _p, ...summary } = result;
 console.log(JSON.stringify(summary, null, 2));
 await browser.close();
 await server.close();
-process.exit(errors.length || policy === 'cue' && !(W.disc.kept && W.disc.overlook) ? 1 : 0);
+process.exit(errors.length || policy === 'cue' && !(W.disc.kept && W.disc.overlook && W.disc.guidanceFinished) ? 1 : 0);

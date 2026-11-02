@@ -125,7 +125,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const base = Float32Array.from(geo.getAttribute('position').array);
   const art = pageTexture();
   const page = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: art, side: THREE.DoubleSide, transparent: true, alphaTest: 0.02, fog: false }));
-  const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.6, H * 1.45), new THREE.MeshBasicMaterial({ color: 0xffb066, map: pageGlowTexture(), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 2.1, H * 1.9), new THREE.MeshBasicMaterial({ color: 0xffb066, map: pageGlowTexture(), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   glow.position.z = -0.01;
   const body = new THREE.Group();
   body.add(glow, page);
@@ -201,6 +201,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const off = new THREE.Vector3();
   let flingT = 0;
   let keptAt = -1;
+  let keptGlow = 0.35;
   const pos = new THREE.Vector3();
   const prev = new THREE.Vector3();
   const flingFrom = new THREE.Vector3();
@@ -230,6 +231,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     for (let i = 0; i < 24; i++) emit(pos, 1.6, 2.4);
     if (catches >= PAGE.stages.length) {
       phase = 'kept';
+      keptGlow = (glow.material as THREE.MeshBasicMaterial).opacity;
       keptAt = 0;
       releaseAnchor.copy(pos);
       const floor = ctx.player!.surfaceAt(pos.x, pos.z);
@@ -381,7 +383,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       pos.lerpVectors(carried, tmp, THREE.MathUtils.smoothstep(keptAt, 0, 0.7));
       body.scale.setScalar(1 + k * 0.25);
       (page.material as THREE.MeshBasicMaterial).opacity = 1 - THREE.MathUtils.smoothstep(keptAt, 2.5, 4.5);
-      (glow.material as THREE.MeshBasicMaterial).opacity = 0.35 * (1 - THREE.MathUtils.smoothstep(keptAt, 2, 4));
+      (glow.material as THREE.MeshBasicMaterial).opacity = keptGlow * (1 - THREE.MathUtils.smoothstep(keptAt, 2, 4));
       holder.visible = keptAt < 4.6;
     }
     // camera interest: while the chase is on, ease the lens round behind the fox so the page stays in frame
@@ -437,7 +439,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     // winded: the glow dims and the sheet sags — the window to catch it (eased, no flicker)
     if (phase !== 'kept') {
       const gm = glow.material as THREE.MeshBasicMaterial;
-      gm.opacity = THREE.MathUtils.damp(gm.opacity, windedT > 0 ? 0.14 + 0.04 * Math.sin(t * 3) : 0.35, 6, dt);
+      gm.opacity = THREE.MathUtils.damp(gm.opacity, windedT > 0 ? 0.14 + 0.04 * Math.sin(t * 3) : 0.55, 6, dt);
     }
     body.position.y = THREE.MathUtils.damp(body.position.y, windedT > 0 ? -0.22 : 0, 5, dt);
     // upright and facing you while it watches; tipped forward into its flight like a moth when it runs

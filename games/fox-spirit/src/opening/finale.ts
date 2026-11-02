@@ -718,7 +718,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     onwardMesh, onwardLut, emberAt: new THREE.Vector3(), onwardAt, onwardFrom,
     homeReady: opts.homeReady,
     emberWhere: (out: THREE.Vector3) => opts.ember.where(out),
-    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
+    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card, teach: ctx.teach.offer,
     cradle: cradleAt,
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
     toCrown,
