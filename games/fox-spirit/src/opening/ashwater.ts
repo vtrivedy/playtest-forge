@@ -512,8 +512,9 @@ export function buildAshwater(
     teach: ctx.teach.offer,
     events: {
       secret: (which) => {
-        say(which === 0 ? 'A home, under the reeds.' : 'The last ferry never left.');
-        opts.onSecret?.(which === 0 ? 'ashwater-roof' : 'ashwater-mooring');
+        // the Album's page toast speaks the place's line (no caption on top of it)
+        if (opts.onSecret) opts.onSecret(which === 0 ? 'ashwater-roof' : 'ashwater-mooring');
+        else say(which === 0 ? 'A home, under the reeds.' : 'The last ferry never left.');
       },
       burstA: () => {
         ctx.audio.cue('millrace-burst');
