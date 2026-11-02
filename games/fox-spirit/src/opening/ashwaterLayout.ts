@@ -34,17 +34,17 @@ export const BED = -1.0;
 
 /** the Low Sluice's reed dam (on the landing bank, west of the path) and the mill race's dam (on an islet in the pond) */
 export const DAM_A = { lx: -11, lz: -35.2, reach: 3.2 };
-export const ISLET = { lx: 24, lz: 3.4, r: 2.6 };
-export const DAM_B = { lx: 24, lz: 3.4, reach: 3.2 };
+export const ISLET = { lx: 23.6, lz: 1.0, r: 2.6 };
+export const DAM_B = { lx: 24.4, lz: 1.0, reach: 3.2 };
 
 /** reed mats over Reed Pond (the main crossing) and the branch out to the dam islet: [lx, lz] centres, 1.8 m square */
 export const MATS: ReadonlyArray<readonly [number, number]> = [
-  // ~4.6 m apart centre to centre: a jump held into a glide carries one gap (~2.8 m edge to edge)
-  [-1.2, -5.6], [1.2, -1.6], [-1.2, 2.4], [1.2, 6.6], [-1.0, 10.9],
+  // 3 m apart, 2.3 m across: ~0.7–1 m of open water between — a running jump, mat to mat (a standing one falls short)
+  [-0.8, -6.0], [0.8, -3.0], [0, 0], [-0.9, 3.0], [0.6, 6.0], [-0.5, 9.0], [0.4, 12.0],
   // the branch east from the third mat out to the dam islet
-  [3.4, 2.8], [8.0, 3.2], [12.6, 3.4], [17.2, 3.3],
+  [3.2, 0.5], [6.4, 0.2], [9.6, 0.7], [12.8, 0.4], [16.0, 0.8], [19.2, 0.6],
 ];
-export const MAT_HALF = 0.9;
+export const MAT_HALF = 1.15;
 /** mats float this far above the pond surface */
 export const MAT_RISE = 0.14;
 
