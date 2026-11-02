@@ -688,15 +688,26 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         ctx.audio.cue('homecoming-onward');
         const cam = opts.cam.camera;
         const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
-        const well = new THREE.Vector3(WELL.x, groundH(WELL.x, WELL.z), WELL.z);
         const toward = new THREE.Vector3(HEARTH_A.x, groundH(HEARTH_A.x, HEARTH_A.z) + 1.5, HEARTH_A.z);
-        const d = toward.clone().sub(well).setY(0).normalize();
-        const pos = well.clone().addScaledVector(d, -5.5).add(new THREE.Vector3(-d.z * 2.5, 3.8, d.x * 2.5));
+        // over the fox's shoulder down the way the stream leaves: the fox stays in the lower frame and the lens is
+        // chosen (nearest the straight-behind angle) with a clear sight of it — framed off the well itself, the roof
+        // hid the fox right at the homecoming (Kit :215, swarm5)
+        const chest = fox.clone().setY(fox.y + 0.45);
+        const d = toward.clone().sub(fox).setY(0).normalize();
+        const pos = new THREE.Vector3();
+        const side = new THREE.Vector3();
+        for (const a of [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4]) {
+          side.set(d.x * Math.cos(a) - d.z * Math.sin(a), 0, d.x * Math.sin(a) + d.z * Math.cos(a));
+          pos.copy(fox).addScaledVector(side, -4.2).setY(fox.y + 1.7);
+          if (!opts.cam.sightBlocked(pos, chest, fox.y)) break;
+        }
+        // look just past the fox (it sits a little below centre), then drift on toward the hearth
+        const ahead = fox.clone().addScaledVector(d, 2.5).setY(fox.y + 0.55);
         opts.cam.playPath({
           keys: [
             { t: 0, pos: cam.position.clone(), look: look0 },
-            { t: 2.2, pos, look: well.clone().addScaledVector(d, 7).setY(well.y + 1.2) },
-            { t: 5.5, pos: pos.clone().addScaledVector(d, 1.5), look: toward },
+            { t: 2.2, pos, look: ahead },
+            { t: 5.5, pos: pos.clone().addScaledVector(d, 1.2).setY(pos.y + 0.3), look: fox.clone().addScaledVector(d, 4.5).setY(fox.y + 0.7) },
           ],
           blendInS: 0.8, blendOutS: 2, lockS: 1.5,
         });
