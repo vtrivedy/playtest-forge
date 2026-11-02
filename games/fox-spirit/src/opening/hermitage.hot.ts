@@ -48,8 +48,7 @@ export function createDryingLines(ctx: OpeningCtx) {
       const pole = pk.build();
       scene.add(pole);
       ctx.occluders.push(pole);
-      // a fat collider so the follow camera's sight-line march treats the thin pole as a blocker and keeps it off the fox
-      ctx.colliders.push({ kind: 'post', x, z, r: 0.38 });
+      ctx.colliders.push({ kind: 'post', x, z, r: 0.1 });
     }
     const a = new THREE.Vector3(ax, lineY[i * 2]!, az);
     const b = new THREE.Vector3(bx, lineY[i * 2 + 1]!, bz);
