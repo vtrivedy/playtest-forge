@@ -108,16 +108,32 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   const moteSeed = Array.from({ length: MOTES }, () => [ctx.rand() * 6.28, ctx.rand() * 0.8, ctx.rand() * 4] as const);
   const m4 = new THREE.Matrix4();
 
-  // sound (DESIGN-audio-moss.md): each kindling is a match-scratch then a glass chime a pentatonic step higher;
+  // sound (DESIGN-audio-moss.md): each kindling is one quiet sine bell a pentatonic step higher;
   // the well filling swells a warm open chord and dips the music under it
   const ac = ctx.audio.ac;
   const world = new THREE.Vector3();
   const at = (o: THREE.Object3D) => o.getWorldPosition(world).clone();
   const STEPS = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3];
   const kindleSound = (i: number) => {
-    const p = at(lanterns[i]!.body);
-    ctx.audio.play('kindle', { at: p, gain: 0.5, rate: 0.9 });
-    ctx.audio.play('chime', { at: p, gain: 0.8, rate: 0.8 * STEPS[i]!, delay: 0.12 });
+    if (ac.state !== 'running') return;
+    // a soft sine bell: slow-ish attack, long gentle tail, low-passed, one pentatonic step higher per lantern
+    const t = ac.currentTime;
+    const out = ctx.audio.at(at(lanterns[i]!.body));
+    for (const [mul, amp] of [[1, 0.028], [2, 0.006]] as const) {
+      const o = ac.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = 392 * STEPS[i]! * mul;
+      const f = ac.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 1600;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(amp, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+      o.connect(f).connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 2.7);
+    }
   };
   const swell = () => {
     if (ac.state !== 'running') return;
@@ -130,7 +146,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       o.frequency.value = hz;
       const g = ac.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.035, t + 0.4 + i * 0.25 + 1.2);
+      g.gain.linearRampToValueAtTime(0.018, t + 0.8 + i * 0.4 + 1.6);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 6.5);
       o.connect(g).connect(out);
       o.start(t);
@@ -155,8 +171,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
     if (pinned < 0) {
       pinned = 0;
       pin.visible = true;
-      ctx.audio.play('page-pin', { at: at(pin), gain: 0.9 });
-      ctx.audio.play('tack', { at: at(pin), gain: 0.5, rate: 1.2, delay: 0.18 });
+      ctx.audio.play('soft-pin', { at: at(pin), gain: 0.08, rate: 0.85 });
       queue.push('page');
     }
     if (pinned >= 0) {

@@ -1,5 +1,5 @@
 // Real-time audio capture of the creature / homecoming SFX (DESIGN-audio-moss.md) from the shared graph's
-// post-limiter tap: pops of all four creatures, the hare leading (bounds), the heron's hop and wheel (wingbeats),
+// sfx bus (pre-master, so it works while the master is muted): pops of all four creatures, the hare leading (bounds), the heron's hop and wheel (wingbeats),
 // the page pinned, five lanterns kindling and the well-fill swell. The sim is paced to wall-clock so events land
 // at their real spacing. Writes mix.webm + evidence.json (event log, peak/RMS per 50 ms).
 //   node tools/sfx-capture.mjs [outDir]
@@ -27,7 +27,11 @@ try {
   const result = await page.evaluate(async () => {
     const h = window.__gameHooks;
     const ac = h.audioContext();
-    const stream = h.audioTap();
+    // the opening's master is muted until the redo is approved, so tap the sfx bus itself (pre-master: SFX only,
+    // at their bus level, before the limiter)
+    const tap = ac.createMediaStreamDestination();
+    window.__opening.ctx.audio.sfx.connect(tap);
+    const stream = tap.stream;
     const rec = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
     const chunks = [];
     rec.ondataavailable = (e) => chunks.push(e.data);

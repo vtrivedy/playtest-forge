@@ -256,10 +256,8 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
       if (f.phase === 'folded' && eligible && within && clear && s.dashing && dash !== lastDash) {
         f.phase = 'opening';
         lastDash = dash;
-        // the paper unfolds: a slow page-open over a timber creak
-        const at = new THREE.Vector3(f.x, f.y, f.z);
-        ctx.audio.play('unfold', { at, rate: 0.75, gain: 1.4 });
-        ctx.audio.play('creak', { at, rate: 0.85, gain: 0.6, delay: 0.08 });
+        // the paper unfolds: one low, slow page-open
+        ctx.audio.play('soft-unfold', { at: new THREE.Vector3(f.x, f.y, f.z), rate: 0.7, gain: 0.5 });
       }
       if (f.phase === 'opening') {
         f.elapsed += dt;
@@ -279,7 +277,6 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
           if (f.guard) { const n = ctx.colliders.indexOf(f.guard); if (n >= 0) ctx.colliders.splice(n, 1); }
           if (f.housing) f.housing.visible = false;
           f.phase = 'open'; f.land();
-          ctx.audio.play('land-1', { at: new THREE.Vector3(f.x, f.y, f.z), rate: 0.75, gain: 0.7 });
           if (i === 2) {
             returns++;
             ctx.field.restore(new THREE.Vector3((R.leaves[0].x + R.overlook.x) / 2, O.top, (R.leaves[0].z + O.z) / 2), 7, 1.3, { edgeMax: 0.8 });

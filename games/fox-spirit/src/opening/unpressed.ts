@@ -400,74 +400,32 @@ function buildCreature(spec: Spec, rand: () => number): { root: THREE.Group; bon
 type Phase = 'pressed' | 'popping' | 'performing' | 'alive';
 
 /**
- * Sound: a pressed drawing breathes a faint glassy shimmer you can find by ear; the pop is a paper "fwump"
- * and a two-note chime, then the creature's own voice. WebAudio starts on the first key, like the hearth hum.
+ * Sound (DESIGN-audio-moss.md): gentle and sparse. Pressed drawings are silent (no locator drone). The pop is
+ * one soft, low paper turn at the drawing and a single quiet sine note, slow-attacked and low-passed; no creature
+ * calls. Movement sounds are limited to a few soft wingbeats on the heron's hop.
  */
 function createUnpressedAudio(audio: OpeningAudio) {
   const ac = audio.ac;
-  const master = ac.createGain();
-  master.gain.value = 0.6;
-  master.connect(audio.sfx);
-  const shimmers = new Map<string, GainNode>();
-  const env = (g: GainNode, t0: number, peak: number, a: number, d: number) => {
-    g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(peak, t0 + a);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
-  };
-  const tone = (f0: number, f1: number, type: OscillatorType, t0: number, peak: number, a: number, d: number, lp = 4000) => {
-    const o = ac.createOscillator();
-    o.type = type;
-    o.frequency.setValueAtTime(f0, t0);
-    o.frequency.exponentialRampToValueAtTime(f1, t0 + a + d);
-    const f = ac.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.value = lp;
-    const g = ac.createGain();
-    env(g, t0, peak, a, d);
-    o.connect(f).connect(g).connect(master);
-    o.start(t0);
-    o.stop(t0 + a + d + 0.05);
-  };
+  /** one note per creature, low in the staff */
+  const NOTE: Record<string, number> = { hedgehog: 523.3, heron: 392, deer: 440, hare: 493.9, kit: 587.3 };
   return {
-    /** per-frame: shimmer loudness by distance to each still-pressed drawing (0 when found) */
-    shimmer(id: string, k: number) {
-      if (ac.state !== 'running') return;
-      let g = shimmers.get(id);
-      if (!g) {
-        g = ac.createGain();
-        g.gain.value = 0;
-        const f = ac.createBiquadFilter();
-        f.type = 'bandpass';
-        f.frequency.value = 1800 + shimmers.size * 260;
-        f.Q.value = 6;
-        for (const [hz, det] of [[880, 0], [1320, 2.5], [1760, -1.5]] as const) {
-          const o = ac.createOscillator();
-          o.type = 'sine';
-          o.frequency.value = hz * (1 + shimmers.size * 0.125) + det;
-          o.connect(f);
-          o.start();
-        }
-        f.connect(g).connect(master);
-        shimmers.set(id, g);
-      }
-      g.gain.setTargetAtTime(0.018 * k, ac.currentTime, 0.2);
-    },
     pop(id: string, at: THREE.Vector3) {
       if (ac.state !== 'running') return;
-      const t = ac.currentTime;
-      // the page peels off the surface, then flicks as the body inflates; small creatures pitch up
-      const rate = id === 'hedgehog' ? 1.25 : id === 'hare' || id === 'kit' ? 1.12 : id === 'heron' ? 0.82 : 0.9;
-      audio.play('page-flip-0', { at, rate, gain: 1.1 });
-      audio.play('page-flip-2', { at, rate: rate * 1.05, gain: 0.8, delay: 0.32 });
-      // two-note chime, a little different per creature
-      const root = id === 'hedgehog' ? 784 : id === 'heron' ? 659 : 587;
-      tone(root, root, 'sine', t + 0.08, 0.09, 0.01, 1.2);
-      tone(root * 1.5, root * 1.5, 'sine', t + 0.26, 0.07, 0.01, 1.4);
-      // the creature's voice
-      if (id === 'hedgehog') for (const dt of [0.7, 0.86]) tone(1500, 2300, 'sine', t + dt, 0.05, 0.01, 0.07);
-      if (id === 'heron') tone(420, 260, 'sawtooth', t + 1.0, 0.06, 0.02, 0.32, 1200);
-      if (id === 'deer') tone(700, 520, 'triangle', t + 1.0, 0.05, 0.05, 0.5, 1800);
-      shimmers.get(id)?.gain.setTargetAtTime(0, t, 0.1);
+      audio.play('soft-paper', { at, rate: 0.8, gain: 0.35 });
+      const t = ac.currentTime + 0.15;
+      const o = ac.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = NOTE[id] ?? 440;
+      const f = ac.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 1400;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.03, t + 0.12);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+      o.connect(f).connect(g).connect(audio.at(at));
+      o.start(t);
+      o.stop(t + 1.9);
     },
   };
 }
@@ -617,7 +575,8 @@ export function buildUnpressed(ctx: OpeningCtx) {
       head.rotation.z = t < 0.8 ? Math.sin(t * 22) * 0.25 * (1 - t / 0.8) : 0;
       const open = smooth(0.8, 1.2, t) * (1 - smooth(2.6, 3.2, t));
       const flap = t > 1.2 && t < 2.7 ? Math.sin((t - 1.2) * 11) : 0;
-      if (t > 1.2 && t < 2.7) beat(c, (t - 1.2) * 11, (n) => ctx.audio.play(n % 2 ? 'cloth-1' : 'cloth-0', { at: c.holder.position, rate: 0.8, gain: 0.9 }));
+      // three soft wingbeats on the hop down, no more
+      if (t > 1.2 && t < 2.7) beat(c, (t - 1.2) * 11, (n) => n < 3 && ctx.audio.play('soft-wing', { at: c.holder.position, rate: n % 2 ? 0.74 : 0.7, gain: 0.2 }));
       wl.rotation.x = -(0.15 + 1.25 * open + flap * 0.75 * open);
       wr.rotation.x = 0.15 + 1.25 * open + flap * 0.75 * open;
       B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = smooth(1.3, 1.6, t) * (1 - smooth(2.3, 2.6, t)) * 0.9;
@@ -715,7 +674,6 @@ export function buildUnpressed(ctx: OpeningCtx) {
     const wr = B(c, 'wingR');
     const open = smooth(0, 0.5, t) * (1 - smooth(F.secs - 0.6, F.secs, t));
     const flap = Math.sin(t * 7) * (0.5 + 0.5 * (1 - smooth(1.5, 3, t)) + 0.5 * smooth(F.secs - 2.5, F.secs - 1, t));
-    if (open > 0.3) beat(c, t * 7, (n) => ctx.audio.play(n % 2 ? 'cloth-1' : 'cloth-0', { at: c.holder.position, rate: 0.75, gain: 0.5 + 0.5 * Math.abs(flap) }));
     wl.rotation.x = -(0.15 + 1.25 * open + flap * 0.6 * open);
     wr.rotation.x = 0.15 + 1.25 * open + flap * 0.6 * open;
     B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = open * 1.1;
@@ -775,8 +733,6 @@ export function buildUnpressed(ctx: OpeningCtx) {
     } else c.gait = 0;
     // the bound: hind legs drive, the body arcs, forelegs reach for the landing
     const g = c.gait;
-    // a soft thump as the hind feet land, every bound
-    if (moving) beat(c, g + 1.2, (n) => ctx.audio.play(n % 2 ? 'land-1' : 'land-0', { at: c.holder.position, rate: 1.3, gain: 0.25 }));
     const air = moving ? Math.max(0, Math.sin(g)) : 0;
     B(c, 'legB').rotation.z = moving ? -0.9 * Math.sin(g + 0.6) : 0;
     B(c, 'legF').rotation.z = moving ? 0.8 * Math.sin(g - 0.5) : 0;
@@ -926,8 +882,6 @@ export function buildUnpressed(ctx: OpeningCtx) {
         const breath = 0.5 + 0.5 * Math.sin(clock * 1.6 + c.idleSeed);
         m.color.setRGB(1, 0.93 + 0.07 * breath, 0.84 + 0.12 * breath);
         m.opacity = 0.82 + 0.18 * breath;
-        const dist = Math.hypot(fox.x - c.at.x, fox.z - c.at.z);
-        audio.shimmer(c.spec.id, (1 - THREE.MathUtils.smoothstep(dist, 2, 12)) * (0.6 + 0.4 * breath));
         if (p?.dashing && Math.hypot(fox.x - c.at.x, fox.z - c.at.z) < UNPRESS.trigger && Math.abs(fox.y - c.at.y) < 2.2) unpress(c.spec.id);
         continue;
       }
