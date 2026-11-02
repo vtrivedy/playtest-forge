@@ -625,47 +625,54 @@ Review timed UI overlays in motion: a bottom-center teaching card covered the fo
 - `ctx.teach` must consume offers after the providers. Registering its updater when createTeach runs makes the early hearth/coal calls overwrite the prior frame's chase offer before consumption. Register in mount after builders instead; tools/teach-order-lint.mjs bans the old placement and late ctx builders. TeachOrder.tla4/4 passes; allowing early Publish fails LatestOfferWins in two states. The fade itself is outside that model.
 - Baseline productioncf48b75 cue-following clip:40s,640×360,10fps offline screenshots, silent; all3catches+roost+overlook+kept+noErrors true. Sampled catches at1.5/12.75/32s, overlook31s. This is route-independent visible-cue following, not blind random wander. Original110s regression on43c4f90:3catches,kept,pinnedhome,finite,noErrors alltrue.
 - Limitation found by injected-input retry test43c4f90: after deliberately walking off the second ruin jump, the guide resets to the first leaf and the bot eventually keeps the page (~70s), but takes11misses and catches it before visiting the overlook (strict overlook check false). Preserve that failure; do not describe this as robust recovery or a full-route retry pass. Floor-to-leaf approaches remain awkward with the old controller; Thistle's collision fix is independent and needs joint retest.
-## Recorder boundary investigation — Reed, swarm5
+## GPU black frames and recording surfaces — Reed, swarm5
 
-- b4fa63a review reports 21 isolated native GPU MediaRecorder flashes. Existing
-  software staging probes and synchronous canvas scans do not establish the GPU
-  cause. Keep this issue open until matched hardware recordings reproduce it.
-- `tools/check-black-frames.py` scans decoded frames with actual PTS, including
-  VFR clips, and fails even one near-black frame. The bright / single-flash /
-  blank negative controls are `python3 tools/tests/black-frame-gate.py` (ffmpeg
-  required, imageio-ffmpeg optional fallback). Existing fixed-clock hub gate stays
-  valid; this diagnostic handles real-time VFR recordings.
-- RecorderBoundary.tla checks synchronous render→copy→publish ordering (11 states).
-  RecorderBoundaryBad.cfg deliberately permits discard before copy and fails
-  NoBlackPublication. It proves ordering only, not GPU/browser correctness.
+- Do not infer a GPU recorder cause from software-only scans. On unchanged
+  b4fa63a game source, a matched T4/EGL 120-second test gives 20 native, 33 staged
+  and 11 independent CDP black frames. A synchronous source sample is black too.
+  A persistent 2D copy does not repair shared canvas corruption.
+- The recorder-free hardware control, with the original MSAA configuration, has
+  zero black frames in 1,156 CDP frames. Preserving the drawing buffer still
+  flashes (18/23/7); disabling canvas MSAA alone is clean (0/0/0). This isolates a
+  recording-triggered GPU canvas/MSAA interaction, not an autonomous game fade.
+  Paired compositor output alone could not distinguish those two causes.
+- The forge's canvas receives a fullscreen output pass; SMAA already owns scene
+  edge smoothing. Runtime fix 74c7db9 disables redundant canvas MSAA. The AST
+  `single-aa-owner` lint rejects true/dynamic flags and overriding spreads or
+  contexts. No gameplay, camera or frame-loop code changes were needed.
+- Actual production **4ed97a0**, no injected override, T4/EGL 1280×720, 280 seconds:
+  **0/6,834 native, 0/7,802 staged, 0/2,601 CDP** black frames, zero JS errors.
+  All 11 full-journey checks pass through snow/title done; page has three catches
+  and zero skips. Full clip, __game and decoded hashes are durable at
+  `keeping-swarm5-captures/reed/boundary-baseline-4ed97a0278-160525-1fd249/`.
+- The first 250-second production probe omitted interact and stalled at coal.
+  Its zero-black result is valid rendering evidence, not a journey clear.
+  Replay now uses `tools/route-input.hot.ts` with pooled immutable jump, dash
+  and interact keys; long captures require the canonical clear checks. Tests
+  include KeyE and combinations, so omitting Carry cannot silently pass again.
+- `tools/check-black-frames.py` uses every decoded VFR frame and actual PTS.
+  Bright/single-flash/blank controls verify it; ffmpeg is required, with optional
+  imageio-ffmpeg fallback. The existing fixed-clock hub gate remains valid.
+- RecorderBoundary.tla checks synchronous render→copy→publish ordering (11
+  states). RecorderBoundaryBad.cfg permits discard before copy and must fail.
+  This proves ordering only. CDP movies are sampled sequences, not real-time
+  performance evidence; the original event timestamps remain in report.json.
 
-Hardware reproduction on diagnostic764b338 (game source identical to b4fa63a):
-T4/EGL1280×720,120s wall recording, native20/2545 black frames, synchronous
-2D staging33/3400, independent CDP compositor11/1133. Stage read at simulation
-tick3000 is0luma. Independent compositor frame00007 is fully black. This proves black pixels
-exist before encoding and that2D staging does not repair the shared output. Artifacts
-`keeping-swarm5-captures/reed/boundary-764b33881c-154213-24ad01`; source/tool hashes,
-actual frame PTS, GPU attributes, screenshots and __game are preserved. Context has
-preserveDrawingBufferfalse and antialiastrue. Cause still open; flag A/B underway.
+Full review and source/control provenance:
+`docs/reviews/swarm5/reed-recorder-boundary.md`. This isolated branch retains the
+old ending composition; Cedar's separate fix 3 handles that visual problem.
 
-Controlled follow-up on0a4862d: preserveDrawingBuffertrue still18 native/23
-staged/7 CDP flashes. Canvas antialiasfalse alone:0/2643 native,0/3422 staged,
-0/1141 CDP, minimum mean luma71.2/80.2/80.3; full SMAA/bloom/grade preserved.
-Critically, baselineMSAAtrue with NO MediaRecorder or captureStream attached
-(CDP-only8495afb) is clean0/1156. This isolates a recording-triggered GPU
-canvas/MSAA interaction rather than an autonomous game fade. Paired compositor
-black by itself did not distinguish recording-triggered corruption from a game
-defect. The forge's fullscreen output surface does not need MSAA; SMAA already
-owns scene-edge smoothing. Actual constructor antialiasfalse is the selected fix;
-AST single-aa-owner lint rejects true, dynamic flags, overriding spreads/context.
+## Independent village collision audit — Reed, swarm5
 
-Actual constructor74c7db9 (no diagnostic context override),250s recording:
-native0/5604, staged0/6948, CDP0/2316 black; noJSerrors, minimum meanluma
-67.948/76.674/76.774. **Scope limit:** probe omitted interact so the page completes
-(3catches0skips) then the journey stalls at coal pickup; this is valid250s render
-output evidence, not an ending clear. Route replay now uses a pooled immutable
-jump/dash/interact encoder (including KeyE) and asserts canonical route completion
-for long captures, making that mistaken clear claim fail automatically.
+- On held-out naive-policy seeds 4–6, Thistle's f1ffac3 reduces unsticks
+  13/9/29 → 1/2/1 and stuck seconds 5.40/6.72/24.70 → 0.20/1.72/0.10 versus
+  b4fa63a. Both use the same corrected bot, tether 14, 90 seconds, frames 0;
+  six fresh-browser runs have zero JS errors. This is a cohort result, not a
+  universal player metric. Do not compare it directly with the broken 131 count.
+- Source/hot-path and sideways-motion concerns are separate from those numbers.
+  Motion verdict awaits a real slide clip. Full commands, scope and durable JSON
+  locations: docs/reviews/swarm5/reed-village-audit.md.
+
 ## Painted corridors & colour coverage (Maple, swarm5 fix 2)
 
 - Measure colour with `node tools/corridor-colour.mjs [--state cold|story] [--views a,b]` (11 corridor views, real chase lens; `--images` scores any frames). Two numbers per frame: `colour` (strict, sat>0.45 off the sepia axis; review frames naive-mid .025 / end-160 .383 / t060 .728) and `tint` (any visible hue off sepia, pale washes included). Plain HSV saturation is useless here: sepia paper itself has sat ~0.35–0.42.
