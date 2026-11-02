@@ -639,11 +639,28 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         // bare Crown in snow behind, the title over them. It holds (a slow push) until the player moves.
         const cam = opts.cam.camera;
         const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
-        const d = view();
         const f = ctx.fox.root.position;
         const group = rig.cradle.clone().lerp(new THREE.Vector3(f.x, cy, f.z), 0.45);
-        const side = new THREE.Vector3(-d.z, 0, d.x);
-        const end = group.clone().addScaledVector(d, -3.5).addScaledVector(side, 0.7).add(new THREE.Vector3(0, 1.3, 0));
+        // pick the angle: the fox seen 3/4 from the front (never its back as it lies facing the Press), the Crown
+        // behind if possible, and a clear line of sight to the fox
+        const fy = ctx.fox.root.rotation.y;
+        const aimAt = new THREE.Vector3(f.x, f.y + 0.35, f.z);
+        const d = new THREE.Vector3();
+        const pos = new THREE.Vector3();
+        let bestScore = -Infinity;
+        const end = new THREE.Vector3();
+        for (let k = 0; k < 24; k++) {
+          const a = (k / 24) * Math.PI * 2;
+          d.set(Math.sin(a), 0, Math.cos(a));
+          const front = -(d.x * Math.sin(fy) + d.z * Math.cos(fy));
+          pos.copy(group).addScaledVector(d, -3.5).add(new THREE.Vector3(0, 1.3, 0));
+          const score = 1.5 * (1 - Math.abs(front - 0.65)) + 0.6 * d.dot(toCrown) - (opts.cam.sightBlocked(pos, aimAt, f.y) ? 10 : 0);
+          if (score > bestScore) {
+            bestScore = score;
+            end.copy(pos);
+          }
+        }
+        d.subVectors(group, end).setY(0).normalize();
         const look = group.clone().addScaledVector(d, 2.4).add(new THREE.Vector3(0, 0.7, 0));
         const hold = FINALE_TIMING.cardIn + FINALE_TIMING.cardHold;
         opts.cam.playPath({
