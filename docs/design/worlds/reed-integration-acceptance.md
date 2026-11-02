@@ -80,7 +80,10 @@ first-puzzle/world deadline floor from the full nine-level design target.
 `tools/world-input-probe.mjs --plan route.json --out /tmp/world-route` starts the
 real default opening with a fresh browser context. A plan contains `steps` with
 `name`, `frames`, `stick: [x,z]`, `keys`, and optional `expect` predicates (`path`
-within hooks state, with `equals` or `finite: true`). It exposes no arbitrary
+within hooks state by default, or `source: "game"` for `window.__game.state()`,
+with `equals` or `finite: true`). A step with `reload: true` reloads the same
+browser context before applying its inputs, retaining genuine browser saves.
+Reload checks remain separate from continuous route evidence. It exposes no arbitrary
 script, teleport or puzzle-state setter. Every step saves a gameplay screenshot,
 full hook/game state, assertion results and requested simulation duration; the
 report includes source commit, working-tree status, original input plan and
@@ -93,3 +96,12 @@ fox readable, normal follow view, page teaching visible. Local artifact:
 `/tmp/reed-world-smoke/report.json` and adjacent PNGs. This only validates the
 probe on the current opening; it establishes no new world, progress or save PASS.
 Canonical portal coordinates and state fields remain required for route plans.
+
+Reload/game-state assertion smoke: source `5d036441` plus the probe-only change
+in this commit. Fresh boot and same-context reload each advanced one fixed step;
+four finite-position checks passed across hook and game snapshots, zero browser
+errors. Inspected both 960×540 frames: identical supported spawn, readable fox,
+normal village follow composition. `/tmp/reed-reload-smoke/report.json` records
+the exact dirty-tree provenance; adjacent `0-fresh.png` and `1-reload.png` are the
+reviewed frames. This validates reload plumbing only, not persistence of puzzle
+progress (that runtime does not yet exist in this branch).

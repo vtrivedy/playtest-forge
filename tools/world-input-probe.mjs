@@ -12,6 +12,11 @@ if(!Array.isArray(plan.steps)||!plan.steps.length)throw Error('plan.steps must b
 for(const step of plan.steps){
   if(!/^[a-z0-9-]+$/.test(step.name)||!Number.isInteger(step.frames)||step.frames<0||step.frames>36000)throw Error('invalid step name/frames');
   if(!Array.isArray(step.stick)||step.stick.length!==2||step.stick.some(v=>!Number.isFinite(v)||Math.abs(v)>1))throw Error('invalid stick');
+  if(step.reload!==undefined&&typeof step.reload!=='boolean')throw Error('invalid reload');
+  for(const check of step.expect??[]){
+    if(!['hooks','game'].includes(check.source??'hooks')||typeof check.path!=='string'||!check.path||check.path.split('.').some(k=>['__proto__','constructor','prototype'].includes(k)))throw Error('invalid assertion source/path');
+    if(check.finite!==true&&!Object.hasOwn(check,'equals'))throw Error('assertion requires finite or equals');
+  }
   if(!Array.isArray(step.keys)||step.keys.some(k=>!['Space','ShiftLeft','ShiftRight','KeyM','Escape'].includes(k)))throw Error('invalid keys');
 }
 const out=path.resolve(arg('out','/tmp/world-input-probe'));
@@ -28,6 +33,10 @@ try{
   await page.goto(`http://127.0.0.1:${port}/?manual=1`,{waitUntil:'domcontentloaded',timeout:300000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true,null,{timeout:300000});
   for(const step of plan.steps){
+    if(step.reload){
+      await page.reload({waitUntil:'domcontentloaded',timeout:300000});
+      await page.waitForFunction(()=>window.__gameHooks?.ready===true,null,{timeout:300000});
+    }
     const state=await page.evaluate(step=>{
       const h=window.__gameHooks;
       h.setKeys(step.keys);h.setStick(...step.stick);
@@ -36,11 +45,11 @@ try{
     },step);
     await page.screenshot({path:path.join(out,`${report.steps.length}-${step.name}.png`)});
     const checks=(step.expect??[]).map(expect=>{
-      const value=expect.path.split('.').reduce((v,k)=>v?.[k],state.hooks);
+      const value=expect.path.split('.').reduce((v,k)=>v?.[k],state[expect.source??'hooks']);
       const passed=expect.finite===true?Number.isFinite(value):JSON.stringify(value)===JSON.stringify(expect.equals);
       return {...expect,value,passed};
     });
-    report.steps.push({name:step.name,state,checks,simulationSeconds:step.frames/60});
+    report.steps.push({name:step.name,reloaded:step.reload===true,state,checks,simulationSeconds:step.frames/60});
   }
   report.passed=report.errors.length===0&&report.steps.every(s=>s.checks.every(c=>c.passed));
 }catch(e){report.errors.push(String(e));}
