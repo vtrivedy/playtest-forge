@@ -1,5 +1,6 @@
 // Independent fresh-boot hub-entry acceptance; Ashwater waypoints derived from Cedar's route.
 // node tools/world-ashwater-acceptance.mjs [outDir]
+import {playPressInputRoute} from './lib/press-input-route.mjs';
 import {createDiscoveryPolicy} from './lib/discovery-policy.mjs';
 import {createDiscoveryObserver} from './lib/discovery-observer.mjs';
 import { chromium } from 'playwright';
@@ -11,7 +12,8 @@ import { execFileSync } from 'node:child_process';
 const args = process.argv.slice(2);
 const out = path.resolve(args[0] && !args[0].startsWith('--') ? args[0] : '/tmp/ashwater-probe');
 const frames = args.includes('--frames');
-const entryTour = args.includes('--entry-tour');
+const pressRoute = args.includes('--press-route');
+const entryTour = args.includes('--entry-tour') || pressRoute;
 let tourPassed = false;
 const started=Date.now();
 fs.mkdirSync(out, { recursive: true });
@@ -121,6 +123,10 @@ try {
     await expectWorld('russetvale', 2, 'tour-02-home');
     for(const [x,z] of [[-6,89],[-9.5,90],[-11,95]]) await go(x-O.x,z-O.z);
     await expectWorld('press', 3, 'tour-03-press');
+    if(pressRoute){
+      await playPressInputRoute(page, name=>shot(`press-${name}`));
+      await go(-700-O.x,123-O.z,{max:1800});
+    }
     // The snowfield return arch is behind its arrival, following the island's outward gradient.
     await go(-700-O.x,132-O.z,{max:600});
     await expectWorld('russetvale', 4, 'tour-04-home');
