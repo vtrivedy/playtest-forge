@@ -76,3 +76,7 @@ Extend the fresh-boot acceptance with an optional entry-tour: after physical Ash
 return arch, cross the Press arch from the hub, return home, then re-enter Ashwater. Assert every active-world and
 travel-count transition and retain screenshots plus complete `window.__game`. This isolates portal reachability and
 re-entry from the evolving puzzle routes; it does not claim puzzle completion or blind discovery.
+
+Measure breadth from the same baked one-metre movement mask used by the controller. Report permitted footprint and
+bounds per world; these include water, obstacles and disconnected cells, so are not a reachable-area or duration
+claim. Record immutable commit in the JSON report. Use actual route simulation time separately from capture wall time.
