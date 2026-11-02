@@ -102,7 +102,8 @@ export function updateAshwater(rig: AshRig, dt: number): void {
       s.splashes++;
       rig.events.splash();
       rig.teleport(rig.safe.x, rig.safe.z, s.safeYaw);
-    } else if (f.y > DRY_Y && (w === null || f.y > level + 0.05)) {
+    } else if (f.y > DRY_Y && (w === null || (w !== 'pond' && f.y > level + 0.05))) {
+      // (never a reed mat: it may be the thing sinking under you)
       // only truly dry footing (not the drowned bank slope) is a place to put the fox back
       rig.safe.copy(f);
       s.safeYaw = rig.fox.rotation.y;
