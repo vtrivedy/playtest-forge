@@ -47,7 +47,7 @@ try {
   fs.writeFileSync(`${out}/evidence.tmp`,JSON.stringify(evidence,null,2));fs.renameSync(`${out}/evidence.tmp`,`${out}/evidence.json`);
   await page.screenshot({path:`${out}/${test.id}.png`});
  }
- evidence.checks={allLegsComplete:evidence.cases.filter(c=>c.required).every(c=>c.legs.every(l=>l.done)),finite:evidence.cases.every(c=>c.trace.every(r=>r.pos.every(Number.isFinite))),noErrors:errors.length===0,allLinesFreed:evidence.cases.every(c=>c.game.state.opening.hermitage.freed.every(Boolean)),plateauPainted:evidence.cases.every(c=>c.game.state.opening.hermitage.painted),deskCaption:evidence.cases.every(c=>c.game.state.opening.hermitage.captioned)};
+ evidence.checks={allLegsComplete:evidence.cases.filter(c=>c.required).every(c=>c.legs.every(l=>l.done)),finite:evidence.cases.every(c=>c.trace.every(r=>r.pos.every(Number.isFinite))),noErrors:errors.length===0,hermitagePresent:evidence.cases.every(c=>Boolean(c.game.state.opening?.hermitage)),allLinesFreed:evidence.cases.every(c=>c.game.state.opening?.hermitage?.freed?.length===3 && c.game.state.opening.hermitage.freed.every(Boolean)),plateauPainted:evidence.cases.every(c=>c.game.state.opening?.hermitage?.painted===true),deskCaption:evidence.cases.every(c=>c.game.state.opening?.hermitage?.captioned===true)};
  fs.writeFileSync(`${out}/evidence.tmp`,JSON.stringify(evidence,null,2));fs.renameSync(`${out}/evidence.tmp`,`${out}/evidence.json`);console.log(JSON.stringify(evidence.checks));
  if(Object.values(evidence.checks).some(v=>!v))process.exitCode=1;
 }finally{await browser.close();if(production)await new Promise(resolve=>server.httpServer.close(resolve));else await server.close();}

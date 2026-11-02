@@ -4,7 +4,7 @@
  * rise at most step + 0.15 = 0.37 m. Colliders are not considered (props sit beside lanes, not on them).
  *   npx tsx tools/checks/paths-walkable.ts
  */
-import { groundH, PATHS } from '../../games/fox-spirit/src/opening/layout';
+import { groundH, ALL_PATHS as PATHS } from '../../games/fox-spirit/src/opening/layout';
 
 const PROBE = 0.28;
 const MAX_RISE = 0.22 + 0.15;

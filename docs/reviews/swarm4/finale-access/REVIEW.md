@@ -30,3 +30,7 @@ Merged Wren1a28d58 into Sorrel branch, retaining both knowledge sections. Rebuil
 ## Kit integration retest — 75d09eb
 
 Rebuilt Kit's integrated production bundle after the audio and finale merges. TypeScript, Vite build and lint:feel pass. Independent production route repeats all eight authored lane legs, the crag descent (340 gliding frames), and three return legs successfully; finite positions and no JavaScript errors. Saved `window.__game`, traces and screenshots in `/captures/sorrel/finale-access-production-75d09eb/`. Arrival and return stills reviewed: visible fox and Press, no terrain trap. This staged-start access check does not establish continuous motion quality, audio quality, or Millbrook integration (not present on this SHA). [Compact evidence](production-integration-75d09eb.json).
+
+## Wren rest integration retest — 628d1b7
+
+Rebuilt Kit’s integration after Wren’s rest animation and lane diagnostic landed. TypeScript, production build and lint:feel pass. The same production input route passes all eight lane legs, 340 glide frames and three return legs, with finite positions and zero JS errors. All four arrival/return screenshots reviewed: fox silhouette visible, hollow destination readable, no access obstruction. Saved window.__game, traces and PNGs: `/captures/sorrel/finale-access-production-628d1b7/`. This repeats the access check after the shared controller changes; it does not exercise the ending state, rest/get-up animation, audio, or Hermitage. No runtime source changes. [Compact evidence](production-integration-628d1b7.json).

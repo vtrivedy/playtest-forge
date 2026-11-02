@@ -4,11 +4,11 @@
  * colliders at boot: nothing that blocks may stand on a lane's centre line (Sorrel caught a rock on the Hermitage lane).
  */
 import { colliderTop, PLAY, type Collider } from '../lookdevPlay';
-import { PATHS } from './layout';
+import { ALL_PATHS } from './layout';
 
 export function laneBlocks(colliders: Collider[], groundH: (x: number, z: number) => number): string[] {
   const out: string[] = [];
-  for (const [ax, az, bx, bz] of PATHS) {
+  for (const [ax, az, bx, bz] of ALL_PATHS) {
     const len = Math.hypot(bx - ax, bz - az);
     for (const c of colliders) {
       if (c.kind === 'box' && c.oneWay) continue;
