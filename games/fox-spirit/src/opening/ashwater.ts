@@ -388,6 +388,7 @@ export function buildAshwater(
     pier.position.set(a.x, 2.5, a.z);
     pier.castShadow = true;
     root.add(pier);
+    ctx.occluders.push(pier);
     colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx, hz, top: 6.3 });
   }
   cWall(W.x0, CISTERN.gate.x0, W.z0 - CISTERN.wall, W.z0);
