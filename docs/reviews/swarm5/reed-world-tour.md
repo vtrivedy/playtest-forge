@@ -31,3 +31,17 @@ separates simulated gameplay time from capture wall time. Neither measure establ
 This circuit does not solve either foreign world's puzzles, measure blind-player comprehension or prove continuous
 video/black-frame stability. The slab-wall winter scene and flat marsh shading still need richer landmarks and
 exploration. Existing waypoint puzzle probes establish solvability, not insight or the new breadth/story bar.
+
+## Physical retest — acc040474a775abd2aec5c2fa187d7cb754d5695
+
+This integrates Maple's `f0648a42`. Same fresh physical circuit on Tesla T4/EGL: **PASS**, all five transitions,
+zero JavaScript errors. Ashwater return lands `[-3.84,0,89.16]`; Press return lands `[-9.69,0,90.13]`.
+Both retained frames now clearly show fox and village instead of timber. Reviewed both at full capture resolution.
+[Home from Ashwater](reed-world-tour/home-fixed-ashwater.png), [home from Press](reed-world-tour/home-fixed-press.png).
+Full screenshots and hook/`window.__game` evidence: `/captures/reed/world-tour-acc04047/`; persistent Modal volume
+`keeping-swarm5-captures/reed/world-tour-acc040474a/`.
+
+The harness now records simulated time, distinct from render/capture wall time. Circuit total 157.317 s;
+146.967 s in Russetvale (including the 90 s discovery policy), 6.167 s in Ashwater, 4.183 s in Press.
+No foreign puzzle was solved in this circuit; these numbers do not establish game length.
+TypeScript, production build, `lint:feel` and whitespace checks pass on the integrated tree.
