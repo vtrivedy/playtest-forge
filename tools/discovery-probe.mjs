@@ -61,6 +61,9 @@ try{
  const intro=evidence.trace.filter(r=>r.t>=0.5&&r.t<idle);
  evidence.checks.initialFollow=idle<0.5||intro.length>0&&intro.every(r=>r.page.phase==='perched'&&r.teach?.showing==='Follow the loose page');
  evidence.checks.dashAfterBolt=evidence.trace.every(r=>r.cue.leg!=='page'||r.cue.action!=='dash'||r.page.phase==='fleeing');
+ evidence.checks.guidanceFinished=evidence.game.opening.discovery.leg==='done'&&!evidence.game.opening.discovery.active;
+ const finishes=evidence.trace.filter(r=>r.transition?.endsWith('->done'));
+ evidence.checks.finishOnGround=finishes.length>0&&finishes.every(r=>r.grounded&&r.ruin.reached);
  evidence.frames=image;
  evidence.simulationCompleted=true;
  evidence.observations={roostVisits:evidence.game.opening.canopy.roostVisits,ruinMisses:evidence.game.opening.popUpRuin.misses};

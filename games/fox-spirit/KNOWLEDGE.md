@@ -705,3 +705,10 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
   LRA 8.5 (the review's 4.8 was the full mix on a capture: ambience/SFX flatten it). The worklet's `mom` envelope
   (bed ×0.82, swell up to ×1.35, 2.5 s up / 4 s down, bass + brighter harp under it) → lift 8.0, LRA 12.7.
   Level-only changes leave the conductor (TLA Hearthsong) untouched; still run `npm run check:music`.
+
+## Discovery safe completion — Hazel, swarm5 follow-up
+
+- An idle-at-wake1.5s trial on7a4cecdd caught the third page during ascent from the second ruin leaf (x−27.24,y0.55), before reaching the overlook. Guidance hid immediately; the bot released jump, jumpCut halved its rise, and it fell short. The overlook assertion correctly failed. That capture was stopped and retained with STATUS.md; it is not a completed final clip.
+- Guidance now remains in `land` after a third catch until CURRENT grounded contact on the overlook. It advises Hold Space, preserving the jump/glide, and a floor miss can reuse opened-leaf guidance. Page progression is unchanged. `readOverlookLanding()` returns a private unique-symbol token; only `completeGuide(token)` may set done/inactive. `discovery-safety-lint.mjs` rejects old phase-based hiding, direct done assignments and raw-token completion.
+- Discovery.tla112generated/38distinct passes; removing Finish's current-contact guard fails DoneAfterLanding in a five-state trace. This checks completion safety and stable done, not physical reachability. Probe assertions now require completed guidance and a grounded done transition as well as kept page + real overlook event.
+- Matched blind controls on591e04b9 vs4f67f9ac (same f1ffac3 random policy, manual clock fixed,120s,seeds1–3): first catches0/0/0→1/1/0; all still0overlook. Rendered-cue following is a separate policy with no hidden goal/action/leg steering, not a claim that random wandering solves platform puzzles.
