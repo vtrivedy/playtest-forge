@@ -362,7 +362,8 @@ export async function runOpening(): Promise<void> {
       const to = worlds.crossing(fp.x, fp.z);
       if (to) {
         const w = WORLDS[to];
-        player.teleport(w.spawn.x, w.spawn.z, w.spawn.yaw);
+        const at = to === 'russetvale' ? worlds.hubArrival(worlds.active) : w.spawn;
+        player.teleport(at.x, at.z, at.yaw);
         worlds.resetCrossing();
         ctx.captions.say(w.name);
         progress.enterWorld(to === 'russetvale' ? 'hub' : to);

@@ -249,6 +249,17 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
       travelled++;
       fadeK = 1;
     },
+    /**
+     * Coming home from `from`: stand 2.6 m inside that world's hub arch facing the well (the old wake spot sat under
+     * the other arch's lintel and the return lens filled with timber — Reed's world-tour stills).
+     */
+    hubArrival(from: WorldId): { x: number; z: number; yaw: number } {
+      const a = HUB_ARCHES.find((h) => h.to === from) ?? HUB_ARCHES[0]!;
+      const dx = a.x - WELL.x;
+      const dz = a.z - WELL.z;
+      const l = Math.hypot(dx, dz);
+      return { x: a.x - (dx / l) * 2.6, z: a.z - (dz / l) * 2.6, yaw: Math.atan2(-dx, -dz) };
+    },
     /** the paper wash rides on the lens */
     attach(camera: THREE.Camera): void {
       camera.add(fade);
