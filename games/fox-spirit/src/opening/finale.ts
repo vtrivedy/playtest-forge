@@ -14,7 +14,7 @@ import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
 import type { FollowCamera } from '../camera';
-import { CROWN, FINALE, KEEPING, pathDist, VISTA } from './layout';
+import { CROWN, FINALE, HEARTH_A, KEEPING, pathDist, VISTA, WELL } from './layout';
 import { FINALE_TIMING, KIT_PHASES, PHASES, updateFinale, type FinaleRig } from './finale.hot';
 
 /** album paper, ink-frost, iron and the warm colours the hollow wakes into */
@@ -75,7 +75,9 @@ function paperTexture(rand: () => number, sketch: number): THREE.CanvasTexture {
 
 export async function buildFinale(ctx: OpeningCtx, opts: {
   settled: () => boolean;
-  ember: { restsAt: (x: number, y: number, z: number, r: number) => boolean };
+  ember: { restsAt: (x: number, y: number, z: number, r: number) => boolean; where: (out: THREE.Vector3) => boolean };
+  /** the homecoming has filled the well: from then on a stream of motes leads on from it to the ember */
+  homeFull: () => boolean;
   cam: FollowCamera;
   player: { setMoveScale: (k: number) => void; intent: () => number };
   crownLetGo: () => void;
@@ -513,6 +515,27 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   wayMesh.count = 0;
   scene.add(wayMesh);
 
+  // ---- onward: when the homecoming fills the well, a second stream leaves the well and leads to wherever the ember
+  // rests (the shelf before the Keeping, the root-hearth after), so the homecoming hands over instead of ending.
+  // Rebuilt (cold) only when the ember has moved; the hot step just walks the LUT.
+  // a little larger than the bridge stream: it has to read across the plaza and meadow from the well
+  const onwardMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.15, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffbe5a, toneMapped: false }), 48);
+  onwardMesh.frustumCulled = false;
+  onwardMesh.count = 0;
+  scene.add(onwardMesh);
+  const onwardLut = new Float32Array(WAY_N * 3);
+  const onwardAt = new THREE.Vector3(Infinity, 0, 0);
+  const rebuildOnward = (to: THREE.Vector3): number => {
+    onwardAt.copy(to);
+    const pts = [[WELL.x - 0.6, groundH(WELL.x, WELL.z) + 1.4, WELL.z - 1.2], [-3, groundH(-3, 81) + 1.1, 81], [0.5, groundH(0.5, 80) + 1.1, 80]];
+    // up the shelf: the motes ride the hearth's warm column, as the fox will
+    if (to.y > 2.5) pts.push([HEARTH_A.x - 0.6, groundH(HEARTH_A.x, HEARTH_A.z) + 1.6, HEARTH_A.z + 0.8], [HEARTH_A.x + 0.4, to.y + 2.2, HEARTH_A.z - 0.3]);
+    pts.push([to.x, to.y + 0.7, to.z]);
+    const curve = new THREE.CatmullRomCurve3(pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+    for (let i = 0; i < WAY_N; i++) curve.getPointAt(i / (WAY_N - 1)).toArray(onwardLut, i * 3);
+    return curve.getLength();
+  };
+
   // ---- the end card
   const card = document.createElement('div');
   card.dataset.finale = 'card';
@@ -575,6 +598,13 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         for (let i = 0; i < 3; i++) ctx.audio.play('soft-paper', { at: rig.bookTop, gain: 0.12, rate: 0.85 + i * 0.07, delay: i * 0.35 });
         say('so it would never end.');
       },
+      onward: (to: THREE.Vector3) => {
+        rig.s.onwardLen = rebuildOnward(to);
+      },
+      homeCaption: () => {
+        say('One page still holds the autumn.');
+        ctx.audio.cue('homecoming-onward');
+      },
       snow: () => {
         ctx.audio.cue('finale-snow');
         say('Let the year turn.');
@@ -602,6 +632,9 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     },
     hinge, screw, wheel, coverMat, paperMat, ironMat, lampPaper, emblemMat, glowMat, light,
     wayMesh, wayLut, wayLen: wayCurve.getLength(),
+    onwardMesh, onwardLut, emberAt: new THREE.Vector3(), onwardAt,
+    homeFull: opts.homeFull,
+    emberWhere: (out: THREE.Vector3) => opts.ember.where(out),
     pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
     cradle: new THREE.Vector3(F.cradle.x, cy, F.cradle.z),
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
@@ -610,7 +643,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, onwardT: 0, onwardLen: 1, homeSaid: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
     player: opts.player, heroLie: hero.lie, heroRest: hero.rest, lieDur: lieClip.duration,
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
@@ -631,7 +664,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     state: () => ({
       phase: PHASES[rig.s.phase], t: +rig.s.t.toFixed(2), kindles: rig.s.kindles, cradle: [+rig.cradle.x.toFixed(2), +rig.cradle.z.toFixed(2)],
       kits: Array.from(rig.kitPhase, (k) => KIT_PHASES[k]), card: ['hidden', 'showing', 'done'][rig.s.card], cardShows: rig.s.cardShows,
-      snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, still: +rig.s.still.toFixed(2),
+      snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, onward: rig.onwardMesh.count, still: +rig.s.still.toFixed(2),
     }),
   };
 }
