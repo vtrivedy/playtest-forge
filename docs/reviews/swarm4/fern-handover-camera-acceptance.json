@@ -1,0 +1,19 @@
+{
+  "sha": "e553200115b3b3f38d7b25ee2a20cf19a78a82c9",
+  "checks": {
+    "sameSource": true,
+    "zeroErrors": true,
+    "fullBoth": true,
+    "allFiveLanterns": true,
+    "completeSnapshots": true,
+    "expectedFrames": true,
+    "finiteCamera": true,
+    "followRestoredBoth": true
+  },
+  "renderedFramesReviewed": 140,
+  "simulationHz": 60,
+  "captureFps": 10,
+  "audio": false,
+  "staging": "dev creature release and kept-page hook; initial plaza teleport; live controller movement in second scenario",
+  "caveat": "Hero leaves frame in deliberate authored wide shot; this is not an always-visible traversal camera verdict. No unfamiliar-player discovery or real-time performance verdict. Original long second run was interrupted; completed short rerun is authoritative."
+}
