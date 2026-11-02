@@ -248,6 +248,9 @@ export async function runOpening(): Promise<void> {
     if (Math.hypot(f.x - KEEPING.crag.x, f.z - KEEPING.crag.z) < 3.2 || t - settledAt > 25) crown.respond();
   });
   const view = player.cam.camera;
+  // the lens carries the in-frame lettering (captions, end card), so it joins the scene graph
+  scene.add(view);
+  ctx.captions.mount(view);
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
   let warnedSlots = false;

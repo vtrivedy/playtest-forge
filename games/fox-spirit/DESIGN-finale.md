@@ -63,3 +63,24 @@ position, save beat screenshots and all 100 final-hold frames with
 regresses. Parse the documented `camera.boom` shot diagnostic rather than
 assuming a numeric `camera.shot` field. This is an offline visual/state check,
 not a realtime feel or audio verdict.
+
+## Sell the ending on screen (Cedar, swarm5 fix 3)
+
+Kit's review of b4fa63a: after *Let the year turn* the clip shows ~60 s of a tiny fox by a fire, kits standing
+inside the hero (reads as duplicate/glitch foxes, `frames/end-245.jpg`), and no title — the card and captions are
+DOM, so canvas recordings never contain them.
+
+- **Words live in the canvas.** Captions and the end card draw into one camera-fixed lettering plane (CanvasTexture,
+  redrawn only when the text changes; the hot step only sets opacity). Every capture path, screenshot or
+  MediaRecorder, sees exactly what the player sees. No DOM text remains (one path).
+- **The card is big.** Title *Russet Vale* fills ~45% of the frame width in the upper third (over sky/Crown), the
+  subtitle *and the year turned* under it.
+- **The rest shot is composed on the family, not the cradle.** Framed on the midpoint of hero and cradle from the
+  approach side, close and low enough that hero + kits read as a group (hero ≥ ~110 px tall at 720p), Press and
+  Crown behind. It holds — drifting slowly — until the player moves (no snap back to the follow lens behind a
+  resting fox).
+- **Kits never stand inside the hero.** Kits are visibly younger (smaller). Curl spots are picked from a ring of
+  slots round the cradle, farthest from the hero and from each other. A curled kit the hero walks into (< 0.9 m)
+  hops up and trots to a free slot (a new `Disturb` step in `tla/Finale.tla`; card liveness re-checked).
+- Measure: min hero↔kit distance over the rest hold (target ≥ 0.8 m); hero on-screen px in the card frame; card
+  pixels present in a canvas readback.
