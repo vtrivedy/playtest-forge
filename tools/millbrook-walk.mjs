@@ -185,6 +185,15 @@ try {
       return { arrived: false, d: 0, pos: s.pos, frame };
     }, { to, o, render, frame });
     if (render) {
+      // fox legibility: projected height (px) of a 0.6 m feet→ears span; a speck means the camera lost her
+      const px = await page.evaluate((H) => {
+        const { camera, ctx } = window.__opening;
+        const f = ctx.fox.root.position;
+        const a = f.clone().project(camera);
+        const b = f.clone().setY(f.y + 0.6).project(camera);
+        return a.z > 1 || b.z > 1 ? 0 : Math.abs(b.y - a.y) * H / 2;
+      }, H);
+      (log.foxPx ??= []).push(Math.round(px));
       await page.screenshot({ path: path.join(frames, `f${String(shot).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 85 });
       shot++;
     }
@@ -215,6 +224,9 @@ try {
   });
   log.complete = beat === ROUTE.length;
   log.simSeconds = frame / 60;
+  const px = [...(log.foxPx ?? [])].sort((a, b) => a - b);
+  log.foxPxSummary = px.length ? { min: px[0], p10: px[Math.floor(px.length * 0.1)], median: px[Math.floor(px.length / 2)], under24: px.filter((v) => v < 24).length, frames: px.length } : null;
+  console.log('fox px', JSON.stringify(log.foxPxSummary));
   log.checks = { complete: log.complete, allArrived: log.beats.every(b => b.arrived), finite: log.final.pos.every(Number.isFinite), noErrors: errors.length === 0 };
   if (Object.values(log.checks).some(v => !v)) process.exitCode = 1;
   fs.writeFileSync(path.join(out, 'route.json'), JSON.stringify(log, null, 1));

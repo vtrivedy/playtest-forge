@@ -27,7 +27,7 @@ export const MILLRACE = {
   burstR: 9,
   burstSecs: 1.6,
   /** surface flecks riding the current */
-  flecks: 70,
+  flecks: 48,
   flowSpeed: 1.5,
   pondDrift: 0.12,
   /** dam leaves */
@@ -98,9 +98,9 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
   const wheelSection = Math.round(M.wheel.s / F.section);
 
   // flecks: pale streaks drifting on the surface (slow in the pond, quick in the running brook)
-  const fleckGeo = new THREE.PlaneGeometry(0.035, 0.26);
+  const fleckGeo = new THREE.PlaneGeometry(0.022, 0.22);
   fleckGeo.rotateX(-Math.PI / 2);
-  const flecks = new THREE.InstancedMesh(fleckGeo, toon(0xa9c0b9), F.flecks);
+  const flecks = new THREE.InstancedMesh(fleckGeo, toon(0x93b2ab, { hatchWeight: 0 }), F.flecks);
   flecks.frustumCulled = false;
   scene.add(flecks);
   const fs = new Float32Array(F.flecks);
