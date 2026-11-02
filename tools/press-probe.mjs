@@ -118,6 +118,11 @@ console.log('ride2 peak', s.peak);
 await shot('08-ledge');
 await page.evaluate(() => { const h = window.__gameHooks; h.setStick(0.6, 0.8); h.advance(40, 1 / 60, false); h.setStick(null); h.advance(60, 1 / 60, false); });
 await shot('09-the-press');
+// save re-entry: a plain reload (no ?fresh) rebuilds the solved Press from the saved progress
+await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded', timeout: 600000 });
+await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
+evidence.reload = await page.evaluate(() => { const h = window.__gameHooks; h.setManual(true); h.travel('press'); return h.advance(30, 1 / 60, false).opening.press; });
+console.log('reload', JSON.stringify(evidence.reload));
 fs.writeFileSync(path.join(out, 'evidence.json'), JSON.stringify(evidence, null, 2));
 const last = evidence.beats.at(-1);
 console.log(JSON.stringify({ done: last.press?.done, progress: last.progress, errors: evidence.errors.length }));

@@ -19,7 +19,10 @@ const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
 const winter = (color: THREE.ColorRepresentation, extra: THREE.MeshToonMaterialParameters = {}) =>
   new THREE.MeshToonMaterial({ color, gradientMap: RAMP_WORLD, ...extra });
 
-export function buildPress(ctx: OpeningCtx, opts: { complete: (level: (typeof LEVEL_IDS)[number]) => boolean; hasInkstep: () => boolean }) {
+export function buildPress(
+  ctx: OpeningCtx,
+  opts: { complete: (level: (typeof LEVEL_IDS)[number]) => boolean; hasInkstep: () => boolean; restored: (level: (typeof LEVEL_IDS)[number]) => boolean },
+) {
   const { scene, colliders } = ctx;
   const root = new THREE.Group();
   root.name = 'press-levels';
@@ -234,6 +237,27 @@ export function buildPress(ctx: OpeningCtx, opts: { complete: (level: (typeof LE
     drafts,
     s: { warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, hint: 0 },
   };
+  // a saved world comes back as it was left, quietly: open seal, breathing drafts, melted ice, lit Press
+  if (opts.restored('teach')) {
+    rig.s.thawed = 1;
+    rig.s.sealK = 1;
+    rig.s.done |= 1;
+    rig.s.hint = 1;
+    seal.visible = false;
+    sealCol.top = seal.userData.base;
+  }
+  if (opts.restored('develop')) {
+    rig.s.crackA = 5;
+    rig.s.done |= 2;
+  }
+  if (opts.restored('combine')) {
+    rig.s.iced = 0;
+    rig.s.iceK = 1;
+    rig.s.crackB = 5;
+    rig.s.done |= 4;
+    ice.visible = false;
+    pressLight.intensity = 2.2;
+  }
   ctx.onUpdate((dt) => updatePress(rig, dt));
 
   return {

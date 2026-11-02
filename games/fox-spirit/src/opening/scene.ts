@@ -264,7 +264,7 @@ export async function runOpening(): Promise<void> {
   // world II (Ashwater Reach, x ≈ +700, Cedar): its levels report physical completion to the store
   const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater') });
   // world III (the Scribe's Press, x ≈ −700, Thistle): its drafts join the updraft read the controller glides on
-  const pressWorld = buildPress(ctx, { complete: (level) => progress.complete('press', level), hasInkstep: () => progress.hasAbility('press') });
+  const pressWorld = buildPress(ctx, { complete: (level) => progress.complete('press', level), hasInkstep: () => progress.hasAbility('press'), restored: (level) => progress.isRestored('press', level) });
   {
     const hearthLift = hearth.updrafts.liftAt;
     hearth.updrafts.liftAt = (x, feetY, z, out) => {
