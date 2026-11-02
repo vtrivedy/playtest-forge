@@ -1,4 +1,4 @@
-# Swarm5 acceptance evidence — updated 21:20 UTC, November 2
+# Swarm5 acceptance evidence — updated 21:39 UTC, November 2
 
 ## Multi-world acceptance update
 
@@ -8,7 +8,7 @@ There is no single latest-build full-game approval. Exact tested commits and ret
 | Expanded request | Independently supported result | Remaining gap |
 |---|---|---|
 | Hub → three distinct worlds → return | Fresh physical five-transition circuit passes on `acc04047`; later Press route `64204175` repeats physical entry, return and re-entry with zero JavaScript errors. Autumn village, rain marsh and snowy ink Press differ visibly in retained frames. | Sampled scenery does not establish continuous camera quality or no-placeholder-art approval. |
-| Real Ashwater puzzles and earned progress | `26280aa3`: fresh opening → physical arch → sluice, sinking-mat check, cistern flood, punt and held-jump wall crossing → all three local/canonical facts, Reedskim, Reed fill 1 and native-Tab Album. Zero JavaScript errors. | Authored solution takes 153.467 simulated seconds including deliberate tests/waits. Blind insight, forgiving traversal and 10–15-minute depth remain unproved. |
+| Real Ashwater puzzles and earned progress | `d126bc50`: fresh opening → physical arch → sluice, sinking-mat check, cistern flood, walkable punt/shelf → all three local/canonical facts, Reedskim, Reed fill 1 and native-Tab Album. Zero JavaScript errors. | Authored solution takes 146.483 simulated seconds including deliberate tests/waits. Cedar's later two-reach sluice is not covered. Blind insight, forgiving traversal and 10–15-minute depth remain unproved. |
 | Real Press puzzles and earned progress | `64204175`: failed direct warmth attempt, relays, two draft rides and Scribe finish → all three local/canonical facts, Inkstep, Maple fill 1 and native-Tab Album. Zero JavaScript errors. Corrected reachable approaches show the whole fox at first brazier and relay. | Authored solution takes 86.683 simulated seconds. Runtime solution hints remain; this is not puzzle-insight or 10–15-minute depth approval. |
 | Characters and story turn | `b374e01a` and `64204175`: independently inspected fox-eared/scarfed Scribe, workbench props and readable coda; banner supplies the family/last-season motive. | Sparse ledge and continuous character/lever motion remain open. A narrative banner is not proof the story works for an unfamiliar player. |
 | Saved world progress agrees with scene | `f49f3aa1`: staged teach/develop/full snapshots pass saved opening, Ashwater and Press reconstruction; fresh discovery control still passes all 13 checks. | Autumn develop/combine reconstruction is excluded. Hazel's later audit reports the mismatch explicitly; do not infer reconstruction from Album checkmarks. |
@@ -17,8 +17,7 @@ There is no single latest-build full-game approval. Exact tested commits and ret
 Evidence: [Ashwater cistern](reed-cistern.md), [Press route and saved opening](reed-scribe-save.md),
 [physical circuit and area method](reed-world-tour.md). Each report names immutable builds, complete
 `window.__game`/hook evidence, retained screenshots, input staging and capture locations. Neither foreign-world
-route above recorded continuous video; neither adds a zero-black-frame claim. Optional Loft/Stacks memory
-component checks are owner-reported work and are not independently accepted here.
+route above recorded continuous video; neither adds a zero-black-frame claim. Optional Stacks input climb, secret-only reward, quiet reload/revisit and native Album are independently verified on `3788c5a2`; typography follow-up `a7b86f39` repeats the route twice and checks all memory spreads. These use staged developer travel/start, not physical hub discovery. Loft and broader optional-memory fixtures remain owner-reported here. See [Stacks replay](reed-stacks.md) and [Album contrast](album-contrast/REVIEW.md).
 
 ### Fresh village regression check — 0c187aba
 
