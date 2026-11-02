@@ -33,6 +33,7 @@ export function lintHotSource(file, source) {
     findings.push(`${file}:${at.line + 1}  [${id}] ${why}\n    ${line.trim()}`);
   };
   const scanFunction = fn => {
+    if (!fn) return;
     if (ts.isIdentifier(fn)) fn = functions.get(fn.text);
     if (!fn || seen.has(fn) || !fn.body) return;
     seen.add(fn);
@@ -72,6 +73,8 @@ export function hotLintSelfTest() {
     'const updateEnvelope=(dt)=>{return {x:dt};};',
   ];
   for (const source of bad) if (!lintHotSource('fixture.hot.ts', source).length) throw new Error(`hot lint missed: ${source}`);
+  const external = 'function update(dt){query(dt);Math.max(dt,0);}';
+  if (lintHotSource('fixture.hot.ts', external).length) throw new Error('hot lint rejected an external scalar query');
   const good = 'function build(){const p=new THREE.Vector3(); const options={edgeMax:3}; function emit(){p.set(1,2,3);} ctx.onUpdate((dt)=>{emit();p.x+=dt;});return {state:()=>({pos:p.toArray()})};}';
   if (lintHotSource('fixture.hot.ts', good).length) throw new Error('hot lint rejected preallocation / cold diagnostics');
 }

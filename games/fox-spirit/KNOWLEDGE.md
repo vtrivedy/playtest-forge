@@ -351,3 +351,16 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
   library internals allocate hit records. The extraction removes project-side
   temporary candidate closures and collider query arrays; it is not a claim of
   a completely allocation-free renderer or camera stack.
+- Final runtime `4ef7d74` chooses1.5m minimum body clearance; normal2.45m boom
+  remains. Complete90s30Hz success and missed-jump replays both pass. Late failure
+  range1.559m/pitch48.77°/speed10.75m/s versus1.2m's1.233m/59.10°/10.80m/s.
+  All60 failure and90 success clip frames retain2% viewport margin for projected
+  skinned geometry; complete source frames reviewed for flame tips and walls.
+  Final success3catches/0skips/page pinned. Evidence:
+  `/captures/fern/final-{success,miss}-4ef7d74/`; full scoped review and reproduce
+  commands in `docs/reviews/swarm4/fern-camera-4ef7d74.md`.
+- The hot AST gate must accept unknown external scalar callbacks without crashing:
+  guard an absent function node before calling TypeScript's `isIdentifier`.
+  Positive external-query fixture plus existing negative allocation fixtures cover
+  this bug class. Cross-module callback bodies and library internals remain outside
+  this local call-graph check.
