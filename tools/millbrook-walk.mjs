@@ -1,6 +1,6 @@
 // Millbrook walk: village → sunken lane → mill → dash the leaf dam → watch the brook run → bridge →
 // orchard → lookout, driven only by stick + Shift through __gameHooks (no mid-route teleports).
-//   node tools/millbrook-walk.mjs --out /tmp/mw [--every 4] [--size 960x540] [--from village|lane|mill]
+//   node tools/millbrook-walk.mjs --out /tmp/mw [--every 4] [--size 960x540] [--from village|lane|mill] [--route hermitage|grand] [--audio]
 // Fixed 1/60 sim; renders a chase-cam jpg every `every` sim frames, encodes clip.mp4 at 60/every fps.
 // Writes route.json (beats, timings, stuck spans, final __game state) before encoding.
 import { chromium } from 'playwright';
@@ -89,6 +89,9 @@ const HERMITAGE_ROUTE = [
   ['back in the village', [-9.7, 102.3]],
 ];
 const which = arg('route', 'millbrook');
+// --audio: a listening tour instead of a clip: nothing rendered, the sim paced to the wall clock, and the three
+// pre-master stems (music / ambience / sfx) recorded sample-for-sample → mix.wav + stems + beats (Ember)
+const audio = process.argv.includes('--audio');
 const ROUTE = which === 'hermitage' ? HERMITAGE_ROUTE : which === 'grand' ? [...HERMITAGE_ROUTE, ['to the west lane', [-12.6, 96.6]], ['west yard', [-14, 95]], ...MILLBROOK_ROUTE.slice(1)] : MILLBROOK_ROUTE;
 const START = {
   village: { at: [-5.2, 92.5, Math.atan2(2.2, -11.5)], beat: 0 },
@@ -109,11 +112,31 @@ const log = { route: from, every, beats: [], stuck: [], errors };
 try {
   await page.goto('http://127.0.0.1:5195/', { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
+  if (audio) {
+    await page.evaluate(() => { window.__listen = true; window.__gameHooks.setManual(true); });
+    await page.keyboard.press('ShiftRight');
+    await page.waitForFunction(() => window.__gameHooks.state().opening.audio.context === 'running', null, { timeout: 60000 });
+    await page.evaluate(() => {
+      const h = window.__gameHooks;
+      const ac = h.audioContext();
+      const b = h.audioBuses();
+      window.__stems = { music: [[], []], ambience: [[], []], sfx: [[], []] };
+      window.__keep = [];
+      for (const name of ['music', 'ambience', 'sfx']) {
+        const sp = ac.createScriptProcessor(4096, 2, 2);
+        sp.onaudioprocess = (e) => { for (let c = 0; c < 2; c++) window.__stems[name][c].push(e.inputBuffer.getChannelData(c).slice()); };
+        const mute = ac.createGain();
+        mute.gain.value = 0;
+        b[name].connect(sp).connect(mute).connect(ac.destination);
+        window.__keep.push(sp);
+      }
+    });
+  }
   await page.evaluate((at) => {
     const h = window.__gameHooks;
     h.setManual(true);
     // silent visual probe: a live synth worklet would steal the 1-CPU box from the renderer
-    h.audioContext?.()?.suspend?.();
+    if (!window.__listen) h.audioContext?.()?.suspend?.();
     h.teleport(at[0], at[1], at[2]);
     h.advance(30, 1 / 60, false);
   }, START.at);
@@ -126,7 +149,7 @@ try {
   const t0 = Date.now();
   while (beat < ROUTE.length && frame < 60 * 240) {
     const [name, to, o = {}] = ROUTE[beat];
-    const render = frame % every === 0;
+    const render = !audio && frame % every === 0;
     const r = await page.evaluate(({ to, o, render, frame }) => {
       const h = window.__gameHooks;
       const s = h.state();
@@ -186,6 +209,10 @@ try {
     }
     frame++;
     const t = frame / 60;
+    if (audio) {
+      const ahead = t0 + t * 1000 - Date.now();
+      if (ahead > 0) await new Promise((res) => setTimeout(res, ahead));
+    }
     if (to) {
       if (r.d < lastProgress.d - 0.3) lastProgress = { t, d: r.d };
       if (t - lastProgress.t > 3 && stuckFrom < 0) stuckFrom = t;
@@ -208,12 +235,49 @@ try {
     return { pos: s.pos, millrace: s.opening.millrace, millWeir: s.opening.millWeir, hermitage: s.opening.hermitage, restores: s.opening.restores };
   });
   log.simSeconds = frame / 60;
+  if (audio) {
+    log.wallSeconds = (Date.now() - t0) / 1000;
+    const sr = await page.evaluate(() => window.__gameHooks.audioContext().sampleRate);
+    const S = {};
+    for (const k of ['music', 'ambience', 'sfx']) {
+      S[k] = [];
+      for (const c of [0, 1]) {
+        const b64 = await page.evaluate(({ k, c }) => {
+          const chunks = window.__stems[k][c];
+          const n = chunks.reduce((a, x) => a + x.length, 0);
+          const o = new Int16Array(n);
+          let i = 0;
+          for (const x of chunks) for (let j = 0; j < x.length; j++) o[i++] = Math.max(-32768, Math.min(32767, Math.round(x[j] * 32767)));
+          const u8 = new Uint8Array(o.buffer);
+          let s = '';
+          for (let j = 0; j < u8.length; j += 0x8000) s += String.fromCharCode(...u8.subarray(j, j + 0x8000));
+          return btoa(s);
+        }, { k, c });
+        const buf = Buffer.from(b64, 'base64');
+        S[k].push(new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2));
+      }
+    }
+    const n = Math.min(...Object.values(S).flatMap((x) => x.map((c) => c.length)));
+    const wav = (name, L, R) => {
+      const buf = Buffer.alloc(44 + n * 4);
+      buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 4, 4); buf.write('WAVE', 8); buf.write('fmt ', 12);
+      buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(2, 22); buf.writeUInt32LE(sr, 24);
+      buf.writeUInt32LE(sr * 4, 28); buf.writeUInt16LE(4, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 4, 40);
+      for (let i = 0; i < n; i++) { buf.writeInt16LE(Math.max(-32768, Math.min(32767, L(i))), 44 + i * 4); buf.writeInt16LE(Math.max(-32768, Math.min(32767, R(i))), 46 + i * 4); }
+      fs.writeFileSync(path.join(out, `${name}.wav`), buf);
+    };
+    for (const k of Object.keys(S)) wav(`stem-${k}`, (i) => S[k][0][i], (i) => S[k][1][i]);
+    wav('mix', (i) => S.music[0][i] + S.ambience[0][i] + S.sfx[0][i], (i) => S.music[1][i] + S.ambience[1][i] + S.sfx[1][i]);
+    log.audioSeconds = n / sr;
+    log.music = await page.evaluate(() => window.__gameHooks.state().opening.audio.music);
+  }
   fs.writeFileSync(path.join(out, 'route.json'), JSON.stringify(log, null, 1));
   console.log('final', JSON.stringify(log.final), 'stuck', JSON.stringify(log.stuck), 'errors', errors.length);
 } finally {
   await browser.close();
   await server.close();
 }
+if (audio) process.exit(0);
 const ffmpeg = execFileSync('python3', ['-c', 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
 execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-framerate', String(60 / every), '-i', path.join(frames, 'f%05d.jpg'), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '20', path.join(out, 'clip.mp4')]);
 console.log('clip', path.join(out, 'clip.mp4'));
