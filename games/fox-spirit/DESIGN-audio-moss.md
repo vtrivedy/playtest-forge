@@ -1,22 +1,35 @@
 # Audio: creatures, homecoming, ruin, canopy (Moss)
 
-Part of the opening audio pass (Kit :963; split Flint :987). Everything plays through Flint's one graph
-(`opening/audio.ts`, docs/design/swarm3/audio-DESIGN.md): `ctx.audio.play(file, { at })` places a one-shot in 3D;
-synth voices connect to `ctx.audio.sfx` or `ctx.audio.at(pos)`; `duck` dips the music. Samples are CC0 Kenney
-files in `src/opening/sfx/` (assets/library/CREDITS.md); where Flint's set already has the same source sound
-(page-flip = bookFlip, cloth, land = impactSoft) it is reused, not duplicated.
+Redo after Vivek's rejection of the first mix (Kit :1144, "intrusive"). Everything plays through Flint's one graph
+(`opening/audio.ts`); the master stays muted until a teammate's independent listen (Kit :1153).
+
+## Principles
+
+- Silence is the default. No locator drones, no per-step or per-bound sounds, no creature calls, no UI clicks.
+- One soft sound per meaningful beat, warm (dark) and short, sitting under the music: every event peaks at or
+  below −20 dBFS at 3 m on the sfx bus (the music bed's RMS is ≈ −18 dBFS), spectral centroid ≤ ~1 kHz.
+- Samples are CC0 Kenney sources softened offline into `soft-*` files (high-pass 90 Hz, low-pass 1.2–1.5 kHz,
+  15–25 ms fade-in to round the transient); tonal moments are quiet sine voices with slow attacks.
 
 ## Events
 
-| event | where | sound | treatment |
-|---|---|---|---|
-| creature pop | the drawing | `page-flip-0` then `page-flip-2` + the two-note synth chime and the creature's voice | pitch by creature (hedgehog high, heron low) |
-| hare bound | hare | `land-0/1` | every bound, rate 1.3, quiet |
-| heron wings | heron | `cloth-0/1` | each wingbeat of the hop down and of the homecoming wheel |
-| canopy leaf | each leaf on first touch / launch | `cloth-2` / `land-0` low | touch pitch rises up the canopy (entry → roost) |
-| ruin unfold | each fold | `unfold` + `creak`, then `land-1` as it lands | slowed, low |
-| page pinned | well post | `page-pin` + `tack` | |
-| lantern kindle | each lantern | `kindle` then `chime` | chime a pentatonic step higher per lantern |
-| well fills | the well | synth open-chord swell (5 voices, 6.5 s) at the well | music ducks to 0.4 for 4.5 s |
+| beat | sound | at 3 m |
+|---|---|---|
+| creature pop | `soft-paper` (rate .8) + one low sine note per creature (392–587 Hz, 120 ms attack) | −25 / −31 dBFS peak |
+| heron hop down | `soft-wing`, first 3 wingbeats only | −20 |
+| canopy leaf, first touch | `soft-leaf`, a shade higher up the canopy | −20 |
+| ruin fold opens | `soft-unfold` (rate .7) | −23 |
+| page pinned at the well | `soft-pin` | −20 |
+| lantern kindles | sine bell (392 Hz × pentatonic step, 40 ms attack, 2.6 s tail, low-passed) | −31 |
+| well fills | 5-voice open-chord swell, slow (2.4 s rise) + music duck | −24 |
 
-The drawings' breath shimmer stays a quiet synth voice (no sample).
+Removed: drawing shimmer drone, creature calls, hare bound thumps, heron wheel wingbeats, canopy launch thump,
+ruin creak + landing thump, lantern match-scratch, glass chime, tack click.
+
+Density: at most 22 of these in a whole slice (5 pops, 3 wingbeats, 4 leaves, 3 folds, 1 pin, 5 lanterns, 1 swell), each tied to something the player did; the slice route alone plays 8.
+
+## Proof
+
+`python3 tools/sfx-analyze.py` measures every event as played (gain × rate × bus) and the music bed;
+`node tools/sfx-capture.mjs <dir>` records the sfx bus in real time through the creature and homecoming beats.
+Both are analysis, not listening.

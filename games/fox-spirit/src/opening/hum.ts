@@ -2,14 +2,19 @@
  * Hearth hum (DESIGN v1 orientation: "hearths hum first"). Every lit hearth drones a low warm chord whose
  * loudness follows the fox's distance, so a lit hearth can be found by ear; cold ones are silent. Lit hearths
  * and the carried coal crackle where they are; a hearth catching swells and the music dips under it. The Runaway
- * Page flutters (findable by ear), flaps its pages when it startles and snaps shut with a chime per catch.
+ * Page rustles while it flees, turns a soft page when it startles and gives a low chime per catch.
  * A Keeping completion swells one rising chord. All on the opening's one graph (audio.ts), placed in 3D.
  */
 import * as THREE from 'three';
 import type { Hearth } from '../chem/updraft';
 import type { OpeningAudio } from './audio';
 
-const HUM = { near: 3, far: 26, gain: 0.07, crackle: 0.5, rustle: 0.05, flap: 0.5 };
+/**
+ * Levels for a gentle mix (Kit :1144; DESIGN-audio-moss.md): nothing here runs as a bed the player can't get away
+ * from. A lit hearth hums and crackles only within a few metres (`near`..`far`); the coal crackles only close to
+ * the fox; the page rustles only while it is fleeing; flaps are rate-limited soft paper turns.
+ */
+const HUM = { near: 2, far: 8, gain: 0.03, crackle: 0.12, rustle: 0.012, flap: 0.14, flapGap: 1.5 };
 
 export function createHearthHum(opts: {
   audio: OpeningAudio;
@@ -64,17 +69,18 @@ export function createHearthHum(opts: {
   flutter.start();
   let caught = 0;
   let flapped = 0;
+  let lastFlap = -Infinity;
 
   /** a short paper-bright arpeggio; one more note per catch, a full open chord when it is kept */
   function chime(n: number): void {
     const t = ac.currentTime;
     [523.3, 659.3, 784, 1046.5].slice(0, Math.min(4, n + 1)).forEach((hz, i) => {
       const o = ac.createOscillator();
-      o.type = 'triangle';
-      o.frequency.value = hz;
+      o.type = 'sine';
+      o.frequency.value = hz / 2;
       const g = ac.createGain();
       g.gain.setValueAtTime(0, t + i * 0.09);
-      g.gain.linearRampToValueAtTime(0.06, t + i * 0.09 + 0.02);
+      g.gain.linearRampToValueAtTime(0.025, t + i * 0.09 + 0.04);
       g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.09 + 1.4);
       o.connect(g).connect(audio.sfx);
       o.start(t + i * 0.09);
@@ -97,7 +103,7 @@ export function createHearthHum(opts: {
         const { h, gain, crackle } = v;
         const lit = h.reactor.restored ? 1 : h.reactor.heat * 0.5;
         gain.gain.setTargetAtTime(HUM.gain * lit * fall(f.distanceTo(h.base)), now, 0.25);
-        crackle.set(HUM.crackle * 0.6 * lit, 0.4);
+        crackle.set(HUM.crackle * lit * fall(f.distanceTo(h.base)), 0.4);
         if (h.reactor.restored && !v.lit) {
           // a hearth catches: a soft whump of fire and the music makes room for it
           audio.play('steam-1', { at: h.base, gain: 0.35, rate: 0.55 });
@@ -107,20 +113,22 @@ export function createHearthHum(opts: {
       }
       const c = opts.coal();
       set(coalPan, c);
-      coalCrackle.set(HUM.crackle, 0.2);
+      coalCrackle.set(HUM.crackle * (1 - THREE.MathUtils.smoothstep(f.distanceTo(c), 1, 6)), 0.2);
       const pg = opts.page?.();
       if (pg) {
         set(pagePan, pg.pos);
-        rustle.gain.setTargetAtTime(pg.kept ? 0 : HUM.rustle * (pg.fleeing ? 1.6 : 0.7), now, 0.15);
+        rustle.gain.setTargetAtTime(!pg.kept && pg.fleeing ? HUM.rustle : 0, now, 0.25);
         rustleBand.frequency.setTargetAtTime(pg.fleeing ? 3400 : 2400, now, 0.2);
         if (pg.flaps > flapped) {
           flapped = pg.flaps;
-          audio.playOne('page-flip', 3, { at: pg.pos, gain: HUM.flap, rate: 0.95 + Math.random() * 0.15 });
+          if (now - lastFlap >= HUM.flapGap) {
+            lastFlap = now;
+            audio.play('soft-paper', { at: pg.pos, gain: HUM.flap, rate: 0.9 + Math.random() * 0.1 });
+          }
         }
         if (pg.catches > caught) {
           caught = pg.catches;
-          audio.playOne('page-flip', 3, { at: pg.pos, gain: 0.7 });
-          audio.play('page-close', { at: pg.pos, gain: 0.8, delay: 0.08 });
+          audio.play('soft-paper', { at: pg.pos, gain: 0.3, rate: 0.75 });
           chime(pg.kept ? 4 : caught);
           audio.duck(pg.kept ? 0.3 : 0.5, pg.kept ? 6 : 2);
         }

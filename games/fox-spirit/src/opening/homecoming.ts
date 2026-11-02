@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { inked, toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
-import { HOMECOMING } from './layout';
+import { HOMECOMING, POP_UP_RUIN } from './layout';
 
 type Page = { art: THREE.Texture; settled: () => boolean };
 type Unpressed = { goHome: (id: 'hare' | 'heron') => boolean; home: () => string[]; state: () => { creatures: { id: string; phase: string }[] } };
@@ -92,14 +92,30 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
     return t;
   })();
   const shaft = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.4, BEACON.height).translate(0, BEACON.height / 2 + 0.6, 0),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.3, 0.55), map: shaftTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false }),
+    new THREE.PlaneGeometry(3.2, BEACON.height).translate(0, BEACON.height / 2 + 0.6, 0),
+    new THREE.MeshBasicMaterial({ color: 0xff8424, map: shaftTex, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, fog: false }),
   );
   shaft.visible = false;
   frame.add(shaft);
   const sparks = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, toneMapped: false, fog: false }), BEACON.sparks);
   sparks.visible = false;
   frame.add(sparks);
+  // the ember trail: a low stream of warm motes drifting from the ruin's overlook, down past its entry and across
+  // the meadow to the well while the beacon burns: a lower anchor in the chase frame that shows the way home
+  const TRAIL = { motes: 42, speed: 2.6, y: 1.1 };
+  const trailPath = new THREE.CatmullRomCurve3(
+    [[POP_UP_RUIN.overlook.x, POP_UP_RUIN.overlook.z], [-23.0, 75.6], ...H.harePath.map((p) => [p.x, p.z]), [H.well.x - 1.2, H.well.z + 0.6]].map(
+      ([x, z]) => new THREE.Vector3(x!, ctx.groundH(x!, z!) + TRAIL.y, z!),
+    ),
+  );
+  trailPath.points[0]!.y = POP_UP_RUIN.overlook.top + 1.4;
+  const trailLen = trailPath.getLength();
+  const trail = new THREE.InstancedMesh(new THREE.SphereGeometry(0.09, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffa040, toneMapped: false }), TRAIL.motes);
+  trail.frustumCulled = false;
+  trail.visible = false;
+  scene.add(trail);
+  const trailSeed = Array.from({ length: TRAIL.motes }, () => [ctx.rand(), ctx.rand() * 6.28, 0.6 + ctx.rand() * 0.6] as const);
+  const tp = new THREE.Vector3();
   const sparkSeed = Array.from({ length: BEACON.sparks }, () => [ctx.rand() * 6.28, ctx.rand() * 0.5, ctx.rand()] as const);
   const MOTES = 28;
   const motes = new THREE.InstancedMesh(new THREE.SphereGeometry(0.03, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffd28a, transparent: true, opacity: 0.9, toneMapped: false }), MOTES);
@@ -108,16 +124,32 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   const moteSeed = Array.from({ length: MOTES }, () => [ctx.rand() * 6.28, ctx.rand() * 0.8, ctx.rand() * 4] as const);
   const m4 = new THREE.Matrix4();
 
-  // sound (DESIGN-audio-moss.md): each kindling is a match-scratch then a glass chime a pentatonic step higher;
+  // sound (DESIGN-audio-moss.md): each kindling is one quiet sine bell a pentatonic step higher;
   // the well filling swells a warm open chord and dips the music under it
   const ac = ctx.audio.ac;
   const world = new THREE.Vector3();
   const at = (o: THREE.Object3D) => o.getWorldPosition(world).clone();
   const STEPS = [1, 9 / 8, 5 / 4, 3 / 2, 5 / 3];
   const kindleSound = (i: number) => {
-    const p = at(lanterns[i]!.body);
-    ctx.audio.play('kindle', { at: p, gain: 0.5, rate: 0.9 });
-    ctx.audio.play('chime', { at: p, gain: 0.8, rate: 0.8 * STEPS[i]!, delay: 0.12 });
+    if (ac.state !== 'running') return;
+    // a soft sine bell: slow-ish attack, long gentle tail, low-passed, one pentatonic step higher per lantern
+    const t = ac.currentTime;
+    const out = ctx.audio.at(at(lanterns[i]!.body));
+    for (const [mul, amp] of [[1, 0.028], [2, 0.006]] as const) {
+      const o = ac.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = 392 * STEPS[i]! * mul;
+      const f = ac.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 1600;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(amp, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.6);
+      o.connect(f).connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 2.7);
+    }
   };
   const swell = () => {
     if (ac.state !== 'running') return;
@@ -130,7 +162,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       o.frequency.value = hz;
       const g = ac.createGain();
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.035, t + 0.4 + i * 0.25 + 1.2);
+      g.gain.linearRampToValueAtTime(0.018, t + 0.8 + i * 0.4 + 1.6);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 6.5);
       o.connect(g).connect(out);
       o.start(t);
@@ -155,8 +187,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
     if (pinned < 0) {
       pinned = 0;
       pin.visible = true;
-      ctx.audio.play('page-pin', { at: at(pin), gain: 0.9 });
-      ctx.audio.play('tack', { at: at(pin), gain: 0.5, rate: 1.2, delay: 0.18 });
+      ctx.audio.play('soft-pin', { at: at(pin), gain: 0.08, rate: 0.85 });
       queue.push('page');
     }
     if (pinned >= 0) {
@@ -164,7 +195,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       const b = THREE.MathUtils.smoothstep(pinned, 0, 1.5) * (1 - THREE.MathUtils.smoothstep(pinned, BEACON.secs - 4, BEACON.secs));
       shaft.visible = sparks.visible = b > 0.001;
       if (shaft.visible) {
-        (shaft.material as THREE.MeshBasicMaterial).opacity = b * (0.9 + 0.1 * Math.sin(clock * 1.7));
+        (shaft.material as THREE.MeshBasicMaterial).opacity = 0.85 * b * (0.9 + 0.1 * Math.sin(clock * 1.7));
         // turn the shaft to the camera (about its own vertical axis)
         const cam = ctx.player?.cam.camera;
         if (cam) shaft.rotation.y = Math.atan2(cam.position.x - H.well.x, cam.position.z - H.well.z) - H.well.yaw;
@@ -176,6 +207,22 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
           sparks.setMatrixAt(i, m4);
         }
         sparks.instanceMatrix.needsUpdate = true;
+      }
+      // the trail runs a little longer than the shaft so its last motes arrive home
+      const tb = THREE.MathUtils.smoothstep(pinned, 0, 1) * (1 - THREE.MathUtils.smoothstep(pinned, BEACON.secs, BEACON.secs + 5));
+      trail.visible = tb > 0.001;
+      if (trail.visible) {
+        for (let i = 0; i < TRAIL.motes; i++) {
+          const [ph, wob, size] = trailSeed[i]!;
+          const u = (ph + (pinned * TRAIL.speed) / trailLen) % 1;
+          trailPath.getPointAt(u, tp);
+          tp.y += Math.sin(clock * 1.3 + wob) * 0.25;
+          tp.x += Math.sin(clock * 0.9 + wob * 2) * 0.3;
+          const k = tb * size * Math.min(1, u * 12, (1 - u) * 6);
+          m4.makeScale(k, k, k).setPosition(tp.x, tp.y, tp.z);
+          trail.setMatrixAt(i, m4);
+        }
+        trail.instanceMatrix.needsUpdate = true;
       }
       // pinned with a little bounce, then it stirs in the wind about its tack
       const pop = Math.min(1, pinned / 0.5);

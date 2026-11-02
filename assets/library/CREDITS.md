@@ -140,5 +140,4 @@ with a 3 s (crackle 0.5 s) equal-power crossfade and one fixed gain so the seam 
 | `steam-0..2.ogg` (markers 1–3) | https://opengameart.org/content/steam-release-sounds | bart | CC0 |
 | `step-grass-0..4`, `step-wood-0..4`, `step-stone-0..4` (footstep_grass/wood/concrete), `land-0..2` (impactSoft_medium) | https://kenney.nl/assets/impact-sounds | Kenney | CC0 |
 | `page-flip-0..2` (bookFlip1–3), `page-close` (bookClose), `cloth-0..3` (cloth1–4) | https://kenney.nl/assets/rpg-audio | Kenney | CC0 |
-| `page-pin` (bookPlace1), `tack` (metalClick), `unfold` (bookOpen), `creak` (creak1) — creatures/homecoming/ruin, Moss | https://kenney.nl/assets/rpg-audio | Kenney | CC0 |
-| `kindle` (scratch_001), `chime` (glass_004) — homecoming lanterns, Moss | https://kenney.nl/assets/interface-sounds | Kenney | CC0 |
+| `soft-paper` (bookFlip1), `soft-wing` (cloth1), `soft-leaf` (cloth3), `soft-unfold` (bookOpen), `soft-pin` (bookPlace1) — derived (high-pass 90 Hz, 2× low-pass 1.2–1.5 kHz, 15–25 ms fade-in, mono), creatures/canopy/ruin/homecoming, Moss | https://kenney.nl/assets/rpg-audio | Kenney | CC0 |

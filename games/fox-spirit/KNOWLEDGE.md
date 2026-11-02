@@ -149,6 +149,19 @@ permits branch unmute; Vivek then hears the landed result on main.
 - `field.restore` has a small shared slot budget (the Keeping and ruin use it); features shouldn't spend it.
 - Collider surfaces are a max over all colliders: a creature that walks with `floorAt` will climb onto any box it passes (the deer pins its y on the crag for this reason).
 
+## Reading audio by eye (Moss)
+
+- `python3 tools/spectrogram.py <audio> <out.png> [--marks evidence.json] [--from s] [--to s]` draws a log-frequency
+  spectrogram (50 Hz–16 kHz, 10 ms columns) with a 50 ms peak/RMS lane and event marks. Look for: horizontal
+  lines = sustained tones (drones, bells); vertical streaks = transients (clicks, flaps); a broadband haze that never
+  goes dark = a constant bed; regular vertical striping inside the haze = an amplitude-modulated loop (e.g. a
+  flutter). Gentle reads as mostly dark with short, low, isolated marks.
+- `python3 tools/sfx-analyze.py` measures each SFX event as played (sample × gain × rate × bus): peak, active RMS,
+  crest, spectral centroid. Brightness (centroid) is the quickest proxy for 'pokes out': raw Kenney bookFlip is
+  6–8 kHz; low-passing to ~1.5 kHz and a 20 ms fade-in brings it to ~1 kHz.
+- Capture the sfx bus directly (`window.__opening.ctx.audio.sfx.connect(dest)`) to get a stem while the master
+  is muted (tools/sfx-capture.mjs).
+
 ## Coordination (Moss)
 
 - Before building shared infrastructure someone else claimed, run `git ls-remote origin` and check for new branches (e.g. `sw3-flint-audio`): a teammate's work can be pushed to a side branch without a channel post. I built a duplicate audio graph for ~20 min before finding Flint's.
