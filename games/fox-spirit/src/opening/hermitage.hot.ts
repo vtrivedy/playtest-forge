@@ -97,6 +97,9 @@ export function createDryingLines(ctx: OpeningCtx) {
     }
   }
 
+  // the leaves letting go are heard at their line (Ember's samples; options made once, events only)
+  const leafSound = H.lines.map(([ax, az, bx, bz], i) => ({ at: new THREE.Vector3((ax + bx) / 2, (lineY[i * 2]! + lineY[i * 2 + 1]!) / 2, (az + bz) / 2), gain: 0.14, rate: 0.9 }));
+  const paperSound = leafSound.map((o) => ({ at: o.at, gain: 0.08, rate: 0.8, delay: 0.25 }));
   const freed = new Uint8Array(L);
   let freeCount = 0;
   let painted = false;
@@ -129,6 +132,8 @@ export function createDryingLines(ctx: OpeningCtx) {
       v[o + 1] = F.lift[0] + rand() * (F.lift[1] - F.lift[0]);
       v[o + 2] = F.wind.z * (0.5 + rand());
     }
+    ctx.audio.play('soft-leaf', leafSound[i]);
+    ctx.audio.play('soft-paper', paperSound[i]);
     ctx.audio.cue('hermitage-leaves');
     if (freeCount === L && !painted) {
       painted = true;

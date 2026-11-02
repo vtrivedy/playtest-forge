@@ -51,6 +51,12 @@ export function createMillWeir(
   });
   document.body.append(hud);
   let teaching = false;
+  // a soft breath per bellows stroke (rate-limited) and a cue when the kiln takes
+  const breath = { at: new THREE.Vector3(), gain: 0.06, rate: 0.5 };
+  parts.lid.updateWorldMatrix(true, false);
+  parts.lid.getWorldPosition(breath.at);
+  let lastStroke = 0;
+  let breathT = -1;
 
   // fall flecks: pale streaks sliding down the fall's curve
   const geo = new THREE.PlaneGeometry(0.07, 0.38);
@@ -77,6 +83,12 @@ export function createMillWeir(
     const turning = wheel.turning();
     pump += wheel.spin() * F.strokes * dt;
     const k = 0.5 + 0.5 * Math.sin(pump);
+    const stroke = Math.floor(pump / (Math.PI * 2));
+    if (stroke !== lastStroke && t - breathT > 0.6) {
+      breathT = t;
+      ctx.audio.play('steam-1', breath);
+    }
+    lastStroke = stroke;
     parts.lid.rotation.x = -k * 0.32;
     parts.belly.scale.y = 0.25 + k * 0.9;
     supplyNow = turning ? F.supply : 0;
@@ -85,6 +97,7 @@ export function createMillWeir(
       lit = true;
       kiln.reactor.restored = true;
       kiln.flare = 1.2;
+      ctx.audio.cue('kiln');
     }
     const f = ctx.fox.root.position;
     const nearKiln = lit && rodeAt < 0 && Math.hypot(f.x - kiln.base.x, f.z - kiln.base.z) < 5;
