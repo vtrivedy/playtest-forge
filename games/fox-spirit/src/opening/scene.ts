@@ -165,7 +165,9 @@ export async function runOpening(): Promise<void> {
   const unpressed = buildUnpressed(ctx);
   const glyphs = buildGlyphs(ctx, { onSolved: () => unpressed.unlock('kit') });
   const crown = createCrown(ctx, sky.mist);
-  const runaway = buildRunawayPage(ctx);
+  const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
+  const savedPage = progress.isRestored('russetvale', 'teach');
+  const runaway = buildRunawayPage(ctx, savedPage);
   const homecoming = buildHomecoming(ctx, runaway, unpressed);
   const leafPiles = buildLeafPiles(ctx);
   const laneWind = createLaneWind(ctx);
@@ -217,7 +219,7 @@ export async function runOpening(): Promise<void> {
   });
   const foley = createFoxFoley({ audio: ctx.audio, groundH });
   ctx.player = player;
-  const discovery = buildDiscovery(ctx, runaway.voice(), canopy.guide, popUpRuin.guide);
+  const discovery = buildDiscovery(ctx, runaway.voice(), canopy.guide, popUpRuin.guide, savedPage);
   carry = createCarry({
     scene, fox: fox.root, teach: ctx.teach,
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
@@ -253,7 +255,7 @@ export async function runOpening(): Promise<void> {
     ctx.captions.say('The tree finished falling, at last.');
   });
   // the Album's story in a few lines (DESIGN-finale.md captions): the runaway page is the first hint whose book it is
-  let pageSaid = false;
+  let pageSaid = savedPage;
   ctx.onUpdate(() => {
     if (pageSaid || !runaway.settled()) return;
     pageSaid = true;
@@ -261,7 +263,6 @@ export async function runOpening(): Promise<void> {
   });
   // the finale (DESIGN-finale.md): warmth set in the Scribe's Press cradle once the Keeping has settled
   // world progress (Hazel's store, DESIGN-worlds.md) is the one truth for levels, abilities and the hub arches
-  const progress = createWorldProgress(window.localStorage, new URLSearchParams(location.search).has('fresh'));
   // world II (Ashwater Reach, x ≈ +700, Cedar): its levels report physical completion to the store
   const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level) });
   // world III (the Scribe's Press, x ≈ −700, Thistle): its drafts join the updraft read the controller glides on

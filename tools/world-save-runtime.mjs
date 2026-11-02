@@ -43,7 +43,9 @@ try {
     const pressState = press.opening.press;
     const full = restored.includes('combine');
     const pressMatchesSave = restored.every(level => pressState.done.includes(level)) && pressState.sealOpen && pressState.draftA === restored.includes('develop') && pressState.draftB === full && pressState.iced === !full;
-    const savedOpeningMatches = boot.opening.homecoming.pinned && !boot.opening.discovery.active;
+    const savedOpeningMatches = boot.opening.homecoming.pinned && !boot.opening.discovery.active
+      && boot.opening.page.phase === 'kept' && boot.opening.page.catches === 3
+      && boot.opening.discovery.restoredAtLoad && boot.opening.discovery.completionAt === null;
     evidence.cases.push({ restored, boot, marsh, press, cameraDistance, pressCameraDistance, pressMatchesSave, savedOpeningMatches, physicalMatchesSave: restored.every(level => marsh.opening.ashwater.done.includes(level)) });
     await fs.writeFile(`${out}/evidence.partial.json`, JSON.stringify(evidence, null, 2));
     await context.close();

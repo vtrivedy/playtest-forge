@@ -116,7 +116,7 @@ function pageGlowTexture(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(canvas);
 }
 
-export function buildRunawayPage(ctx: OpeningCtx) {
+export function buildRunawayPage(ctx: OpeningCtx, keptAtLoad = false) {
   const stages = PAGE.stages.map(loop);
   const W = 0.62;
   const H = 0.8;
@@ -169,10 +169,10 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     f.life = life;
   };
 
-  let stage = 0;
-  let phase: Phase = 'perched';
+  let stage = keptAtLoad ? PAGE.stages.length - 1 : 0;
+  let phase: Phase = keptAtLoad ? 'kept' : 'perched';
   let s = 0;
-  let catches = 0;
+  let catches = keptAtLoad ? PAGE.stages.length : 0;
   let skips = 0;
   let lastSkip = -1;
   let dodges = 0;
@@ -200,7 +200,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const vel = new THREE.Vector3();
   const off = new THREE.Vector3();
   let flingT = 0;
-  let keptAt = -1;
+  let keptAt = keptAtLoad ? 5 : -1;
   let keptGlow = 0.35;
   const pos = new THREE.Vector3();
   const prev = new THREE.Vector3();
@@ -218,6 +218,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     return out;
   };
   place(0, 0, pos);
+  // Restored facts begin after release; no catch effects or visible duplicate page on load.
+  holder.visible = !keptAtLoad;
 
   function caught(): void {
     catches++;

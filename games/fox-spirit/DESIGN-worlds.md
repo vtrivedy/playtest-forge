@@ -87,6 +87,10 @@ Saved-game acceptance also checks the opening invitation: once the page is alrea
 restart its chase or display its old instructions. Keep the complete boot state and screenshot alongside
 the foreign-world reconstruction checks; a clear travel camera does not establish a clear initial lens.
 The saved-page contract is pinned homecoming plus inactive discovery, independently of later world facts.
+Read the store before building the opening. Initialize a saved returned page directly as kept, with all
+three catches accounted for and its release already settled; initialize its invitation as finished
+without inventing a current landing contact. Fresh games still use the three catches and grounded
+overlook proof. Saved initialization emits no new catch wash, release, or page-origin caption.
 
 ## Who builds what
 - **Maple** — scene integration: worlds registry, terrain dispatch, mask, arches, travel, per-world look/weather,
