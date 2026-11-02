@@ -104,6 +104,19 @@ function pageTexture(): THREE.CanvasTexture {
   return t;
 }
 
+function pageGlowTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const g = canvas.getContext('2d')!;
+  const gradient = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gradient.addColorStop(0, 'rgba(255,255,255,0.6)');
+  gradient.addColorStop(0.5, 'rgba(255,255,255,0.18)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gradient;
+  g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(canvas);
+}
+
 export function buildRunawayPage(ctx: OpeningCtx) {
   const stages = PAGE.stages.map(loop);
   const W = 0.62;
@@ -113,7 +126,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const base = Float32Array.from(geo.getAttribute('position').array);
   const art = pageTexture();
   const page = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: art, side: THREE.DoubleSide, transparent: true, alphaTest: 0.02, fog: false }));
-  const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.6, H * 1.45), new THREE.MeshBasicMaterial({ color: 0xffb066, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(W * 1.6, H * 1.45), new THREE.MeshBasicMaterial({ color: 0xffb066, map: pageGlowTexture(), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   glow.position.z = -0.01;
   const body = new THREE.Group();
   body.add(glow, page);
@@ -219,8 +232,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     if (catches >= PAGE.stages.length) {
       phase = 'kept';
       keptAt = 0;
-      releaseAnchor.copy(ctx.fox.root.position);
-      releaseAnchor.y = Math.max(releaseAnchor.y, ctx.groundH(releaseAnchor.x, releaseAnchor.z));
+      releaseAnchor.copy(pos);
+      const floor = ctx.player!.surfaceAt(pos.x, pos.z);
+      releaseAnchor.y = Number.isFinite(floor) ? floor : ctx.fox.root.position.y;
       return;
     }
     stage = catches;
@@ -361,11 +375,11 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       // The release stays at the catch, independent of subsequent landing/turning motion.
       const k = Math.min(1, keptAt / 2.5);
       // A readable, modest unfold inside the chase frame; the world wash carries the large payoff.
-      tmp.set(releaseAnchor.x, releaseAnchor.y + 1.25 + 0.45 * Math.sin(Math.min(1, keptAt / 2) * Math.PI * 0.5), releaseAnchor.z);
+      tmp.set(releaseAnchor.x, releaseAnchor.y + 1.05 + 0.15 * Math.sin(Math.min(1, keptAt / 2) * Math.PI * 0.5), releaseAnchor.z);
       // from where it was caught (still drifting on its own momentum) into the rise over the fox
       carried.copy(flingFrom).addScaledVector(kick, 0.15 * (1 - Math.exp(-keptAt / 0.15)));
       pos.lerpVectors(carried, tmp, THREE.MathUtils.smoothstep(keptAt, 0, 0.7));
-      body.scale.setScalar(1 + k * 0.8);
+      body.scale.setScalar(1 + k * 0.25);
       (page.material as THREE.MeshBasicMaterial).opacity = 1 - THREE.MathUtils.smoothstep(keptAt, 2.5, 4.5);
       (glow.material as THREE.MeshBasicMaterial).opacity = 0.35 * (1 - THREE.MathUtils.smoothstep(keptAt, 2, 4));
       holder.visible = keptAt < 4.6;

@@ -35,7 +35,7 @@ try {
   await page.evaluate(({ source, start, tape }) => {
     const h = window.__gameHooks;
     h.setManual(true); h.teleport(start.x, start.z, start.yaw);
-    window.__pageProbe = { route: new Function(`return (${source})`)()(), state: h.advance(60, 1 / 60, false), f: 0, trace: [], tape, mismatches: [], keptStart: null };
+    window.__pageProbe = { route: new Function(`return (${source})`)()(), state: h.advance(60, 1 / 60, false), f: 0, trace: [], tape, mismatches: [], keptStart: null, visual: [] };
   }, { source: createSliceRoute.toString(), start: SLICE_START, tape: replay?.trace ?? null });
   let image = 0, lastBeat = '', done = false;
   while (!done) {
@@ -50,6 +50,20 @@ try {
         shot = capture && p.f % Math.max(1, Math.round(1 / (fps * dt))) === 0;
         p.state = h.advance(1, dt, shot);
         const s = p.state;
+        if (shot && s.opening.page.phase === 'kept') {
+          const holder = window.__opening.ctx.scene.getObjectByName('runaway-page');
+          const sheet = holder.children[0].children.find(o => o.material?.map?.image?.width === 192);
+          if (holder.visible && sheet.material.opacity > 0.05) {
+            holder.updateMatrixWorld(true);
+            const camera = window.__opening.camera, v = camera.position.clone(), vertices = sheet.geometry.getAttribute('position');
+            let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+            for (let j=0;j<vertices.count;j++) {
+              v.set(vertices.getX(j),vertices.getY(j),vertices.getZ(j));sheet.localToWorld(v);v.project(camera);
+              minX=Math.min(minX,v.x);maxX=Math.max(maxX,v.x);minY=Math.min(minY,v.y);maxY=Math.max(maxY,v.y);
+            }
+            p.visual.push({frame:p.f,minX,maxX,minY,maxY,inFrame:minX>-.97&&maxX<.97&&minY>-.97&&maxY<.97});
+          }
+        }
         if (!p.keptStart && s.opening.page.phase === 'kept') p.keptStart = { page: s.opening.page.pos, fox: s.pos };
         if (expected && (JSON.stringify(s.opening.page) !== JSON.stringify(expected.opening.page) || JSON.stringify(s.pos) !== JSON.stringify(expected.pos))) {
           if (p.mismatches.length < 10) p.mismatches.push({ frame: p.f, expected: expected.opening.page, actual: s.opening.page, expectedFox: expected.pos, actualFox: s.pos });
@@ -63,8 +77,8 @@ try {
     if (r.shot) await page.screenshot({ path: `${out}/frames/f${String(image++).padStart(5, '0')}.jpg`, type: 'jpeg', quality: 88 });
     done = r.done;
   }
-  const evidence = await page.evaluate(() => ({ trace: window.__pageProbe.trace, keptStart: window.__pageProbe.keptStart, mismatches: window.__pageProbe.mismatches, game: { mode: window.__game.mode, state: window.__game.state() } }));
-  const checks = { deterministicReplay: !replay || evidence.mismatches.length === 0, catches: evidence.game.state.opening.page.catches === 3, kept: evidence.game.state.opening.page.phase === 'kept', noErrors: !errors.length, finite: evidence.trace.every(s => s.pos.every(Number.isFinite)) };
+  const evidence = await page.evaluate(() => ({ trace: window.__pageProbe.trace, keptStart: window.__pageProbe.keptStart, visual: window.__pageProbe.visual, mismatches: window.__pageProbe.mismatches, game: { mode: window.__game.mode, state: window.__game.state() } }));
+  const checks = { revealFramed: evidence.visual.every(s => s.inFrame), returnedHome: seconds < 80 || evidence.game.state.opening.homecoming.pinned === true, deterministicReplay: !replay || evidence.mismatches.length === 0, catches: evidence.game.state.opening.page.catches === 3, kept: evidence.game.state.opening.page.phase === 'kept', noErrors: !errors.length, finite: evidence.trace.every(s => s.pos.every(Number.isFinite)) };
   fs.writeFileSync(`${out}/evidence.json`, JSON.stringify({ sha, dt, runtime: production ? 'vite-production-preview' : 'vite-dev', replay: replayPath || null, staging: 'Initial wake position only; game input route; no forced catches or midroute teleport.', frames: image, errors, checks, ...evidence }, null, 2));
   await page.evaluate(() => window.__gameHooks.advance(0, 0, true));
   await page.screenshot({ path: `${out}/final.png` });
