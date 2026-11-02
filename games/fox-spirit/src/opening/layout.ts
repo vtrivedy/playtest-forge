@@ -2,6 +2,7 @@
  * Opening slice layout: Lanternhollow + Arrival Meadow at the old Russetvale coordinates
  * (regionLanternhollow.ts / russetvale.ts route + H-a placement). Every module places from here.
  */
+import { H as ashH } from './ashwaterLayout';
 import * as THREE from 'three';
 import { WEST_PATHS, westBase, westK, westRim } from './millbrookLayout';
 import { NORTH_PATHS, northRim, northRise } from './hermitageLayout';
@@ -202,6 +203,8 @@ function smin(a: number, b: number, k: number): number {
 
 /** Base terrain (no props): gentle swells, flattened lanes and house pads, cliffed rim */
 export function groundH(x: number, z: number): number {
+  // Ashwater Reach (world II) is a separate island far east of the vale
+  if (x > 400) return ashH(x, z);
   const swell = Math.sin(x * 0.11) * Math.cos(z * 0.09) * 0.7 + Math.sin(x * 0.31 + z * 0.17) * 0.18;
   let flat = THREE.MathUtils.smoothstep(pathDist(x, z), 1.2, 5);
   for (const h of HOUSES) {

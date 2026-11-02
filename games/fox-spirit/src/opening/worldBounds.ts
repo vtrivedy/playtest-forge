@@ -9,6 +9,7 @@
 import { CANOPY, FINALE, HEARTH_A, inVista, KEEPING, LEAF_PILES, PAGE, POP_UP_RUIN, rimK, SHELF, SOUTH_LANE, SPAWN, VISTA, WELL, ALL_PATHS } from './layout';
 import { MILLBROOK, westE } from './millbrookLayout';
 import { HERMITAGE, northE } from './hermitageLayout';
+import { E as ashE } from './ashwaterLayout';
 
 /** the rail on Press Hollow's far lip (worldEdge.ts): metres along the fall line past the crag, half-width across */
 export const EDGE = { a: FINALE.hollow.lip + 1.5, half: 34, step: 2.6, height: 1.0, reach: 4 } as const;
@@ -38,6 +39,8 @@ export function bakeWorldBounds(): { inWorld: (x: number, z: number) => boolean;
     cells: w * h,
     inside: n,
     inWorld(x: number, z: number): boolean {
+      // Ashwater Reach (world II, x ≈ +700) is its own oval island (ashwaterLayout E)
+      if (x > 400) return ashE(x, z) < 2.5;
       const i = Math.floor((x - B.minX) / B.cell);
       const j = Math.floor((z - B.minZ) / B.cell);
       return i >= 0 && j >= 0 && i < w && j < h && mask[j * w + i] === 1;
