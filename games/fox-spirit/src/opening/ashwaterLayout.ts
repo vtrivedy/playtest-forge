@@ -24,7 +24,7 @@ export const WATER = {
   /** level 2: Reed Pond spans the marsh, Reed Island ↔ Mill Shore; only the earned reed mats cross it */
   pond: { x0: -80, x1: 80, z0: -8, z1: 14, full: -0.15, drained: -0.15 },
   /** level 3: the Mill Pool below the weir; its steps only stand clear once it is drained */
-  pool: { x0: -15, x1: 15, z0: 20, z1: 34, full: -0.15, drained: -1.25 },
+  pool: { x0: -15, x1: 15, z0: 20, z1: 33.2, full: -0.15, drained: -1.25 },
 } as const;
 export type WaterId = keyof typeof WATER;
 /** fixed iteration order (module-level: no array literal per call on the hot path) */
@@ -49,9 +49,9 @@ export const MAT_HALF = 1.15;
 export const MAT_RISE = 0.14;
 
 /** the weir plateau north of the Mill Pool, and the steps that climb out of the drained pool onto it */
-export const WEIR = { z0: 34, top: 3.6, xMax: 18 };
-export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2].map((top, i) => ({ lz: 28.3 + i * 0.86, top }));
-export const STEP_HALF = { x: 1.6, z: 0.45 };
+export const WEIR = { z0: 33.6, top: 3.6, xMax: 18 };
+export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2].map((top, i) => ({ lz: 27.8 + i * 0.86, top }));
+export const STEP_HALF = { x: 1.6, z: 0.48 };
 
 /** the Reed Seedwell on its own ledge east of the weir: reached by gliding off the plateau's east lip */
 export const LEDGE = { x0: 23, x1: 31, z0: 36, z1: 46, top: 2.6 };
@@ -91,11 +91,6 @@ export function H(x: number, z: number): number {
   const lz = z - ASH_ORIGIN.z;
   // low hummocks of moss and peat
   let h = 0.22 * Math.sin(lx * 0.21 + 0.6) * Math.cos(lz * 0.17) + 0.12 * Math.sin(lx * 0.53 + lz * 0.41);
-  // the weir plateau and the Seedwell ledge: sheer peat walls the fox cannot step up
-  const weir = smoothstep(lz, WEIR.z0 - 0.15, WEIR.z0 + 0.35) * (1 - smoothstep(lx, WEIR.xMax - 0.2, WEIR.xMax + 0.3));
-  h = THREE.MathUtils.lerp(h, WEIR.top, weir);
-  const ledge = -sdRect(lx, lz, LEDGE.x0, LEDGE.x1, LEDGE.z0, LEDGE.z1);
-  if (ledge > -0.4) h = THREE.MathUtils.lerp(h, LEDGE.top, smoothstep(ledge, -0.4, 0.15));
   // channels and pools: soft banks down to a muddy bed
   for (const id of WATER_IDS) {
     const w = WATER[id];
@@ -103,6 +98,11 @@ export function H(x: number, z: number): number {
     if (id === 'pond') d = Math.max(d, ISLET.r - Math.hypot(lx - ISLET.lx, lz - ISLET.lz));
     h = THREE.MathUtils.lerp(h, BED, 1 - smoothstep(d, -0.9, 0.7));
   }
+  // the weir plateau and the Seedwell ledge (after the water cut, so no bank slope eats the wall): sheer peat walls
+  const weir = smoothstep(lz, WEIR.z0 - 0.4, WEIR.z0) * (1 - smoothstep(lx, WEIR.xMax - 0.2, WEIR.xMax + 0.3));
+  h = THREE.MathUtils.lerp(h, WEIR.top, weir);
+  const ledge = -sdRect(lx, lz, LEDGE.x0, LEDGE.x1, LEDGE.z0, LEDGE.z1);
+  if (ledge > -0.4) h = THREE.MathUtils.lerp(h, LEDGE.top, smoothstep(ledge, -0.4, 0.15));
   // the oval's rim rises into reed banks and willow scrub
   const e = E(x, z);
   return h + Math.max(0, e + 5) * 1.6;
