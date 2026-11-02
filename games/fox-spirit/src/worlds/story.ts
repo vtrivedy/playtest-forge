@@ -1,20 +1,26 @@
-/** Earned Album testimony. Visibility is derived from mechanism facts, never visits. */
+/** Earned Album testimony. Visibility derives from mechanism facts, never visits. */
 import type { WorldId, LevelId } from './progress';
 export interface StoryMemory { voice: string; title: string; text: string }
+/** The spoken page lines stay short enough to read during the staged reveal. */
+export const WORLD_REVELATIONS = {
+  russetvale: 'Here the Scribe kept every autumn.',
+  ashwater: 'The Scribe pressed the rain first.',
+  press: 'I kept autumn. It was the last season we were all here.',
+} as const satisfies Record<WorldId, string>;
 export const WORLD_STORIES = {
   russetvale: {
-    teach: { voice: 'The returned page', title: 'The last hearth-fox', text: 'The page holds a fox-shaped space where the ink would not settle. The autumn was pressed flat, but one small warmth escaped its edges. Yours.' },
-    develop: { voice: 'A mill ledger', title: 'A year without a winter', text: 'Every entry ends on the same autumn day. The mill stopped; the date did not change. Someone kept the season, and everything living in it had to wait.' },
-    combine: { voice: 'The Hearthtree page', title: 'Beyond the familiar trees', text: 'The roots reach past the village into rain-dark country. This was never the whole world. The same ink runs through the marsh and back toward the Press.' },
+    teach: { voice: 'The returned page', title: 'A page going home', text: 'The runaway was never fleeing you. It was trying to return to the Album. Its edges settle around the valley: a whole place, pressed into one page.' },
+    develop: { voice: 'A mill ledger', title: 'A moment that cannot finish', text: 'Every entry ends on the same autumn day. The mill stopped; the date did not change. The Scribe kept the season, and everything living in it had to wait.' },
+    combine: { voice: 'The Hearthtree page', title: 'Here the Scribe kept every autumn', text: 'An ink-dark watcher stands beyond the trees: the Ash Warden. The Album is real, and this valley is one of its pages. Its footprints lead toward the rain.' },
   },
   ashwater: {
-    teach: { voice: 'A water-stained page', title: 'Rain that remembers', text: 'Under the pale surface, the old water still remembers where it used to run. The Press flattened a place; it could not erase every trace of its life.' },
-    develop: { voice: 'An ink silhouette', title: 'The shape inside the stain', text: 'A Shade is an outline caught in ink. When warmth breaks its hold, the outline can move again. The darkness is holding something, not merely hiding it.' },
-    combine: { voice: 'The Reed Seedwell page', title: 'Upstream', text: 'The rain carries loosened ink toward the winter country. There is a hand behind these marks. Beyond the reeds, the Scribe’s Press is still holding the year.' },
+    teach: { voice: 'The Ferrykeeper', title: 'The last crossing', text: 'The heron has held the last ferry for years, pressed in the middle of a wade. The Warden froze the sluices. Even the water has been waiting to finish its journey.' },
+    develop: { voice: 'The Ferrykeeper', title: 'Before the endless autumn', text: 'The Scribe once lived beside this marsh. The Ferrykeeper remembers a house, a flood, and the moment the rain stopped moving. The river was their first page.' },
+    combine: { voice: 'The Reed Seedwell page', title: 'The Scribe pressed the rain first', text: 'They pressed the flood that took their home, then could not stop pressing. The Ferrykeeper turns her lantern toward winter. At the Press, the Scribe is still keeping the last season.' },
   },
   press: {
-    teach: { voice: 'A scorched margin', title: 'Warmth between the lines', text: 'Even here, beneath winter ink, warmth can open a margin. The Press has not made the world lifeless. It has made the living world wait.' },
-    develop: { voice: 'An Archive leaf', title: 'A world made small', text: 'The Archive keeps a place in every fold: a village, a river, a season. What was wide enough to wander has been made small enough to keep.' },
-    combine: { voice: 'The Wellspring page', title: 'The year can turn', text: 'The ink no longer holds every edge. Water and warmth have found a way through. What returns will have room to change, and a season after autumn.' },
+    teach: { voice: 'A scorched margin', title: 'The hand behind the marks', text: 'At the Press stands someone small and old. The Scribe has kept every place close enough to touch, yet none of the pressed moments can answer them.' },
+    develop: { voice: 'An Archive leaf', title: 'The shadow at the Press', text: 'The Ash Warden is the Scribe’s own shadow: the ink of every moment they pressed. The watcher has been carrying the weight of everything its maker could not let go.' },
+    combine: { voice: 'The Scribe', title: 'The last season we were all here', text: '“I kept autumn because it was the last season we were all here.” The fox brings warmth to the Press. The Scribe lets the year turn. What returns will have room to change.' },
   },
 } as const satisfies Record<WorldId, Record<LevelId, StoryMemory>>;

@@ -49,7 +49,7 @@ for(const world of ['russetvale','ashwater','press']){
  const visibleText=await page.evaluate(()=>window.__albumText);
  const missing=visibleText.filter(t=>t==='A page still missing').length;
  const expectedMissing={russetvale:3,ashwater:1,press:0}[world];
- const spoiler=world==='ashwater'&&visibleText.includes('Upstream');
+ const spoiler=world==='ashwater'&&visibleText.includes('The Scribe pressed the rain first');
  storyChecks.push({world,missing,expectedMissing,spoiler,visibleText});
  if(missing!==expectedMissing||spoiler)throw Error(`story reveal invariant failed: ${world}`);
 }
@@ -62,6 +62,19 @@ const closed=await page.evaluate(()=>{window.__gameHooks.advance(1);return !wind
 await page.screenshot({path:'/tmp/hazel-map-preview/closed-badge-960.png'});
 await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
 const open=await page.evaluate(()=>window.__mapPreview.map.isOpen());
+await page.evaluate(()=>{
+ window.__mapPreview.map.setOpen(false);
+ window.__mapPreview.progress.complete('russetvale','teach');
+ window.__mapPreview.progress.complete('russetvale','develop');
+ window.__mapPreview.progress.complete('russetvale','combine');
+ window.__mapPreview.map.step();window.__gameHooks.advance(1);
+});
+await page.screenshot({path:'/tmp/hazel-map-preview/returned-page-960.png'});
+await page.evaluate(()=>{
+ window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'}));
+ window.__gameHooks.advance(1);
+});
+await page.screenshot({path:'/tmp/hazel-map-preview/returned-story-960.png'});
 await page.evaluate(async()=>{
  const {buildSeedwells}=await import('/src/worlds/seedwells.ts');
  const THREE=await import('/@fs/work/node_modules/.vite/deps/three.js');

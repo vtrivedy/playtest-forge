@@ -4,7 +4,7 @@ import { WORLD_IDS, LEVEL_IDS, WORLD_CATALOGUE, type WorldProgress, type WorldId
 import type { LetterPlane } from '../opening/lettering.hot';
 import { createLetterPlane } from '../opening/lettering';
 import { stepPageMap } from './pageMap.hot';
-import { WORLD_STORIES } from './story';
+import { WORLD_STORIES, WORLD_REVELATIONS } from './story';
 const WIDTH = 1440, HEIGHT = 880;
 const FONT = 'Georgia, "DejaVu Serif", serif';
 export interface PageMap {
@@ -25,6 +25,10 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
   badge.draw([{ text: 'Tab · Album', px: 34 }]);
   camera.add(badge.mesh);
   const plane: LetterPlane = { mesh, mat: material, aspect: WIDTH / HEIGHT, heightFrac: .88, y: 0, x: 0, left: false };
+  const revelation = createLetterPlane(1400, 160, .105, .60, { panel: true });
+  camera.add(revelation.mesh);
+  let pendingRevelation = false;
+  const knownCombine = WORLD_IDS.map(world => progress.isRestored(world, 'combine'));
   let open = false;
   let spread = 0;
   function text(value: string, x: number, y: number, size: number, color = '#382b31') {
@@ -119,7 +123,7 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     text('[ / ] · read memories     Tab · close Album', WIDTH / 2, 844, 22);
     texture.needsUpdate = true;
   }
-  function setOpen(value: boolean) { open = value; if (open) draw(); stepPageMap(plane, camera, open, badge); }
+  function setOpen(value: boolean) { open = value; if (open) pendingRevelation = false; if (open) draw(); stepPageMap(plane, camera, open, badge, revelation, pendingRevelation); }
   function keydown(event: KeyboardEvent) {
     if (event.code === 'Tab') { event.preventDefault(); if (!event.repeat) setOpen(!open); }
     else if (open && (event.code === 'BracketLeft' || event.code === 'BracketRight')) {
@@ -128,7 +132,18 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     }
   }
   inputTarget.addEventListener('keydown', keydown);
-  const unsubscribe = progress.subscribe(() => { if (open) draw(); });
+  const unsubscribe = progress.subscribe(() => {
+    for (let wi = 0; wi < WORLD_IDS.length; wi++) {
+      const world = WORLD_IDS[wi], restored = progress.isRestored(world, 'combine');
+      if (restored && !knownCombine[wi]) {
+        revelation.draw([{ text: WORLD_REVELATIONS[world], px: 42 }, { text: 'A page returned · Tab to read', px: 25 }]);
+        pendingRevelation = !open;
+        spread = wi + 1;
+      }
+      knownCombine[wi] = restored;
+    }
+    if (open) draw();
+  });
   draw();
-  return { setOpen, isOpen: () => open, step: () => stepPageMap(plane, camera, open, badge), dispose() { unsubscribe(); inputTarget.removeEventListener('keydown', keydown); camera.remove(mesh); camera.remove(badge.mesh); badge.mat.map?.dispose(); badge.mat.dispose(); badge.mesh.geometry.dispose(); mesh.geometry.dispose(); material.dispose(); texture.dispose(); } };
+  return { setOpen, isOpen: () => open, step: () => stepPageMap(plane, camera, open, badge, revelation, pendingRevelation), dispose() { unsubscribe(); inputTarget.removeEventListener('keydown', keydown); camera.remove(mesh); camera.remove(badge.mesh); camera.remove(revelation.mesh); revelation.mat.map?.dispose(); revelation.mat.dispose(); revelation.mesh.geometry.dispose(); badge.mat.map?.dispose(); badge.mat.dispose(); badge.mesh.geometry.dispose(); mesh.geometry.dispose(); material.dispose(); texture.dispose(); } };
 }
