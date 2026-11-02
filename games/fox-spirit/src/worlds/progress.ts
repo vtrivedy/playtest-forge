@@ -1,7 +1,7 @@
 /** World progress: mechanism facts are canonical; abilities and Seedwells are derived. */
 export const WORLD_IDS = ['russetvale', 'ashwater', 'press'] as const;
 export const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
-export const SECRET_IDS = ['press-stacks'] as const;
+export const SECRET_IDS = ['press-stacks', 'vale-loft'] as const;
 export type SecretId = typeof SECRET_IDS[number];
 export type WorldId = typeof WORLD_IDS[number];
 export type LevelId = typeof LEVEL_IDS[number];

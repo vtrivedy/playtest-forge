@@ -57,3 +57,16 @@ Inspected that frame plus `climb.png`; no duplicate discovery caption and fox
 silhouette remains clear. Retained movement telemetry: last jump apex .750 m,
 air .700 s, time to apex .300 s, zero dashes; no feel tuning in this change.
 TypeScript, lint:feel (160 anchors), progress checks and diff check pass.
+
+## Maple integration wake retest
+
+Runtime `eef9fd2b` merges Maple integration `8abbe593` into the Hazel branch.
+`/captures/hazel/stacks-maple-8abbe593/evidence.json` records another PASS9/9
+input climb, native Tab, optional-memory-only progression, reload, reopened
+memory and quiet stand revisit, with zero JavaScript errors. This retains the
+staged-start scope above. Inspected `climb.png` and `earned-memory.png`: the
+returned-page notice stays above the fox, the earned prose fits the card, and
+the new Press dressing does not block this climb. The 640px frame leaves the
+small Album controls faint; it does not establish full-resolution UI quality.
+Progress checks, TypeScript and lint:feel pass. No gameplay or feel changes.
+Saved-autumn reconstruction remains separately open in SAVED-AUTUMN-AUDIT.md.

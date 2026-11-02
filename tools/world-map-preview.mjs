@@ -61,6 +61,10 @@ if(!secretMissing)throw Error('Unfound secret leaked memory');
 await page.screenshot({path:`${out}/secret-missing-960.png`});
 await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'BracketRight'})));
 await page.evaluate(()=>window.__gameHooks.advance(1));
+const loftMissing=await page.evaluate(()=>window.__albumText.includes('A loose binding') && !window.__albumText.includes('The house before the rain'));
+if(!loftMissing)throw Error('Unfound Loft leaked memory');
+await page.screenshot({path:`${out}/loft-missing-960.png`});
+await page.evaluate(()=>{window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'BracketRight'}));window.__gameHooks.advance(1)});
 await page.screenshot({path:`${out}/map-return-960.png`});
 
 await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
@@ -90,6 +94,15 @@ await page.evaluate(()=>{window.__mapPreview.keyTarget.dispatchEvent(new Keyboar
 const secretFound=await page.evaluate(()=>window.__albumText.includes('Everyone, together, laughing'));
 if(!secretFound)throw Error('Earned secret memory missing');
 await page.screenshot({path:`${out}/secret-memory-960.png`});
+await page.evaluate(()=>{
+ window.__mapPreview.map.setOpen(false);window.__albumText=[];
+ window.__mapPreview.progress.findSecret('vale-loft');window.__mapPreview.map.step();window.__gameHooks.advance(1);
+});
+await page.screenshot({path:`${out}/loft-returned-960.png`});
+await page.evaluate(()=>{window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'}));window.__gameHooks.advance(1)});
+const loftFound=await page.evaluate(()=>window.__albumText.includes('The house before the rain'));
+if(!loftFound)throw Error('Earned Loft memory missing');
+await page.screenshot({path:`${out}/loft-memory-960.png`});
 await page.evaluate(async()=>{
  const {buildSeedwells}=await import('/src/worlds/seedwells.ts');
  const THREE=await import('/@fs/work/node_modules/.vite/deps/three.js');

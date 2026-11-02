@@ -155,3 +155,14 @@ solvability evidence, not blind puzzle discovery or a duration target.
 Both foreign-world physical routes must assert canonical earned ability and full Seedwell fill as well as local
 puzzle facts. Capture the Album with native Tab at completion and close it before return travel. On the Press route,
 retain two later stationary scene frames across the Scribe's lever/coda hold; sampled frames do not prove animation.
+
+### Optional memory — the Russetvale Loft
+The east cottage roof climb returns `vale-loft`, a second independent secret.
+Each optional memory has its own Album spread, discovered notice and persisted fact.
+The Loft remembers the Scribe’s house before the rain; it grants no world completion,
+Seedwell fill or ability. Reload keeps both optional pages and replays neither notice.
+
+Optional-memory reload verification uses four independent saved fixtures: neither
+page, Stacks only, Loft only, and both. Native Tab/bracket navigation must show
+only earned prose, preserve zero level/ability/well gains, and stay quiet after a
+second load. Injected fixtures verify reconstruction only, not either physical climb.

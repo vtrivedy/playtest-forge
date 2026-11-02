@@ -1,10 +1,15 @@
 /** In-canvas illustrated Album. Progress changes redraw once; the hot step only fits its plane. */
 import * as THREE from 'three';
-import { WORLD_IDS, LEVEL_IDS, WORLD_CATALOGUE, type WorldProgress, type WorldId } from './progress';
+import { WORLD_IDS, LEVEL_IDS, SECRET_IDS, WORLD_CATALOGUE, type WorldProgress, type WorldId, type SecretId } from './progress';
 import type { LetterPlane } from '../opening/lettering.hot';
 import { createLetterPlane } from '../opening/lettering';
 import { stepPageMap } from './pageMap.hot';
-import { WORLD_STORIES, WORLD_REVELATIONS, STACKS_MEMORY } from './story';
+import { WORLD_STORIES, WORLD_REVELATIONS, STACKS_MEMORY, LOFT_MEMORY, type StoryMemory } from './story';
+const SECRET_PAGES = {
+  'press-stacks': { memory: STACKS_MEMORY, notice: 'A page never pressed: everyone, together, laughing.' },
+  'vale-loft': { memory: LOFT_MEMORY, notice: 'The Scribe’s own house, before the rain.' },
+} satisfies Record<SecretId, { memory: StoryMemory; notice: string }>;
+const SPREAD_COUNT = 1 + WORLD_IDS.length + SECRET_IDS.length;
 const WIDTH = 1440, HEIGHT = 880;
 const FONT = 'Georgia, "DejaVu Serif", serif';
 export interface PageMap {
@@ -29,7 +34,7 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
   camera.add(revelation.mesh);
   let pendingRevelation = false;
   const knownCombine = WORLD_IDS.map(world => progress.isRestored(world, 'combine'));
-  let knownStacks = progress.isSecretFound('press-stacks');
+  const knownSecrets = SECRET_IDS.map(secret => progress.isSecretFound(secret));
   let open = false;
   let spread = 0;
   function text(value: string, x: number, y: number, size: number, color = '#382b31') {
@@ -98,13 +103,15 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     if (spread > 0) {
       if (spread < 4) drawStory(WORLD_IDS[spread - 1]);
       else {
-        const found = progress.isSecretFound('press-stacks');
+        const secretIndex = spread - 4;
+        const found = progress.isSecretFound(SECRET_IDS[secretIndex]);
+        const memory = SECRET_PAGES[SECRET_IDS[secretIndex]].memory;
         text('Unpressed pages', WIDTH / 2, 220, 36, '#302334');
         g.fillStyle = '#e4d4b8'; g.beginPath(); g.roundRect(180, 295, 1080, 380, 16); g.fill();
-        text(found ? STACKS_MEMORY.title : 'A loose binding', WIDTH / 2, 355, 32, '#302334');
-        text(found ? STACKS_MEMORY.voice : 'There is room for another memory.', WIDTH / 2, 405, 24, '#625354');
+        text(found ? memory.title : 'A loose binding', WIDTH / 2, 355, 32, '#302334');
+        text(found ? memory.voice : 'There is room for another memory.', WIDTH / 2, 405, 24, '#625354');
         g.textAlign = 'left';
-        wrap(found ? STACKS_MEMORY.text : 'Some moments were never pressed into the Album. An empty space waits between these pages.', 235, 475, 970, 28, '#302330');
+        wrap(found ? memory.text : 'Some moments were never pressed into the Album. An empty space waits between these pages.', 235, 475, 970, 28, '#302330');
         g.textAlign = 'center';
       }
       text('[ / ] · turn pages     Tab · close Album', WIDTH / 2, 844, 22);
@@ -139,7 +146,7 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     if (event.code === 'Tab') { event.preventDefault(); if (!event.repeat) setOpen(!open); }
     else if (open && (event.code === 'BracketLeft' || event.code === 'BracketRight')) {
       event.preventDefault();
-      if (!event.repeat) { spread = (spread + (event.code === 'BracketRight' ? 1 : 4)) % 5; draw(); }
+      if (!event.repeat) { spread = (spread + (event.code === 'BracketRight' ? 1 : SPREAD_COUNT - 1)) % SPREAD_COUNT; draw(); }
     }
   }
   inputTarget.addEventListener('keydown', keydown);
@@ -153,13 +160,15 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
       }
       knownCombine[wi] = restored;
     }
-    const stacks = progress.isSecretFound('press-stacks');
-    if (stacks && !knownStacks) {
-      revelation.draw([{ text: 'A page never pressed: everyone, together, laughing.', px: 42 }, { text: 'A page returned · Tab to read', px: 25 }]);
-      pendingRevelation = !open;
-      spread = 4;
+    for (let si = 0; si < SECRET_IDS.length; si++) {
+      const found = progress.isSecretFound(SECRET_IDS[si]);
+      if (found && !knownSecrets[si]) {
+        revelation.draw([{ text: SECRET_PAGES[SECRET_IDS[si]].notice, px: 42 }, { text: 'A page returned · Tab to read', px: 25 }]);
+        pendingRevelation = !open;
+        spread = 4 + si;
+      }
+      knownSecrets[si] = found;
     }
-    knownStacks = stacks;
     if (open) draw();
   });
   draw();
