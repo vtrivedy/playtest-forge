@@ -171,6 +171,10 @@ permits branch unmute; Vivek then hears the landed result on main.
   ratio 3.5 / index 1.6 (ratio 4, index 0.8 = celesta); "ticking clock" = 6 ms-attack footsteps at a steady gait.
 - The model hallucinates (a "male voice", "alarm") on noise beds; confirm any flaw on the spectrogram before acting.
 
+- Place tunes: a `SONG.tunes` entry with `places: [...]` is taken at the next pass start while one of its places
+  leads (weight > 0.5), never twice running, alternating with the shared rotation. Add new regions' places to
+  `PLACES` and, if they deserve it, a tune. 15-minute offline render: stable level (−34…−30 dB RMS/min), no NaN.
+
 ### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
 
 - Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
