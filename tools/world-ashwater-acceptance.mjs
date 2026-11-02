@@ -38,8 +38,10 @@ const go = async (lx, lz, o = {}) => {
   const r = await page.evaluate(([x, z, o]) => {
     const h = window.__gameHooks;
     let n = 0;
+    const startingWorld=h.state().opening.worlds.active;
     for (; n < (o.max ?? 900); n++) {
       const s = h.state();
+      if(s.opening.worlds.active!==startingWorld)break;
       const dx = x - s.pos[0], dz = z - s.pos[2], d = Math.hypot(dx, dz);
       if (d < (o.reach ?? 0.35) && (!o.land || s.grounded)) break;
       const k = Math.min(1, d / 0.8) * (o.speed ?? 1);
@@ -52,7 +54,7 @@ const go = async (lx, lz, o = {}) => {
       h.setKeys(keys);
       h.advance(1, 1 / 60, false);
     }
-    h.setKeys([]);
+    h.setKeys([]);h.setStick(0,0);
     return n;
   }, [O.x + lx, O.z + lz, o]);
   if (frames) {
