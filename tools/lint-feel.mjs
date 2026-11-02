@@ -69,7 +69,7 @@ function scanHot(dir) {
 scanHot('games/fox-spirit/src');
 findings.push(...lintRenderSurface('src/render/forgeRenderer.ts', fs.readFileSync('src/render/forgeRenderer.ts', 'utf8')));
 // world checks that need the TypeScript layout (tools/checks/*.ts via tsx): painted lanes must be walkable (Wren 77d303a)
-for (const check of ['tools/checks/paths-walkable.ts', 'tools/tests/route-input.ts', 'tools/checks/ashwater-terrain.ts']) {
+for (const check of ['tools/checks/paths-walkable.ts', 'tools/tests/route-input.ts', 'tools/checks/ashwater-terrain.ts', 'tools/camera-relocation-check.ts']) {
   const r = spawnSync(process.execPath, ['--import', 'tsx', check], { encoding: 'utf8' });
   if (r.status !== 0) findings.push(`${check}  [world-check] ${(r.stdout + r.stderr).trim()}`);
 }

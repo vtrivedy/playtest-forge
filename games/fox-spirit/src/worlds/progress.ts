@@ -7,7 +7,7 @@ export type ActiveWorld = WorldId | 'hub';
 export const PROGRESS_SAVE_KEY = 'russet-vale-worlds-v1';
 export const WORLD_CATALOGUE = {
   russetvale: { name: 'Russetvale', season: 'Autumn hearthlands', well: 'Kiln', ability: 'Hearthbound', color: '#dc8748', levels: { teach: 'Lanternhollow', develop: 'Millbrook Kiln', combine: 'Hearthtree Keeping' } },
-  ashwater: { name: 'Ashwater Reach', season: 'Rain & reedwater', well: 'Reed', ability: 'Reedskim', color: '#56b9b2', levels: { teach: 'Low Sluice', develop: 'Ferry Lantern', combine: 'Weir Heart' } },
+  ashwater: { name: 'Ashwater Reach', season: 'Rain & reedwater', well: 'Reed', ability: 'Reedskim', color: '#56b9b2', levels: { teach: 'Low Sluice', develop: 'Reed Pond', combine: 'Weir Heart' } },
   press: { name: 'The Scribe’s Press', season: 'Winter ink', well: 'Maple', ability: 'Inkstep', color: '#a6a9e6', levels: { teach: 'White Margin', develop: 'Folded Archive', combine: 'Wellspring Press' } },
 } as const satisfies Record<WorldId, { name: string; season: string; well: string; ability: string; color: string; levels: Record<LevelId, string> }>;
 export interface ProgressStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; removeItem(key: string): void }
