@@ -31,15 +31,15 @@ export const RIDGE_BASE = groundTop(-RIDGE.xMax, RIDGE.xMax, RIDGE.lz - 1, RIDGE
  * (tla/Press.tla abstracts the chain to "warmth reachable on this side"; lit braziers never go out.)
  */
 export const BRAZIERS: ReadonlyArray<{ lx: number; lz: number; lit: boolean; shelf: boolean }> = [
-  { lx: -26, lz: 30, lit: true, shelf: false },
+  { lx: -22, lz: 28, lit: true, shelf: false },
   { lx: -6, lz: 30, lit: false, shelf: false },
   { lx: 30, lz: -10, lit: true, shelf: true },
   { lx: 16, lz: -24, lit: false, shelf: true },
 ];
 export const BRAZIER_REACH = 2.0;
-/** seconds of carried warmth (≈ 21 m at a run): one relay leg (≤ 18 m), never lit brazier → gate (≥ 24 m), and
+/** seconds of carried warmth (≈ 19 m at a run): one relay leg (≤ 16 m), never lit brazier → gate (≥ 21 m), and
  *  the relays stand off the straight line, so the chain has to be seen, not walked into */
-export const WARM_S = 6.5;
+export const WARM_S = 6;
 
 /** level 2 (develop): the Archive shelf spans the island; a frozen membrane at its foot breaks into a glide draft */
 export const SHELF = { z0: -30, z1: -6, xMax: 60, rise: 4.4 };
