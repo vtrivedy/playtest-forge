@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { createCameraEnvelope } from '../games/fox-spirit/src/cameraEnvelope.hot';
+import { terrainBodyVisibility } from '../games/fox-spirit/src/cameraTerrain.hot';
 
 // The desired lens is free below a ledge, but its straight release segment
 // intersects that ledge. Both the free and obstructed exits must remain gradual.
@@ -73,3 +74,32 @@ for (const visibleProxy of [false,true]) for (const dt of [1 / 30, 1 / 60, 1 / 1
   assert.ok(lens.distanceTo(goal)<.1,'camera stayed stranded behind the nearby post');
 }
 console.log('camera envelope: local post detour recovers continuously at30/60/120Hz');
+
+// The centre segment and lens volume clear a cross-slope while its shoulder masks the body.
+// A point-only terrain check is the negative control: it sees no obstruction here.
+const crossSlope = (x: number, z: number) => -.7 * x - 3 * z;
+const focus = new THREE.Vector3(0, .33, 0), goal = new THREE.Vector3(-1.9, 1.9, 0);
+assert.equal(terrainBodyVisibility(...focus.toArray() as [number,number,number], ...goal.toArray() as [number,number,number], crossSlope, 0), 1);
+assert.ok(terrainBodyVisibility(...focus.toArray() as [number,number,number], ...goal.toArray() as [number,number,number], crossSlope, .28) < .9);
+for (const dt of [1/30,1/60,1/120]) {
+  let hill = true;
+  const ground = (x: number,z: number) => hill ? crossSlope(x,z) : 0;
+  const previous = goal.clone(), lens = goal.clone();
+  const update = createCameraEnvelope({params:{minDistance:1.9,distance:2.45,clearance:.35,sideBias:.35,terrainBodyWidth:.28},previousLens:previous,surfaceAt:ground,terrainAt:ground,lensBlocked:()=>false,yaw:()=>-Math.PI/2,sightFraction:()=>1});
+  for (let i=0;i<Math.ceil(3/dt);i++) {
+    lens.copy(goal);update(focus,lens,dt,false);
+    assert.ok(lens.distanceTo(previous)<=16*dt+1e-5,`terrain body recovery snapped dt=${dt} step=${lens.distanceTo(previous)} from=${previous.toArray()} to=${lens.toArray()}`);
+    assert.ok(Math.hypot(lens.x,lens.z)>=1.9-1e-5,'terrain body recovery lost body room');
+    assert.ok(lens.y>=ground(lens.x,lens.z)+.28-1e-5,'terrain body recovery entered floor');
+    previous.copy(lens);
+  }
+  assert.ok(terrainBodyVisibility(...focus.toArray() as [number,number,number], ...lens.toArray() as [number,number,number], ground, .28)>.99,'body remained hidden by terrain shoulder');
+  hill=false;
+  for(let i=0;i<Math.ceil(2/dt);i++) {
+    lens.copy(goal);update(focus,lens,dt,false);
+    assert.ok(lens.distanceTo(previous)<=16*dt+1e-5,'terrain body release snapped');
+    previous.copy(lens);
+  }
+  assert.ok(lens.distanceTo(goal)<.1,`terrain body escape failed to release dt=${dt} from=${lens.toArray()} goal=${goal.toArray()}`);
+}
+console.log('camera envelope: lateral terrain-body visibility recovers/releases continuously at30/60/120Hz');

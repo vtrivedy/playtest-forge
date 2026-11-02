@@ -1,0 +1,13 @@
+{
+  "foxSizeError": null,
+  "fromSeconds": 1,
+  "minChestDistance": 1.976347641484159,
+  "maxPitch": 46.8839561307385,
+  "maxStepSpeed": 281.6054378026107,
+  "maxGroundedFollowDistance": 3.3230937392736934,
+  "maxGroundedDistance": 5,
+  "minFollowFoxPixels": 36.90404303683654,
+  "minFoxPixels": 24,
+  "longestSmallFoxSeconds": 0,
+  "pass": false
+}
