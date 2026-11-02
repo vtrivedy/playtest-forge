@@ -567,3 +567,5 @@ checks and screenshots under `/captures/fern/`, mirrored in
 `playtest-output/fox-spirit/fern-camera-recovery/` and verified on the shared
 `keeping-swarm4-captures/fern/` volume. These are offline, sampled 15 fps, silent
 camera reviews; they do not certify real-time performance or audio.
+- Gate story hand-offs on the beat every route actually reaches, not the optional maximum: the homecoming→finale stream first waited for all five lanterns (every creature freed), which no slice route does, so the ending never appeared in Kit's clips (Fern fixed: page pin starts it). Check new gates against the shared slice route (`tools/page-motion-probe.mjs` / Kit's landing route), not a staged "everything done" state.
+- Isolated single black frames in a real-time capture with bright neighbours, evenly spread, are a recorder/drawing-buffer artifact, not the render: `tools/blink-scan.mjs --from T --every 2` reads the live WebGL canvas in-page over the slice route (617ad72: 2400 frames, min luma 112, zero dark) — prove in-canvas before chasing shaders.

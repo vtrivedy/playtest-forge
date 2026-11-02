@@ -1,0 +1,13 @@
+# Production handover replay
+
+A fresh production build of 52795df (runtime sources identical to integrated d0d1953) reproduces the page-only onward guidance. Production packaging does not explain Kit's #swarm :617 report of no plaza guidance. That live-video failure and its isolated black frames remain open until the exact recording's state and capture path reconcile.
+
+The first run uses production preview, 640×360 SwiftShader, offline 60 Hz simulation and createSliceRoute. Only the wake placement is staged. It reaches homecoming at 73.25 seconds with all three catches and the return fold complete. Saved state shows pinned=true, lit=[page], full=false, onward=48 at 70, 73, 75, 77, 80 and 85 seconds. Shot weight is 0 while returning, 1 at 75/77 seconds, 0.32 at 80 seconds and 0 at 85 seconds. No JavaScript errors were recorded. This first process ended with SIGTERM before its 85-second screenshot completed; raw partial evidence is preserved separately.
+
+Reviewed the native 45-second ruin, 75-second reveal and 80-second blend-out PNGs. The page and fox read in the ruin. The reveal visibly includes the well, page, gate, hearth column, onward motes and caption. It crops the fox during the scenic shot, as previously documented; the 80-second frame still has partial story-camera weight and is not the final follow framing. These sampled stills do not establish motion stability, real-time performance, audio quality or GPU blink behavior.
+
+Partial evidence: /captures/sorrel/production-handover-52795df/.
+
+A second run completed through 90 simulated seconds with exit 0. It evaluates the identical route in browser-side batches to reduce harness overhead, with the same 60 Hz controller inputs and single initial wake placement. All nine saved-evidence checks pass. Complete evidence is at /captures/sorrel/production-handover-complete-52795df/ (full state, route script, ten native screenshots and acceptance.json). Reviewed native 77-second reveal and 85-second final follow frames: the reveal visibly points through the gate to the hearth; the follow frame restores the entire fox with comfortable body room. No source correction was warranted after this review. This is a completed replay after the first visual review, not a new motion or character-feel approval.
+
+Shared archive: keeping-swarm4-captures/sorrel/production-handover-52795df.tgz. The volume already contained the locally created archive (upload correctly refused overwrite); an independent download matched SHA-256 a5f3dab8d53d3f2da928fe2943e4e432efe44df988f7b79816ee3208d3c119db. Fresh production build passed; git diff --check passed. This review changes no runtime sources.
