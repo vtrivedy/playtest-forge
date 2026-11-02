@@ -40,17 +40,7 @@ export function createMillWeir(
   const paintAt = new THREE.Vector3(R.x, 0, R.z);
   const PAINT_OPTS = { edgeMax: 2.2 };
 
-  const hud = document.createElement('div');
-  hud.dataset.openingTeach = 'kiln';
-  hud.textContent = 'The bellows woke the kiln · Space jump and hold to ride its warm air';
-  Object.assign(hud.style, {
-    position: 'fixed', left: '50%', bottom: '7%', transform: 'translateX(-50%)',
-    color: '#f4e5cb', background: 'rgba(43,35,30,.76)', padding: '10px 18px',
-    borderRadius: '5px', font: '16px Georgia,serif', textAlign: 'center',
-    pointerEvents: 'none', maxWidth: '80vw', transition: 'opacity .4s', opacity: '0',
-  });
-  document.body.append(hud);
-  let teaching = false;
+  const TEACH = 'The bellows woke the kiln · Space jump and hold to ride its warm air';
   // a soft breath per bellows stroke (rate-limited) and a cue when the kiln takes
   const breath = { at: new THREE.Vector3(), gain: 0.06, rate: 0.5 };
   parts.lid.updateWorldMatrix(true, false);
@@ -102,10 +92,7 @@ export function createMillWeir(
     const f = ctx.fox.root.position;
     const nearKiln = lit && rodeAt < 0 && Math.hypot(f.x - kiln.base.x, f.z - kiln.base.z) < 5;
     if (lit && rodeAt < 0 && f.y > kiln.base.y + 3) rodeAt = t;
-    if (teaching !== nearKiln) {
-      teaching = nearKiln;
-      hud.style.opacity = teaching ? '1' : '0';
-    }
+    if (nearKiln) ctx.teach.offer(TEACH);
     if (!reached && Math.abs(f.y - R.top) < 0.3 && Math.hypot(f.x - R.x, f.z - R.z) < R.half * 1.3) {
       reached = true;
       ctx.field.restore(paintAt, F.paintR, F.paintSecs, PAINT_OPTS);

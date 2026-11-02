@@ -27,6 +27,11 @@ const RULES = [
     test: (l) => /rotation\.y\s*=\s*Math\.atan2\(\s*\w+\.x\s*-\s*prev/.test(l),
     why: 'heading from a raw per-frame displacement flip-flops near half turns (the page jitter); smooth the velocity and cap the turn rate',
   },
+  {
+    id: 'dom-text',
+    test: (l) => /createElement\(\s*['"]div['"]\s*\)|\.textContent\s*=|\.innerHTML\s*=/.test(l),
+    why: 'words must be drawn in the frame (ctx.captions / ctx.teach / lettering.ts): DOM text never reaches canvas recordings, so the ending card was invisible in every review clip',
+  },
 ];
 
 const findings = [];
@@ -35,7 +40,7 @@ for (const f of fs.readdirSync(ROOT).filter((n) => n.endsWith('.ts'))) {
   const source = fs.readFileSync(file, 'utf8');
   source.split('\n').forEach((line, i) => {
     if (/lint-feel:\s*ok/.test(line) || /^\s*(\/\/|\*)/.test(line)) return;
-    for (const r of RULES) if (r.test(line)) findings.push(`${file}:${i + 1}  [${r.id}] ${r.why}\n    ${line.trim()}`);
+    for (const r of RULES) if (!r.skip?.includes(f) && r.test(line)) findings.push(`${file}:${i + 1}  [${r.id}] ${r.why}\n    ${line.trim()}`);
   });
 }
 function scanHot(dir) {

@@ -1,7 +1,8 @@
 /** Lettering's per-frame step (lettering.ts builds the planes): fit to the lens, set opacity. No allocation. */
 import type * as THREE from 'three';
 
-export type LetterPlane = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; aspect: number; heightFrac: number; y: number };
+/** `y` is the plane centre's NDC height; `x` (with `left`) puts the plane's left edge at that NDC x instead of centring */
+export type LetterPlane = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; aspect: number; heightFrac: number; y: number; x: number; left: boolean };
 
 const DIST = 1;
 const DEG = Math.PI / 180;
@@ -16,5 +17,6 @@ export function fitLetterPlane(p: LetterPlane, cam: THREE.PerspectiveCamera, opa
   const maxW = 2 * halfH * cam.aspect * 0.94;
   if (h * p.aspect > maxW) h = maxW / p.aspect;
   p.mesh.scale.set(h * p.aspect, h, 1);
-  p.mesh.position.set(0, halfH * p.y, -DIST);
+  const w = h * p.aspect;
+  p.mesh.position.set(p.left ? halfH * cam.aspect * p.x + w * 0.5 : 0, halfH * p.y, -DIST);
 }
