@@ -34,7 +34,15 @@ export const WALK_MILL: Leg[] = [
   { t: 90, place: 'orchard', restored: 0.9 },
   { t: 140, place: 'lookout', restored: 1 },
 ];
-export const WALKS: Record<string, Leg[]> = { main: WALK, mill: WALK_MILL };
+/** the Hermitage: up the hanger lane to the desk */
+export const WALK_HERMITAGE: Leg[] = [
+  { t: 0, place: 'village', restored: 0.6 },
+  { t: 15, place: 'hillside', restored: 0.7 },
+  { t: 40, place: 'hermitage', restored: 0.8 },
+  { t: 70, place: 'hermitage', restored: 0.9, cue: true },
+  { t: 140, place: 'hermitage', restored: 1 },
+];
+export const WALKS: Record<string, Leg[]> = { main: WALK, mill: WALK_MILL, hermitage: WALK_HERMITAGE };
 
 export async function renderHearthsong(seconds: number, walk: Leg[] = WALK, seed = 1): Promise<{ sr: number; l: string; r: string; marks: Leg[] }> {
   const sr = 48000;
