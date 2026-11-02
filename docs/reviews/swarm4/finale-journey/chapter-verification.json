@@ -1,0 +1,87 @@
+{
+  "sha": "547ce676460bd3e528cdf764426b70fa88e26cc4",
+  "scope": "One initial hearth placement; original Keeping route then live pickup, bridge crossing, glide and placement. No forced progression or camera.",
+  "hz": 30,
+  "motion": {
+    "frames": 450,
+    "fps": 10,
+    "seconds": 45,
+    "resolution": [
+      640,
+      360
+    ],
+    "audio": false
+  },
+  "checks": {
+    "steam": true,
+    "keeping": true,
+    "bridge": true,
+    "realCarry": true,
+    "emberPlaced": true,
+    "finaleKindled": true,
+    "snow": true,
+    "kitsCurled": true,
+    "cardShown": true,
+    "cardDone": true,
+    "finite": true,
+    "noErrors": true
+  },
+  "firstSampleTimes": {
+    "warming": 82,
+    "snow": 98,
+    "cardShowing": 109,
+    "cardDone": 122
+  },
+  "carry": {
+    "carried": false,
+    "heat": 1,
+    "cooling": false,
+    "position": [
+      20.79181321638373,
+      0.24660261616488827,
+      39.64116513385068
+    ],
+    "lastGrounded": [
+      20.99767324723309,
+      0.2659433305130645,
+      40.571219157838314
+    ],
+    "canPickup": true,
+    "canPlace": false,
+    "pickups": 4,
+    "placements": 3,
+    "dashDrops": 1,
+    "recoveries": 0,
+    "lastAction": "place",
+    "rolling": false
+  },
+  "finale": {
+    "phase": "snow",
+    "t": 82.6,
+    "kindles": 1,
+    "cradle": [
+      20.79,
+      39.64
+    ],
+    "kits": [
+      "curled",
+      "curled",
+      "curled"
+    ],
+    "card": "done",
+    "cardShows": 1,
+    "snow": 82.63,
+    "leaves": 72,
+    "onward": 0,
+    "still": 82.63
+  },
+  "lastJump": {
+    "apex": 0,
+    "air": 5.967,
+    "timeToApex": 0
+  },
+  "dashesUsed": 1,
+  "lastDashDistance": 2.085,
+  "errors": [],
+  "evidence": "/captures/sorrel/finale-journey-production-547ce67/evidence.json"
+}
