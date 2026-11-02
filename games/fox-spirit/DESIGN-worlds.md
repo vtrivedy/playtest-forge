@@ -103,3 +103,21 @@ corridor colour (`tools/corridor-colour.mjs`), ending, `check:stuck`, 0 black fr
 walks the kept page home and crosses the hub arch before replaying the Ashwater movement route. It records full hook
 and `window.__game` states at each beat. No teleport, progress setters or saved-unlock fixture count as route proof.
 A failure is retained with the last position; later stages may not mask a failed entry.
+
+Entry review found the finale's homeward guidance continuing in Ashwater after discovery had finished. Scope both its
+hint and mote trail to Russetvale; defer a pending homecoming caption until returning there. Foreign-world puzzle
+hints retain the shared teach panel. Verify via the fresh route's foreign-world screenshot/state after the change.
+
+### Independent portal circuit (Reed)
+Extend the fresh-boot acceptance with an optional entry-tour: after physical Ashwater entry, walk back through its
+return arch, cross the Press arch from the hub, return home, then re-enter Ashwater. Assert every active-world and
+travel-count transition and retain screenshots plus complete `window.__game`. This isolates portal reachability and
+re-entry from the evolving puzzle routes; it does not claim puzzle completion or blind discovery.
+
+Measure breadth from the same baked one-metre movement mask used by the controller. Report permitted footprint and
+bounds per world; these include water, obstacles and disconnected cells, so are not a reachable-area or duration
+claim. Record immutable commit in the JSON report. Use actual route simulation time separately from capture wall time.
+
+Portal-circuit visual review on 053e9e0c found both home-return lenses almost wholly blocked despite camera
+`blocked:false`. Diagnose with staged world travel and centre-screen mesh intersections; compare return landing
+positions without changing the opening spawn. Fix the landing or missing occluder, then repeat physical circuit.

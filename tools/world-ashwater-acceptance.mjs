@@ -11,6 +11,8 @@ import { execFileSync } from 'node:child_process';
 const args = process.argv.slice(2);
 const out = path.resolve(args[0] && !args[0].startsWith('--') ? args[0] : '/tmp/ashwater-probe');
 const frames = args.includes('--frames');
+const entryTour = args.includes('--entry-tour');
+let tourPassed = false;
 const started=Date.now();
 fs.mkdirSync(out, { recursive: true });
 const port = 5251;
@@ -25,7 +27,7 @@ const log = [];
 const commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 let fi = 0;
 const O = { x: 700, z: 80 };
-const state = () => page.evaluate(() => { const s = window.__gameHooks.state(); return { pos: s.pos.map((v) => +v.toFixed(2)), grounded: s.grounded, ash: s.opening.ashwater, hooks:s, game:window.__game.state() }; });
+const state = () => page.evaluate(() => { const s = window.__gameHooks.state(); return { pos: s.pos.map((v) => +v.toFixed(2)), grounded: s.grounded, ash: s.opening.ashwater, hooks:s, game:window.__game.state(), timing:window.__routeTiming }; });
 const shot = async (name) => {
   await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
   await page.screenshot({ path: path.join(out, `${name}.png`) });
@@ -38,8 +40,10 @@ const go = async (lx, lz, o = {}) => {
   const r = await page.evaluate(([x, z, o]) => {
     const h = window.__gameHooks;
     let n = 0;
+    const startingWorld=h.state().opening.worlds.active;
     for (; n < (o.max ?? 900); n++) {
       const s = h.state();
+      if(s.opening.worlds.active!==startingWorld)break;
       const dx = x - s.pos[0], dz = z - s.pos[2], d = Math.hypot(dx, dz);
       if (d < (o.reach ?? 0.35) && (!o.land || s.grounded)) break;
       const k = Math.min(1, d / 0.8) * (o.speed ?? 1);
@@ -52,7 +56,7 @@ const go = async (lx, lz, o = {}) => {
       h.setKeys(keys);
       h.advance(1, 1 / 60, false);
     }
-    h.setKeys([]);
+    h.setKeys([]);h.setStick(0,0);
     return n;
   }, [O.x + lx, O.z + lz, o]);
   if (frames) {
@@ -66,7 +70,16 @@ try {
   await page.goto(`http://127.0.0.1:${port}/?fresh&manual=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
   await page.keyboard.press('KeyM');
-  await page.evaluate(() => { const h = window.__gameHooks; h.setManual(true); });
+  await page.evaluate(() => { const h = window.__gameHooks; h.setManual(true);
+    const advance=h.advance.bind(h);
+    const timing=window.__routeTiming={totalSeconds:0,byWorld:{russetvale:0,ashwater:0,press:0}};
+    h.advance=(frames=1,dt=1/60,render=true)=>{
+      const world=h.state().opening.worlds.active;
+      timing.totalSeconds+=frames*dt;
+      timing.byWorld[world]+=frames*dt;
+      return advance(frames,dt,render);
+    };
+  });
   console.log('boot-ready');
   const gl=await page.evaluate(()=>{const gl=window.__opening.ctx.renderer.getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
   console.log(JSON.stringify({renderer:gl}));
@@ -94,7 +107,27 @@ try {
   await settle(120);
   await shot('01-hub-entry');
   if((await state()).hooks.opening.worlds.active!=='ashwater')throw Error('Hub arch did not enter Ashwater');
+  if((await state()).game.opening.teach.showing==='Follow the warm light home')throw Error('Autumn hint leaked into Ashwater');
   await shot('00-landing');
+  if (entryTour) {
+    const expectWorld = async (world, travels, name) => {
+      await settle(150);
+      await shot(name);
+      const s = (await state()).hooks.opening.worlds;
+      if(s.active !== world || s.travels !== travels) throw Error(`${name}: expected ${world}/${travels}, got ${s.active}/${s.travels}`);
+    };
+    // Ashwater arrival faces inward; its return arch stands three metres behind the spawn.
+    await go(0, -52, {max:600});
+    await expectWorld('russetvale', 2, 'tour-02-home');
+    for(const [x,z] of [[-6,89],[-9.5,90],[-11,95]]) await go(x-O.x,z-O.z);
+    await expectWorld('press', 3, 'tour-03-press');
+    // The snowfield return arch is behind its arrival, following the island's outward gradient.
+    await go(-700-O.x,132-O.z,{max:600});
+    await expectWorld('russetvale', 4, 'tour-04-home');
+    for(const [x,z] of [[-4,88],[-2,90],[-1,93]]) await go(x-O.x,z-O.z);
+    await expectWorld('ashwater', 5, 'tour-05-reentry');
+    tourPassed = true;
+  } else {
   // Level 1, Low Sluice: try the channel first (it is deep: the fox is put back), then dash the dam
   await go(0, -31.5, { max: 400 });
   await settle(30);
@@ -131,14 +164,15 @@ try {
   await go(26.5, 40.5, { jump: true, jumpAt: 8.6, hold: 200, max: 400, reach: 0.8, land: true });
   await settle(200);
   await shot('08-seedwell');
+  }
 } catch (e) {
   errors.push(String(e?.stack ?? e));
 } finally {
   const last = log.length ? log[log.length - 1][1] : null;
-  fs.writeFileSync(path.join(out, 'log.json'), JSON.stringify({ commit, provenance:"Fresh boot; rendered invitation follower then movement only; no teleport or progress setters", log, errors, pass: errors.length===0 && !!last && last.ash.done.length === 3 }, null, 1));
+  fs.writeFileSync(path.join(out, 'log.json'), JSON.stringify({ commit, provenance:"Fresh boot; rendered invitation follower then movement only; no teleport or progress setters", log, errors, pass: errors.length===0 && !!last && (entryTour ? tourPassed : last.ash.done.length === 3) }, null, 1));
   if (frames && fi > 0) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '6', '-i', path.join(out, 'f%04d.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'route.mp4')]);
   console.log(JSON.stringify({ errors, last:last?{pos:last.pos,ash:last.ash}:null }, null, 1));
-  process.exitCode=errors.length===0 && last?.ash.done.length===3 ? 0 : 1;
+  process.exitCode=errors.length===0 && (entryTour ? tourPassed : last?.ash.done.length===3) ? 0 : 1;
   await browser.close();
   await server.close();
 }
