@@ -77,6 +77,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   settled: () => boolean;
   ember: { restsAt: (x: number, y: number, z: number, r: number) => boolean };
   cam: FollowCamera;
+  player: { setMoveScale: (k: number) => void; intent: () => number };
   crownLetGo: () => void;
   onCard?: () => void;
 }) {
@@ -560,8 +561,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, restK: 0, lieT: 0, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
-    heroLie: hero.lie, heroRest: hero.rest, lieDur: lieClip.duration,
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    player: opts.player, heroLie: hero.lie, heroRest: hero.rest, lieDur: lieClip.duration,
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
     kitX: new Float32Array(F2.length),

@@ -16,6 +16,8 @@ export const FINALE_TIMING = {
   /** the card: fox still this long by the cradle (within `restR`), or `timeout` s after snow begins */
   rest: 1.6, restR: 4.2, timeout: 24, cardIn: 2.5, cardHold: 7.5, cardOut: 2.5,
   snowRamp: 14,
+  /** seconds for the hero to get up from lying (the lie-down played back) */
+  getUp: 0.55,
 };
 const T = FINALE_TIMING;
 
@@ -69,10 +71,11 @@ export type FinaleRig = {
   cover0: THREE.Color; cover1: THREE.Color; paper0: THREE.Color; paper1: THREE.Color; ember: THREE.Color; emblem0: THREE.Color;
   /** mutable state (numbers only) */
   s: {
-    phase: number; t: number; clock: number; snowT: number; still: number; settledT: number; restK: number; lieT: number;
+    phase: number; t: number; clock: number; snowT: number; still: number; settledT: number; restK: number; lieT: number; getUpT: number;
     card: 0 | 1 | 2; cardT: number; foxX: number; foxZ: number; kindles: number; cardShows: number; wheel: number; leavesOut: number;
   };
   /** the hero's rest clips on its own mixer, blended over the controller while it lies by the ember */
+  player: { setMoveScale: (k: number) => void; intent: () => number };
   heroLie: THREE.AnimationAction;
   heroRest: THREE.AnimationAction;
   lieDur: number;
@@ -276,12 +279,42 @@ function stepWay(rig: FinaleRig, dt: number): void {
 
 /**
  * The hero lies down with the kits: in snow, still by the ember, it blends lieDown → rest over whatever the controller
- * plays (a heavy weight so the controller's idle only tints it); any move fades it straight back to the controller.
+ * plays (a heavy weight so the controller's idle only tints it). Asking to move starts a get-up: the controller is held
+ * in place while lieDown plays back (chest and fore paws first, then the hips), then movement eases back in — the fox
+ * never turns or slides on its belly (feel critic, 7527b97).
  */
 function stepHeroRest(rig: FinaleRig, dt: number): void {
   const s = rig.s;
-  const want = s.phase === 5 && s.still >= T.rest * 0.5 ? 1 : 0;
-  s.restK = want > s.restK ? Math.min(1, s.restK + dt / 0.6) : Math.max(0, s.restK - dt / 0.25);
+  const asking = rig.player.intent() > 0.1;
+  if (s.getUpT >= 0) {
+    s.getUpT += dt;
+    // movement returns once the body is mostly up
+    rig.player.setMoveScale(smooth(s.getUpT, T.getUp * 0.55, T.getUp));
+    rig.heroLie.setEffectiveWeight(30 * (1 - smooth(s.getUpT, T.getUp * 0.45, T.getUp)));
+    rig.heroRest.setEffectiveWeight(0);
+    if (s.getUpT >= T.getUp) {
+      s.getUpT = -1;
+      s.restK = 0;
+      s.lieT = 0;
+      rig.heroLie.stop();
+      rig.heroRest.stop();
+      rig.heroLie.timeScale = 1;
+      rig.player.setMoveScale(1);
+    }
+    return;
+  }
+  const want = s.phase === 5 && s.still >= T.rest * 0.5 && !asking ? 1 : 0;
+  if (asking && s.restK > 0.05) {
+    // get up: play the lie-down backwards from wherever it is, quickly
+    s.getUpT = 0;
+    rig.player.setMoveScale(0);
+    rig.heroLie.paused = false;
+    rig.heroLie.timeScale = -rig.lieDur / T.getUp;
+    if (s.lieT >= rig.lieDur) rig.heroLie.time = rig.lieDur;
+    rig.heroLie.play();
+    return;
+  }
+  s.restK = want > s.restK ? Math.min(1, s.restK + dt / 0.6) : Math.max(0, s.restK - dt / 0.4);
   if (s.restK <= 0) {
     if (s.lieT > 0) {
       s.lieT = 0;

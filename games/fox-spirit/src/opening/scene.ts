@@ -200,6 +200,7 @@ export async function runOpening(): Promise<void> {
     settled: () => settledAt >= 0,
     ember: coal,
     cam: player.cam,
+    player,
     crownLetGo: crown.letGo,
   });
   ctx.onUpdate((_dt, t) => {

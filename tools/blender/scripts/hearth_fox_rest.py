@@ -16,9 +16,9 @@ for _stage in ("build", "rig", "anim"):
 
 # lying: hips and chest down onto the belly, fore paws out in front with the forearms flat, hind paws tucked under,
 # head low on the paws, tail wrapped round the front (`wrap` = tail yaw per joint)
-LIE = dict(hip_up=-0.24, hip_fwd=-0.03, hips=-0.04, spine=0.04, chest=0.1, neck=0.32, head=-0.12, tail=0.3, curl=0.25, ear=0.12,
+LIE = dict(hip_up=-0.24, hip_fwd=-0.03, hips=-0.04, spine=0.04, chest=0.1, neck=0.32, head=-0.12, tail=0.3, curl=0.32, ear=0.12,
            F=(0.2, 0.0, 1.35), H=(0.13, 0.0, 1.45))
-WRAP = 0.36
+WRAP = 0.55
 
 
 def lie_pose(keys, f, wrap, breath=0.0, flick=0.0, stir=0.0):
@@ -40,13 +40,18 @@ def lie_pose(keys, f, wrap, breath=0.0, flick=0.0, stir=0.0):
 
 
 def author_lie_down():
+    """sequenced (feel critic 7527b97): hips sit first (f0-8, chest held up), then the fore paws slide out and the chest
+    lowers onto the forearms (f6-16) with a small settle (f16-22); the tail comes round late (f10-24)."""
     N = 40
-    keys = [(0, dict()), (10, dict(LIE, hip_up=-0.08, chest=0.04, neck=0.12, head=0.04, F=(0.08, 0.04, 0.6), H=(0.05, 0.0, 0.8))), (26, LIE), (40, LIE)]
+    sit = dict(LIE, hip_up=-0.15, hips=0.0, spine=-0.04, chest=-0.07, neck=0.02, head=0.1, tail=0.04, curl=0.0, ear=0.05,
+               F=(0.03, 0.0, 0.15), H=(0.1, 0.0, 1.1))
+    keys = [(0, dict()), (8, sit), (16, dict(LIE, hip_up=LIE["hip_up"] - 0.012, chest=LIE["chest"] + 0.03, tail=0.18, curl=0.1)),
+            (20, dict(LIE, chest=LIE["chest"] - 0.012)), (24, LIE), (40, LIE)]
     act = bpy.data.actions.new("src_lieDown")
     rig.animation_data_create().action = act
     for fr in range(N + 1):
         clear_pose()
-        lie_pose(keys, fr, WRAP * ease(min(1.0, max(0.0, (fr - 8) / 26))))
+        lie_pose(keys, fr, WRAP * ease(min(1.0, max(0.0, (fr - 10) / 14))), breath=-0.6 * math.sin(math.pi * min(1.0, max(0.0, (fr - 18) / 10))))
         key_all(fr)
     return act, N
 
