@@ -21,6 +21,8 @@ export type Collider =
 /** lens volume samples: centre + 8 around the rim (unit radius) */
 
 export const PLAY = {
+  /** glide round posts / corners when a step is blocked on both axes (moveTo); off = the old pin */
+  slide: true,
   runSpeed: 3.2,
   walkSpeed: 0.85,
   /** ground speed ease (1/s) up / down */
@@ -673,7 +675,8 @@ export function createPlay(opts: {
     // 30° then 60° to either side (last side first), probing ahead along the turned step, never through the blocker
     const x0 = nx - dx;
     const z0 = nz - dz;
-    if (grounded && len > 1e-5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5) {
+    // only while the player is steering at walk/run pace: momentum (post-dash skid, coasting) still stops dead at a blocker
+    if (P.slide && dashT <= 0 && wish.lengthSq() > 0.01 && speed <= P.runSpeed * 1.05 && grounded && len > 1e-5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5) {
       {
         for (const a of [0.52, 1.05, 1.4]) {
           for (const side of [slideSide, -slideSide]) {

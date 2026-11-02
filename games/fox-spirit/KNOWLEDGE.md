@@ -486,3 +486,4 @@ A clear destination is not a clear connecting segment. Full staged finale route 
 - Paint restores each need a shader slot (`RESTORE_SLOTS`, now 24; `uRestore` loop breaks at the count).
   With page (4) + Keeping (3) + homecoming + ruin + finale (2) + Millbrook/Hermitage (5) the old 16 was
   exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.
+- Controller slide (moveTo glides round posts/corners) must only act while the player steers at walk/run pace: authored routes and puzzles rely on momentum (dash, post-dash skid, coasting) stopping dead at a blocker — the pop-up ruin folds broke when a post-dash skid slid round the fold (Fern, b24bf90 → fixed). `PLAY.slide` toggles it for A/B; `node tools/page-motion-probe.mjs --out DIR` (sim-only, ~2 min) is the full-slice regression: 3 catches, kept, home.
