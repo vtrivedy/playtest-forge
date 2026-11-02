@@ -181,8 +181,10 @@ function buildDesk(k: Kit, ctx: OpeningCtx): void {
     k.add(cyl(0.06, 0.07, 0.1, 8), C.timberDark, [0.6, 0.9, -0.2]);
     k.add(new THREE.ConeGeometry(0.02, 0.42, 4), C.plaster, [0.63, 1.08, -0.2], [0.3, 0, -0.35], 0.004);
     // lean-to: two posts and a shingle roof sloping off the house
-    for (const sx of [-1, 1]) k.add(cyl(0.07, 0.08, 2.4, 6), C.timberDark, [sx * 1.1, 1.2, 0.75]);
-    k.add(hewn(new THREE.BoxGeometry(2.8, 0.1, 2.0, 3, 1, 2), rand, 0.01), C.slate, [0, 2.5, 0], [-0.32, 0, 0], 0.018);
+    // posts at the back corners only, so the desk stays open to whoever walks up to it (and to the lens)
+    for (const sx of [-1, 1]) k.add(cyl(0.07, 0.08, 2.5, 6), C.timberDark, [sx * 1.05, 1.25, -0.75]);
+    k.add(box(2.3, 0.12, 0.12), C.timberDark, [0, 2.45, -0.75]);
+    k.add(hewn(new THREE.BoxGeometry(2.6, 0.1, 1.9, 3, 1, 2), rand, 0.01), C.slate, [0, 2.48, 0.05], [0.3, 0, 0], 0.018);
     // a stool, pushed back
     k.add(cyl(0.2, 0.2, 0.06, 10), C.timber, [0.1, 0.46, -0.75], [0, 0, 0], 0.01);
     for (let i = 0; i < 3; i++) k.add(cyl(0.025, 0.03, 0.46, 5), C.timberDark, [0.1 + Math.cos(i * 2.1) * 0.14, 0.22, -0.75 + Math.sin(i * 2.1) * 0.14]);
