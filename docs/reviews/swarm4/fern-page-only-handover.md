@@ -56,3 +56,31 @@ Shared archive (downloaded and SHA-256 compared):
 `keeping-swarm4-captures/fern/page-only-handover-075662b.tgz`.
 SHA-256: `6d504bc2aa80f0f3bed4925200a9b98136efd4645f8339513b9113b155a60418`.
 Local deliverable: playtest-output/fox-spirit/homecoming-page-only-075662b/.
+
+## Durable regression command
+
+`node tools/page-only-handover-probe.mjs OUT` now retains the natural slice
+probe in the repository. It writes beat screenshots, 100 final-hold frames and
+full state/trace evidence, and exits nonzero for any of the ten acceptance
+failures. `node tools/page-only-handover-probe.mjs --check-evidence
+OUT/evidence.json` rechecks the saved evidence without launching a browser.
+The assertion evaluator passes the retained 075662b run and fails a negative
+control with its onward count set to zero. This changes no game behavior.
+
+## Integrated build recheck — d0d1953
+
+Replayed the same natural shared slice on integrated `d0d1953d18ef113033b71d5834592bc442e287e8`:
+arrival 73.267 simulated seconds, pinned page only, full=false, onward=48;
+all ten checks pass. No reveal during the journey, reveal weight reaches 1,
+and returns to 0. Camera coordinates remain finite and no JS errors occur.
+All 100 final-hold frames reviewed on four sheets, plus native ruin and reveal
+stills. The well/gate/hearth route is visible; scenic fox cropping is unchanged;
+follow framing returns with the full fox visible. No runtime correction needed.
+
+Evidence: `/captures/fern/integrated-d0d1953/`, including `homecoming.mp4`,
+`evidence.json`, `acceptance.json`, 100 frames and all-frame sheets. The captured
+script still had the old raw diagnostic assertion; corrected acceptance and
+the new repository evaluator both pass the actual documented camera state.
+The new evaluator also rejects a missing-onward negative control. TypeScript,
+feel lint/camera release checks and production build pass. Offline 640×360
+SwiftShader, final hold 10 fps, silent; no realtime or audio verdict.
