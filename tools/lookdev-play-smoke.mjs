@@ -21,6 +21,9 @@ const out = path.resolve(arg('out', '/tmp/lookdev-play-smoke'));
 const hero = process.argv.includes('--hero') || process.argv.includes('--video');
 // --video: hero route rendered every 2nd sim step → frames/ + hero-30s.mp4 (30 fps, 1280×720) + manifest
 const video = process.argv.includes('--video');
+// --windows 60-420,760-1260: with --video, render EVERY sim frame inside these frame ranges only (60 fps, no
+// frame skipping), so motion at a moment (e.g. each page catch) can be judged continuously without a full render
+const windows = arg('windows', '').split(',').filter(Boolean).map((w) => w.split('-').map(Number));
 fs.mkdirSync(out, { recursive: true });
 
 const server = await createServer({
@@ -73,6 +76,7 @@ try {
     let touchdownF = -1;
     let apexCaptured = false;
     let clipF = -1;
+    let videoN = 0;
     for (let f = 0; f < totalFrames; f++) {
       const input = route(f / 60, state);
       const prev = state;
@@ -85,7 +89,7 @@ try {
       // 2 s run clip (30 fps) at the start of the loop back
       if (input.beat === 'loop back' && clipF < 0) clipF = f;
       const clipFrame = !video && clipF >= 0 && f - clipF < 120 && (f - clipF) % 2 === 0;
-      const videoFrame = video && f % 2 === 1;
+      const videoFrame = video && (windows.length ? windows.some(([a, b]) => f >= a && f <= b) : f % 2 === 1);
       beat = input.beat;
       state = await page.evaluate(
         ({ input, shot }) => {
@@ -98,8 +102,8 @@ try {
       );
       if (videoFrame) {
         fs.mkdirSync(path.join(out, 'frames'), { recursive: true });
-        await page.screenshot({ path: path.join(out, 'frames', `f${String((f - 1) / 2).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 92 });
-        if (f % 120 === 1) console.log('frame', (f - 1) / 2, `/ ${totalFrames / 2}`);
+        await page.screenshot({ path: path.join(out, 'frames', `f${String(videoN).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 92 });
+        if (videoN++ % 60 === 0) console.log('frame', videoN - 1, 'sim f', f);
       }
       if (clipFrame) {
         fs.mkdirSync(path.join(out, 'run-clip'), { recursive: true });
@@ -140,7 +144,7 @@ try {
       console.log('OPENING_SUMMARY', JSON.stringify(summary));
     }
     if (video) {
-      execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, slice ? 'slice.mp4' : keeping ? 'keeping.mp4' : opening ? 'opening-75s.mp4' : 'hero-30s.mp4')]);
+      execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', windows.length ? '60' : '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, slice ? 'slice.mp4' : keeping ? 'keeping.mp4' : opening ? 'opening-75s.mp4' : 'hero-30s.mp4')]);
       const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
       fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/', route: keeping ? 'tools/opening-hero-route.mjs#keeping' : opening ? 'tools/opening-hero-route.mjs' : 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: totalFrames / 2, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
     }

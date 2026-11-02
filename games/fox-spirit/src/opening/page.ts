@@ -145,11 +145,22 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   let dodges = 0;
   let windedT = 0;
   let beat = 0;
+  let beatRate = 1;
+  let nerve = 0.3;
+  let turnDir = 0;
+  const travel = new THREE.Vector3();
   let hopTo = 0;
   let wasDashing = false;
   let wasGrounded = true;
   /** sideways jink offset (world xz), eased back to the flight line */
   const side = new THREE.Vector3();
+  /** jink goal: the offset eases toward it (never steps), and the goal itself relaxes back to the line */
+  const sideGoal = new THREE.Vector3();
+  /** arc distance still owed from a skip/jink, paid out smoothly rather than stepped */
+  let sOwed = 0;
+  /** the page rides a critically damped spring to its flight point, so no target step ever becomes a velocity step */
+  const vel = new THREE.Vector3();
+  const off = new THREE.Vector3();
   let flingT = 0;
   let keptAt = -1;
   const pos = new THREE.Vector3();
@@ -180,6 +191,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     ctx.field.restore(new THREE.Vector3(pos.x, 0, pos.z), PAGE.payoff.step, 2.5, { edgeMax: 2.5 });
     stage = catches;
     s = 0;
+    sOwed = 0;
+    side.set(0, 0, 0);
+    sideGoal.set(0, 0, 0);
     place(stage, 0, flingTo);
     phase = 'flung';
     flingT = 0;
@@ -205,8 +219,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       windedT = TUNE.winded[stage]!;
       const ax = pos.x - fox.x, az = pos.z - fox.z, al = Math.hypot(ax, az) || 1;
       const sign = Math.random() < 0.5 ? -1 : 1;
-      side.set((-az / al) * sign * TUNE.jink, 0, (ax / al) * sign * TUNE.jink);
-      s += 0.8;
+      sideGoal.set((-az / al) * sign * TUNE.jink, 0, (ax / al) * sign * TUNE.jink);
+      // on a lap it also darts ahead; a hopping page keeps to its perch (only the jink)
+      if (!TUNE.hop[stage]) sOwed += 0.8;
       phase = 'fleeing';
       for (let i = 0; i < 8; i++) emit(pos, 0.9, 1.6);
     }
@@ -216,7 +231,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       else if (d < 1.1 && st.grounded && t - lastSkip > 0.7) {
         lastSkip = t;
         // walked into it: a startled skip ahead (it wants a dash)
-        s += TUNE.skip;
+        if (!TUNE.hop[stage]) sOwed += TUNE.skip;
         skips++;
         for (let i = 0; i < 6; i++) emit(pos, 0.8, 1.2);
       }
@@ -226,7 +241,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 4.6 && windedT <= 0) {
       windedT = TUNE.hopRest + 0.6;
       dodges++;
-      side.set(0, 0.9, 0);
+      sideGoal.set(0, 0.9, 0);
       for (let i = 0; i < 8; i++) emit(pos, 0.9, 1.4);
     }
     if (phase === 'perched' && d < TUNE.spookAt[stage]! && !(TUNE.hop[stage] && windedT > 0)) {
@@ -241,6 +256,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     }
     if (phase === 'fleeing' && TUNE.hop[stage] && s >= hopTo) {
       s = hopTo;
+      sOwed = 0;
       phase = 'perched';
       windedT = TUNE.hopRest;
     }
@@ -250,12 +266,26 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       else s += THREE.MathUtils.lerp(TUNE.fast, TUNE.slow, THREE.MathUtils.smoothstep(d, 1.5, TUNE.spook)) * (windedT > 0 ? 0.55 : 1) * dt;
     }
     if (phase === 'perched' || phase === 'fleeing') {
+      const pay = sOwed * (1 - Math.exp(-dt * 7));
+      sOwed -= pay;
+      s += pay;
       place(stage, s, tmp);
-      side.x *= Math.exp(-dt * 0.9);
-      side.z *= Math.exp(-dt * 0.9);
-      side.y *= Math.exp(-dt * 4);
+      sideGoal.x *= Math.exp(-dt * 0.9);
+      sideGoal.z *= Math.exp(-dt * 0.9);
+      sideGoal.y *= Math.exp(-dt * 5);
+      // the jink sweeps across over ~0.3 s; the startle's jerk up is quicker, and it has sagged back by the time a leaper lands
+      const k = 1 - Math.exp(-dt * 9);
+      side.x += (sideGoal.x - side.x) * k;
+      side.z += (sideGoal.z - side.z) * k;
+      side.y += (sideGoal.y - side.y) * (1 - Math.exp(-dt * 14));
       tmp.add(side);
-      pos.lerp(tmp, 1 - Math.exp(-dt * 10));
+      // exact critically damped step: x' = (x + (v + w x) dt) e^-w dt
+      const w = 12;
+      const e = Math.exp(-w * dt);
+      off.subVectors(pos, tmp);
+      const jx = vel.x + w * off.x, jy = vel.y + w * off.y, jz = vel.z + w * off.z;
+      vel.set((vel.x - w * jx * dt) * e, (vel.y - w * jy * dt) * e, (vel.z - w * jz * dt) * e);
+      pos.set(tmp.x + (off.x + jx * dt) * e, tmp.y + (off.y + jy * dt) * e, tmp.z + (off.z + jz * dt) * e);
     } else if (phase === 'flung') {
       flingT += dt;
       const k = Math.min(1, flingT / TUNE.fling);
@@ -263,6 +293,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       pos.lerpVectors(flingFrom, flingTo, e);
       pos.y += Math.sin(k * Math.PI) * (6 + flingFrom.distanceTo(flingTo) * 0.15);
       if (Math.random() < dt * 30) emit(pos, 3, 0.3);
+      if (dt > 0) vel.subVectors(pos, prev).divideScalar(dt);
       if (k >= 1) phase = 'perched';
     } else if (keptAt >= 0) {
       keptAt += dt;
@@ -285,33 +316,53 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       const w = 1 - THREE.MathUtils.smoothstep(d, 8, 12);
       cam.orbit(THREE.MathUtils.clamp(dYaw, -1, 1) * Math.min(1, dt * 2.2) * w);
     }
-    // it flies like a moth: the sheet folds along its spine and beats its two halves, slow and shallow
-    // while it watches, quick and deep in flight; a ripple runs out along each half
-    const nerve = phase === 'fleeing' || phase === 'flung' ? 1 : 1 - THREE.MathUtils.smoothstep(d, 3, 10) * 0.7;
-    beat += dt * (phase === 'kept' ? 1 : 2.2 + nerve * 9 + (windedT > 0 ? -4 : 0));
-    const fold = phase === 'kept' ? 0.05 : (0.25 + 0.75 * nerve) * (0.55 + 0.45 * Math.sin(beat * Math.PI * 2));
+    // it flies like a moth: the sheet folds along its spine and beats its two halves. Everything here is
+    // damped: the beat rate, fold depth, heading, droop and glow ease toward their targets so nothing
+    // snaps frame to frame (Vivek: "it weirdly jitters"). Beats stay ≤ ~3 Hz and shallow.
+    const nerveGoal = phase === 'fleeing' || phase === 'flung' ? 1 : 1 - THREE.MathUtils.smoothstep(d, 3, 10) * 0.7;
+    nerve = THREE.MathUtils.damp(nerve, nerveGoal, 3, dt);
+    const rateGoal = phase === 'kept' ? 0.5 : windedT > 0 ? 0.6 : 0.9 + nerve * 2.1;
+    beatRate = THREE.MathUtils.damp(beatRate, rateGoal, 4, dt);
+    beat += dt * beatRate;
+    const fold = phase === 'kept' ? 0.04 : (0.15 + 0.45 * nerve) * (0.55 + 0.45 * Math.sin(beat * Math.PI * 2));
     const arr = geo.getAttribute('position') as THREE.BufferAttribute;
     for (let i = 0; i < arr.count; i++) {
       const x = base[i * 3]!;
       const ax = Math.abs(x);
       const a = fold * 1.1;
-      const ripple = Math.sin(ax * 14 - beat * 9) * 0.015 * (ax / (W / 2));
+      const ripple = Math.sin(ax * 10 - beat * Math.PI * 2) * 0.01 * (ax / (W / 2));
       arr.setX(i, Math.sign(x) * ax * Math.cos(a));
       arr.setZ(i, ax * Math.sin(a) + ripple);
     }
     arr.needsUpdate = true;
     holder.position.copy(pos);
-    holder.position.y += Math.sin(t * 2.3) * 0.08;
-    // perched it faces the fox; in flight it faces where it is going, rolled into the turn
-    const look = phase === 'perched' ? Math.atan2(fox.x - pos.x, fox.z - pos.z) : Math.atan2(pos.x - prev.x, pos.z - prev.z) || holder.rotation.y;
-    holder.rotation.y = phase === 'kept' ? holder.rotation.y : look;
+    holder.position.y += Math.sin(t * 1.6) * 0.06;
+    // heading: perched it turns to face the fox; in flight it faces its smoothed travel direction.
+    // Both ease in (wrapped), and tiny displacements never re-aim it.
+    if (dt > 0) {
+      travel.x = THREE.MathUtils.damp(travel.x, (pos.x - prev.x) / dt, 6, dt);
+      travel.z = THREE.MathUtils.damp(travel.z, (pos.z - prev.z) / dt, 6, dt);
+    }
+    if (phase !== 'kept') {
+      const moving = Math.hypot(travel.x, travel.z) > 0.4;
+      const goal = phase === 'perched' || !moving ? Math.atan2(fox.x - pos.x, fox.z - pos.z) : Math.atan2(travel.x, travel.z);
+      let dy = Math.atan2(Math.sin(goal - holder.rotation.y), Math.cos(goal - holder.rotation.y));
+      // a goal near half a turn away would flip the short way every frame: keep turning the way it started
+      if (Math.abs(dy) > 2.6 && turnDir !== 0 && Math.sign(dy) !== turnDir) dy += turnDir * Math.PI * 2;
+      turnDir = Math.abs(dy) > 0.05 ? Math.sign(dy) : 0;
+      // ease in, and never spin faster than ~200°/s however far it has to turn
+      holder.rotation.y += THREE.MathUtils.clamp(dy * (1 - Math.exp(-dt * 4)), -3.5 * dt, 3.5 * dt);
+    }
     glow.scale.x = Math.cos(fold * 1.1);
-    body.rotation.z = Math.sin(t * 3.1) * 0.15 * nerve;
-    // winded: the glow gutters and the sheet droops — the window to catch it
-    if (phase !== 'kept') (glow.material as THREE.MeshBasicMaterial).opacity = windedT > 0 ? 0.12 + 0.08 * Math.sin(t * 20) : 0.35;
-    body.position.y = windedT > 0 ? -0.25 * Math.min(1, windedT) : 0;
+    body.rotation.z = Math.sin(t * 1.4) * 0.08 * nerve;
+    // winded: the glow dims and the sheet sags — the window to catch it (eased, no flicker)
+    if (phase !== 'kept') {
+      const gm = glow.material as THREE.MeshBasicMaterial;
+      gm.opacity = THREE.MathUtils.damp(gm.opacity, windedT > 0 ? 0.14 + 0.04 * Math.sin(t * 3) : 0.35, 6, dt);
+    }
+    body.position.y = THREE.MathUtils.damp(body.position.y, windedT > 0 ? -0.22 : 0, 5, dt);
     // upright and facing you while it watches; tipped forward into its flight like a moth when it runs
-    body.rotation.x = THREE.MathUtils.damp(body.rotation.x, phase === 'fleeing' || phase === 'flung' ? -1.0 : 0, 6, dt);
+    body.rotation.x = THREE.MathUtils.damp(body.rotation.x, phase === 'fleeing' || phase === 'flung' ? -1.0 : 0, 4, dt);
     if (phase === 'fleeing' && Math.random() < dt * 14) emit(pos, 1.2, 0.5);
     // flecks
     const m = new THREE.Matrix4();
@@ -337,6 +388,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       stage = Math.max(0, Math.min(PAGE.stages.length - 1, n));
       catches = stage;
         side.set(0, 0, 0);
+      sideGoal.set(0, 0, 0);
+      vel.set(0, 0, 0);
+      sOwed = 0;
       s = 0;
       phase = 'perched';
       place(stage, 0, pos);
@@ -347,6 +401,6 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     settled: () => phase === 'kept' && keptAt > 4.6,
     /** for the hum: where it is, whether it's in flight, how many times it's been caught */
     voice: () => ({ pos, fleeing: phase === 'fleeing' || phase === 'flung', catches, kept: phase === 'kept' }),
-    state: () => ({ stage, phase, catches, skips, dodges, winded: windedT > 0, s: +s.toFixed(2), pos: pos.toArray().map((v) => +v.toFixed(2)) }),
+    state: () => ({ stage, phase, catches, skips, dodges, winded: windedT > 0, yaw: +holder.rotation.y.toFixed(4), droop: +(body.position.y).toFixed(3), s: +s.toFixed(2), pos: pos.toArray().map((v) => +v.toFixed(4)) }),
   };
 }
