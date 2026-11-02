@@ -19,3 +19,9 @@ Snow begins approximately wall 216.380 s (first snow state wall time minus its s
 Durable volume `keeping-swarm5-captures/reed/boundary-baseline-2f5af69eb7-172101-1cbfc1` contains native/staged WebMs, compositor sequence/movie, decoded audits, full game state in report.json, run.json, start/end screenshots. Local `/captures/reed/boundary-baseline-2f5af69eb7-172101-1cbfc1` contains native.webm, report/run, end, and extracted snow-plus1.png, snow-plus4.png, card.png. Extracted card wall time: 231.380 s.
 
 This authored-route replay verifies recorder regression and integrated journey completion. It does not establish blind discovery success, village sliding feel, or exhaustive world-edge coverage.
+
+## Snow timing cross-check
+
+`2f5af69` already contains Cedar `80238fd` (Album clearance and 2.2-second snow ease), confirmed by ancestry and source. A redundant replay of the older Cedar branch was stopped before completion; it supplies no additional result.
+
+The independent compositor frame `compositor/frame-01962.jpg` has timestamp minus `startEpochMs` of 217.38994 seconds. Snow begins approximately 216.3801 seconds, so this is snow +1.01 seconds. It independently shows the Press centred and the family cropped by the lower edge, matching the native snow+1 frame. This observation is not a native recording time-offset artifact. The existing title-frame verdict still stands: hero and all three kits fit, without overlap. Camera transition continuity remains unreviewed.
