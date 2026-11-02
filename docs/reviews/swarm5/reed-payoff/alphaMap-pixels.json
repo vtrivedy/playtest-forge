@@ -1,0 +1,99 @@
+{
+  "method": "Chromium Canvas2D identical128px ramp. Three alphamap_fragment samples green; this verifies source ramp channels, not the GPU appearance.",
+  "result": {
+    "alpha-on-white": [
+      {
+        "y": 0,
+        "rgba": [
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "y": 16,
+        "rgba": [
+          255,
+          255,
+          255,
+          21
+        ]
+      },
+      {
+        "y": 64,
+        "rgba": [
+          252,
+          252,
+          252,
+          82
+        ]
+      },
+      {
+        "y": 96,
+        "rgba": [
+          255,
+          255,
+          255,
+          164
+        ]
+      },
+      {
+        "y": 127,
+        "rgba": [
+          255,
+          255,
+          255,
+          254
+        ]
+      }
+    ],
+    "opaque-grayscale": [
+      {
+        "y": 0,
+        "rgba": [
+          0,
+          0,
+          0,
+          255
+        ]
+      },
+      {
+        "y": 16,
+        "rgba": [
+          21,
+          21,
+          21,
+          255
+        ]
+      },
+      {
+        "y": 64,
+        "rgba": [
+          81,
+          81,
+          81,
+          255
+        ]
+      },
+      {
+        "y": 96,
+        "rgba": [
+          164,
+          164,
+          164,
+          255
+        ]
+      },
+      {
+        "y": 127,
+        "rgba": [
+          254,
+          254,
+          254,
+          255
+        ]
+      }
+    ]
+  }
+}

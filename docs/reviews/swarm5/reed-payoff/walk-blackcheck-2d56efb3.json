@@ -1,0 +1,16 @@
+{
+  "video": "/tmp/reed-artifacts/world-entry-2d56efb3a3/marsh-walk.mp4",
+  "sha256": "283c3867c4a65b2a180cf9b21f72446716d77dc66e7b16eb87965926bab8dff3",
+  "decodedFrames": 72,
+  "firstPts": 0.0,
+  "lastPts": 5.916667,
+  "minimumMeanLuma": 91.877,
+  "thresholds": {
+    "meanLuma": 12,
+    "pixelLuma": 16,
+    "fraction": 0.98
+  },
+  "darkFrameCount": 0,
+  "darkFrames": [],
+  "pass": true
+}
