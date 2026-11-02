@@ -9,3 +9,5 @@ One-second state samples first show homecoming at 74 seconds, complete=true at 7
 Reviewed all ten named stills on a contact sheet, plus native 45, 75, 80, 90 and 150-second frames. The reveal shows the page, well, gate, hearth column, caption and onward motes. As in the accepted 60 Hz view, the scenic lens crops the fox and the 80-second blend still clips its lower body. By 90 seconds the full fox is comfortably framed; that follow view remains through 150 seconds. No runtime change was warranted by this bounded composition review. Sampled stills do not establish continuous motion, audio quality, real-time throughput, GPU recording behavior or unfamiliar-player discovery.
 
 Full state and ten screenshots: `/captures/sorrel/homecoming-cadence-30hz-a86d8cb/`. Compact state: `cadence-30hz-verification.json`. Syntax check, diff check and lint:feel/camera fixtures pass; an invalid frequency fails before browser startup. No runtime source changed.
+
+Shared archive: `keeping-swarm4-captures/sorrel/homecoming-cadence-30hz-a86d8cb.tgz`. Independently downloaded and SHA-256 matched: `ac1474f3cd76f255ca2a27be27d629fa41095b19d0619ef1138d4abf27d3576e`.
