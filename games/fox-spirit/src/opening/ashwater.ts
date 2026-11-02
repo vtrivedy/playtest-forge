@@ -28,7 +28,14 @@ const marsh = (color: THREE.ColorRepresentation, extra: THREE.MeshToonMaterialPa
 
 export function buildAshwater(
   ctx: OpeningCtx,
-  opts: { complete: (level: (typeof LEVEL_IDS)[number]) => boolean; hasReedskim: () => boolean; isRestored?: (level: (typeof LEVEL_IDS)[number]) => boolean },
+  opts: {
+    complete: (level: (typeof LEVEL_IDS)[number]) => boolean;
+    hasReedskim: () => boolean;
+    isRestored?: (level: (typeof LEVEL_IDS)[number]) => boolean;
+    /** side places (the Album keeps their pages): found already at load, and the moment one is found */
+    secretFound?: (which: 'ashwater-roof' | 'ashwater-mooring') => boolean;
+    onSecret?: (which: 'ashwater-roof' | 'ashwater-mooring') => void;
+  },
 ) {
   const { scene, colliders } = ctx;
   const rand = rng(7071);
@@ -457,7 +464,10 @@ export function buildAshwater(
     teleport: (x, z, yaw) => ctx.player?.teleport(x, z, yaw),
     teach: ctx.teach.offer,
     events: {
-      secret: (which) => say(which === 0 ? 'A home, under the reeds.' : 'The last ferry never left.'),
+      secret: (which) => {
+        say(which === 0 ? 'A home, under the reeds.' : 'The last ferry never left.');
+        opts.onSecret?.(which === 0 ? 'ashwater-roof' : 'ashwater-mooring');
+      },
       burstA: () => {
         ctx.audio.cue('millrace-burst');
         say('The low sluice runs again.');
@@ -519,6 +529,8 @@ export function buildAshwater(
     damA.col.r = 0.001;
   }
   if (was('develop')) rig.s.done |= 2;
+  if (opts.secretFound?.('ashwater-roof')) rig.s.secrets |= 1;
+  if (opts.secretFound?.('ashwater-mooring')) rig.s.secrets |= 2;
   if (was('combine')) {
     rig.s.burstB = 999;
     rig.s.done |= 4;
