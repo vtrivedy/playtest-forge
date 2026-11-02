@@ -377,13 +377,18 @@ export function createFollowCamera(opts: {
 
   function clearLensVolume(focus: THREE.Vector3, lens: THREE.Vector3, dt: number, firstFrame: boolean) {
     const blocked = opts.lensBlocked;
-    if (!blocked || !blocked(lens.x, lens.y, lens.z, .35)) return false;
+    if (!blocked) return false;
+    // Clearance is measured from the moving fox, including after a floor lift.
+    // An unobstructed lens can still be inside the animal or almost overhead.
+    const bodyRadius = (point: THREE.Vector3) => Math.max(params.minDistance, Math.abs(point.y - focus.y) / Math.tan(THREE.MathUtils.degToRad(55)));
+    const bodyClear = (point: THREE.Vector3) => Math.hypot(point.x - focus.x, point.z - focus.z) >= bodyRadius(point) - .00001;
+    if (!blocked(lens.x, lens.y, lens.z, .35) && bodyClear(lens)) return false;
     const dx = lens.x - focus.x, dz = lens.z - focus.z;
     const range = Math.hypot(dx, dz);
-    if (range < .01) return false;
-    const ux = dx / range, uz = dz / range;
+    const ux = range > .01 ? dx / range : Math.sin(yaw + params.sideBias);
+    const uz = range > .01 ? dz / range : Math.cos(yaw + params.sideBias);
     let best = Infinity;
-    const previousClear = !firstFrame && !blocked(previousLens.x, previousLens.y, previousLens.z, .2);
+    const previousClear = !firstFrame && bodyClear(previousLens) && !blocked(previousLens.x, previousLens.y, previousLens.z, .2);
     const floorClear = (point: THREE.Vector3) => {
       const floor = opts.surfaceAt?.(point.x, point.z, point.y + 1.5);
       return floor === undefined || !Number.isFinite(floor) || point.y >= floor + params.clearance * .8 - .00001;
@@ -396,6 +401,14 @@ export function createFollowCamera(opts: {
       if (previousClear) {
         const travel = candidateLens.distanceTo(previousLens), maximumStep = Math.max(.08, 16 * dt);
         if (travel > maximumStep) candidateLens.lerpVectors(previousLens, candidateLens, maximumStep / travel);
+      }
+      // Linear interpolation around the fox cuts across its body envelope.
+      // Keep the lateral escape on the outside of that envelope.
+      const cx = candidateLens.x - focus.x, cz = candidateLens.z - focus.z;
+      const cr = Math.hypot(cx, cz), minimumRoom = bodyRadius(candidateLens);
+      if (cr < minimumRoom) {
+        candidateLens.x = focus.x + (cr > .01 ? cx / cr : ux) * minimumRoom;
+        candidateLens.z = focus.z + (cr > .01 ? cz / cr : uz) * minimumRoom;
       }
       const cost = candidateLens.distanceToSquared(lens) * .2 + (previousClear ? candidateLens.distanceToSquared(previousLens) * .8 : 0);
       if (cost >= best || !floorClear(candidateLens) || blocked(candidateLens.x, candidateLens.y, candidateLens.z, .35)) return;
@@ -410,11 +423,11 @@ export function createFollowCamera(opts: {
       }
       best = cost; freeLens.copy(candidateLens);
     };
-    const minimum = Math.min(range, params.minDistance);
-    const maximum = Math.max(range, params.distance) + .8;
+    const minimum = bodyRadius(lens);
+    const maximum = Math.max(range, params.distance, minimum) + .8;
     for (let r = minimum; r <= maximum + .001; r += .1) check(focus.x + ux * r, focus.z + uz * r);
-    const sideRange = Math.max(range, params.minDistance);
-    for (const degrees of [15, -15, 30, -30, 45, -45, 60, -60]) {
+    const sideRange = Math.max(range, minimum);
+    for (const degrees of [15, -15, 30, -30, 45, -45, 60, -60, 90, -90, 120, -120, 150, -150, 180]) {
       const a = THREE.MathUtils.degToRad(degrees), c = Math.cos(a), s = Math.sin(a);
       check(focus.x + (ux * c + uz * s) * sideRange, focus.z + (uz * c - ux * s) * sideRange);
     }
