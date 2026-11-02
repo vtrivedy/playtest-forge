@@ -92,9 +92,15 @@ const shot = async (name) => {
 };
 
 await shot('00-spawn');
-await walk(L(-8.6, 26), { r: 0.3 });
+// the direct try: lit brazier → seal fades on the way (the puzzle's lesson), then the relay
+await walk(L(-24.6, 29), { r: 0.3 });
 await shot('01-brazier');
-await walk(L(0, 20), { r: 0.4 });
+await walk(L(0, 18), { r: 0.4 });
+await shot('01b-faded-at-seal');
+await walk(L(-24.6, 29), { r: 0.3 });
+await walk(L(-7.6, 29.8), { r: 0.3 });
+await shot('01c-relay-lit');
+await walk(L(-1, 21), { r: 0.4 });
 await walk(L(0, 16.4), { r: 0.3, max: 3 });
 await page.evaluate(() => window.__gameHooks.advance(100, 1 / 60, false));
 await shot('02-seal-thawed');
@@ -106,8 +112,10 @@ await shot('04-before-membrane');
 let s = await breakAndRide([0, -1], L(0, -3.6), [...L(0, -9), 7.6], 8);
 console.log('ride1 peak', s.peak);
 await shot('05-on-shelf');
-await walk(L(10.6, -13.4), { r: 0.3 });
+await walk(L(28.6, -10.5), { r: 0.3 });
 await shot('06-brazier-b');
+await walk(L(16, -22.4), { r: 0.3 });
+await shot('06b-relay-b');
 await walk(L(0, -17.2), { r: 0.3 });
 await page.evaluate(() => window.__gameHooks.advance(80, 1 / 60, false));
 await shot('07-ice-melted');

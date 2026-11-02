@@ -34,6 +34,11 @@ const RULES = [
     why: 'heading from a raw per-frame displacement flip-flops near half turns (the page jitter); smooth the velocity and cap the turn rate',
   },
   {
+    id: 'wall-clock-timer',
+    test: (l) => /\bset(?:Timeout|Interval)\s*\(/.test(l),
+    why: 'game beats must run on sim time (onUpdate dt): a wall-clock timer fires at a different sim moment under the manual clock and breaks replay (the Press coda line, swarm5)',
+  },
+  {
     id: 'dom-text',
     test: (l) => /createElement\(\s*['"]div['"]\s*\)|\.textContent\s*=|\.innerHTML\s*=/.test(l),
     why: 'words must be drawn in the frame (ctx.captions / ctx.teach / lettering.ts): DOM text never reaches canvas recordings, so the ending card was invisible in every review clip',
