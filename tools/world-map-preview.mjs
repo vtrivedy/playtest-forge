@@ -29,6 +29,20 @@ const closed=await page.evaluate(()=>{window.__gameHooks.advance(1);return !wind
 await page.screenshot({path:'/tmp/hazel-map-preview/closed-badge-960.png'});
 await page.keyboard.press('Tab');
 const open=await page.evaluate(()=>window.__mapPreview.map.isOpen());
+await page.evaluate(async()=>{
+ const {buildSeedwells}=await import('/src/worlds/seedwells.ts');
+ const THREE=await import('/@fs/work/node_modules/.vite/deps/three.js');
+ const {createPostStack}=await import('/@fs/work/src/render/index.ts');
+ const renderer=window.__opening.ctx.renderer;
+ const scene=new THREE.Scene(); scene.background=new THREE.Color('#a8b6bf');
+ scene.add(new THREE.HemisphereLight('#f2ede0','#625760',2));
+ const light=new THREE.DirectionalLight('#fff1d4',3); light.position.set(-3,7,4); light.castShadow=true; scene.add(light);
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(50,50),new THREE.MeshStandardMaterial({color:'#8d9a8c',roughness:.9})); floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
+ buildSeedwells(scene,window.__mapPreview.progress,[{world:'russetvale',x:-3,z:0,y:0},{world:'ashwater',x:0,z:0,y:0},{world:'press',x:3,z:0,y:0}]);
+ const camera=new THREE.PerspectiveCamera(44,960/540,.1,100);camera.position.set(4,4,11);camera.lookAt(0,1,0);camera.updateMatrixWorld(true);
+ const post=createPostStack(renderer,scene,camera,{bloomStrength:.2,pixelRatio:1});post.setSize(960,540);post.render();
+});
+await page.screenshot({path:'/tmp/hazel-map-preview/seedwells-960.png'});
 await fs.writeFile('/tmp/hazel-map-preview/state.json',JSON.stringify(await page.evaluate(()=>({game:window.__game.state(),progress:window.__mapPreview.progress.snapshot()})),null,2));
 if(errors.length || !closed || !open) throw Error(JSON.stringify({errors,closed,open}));
 console.log(JSON.stringify({errors,closed,open})); await browser.close();
