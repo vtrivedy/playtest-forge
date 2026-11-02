@@ -1,3 +1,7 @@
 # Independent homecoming handover check
 
 Verify Wren's well-to-ember guidance on an unchanged named runtime. Stage the freed creatures and page using existing dev hooks, then let homecoming simulation fill the well. Capture ordinary chase-camera frames from the plaza before and after a dev Keeping release (which leaves the ember on its shelf). Require the stream absent before full, present after full, finite state, and absent on approach and real E pickup. Preserve window.__game and errors. A follow-up uses live stick input toward the gate, then real pickup and E placement at the root-hearth with disclosed teleport travel. No camera or gameplay tuning; this is staged behavior/composition evidence, not discovery, continuous-route, audio, or performance approval.
+
+## Production/live-capture discrepancy check
+
+Kit's d0d1953 live video reports no onward trail or reveal despite independent development-server route passes. Replay the unchanged natural slice against a freshly built production preview. Use the same initial wake placement and subsequent controller inputs; record complete state and native screenshots around the homecoming handoff. Compare page pin, carry position/carried flag, finale phase/onward, camera shot weight, and console errors. A production pass only narrows the cause; it cannot clear an unexamined live GPU recording or single-frame black flashes. Preserve that failure until capture state and footage reconcile.

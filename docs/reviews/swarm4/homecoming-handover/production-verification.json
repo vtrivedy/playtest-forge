@@ -1,0 +1,89 @@
+{
+  "runtime": "52795df (sources identical d0d1953)",
+  "production": true,
+  "simulation": "offline60Hz,640x360 SwiftShader, initial wake placement only; natural controller route",
+  "checks": {
+    "allThreeCatches": true,
+    "pageOnly": true,
+    "trailActive": true,
+    "walkingNoShot": true,
+    "pausedReveal": true,
+    "blendOut": true,
+    "followReturns": true,
+    "noErrors": true,
+    "screenshotsPresent": true
+  },
+  "samples": [
+    {
+      "time": 1,
+      "beat": "wake in paper",
+      "shot": 0.0,
+      "onward": 0,
+      "pinned": false
+    },
+    {
+      "time": 45,
+      "beat": "the page opens",
+      "shot": 0.0,
+      "onward": 0,
+      "pinned": false
+    },
+    {
+      "time": 70,
+      "beat": "through the warm gate",
+      "shot": 0.0,
+      "onward": 48,
+      "pinned": true
+    },
+    {
+      "time": 73,
+      "beat": "the page is home",
+      "shot": 0.0,
+      "onward": 48,
+      "pinned": true
+    },
+    {
+      "time": 75,
+      "beat": "homecoming",
+      "shot": 1.0,
+      "onward": 48,
+      "pinned": true
+    },
+    {
+      "time": 77,
+      "beat": "homecoming",
+      "shot": 1.0,
+      "onward": 48,
+      "pinned": true
+    },
+    {
+      "time": 80,
+      "beat": "homecoming",
+      "shot": 0.33,
+      "onward": 48,
+      "pinned": true
+    },
+    {
+      "time": 85,
+      "beat": "homecoming",
+      "shot": 0.0,
+      "onward": 48,
+      "pinned": true
+    },
+    {
+      "time": 89,
+      "beat": "homecoming",
+      "shot": 0.0,
+      "onward": 48,
+      "pinned": true
+    },
+    {
+      "time": 90,
+      "beat": "homecoming",
+      "shot": 0.0,
+      "onward": 48,
+      "pinned": true
+    }
+  ],
+  "limits": "Sampled stills, no continuous motion/audio/GPU blink/performance approval; Kit live-capture failure remains open."
+}

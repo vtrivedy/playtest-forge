@@ -1,0 +1,7 @@
+# Natural slice handover verification
+
+Replay the shared createSliceRoute from its ordinary wake position with real controller input and no gameplay staging. Continue the terminal homecoming hold through 150 simulated seconds. Retain route beat, window.__game, camera/path, homecoming and finale state so a dead plaza can be distinguished from incomplete prerequisites. Render chase views at named terminal times; no runtime changes or camera overrides. This is deterministic route/state and sampled composition evidence, not real-time performance or unaided discovery. Candidate retest must use the same shared input route and a named SHA.
+
+A separate staged remote page-only check starts the fox at the root-hearth with no creatures freed. Force only page homecoming, advance eight seconds and require no scenic path/cross-map camera. Teleport into the plaza while holding ordinary stick, then release input: the one-shot reveal must remain pending through remote/walking states, play on pause, yield to movement, and stay consumed on a later plaza revisit. Retain screenshots and full state/camera samples. Setup teleports are disclosed and do not prove discovery or travel.
+
+The well-full assertion is diagnostic on the initial baseline only. Final acceptance must require page pinned, optional creatures still pressed, well not full, persistent onward motes after returning home, a single scenic reveal after stopping, and finite/error-free state. A route that ends with an infinite hold cannot demonstrate player discovery or completion of the Keeping/finale.
