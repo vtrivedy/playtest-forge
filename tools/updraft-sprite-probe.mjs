@@ -25,8 +25,8 @@ page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
 try{
   await page.goto('http://127.0.0.1:5194/?manual=1',{waitUntil:'domcontentloaded',timeout:180000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true,null,{timeout:300000});
-  const samples=await page.evaluate(async baseline=>{
-    const THREE=await import('/node_modules/three/build/three.module.js');
+  const samples=await page.evaluate(async ({baseline,threeUrl})=>{
+    const THREE=await import(threeUrl);
     const renderer=window.__opening.ctx.renderer;
     const hearth=window.__opening.ctx.scene.getObjectByName('hearth-kiln');
     const source=hearth.children.find(c=>c.isPoints&&c.material.uniforms?.uEmberSize)?.material;
@@ -71,7 +71,7 @@ try{
       target.dispose();geometry.dispose();shader.dispose();
     }
     return samples;
-  },baseline);
+  },{baseline,threeUrl:`/@fs/${path.resolve('node_modules/three/build/three.module.js')}`});
   for(const s of samples){fs.writeFileSync(path.join(out,`${s.variant}-${s.kind}-${s.depth}.rgba`),new Uint8Array(s.pixels));delete s.pixels;}
   const current=samples.filter(s=>s.variant==='current'),bad=samples.filter(s=>s.variant==='baseline');
   const result={sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),baselineSha,errors,samples,pass:!errors.length&&current.every(s=>s.pass)&&(!baselineSha||bad.some(s=>!s.pass)),scope:'actual shader GPU raster at96x96; controlled individual sprite, no bloom'};
