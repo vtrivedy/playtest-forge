@@ -13,11 +13,14 @@ const fallLag = Number(process.argv[3] ?? '0.07');
 const seconds = Number(process.argv[4] ?? '62');
 const port = Number(process.argv[5] ?? '5198');
 const clip = process.argv.includes('--clip');
+const missOverlook = process.argv.includes('--miss-overlook');
 const option = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
 const clipBeat = option('clip-beat', 'off the canopy');
 const clipSeconds = Number(option('clip-seconds', '3'));
 const clipFrom = option('clip-from', '') === '' ? null : Number(option('clip-from', ''));
 if (clipFrom !== null && (!Number.isFinite(clipFrom) || clipFrom < 0)) throw Error('clip-from must be nonnegative');
+const minDistance = Number(option('min-distance', '1.2'));
+if (!Number.isFinite(minDistance) || minDistance < 1.2 || minDistance > 2.45) throw Error('min-distance must be in [1.2, 2.45]');
 const testDt = Number(option('dt', String(1 / 60)));
 if (!Number.isFinite(testDt) || testDt <= 0 || testDt > .05) throw Error('dt must be in (0, .05]');
 const stillFrames = option('stills-at', '').split(',').filter(Boolean).map(t => Math.round(Number(t) / testDt));
@@ -46,19 +49,21 @@ page.setDefaultTimeout(300000);
 try {
   await page.goto(`http://127.0.0.1:${port}/`,{waitUntil:'domcontentloaded',timeout:180000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true);
-  await page.evaluate(({source,start,fallLag,testDt})=>{
+  await page.evaluate(({source,start,fallLag,testDt,minDistance})=>{
     const h=window.__gameHooks;
-    h.setManual(true); h.camera.fallLag=fallLag;
+    h.setManual(true); h.camera.fallLag=fallLag; h.camera.minDistance=minDistance;
     h.teleport(start.x,start.z,start.yaw);
     window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1};
-  },{source:createSliceRoute.toString(),start:SLICE_START,fallLag,testDt});
+  },{source:createSliceRoute.toString(),start:SLICE_START,fallLag,testDt,minDistance});
   let done=false, n=0;
   while(!done){
-    const result=await page.evaluate(({total,clip,clipBeat,clipFrames,testDt,stillFrames,clipFrom})=>{
+    const result=await page.evaluate(({total,clip,clipBeat,clipFrames,testDt,stillFrames,clipFrom,missOverlook})=>{
       const p=window.__cameraProbe,h=window.__gameHooks,c=window.__opening.camera;
       let label='', captureFrame=null;
       for(let i=0;i<60 && p.f<total;i++,p.f++){
         const f=p.f,prev=p.state,input=p.route(f*testDt,prev);
+        // Explicit input variant: walk off the second page instead of jumping to the overlook.
+        if (missOverlook && input.beat === 'leap to the overlook') input.jump = false;
         if(prev.grounded)p.apex=false;
         const apex=!p.apex&&!prev.grounded&&prev.vel[1]>0&&prev.vel[1]-15*testDt<=0;
         if(apex)p.apex=true;
@@ -83,7 +88,7 @@ try {
         }
       }
       return {done:p.f>=total,f:p.f,label,beat:p.beat,captureFrame};
-    },{total:Math.round(seconds/testDt),clip,clipBeat,clipFrames,testDt,stillFrames,clipFrom});
+    },{total:Math.round(seconds/testDt),clip,clipBeat,clipFrames,testDt,stillFrames,clipFrom,missOverlook});
     done=result.done;
     if(result.captureFrame!==null)await page.screenshot({path:path.join(out,'drop-frames',`f${String(result.captureFrame).padStart(3,'0')}.jpg`),type:'jpeg',quality:92});
     if(result.label){
@@ -94,7 +99,7 @@ try {
   }
   const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,game:{mode:window.__game.mode,state:window.__game.state()}}));
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,testDt,seconds,sha,clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
   const late = evidence.trace.filter(s => s.f * testDt >= 60);
   if (late.length) {
     const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));

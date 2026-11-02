@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createCameraEnvelope } from './cameraEnvelope.hot';
 
 /** Per-frame traversal input. The camera owns no gameplay state beyond what it is told here. */
 export type CameraFrame = {
@@ -371,78 +372,17 @@ export function createFollowCamera(opts: {
   const sightOrigin = new THREE.Vector3();
   const sightHits: THREE.Intersection[] = [];
   const safeLens = new THREE.Vector3();
-  const freeLens = new THREE.Vector3();
   const previousLens = new THREE.Vector3();
-  const candidateLens = new THREE.Vector3();
-
-  function clearLensVolume(focus: THREE.Vector3, lens: THREE.Vector3, dt: number, firstFrame: boolean) {
-    const blocked = opts.lensBlocked;
-    if (!blocked) return false;
-    // Clearance is measured from the moving fox, including after a floor lift.
-    // An unobstructed lens can still be inside the animal or almost overhead.
-    const bodyRadius = (point: THREE.Vector3) => Math.max(params.minDistance, Math.abs(point.y - focus.y) / Math.tan(THREE.MathUtils.degToRad(55)));
-    const bodyClear = (point: THREE.Vector3) => Math.hypot(point.x - focus.x, point.z - focus.z) >= bodyRadius(point) - .00001;
-    if (!blocked(lens.x, lens.y, lens.z, .35) && bodyClear(lens)) return false;
-    const dx = lens.x - focus.x, dz = lens.z - focus.z;
-    const range = Math.hypot(dx, dz);
-    const ux = range > .01 ? dx / range : Math.sin(yaw + params.sideBias);
-    const uz = range > .01 ? dz / range : Math.cos(yaw + params.sideBias);
-    let best = Infinity;
-    const previousFree = !firstFrame && !blocked(previousLens.x, previousLens.y, previousLens.z, .2);
-    const previousClear = previousFree && bodyClear(previousLens);
-    const floorClear = (point: THREE.Vector3) => {
-      const floor = opts.surfaceAt?.(point.x, point.z, point.y + 1.5);
-      return floor === undefined || !Number.isFinite(floor) || point.y >= floor + params.clearance * .8 - .00001;
-    };
-    const check = (x: number, z: number) => {
-      // Escape horizontally at the last clear height before descending off a
-      // platform. Lowering every candidate into its side can pin the old lens
-      // forever while the fox walks underneath it.
-      candidateLens.set(x, previousFree ? Math.max(lens.y, previousLens.y) : lens.y, z);
-      if (previousFree) {
-        const travel = candidateLens.distanceTo(previousLens), maximumStep = Math.max(.08, 16 * dt);
-        if (travel > maximumStep) candidateLens.lerpVectors(previousLens, candidateLens, maximumStep / travel);
-      }
-      // Linear interpolation around the fox cuts across its body envelope.
-      // Keep the lateral escape on the outside of that envelope.
-      const cx = candidateLens.x - focus.x, cz = candidateLens.z - focus.z;
-      const cr = Math.hypot(cx, cz), minimumRoom = bodyRadius(candidateLens);
-      if (cr < minimumRoom) {
-        candidateLens.x = focus.x + (cr > .01 ? cx / cr : ux) * minimumRoom;
-        candidateLens.z = focus.z + (cr > .01 ? cz / cr : uz) * minimumRoom;
-      }
-      const cost = candidateLens.distanceToSquared(lens) * .2 + (previousFree ? candidateLens.distanceToSquared(previousLens) * .8 : 0);
-      if (cost >= best || !floorClear(candidateLens) || blocked(candidateLens.x, candidateLens.y, candidateLens.z, .35)) return;
-      if (previousFree) {
-        const steps = Math.ceil(candidateLens.distanceTo(previousLens) / .1);
-        for (let i = 1; i < steps; i++) {
-          const t = i / steps;
-          if (blocked(THREE.MathUtils.lerp(previousLens.x, candidateLens.x, t),
-            THREE.MathUtils.lerp(previousLens.y, candidateLens.y, t),
-            THREE.MathUtils.lerp(previousLens.z, candidateLens.z, t), .2)) return;
-        }
-      }
-      // A free lens behind the next wall still loses the fox. Prefer a clear
-      // sight line when choosing which side of the platform to escape toward.
+  const clearLensVolume = createCameraEnvelope({
+    params, previousLens, surfaceAt: opts.surfaceAt, lensBlocked: opts.lensBlocked,
+    yaw: () => yaw,
+    sightFraction: (focus, lens) => {
       const blockerName = sceneryName;
-      const visibility = sceneryFraction(focus, candidateLens);
+      const visibility = sceneryFraction(focus, lens);
       sceneryName = blockerName;
-      const visibleCost = cost + (1 - visibility) * params.distance * params.distance * 4;
-      if (visibleCost >= best) return;
-      best = visibleCost; freeLens.copy(candidateLens);
-    };
-    const minimum = bodyRadius(lens);
-    const maximum = Math.max(range, params.distance, minimum) + .8;
-    for (let r = minimum; r <= maximum + .001; r += .1) check(focus.x + ux * r, focus.z + uz * r);
-    const sideRange = Math.max(range, minimum);
-    for (const degrees of [15, -15, 30, -30, 45, -45, 60, -60, 90, -90, 120, -120, 150, -150, 180]) {
-      const a = THREE.MathUtils.degToRad(degrees), c = Math.cos(a), s = Math.sin(a);
-      check(focus.x + (ux * c + uz * s) * sideRange, focus.z + (uz * c - ux * s) * sideRange);
-    }
-    if (Number.isFinite(best)) lens.copy(freeLens);
-    else if (previousClear && floorClear(previousLens)) { lens.copy(previousLens); return true; }
-    return Number.isFinite(best);
-  }
+      return visibility;
+    },
+  });
 
   function traceScenery(nearest: number, accept?: (hit: THREE.Intersection) => boolean) {
     for (const { source: mesh, probe } of scenery) {

@@ -415,3 +415,13 @@ retain exposed branch gaps. Use the returned ground mesh for downward contact
 samples, then bisect each crossing rock edge against that actual surface and
 lift contact ink 2.5 cm. Verify five fixed stills, fix the weakest read, retest,
 and request another named-SHA verdict before integration.
+
+## Swarm4 ruin pounce framing
+The inherited failed-catch escape keeps the lens outside the fox, but its 1.2m
+minimum briefly clips ear/tail tips. Compare 1.2 / 1.5 / 1.8m horizontal body
+clearance without changing the follow spring, controls, or normal 2.45m boom.
+Choose the smallest setting that preserves the complete pounce silhouette and
+still traverses the village arch and ruin return. Formal camera mode model checks
+that traversal output must pass through the body-envelope constraint after floor
+correction; authored shots keep their separate composition. Continuous failed-
+catch footage plus a successful return route, screenshots and __game are required.

@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { createFollowCamera, type FollowCamera } from './camera';
+import { colliderTop, lensVolumeBlocked } from './cameraCollider.hot';
 import type { HearthFox } from './lookdevFox';
 import type { UpdraftSystem } from './chem/updraft';
 
@@ -18,7 +19,6 @@ export type Collider =
   | { kind: 'post'; x: number; z: number; r: number };
 
 /** lens volume samples: centre + 8 around the rim (unit radius) */
-const LENS_RING = [[0, 0], ...Array.from({ length: 8 }, (_, i) => [Math.cos((i * Math.PI) / 4), Math.sin((i * Math.PI) / 4)])] as const;
 
 export const PLAY = {
   runSpeed: 3.2,
@@ -67,21 +67,6 @@ export const PLAY = {
 
 const TAU = Math.PI * 2;
 const wrap = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
-
-function colliderTop(c: Collider, x: number, z: number): number {
-  const dx = x - c.x;
-  const dz = z - c.z;
-  if (c.kind === 'post') return dx * dx + dz * dz < c.r * c.r ? Infinity : -Infinity;
-  if (c.kind === 'cap') {
-    const k = 1 - (dx * dx + dz * dz) / (c.r * c.r);
-    return k > 0 ? c.base + c.h * Math.sqrt(k) : -Infinity;
-  }
-  const cos = Math.cos(c.yaw);
-  const sin = Math.sin(c.yaw);
-  const lx = dx * cos - dz * sin;
-  const lz = dx * sin + dz * cos;
-  return Math.abs(lx) < c.hx && Math.abs(lz) < c.hz ? c.top : -Infinity;
-}
 
 type AnimState = 'idle' | 'loco' | 'jumpUp' | 'fall' | 'land';
 const STATE_FADE: Record<Exclude<AnimState, 'loco' | 'idle'>, number> = { jumpUp: 0.06, fall: 0.16, land: 0.06 };
@@ -452,11 +437,7 @@ export function createPlay(opts: {
 
   /** lens sphere inside a pier / block / rock / trunk */
   const lensBlocked = (x: number, y: number, z: number, r: number) =>
-    colliders.some((c) => {
-      if (c.kind === 'box' && c.oneWay) return false;
-      for (const [ox, oz] of LENS_RING.map(([u, w]) => [u * r, w * r])) if (colliderTop(c, x + ox, z + oz) > y - r) return true;
-      return false;
-    });
+    lensVolumeBlocked(colliders, x, y, z, r);
   /**
    * Sight blockers for the follow camera's scenery occlusion (it pulls the boom in front of anything
    * between lens and fox): unrendered solid proxies of piers, blocks and trunks built from the colliders.
