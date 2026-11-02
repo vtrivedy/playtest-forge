@@ -93,11 +93,11 @@ const shot = async (name) => {
 
 await shot('00-spawn');
 // the direct try: lit brazier → seal fades on the way (the puzzle's lesson), then the relay
-await walk(L(-24.6, 29), { r: 0.3 });
+await walk(L(-20.6, 27.4), { r: 0.3 });
 await shot('01-brazier');
 await walk(L(0, 18), { r: 0.4 });
 await shot('01b-faded-at-seal');
-await walk(L(-24.6, 29), { r: 0.3 });
+await walk(L(-20.6, 27.4), { r: 0.3 });
 await walk(L(-7.6, 29.8), { r: 0.3 });
 await shot('01c-relay-lit');
 await walk(L(-1, 21), { r: 0.4 });

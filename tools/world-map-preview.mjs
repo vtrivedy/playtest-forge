@@ -55,6 +55,10 @@ for(const world of ['russetvale','ashwater','press']){
  storyChecks.push({world,missing,expectedMissing,spoiler,visibleText});
  if(missing!==expectedMissing||spoiler)throw Error(`story reveal invariant failed: ${world}`);
 }
+await page.evaluate(()=>{window.__albumText=[];window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'BracketRight'}));window.__gameHooks.advance(1)});
+const secretMissing=await page.evaluate(()=>!window.__albumText.includes('Everyone, together, laughing') && window.__albumText.includes('A loose binding'));
+if(!secretMissing)throw Error('Unfound secret leaked memory');
+await page.screenshot({path:`${out}/secret-missing-960.png`});
 await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'BracketRight'})));
 await page.evaluate(()=>window.__gameHooks.advance(1));
 await page.screenshot({path:`${out}/map-return-960.png`});
@@ -77,6 +81,15 @@ await page.evaluate(()=>{
  window.__gameHooks.advance(1);
 });
 await page.screenshot({path:`${out}/returned-story-960.png`});
+await page.evaluate(()=>{
+ window.__mapPreview.map.setOpen(false);window.__albumText=[];
+ window.__mapPreview.progress.findSecret('press-stacks');window.__mapPreview.map.step();window.__gameHooks.advance(1);
+});
+await page.screenshot({path:`${out}/secret-returned-960.png`});
+await page.evaluate(()=>{window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'}));window.__gameHooks.advance(1)});
+const secretFound=await page.evaluate(()=>window.__albumText.includes('Everyone, together, laughing'));
+if(!secretFound)throw Error('Earned secret memory missing');
+await page.screenshot({path:`${out}/secret-memory-960.png`});
 await page.evaluate(async()=>{
  const {buildSeedwells}=await import('/src/worlds/seedwells.ts');
  const THREE=await import('/@fs/work/node_modules/.vite/deps/three.js');

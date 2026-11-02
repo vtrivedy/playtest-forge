@@ -87,6 +87,21 @@ Saved-game acceptance also checks the opening invitation: once the page is alrea
 restart its chase or display its old instructions. Keep the complete boot state and screenshot alongside
 the foreign-world reconstruction checks; a clear travel camera does not establish a clear initial lens.
 The saved-page contract is pinned homecoming plus inactive discovery, independently of later world facts.
+Read the store before building the opening. Initialize a saved returned page directly as kept, with all
+three catches accounted for and its release already settled; initialize its invitation as finished
+without inventing a current landing contact. Fresh games still use the three catches and grounded
+overlook proof. Saved initialization emits no new catch wash, release, or page-origin caption.
+An arch already unlocked in the save starts with its announcement accounted for. Only an unlock
+earned in this session announces a newly lit arch; reload keeps the hub quiet and leaves its
+existing destination signs and Album available for orientation.
+
+### Optional memory — the Scribe’s Stacks
+The side climb rewards an unpressed family page: a moment allowed to stay unfinished. Its
+physical reading stand reports one typed secret, `press-stacks`, persisted beside world facts.
+Finding it never completes a level, fills a Seedwell or grants an ability. The Album adds an
+“Unpressed pages” spread with the earned memory, and a short returned-page notice points to
+Tab. On reload both stand and Album retain the discovery without replaying its notice. Old
+version-one saves without secrets load unchanged; unknown secret ids are discarded.
 
 ## Who builds what
 - **Maple** — scene integration: worlds registry, terrain dispatch, mask, arches, travel, per-world look/weather,
@@ -130,3 +145,13 @@ positions without changing the opening spawn. Fix the landing or missing occlude
 Extend the physical portal circuit with optional Press puzzle-route acceptance. Reuse Thistle's documented movement
 sequence through a dedicated input helper after real hub entry; assert all three physical completion facts and earned
 Inkstep, then walk home. This proves solvability from the hub, not blind insight. Retain all intermediate frames.
+
+Update independent Ashwater acceptance for the Weir Heart cistern: retain the physical fresh-boot entry, then test
+that standing on a reed mat sinks it and returns the fox to dry footing. After draining the mill pool, enter the
+cistern, climb the weir and dash its third reed gate. Assert a risen pool and active flood before using the punt
+and east wall to reach the Seedwell. Retain full states at the drained, flooded and completed beats; this is
+solvability evidence, not blind puzzle discovery or a duration target.
+
+Both foreign-world physical routes must assert canonical earned ability and full Seedwell fill as well as local
+puzzle facts. Capture the Album with native Tab at completion and close it before return travel. On the Press route,
+retain two later stationary scene frames across the Scribe's lever/coda hold; sampled frames do not prove animation.
