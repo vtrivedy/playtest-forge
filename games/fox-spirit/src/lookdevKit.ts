@@ -148,6 +148,8 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             bloom = max(bloom, exp(-pow((d - 0.35 - 0.25 * lkNoise(xz * 1.7)) / 0.3, 2.0)) * step(0.5, r.z));
           }
           ${TRAIL_BLEND}
+          // the other worlds (opening/worlds.ts) are islands far along x, in their own colours from the start
+          paint = max(paint, uLaneOn * step(350.0, abs(xz.x)));
           float lum = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
           float t = clamp(lum / 1.25, 0.0, 1.0);
           // paper: tooth + laid fibres (screen) and old-paper stains / foxing (world)
@@ -902,7 +904,13 @@ export const SKY = {
   sun: 0xffc27a,
 };
 
-export type LookdevSky = { setPaint: (k: number, dir: THREE.Vector2) => void; mist: THREE.Color; update: (dt: number) => void };
+export type LookdevSky = {
+  setPaint: (k: number, dir: THREE.Vector2) => void;
+  mist: THREE.Color;
+  update: (dt: number) => void;
+  /** another world's sky (opening/worlds.ts): blend the painted gradient and mist toward it by k (0 = autumn) */
+  setWorld: (top: THREE.Color, mid: THREE.Color, hor: THREE.Color, mist: THREE.Color, k: number) => void;
+};
 
 export function buildSky(scene: THREE.Scene, sunDir: THREE.Vector3): LookdevSky {
   const C = (h: number) => new THREE.Color(h);
@@ -1034,6 +1042,15 @@ export function buildSky(scene: THREE.Scene, sunDir: THREE.Vector3): LookdevSky 
     },
     update(dt) {
       u.uTime.value += dt;
+    },
+    setWorld(top, mid, hor, wMist, k) {
+      u.uTop.value.set(SKY.autumn.top).lerp(top, k);
+      u.uMid.value.set(SKY.autumn.mid).lerp(mid, k);
+      u.uHor.value.set(SKY.autumn.horizon).lerp(hor, k);
+      if (k > 0) {
+        u.uPaint.value = Math.max(u.uPaint.value, k);
+        mist.lerp(wMist, k);
+      }
     },
   };
 }
