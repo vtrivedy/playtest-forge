@@ -85,7 +85,7 @@ try {
       const apex = !apexCaptured && !prev.grounded && prev.vel[1] > 0 && prev.vel[1] - 15 / 60 <= 0;
       if (apex) apexCaptured = true;
       const touch = touchdownF >= 0 && f === touchdownF + 2;
-      const shot = input.beat !== beat || apex || touch;
+      const shot = input.complete || input.beat !== beat || apex || touch;
       // 2 s run clip (30 fps) at the start of the loop back
       if (input.beat === 'loop back' && clipF < 0) clipF = f;
       const clipFrame = !video && clipF >= 0 && f - clipF < 120 && (f - clipF) % 2 === 0;
@@ -116,13 +116,14 @@ try {
         await page.screenshot({ path: path.join(out, `${String(++n).padStart(2, '0')}-${tag}.png`) });
         console.log(f, beat.padEnd(18), JSON.stringify({ pos: state.pos, speed: state.speed, anim: state.anim, gait: state.gait, lastJump: state.lastJump }));
       }
+      if (input.complete) break;
     }
     fs.writeFileSync(path.join(out, 'trace.json'), JSON.stringify(trace));
     if (opening) {
       const hearths = trace.flatMap(s => s.updraft?.hearths ?? s.hearth?.hearths ?? []);
       const shelf = trace.filter(s => s.grounded && Math.hypot(s.pos[0] - 13, s.pos[2] - 75.5) < 3);
       const summary = {
-        seconds, frames: trace.length, finalBeat: beat,
+        seconds: trace.length / 60, requestedSeconds: seconds, frames: trace.length, finalBeat: beat,
         beats: [...new Set(trace.map(s => s.beat))],
         hearthLit: hearths.some(h => h.id === 'H-a' && h.heat > 0.9),
         glideFrames: trace.filter(s => s.gliding).length,
@@ -146,7 +147,7 @@ try {
     if (video) {
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', windows.length ? '60' : '30', '-i', path.join(out, 'frames/f%04d.jpg'), '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, slice ? 'slice.mp4' : keeping ? 'keeping.mp4' : opening ? 'opening-75s.mp4' : 'hero-30s.mp4')]);
       const git = (...a) => execFileSync('git', a, { encoding: 'utf8' }).trim();
-      fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/', route: keeping ? 'tools/opening-hero-route.mjs#keeping' : opening ? 'tools/opening-hero-route.mjs' : 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: 30, frames: totalFrames / 2, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
+      fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({ sha: git('rev-parse', 'HEAD'), dirty: git('status', '--porcelain'), url: '/', route: keeping ? 'tools/opening-hero-route.mjs#keeping' : opening ? 'tools/opening-hero-route.mjs' : 'tools/lookdev-hero-route.mjs', sim: '60 Hz manual clock, render every 2nd step', fps: windows.length ? 60 : 30, frames: videoN, seconds: trace.length / 60, resolution: [1280, 720], renderer: 'SwiftShader' }, null, 2));
     }
     if (!video && clipF >= 0)
       execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(out, 'run-clip/f%03d.jpg'), '-c:v', 'libx264', '-crf', '20', '-pix_fmt', 'yuv420p', path.join(out, 'run-clip.mp4')]);

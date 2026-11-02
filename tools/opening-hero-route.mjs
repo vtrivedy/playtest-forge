@@ -129,7 +129,7 @@ export function createKeepingRoute() {
 // Input only (stick, Space, Shift); every step waits on __game state. No teleports after the wake spot.
 export const SLICE_START = OPENING_START;
 
-export function createSliceRoute() {
+export function createSliceRoute(startBeat = 'wake in paper') {
   let step = 0;
   let since = 0;
   let last = 0;
@@ -196,10 +196,11 @@ export function createSliceRoute() {
     hold('the page opens', 1.8),
     hold('colour rolls out', 2.6),
     hold('the meadow paints', 2.5),
-    walk('to the return fold', [-25, 71.4], 0.12, 0.6),
+    walk('to the return fold', [-25.7, 69.6], 0.08, 0.45),
+    hold('ready the homeward fold', 0.5),
     { beat: 'unfold the way home', run: (s) => ({
-      x: since < 0.6 ? 0.08 : since < 1.0 ? 1 : 0, z: 0,
-      dash: since > 0.75 && since < 0.95,
+      x: since < 0.6 ? 0.057 : 0, z: since < 0.6 ? 0.057 : 0,
+      dash: since >= 0.6 && since < 0.65,
       done: since > 1.5 && (s.opening?.popUpRuin?.returns ?? 0) > 0,
     }) },
     walk('onto the return steps', [-24.4, 72.1], 0.15, 0.6),
@@ -213,6 +214,8 @@ export function createSliceRoute() {
     walk('the page is home', [-7.2, 88], 0.3, 0.5),
     hold('homecoming', Infinity),
   ];
+  step = S.findIndex((s) => s.beat === startBeat);
+  if (step < 0) throw new Error(`Unknown slice start beat: ${startBeat}`);
   return (t, state) => {
     since += Math.max(0, t - last);
     last = t;
@@ -225,6 +228,6 @@ export function createSliceRoute() {
       st = S[step];
       r = st.run(state);
     }
-    return { x: r.x ?? 0, z: r.z ?? 0, jump: !!r.jump, dash: !!r.dash, interact: false, beat: st.beat };
+    return { x: r.x ?? 0, z: r.z ?? 0, jump: !!r.jump, dash: !!r.dash, interact: false, beat: st.beat, complete: st.beat === 'homecoming' && since >= 4 };
   };
 }
