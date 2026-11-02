@@ -253,6 +253,7 @@ export async function runOpening(): Promise<void> {
     settled: () => settledAt >= 0,
     ember: coal,
     homeReady: homecoming.isPinned,
+    canTeachOnward: () => discovery.finished,
     cam: player.cam,
     player,
     crownLetGo: crown.letGo,

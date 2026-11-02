@@ -453,3 +453,11 @@ and ink remain opaque. Register each stem with the existing sight-blocker fade
 so the fox remains visible during descent. Keep support geometry and launch
 feel intact. Replay the rendered discovery follower, inspect descent frames and
 the jump retries, and retain screenshots plus window.__game and journey checks.
+
+### Discovery recovery instruction priority — swarm5 follow-up
+
+A kept page does not prove the fox landed on the overlook. While discovery is
+active, its jump/landing instructions must retain priority over the onward home
+instruction. The probe must reject that competing line after a missed landing,
+including when all three catches are already recorded. Preserve the real support
+contact gate; prove recovery with the normal input-only observer and saved state.

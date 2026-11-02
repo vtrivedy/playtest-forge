@@ -86,6 +86,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   ember: { restsAt: (x: number, y: number, z: number, r: number) => boolean; where: (out: THREE.Vector3) => boolean };
   /** the page is pinned at home: from then on a stream of motes leads from the well to the ember */
   homeReady: () => boolean;
+  /** traversal teaching retains priority until the overlook landing is confirmed */
+  canTeachOnward: () => boolean;
   cam: FollowCamera;
   player: { setMoveScale: (k: number) => void; intent: () => number };
   crownLetGo: () => void;
@@ -716,7 +718,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     hinge, screw, wheel, coverMat, paperMat, ironMat, lampPaper, emblemMat, glowMat, light,
     wayMesh, wayLut, wayLen: wayCurve.getLength(),
     onwardMesh, onwardLut, emberAt: new THREE.Vector3(), onwardAt, onwardFrom,
-    homeReady: opts.homeReady,
+    homeReady: opts.homeReady, canTeachOnward: opts.canTeachOnward,
     emberWhere: (out: THREE.Vector3) => opts.ember.where(out),
     pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card, teach: ctx.teach.offer,
     cradle: cradleAt,
