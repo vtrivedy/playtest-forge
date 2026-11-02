@@ -18,7 +18,7 @@ export const LANE_WIND = {
   /** wind speed along the lane (m/s) and how long a leaf lies before fading (s) */
   wind: 2.6,
   rest: 6,
-  gain: 0.05,
+  gain: 0.07,
 };
 const LEAVES = 44;
 
@@ -65,7 +65,9 @@ export function createLaneWind(ctx: OpeningCtx) {
   const band = new BiquadFilterNode(ac, { type: 'bandpass', frequency: 500, Q: 0.6 });
   const gain = new GainNode(ac, { gain: 0 });
   const pan = ctx.audio.at(new THREE.Vector3(LANE[0]![0], 2, LANE[0]![1]), 5);
-  src.connect(band).connect(gain).connect(pan);
+  // no rumble under it: a low tail reads as traffic, not air (KNOWLEDGE: critic vocabulary)
+  const hp = new BiquadFilterNode(ac, { type: 'highpass', frequency: 200, Q: 0.5 });
+  src.connect(hp).connect(band).connect(gain).connect(pan);
   src.start();
   let next = 3;
   let t = 0;
