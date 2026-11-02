@@ -8,9 +8,33 @@ type Action = 'follow' | 'dash' | 'spring' | 'unfold' | 'jump' | 'wait';
 const ACTIONS: readonly Action[] = ['follow', 'dash', 'spring', 'unfold', 'jump', 'wait'];
 type PageView = { readonly pos: THREE.Vector3; readonly catches: number; readonly kept: boolean };
 type CanopyView = { readonly lastLeaf: string | null };
-type RuinView = { readonly firstOpen: boolean; readonly secondOpen: boolean; readonly reached: boolean; readonly opening: boolean };
+type RuinView = { readonly firstOpen: boolean; readonly secondOpen: boolean; readonly opening: boolean };
 
 type Leg = 'page' | 'gate' | 'entry' | 'middle' | 'high' | 'roost' | 'grove' | 'fold1' | 'jump1' | 'fold2' | 'jump2' | 'jump3' | 'catch' | 'done';
+
+function invitationPaper(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 96;
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = '#f0d395';
+  g.strokeStyle = '#78512e';
+  g.lineWidth = 3;
+  g.beginPath();
+  g.moveTo(5, 5); g.lineTo(58, 3); g.lineTo(57, 73);
+  g.lineTo(52, 89); g.lineTo(43, 83); g.lineTo(34, 91);
+  g.lineTo(22, 85); g.lineTo(8, 91); g.closePath();
+  g.fill(); g.stroke();
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(16, 28); g.lineTo(47, 24);
+  g.moveTo(16, 40); g.lineTo(41, 37);
+  g.moveTo(17, 52); g.lineTo(45, 50);
+  g.stroke();
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
 
 /** Guidance observes progression; only actual contacts/landings advance its traversal invitation. */
 export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyView, ruin: RuinView) {
@@ -18,12 +42,13 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   const target = new THREE.Vector3();
   let action = 0;
   let active = true;
-  const scraps = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.12, 0.2), new THREE.MeshBasicMaterial({ color: 0xe7a947, side: THREE.DoubleSide, transparent: true, opacity: 0.8 }), 20);
+  const scraps = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.28, 0.4), new THREE.MeshBasicMaterial({ map: invitationPaper(), side: THREE.DoubleSide, transparent: true, alphaTest: 0.05 }), 4);
   scraps.name = 'page-invitation';
   scraps.frustumCulled = false;
   ctx.scene.add(scraps);
   const matrix = new THREE.Matrix4();
   const rotation = new THREE.Quaternion();
+  const flutter = new THREE.Quaternion();
   const euler = new THREE.Euler();
   const position = new THREE.Vector3();
   const scale = new THREE.Vector3(1, 1, 1);
@@ -56,7 +81,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
 
   function onRuinLeaf(index: number): boolean {
     const fox = ctx.fox.root.position;
-    const q = POP_UP_RUIN.leaves[index]!;
+    const q = index === 2 ? POP_UP_RUIN.overlook : POP_UP_RUIN.leaves[index]!;
     return !!ctx.player?.motion.grounded && Math.abs(fox.x - q.x) < 1.6 && Math.abs(fox.z - q.z) < 1.6 && Math.abs(fox.y - q.top) < 0.12;
   }
 
@@ -81,7 +106,7 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
       if (leg === 'jump1' && onRuinLeaf(0)) leg = 'fold2';
       if (leg === 'fold2' && ruin.secondOpen) leg = 'jump2';
       if (leg === 'jump2' && onRuinLeaf(1)) leg = 'jump3';
-      if (leg === 'jump3' && ruin.reached) leg = 'catch';
+      if (leg === 'jump3' && onRuinLeaf(2)) leg = 'catch';
       if (leg !== 'grove' && leg !== 'fold1' && ctx.player?.motion.grounded && fox.y < POP_UP_RUIN.leaves[0].top - 0.15) leg = 'jump1';
     }
     if (leg === 'page') {
@@ -127,16 +152,18 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
     const dx = target.x - fox.x;
     const dz = target.z - fox.z;
     const distance = Math.hypot(dx, dz);
-    const length = Math.min(6, distance);
-    for (let i = 0; i < scraps.count; i++) {
-      const u = ((i / scraps.count + t * 0.27) % 1);
-      const along = u * length;
-      const blend = distance > 0.01 ? along / distance : 0;
-      position.set(fox.x + dx * blend, fox.y + (target.y - fox.y) * blend + 0.35 + Math.sin(t * 3 + i) * 0.13, fox.z + dz * blend);
-      position.y = Math.max(position.y, ctx.groundH(position.x, position.z) + 0.18);
-      euler.set(t * 2.1 + i, t * 1.3 + i * 2, Math.sin(t + i));
-      rotation.setFromEuler(euler);
-      scale.setScalar(Math.sin(u * Math.PI) * 0.85);
+    const count = distance < 0.8 ? 0 : Math.min(4, Math.max(1, Math.ceil(distance / 2.25)));
+    scraps.count = count;
+    const step = Math.min(2.25, distance / Math.max(1, count));
+    for (let i = 0; i < count; i++) {
+      const along = (i + 1) * step;
+      const blend = along / distance;
+      position.set(fox.x + dx * blend, fox.y + (target.y - fox.y) * blend + 0.45 + Math.sin(t * 2 + i) * 0.1, fox.z + dz * blend);
+      position.y = Math.max(position.y, ctx.groundH(position.x, position.z) + 0.45);
+      euler.set(Math.sin(t * 1.7 + i) * 0.22, Math.sin(t * 1.2 + i) * 0.16, Math.sin(t * 1.5 + i * 2) * 0.25);
+      flutter.setFromEuler(euler);
+      rotation.copy(ctx.player!.cam.camera.quaternion).multiply(flutter);
+      scale.setScalar(0.9 + Math.sin(t * 2 - i) * 0.08);
       scraps.setMatrixAt(i, matrix.compose(position, rotation, scale));
     }
     scraps.instanceMatrix.needsUpdate = true;
