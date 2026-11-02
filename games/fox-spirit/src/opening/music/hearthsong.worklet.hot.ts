@@ -90,6 +90,8 @@ class Hearthsong extends AudioWorkletProcessor {
   hL = new Float32Array(HARPS);
   hR = new Float32Array(HARPS);
   hAge = new Float32Array(HARPS);
+  /** samples until a plucked string sounds (humanized onsets) */
+  hWait = new Int32Array(HARPS);
   hNext = 0;
   hLpL = 0;
   hLpR = 0;
@@ -103,6 +105,7 @@ class Hearthsong extends AudioWorkletProcessor {
   pLp2 = 0;
   pLp3 = 0;
   pLp4 = 0;
+  pLfo = 0;
   // bass
   bPh = 0;
   bInc = 0;
@@ -152,7 +155,8 @@ class Hearthsong extends AudioWorkletProcessor {
     r[i] = Math.sin(a);
   }
 
-  pluck(midi: number, vel: number): void {
+  /** late: max humanizing delay in seconds (a played harp is never on the grid) */
+  pluck(midi: number, vel: number, late = 0): void {
     const i = this.hNext;
     this.hNext = (i + 1) % HARPS;
     const f = hz(midi);
@@ -184,6 +188,7 @@ class Hearthsong extends AudioWorkletProcessor {
     for (let n = 0; n < pp; n++) buf[n] = (buf[n]! - mean) * vel * 0.4;
     this.pan(i, (midi - 64) / 30, this.hL, this.hR);
     this.hAge[i] = 0;
+    this.hWait[i] = Math.floor(this.rand() * late * sampleRate);
   }
 
   bell(midi: number, vel: number): void {
@@ -280,6 +285,14 @@ class Hearthsong extends AudioWorkletProcessor {
     if (k === 18) for (let v = 0; v < PADS; v++) this.pTo[v] = 0;
   }
 
+  /** rubato: each 4-bar phrase leans back into its last bar; the coda's last bar slows more */
+  stretch(): number {
+    const k = (this.slot === 0 ? this.s.slots : this.slot) / this.s.slots;
+    if (this.breath) return 1.04;
+    if (this.ending === CODA && this.bar === this.s.bars - 1) return 1 + 0.25 * k * k;
+    return this.bar % 4 === 3 ? 1 + 0.09 * k * k : 1;
+  }
+
   /** one eighth-note slot: decide what plays */
   doSlot(): void {
     const s = this.s;
@@ -316,7 +329,7 @@ class Hearthsong extends AudioWorkletProcessor {
       if (play) {
         const pick = slot === 0 ? 0 : slot === 1 || slot === 5 ? 2 : slot === 3 ? 0 : 1;
         const oct = slot === 0 ? -12 : slot === 3 ? 12 : 0;
-        this.pluck(s.key + chords[cb + pick]! + oct, (slot === 0 ? 0.55 : 0.32) * human);
+        this.pluck(s.key + chords[cb + pick]! + oct, (slot === 0 ? 0.55 : 0.32) * human, slot === 0 ? 0.004 : 0.018);
       }
       // the tune: the lead sings it in a swell (or every other pass once it's allowed); otherwise the harp carries it
       const n = s.tune[(tb + this.bar) * s.slots + slot]!;
@@ -331,7 +344,7 @@ class Hearthsong extends AudioWorkletProcessor {
       } else {
         this.lGate = 0;
         const hint = this.pass % 4 === 2;
-        if (n >= 0 && (!hint || slot === 0)) this.pluck(n + 12, 0.5 * human);
+        if (n >= 0 && (!hint || slot === 0)) this.pluck(n + 12, 0.5 * human, 0.025);
       }
       if (singing && lv[4]! > 0.02 && (slot === 0 || slot === 3) && this.rand() < 0.7) {
         this.bell(s.key + 24 + chords[cb + Math.floor(this.rand() * 3)]!, 0.5 * human);
@@ -388,10 +401,11 @@ class Hearthsong extends AudioWorkletProcessor {
     const bellDec = Math.pow(0.001, 1 / (sampleRate * 2.6));
     const idxDec = Math.pow(0.001, 1 / (sampleRate * 0.9));
     const vibHz = (TAU * 5.1) / sampleRate;
+    const padLfo = (TAU * 0.07) / sampleRate;
     for (let i = 0; i < n; i++) {
       if (this.toSlot <= 0) {
         this.doSlot();
-        this.toSlot += this.slotLen;
+        this.toSlot += this.slotLen * this.stretch();
       }
       this.toSlot--;
       let l = 0;
@@ -402,6 +416,7 @@ class Hearthsong extends AudioWorkletProcessor {
       for (let v = 0; v < HARPS; v++) {
         const d = this.hLen[v]!;
         if (d === 0) continue;
+        if (this.hWait[v]! > 0) { this.hWait[v]--; continue; }
         const buf = this.hBuf[v]!;
         const pos = this.hPos[v]!;
         const x = buf[pos]!;
@@ -441,6 +456,11 @@ class Hearthsong extends AudioWorkletProcessor {
         w *= a;
         if (v % 2 === 0) { pl += w; pr += w * 0.6; } else { pr += w; pl += w * 0.6; }
       }
+      this.pLfo += padLfo;
+      if (this.pLfo > TAU) this.pLfo -= TAU;
+      const breathe = 1 + 0.18 * Math.sin(this.pLfo);
+      pl *= breathe;
+      pr *= 2 - breathe;
       this.pLp1 += (pl - this.pLp1) * padLp;
       this.pLp2 += (this.pLp1 - this.pLp2) * padLp;
       this.pLp3 += (pr - this.pLp3) * padLp;

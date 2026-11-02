@@ -59,9 +59,9 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
     const rest = Math.max(0, 1 - total);
     const norm = Math.max(1, total);
     for (let k = 0; k < KEYS.length; k++) mix[k] = (mix[k]! + wild[k]! * rest) / norm;
-    // the story: a sepia world is the harp alone and sparse; colour brings the pad, then bass, then the lead
-    mix[0] = mix[0]! * (0.35 + 0.65 * ramp(restored, 0, 0.35));
-    mix[1] = mix[1]! * (0.3 + 0.7 * ramp(restored, 0.02, 0.3));
+    // the story: a sepia world is a soft harp and pad; colour brings the bass, then the lead, and the light
+    mix[0] = mix[0]! * (0.6 + 0.4 * ramp(restored, 0, 0.35));
+    mix[1] = mix[1]! * (0.65 + 0.35 * ramp(restored, 0.02, 0.3));
     mix[2] = mix[2]! * ramp(restored, 0.15, 0.5);
     mix[3] = mix[3]! * ramp(restored, 0.3, 0.7);
     mix[5] = mix[5]! * (0.6 + 0.4 * ramp(restored, 0, 0.6));
