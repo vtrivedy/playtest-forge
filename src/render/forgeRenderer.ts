@@ -53,6 +53,9 @@ export async function createForgeRenderer(opts: RendererOptions = {}): Promise<F
       antialias: true,
       powerPreference: 'high-performance',
       alpha: false,
+      // keep the presented frame in the drawing buffer: canvas.captureStream recorders (landing clips) otherwise
+      // sample a cleared buffer now and then and record isolated black frames
+      preserveDrawingBuffer: true,
     });
     backend = 'webgl2';
   }
