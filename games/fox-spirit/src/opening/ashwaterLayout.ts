@@ -68,6 +68,14 @@ export const PUNT = { lx: 12.75, lz: 31.6, hx: 0.65, hz: 2.0, rise: 0.22 };
 /** a slate shelf inside the cistern's east wall at wall height: the risen punt's flank touches it */
 export const SHELF = { x0: 13.4, x1: 15, z0: 24, z1: 30.5 };
 
+/** side places off the run line that tell the marsh's story once each (DESIGN-worlds: the flood that took a home) */
+export const SECRETS = {
+  /** a cottage roof drowned in the channel's west reach, dry only once the sluice runs */
+  roof: { lx: -46, lz: -28.5, r: 4.5 },
+  /** the Ferrykeeper's mooring post and lantern on the dam islet */
+  mooring: { lx: 23.6, lz: 1.0, r: 2.8 },
+} as const;
+
 /** spawn (and the return arch) on the landing, facing north */
 export const ASH_SPAWN = { lx: 0, lz: -46, yaw: Math.PI };
 
