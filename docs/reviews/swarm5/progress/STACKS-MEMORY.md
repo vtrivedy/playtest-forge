@@ -48,3 +48,12 @@ The 640px capture is a bounded integration check, not Press art acceptance or
 an uninterrupted hub route. Existing slab-like geometry remains in this source
 and is being replaced by the world owners. Component fixture at 960px above
 provides the closer typography review. No movement parameters changed.
+
+Final integration retest on `6a01987e` (Thistle `eb4abb29` Scribe/Press art,
+Maple `c4aae0bd`): `/captures/hazel/stacks-secret-art-retest/`, PASS9/9 climb,
+secret-only progression, native Album, reload and quiet revisit; zero JS errors.
+Added `reloaded-memory.png` proving the persisted memory can be opened again.
+Inspected that frame plus `climb.png`; no duplicate discovery caption and fox
+silhouette remains clear. Retained movement telemetry: last jump apex .750 m,
+air .700 s, time to apex .300 s, zero dashes; no feel tuning in this change.
+TypeScript, lint:feel (160 anchors), progress checks and diff check pass.

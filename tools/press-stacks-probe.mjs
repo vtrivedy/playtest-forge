@@ -51,6 +51,11 @@ await page.evaluate(() => { window.__gameHooks.travel('press'); window.__gameHoo
 evidence.revisit = await page.evaluate(() => window.__gameHooks.advance(60, 1/60, true));
 await page.screenshot({ path: `${out}/revisited-stand.png` });
 assert.notEqual(evidence.revisit.opening.captions.showing, 'A page never pressed: everyone, together, laughing.', 'saved stand stays quiet');
+await page.keyboard.press('Tab');
+for (let i = 0; i < 4; i++) await page.keyboard.press('BracketRight');
+evidence.reloadedAlbum = await page.evaluate(() => window.__gameHooks.advance(1, 1/60, true));
+await page.screenshot({ path: `${out}/reloaded-memory.png` });
+assert.equal(evidence.reloadedAlbum.opening.worlds.mapOpen, true);
 assert.deepEqual(errs, []);
 evidence.completed = true;
 console.log(`PASS Stacks climb, optional memory, reload: ${out}`);
