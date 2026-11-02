@@ -613,3 +613,11 @@ Review timed UI overlays in motion: a bottom-center teaching card covered the fo
   still counts as home fixes it; WF suffices.
 - The rest shot frames hero + cradle (45% toward the fox) from the approach side, ~3.5 m back, and holds with a 90 s
   slow push until the player moves (after the card's lock). Fox ≈ 140-160 px tall at 720p.
+
+## Opening discovery — Hazel, swarm5
+
+- The review's naive bot threshold `.08 m/frame` exceeds this controller's ordinary run displacement (`3.2 m/s / 60 = .053 m/frame`), so ~120 false unsticks per90s are predictable even in open space. Thistle owns correcting the tool. Keep old and corrected measurements separate; random wandering and public-cue following answer different questions.
+- A guide that chooses the next ruin page from position alone can turn in midair before landing. The paper invitation now advances from actual support contact (`grounded`, footprint and height), with grounded floor retries. Canopy's live guide view returns no last leaf after `onRoute` clears on a floor landing; historical diagnostic `lastLeaf` remains unchanged. Readonly page/support views keep guidance unable to perform catches/unlocks.
+- `Discovery.tla` passes36generated/14distinct states; removing catch synchronization fails MatchesWorld in two states. It checks guide/world synchronization and kept stability, assuming real Arrive guards. It does not prove continuous geometry, visibility or unfamiliar-player discovery. `.agents/skills/verify-discovery/SKILL.md` preserves recheck and negative control.
+- `tools/discovery-probe.mjs` follows only the current drawn invitation plus ordinary movement feedback, never an authored route table or progression controls. Pre-lettering simulation on e32b927 reaches roost+overlook and keeps3catches at~33s; this is a cue-following input test, not blind-wander or human-fun proof. Named visual evidence/retest is required before landing.
+- A dash follows the visible fox heading, so cue followers must turn before dashing; otherwise the second ruin tab gets a westward dash while the requested movement points north. Hold jump through the spring's0.12s load; repeated grounded jump taps can replace the intended spring with a small ordinary jump.

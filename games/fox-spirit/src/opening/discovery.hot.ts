@@ -1,8 +1,6 @@
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import { CANOPY, JOGS, POP_UP_RUIN } from './layout';
-import { createLetterPlane } from './lettering';
-import { fitLetterPlane } from './lettering.hot';
 
 const TO_CANOPY = [[-4, 88], [-3.2, 86.5], [-3.2, 80.5], [-0.2, 74.4], [-0.2, 71.5]] as const;
 const HINTS = ['Follow the loose page', 'Shift · dash to catch it', 'Space · hold to spring from a leaf', 'Shift · dash into the folded tab', 'Space · jump across the paper', 'Let the paper unfold'] as const;
@@ -29,14 +27,6 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   const euler = new THREE.Euler();
   const position = new THREE.Vector3();
   const scale = new THREE.Vector3(1, 1, 1);
-  const camera = ctx.player!.cam.camera;
-  const hints = HINTS.map(text => {
-    const plane = createLetterPlane(1536, 128, 0.052, 0.85);
-    plane.draw([{ text, px: 64 }]);
-    camera.add(plane.mesh);
-    return plane;
-  });
-  let previousAction = -1;
   let leg: Leg = 'page';
   let seenCatches = -1;
   // cold:end
@@ -131,12 +121,8 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   ctx.onUpdate((_dt, t) => {
     updateTarget();
     scraps.visible = active;
-    if (!active) { if (previousAction >= 0) hints[previousAction]!.mesh.visible = false; return; }
-    if (previousAction !== action) {
-      if (previousAction >= 0) hints[previousAction]!.mesh.visible = false;
-      previousAction = action;
-    }
-    fitLetterPlane(hints[action]!, camera, 0.95);
+    if (!active) return;
+    ctx.teach.offer(HINTS[action]!);
     const fox = ctx.fox.root.position;
     const dx = target.x - fox.x;
     const dz = target.z - fox.z;

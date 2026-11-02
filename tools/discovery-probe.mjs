@@ -17,7 +17,7 @@ const page=await browser.newPage({viewport:{width,height}});page.setDefaultTimeo
 try{
  await page.goto('http://127.0.0.1:5224/?manual=1');await page.waitForFunction(()=>window.__gameHooks?.ready);
  await page.evaluate(()=>{const h=window.__gameHooks;h.setManual(true);window.__discoveryProbe={f:0,s:h.advance(1,1/60,false),rows:[]};});
- let image=0;
+ let image=0,lastSaved=0;
  for(let tick=0;tick<seconds*60;){
   const r=await page.evaluate(({limit,renderEvery})=>{
    const p=window.__discoveryProbe,h=window.__gameHooks;let shot=false;
@@ -47,7 +47,7 @@ try{
   },{limit:seconds*60,renderEvery});
   tick=r.f;evidence.trace.push(...r.rows);
   if(r.shot)await page.screenshot({path:`${out}/frames/f${String(image++).padStart(5,'0')}.jpg`});
-  if(tick%600===0){console.log(JSON.stringify({t:tick/60,pos:r.s.pos,cue:r.s.opening.discovery,page:r.s.opening.page.catches}));fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));}
+  if(tick-lastSaved>=600){lastSaved=tick;console.log(JSON.stringify({t:tick/60,pos:r.s.pos,cue:r.s.opening.discovery,page:r.s.opening.page.catches}));fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));}
  }
  evidence.game=await page.evaluate(()=>window.__game.state());
  fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));
