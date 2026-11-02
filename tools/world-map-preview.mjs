@@ -7,6 +7,13 @@ const errors=[]; page.on('pageerror',e=>errors.push(e.message));
 await page.goto('http://127.0.0.1:5180/?manual');
 await page.waitForFunction(()=>window.__gameHooks?.ready,{timeout:120000});
 await page.evaluate(()=>{window.__gameHooks.setStick(.6,0);window.__gameHooks.advance(60);window.__gameHooks.setStick(0,0);window.__gameHooks.advance(10)});
+const nativeMap=await page.evaluate(()=>typeof window.__game.state().opening.worlds?.mapOpen==='boolean');
+if(nativeMap){
+ await page.keyboard.press('Tab');
+ if(!await page.evaluate(()=>window.__game.state().opening.worlds.mapOpen))throw Error('native Album did not open');
+ await page.keyboard.press('Tab');
+ if(await page.evaluate(()=>window.__game.state().opening.worlds.mapOpen))throw Error('native Album did not close');
+}
 await page.evaluate(async()=>{
  const {createWorldProgress}=await import('/src/worlds/progress.ts');
  const {createPageMap}=await import('/src/worlds/pageMap.ts');
@@ -14,7 +21,8 @@ await page.evaluate(async()=>{
  p.visit('russetvale','teach');
  p.complete('ashwater','teach'); p.complete('ashwater','develop');
  p.complete('press','teach'); p.complete('press','develop'); p.complete('press','combine');
- window.__mapPreview={progress:p,map:createPageMap(window.__opening.camera,p)};
+ const keyTarget=new EventTarget();
+ window.__mapPreview={progress:p,keyTarget,map:createPageMap(window.__opening.camera,p,keyTarget)};
  window.__mapPreview.map.setOpen(true); window.__gameHooks.advance(1);
 });
 await fs.mkdir('/tmp/hazel-map-preview',{recursive:true});
@@ -24,11 +32,25 @@ await page.waitForTimeout(250);
 await page.evaluate(()=>{window.__mapPreview.map.step();window.__gameHooks.advance(2)});
 await page.waitForTimeout(100);
 await page.screenshot({path:'/tmp/hazel-map-preview/album-960.png'});
-await page.keyboard.press('Tab');
+await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
 const closed=await page.evaluate(()=>{window.__gameHooks.advance(1);return !window.__mapPreview.map.isOpen()});
 await page.screenshot({path:'/tmp/hazel-map-preview/closed-badge-960.png'});
-await page.keyboard.press('Tab');
+await page.evaluate(()=>window.__mapPreview.keyTarget.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab'})));
 const open=await page.evaluate(()=>window.__mapPreview.map.isOpen());
+await page.evaluate(async()=>{
+ const {buildSeedwells}=await import('/src/worlds/seedwells.ts');
+ const THREE=await import('/@fs/work/node_modules/.vite/deps/three.js');
+ const {createPostStack}=await import('/@fs/work/src/render/index.ts');
+ const renderer=window.__opening.ctx.renderer;
+ const scene=new THREE.Scene(); scene.background=new THREE.Color('#a8b6bf');
+ scene.add(new THREE.HemisphereLight('#f2ede0','#625760',2));
+ const light=new THREE.DirectionalLight('#fff1d4',3); light.position.set(-3,7,4); light.castShadow=true; scene.add(light);
+ const floor=new THREE.Mesh(new THREE.PlaneGeometry(50,50),new THREE.MeshStandardMaterial({color:'#8d9a8c',roughness:.9})); floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
+ buildSeedwells(scene,window.__mapPreview.progress,[{world:'russetvale',x:-3,z:0,y:0},{world:'ashwater',x:0,z:0,y:0},{world:'press',x:3,z:0,y:0}]);
+ const camera=new THREE.PerspectiveCamera(44,960/540,.1,100);camera.position.set(4,4,11);camera.lookAt(0,1,0);camera.updateMatrixWorld(true);
+ const post=createPostStack(renderer,scene,camera,{bloomStrength:.2,pixelRatio:1});post.setSize(960,540);post.render();
+});
+await page.screenshot({path:'/tmp/hazel-map-preview/seedwells-960.png'});
 await fs.writeFile('/tmp/hazel-map-preview/state.json',JSON.stringify(await page.evaluate(()=>({game:window.__game.state(),progress:window.__mapPreview.progress.snapshot()})),null,2));
-if(errors.length || !closed || !open) throw Error(JSON.stringify({errors,closed,open}));
-console.log(JSON.stringify({errors,closed,open})); await browser.close();
+if(errors.length || !closed || !open) throw Error(JSON.stringify({errors,closed,open,nativeRealKeyboard:nativeMap}));
+console.log(JSON.stringify({errors,closed,open,nativeRealKeyboard:nativeMap})); await browser.close();
