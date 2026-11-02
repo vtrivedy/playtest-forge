@@ -1,0 +1,19 @@
+{
+  "source": "f62462a0a1df96c5c66784fd03facc277d8ba1f7",
+  "checks": {
+    "zeroErrors": true,
+    "bothFull": true,
+    "allFiveLanterns": true,
+    "nearReveal": true,
+    "remoteNeverReveals": true,
+    "onwardBoth": true,
+    "finiteCamera": true,
+    "completeFrames": true
+  },
+  "remoteDistance": 58.05170109479997,
+  "reviewedFrames": 40,
+  "simulationHz": 60,
+  "captureFps": 10,
+  "staged": true,
+  "audio": false
+}
