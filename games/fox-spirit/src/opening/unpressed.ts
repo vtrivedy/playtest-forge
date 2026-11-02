@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { RAMP_WORLD, inkMaterial, hullGeometry, plumeGeometry, hewn, toon, inked } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import type { OpeningAudio } from './audio';
+import { pluck } from './pluck';
 import type { Collider } from '../lookdevPlay';
 import { HOMECOMING, JOGS, KIT, UNPRESSED } from './layout';
 
@@ -401,7 +402,7 @@ type Phase = 'pressed' | 'popping' | 'performing' | 'alive';
 
 /**
  * Sound (DESIGN-audio-moss.md): gentle and sparse. Pressed drawings are silent (no locator drone). The pop is
- * one soft, low paper turn at the drawing and a single quiet sine note, slow-attacked and low-passed; no creature
+ * one soft, low paper turn at the drawing and a single quiet harp pluck (pluck.ts); no creature
  * calls. Movement sounds are limited to a few soft wingbeats on the heron's hop.
  */
 function createUnpressedAudio(audio: OpeningAudio) {
@@ -411,21 +412,17 @@ function createUnpressedAudio(audio: OpeningAudio) {
   return {
     pop(id: string, at: THREE.Vector3) {
       if (ac.state !== 'running') return;
-      audio.play('soft-paper', { at, rate: 0.8, gain: 0.35 });
-      const t = ac.currentTime + 0.15;
-      const o = ac.createOscillator();
-      o.type = 'sine';
-      o.frequency.value = NOTE[id] ?? 440;
+      audio.play('soft-paper', { at, rate: 0.8, gain: 0.22 });
+      // one soft harp pluck per creature (sits with the music's harp phrases)
+      const src = ac.createBufferSource();
+      src.buffer = pluck(ac, NOTE[id] ?? 440, 2);
       const f = ac.createBiquadFilter();
       f.type = 'lowpass';
-      f.frequency.value = 1400;
+      f.frequency.value = 2000;
       const g = ac.createGain();
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.03, t + 0.12);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
-      o.connect(f).connect(g).connect(audio.at(at));
-      o.start(t);
-      o.stop(t + 1.9);
+      g.gain.value = 0.05;
+      src.connect(f).connect(g).connect(audio.at(at));
+      src.start(ac.currentTime + 0.15);
     },
   };
 }
@@ -487,7 +484,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       });
     // the kit's page is sealed behind the glyph shrine's door until it opens
     paper.visible = spec.id !== 'kit';
-    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false, look: 0, beat: 0 };
+    return { spec, at, root, bones, holder, paper, flakes, phase: 'pressed' as Phase, t: 0, idleSeed: rand() * 10, userFrom: null as THREE.Vector3 | null, gait: 0, arrived: null as number | null, leg: 0, bow: 0, homing: false, look: 0, beat: 0, startle: -1 };
   });
 
   const world = new THREE.Vector3();
@@ -762,6 +759,19 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'head').rotation.z = Math.sin(t * 18) * 0.08 * burst - 0.05;
       B(c, 'head').rotation.y = Math.sin(t * 0.37 + c.idleSeed) * 0.35;
       B(c, 'body').scale.y = 1 + Math.sin(t * 3.1) * 0.02;
+      // startled: tuck the head and legs in and round up into a spiny ball, then slowly uncurl
+      const curl = c.startle < 0 ? 0 : smooth(0, 0.15, c.startle) * (1 - smooth(1.6, 2.5, c.startle));
+      if (curl > 0) {
+        B(c, 'head').rotation.z -= 1.1 * curl;
+        B(c, 'head').rotation.y *= 1 - curl;
+        B(c, 'legF').rotation.z = -1.3 * curl;
+        B(c, 'legB').rotation.z = 1.3 * curl;
+        B(c, 'body').rotation.z = 0.35 * curl;
+        B(c, 'body').scale.set(1 - 0.12 * curl, 1 + 0.18 * curl, 1);
+      } else {
+        B(c, 'legF').rotation.z = B(c, 'legB').rotation.z = B(c, 'body').rotation.z = 0;
+        B(c, 'body').scale.x = 1;
+      }
     },
     heron(c, t, dt) {
       if (fling >= 0) {
@@ -827,6 +837,19 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'earR').rotation.x = -(Math.max(0, Math.sin(t * 1.1 + c.idleSeed)) ** 12) * 0.5;
       B(c, 'tail').rotation.z = 0;
       B(c, 'tail').scale.setScalar(1);
+      // startled: one high bound straight up, ears flat, scut flashing, then it sits again
+      if (c.startle >= 0 && c.startle < 0.6) {
+        const u = c.startle / 0.6;
+        B(c, 'body').position.y = 0.2 + Math.sin(u * Math.PI) * 0.32;
+        B(c, 'body').rotation.z -= Math.sin(u * Math.PI) * 0.25;
+        B(c, 'earL').rotation.x = B(c, 'earR').rotation.x = 0;
+        B(c, 'earL').rotation.z = B(c, 'earR').rotation.z = -0.7 * Math.sin(u * Math.PI);
+        B(c, 'tail').scale.setScalar(1 + 0.9 * Math.sin(u * Math.PI));
+        B(c, 'legB').rotation.z = -0.9 * Math.sin(u * Math.PI);
+      } else {
+        B(c, 'earL').rotation.z = B(c, 'earR').rotation.z = 0;
+        B(c, 'legB').rotation.z = 0;
+      }
     },
     deer(c, t, dt) {
       // graze, lift the head, chew, ear flicks and tail flicks
@@ -930,6 +953,9 @@ export function buildUnpressed(ctx: OpeningCtx) {
         }
         continue;
       }
+      // a dash close by startles a living creature (the hedgehog balls up, the hare hops); it settles back after
+      if (c.startle >= 0) c.startle += dt;
+      if (p?.dashing && (c.startle < 0 || c.startle > 2.6) && Math.hypot(fox.x - c.holder.position.x, fox.z - c.holder.position.z) < 2.6) c.startle = 0;
       idle[c.spec.id](c, clock, dt);
     }
     if (fling >= 0 && (fling += dt) > 0.9) fling = -1;

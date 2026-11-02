@@ -91,7 +91,7 @@ export function buildCanopy(ctx: OpeningCtx) {
       onRoute = true;
       if (leaf.id === 'roost') roostVisits++;
       // a soft papery leaf touch, a shade higher up the canopy from the entry leaf to the roost
-      ctx.audio.play('soft-leaf', { at: new THREE.Vector3(leaf.x, leaf.top, leaf.z), rate: 0.8 + leaves.indexOf(leaf) * 0.05, gain: 0.2 });
+      ctx.audio.play('soft-leaf', { at: new THREE.Vector3(leaf.x, leaf.top, leaf.z), rate: 0.8 + leaves.indexOf(leaf) * 0.05, gain: 0.12 });
     }
     if (leaf.id === 'roost' || leaf.latched) return null;
     leaf.dwell = held ? leaf.dwell + dt : 0;

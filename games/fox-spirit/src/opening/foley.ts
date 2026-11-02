@@ -1,14 +1,23 @@
 /**
- * The fox's own sounds (audio-DESIGN.md): a footfall per paw plant (Kenney footsteps, CC0) on the surface under
- * the paw, a cloth flick on take-off, a soft thud on landing scaled by impact, and air over the ears while
- * gliding. In the head (no panner): the camera is always just behind the fox.
+ * The fox's own sounds (audio-DESIGN.md): a soft pad per forepaw plant, shaped by the surface under the paw (a
+ * short low-passed noise thump — recorded footsteps read as clicks and taps in every listening pass), a cloth
+ * flick on take-off, a deeper pad on landing scaled by impact, and air over the ears while gliding. In the head
+ * (no panner): the camera is always just behind the fox.
  */
 import * as THREE from 'three';
 import type { OpeningAudio } from './audio';
 import { CANOPY, POP_UP_RUIN } from './layout';
 
 type Surface = 'grass' | 'leaf' | 'wood' | 'stone';
-export const FOLEY = { step: 0.07, jump: 0.08, land: 0.12, glide: 0.04, warmth: 1800, gap: 0.16 };
+export const FOLEY = { step: 0.025, jump: 0.05, land: 0.12, glide: 0.04, warmth: 1800, gap: 0.16 };
+/** pad colour per surface: low-pass (Hz), resonance, decay (s) */
+const PAD: Record<Surface, { lp: number; q: number; decay: number; gain: number }> = {
+  // grass is silent underfoot (as it is): a run across the meadow leaves the quiet alone
+  grass: { lp: 420, q: 0.5, decay: 0.05, gain: 0 },
+  leaf: { lp: 900, q: 0.6, decay: 0.07, gain: 0.45 },
+  wood: { lp: 320, q: 0.9, decay: 0.07, gain: 0.6 },
+  stone: { lp: 650, q: 0.8, decay: 0.035, gain: 0.8 },
+};
 
 export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z: number) => number }) {
   const { audio } = o;
@@ -32,6 +41,27 @@ export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z:
   const warm = new BiquadFilterNode(ac, { type: 'lowpass', frequency: FOLEY.warmth, Q: 0.5 });
   warm.connect(audio.sfx);
 
+  const burst = ac.createBuffer(1, Math.round(ac.sampleRate * 0.25), ac.sampleRate);
+  const bd = burst.getChannelData(0);
+  for (let i = 0; i < bd.length; i++) bd[i] = Math.random() * 2 - 1;
+  /** one soft pad: noise through the surface's low-pass under a quick rise and short exponential fall */
+  function pad(s: Surface, gain: number, deeper = 1): void {
+    const p = PAD[s];
+    if (p.gain * gain <= 0) return;
+    const t = ac.currentTime;
+    const src = ac.createBufferSource();
+    src.buffer = burst;
+    src.playbackRate.value = 0.85 + Math.random() * 0.3;
+    const lp = new BiquadFilterNode(ac, { type: 'lowpass', frequency: p.lp / deeper, Q: p.q });
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain * p.gain, t + 0.006);
+    g.gain.setTargetAtTime(0, t + 0.006, p.decay * deeper);
+    src.connect(lp).connect(g).connect(warm);
+    src.start(t, Math.random() * 0.1, 0.15 * deeper);
+    src.onended = () => g.disconnect();
+  }
+
   /** what the paw is on: the terrain is grass; raised tops are canopy leaves, paper ruin (card) or stone/timber props */
   function surface(at: THREE.Vector3): Surface {
     if (at.y - o.groundH(at.x, at.z) < 0.12) return 'grass';
@@ -53,10 +83,7 @@ export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z:
       const pace = THREE.MathUtils.clamp(speed / 3.2, 0.35, 1.15);
       // uneven like real paws (a metronomic patter reads as a ticking clock)
       const gain = FOLEY.step * pace * (0.6 + Math.random() * 0.7);
-      const rate = 0.9 + Math.random() * 0.2;
-      if (s === 'leaf') audio.playOne('step-grass', 5, { gain: gain * 0.8, rate: rate * 1.25, out: warm });
-      // soft ground is nearly silent; wood and stone a touch more present
-      else audio.playOne(`step-${s}`, 5, { gain: s === 'grass' ? gain * 0.6 : gain * 0.65, rate, out: warm });
+      pad(s, gain);
     },
     update(st: { grounded: boolean; gliding: boolean; vel: number[]; speed: number }): void {
       if (ac.state !== 'running') return;
@@ -67,8 +94,8 @@ export function createFoxFoley(o: { audio: OpeningAudio; groundH: (x: number, z:
       airGain.gain.setTargetAtTime(st.gliding && !st.grounded ? FOLEY.glide * (0.5 + Math.min(1, v / 8)) : 0, now, 0.12);
       band.frequency.setTargetAtTime(400 + Math.min(10, v) * 90, now, 0.2);
     },
-    land(_at: THREE.Vector3, impact: number): void {
-      audio.playOne('land', 3, { gain: FOLEY.land * (0.35 + 0.65 * impact), out: warm });
+    land(at: THREE.Vector3, impact: number): void {
+      pad(surface(at), FOLEY.land * (0.35 + 0.65 * impact), 1.6);
     },
     state: () => ({ steps: { ...counts }, glide: +airGain.gain.value.toFixed(3) }),
   };
