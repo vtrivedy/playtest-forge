@@ -4,10 +4,12 @@ import { WORLD_IDS, LEVEL_IDS, SECRET_IDS, WORLD_CATALOGUE, type WorldProgress, 
 import type { LetterPlane } from '../opening/lettering.hot';
 import { createLetterPlane } from '../opening/lettering';
 import { stepPageMap } from './pageMap.hot';
-import { WORLD_STORIES, WORLD_REVELATIONS, STACKS_MEMORY, LOFT_MEMORY, type StoryMemory } from './story';
+import { WORLD_STORIES, WORLD_REVELATIONS, STACKS_MEMORY, LOFT_MEMORY, ROOF_MEMORY, MOORING_MEMORY, type StoryMemory } from './story';
 const SECRET_PAGES = {
   'press-stacks': { memory: STACKS_MEMORY, notice: 'A page never pressed: everyone, together, laughing.' },
   'vale-loft': { memory: LOFT_MEMORY, notice: 'The Scribe’s own house, before the rain.' },
+  'ashwater-roof': { memory: ROOF_MEMORY, notice: 'A home, under the reeds.' },
+  'ashwater-mooring': { memory: MOORING_MEMORY, notice: 'The last ferry never left.' },
 } satisfies Record<SecretId, { memory: StoryMemory; notice: string }>;
 const SPREAD_COUNT = 1 + WORLD_IDS.length + SECRET_IDS.length;
 const WIDTH = 1440, HEIGHT = 880;
