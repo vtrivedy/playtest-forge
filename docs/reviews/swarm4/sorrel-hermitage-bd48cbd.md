@@ -86,3 +86,24 @@ build pass. Shared camera remains unchanged.
 Evidence: `/captures/sorrel/hermitage-pole-fat/`,60raw frames,4s15fps clip,
 all-frame sheets, timed PNGs, full window.__game and1500trace samples. Exact
 32s PNG is `19-32.00s.png`; named runtime c701933d21ef306526214444774358e35fcd6145.
+
+## Accepted lateral pole — 16e91bc (Bramble 74ce756)
+
+Line-three south pole at(-13.7,136.6), thin r0.1 colliders restored. Exact
+50s replay passes all3state checks, complete route, numeric camera gates and
+60/60 strict animated-body margins. Zero JS errors. Reviewed all60frames of
+30–34s plus native32s PNG: no upright over the fox, full body stays in view
+through the pause and turn. This closes the bounded pole caveat for this route.
+Camera extrema remain min chest1.942m, max pitch35.248°, max grounded2.790m,
+min fox74.627px. TypeScript/lint:feel/production build pass.
+
+Evidence `/captures/sorrel/hermitage-pole-lateral-thin/`: window.__game,
+1500samples,7stills,60rawframes,4s15fps clip and2all-frame sheets. Runtime
+16e91bc32acf51ce6601bc34adffe24618541ccc,50simulated seconds30Hz640×360,
+staged lane-mouth start, live controller thereafter, silent/offline.
+
+Intermediate lateral0943d18 with fat colliders also completed and passed in
+`/captures/sorrel/hermitage-pole-lateral-complete/`; its first non-PTY attempt
+was terminated143 after48s before final evidence and is not counted as a
+complete run. Final acceptance above uses the latest thin-collider source.
+Shared camera tuning and solver were not changed.
