@@ -36,7 +36,7 @@ export const MILLRACE = {
 
 type Phase = 'held' | 'burst';
 
-export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
+export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D, restoredAtLoad = false) {
   const F = MILLRACE;
   const M = MILLBROOK;
   const { scene } = ctx;
@@ -170,13 +170,18 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
   const TEACH = 'The leaves have stopped the brook · Shift dash through them';
   let nearT = 0;
 
-  let phase: Phase = 'held';
-  let front = damSection * F.section;
-  let turning = false;
-  let painted = false;
-  let spin = 0;
+  let phase: Phase = restoredAtLoad ? 'burst' : 'held';
+  let front = restoredAtLoad ? brookLength : damSection * F.section;
+  let turning = restoredAtLoad;
+  let painted = restoredAtLoad;
+  let spin = restoredAtLoad ? F.wheelRate : 0;
   let dashWindow = 0;
-  let burstAt = -1;
+  let burstAt = restoredAtLoad ? -100 : -1;
+  if (restoredAtLoad) {
+    // Rebuild the completed water/paint quietly; no burst, wheel-start cue or airborne leaves.
+    leaves.visible = false;
+    ctx.field.restore(paintAt, F.paintR, 0, PAINT_OPTS);
+  }
 
   function placeLeaf(i: number): void {
     const o = i * 3;
