@@ -665,10 +665,13 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
           d.set(Math.sin(a), 0, Math.cos(a));
           const front = -(d.x * Math.sin(fy) + d.z * Math.cos(fy));
           pos.copy(group).addScaledVector(d, -3.5).add(new THREE.Vector3(0, 1.3, 0));
-          // stay on the approach side of the book's foot (the lens must not pass through the Press) and keep the
+          // keep the lens off the Press (it must not pass through or crowd it) and keep the
           // frame's near post off the line to the fox
           const px = pos.x - F.press.x, pz = pos.z - F.press.z;
-          const inFront = Math.sin(F.press.yaw) * px + Math.cos(F.press.yaw) * pz > 2.4;
+          const lx = Math.cos(F.press.yaw) * px - Math.sin(F.press.yaw) * pz;
+          const lz = Math.sin(F.press.yaw) * px + Math.cos(F.press.yaw) * pz;
+          // well clear of the plinth's footprint (±1.5 × ±1.9 local), so the Press never fills the foreground
+          const inFront = Math.hypot(Math.max(0, Math.abs(lx) - 1.5), Math.max(0, Math.abs(lz) - 1.9)) > 2.6;
           const postClear = segDist(pos.x, pos.z, f.x, f.z, post.x, post.z) > 0.75 && Math.hypot(pos.x - post.x, pos.z - post.z) > 2.2;
           const ok = inFront && postClear && !opts.cam.sightBlocked(pos, aimAt, f.y);
           const score = 1.5 * (1 - Math.abs(front - 0.65)) + 0.6 * d.dot(toCrown) - (ok ? 0 : 10);
