@@ -59,11 +59,15 @@ export const LANE_BAND = /* glsl */ `
       float top = mix(0.35, 1.8, smoothstep(0.4, 0.8, laneUp));
       float low = 1.0 - smoothstep(top, top + 0.6, above + (lkNoise(xz * 1.7) - 0.5) * 0.5);
       lane = (1.0 - smoothstep(-0.25, 0.25, ld)) * low;
-      laneEdge = exp(-pow((ld + 0.3) / 0.22, 2.0)) * low;
+      laneEdge = exp(-pow((ld + 0.18) / 0.14, 2.0)) * low;
       // restores run along the lane: a stream wide where it leaves the restore, the band's width at its far end
       laneRun = (1.0 - smoothstep(-0.3, 4.0, ld)) * low;
       // the trodden middle of the road (≈1 m either side of the line) vs its grassy verges
-      laneCore = (1.0 - smoothstep(-2.0, -1.0, ld)) * low;
+      // a crisp, bitten edge (a saved-paper road is cut with the brush, not airbrushed)
+      float coreD = ld + 1.5 + (lkNoise(xz * 2.3 + 4.1) - 0.5) * 0.5;
+      laneCore = (1.0 - smoothstep(-0.06, 0.06, coreD)) * low;
+      // both edges of the verge wash pool a darker tide line
+      laneEdge = max(laneEdge, exp(-pow(coreD / 0.12, 2.0)) * low);
     }
   }
 `;

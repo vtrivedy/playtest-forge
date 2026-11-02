@@ -213,10 +213,11 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             // the trodden middle is left as paper with a light warm-gold glaze, the way a watercolourist
             // saves the white of a road between painted verges
             washC = mix(washC, mix(sepia, vec3(0.98, 0.78, 0.42) * sl / 0.78, 0.5), laneCore * 0.85);
+            // pigment pools at the wash's edges: a darker, more saturated tide line on the verge side
+            washC = mix(washC, washC * vec3(0.72, 0.78, 0.66), laneEdge * (1.0 - laneCore) * 0.8);
             float under = lane * uLaneUnder * (0.85 + 0.3 * gran) * (1.0 - paint);
             sepia = mix(sepia, washC, clamp(under, 0.0, 1.0));
           }
-          sepia = mix(sepia, pigment, laneEdge * uLaneUnder * 0.35 * (1.0 - paint));
           outgoingLight = mix(sepia, cel, paint);
           outgoingLight = mix(outgoingLight, pigment, wet * 0.22);
           // brushy contour ink where the surface turns away from the eye
