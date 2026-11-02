@@ -12,14 +12,14 @@ import { HERMITAGE } from './hermitageLayout';
 
 export const DRYING = {
   /** leaves pegged per line, line height (m) */
-  perLine: 11,
+  perLine: 16,
   height: 1.25,
   /** fox reach to a line (m, xz) and minimum speed (m/s) that frees it */
   reach: 0.85,
   minSpeed: 1.2,
   /** lift, wind toward the village, flutter */
-  lift: [1.4, 2.6] as const,
-  wind: { x: 0.35, z: -1.1 },
+  lift: [2.4, 4.2] as const,
+  wind: { x: 0.4, z: -1.9 },
   sway: 0.9,
   terminal: 0.45,
   /** seconds a freed leaf drifts at most (×3) before it settles */
@@ -55,7 +55,7 @@ export function createDryingLines(ctx: OpeningCtx) {
   // the pressed leaves: flat, hung by their stems, each with a little peg
   const leafMat = toon(0xffffff);
   leafMat.side = THREE.DoubleSide;
-  const leafGeo = mapleLeafGeometry(0.2).rotateX(Math.PI / 2).translate(0, -0.2, 0);
+  const leafGeo = mapleLeafGeometry(0.26).rotateX(Math.PI / 2).translate(0, -0.26, 0);
   const leaves = new THREE.InstancedMesh(leafGeo, leafMat, N);
   leaves.frustumCulled = false;
   scene.add(leaves);
