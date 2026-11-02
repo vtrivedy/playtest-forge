@@ -106,3 +106,29 @@ Reed's design contribution `acb5ec8e` strengthens the recommendation: earn each 
 - Unsubscribe/dispose removes UI listeners and texture resources if worlds reload in one page.
 - Opening Tab ignores repeated keydown, prevents browser focus hopping, and does not consume jump/dash input.
 - Fresh reset belongs to boot/session management, not to the shared save reader called by each world.
+
+## Proposed minimal integration contract (Phase A)
+
+To avoid waiting on level display-name debate, stable level keys can be `teach`, `develop`, `combine`, scoped by one of the three world IDs. The catalogue supplies the real authored place names. The store should expose primitive `isRestored(world, level)` reads without allocation. A world builder registers exactly three display definitions before map creation; duplicate keys fail at build time through a typed tuple or record.
+
+Recommended public calls:
+
+```ts
+// Design sketch, not an implementation or final approved names.
+type WorldId = 'russetvale' | 'ashwater' | 'press';
+type LevelId = 'teach' | 'develop' | 'combine';
+progress.enterWorld(world);                 // current place; no solve
+progress.visit(world, level);               // discover only
+progress.complete(world, level);            // true on first valid mechanism completion
+progress.isRestored(world, level);          // primitive read, no snapshot allocation
+progress.hasAbility(world);                 // first puzzle earned its world's contextual verb
+progress.snapshot();                        // capture/UI only, not per-tick
+```
+
+Earning from the teach puzzle rather than a free public `earn` call gives each ability one provenance. Completing develop requires teach; completing combine requires teach + develop. If the canonical design supports branching prerequisite order, encode that in the catalogue rather than scattering ad-hoc tests in world modules. World owners remain responsible for applying new contextual ability behavior before the store marks it earned.
+
+Snapshot includes `activeWorld`, discovered/restored state for all named levels, earned ability names, three Seedwell fill fractions and revision. Hub presence should be explicit (`activeWorld: 'hub'`) even though its physical space is in the autumn scene. Saved data contains completed mechanism facts and known visited nodes; current active world can remain session-only so a reload starts safely in the hub unless the integrator deliberately supports checkpoints.
+
+Progress map opening/closing is presentation state and does not write a gameplay save. Every snapshot field must be derived from one canonical set of facts so ability/Seedwell/map cannot disagree. The map renders only the store's catalogue and facts; a level module never sends freeform HUD strings every frame.
+
+Source-linked portal constraints (Reed's Phase A audit): original world-bounds mask covers only x[-140,90], z[-10,170]; active world ground and bounds dispatch must be explicit. `createPlay` caches camera sight proxies from initial colliders, so dynamic / later-built solids need a camera rebuild or prebuilt proxies. `teleport` resets motion but not held keys/stick; scene transition must neutralize inputs and prevent reciprocal portal bounce until the fox leaves the arrival trigger.
