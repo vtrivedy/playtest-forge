@@ -53,6 +53,19 @@ export const SONG = {
         '4 - 2 - 6 4', "5 - 7 - 2' -", "1' 7 1' 5 3 2", '1 - - - - .',
       ],
     },
+    {
+      // the Scribe's Hermitage: long notes, starting on the relative minor — someone who kept every autumn
+      name: 'scribe',
+      places: ['hermitage', 'hillside'],
+      chords: '6 4 1 5  6 4 2 3  4 5 3 6  2 5 1 1',
+      shade: '6 2 6 3  6 2 2 3  2 3 3 6  2 3 6 6',
+      bars: [
+        '3 - - - 1 -', '6, - - - 1 2', '3 - - - 5 -', '5 - - - - .',
+        "1' - - - 7 6", '6 - - - 5 4', '4 - - - 3 2', '3 - - - - .',
+        "4 - - - 6 1'", "2' - - - 7 5", '7 - - - 5 3', '6 - - - - .',
+        '6 - - - 4 2', '7, - - - 2 4', '3 - - - 2 -', '1 - - - - .',
+      ],
+    },
   ] as ReadonlyArray<{ name: string; places?: string[]; chords: string; shade: string; bars: string[] }>,
 };
 
@@ -80,6 +93,9 @@ export const PLACES: ReadonlyArray<{ id: string; x: number; z: number; r: number
   { id: 'millbrook', x: -74, z: 94, r: 14, c: { harp: 1, pad: 0.7, bass: 0.7, lead: 0.6, bells: 0.3, bright: 0.6, shade: 0 } },
   { id: 'orchard', x: -91, z: 88, r: 8, c: { harp: 0.9, pad: 0.8, bass: 0.6, lead: 0.7, bells: 0.2, bright: 0.6, shade: 0 } },
   { id: 'lookout', x: -100, z: 71, r: 10, c: { harp: 0.8, pad: 1, bass: 0.6, lead: 1, bells: 0.5, bright: 0.8, shade: 0 } },
+  // Bramble's Scribe's Hermitage (north): the hanger lane up, then the plateau with the desk and the view
+  { id: 'hillside', x: -10, z: 112, r: 10, c: { harp: 0.8, pad: 0.7, bass: 0.5, lead: 0.5, bells: 0.1, bright: 0.5, shade: 0.2 } },
+  { id: 'hermitage', x: -6.5, z: 133, r: 11, c: { harp: 0.7, pad: 1, bass: 0.4, lead: 0.9, bells: 0.4, bright: 0.6, shade: 0.45 } },
   // Wren's finale hollow below the far crag (the Scribe's Press)
   { id: 'hollow', x: 20, z: 42, r: 10, c: { harp: 0.6, pad: 1, bass: 0.4, lead: 0.8, bells: 0.4, bright: 0.55, shade: 0.3 } },
   { id: 'vista', x: VISTA.x + VISTA.dx * 6, z: VISTA.z + VISTA.dz * 6, r: 8, c: { harp: 0.6, pad: 1, bass: 0.5, lead: 1, bells: 0.6, bright: 0.8, shade: 0 } },
