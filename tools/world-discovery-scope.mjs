@@ -2,7 +2,9 @@
 import {chromium} from 'playwright';
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
-const out='/captures/hazel/world-discovery-scope-ee49c473'; await fs.mkdir(out,{recursive:true});
+const outIndex=process.argv.indexOf('--out');
+const out=outIndex<0?`/captures/hazel/world-discovery-scope-${Date.now()}`:process.argv[outIndex+1];
+await fs.mkdir(out,{recursive:false});
 const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 const page=await browser.newPage({viewport:{width:960,height:540}});const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 try {
