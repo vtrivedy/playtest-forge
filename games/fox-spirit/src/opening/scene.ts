@@ -12,7 +12,8 @@ import { buildSky, inkMaterial, paintU, RESTORE_SLOTS, rng } from '../lookdevKit
 import { buildContactShadow } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import { createPlay, PLAY, type Collider, type PlayController } from '../lookdevPlay';
-import { FINALE, groundH, KEEPING, SPAWN } from './layout';
+import { ALL_PATHS, FINALE, groundH, KEEPING, pathDist, SPAWN } from './layout';
+import { bakeLaneMap } from './lanePaint';
 import { buildMeadow } from './meadow';
 import { buildVillage } from './village';
 import { createOpeningHearth } from './hearth';
@@ -28,6 +29,7 @@ import { createHearthHum } from './hum';
 import { createOpeningAudio, MIX, type OpeningAudio } from './audio';
 import { createFoxFoley } from './foley';
 import { buildRunawayPage } from './page.hot';
+import { buildDiscovery } from './discovery.hot';
 import { buildHomecoming } from './homecoming';
 import { createLaneWind } from './laneWind.hot';
 import { buildLeafPiles } from './leafPiles';
@@ -46,6 +48,7 @@ import { NORTH_PILES } from './hermitageLayout';
 import { buildFinale } from './finale';
 import { laneBlocks } from './lanes';
 import { createCaptions, type Captions } from './captions';
+import { createTeach, type Teach } from './teach';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -86,6 +89,8 @@ export interface OpeningCtx {
   audio: OpeningAudio;
   /** Album captions (captions.ts): `ctx.captions.say('≤ 6 words')` for a story beat */
   captions: Captions;
+  /** the in-frame control hint (teach.ts): `ctx.teach.offer(text)` each frame a place wants to teach */
+  teach: Teach;
 }
 
 export async function runOpening(): Promise<void> {
@@ -123,8 +128,10 @@ export async function runOpening(): Promise<void> {
     audio: createOpeningAudio(),
     // bound just below: the caption line registers its fade through ctx.onUpdate
     captions: null as unknown as Captions,
+    teach: null as unknown as Teach,
   };
   ctx.captions = createCaptions(ctx);
+  ctx.teach = createTeach(ctx);
   const { field } = ctx;
 
   buildMeadow(ctx);
@@ -159,13 +166,15 @@ export async function runOpening(): Promise<void> {
   scene.add(fox.root);
 
   const paint = createOpeningPaint({ field, renderer, uniforms: paintU, groundH });
+  // the roads are underpainted and restores run down them (DESIGN-corridors.md)
+  bakeLaneMap({ uniforms: paintU, paths: ALL_PATHS, pathDist, groundH });
   const occlusion = createOpeningOcclusion([...ctx.occluders, ...ctx.cutout]);
   {
     const unfaded = unfadedBlockers(ctx.colliders, [...ctx.occluders, ...ctx.cutout], groundH);
     if (unfaded.length) console.error(`unfaded blocker:\n${unfaded.join('\n')}`);
   }
   const hearth = createOpeningHearth({
-    scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p),
+    scene, groundH, fox: fox.root, teach: ctx.teach, supplyAt: (p) => field.sample(p),
     onIgnite: (at) => field.restore(at, 12, 1.8, { edgeMax: 1.4 }),
     extraSpots: [
       { id: 'steam', ...KEEPING.steam, height: 9, medium: 'steam', bedOffset: 0.03 },
@@ -195,8 +204,9 @@ export async function runOpening(): Promise<void> {
   });
   const foley = createFoxFoley({ audio: ctx.audio, groundH });
   ctx.player = player;
+  const discovery = buildDiscovery(ctx, runaway.voice(), canopy.guide, popUpRuin.guide);
   carry = createCarry({
-    scene, fox: fox.root,
+    scene, fox: fox.root, teach: ctx.teach,
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
     surfaceAt: player.surfaceAt,
     bowls: [...[KEEPING.steam, KEEPING.root].map(b => new THREE.Vector3(b.x, b.y, b.z)), new THREE.Vector3(FINALE.cradle.x, player.surfaceAt(FINALE.cradle.x, FINALE.cradle.z), FINALE.cradle.z)],
@@ -248,6 +258,10 @@ export async function runOpening(): Promise<void> {
     if (Math.hypot(f.x - KEEPING.crag.x, f.z - KEEPING.crag.z) < 3.2 || t - settledAt > 25) crown.respond();
   });
   const view = player.cam.camera;
+  // the lens carries the in-frame lettering (captions, end card), so it joins the scene graph
+  scene.add(view);
+  ctx.captions.mount(view);
+  ctx.teach.mount(view);
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
   let warnedSlots = false;
@@ -316,7 +330,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), captions: ctx.captions.state(), teach: ctx.teach.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), discovery: discovery.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state() } });
   const pxA = new THREE.Vector3();
   const pxB = new THREE.Vector3();
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock

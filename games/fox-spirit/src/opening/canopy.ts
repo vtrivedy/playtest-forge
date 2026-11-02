@@ -138,5 +138,5 @@ export function buildCanopy(ctx: OpeningCtx) {
     gui.add(CANOPY_FEEL, 'bow', 0.05, 0.3, 0.01);
     gui.close();
   });
-  return { contact, feel: CANOPY_FEEL, state: () => ({ launches, contacts, retries, roostVisits, lastLeaf, lastFlight, activeFlight: flight, lensTucked: leaves.filter(l => l.lensScale < 0.95).length, profile: { ...CANOPY_FEEL }, leaves: leaves.map(({ id, x, z, top, touched }) => ({ id, x, z, top, touched })) }) };
+  return { guide: { get lastLeaf() { return onRoute ? lastLeaf : null; } }, contact, feel: CANOPY_FEEL, state: () => ({ launches, contacts, retries, roostVisits, lastLeaf, lastFlight, activeFlight: flight, lensTucked: leaves.filter(l => l.lensScale < 0.95).length, profile: { ...CANOPY_FEEL }, leaves: leaves.map(({ id, x, z, top, touched }) => ({ id, x, z, top, touched })) }) };
 }

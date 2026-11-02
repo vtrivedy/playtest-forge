@@ -14,6 +14,8 @@ export function createOpeningHearth(opts: {
   onIgnite?: (at: THREE.Vector3) => void;
   /** Additional coal-only volumes; opening/chemistry updates these separately. */
   extraSpots?: HearthSpot[];
+  /** the shared in-frame teach line (teach.ts) */
+  teach: { offer: (text: string) => void };
 }) {
   let latched = false;
   let complete = false;
@@ -32,15 +34,9 @@ export function createOpeningHearth(opts: {
       opts.onIgnite?.(h.base.clone());
     },
   });
-  const hud = document.createElement('div');
-  hud.dataset.openingTeach = 'heat';
-  Object.assign(hud.style, {
-    position: 'fixed', left: '12px', top: '12px',
-    color: '#f4e5cb', background: 'rgba(43,35,30,.76)', padding: '10px 18px',
-    borderRadius: '5px', font: '16px Georgia,serif', textAlign: 'center',
-    pointerEvents: 'none', maxWidth: 'min(240px, 32vw)', transition: 'opacity .4s',
-  });
-  document.body.append(hud);
+  const HINT_HEAT = 'Bring your colour to the cold hearth · run close or Shift dash';
+  const HINT_RIDE = 'Space · jump and hold to ride the warm air';
+  let hint: string | null = null;
   let elapsed = 0;
   return {
     updrafts,
@@ -57,11 +53,11 @@ export function createOpeningHearth(opts: {
       const near = fox.distanceToSquared(base) < 6 * 6;
       const ride = updrafts.lastRide;
       if (ride?.hearth === 'H-a' && ride.landFeetY !== null && ride.landFeetY > ride.baseY + 2) complete = true;
-      hud.textContent = latched ? 'Space · jump and hold to ride the warm air' : 'Bring your colour to the cold hearth · run close or Shift dash';
-      hud.style.opacity = !complete && near && elapsed > 2 ? '1' : '0';
+      hint = !complete && near && elapsed > 2 ? (latched ? HINT_RIDE : HINT_HEAT) : null;
+      if (hint) opts.teach.offer(hint);
     },
     state() {
-      return { ...updrafts.state(), latched, ignition, complete };
+      return { ...updrafts.state(), latched, ignition, complete, hint };
     },
   };
 }

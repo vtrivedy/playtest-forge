@@ -10,7 +10,7 @@ try{
 await page.goto('http://127.0.0.1:5198/');await page.waitForFunction(()=>window.__gameHooks?.ready);
 const result=await page.evaluate(async()=>{
 const h=window.__gameHooks;h.setManual(true);const samples=[];
-const snap=label=>{const state=h.advance(1,1/60,false);samples.push({label,state,hud:document.querySelector('[data-opening-teach="heat"]').style.opacity});return state};
+const snap=label=>{const state=h.advance(1,1/60,false);samples.push({label,state,hud:(h.state().opening.hearth.hint?1:0)});return state};
 const stage=(x,z)=>{h.setKeys([]);h.setStick(0,0);h.teleport(x,z,0);h.advance(20,1/60,false)};
 const {createKeepingRoute,KEEPING_START}=await import('/@fs/work/tools/opening-hero-route.mjs');const route=createKeepingRoute();stage(KEEPING_START.x,KEEPING_START.z);
 let s=h.state();for(let i=0;i<2400;i++){const input=route(i/60,s);h.setStick(input.x,input.z);h.setKeys(input.jump?['Space']:[]);s=h.advance(1,1/60,false);if(input.beat==='shelf reveal'&&s.grounded)break;}

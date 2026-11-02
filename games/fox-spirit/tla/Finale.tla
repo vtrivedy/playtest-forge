@@ -24,7 +24,7 @@ CONSTANTS Kits
 Phases == <<"sealed", "warming", "unbinding", "open", "released", "snow">>
 Rank(p) == CHOOSE i \in 1..6 : Phases[i] = p
 EmberAt == {"carried", "ground", "cradle"}
-KitPhases == {"pressed", "trotting", "curled"}
+KitPhases == {"pressed", "trotting", "curled", "shuffling"}
 
 VARIABLES phase, ember, settled, kit, resting, card, hero, held
 
@@ -78,7 +78,17 @@ Curl(k) ==
   /\ kit[k] = "trotting"
   /\ kit' = [kit EXCEPT ![k] = "curled"]
   /\ UNCHANGED <<phase, ember, settled, resting, card, hero, held>>
-AllCurled == \A k \in Kits : kit[k] = "curled"
+\* a curled kit the moving hero walks into hops up and trots to a free slot (swarm5: kits never stand inside the hero)
+Disturb(k) ==
+  /\ kit[k] = "curled" /\ hero = "standing"
+  /\ kit' = [kit EXCEPT ![k] = "shuffling"]
+  /\ UNCHANGED <<phase, ember, settled, resting, card, hero, held>>
+Resettle(k) ==
+  /\ kit[k] = "shuffling"
+  /\ kit' = [kit EXCEPT ![k] = "curled"]
+  /\ UNCHANGED <<phase, ember, settled, resting, card, hero, held>>
+\* home = has curled by the ember at least once (a shuffling kit is still home)
+AllCurled == \A k \in Kits : kit[k] \in {"curled", "shuffling"}
 ShowCard(byTimeout) ==
   /\ card = "hidden" /\ phase = "snow" /\ AllCurled
   /\ (resting \/ byTimeout)
@@ -97,14 +107,14 @@ AskMove == hero = "lying" /\ hero' = "gettingUp" /\ held' = TRUE
 StoodUp == hero = "gettingUp" /\ hero' = "standing" /\ held' = FALSE
            /\ UNCHANGED <<phase, ember, settled, kit, resting, card>>
 
-Player == KeepingSettles \/ PickUp \/ SetDown \/ SetInCradle \/ Rest \/ Wander \/ LieDown \/ AskMove
-Auto == StoodUp \/ Kindle \/ Advance \/ (\E k \in Kits : Pop(k) \/ Curl(k)) \/ ShowCard(TRUE) \/ HideCard
+Player == KeepingSettles \/ PickUp \/ SetDown \/ SetInCradle \/ Rest \/ Wander \/ LieDown \/ AskMove \/ (\E k \in Kits : Disturb(k))
+Auto == StoodUp \/ Kindle \/ Advance \/ (\E k \in Kits : Pop(k) \/ Curl(k) \/ Resettle(k)) \/ ShowCard(TRUE) \/ HideCard
 
 Next == Player \/ Auto \/ ShowCard(FALSE)
 
 Spec == Init /\ [][Next]_vars
   /\ WF_vars(Kindle) /\ WF_vars(Advance)
-  /\ \A k \in Kits : WF_vars(Pop(k)) /\ WF_vars(Curl(k))
+  /\ \A k \in Kits : WF_vars(Pop(k)) /\ WF_vars(Curl(k)) /\ WF_vars(Resettle(k))
   /\ WF_vars(ShowCard(TRUE)) /\ WF_vars(HideCard) /\ WF_vars(StoodUp)
 
 \* ---- properties -------------------------------------------------------

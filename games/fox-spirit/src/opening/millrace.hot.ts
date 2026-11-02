@@ -167,18 +167,8 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
   let lookoutPainted = false;
 
   // one teach line, like the hearth's: only while standing by the held dam
-  const hud = document.createElement('div');
-  hud.dataset.openingTeach = 'millrace';
-  hud.textContent = 'The leaves have stopped the brook · Shift dash through them';
-  Object.assign(hud.style, {
-    position: 'fixed', left: '50%', bottom: '7%', transform: 'translateX(-50%)',
-    color: '#f4e5cb', background: 'rgba(43,35,30,.76)', padding: '10px 18px',
-    borderRadius: '5px', font: '16px Georgia,serif', textAlign: 'center',
-    pointerEvents: 'none', maxWidth: '80vw', transition: 'opacity .4s', opacity: '0',
-  });
-  document.body.append(hud);
+  const TEACH = 'The leaves have stopped the brook · Shift dash through them';
   let nearT = 0;
-  let teaching = false;
 
   let phase: Phase = 'held';
   let front = damSection * F.section;
@@ -238,10 +228,7 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
     }
     const near = phase === 'held' && Math.hypot(fox.x - M.dam.x, fox.z - M.dam.z) < 7;
     nearT = near ? nearT + dt : 0;
-    if (teaching !== nearT > 1.2) {
-      teaching = nearT > 1.2;
-      hud.style.opacity = teaching ? '1' : '0';
-    }
+    if (nearT > 1.2) ctx.teach.offer(TEACH);
     if (phase === 'burst' && front < brookLength) front = Math.min(brookLength, front + F.frontSpeed * dt);
     geo.setDrawRange(0, Math.max(1, sectionAt(front)) * PER_SECTION);
     if (!turning && front >= wheelSection * F.section) {
