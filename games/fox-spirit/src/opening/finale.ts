@@ -180,6 +180,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   plinth.position.y = 0.25;
   press.add(plinth);
   const coverMat = new THREE.MeshToonMaterial({ color: FROST, gradientMap: RAMP_WORLD });
+  const ironMat = new THREE.MeshToonMaterial({ color: IRON, emissive: 0x000000, gradientMap: RAMP_WORLD });
   const BOOK = { y: 0.6, w: 2.5, d: 3.3, cover: 0.16, block: 0.42 };
   const back = inked(hewn(new THREE.BoxGeometry(BOOK.w, BOOK.cover, BOOK.d, 3, 1, 4), rand, 0.02), coverMat, 0.02);
   back.position.set(0, BOOK.y + BOOK.cover / 2, 0);
@@ -212,6 +213,19 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const emblem = new THREE.Mesh(mapleLeafGeometry(0.9).rotateX(-Math.PI / 2), emblemMat);
   emblem.position.set(0.15, BOOK.cover / 2 + 0.012, 0.35);
   front.add(emblem);
+  // iron corner caps on both covers and a rounded spine: it reads as a book, not a crate
+  const capGeo = new THREE.BoxGeometry(0.34, BOOK.cover + 0.04, 0.34);
+  for (const [cx, cz] of [[1, 1], [1, -1]] as const) {
+    for (const host of [front, back]) {
+      const cap = new THREE.Mesh(capGeo, ironMat);
+      cap.position.set(host === front ? cx * (BOOK.w / 2 - 0.15) : BOOK.w / 2 - 0.15, 0, cz * (BOOK.d / 2 - 0.15));
+      host.add(cap);
+    }
+  }
+  const spine = inked(new THREE.CylinderGeometry(0.42, 0.42, BOOK.d + 0.02, 12, 1, false, Math.PI, Math.PI).rotateX(Math.PI / 2), coverMat, 0.018);
+  spine.scale.set(0.42, 1, 1);
+  spine.position.set(-BOOK.w / 2, BOOK.y + BOOK.cover + BOOK.block / 2, 0);
+  press.add(spine);
   // where the open cover comes to rest: a low stone off the spine side
   const rest = buildRock(rand, 0.42, false);
   rest.position.set(-BOOK.w - 0.9, 0.18, 0);
@@ -253,7 +267,6 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     band.position.set(FRAME.x, FRAME.top, y);
     frame.add(band);
   }
-  const ironMat = new THREE.MeshToonMaterial({ color: IRON, emissive: 0x000000, gradientMap: RAMP_WORLD });
   // the screw assembly (thread + platen) slides up when the Press unbinds; the wheel turns on top of the beam
   const screw = new THREE.Group();
   screw.position.set(FRAME.x, 0, 0);
