@@ -96,7 +96,8 @@ try {
   if (late.length) {
     const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));
     const maxPitch = Math.max(...late.map(s => Math.abs(s.lensPitch)));
-    const cameraCheck = { fromSeconds: 60, minChestDistance, maxPitch, pass: minChestDistance >= 1.1 && maxPitch < 70 && !errors.length };
+    const maxStepSpeed = Math.max(0, ...late.slice(1).map((s, i) => Math.hypot(...s.camera.pos.map((v, axis) => v - late[i].camera.pos[axis])) / testDt));
+    const cameraCheck = { fromSeconds: 60, minChestDistance, maxPitch, maxStepSpeed, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && !errors.length };
     fs.writeFileSync(path.join(out, 'camera-check.json'), JSON.stringify(cameraCheck, null, 2));
     console.log('CAMERA', JSON.stringify(cameraCheck));
     if (process.argv.includes('--check-camera') && !cameraCheck.pass) process.exitCode = 1;
