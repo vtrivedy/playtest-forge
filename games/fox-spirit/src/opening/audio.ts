@@ -12,7 +12,7 @@ const FILES = import.meta.glob('./sfx/*.ogg', { eager: true, query: '?url', impo
 const URLS = Object.fromEntries(Object.entries(FILES).map(([k, v]) => [k.replace('./sfx/', '').replace('.ogg', ''), v]));
 
 export const MIX = {
-  master: 1,
+  master: 0, // muted by vivek (Nov 1): mix rejected as intrusive; the redo sets this back
   /** the bed sits ~ −20 LUFS, effects on top */
   music: 0.75,
   ambience: 0.5,
