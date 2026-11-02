@@ -13,7 +13,8 @@ import { execFileSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
 const out = path.resolve(args[0] && !args[0].startsWith('--') ? args[0] : '/tmp/finale-camera');
-const clip = args.includes('--clip');
+const clipHandoff = args.includes('--clip-handoff');
+const clip = args.includes('--clip') || clipHandoff;
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5196, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
 await server.listen();
@@ -89,7 +90,7 @@ try {
       frame += 2;
       const s = r.s;
       trace.push([frame, li, s.pos.map((v) => +v.toFixed(3)), s.grounded, s.gliding, s.opening.carry.carried, s.opening.finale.phase, s.opening.finale.card, r.cam]);
-      if (clip && ((li < 2 && n % 4 === 0) || (li === 3 && (s.opening.finale.card !== 'hidden') && n % 30 === 0) || ((li === 4 && n < 180 || li === 6) && n % 4 === 0))) {
+      if (clip && (!clipHandoff || li === 4) && ((li < 2 && n % 4 === 0) || (li === 3 && (s.opening.finale.card !== 'hidden') && n % 30 === 0) || ((li === 4 && n < 180 || li === 6) && n % 4 === 0))) {
         await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
         await page.screenshot({ path: path.join(out, `f${String(frame / 2).padStart(5, '0')}.jpg`), type: 'jpeg', quality: 80 });
       }
