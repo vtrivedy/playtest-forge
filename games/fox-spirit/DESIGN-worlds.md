@@ -161,3 +161,8 @@ The east cottage roof climb returns `vale-loft`, a second independent secret.
 Each optional memory has its own Album spread, discovered notice and persisted fact.
 The Loft remembers the Scribe’s house before the rain; it grants no world completion,
 Seedwell fill or ability. Reload keeps both optional pages and replays neither notice.
+
+Optional-memory reload verification uses four independent saved fixtures: neither
+page, Stacks only, Loft only, and both. Native Tab/bracket navigation must show
+only earned prose, preserve zero level/ability/well gains, and stay quiet after a
+second load. Injected fixtures verify reconstruction only, not either physical climb.
