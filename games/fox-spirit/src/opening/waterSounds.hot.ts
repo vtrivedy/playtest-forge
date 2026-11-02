@@ -12,8 +12,8 @@ import type { OpeningAudio } from './audio';
 
 export const WATER = {
   /** the bed under the bubbles: kept low and always moving (a steady noise band reads as a fan or an engine) */
-  brook: 0.018,
-  bubbles: 0.014,
+  brook: 0.05,
+  bubbles: 0.075,
   /** bubbles per second at full flow */
   bubbleRate: 38,
   wheelKnock: 0.04,
@@ -43,11 +43,11 @@ export function createWaterSounds(o: { audio: OpeningAudio; brook: ReadonlyArray
     s.start(0, offset);
   };
   // brook: noise → band → gain → panner at the nearest bed point
-  const brookPan = audio.at(o.brook[0] ?? o.wheel, 4);
+  const brookPan = audio.at(o.brook[0] ?? o.wheel, 6);
   const brookGain = ac.createGain();
   brookGain.gain.value = 0;
   brookGain.connect(brookPan);
-  const brookBand = new BiquadFilterNode(ac, { type: 'bandpass', frequency: 1100, Q: 0.7 });
+  const brookBand = new BiquadFilterNode(ac, { type: 'bandpass', frequency: 1100, Q: 1.3 });
   const brookLow = new BiquadFilterNode(ac, { type: 'lowpass', frequency: 1600, Q: 0.3 });
   brookBand.connect(brookLow).connect(brookGain);
   noise(brookBand, 0.3);
@@ -104,16 +104,23 @@ export function createWaterSounds(o: { audio: OpeningAudio; brook: ReadonlyArray
   function update(fox: THREE.Vector3, flow: number, turn: number, dt: number): void {
     if (ac.state !== 'running') return;
     const now = ac.currentTime;
-    // the bed point nearest the fox carries the brook
+    // the nearest point on the bed (segments, not just their ends) carries the brook
     let best = Infinity;
-    for (let i = 0; i < o.brook.length; i++) {
-      const p = o.brook[i]!;
-      const d = p.distanceToSquared(fox);
+    for (let i = 0; i + 1 < o.brook.length; i++) {
+      const a = o.brook[i]!;
+      const b = o.brook[i + 1]!;
+      const abx = b.x - a.x;
+      const abz = b.z - a.z;
+      const t = Math.min(1, Math.max(0, ((fox.x - a.x) * abx + (fox.z - a.z) * abz) / (abx * abx + abz * abz || 1)));
+      const px = a.x + abx * t;
+      const pz = a.z + abz * t;
+      const d = (fox.x - px) ** 2 + (fox.z - pz) ** 2;
       if (d < best) {
         best = d;
-        nearest.copy(p);
+        nearest.set(px, a.y + (b.y - a.y) * t, pz);
       }
     }
+    if (o.brook.length === 1) nearest.copy(o.brook[0]!);
     brookPan.positionX.setTargetAtTime(nearest.x, now, 0.3);
     brookPan.positionY.setTargetAtTime(nearest.y, now, 0.3);
     brookPan.positionZ.setTargetAtTime(nearest.z, now, 0.3);
