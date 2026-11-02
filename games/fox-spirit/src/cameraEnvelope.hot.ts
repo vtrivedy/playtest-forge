@@ -66,7 +66,28 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
     const blocked = opts.lensBlocked;
     if (!blocked) return false;
     focus = nextFocus; lens = nextLens; dt = nextDt;
-    if (!blocked(lens.x, lens.y, lens.z, .35) && bodyClear(lens)) return false;
+    const desiredFree = !blocked(lens.x, lens.y, lens.z, .35) && bodyClear(lens);
+    if (desiredFree) {
+      // Release an elevated escape pose along a checked segment instead of
+      // dropping straight back to the unconstrained spring in one frame.
+      const travel = lens.distanceTo(previousLens), maximumStep = Math.max(.08, 12 * dt);
+      if (!firstFrame && travel > maximumStep && bodyClear(previousLens) && floorClear(previousLens)
+        && !blocked(previousLens.x, previousLens.y, previousLens.z, .2)) {
+        candidateLens.lerpVectors(previousLens, lens, maximumStep / travel);
+        let clear = bodyClear(candidateLens) && floorClear(candidateLens);
+        const steps = Math.ceil(maximumStep / .1);
+        for (let i = 1; clear && i <= steps; i++) {
+          const t = i / steps;
+          clear = !blocked(THREE.MathUtils.lerp(previousLens.x, candidateLens.x, t),
+            THREE.MathUtils.lerp(previousLens.y, candidateLens.y, t),
+            THREE.MathUtils.lerp(previousLens.z, candidateLens.z, t), .2);
+        }
+        if (clear) { lens.copy(candidateLens); return true; }
+      }
+      if (firstFrame || travel <= maximumStep) return false;
+      // A direct release can cross the platform edge. Keep using the escape
+      // search until a continuous path back to the spring becomes clear.
+    }
     const dx = lens.x - focus.x, dz = lens.z - focus.z;
     const range = Math.hypot(dx, dz);
     ux = range > .01 ? dx / range : Math.sin(opts.yaw() + params.sideBias);
