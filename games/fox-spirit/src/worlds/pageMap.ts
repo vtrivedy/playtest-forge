@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { WORLD_IDS, LEVEL_IDS, WORLD_CATALOGUE, type WorldProgress, type WorldId } from './progress';
 import type { LetterPlane } from '../opening/lettering.hot';
+import { createLetterPlane } from '../opening/lettering';
 import { stepPageMap } from './pageMap.hot';
 const WIDTH = 1440, HEIGHT = 880;
 const FONT = 'Georgia, "DejaVu Serif", serif';
@@ -19,6 +20,9 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
   mesh.renderOrder = 12000; mesh.frustumCulled = false; mesh.visible = false; mesh.userData.forgeSkipAO = true;
   camera.add(mesh);
+  const badge = createLetterPlane(400, 88, .055, .85, { panel: true });
+  badge.draw([{ text: 'Tab · Album', px: 34 }]);
+  camera.add(badge.mesh);
   const plane: LetterPlane = { mesh, mat: material, aspect: WIDTH / HEIGHT, heightFrac: .88, y: 0, x: 0, left: false };
   let open = false;
   function text(value: string, x: number, y: number, size: number, color = '#382b31') {
@@ -81,10 +85,10 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     text('Tab · close Album', WIDTH / 2, 844, 22);
     texture.needsUpdate = true;
   }
-  function setOpen(value: boolean) { open = value; if (open) draw(); stepPageMap(plane, camera, open); }
+  function setOpen(value: boolean) { open = value; if (open) draw(); stepPageMap(plane, camera, open, badge); }
   function keydown(event: KeyboardEvent) { if (event.code === 'Tab') { event.preventDefault(); if (!event.repeat) setOpen(!open); } }
   inputTarget.addEventListener('keydown', keydown);
   const unsubscribe = progress.subscribe(() => { if (open) draw(); });
   draw();
-  return { setOpen, isOpen: () => open, step: () => stepPageMap(plane, camera, open), dispose() { unsubscribe(); inputTarget.removeEventListener('keydown', keydown); camera.remove(mesh); mesh.geometry.dispose(); material.dispose(); texture.dispose(); } };
+  return { setOpen, isOpen: () => open, step: () => stepPageMap(plane, camera, open, badge), dispose() { unsubscribe(); inputTarget.removeEventListener('keydown', keydown); camera.remove(mesh); camera.remove(badge.mesh); badge.mat.map?.dispose(); badge.mat.dispose(); badge.mesh.geometry.dispose(); mesh.geometry.dispose(); material.dispose(); texture.dispose(); } };
 }
