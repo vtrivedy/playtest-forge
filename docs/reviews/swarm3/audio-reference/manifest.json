@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "alba-along-the-path",
+    "title": "Along the Path",
+    "artist": "Lorena \u00c1lvarez",
+    "album_id": 1568790780,
+    "metadata_url": "https://itunes.apple.com/lookup?id=1568790780&entity=song",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/f2/54/19/f2541913-9cba-bd64-e730-8c9278014f52/mzaf_6422941966837599473.plus.aac.p.m4a",
+    "source_sha256": "0554363ae86d642060292e45e1bc2e6bd9feb14da3dccd45d5441efd37b9e0d5",
+    "label": "Published OST preview, not gameplay mix"
+  },
+  {
+    "slug": "alba-the-pine-grove",
+    "title": "The Pine Grove",
+    "artist": "Lorena \u00c1lvarez",
+    "album_id": 1568790780,
+    "metadata_url": "https://itunes.apple.com/lookup?id=1568790780&entity=song",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/60/2f/64/602f64db-e4e0-7242-646b-be8135a12251/mzaf_1102421970870308105.plus.aac.p.m4a",
+    "source_sha256": "fcf9f2fc425a43d976da5add55910a9edf9fa37a09d89b1175b530334e69c2e4",
+    "label": "Published OST preview, not gameplay mix"
+  },
+  {
+    "slug": "alba-a-summer-night",
+    "title": "A Summer Night",
+    "artist": "Lorena \u00c1lvarez",
+    "album_id": 1568790780,
+    "metadata_url": "https://itunes.apple.com/lookup?id=1568790780&entity=song",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/98/b4/7b/98b47b17-9f41-0acf-8f04-9d1543947574/mzaf_6583196546962879315.plus.aac.p.m4a",
+    "source_sha256": "3bb817c7f0385aaff1625d08387fb0784e576f6bc7968618522d555e032baf2e",
+    "label": "Published OST preview, not gameplay mix"
+  },
+  {
+    "slug": "short-hike-beach-buds",
+    "title": "Beach Buds (Short Hike)",
+    "artist": "Mark Sparling",
+    "album_id": 1473635430,
+    "metadata_url": "https://itunes.apple.com/lookup?id=1473635430&entity=song",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/34/6e/ac/346eacbe-927c-aa72-7872-e8b109f3c322/mzaf_4574076423722080432.plus.aac.p.m4a",
+    "source_sha256": "ecb9a057727cde9c508537712d41aebeadb50e8406035b5bfd0dfb938cfdc975",
+    "label": "Published OST preview, not gameplay mix"
+  },
+  {
+    "slug": "short-hike-somewhere-in-the-woods",
+    "title": "Somewhere in the Woods (Short Hike)",
+    "artist": "Mark Sparling",
+    "album_id": 1473635430,
+    "metadata_url": "https://itunes.apple.com/lookup?id=1473635430&entity=song",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/4b/09/28/4b092839-f659-8d6d-e816-a4bf7c9d4726/mzaf_18199109378236569393.plus.aac.p.m4a",
+    "source_sha256": "60fced35b7d8aba8e79d8c0680c1a671f5ca9ac802d8143c74e72b4ced67076f",
+    "label": "Published OST preview, not gameplay mix"
+  },
+  {
+    "slug": "short-hike-hello",
+    "title": "Hello?",
+    "artist": "Mark Sparling",
+    "album_id": 1473635430,
+    "metadata_url": "https://itunes.apple.com/lookup?id=1473635430&entity=song",
+    "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/76/93/bb/7693bb86-19ae-4cc1-08de-56f51eb78290/mzaf_15601113121534618029.plus.aac.p.m4a",
+    "source_sha256": "714c8d8171761f099c9c57c9f8fa5f98b795bbf6ae8d164662bae8be8aa4562b",
+    "label": "Published OST preview, not gameplay mix"
+  },
+  {
+    "slug": "music-hush-hamlet",
+    "source": "games/fox-spirit/src/opening/sfx/music-hush-hamlet.ogg",
+    "source_sha256": "cd54bc48e26e81e0f5d372ad474d9bf61edf85b1f2b0ab475389b33b001405b6",
+    "label": "Unscaled existing game source music"
+  },
+  {
+    "slug": "music-apple-cider",
+    "source": "games/fox-spirit/src/opening/sfx/music-apple-cider.ogg",
+    "source_sha256": "e52190cf030f8a73e1ea9f16e9288777aa2547a2447c25038aff4fd2ec6afea5",
+    "label": "Unscaled existing game source music"
+  }
+]
