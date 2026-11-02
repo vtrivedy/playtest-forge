@@ -39,6 +39,12 @@ finale stages release, ember pickup and crag arrival. Their recorded movement is
 real input, but these starts do not establish discovery or an uninterrupted
 whole-game completion.
 
+The Hermitage visual verdict covers its timed desk views and verified route
+outcomes. Independent 30–34 s review found a thin drying pole overlapping the
+tail at the release pause while the face and torso remain visible; registering
+that pole alone did not clear the overlap. Bramble’s lateral pole correction `74ce756` closes this separate angle in
+Sorrel’s replay `16e91bc`; the bounded evidence review is recorded below.
+
 ## Clearance and world occlusion
 
 Matched 1.8/1.9 m trials isolate the compressed ruin landing. At 1.8 m two frames
@@ -85,3 +91,45 @@ All directories above are under `/captures/fern/`, mirrored under
 `window.__game`, trace, checks, stills and source frames. Videos play the sampled
 frames at 15 fps, rendered offline with SwiftShader and no audio. They establish
 this bounded camera/visibility review, not real-time performance or audio quality.
+
+## Integrated world and paint recheck
+
+On `834881d` (clean merge of integrated `9b977fb`), the unchanged natural
+Keeping route again completes steam, root heat, bridge opening and crag arrival.
+All 60 crossing frames were visually reviewed: the fox and walking surface remain
+readable, and all skinned-body samples retain the 2% viewport margin. Maximum
+sustained grounded follow distance is 2.810 m; minimum hero height is 44.00 px at
+640×360, with no interval below the 24 px floor. There are no console/page errors.
+Typecheck, feel checks and production build pass. No additional camera tuning is
+needed for the integrated warm paint and occluder roots.
+
+Evidence: `/captures/fern/integrated-9b977fb-keeping/`, including the complete
+110-second simulation trace and `window.__game`, four timed stills, all 60 source
+frames, contact sheets and a four-second crossing clip. One initial placement
+beside the hearth precedes controller input and actual chemistry progression;
+there is no forced bridge release. The clip is offline 15 fps, silent SwiftShader
+capture. The separate Hermitage pole resolution is recorded below.
+
+
+## Hermitage pole resolution — independent evidence review
+
+Bramble’s `74ce756` moves the third south pole laterally and retains thin
+0.1 m colliders. Sorrel replayed it on `16e91bc` for 50 simulated seconds:
+all three Hermitage state checks pass, all 60 body samples during 30–34 s
+retain the strict viewport margin, and there are no JavaScript errors.
+Minimum follow hero height is 74.63 px at 640×360; maximum grounded follow
+distance is 2.790 m. This closes the pole caveat, without shared camera changes.
+
+Fern downloaded the verified archive and independently reviewed both contact
+sheets containing every one of those 60 frames, plus the native 32 s still.
+The pole clears the tail and torso through the release hold and subsequent turn;
+the full fox remains visible. This is review of Sorrel’s played evidence, not a
+new Fern replay. The route uses one initial teleport followed by controller
+input, so it does not establish unfamiliar-player discovery.
+
+Evidence: `keeping-swarm4-captures/sorrel/hermitage-pole-lateral-thin.tgz`,
+locally extracted to `/captures/fern/pole-independent/hermitage-pole-lateral-thin/`.
+It includes the 1,500-sample trace, `window.__game`, state/camera checks, seven
+stills, 60 source frames and clip. The raw checkpoint has `complete: false`;
+acceptance uses the final `evidence.json` and successful state checks, consistent
+with Sorrel’s completed-run report. No runtime code changed in this follow-up.
