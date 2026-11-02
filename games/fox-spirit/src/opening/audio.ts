@@ -202,7 +202,7 @@ export function createOpeningAudio() {
     loop,
     cue,
     /** per frame: listener = camera; wind follows height; the song follows the fox and the colour */
-    update(camera: THREE.Camera, o: { restored: number; height: number; x: number; z: number }): void {
+    update(camera: THREE.Camera, o: { restored: number; height: number; x: number; z: number; gliding?: boolean }): void {
       if (ac.state !== 'running') return;
       const now = ac.currentTime;
       const L = ac.listener;
@@ -228,7 +228,7 @@ export function createOpeningAudio() {
       const aloft = THREE.MathUtils.smoothstep(height, 1, 8);
       wind.gain.setTargetAtTime(THREE.MathUtils.lerp(MIX.wind.ground, MIX.wind.high, aloft) * swell, now, 0.5);
       windLow.frequency.setTargetAtTime(THREE.MathUtils.lerp(MIX.wind.dark, MIX.wind.open, Math.max(swell, aloft * 0.6)), now, 0.6);
-      song.update(o.x, o.z, restored);
+      song.update(o.x, o.z, restored, undefined, o.gliding ? 1 : 0);
     },
     state: () => ({
       context: ac.state,
