@@ -150,7 +150,6 @@ export async function runOpening(): Promise<void> {
   const glyphs = buildGlyphs(ctx, { onSolved: () => unpressed.unlock('kit') });
   const crown = createCrown(ctx, sky.mist);
   const runaway = buildRunawayPage(ctx);
-  const discovery = buildDiscovery(ctx, runaway.voice(), canopy.guide, popUpRuin.guide);
   const homecoming = buildHomecoming(ctx, runaway, unpressed);
   const leafPiles = buildLeafPiles(ctx);
   const laneWind = createLaneWind(ctx);
@@ -197,6 +196,7 @@ export async function runOpening(): Promise<void> {
   });
   const foley = createFoxFoley({ audio: ctx.audio, groundH });
   ctx.player = player;
+  const discovery = buildDiscovery(ctx, runaway.voice(), canopy.guide, popUpRuin.guide);
   carry = createCarry({
     scene, fox: fox.root,
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),

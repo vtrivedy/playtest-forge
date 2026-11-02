@@ -50,6 +50,7 @@ try{
   if(tick%600===0){console.log(JSON.stringify({t:tick/60,pos:r.s.pos,cue:r.s.opening.discovery,page:r.s.opening.page.catches}));fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));}
  }
  evidence.game=await page.evaluate(()=>window.__game.state());
+ fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));
  await page.evaluate(()=>window.__gameHooks.advance(0,1/60,true));await page.screenshot({path:`${out}/end.png`});
  evidence.checks={firstCatch:evidence.game.opening.page.catches>0,canopy:evidence.game.opening.canopy.roostVisits>0,overlook:evidence.game.opening.popUpRuin.reached,kept:evidence.game.opening.page.phase==='kept',noErrors:evidence.errors.length===0};
  console.log(JSON.stringify(evidence.checks));
