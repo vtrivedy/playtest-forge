@@ -13,6 +13,7 @@ for(const step of plan.steps){
   if(!/^[a-z0-9-]+$/.test(step.name)||!Number.isInteger(step.frames)||step.frames<0||step.frames>36000)throw Error('invalid step name/frames');
   if(!Array.isArray(step.stick)||step.stick.length!==2||step.stick.some(v=>!Number.isFinite(v)||Math.abs(v)>1))throw Error('invalid stick');
   if(step.reload!==undefined&&typeof step.reload!=='boolean')throw Error('invalid reload');
+  if(step.press!==undefined&&(!Array.isArray(step.press)||step.press.some(k=>!['Tab','Escape','KeyM'].includes(k))))throw Error('invalid press');
   for(const check of step.expect??[]){
     if(!['hooks','game'].includes(check.source??'hooks')||typeof check.path!=='string'||!check.path||check.path.split('.').some(k=>['__proto__','constructor','prototype'].includes(k)))throw Error('invalid assertion source/path');
     if(check.finite!==true&&!Object.hasOwn(check,'equals'))throw Error('assertion requires finite or equals');
@@ -21,7 +22,7 @@ for(const step of plan.steps){
 }
 const out=path.resolve(arg('out','/tmp/world-input-probe'));
 fs.mkdirSync(out,{recursive:true});
-const report={commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),dirty:execFileSync('git',['status','--porcelain'],{encoding:'utf8'}),provenance:'Fresh default opening boot; only setKeys, setStick and fixed-step advance. No teleport, restore or puzzle setters.',plan,errors:[],steps:[],passed:false};
+const report={commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),dirty:execFileSync('git',['status','--porcelain'],{encoding:'utf8'}),provenance:'Fresh default opening boot; only setKeys, setStick, fixed-step advance and browser menu key presses. No teleport, restore or puzzle setters.',plan,errors:[],steps:[],passed:false};
 const port=Number(arg('port','5241'));
 let server,browser;
 try{
@@ -37,6 +38,8 @@ try{
       await page.reload({waitUntil:'domcontentloaded',timeout:300000});
       await page.waitForFunction(()=>window.__gameHooks?.ready===true,null,{timeout:300000});
     }
+    // Menu listeners consume DOM events rather than the movement hook's key set.
+    for(const key of step.press??[])await page.keyboard.press(key==='KeyM'?'m':key);
     const state=await page.evaluate(step=>{
       const h=window.__gameHooks;
       h.setKeys(step.keys);h.setStick(...step.stick);

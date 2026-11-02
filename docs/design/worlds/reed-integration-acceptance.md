@@ -83,7 +83,10 @@ real default opening with a fresh browser context. A plan contains `steps` with
 within hooks state by default, or `source: "game"` for `window.__game.state()`,
 with `equals` or `finite: true`). A step with `reload: true` reloads the same
 browser context before applying its inputs, retaining genuine browser saves.
-Reload checks remain separate from continuous route evidence. It exposes no arbitrary
+A step may also contain `press: ["Tab"]` (or Escape/KeyM) for real browser
+menu key events before simulation advances. This is needed because Album DOM
+listeners do not consume the controller hook key set. Menu key events never
+write progress. Reload checks remain separate from continuous route evidence. It exposes no arbitrary
 script, teleport or puzzle-state setter. Every step saves a gameplay screenshot,
 full hook/game state, assertion results and requested simulation duration; the
 report includes source commit, working-tree status, original input plan and
@@ -105,3 +108,11 @@ normal village follow composition. `/tmp/reed-reload-smoke/report.json` records
 the exact dirty-tree provenance; adjacent `0-fresh.png` and `1-reload.png` are the
 reviewed frames. This validates reload plumbing only, not persistence of puzzle
 progress (that runtime does not yet exist in this branch).
+
+Menu-event smoke on `8dd37b8c` plus this probe-only change: two real Tab
+presses before first snapshot, then same-context reload. Four finite hook/game
+position checks passed, zero JavaScript errors. Both 960×540 screenshots inspected:
+matching supported village spawn and readable fox. Evidence:
+`/tmp/reed-menu-smoke/report.json`, `0-fresh.png`, `1-reload.png`. The Album is
+not integrated on this source: this validates event dispatch and reload plumbing,
+not map rendering, toggling, puzzle pause policy or persistence.
