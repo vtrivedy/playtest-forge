@@ -1,0 +1,452 @@
+{
+  "baseline": {
+    "sha": "057bd1bba38963323dd3f2240e6f7fb380dbda5c",
+    "runtime": "vite-dev",
+    "staging": "Each case has an explicit initial teleport; no teleport after movement starts; no forced finale/Keeping state; no coal carried.",
+    "checks": {
+      "allLegsComplete": false,
+      "finite": true,
+      "noErrors": true
+    },
+    "cases": [
+      {
+        "id": "meadow-walk-in-and-out",
+        "legs": [
+          {
+            "id": 0,
+            "goal": [
+              7.5,
+              63.5
+            ],
+            "done": true,
+            "minDistance": 0.40971819583709124,
+            "pos": [
+              7.287,
+              -0.6,
+              63.85
+            ]
+          },
+          {
+            "id": 1,
+            "goal": [
+              12.5,
+              53
+            ],
+            "done": false,
+            "minDistance": 8.659886950763275,
+            "pos": [
+              9.211,
+              -0.313,
+              61.011
+            ]
+          }
+        ],
+        "final_pos": [
+          9.256,
+          -0.302,
+          61.011
+        ]
+      },
+      {
+        "id": "crag-glide-and-walk-out",
+        "legs": [
+          {
+            "id": "glide",
+            "done": true,
+            "pos": [
+              21.495,
+              0.51,
+              46.401
+            ],
+            "glidingFrames": 340
+          },
+          {
+            "id": 0,
+            "goal": [
+              14.5,
+              50
+            ],
+            "done": true,
+            "minDistance": 0.5211842284643691,
+            "pos": [
+              14.947,
+              0.5,
+              49.732
+            ]
+          },
+          {
+            "id": 1,
+            "goal": [
+              11.5,
+              58
+            ],
+            "done": true,
+            "minDistance": 0.5318430219529087,
+            "pos": [
+              11.684,
+              1.472,
+              57.501
+            ]
+          },
+          {
+            "id": 2,
+            "goal": [
+              6,
+              66
+            ],
+            "done": true,
+            "minDistance": 0.332295049617054,
+            "pos": [
+              6.188,
+              -0.6,
+              65.726
+            ]
+          }
+        ],
+        "final_pos": [
+          5.893,
+          -0.6,
+          66.155
+        ]
+      }
+    ],
+    "errors": [],
+    "evidence": "/captures/sorrel/finale-access-057bd1b/evidence.json"
+  },
+  "alternate_baseline": {
+    "sha": "057bd1bba38963323dd3f2240e6f7fb380dbda5c",
+    "runtime": "vite-dev",
+    "staging": "Each case has an explicit initial teleport; no teleport after movement starts; no forced finale/Keeping state; no coal carried.",
+    "checks": {
+      "allLegsComplete": false,
+      "finite": true,
+      "noErrors": true
+    },
+    "cases": [
+      {
+        "id": "alternate-meadow-entry",
+        "legs": [
+          {
+            "id": 0,
+            "goal": [
+              11.5,
+              58
+            ],
+            "done": false,
+            "minDistance": 3.5553230514258467,
+            "pos": [
+              9.761,
+              -0.267,
+              61.101
+            ]
+          }
+        ],
+        "final_pos": [
+          9.761,
+          -0.267,
+          61.101
+        ]
+      },
+      {
+        "id": "east-meadow-entry",
+        "legs": [
+          {
+            "id": 0,
+            "goal": [
+              13,
+              65
+            ],
+            "done": true,
+            "minDistance": 0.5244273066879711,
+            "pos": [
+              12.48,
+              0.001,
+              65.068
+            ]
+          },
+          {
+            "id": 1,
+            "goal": [
+              17,
+              61
+            ],
+            "done": false,
+            "minDistance": 2.318555800493059,
+            "pos": [
+              15.551,
+              0.303,
+              62.81
+            ]
+          }
+        ],
+        "final_pos": [
+          15.566,
+          0.308,
+          62.81
+        ]
+      },
+      {
+        "id": "crag-glide-and-walk-out",
+        "legs": [
+          {
+            "id": "glide",
+            "done": true,
+            "pos": [
+              21.495,
+              0.51,
+              46.401
+            ],
+            "glidingFrames": 340
+          },
+          {
+            "id": 0,
+            "goal": [
+              14.5,
+              50
+            ],
+            "done": true,
+            "minDistance": 0.5211842284643691,
+            "pos": [
+              14.947,
+              0.5,
+              49.732
+            ]
+          },
+          {
+            "id": 1,
+            "goal": [
+              11.5,
+              58
+            ],
+            "done": true,
+            "minDistance": 0.5318430219529087,
+            "pos": [
+              11.684,
+              1.472,
+              57.501
+            ]
+          },
+          {
+            "id": 2,
+            "goal": [
+              6,
+              66
+            ],
+            "done": true,
+            "minDistance": 0.332295049617054,
+            "pos": [
+              6.188,
+              -0.6,
+              65.726
+            ]
+          }
+        ],
+        "final_pos": [
+          5.893,
+          -0.6,
+          66.155
+        ]
+      }
+    ],
+    "errors": [],
+    "evidence": "/captures/sorrel/finale-access-alt-057bd1b/evidence.json"
+  },
+  "fixed": {
+    "sha": "77d303a1969928af70f5ac1774fdf594fe6a03f8",
+    "runtime": "vite-dev",
+    "staging": "Each case has an explicit initial teleport; no teleport after movement starts; no forced finale/Keeping state; no coal carried.",
+    "checks": {
+      "allLegsComplete": true,
+      "finite": true,
+      "noErrors": true
+    },
+    "cases": [
+      {
+        "id": "authored-lane-in-and-out",
+        "legs": [
+          {
+            "id": 0,
+            "goal": [
+              7.5,
+              63.5
+            ],
+            "done": true,
+            "minDistance": 0.40971819583709124,
+            "pos": [
+              7.287,
+              -0.6,
+              63.85
+            ]
+          },
+          {
+            "id": 1,
+            "goal": [
+              12.5,
+              53
+            ],
+            "done": true,
+            "minDistance": 0.23259406699226073,
+            "pos": [
+              12.4,
+              0.271,
+              53.21
+            ]
+          },
+          {
+            "id": 2,
+            "goal": [
+              18.8,
+              44.2
+            ],
+            "done": true,
+            "minDistance": 0.5056836956042748,
+            "pos": [
+              18.504,
+              0.446,
+              44.61
+            ]
+          },
+          {
+            "id": 3,
+            "goal": [
+              21.1,
+              40.2
+            ],
+            "done": true,
+            "minDistance": 0.32162244946520446,
+            "pos": [
+              20.94,
+              0.264,
+              40.479
+            ]
+          },
+          {
+            "id": 4,
+            "goal": [
+              18.8,
+              44.2
+            ],
+            "done": true,
+            "minDistance": 0.490156097585252,
+            "pos": [
+              19.022,
+              0.409,
+              43.763
+            ]
+          },
+          {
+            "id": 5,
+            "goal": [
+              12.5,
+              53
+            ],
+            "done": true,
+            "minDistance": 0.44150877680970413,
+            "pos": [
+              12.757,
+              0.307,
+              52.641
+            ]
+          },
+          {
+            "id": 6,
+            "goal": [
+              7.5,
+              63.5
+            ],
+            "done": true,
+            "minDistance": 0.2393010656056517,
+            "pos": [
+              7.603,
+              -0.6,
+              63.284
+            ]
+          },
+          {
+            "id": 7,
+            "goal": [
+              6,
+              66
+            ],
+            "done": true,
+            "minDistance": 0.27731750756127455,
+            "pos": [
+              6.144,
+              -0.6,
+              65.763
+            ]
+          }
+        ],
+        "final_pos": [
+          5.871,
+          -0.6,
+          66.205
+        ]
+      },
+      {
+        "id": "crag-glide-and-walk-out",
+        "legs": [
+          {
+            "id": "glide",
+            "done": true,
+            "pos": [
+              21.495,
+              0.51,
+              46.401
+            ],
+            "glidingFrames": 340
+          },
+          {
+            "id": 0,
+            "goal": [
+              14.5,
+              50
+            ],
+            "done": true,
+            "minDistance": 0.5211842284643691,
+            "pos": [
+              14.947,
+              0.457,
+              49.732
+            ]
+          },
+          {
+            "id": 1,
+            "goal": [
+              11.5,
+              58
+            ],
+            "done": true,
+            "minDistance": 0.5318430219529087,
+            "pos": [
+              11.684,
+              -0.117,
+              57.501
+            ]
+          },
+          {
+            "id": 2,
+            "goal": [
+              6,
+              66
+            ],
+            "done": true,
+            "minDistance": 0.332295049617054,
+            "pos": [
+              6.188,
+              -0.6,
+              65.726
+            ]
+          }
+        ],
+        "final_pos": [
+          5.893,
+          -0.6,
+          66.155
+        ]
+      }
+    ],
+    "errors": [],
+    "evidence": "/captures/sorrel/finale-access-fixed-77d303a/evidence.json"
+  }
+}

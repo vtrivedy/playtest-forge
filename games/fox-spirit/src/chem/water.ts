@@ -1,4 +1,6 @@
 import { weatheredSurface } from '../worldSurfaces';
+import brickColorUrl from '../../../../assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_Color.jpg?url';
+import brickNormalUrl from '../../../../assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_NormalGL.jpg?url';
 import * as THREE from 'three';
 import { sceneWaterSampler, sceneWaterFragment } from '../../../../src/render/waterScene';
 import type GUI from 'lil-gui';
@@ -47,8 +49,8 @@ export function createWater(scene: THREE.Scene, collision: CollisionWorld, gui?:
   }
   // Worn aqueduct paving uses the shipped CC0 masonry scan and normal map;
   // the broad source deck must read as stone rather than a flat brown slab.
-  const deckMap = new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_Color.jpg');
-  const deckNormal = new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_NormalGL.jpg');
+  const deckMap = new THREE.TextureLoader().load(brickColorUrl);
+  const deckNormal = new THREE.TextureLoader().load(brickNormalUrl);
   for (const texture of [deckMap, deckNormal]) { texture.wrapS = texture.wrapT = THREE.RepeatWrapping; texture.repeat.set(3, 1.2); texture.anisotropy = 8; }
   deckMap.colorSpace = THREE.SRGBColorSpace;
   const deckMaterial = new THREE.MeshStandardMaterial({ name: 'reed-aqueduct-paving', color: 0xc4b69b, map: deckMap, normalMap: deckNormal, roughness: 0.9 });

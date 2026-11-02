@@ -1,17 +1,20 @@
 import * as THREE from 'three';
+import barkUrl from '../../../assets/library/textures/bark_brown_02/bark_brown_02_Diffuse_1k.jpg?url';
+import rockUrl from '../../../assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg?url';
+import brickUrl from '../../../assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_Color.jpg?url';
 
 /** CC0 library scans, projected in metres so merged and scaled props share a surface. */
 export function weatheredSurface(mat: THREE.MeshStandardMaterial, timber = false, timberCoordinates: 'world' | 'local' = 'world', mineral: 'masonry' | 'rock' = 'masonry'): void {
   const rock = !timber && mineral === 'rock';
   const hullTimber = timber && timberCoordinates === 'local';
   const texture = new THREE.TextureLoader().load(timber
-    ? '/assets/library/textures/bark_brown_02/bark_brown_02_Diffuse_1k.jpg'
-    : rock ? '/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg'
-    : '/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_Color.jpg');
+    ? barkUrl
+    : rock ? rockUrl
+    : brickUrl);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 8;
-  const topTexture = timber || rock ? texture : new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg');
+  const topTexture = timber || rock ? texture : new THREE.TextureLoader().load(rockUrl);
   topTexture.wrapS = topTexture.wrapT = THREE.RepeatWrapping;
   topTexture.colorSpace = THREE.SRGBColorSpace;
   topTexture.anisotropy = 8;

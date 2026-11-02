@@ -6,11 +6,17 @@ export function lintHotSource(file, source) {
   const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const functions = new Map();
   const roots = [];
+  const frameName = name => /^(update|tick|frame|process|step)/i.test(name);
+  const coldFactory = name => /^(build|create|load|make)/i.test(name);
+  const exported = node => node?.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword) === true;
   const visit = node => {
-    if (ts.isFunctionDeclaration(node) && node.name && node.body) functions.set(node.name.text, node);
+    if (ts.isFunctionDeclaration(node) && node.name && node.body) {
+      functions.set(node.name.text, node);
+      if (exported(node) && !coldFactory(node.name.text)) roots.push(node);
+    }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
       functions.set(node.name.text, node.initializer);
-      if (/^(update|tick|frame|process)/i.test(node.name.text)) roots.push(node.initializer);
+      if (frameName(node.name.text) || (exported(node.parent?.parent) && !coldFactory(node.name.text))) roots.push(node.initializer);
     }
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && /^(onUpdate|onTick|onFrame)$/.test(node.expression.name.text)) {
       for (const arg of node.arguments) roots.push(arg);
@@ -18,9 +24,9 @@ export function lintHotSource(file, source) {
     if (ts.isMethodDeclaration(node) && node.name && node.body) functions.set(node.name.getText(sf), node);
     if (ts.isPropertyDeclaration(node) && node.name && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
       functions.set(node.name.getText(sf), node.initializer);
-      if (/^(update|tick|frame|process)/i.test(node.name.getText(sf))) roots.push(node.initializer);
+      if (frameName(node.name.getText(sf))) roots.push(node.initializer);
     }
-    if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && node.name && /^(update|tick|frame|process)/i.test(node.name.getText(sf))) roots.push(node);
+    if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && node.name && frameName(node.name.getText(sf))) roots.push(node);
     ts.forEachChild(node, visit);
   };
   visit(sf);
@@ -33,6 +39,7 @@ export function lintHotSource(file, source) {
     findings.push(`${file}:${at.line + 1}  [${id}] ${why}\n    ${line.trim()}`);
   };
   const scanFunction = fn => {
+    if (!fn) return;
     if (ts.isIdentifier(fn)) fn = functions.get(fn.text);
     if (!fn || seen.has(fn) || !fn.body) return;
     seen.add(fn);
@@ -64,6 +71,8 @@ export function hotLintSelfTest() {
     'function build(){ctx.onUpdate((dt)=>{const ahead = perches.map(p=>p+1).filter(p=>p>0);});}',
     'function update(dt){const options = [];}',
     'function tick(dt){Math.random();}',
+    'export function drift(dt){return new THREE.Vector3();}',
+    'function stepFinale(dt){return {phase:1};}',
     'class Worklet { process(){this.voice();} voice(){return new Float32Array(128);} }',
     'function update(dt){scale.setScalar(1 - f.age / f.life);}',
     'function update(dt){y += 1 / 30;}',
@@ -72,6 +81,9 @@ export function hotLintSelfTest() {
     'const updateEnvelope=(dt)=>{return {x:dt};};',
   ];
   for (const source of bad) if (!lintHotSource('fixture.hot.ts', source).length) throw new Error(`hot lint missed: ${source}`);
+  if (lintHotSource('fixture.hot.ts', 'export function build(){return {p:new THREE.Vector3()};}').length) throw new Error('hot lint rejected an exported cold factory');
+  const external = 'function update(dt){query(dt);Math.max(dt,0);}';
+  if (lintHotSource('fixture.hot.ts', external).length) throw new Error('hot lint rejected an external scalar query');
   const good = 'function build(){const p=new THREE.Vector3(); const options={edgeMax:3}; function emit(){p.set(1,2,3);} ctx.onUpdate((dt)=>{emit();p.x+=dt;});return {state:()=>({pos:p.toArray()})};}';
   if (lintHotSource('fixture.hot.ts', good).length) throw new Error('hot lint rejected preallocation / cold diagnostics');
 }

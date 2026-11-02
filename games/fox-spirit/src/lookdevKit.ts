@@ -47,6 +47,8 @@ export const paintU = {
   uRestoreCount: { value: 0 },
   uPaper: { value: new THREE.Color(0.8, 0.66, 0.47) },
   uPaperInk: { value: new THREE.Color(0.2, 0.13, 0.08) },
+  /** first snow (finale): 0 none → 1 a full dusting on every upward-facing painted surface */
+  uSnow: { value: 0 },
 };
 
 export const NOISE_GLSL = /* glsl */ `
@@ -99,6 +101,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
         uniform float uLkContour;
         uniform float uLkHatchWeight;
         uniform vec2 uLkClimb;
+        uniform float uSnow;
         ${NOISE_GLSL}`,
       )
       .replace(
@@ -158,6 +161,14 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           float brush = 0.65 + 0.7 * lkNoise(xz * 2.0 + vLkWorld.y * 3.0);
           float cont = (1.0 - smoothstep(0.1, 0.1 + 0.22 * brush, ndv)) * uLkContour;
           outgoingLight = mix(outgoingLight, uPaperInk * 0.8, cont);
+          // first snow settles in patches on whatever faces the sky, growing in from the patch noise
+          if (uSnow > 0.001) {
+            vec3 upV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+            float up = smoothstep(0.5, 0.85, dot(normalize(normal), upV));
+            float patchK = smoothstep(0.62, 0.42, lkFbm(xz * 0.45 + 31.0) + (lkNoise(xz * 3.1) - 0.5) * 0.15 - uSnow * 0.55 + 0.3);
+            vec3 snowC = vec3(0.95, 0.93, 0.9) * (0.62 + 0.42 * t) * (0.97 + 0.05 * tooth);
+            outgoingLight = mix(outgoingLight, snowC, up * patchK * uSnow * 0.9);
+          }
         }
         #include <opaque_fragment>`,
       );

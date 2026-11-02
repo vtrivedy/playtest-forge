@@ -12,7 +12,7 @@ import { buildSky, inkMaterial, paintU, RESTORE_SLOTS, rng } from '../lookdevKit
 import { buildContactShadow } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import { createPlay, PLAY, type Collider, type PlayController } from '../lookdevPlay';
-import { groundH, KEEPING, SPAWN } from './layout';
+import { FINALE, groundH, KEEPING, SPAWN } from './layout';
 import { buildMeadow } from './meadow';
 import { buildVillage } from './village';
 import { createOpeningHearth } from './hearth';
@@ -27,11 +27,13 @@ import { buildGlyphs } from './glyphs';
 import { createHearthHum } from './hum';
 import { createOpeningAudio, MIX, type OpeningAudio } from './audio';
 import { createFoxFoley } from './foley';
-import { buildRunawayPage } from './page';
+import { buildRunawayPage } from './page.hot';
 import { buildHomecoming } from './homecoming';
 import { buildLeafPiles } from './leafPiles';
 import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
+import { buildFinale } from './finale';
+import { createCaptions, type Captions } from './captions';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -45,6 +47,10 @@ const SHOTS: Record<string, { pos: [number, number, number]; look: [number, numb
   // the first Keeping: the arrested Hearthtree over the ridge, and the gorge it falls across
   hearthtree: { pos: [14, 15, 80], look: [27.5, 13, 70.5] },
   gorge: { pos: [38, 16, 71], look: [26, 11, 70] },
+  // the finale: Press Hollow from the far crag's lip, and the Press close up with the Crown behind
+  hollow: { pos: [27.5, 9.5, 57.5], look: [19.3, 1.5, 37] },
+  press: { pos: [21.6, 3.1, 47.0], look: [19.3, 1.6, 37.0] },
+  southlane: { pos: [4.6, 2.6, 71.5], look: [11.5, 0.4, 55] },
 };
 
 export interface OpeningCtx {
@@ -66,6 +72,8 @@ export interface OpeningCtx {
   onUpdate: (fn: (dt: number, t: number) => void) => void;
   /** the one sound graph (audio.ts): play samples, place voices in 3D, duck the music */
   audio: OpeningAudio;
+  /** Album captions (captions.ts): `ctx.captions.say('≤ 6 words')` for a story beat */
+  captions: Captions;
 }
 
 export async function runOpening(): Promise<void> {
@@ -101,7 +109,10 @@ export async function runOpening(): Promise<void> {
     player: null,
     onUpdate: (fn) => void updates.push(fn),
     audio: createOpeningAudio(),
+    // bound just below: the caption line registers its fade through ctx.onUpdate
+    captions: null as unknown as Captions,
   };
+  ctx.captions = createCaptions(ctx);
   const { field } = ctx;
 
   buildMeadow(ctx);
@@ -151,7 +162,7 @@ export async function runOpening(): Promise<void> {
     scene, fox: fox.root,
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
     surfaceAt: player.surfaceAt,
-    bowls: [KEEPING.steam, KEEPING.root].map(b => new THREE.Vector3(b.x, b.y, b.z)),
+    bowls: [...[KEEPING.steam, KEEPING.root].map(b => new THREE.Vector3(b.x, b.y, b.z)), new THREE.Vector3(FINALE.cradle.x, player.surfaceAt(FINALE.cradle.x, FINALE.cradle.z), FINALE.cradle.z)],
   });
   const coal = carry;
   const chemistry = createKeepingChemistry({
@@ -175,6 +186,21 @@ export async function runOpening(): Promise<void> {
   keeping.onSettled(() => {
     settledAt = time;
     hum.swell();
+    ctx.captions.say('The tree finished falling, at last.');
+  });
+  // the Album's story in a few lines (DESIGN-finale.md captions): the runaway page is the first hint whose book it is
+  let pageSaid = false;
+  ctx.onUpdate(() => {
+    if (pageSaid || !runaway.settled()) return;
+    pageSaid = true;
+    ctx.captions.say("A page escaped the Scribe's Album.");
+  });
+  // the finale (DESIGN-finale.md): warmth set in the Scribe's Press cradle once the Keeping has settled
+  const finale = await buildFinale(ctx, {
+    settled: () => settledAt >= 0,
+    ember: coal,
+    cam: player.cam,
+    crownLetGo: crown.letGo,
   });
   ctx.onUpdate((_dt, t) => {
     if (settledAt < 0) return;
@@ -237,9 +263,9 @@ export async function runOpening(): Promise<void> {
   addEventListener('resize', resize);
   resize();
 
-  let manual = false;
+  let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), finale: finale.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -298,6 +324,8 @@ export async function runOpening(): Promise<void> {
     unpress: unpressed.unpress,
     /** dev: the homecoming as if the page were kept (pins it, sends the freed home) */
     homecoming: homecoming.force,
+    /** dev: the finale as if the Keeping had settled and the ember sat in the Press cradle */
+    finale: finale.force,
     /** dev: open the glyph shrine without solving it */
     glyphSolve: glyphs.solve,
     /** dev: unfold the steam stair without the steam latch */
