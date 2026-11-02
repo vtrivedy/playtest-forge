@@ -9,8 +9,9 @@ const out=arg('out','/captures/hazel/discovery');
 const seconds=Number(arg('seconds','180'));
 const renderEvery=Number(arg('render-every','0'));
 const width=Number(arg('width','640')),height=Math.round(width*9/16);
+if(fs.existsSync(`${out}/frames`)&&fs.readdirSync(`${out}/frames`).length)throw new Error('Output already has frames; use a fresh directory to preserve evidence');
 fs.mkdirSync(`${out}/frames`,{recursive:true});
-const evidence={commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),tool:'Visible-cue follower; no authored route coordinates, no teleports, no forced state. Reads public invitation, position/velocity and grounded feedback.',seconds,errors:[],trace:[]};
+const evidence={commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),tool:'Visible-cue follower; no authored route coordinates, no teleports, no forced state. Reads public invitation, position/velocity and grounded feedback.',seconds,capture:{clock:'fixed 60Hz simulation, offline screenshots',fps:renderEvery?60/renderEvery:0,audio:false},completed:false,errors:[],trace:[]};
 const server=arg('production','0')==='1'?await preview({configFile:'games/fox-spirit/vite.config.ts',preview:{host:'127.0.0.1',port:5224,strictPort:true},logLevel:'error'}):await createServer({configFile:'games/fox-spirit/vite.config.ts',server:{host:'127.0.0.1',port:5224,strictPort:true},logLevel:'error'});
 if(server.listen)await server.listen();
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -42,6 +43,9 @@ try{
  fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));
  await page.evaluate(()=>window.__gameHooks.advance(0,1/60,true));await page.screenshot({path:`${out}/end.png`});
  evidence.checks={firstCatch:evidence.game.opening.page.catches>0,canopy:evidence.game.opening.canopy.roostVisits>0,overlook:evidence.game.opening.popUpRuin.reached,kept:evidence.game.opening.page.phase==='kept',noErrors:evidence.errors.length===0};
+ evidence.frames=image;
+ evidence.completed=true;
  console.log(JSON.stringify(evidence.checks));
+ if(!Object.values(evidence.checks).every(Boolean))process.exitCode=1;
  if(renderEvery&&image>0)execFileSync('ffmpeg',['-y','-v','error','-framerate',String(60/renderEvery),'-i',`${out}/frames/f%05d.jpg`,'-c:v','libx264','-pix_fmt','yuv420p',`${out}/discovery.mp4`]);
 }finally{fs.writeFileSync(`${out}/evidence.json`,JSON.stringify(evidence,null,2));await browser.close();await server.close();}
