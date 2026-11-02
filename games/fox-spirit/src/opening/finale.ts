@@ -560,6 +560,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const say = (text: string) => ctx.captions.say(text);
 
   const F2 = F.kits;
+  /** review: the rest shot's candidate angles [k, front, inFront, postClear, blocked] */
+  const restShot = { tried: [] as number[][] };
   const toCrown = new THREE.Vector3(CROWN.x - F.press.x, 0, CROWN.z - F.press.z).normalize();
   /** the finale's view direction: between the book's face (local −z) and the Crown */
   const view = () => new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)).lerp(toCrown, 0.6).normalize();
@@ -657,6 +659,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         const pos = new THREE.Vector3();
         let bestScore = -Infinity;
         const end = new THREE.Vector3();
+        restShot.tried.length = 0;
         for (let k = 0; k < 24; k++) {
           const a = (k / 24) * Math.PI * 2;
           d.set(Math.sin(a), 0, Math.cos(a));
@@ -665,10 +668,11 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
           // stay on the approach side of the book's foot (the lens must not pass through the Press) and keep the
           // frame's near post off the line to the fox
           const px = pos.x - F.press.x, pz = pos.z - F.press.z;
-          const inFront = Math.sin(F.press.yaw) * px + Math.cos(F.press.yaw) * pz > 1.8;
-          const postClear = segDist(pos.x, pos.z, f.x, f.z, post.x, post.z) > 0.75;
+          const inFront = Math.sin(F.press.yaw) * px + Math.cos(F.press.yaw) * pz > 2.4;
+          const postClear = segDist(pos.x, pos.z, f.x, f.z, post.x, post.z) > 0.75 && Math.hypot(pos.x - post.x, pos.z - post.z) > 2.2;
           const ok = inFront && postClear && !opts.cam.sightBlocked(pos, aimAt, f.y);
           const score = 1.5 * (1 - Math.abs(front - 0.65)) + 0.6 * d.dot(toCrown) - (ok ? 0 : 10);
+          restShot.tried.push([k, +front.toFixed(2), inFront ? 1 : 0, postClear ? 1 : 0, opts.cam.sightBlocked(pos, aimAt, f.y) ? 1 : 0]);
           if (score > bestScore) {
             bestScore = score;
             end.copy(pos);
@@ -723,7 +727,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     state: () => ({
       phase: PHASES[rig.s.phase], t: +rig.s.t.toFixed(2), kindles: rig.s.kindles, cradle: [+rig.cradle.x.toFixed(2), +rig.cradle.z.toFixed(2)],
       kits: Array.from(rig.kitPhase, (k) => KIT_PHASES[k]), card: ['hidden', 'showing', 'done'][rig.s.card], cardShows: rig.s.cardShows,
-      kitNear: +rig.s.kitNear.toFixed(2), snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, onward: rig.onwardMesh.count, still: +rig.s.still.toFixed(2),
+      kitNear: +rig.s.kitNear.toFixed(2), restShot: restShot.tried, snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, onward: rig.onwardMesh.count, still: +rig.s.still.toFixed(2),
     }),
   };
 }
