@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { createTrailUniforms, TRAIL_DECLARATIONS, TRAIL_BLEND } from './opening/paint';
+import { createLaneUniforms, LANE_BAND, LANE_DECLARATIONS } from './opening/lanePaint';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const INK = new THREE.Color(0x24160e);
@@ -43,6 +44,7 @@ export const RAMP_CANOPY = toonRamp([118, 178, 255]);
 export const RESTORE_SLOTS = 24;
 export const paintU = {
   ...createTrailUniforms(),
+  ...createLaneUniforms(),
   uRestore: { value: Array.from({ length: RESTORE_SLOTS }, () => new THREE.Vector4()) },
   uRestoreCount: { value: 0 },
   /** per restore: how far (m) its colour has bled out past the washed front (grows for a while after it settles) */
@@ -101,6 +103,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
         uniform int uRestoreCount;
         uniform float uRestoreBleed[${RESTORE_SLOTS}];
         ${TRAIL_DECLARATIONS}
+        ${LANE_DECLARATIONS}
         uniform vec3 uPaper;
         uniform vec3 uPaperInk;
         uniform float uLkContour;
@@ -119,10 +122,13 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           float lift = max(0.0, vLkWorld.y - uLkClimb.x) * uLkClimb.y;
           float drops = smoothstep(0.7, 0.78, lkNoise(xz * 1.3 + 11.0)) * (1.0 - step(0.2, lift));
           float paint = 0.0, tide = 0.0, bloom = 0.0, soft = 0.0;
+          ${LANE_BAND}
           for (int i = 0; i < ${RESTORE_SLOTS}; i++) {
             if (i >= uRestoreCount) break;
             vec4 r = uRestore[i];
             float d = length(xz - r.xy) - r.z + rag * min(1.0, r.z / 12.0) + lift;
+            // ...and runs on down the roads (DESIGN-corridors.md) as its colour bleeds
+            d -= laneRun * uLaneReach * uRestoreBleed[i];
             // tight front so the edge reads as a wet brush stroke, not an airbrushed blur
             float e = max(0.06, r.w * 0.16);
             float p = 1.0 - smoothstep(-e, e, d);
@@ -178,6 +184,38 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           // the bled halo: colour without the wet front (paler, part-way to paper), feathering the island's edge
           vec3 faded = mix(sepia, cel, 0.78);
           sepia = mix(sepia, faded, soft * (1.0 - paint));
+          // the roads' underpainting (DESIGN-corridors.md): painted verges either side of a saved-paper road, and a
+          // faint broken tide at the verge. Beige lane cel alone reads as paper, so the wash brings its own pigment.
+          const vec3 lw = vec3(0.2126, 0.7152, 0.0722);
+          // the sketch is not grey: it keeps a little of its authored hue at the paper's value, like a coloured-pencil
+          // underdrawing the fox's paint completes (DESIGN-corridors.md)
+          {
+            float cl = max(1e-3, dot(cel, lw));
+            vec3 hueAtPaper = cel * (dot(sepia, lw) / cl);
+            sepia = mix(sepia, hueAtPaper, uSketchTint * uLaneOn);
+          }
+          if (lane > 0.0) {
+            // ochre alone is the paper's own hue and vanishes into it: the verges are one sap-green family laid in
+            // value (pigment settles in the paper's valleys), with crisp-edged gold autumn-grass islands and madder
+            // flecks — washes with edges, never a rainbow airbrush
+            float gran = lkNoise(xz * 5.3 + 2.0) * 0.6 + lkNoise(xz * 1.4 + 8.0) * 0.4;
+            vec3 wash = mix(vec3(0.38, 0.56, 0.22), vec3(0.5, 0.64, 0.3), gran);
+            float gold = smoothstep(0.545, 0.565, lkFbm(xz * 0.16 + 7.0) + (lkNoise(xz * 1.9) - 0.5) * 0.06);
+            wash = mix(wash, vec3(0.92, 0.66, 0.18) * (0.9 + 0.2 * gran), gold);
+            float fleck = smoothstep(0.8, 0.83, lkNoise(xz * 1.1 + 2.0));
+            wash = mix(wash, vec3(0.86, 0.26, 0.2), fleck * 0.85);
+            float sl = dot(sepia, lw);
+            // laid a little darker than the paper and pushed past its own chroma: a pastel at paper value
+            // washes out under the haze and tone map
+            vec3 washC = wash * (0.8 * sl / dot(wash, lw));
+            washC = max(vec3(0.0), sl * 0.8 + (washC - sl * 0.8) * 1.8);
+            // the trodden middle is left as paper with a light warm-gold glaze, the way a watercolourist
+            // saves the white of a road between painted verges
+            washC = mix(washC, mix(sepia, vec3(0.98, 0.78, 0.42) * sl / 0.78, 0.5), laneCore * 0.85);
+            float under = lane * uLaneUnder * (0.85 + 0.3 * gran) * (1.0 - paint);
+            sepia = mix(sepia, washC, clamp(under, 0.0, 1.0));
+          }
+          sepia = mix(sepia, pigment, laneEdge * uLaneUnder * 0.35 * (1.0 - paint));
           outgoingLight = mix(sepia, cel, paint);
           outgoingLight = mix(outgoingLight, pigment, wet * 0.22);
           // brushy contour ink where the surface turns away from the eye
