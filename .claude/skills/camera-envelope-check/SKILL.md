@@ -60,3 +60,21 @@ constant-visible proxy as well as an actual visibility ray; collision geometry
 can exceed its rendered proxy. Do not remove that fixture. These finite checks
 do not prove arbitrary pathfinding completeness. Current review and actual
 source-pinned natural route evidence: `docs/reviews/swarm4/fern-bridge-recovery-final.md`.
+
+
+The current opening compression floor is 1.9 m (normal boom 2.45 m). A matched
+1.8 m regional drop left the tail on-screen but short of the strict 2% padding in
+two frames. Keep the body-margin gate; do not replace it with a size-only check.
+The probe imports the shared fox-size helper/gate and game hook rather than
+copying its projection math.
+
+World occlusion requires actual pixel review. `Fold.pivot` now requires the
+registered `FoldPivot` constructor in `opening/popUpRuin.ts`; a plain group must
+not silently enter the fold state machine. The previously unregistered upright
+return stair fan hid the fox at 48.43 s despite every numeric camera gate passing.
+After changing fold geometry or cutout ownership, play both the actual failed
+approach (`--miss-overlook --check-from 1 --expect-beat 'catch it on the overlook'
+--clip --clip-beat 'catch it on the overlook' --clip-seconds 8`) and the successful
+homeward descent (`--expect-beat homecoming --clip --clip-beat 'onto the return steps' --clip-seconds 6`). Keep full trace comparisons and inspect every frame,
+including the formerly hidden 48.43 s pose. The final review records the typed
+constructor negative and the 6,000-sample player/camera identity check.

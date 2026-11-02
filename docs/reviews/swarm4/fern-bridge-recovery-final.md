@@ -1,35 +1,87 @@
-# Keeping camera recovery review
+# Camera recovery and ruin visibility — final review
 
-Runtime under review: `6b820d9` (camera recovery `6ffe34c`, integration `d03831b`). Source remained fixed for the sequential browser regression queue. The camera uses the existing single follow rig, control yaw, height1.15m and side bias0.35.
+Approved for the recorded camera and visibility cases. The broad replay uses
+`aeaa2f1` (1.9 m opening clearance, single recovery solver, Wren's post-only slide).
+The final return-fold registration and typed constructor are verified on `653492e`.
+The original input route is unchanged; both experimental route workarounds were
+withdrawn after the controller correction.
 
-## Problem and change
+The natural Keeping approach previously stranded the lens 16.85 m from the
+walking fox. Recovery validates complete destinations before bounding their next
+step, shares swept terrain/collider clearance, and tries local detours before
+holding. The accepted natural route now peaks at 2.810 m grounded follow distance,
+with a minimum 44 px hero at 640×360. The bridge, walking surface and destination
+remain readable throughout its reviewed clip.
 
-The natural hearth → Carry → steam → root → released-tree bridge route completed, but the camera held an old clearance pose16.85m from the grounded fox. Minimum distance, pitch, speed and full-body viewport bounds all passed while the fox became a tiny speck. An isolated dev-release bridge start missed the approach history.
+## Played results
 
-The solver now rejects an infeasible final candidate before bounding its next step. Recovery shares terrain lifting and swept clearance between direct and escape candidates, and searches eight local directions around the previous lens before holding. A small local tie preference follows existing side bias. No additional camera rig, control transform or locomotion tuning was introduced.
+Every listed outcome and camera gate passes, with zero page/console errors.
+The [acceptance manifest](fern-camera-acceptance.json) records each source and check.
+Minimum hero height is measured over each whole run after its initial 1 s settle.
 
-Free release, obstructed release, terrain ridge and convex-post fixtures pass at30/60/120Hz. The post includes actual visibility and a constant-visible proxy because collision geometry can extend beyond its drawn proxy. Earlier solvers fail the corresponding ridge/post fixtures. These bounded examples do not establish arbitrary pathfinding completeness. TLC recheck passes9distinct ordering states (`/captures/fern/recovery-order-model.log`); geometry/recovery remain outside that abstraction.
+| Route | Verified outcome | Min hero px | Reviewed frames | Evidence directory |
+| --- | --- | ---: | ---: | --- |
+| Regional ledge drop | 7 real setup/fall/retry checks | 66.91 | 150 | `final-posts-regional-drop` |
+| Original chase | 3 catches, 0 skips, kept and pinned home | 40.50 | 60 | `final-posts-ruin-success` |
+| Missed overlook jump | Required jump beat, airborne departure and fall | 40.50 | 120 | `registered-fold-miss` |
+| Natural Keeping | Steam, root heat, bridge and crag | 44.00 | 60 | `final-posts-natural-keeping` |
+| Millbrook | Dam, kiln, Weir and lookout completed | 39.48 | 60 | `final-posts-millbrook` |
+| Finale handoff | 7 staged live-input legs completed | — | 45 | `final-posts-finale` |
+| Homeward stairs | 3 catches, return unfolded, home pinned | 40.50 | 90 | `registered-fold-home` |
+| Hermitage desk | 3 lines freed, paint and caption | 74.63 | 3 stills | `final-posts-desk` |
 
-## Played evidence
+There are 585 reviewed continuous frames: 540/540 animated-body samples retain
+the strict 2% viewport margin, plus 45 visually reviewed finale handoff frames.
+The desk uses three timed stills and explicit completion state. After settling, all camera-drop
+runs remain above the 24 px hero floor, with no sustained small-hero interval.
+The regional drop stages real dashes and placements to open the folds; the
+finale stages release, ember pickup and crag arrival. Their recorded movement is
+real input, but these starts do not establish discovery or an uninterrupted
+whole-game completion.
 
-Natural Keeping110s on the integrated runtime passes real steam/root completion, bridge crossing, crag arrival and terminal beat. Maximum grounded follow distance is2.799m, minimum chest clearance2.043m, maximum pitch29.13°, peak lens speed15.99m/s. Minimum projected feet-to-ears height is44px at640×360, with no interval below24px. All60bridge clip frames fit the body within the2% viewport margin and were visually reviewed: fox, walking surface and destination remain readable.
+## Clearance and world occlusion
 
-Evidence: `/captures/fern/recovery-final-keeping/` includes `evidence.json` (full `window.__game` state, trace, sourceSHA and staging), checks, four stills,60source frames, two reviewed contact sheets and `clip.webm`. `01-40.00s.png` shows the root hearth and bridge; `02-50.00s.png` shows the fox close to the destination. One initial placement near the first hearth; controller input thereafter, no forced release or paint.
+Matched 1.8/1.9 m trials isolate the compressed ruin landing. At 1.8 m two frames
+remain inside the screen but miss the 2% bottom padding (NDC y −0.976). At 1.9 m
+all 15 matched frames pass (minimum y −0.849, about 27 px bottom room at 360 px
+high); the full 150-frame drop then passes. The fox remains close and readable.
+The normal boom is 2.45 m. Sorrel independently reproduced the old two-frame
+failure and confirmed the 1.9 m result without relaxing the margin.
 
-Millbrook70s also passes all six chemistry/traversal/completion checks and its terminal beat. Minimum chest1.877m, pitch40.35°, peak12.03m/s, maximum grounded follow3.236m, minimum fox39.29px; no samples below24px. All60Weir drop frames fit the2% margin and were reviewed in order. The camera clears the ledge continuously, retains fox silhouette through the drop, and closes in again in the valley. Evidence: `/captures/fern/recovery-final-millbrook/`.
+Actual miss pixels exposed a separate failure despite passing every numeric
+gate: the upright return stair fan completely hid the fox at 48.43 s. Sorrel's
+registration fix is incorporated with attribution. All fold pivots now come from
+one constructor that registers their camera cutout, and `Fold` requires that
+constructor's type. A deliberate plain `THREE.Group` substitution fails TS2322;
+the restored source typechecks. The new 120-frame failed-approach clip keeps the
+fox visible through the fan; all 90 homeward frames retain a readable walking
+surface. The 2,700 miss and 3,300 success trace samples exactly match the previous
+player/camera snapshots. Registration changes visibility, not movement or framing.
 
-The legacy original-page run passes numeric camera checks but is **not accepted as a successful route**: after the second-fold dash it runs off the not-yet-open page, then stalls below it on the return-to-run-up beat (2catches). Its paired omit-overlook-jump run therefore cannot yet exercise the intended failed catch. Wren confirmed a controller regression and fixed it in `deb3b94`: slide under active walk/run steering, excluding dash, post-dash skid and idle coasting. An unsuccessful sideways-input trial was withdrawn; the original direct-dash route is restored. Actual final-catch and failed-catch camera cases require a retest on that controller fix.
+Direct comparison: `/captures/fern/registered-fold-miss/before-after.png`.
+Trace comparison: `/captures/fern/registered-fold-comparison.json`.
+The earlier 60-frame miss clip is rejected for visual approval and superseded by
+the repaired 120-frame clip. Older stalled chase runs are also rejected; the
+current miss guard requires the actual jump beat, airborne departure and fall.
 
-Staged finale replay passes7/7live-input legs with0errors: crag→Press→ember placement→completed card→return to meadow. Minimum chest across legs1.944m, maximum pitch29.12°, peak15.89m/s. All45sampled handoff frames were reviewed in sequence: the fox walks out from the cradle with continuous close framing, readable silhouette and supporting floor; the former release snap is absent. Evidence `/captures/fern/recovery-final-finale/` contains `trace.json`, `game.json` (`window.__game`),7leg stills,45source frames,2sheets and encoded handoff. Setup intentionally forces the Keeping release and stages ember pickup/crag start; this does not establish discovery or natural full-game completion.
+## Checks and evidence
 
-Hermitage80s uphill-facing route passes all three drying-line releases, paint, caption and terminal beat. Minimum chest1.842m, pitch37.78°, peak16.76m/s, grounded follow2.790m, minimum fox74.62px. `01-14.00s.png` shows book and caption comfortably above the fox. No errors. Evidence `/captures/fern/recovery-final-desk/`.
+Typecheck, feel lint, production build and free/ledge/ridge/post recovery fixtures
+pass; the fixtures cover 30/60/120 Hz, including collision geometry beyond its
+visibility proxy. TLC passes nine ordering states. That abstraction checks
+publication order, not geometric search completeness. The excessive 200 px floor
+negative independently fails the shared pixel gate while other camera checks
+pass (`shared-pixel-negative`, source `3ee5343`). The fold type negative is in
+`/captures/fern/fold-type-negative.log`.
 
-All four accepted place/finale checks are mirrored under `playtest-output/fox-spirit/fern-camera-recovery/`. The two legacy chase runs remain explicitly unaccepted until they exercise their intended outcomes. Recovery source was published as `6b820d9` before that separate harness/guard investigation concluded.
+The successful chase records a 0.75 m jump apex, 0.30 s to apex, 0.633 s airtime,
+four dashes and 2.132 m for its last dash. These are route measurements, not a
+whole-game feel verdict. The cutout follow-up preserves all 6,000 compared trace
+samples. No movement tuning was introduced by this camera/registration work.
 
-## Scope and limits
-
-The probe now checks sustained grounded follow distance≤5m and projected hero height≥viewportHeight/15, failing when the latter remains small for more than1s outside authored shots. A deliberately excessive200px CLI floor independently fails the pixel guard; all other camera checks pass in that negative run (`/captures/fern/fox-pixel-negative/`). Projection is feet-to-ears0.6m through the rendered lens, not a visibility or occlusion proof. Visual review remains necessary.
-
-Higher camera1.55m cropped more of the destination card; side bias0.6 faded the bridge beneath the feet. Both were rejected in favor of existing composition. Uphill Hermitage facing shows the book/quill and caption; deliberate backpedalling retains its existing heading and can put the desk at the edge. No forced turn was added.
-
-All captures use deterministic offline SwiftShader rendering, without audio; encoded clips play sampled frames at15fps. This is camera regression evidence, not a realtime performance, audio, or full-game feel certification.
+All directories above are under `/captures/fern/`, mirrored under
+`playtest-output/fox-spirit/fern-camera-recovery/`, and verified on the shared
+`keeping-swarm4-captures/fern/` volume. They retain named source, full
+`window.__game`, trace, checks, stills and source frames. Videos play the sampled
+frames at 15 fps, rendered offline with SwiftShader and no audio. They establish
+this bounded camera/visibility review, not real-time performance or audio quality.

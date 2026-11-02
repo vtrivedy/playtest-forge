@@ -480,7 +480,7 @@ A clear destination is not a clear connecting segment. Full staged finale route 
 
 ## Expanded-region camera and foreground sprites — Fern
 
-- A distance/pitch camera gate can pass while an animated tail leaves the viewport. Millbrook's27–29s wheel turn at1.5m failed6/30 skinned-body frames (maxNDCy1.233).1.8m and2.0m pass30/30; b24abc5 keeps1.8m with the larger hero. This supersedes the earlier ruin-only1.5m default, not its historical evidence. Project the full animated body and inspect actual pixels; shader flames, occlusion and UI are outside mesh-bounds checks.
+- A distance/pitch camera gate can pass while an animated tail leaves the viewport. Millbrook's27–29s wheel turn at1.5m failed6/30 skinned-body frames (maxNDCy1.233).1.8m and2.0m pass30/30; b24abc5 historically selected1.8m; current1.9m adds ruin-landing padding (see final camera review). This supersedes the earlier ruin-only1.5m default, not its historical evidence. Project the full animated body and inspect actual pixels; shader flames, occlusion and UI are outside mesh-bounds checks.
 -60e4a2c's full70s west route completes without debug restores or timeout skips: mill turning/painted,kiln lit/rode,Weir reached,bank-height bridge crossed,lookout painted.510/510 continuous body frames pass; all reviewed. Route module has precise bridge waypoints and an explicit completion beat; the runner's --expect-beat fails unfinished paths. Bramble42af413 fixes the genuine0.56m bridge-entry step that aligning the bot revealed.
 - A framed body can still be veiled by particles.8292211 caps shared updraft ember/leaf billboards at12/24px and fades both near the lens. No lift/heat/collider change. The actual-shader GPU probe measures pixels at known depths and proves the old shader fails4/6cases; farther-visible checks prevent a broken blank shader passing. d0a3ee3 full route+120-frame in-game hold/rise retest passes and remains readable with bloom. Workflow: .claude/skills/updraft-sprite-visibility/SKILL.md.
 - Final integrated7ea02f2 original90s success:3catches0skips,page pinnedhome,0JS/console errors; all7 staged finale legs and45 handoff frames pass. Review docs/reviews/swarm4/fern-millbrook-final.md names exact per-run scope. Body clearance/appearance proof is not a whole-game gait or unfamiliar-player discovery verdict. Source stays fixed during captures; tools now start ?manual=1 and retain console shader errors too.
@@ -496,12 +496,50 @@ A clear destination is not a clear connecting segment. Full staged finale route 
   exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.
 - Controller slide (moveTo glides round round posts only — trunks, pillars — never boxes) must only act while the player steers at walk/run pace into the post. Scripted routes are chaotic: a 2 cm nudge against a fold at 951 frames flipped a later 180° turn's side and walked the fox off a page (30 Hz). Restricting the slide to posts makes the full slice trace bit-identical to slide-off (`PLAY.slide=false`) at 30 Hz. Earlier: authored routes and puzzles rely on momentum (dash, post-dash skid, coasting) stopping dead at a blocker — the pop-up ruin folds broke when a post-dash skid slid round the fold (Fern, b24bf90 → fixed). `PLAY.slide` toggles it for A/B; `node tools/page-motion-probe.mjs --out DIR` (sim-only, ~2 min) is the full-slice regression: 3 catches, kept, home.
 
-## Fern — real-approach camera recovery (6b820d9, Nov2)
+## Camera recovery, clearance and fold visibility — Fern
 
-A cold released-tree start missed the terrain/post approach history: natural Carry→steam→root→tree bridge stranded the old clear lens16.85m from the grounded fox, despite passing minimum-distance/pitch/speed/body-in-view checks. Recovery6ffe34c validates complete candidate goals before bounding steps, shares terrain/swept clearance, and tries local detours around the previous lens. Current integrated natural route passes real progression with2.799m max grounded follow,44px min hero height at640×360,60/60body frames; full Millbrook passes3.236m/39px and60/60Weir-drop frames. Staged finale7/7legs+45handback frames and uphill Hermitage80s also pass. Review `docs/reviews/swarm4/fern-bridge-recovery-final.md`; raw__game/source/frames mirrored under `playtest-output/fox-spirit/fern-camera-recovery/`.
+A cold released-tree start missed the real approach history: Carry → steam → root
+→ tree bridge stranded the old lens 16.85 m from the grounded fox while minimum
+range, pitch, speed and body-in-view gates passed. Recovery `6ffe34c` validates
+complete goals before bounding their next step, shares swept terrain/collider
+checks and searches locally around the previous lens. The accepted natural run
+on `aeaa2f1` peaks at 2.810 m grounded follow distance with a minimum 44 px hero at
+640×360. Free/ledge/ridge/post fixtures pass at 30/60/120 Hz; the nine-state TLC
+model proves publication order only, not arbitrary geometric recovery.
 
-The camera probe now fails sustained grounded follow distance>5m and hero projected height<H/15 for>1s outside authored shots. Excessive200px floor negative fails independently;200is not default. Projection does not replace visual occlusion review. Free/ledge/ridge/post fixtures pass30/60/120Hz; the post includes a missing-render-proxy case. TLC9states still proves ordering only, no arbitrary geometric recovery theorem.
+Current opening compression is **1.9 m**, selected after the regional ruin drop
+revealed two 1.8 m frames with only four pixels of bottom padding. The matched
+1.9 m trial retains about 27 pixels, and the full 150-frame drop passes the same
+2% body margin. The normal boom is 2.45 m. Sorrel independently reproduced both
+results. Historical 1.5/1.8 m evidence remains useful but is not the current default.
 
-Regression caveat: d03831b's80°post slide lets the old direct-dash ruin script skirt a folded-page safety stop and fall before the page opens; it stalls with2catches. Its nominal camera pass is not full-route success, and its omit-overlook-jump twin never reaches the intended miss. Wren/Kit notified; camera recovery is separately published. Do not cite these two new runs as accepted chase outcomes.
+All route tools should use the shared game `foxScreenPx()` hook and
+`tools/lib/fox-size.mjs` gate: a 0.6 m feet-to-ears projection, minimum viewport
+height/15 (24 px at 360 px high), failing more than one second below that floor
+outside authored shots. The camera probe also checks grounded follow range ≤ 5 m
+after one second grounded. Its excessive 200 px negative fails independently.
+Neither projected size nor full-body bounds proves world visibility.
 
+Actual miss pixels caught an upright return stair fan fully hiding the fox while
+all numeric gates passed. It lacked occluder registration. Sorrel's fix is
+incorporated; `653492e` creates all folds through one registered constructor, and
+`Fold` requires its `FoldPivot` type. A raw `THREE.Group` substitution fails
+TS2322. The repaired 120-frame missed approach and 90-frame homeward descent were
+reviewed throughout; the fan fades, the fox stays visible, and the walking surface
+remains readable. All 6,000 compared player/camera trace samples match `aeaa2f1`.
 
+The earlier stalled chase runs are rejected as outcome evidence. Wren's
+`9e04283` confines sliding to round posts under active steering, restoring the
+authored fold stops. The original input route is unchanged again: the accepted
+110 s run has three catches, zero skips, kept page and pinned home. The miss guard
+requires the actual overlook-jump beat, an airborne departure and a fall below
+the leaf. A numeric camera pass on an unvisited test case is insufficient.
+
+Review `docs/reviews/swarm4/fern-bridge-recovery-final.md` and its JSON acceptance
+manifest for named sources and route scope. Accepted clips contain 585 reviewed
+continuous frames, with 540/540 strict body-margin samples and 45 visually reviewed
+finale handoff frames. Evidence includes full `window.__game`, source, traces,
+checks and screenshots under `/captures/fern/`, mirrored in
+`playtest-output/fox-spirit/fern-camera-recovery/` and verified on the shared
+`keeping-swarm4-captures/fern/` volume. These are offline, sampled 15 fps, silent
+camera reviews; they do not certify real-time performance or audio.
