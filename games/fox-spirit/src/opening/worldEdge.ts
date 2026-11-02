@@ -6,11 +6,10 @@
  */
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
-import { FINALE, VISTA } from './layout';
+import { VISTA } from './layout';
+import { EDGE } from './worldBounds';
 import { C, cyl, Kit } from './village';
 
-/** metres along the fall line past the crag (the lip starts at FINALE.hollow.lip) and the half-width across it */
-export const EDGE = { a: FINALE.hollow.lip + 1.5, half: 34, step: 2.6, height: 1.0, reach: 4 } as const;
 
 export function buildWorldEdge(ctx: OpeningCtx): void {
   const { groundH, colliders, scene } = ctx;
