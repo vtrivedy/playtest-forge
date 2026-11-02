@@ -49,7 +49,12 @@ const MAX_FORCE = 2;
 /** the coda sings the tune's last line (tla CodaFrom = bars - 4) */
 const CODA_BARS = 4;
 
+/** semitones down to the diatonic third below a note (C major; semis = note above the key) */
+const THIRD_DOWN = Int8Array.from([3, 3, 3, 3, 4, 3, 4, 3, 4, 4, 4, 4]);
 // cold:end
+function thirdBelow(semis: number): number {
+  return THIRD_DOWN[((semis % 12) + 12) % 12]!;
+}
 function hz(m: number): number {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
@@ -390,7 +395,11 @@ class Hearthsong extends AudioWorkletProcessor {
       } else {
         this.lGate = 0;
         const hint = this.pass % 4 === 2;
-        if (n >= 0 && (!hint || slot === 0)) this.pluck(n + 12, 0.5 * human, 0.025);
+        if (n >= 0 && (!hint || slot === 0)) {
+          this.pluck(n + 12, 0.5 * human, 0.025);
+          // later hearings are harmonized: a diatonic third under the tune (a second hand on the harp)
+          if (this.pass >= 2 && !hint && lv[0]! > 0.5) this.pluck(n + 12 - thirdBelow(n - s.key), 0.3 * human, 0.03);
+        }
       }
       if ((singing ? lv[4]! > 0.02 : lv[4]! > 0.4) && (slot === 0 || slot === 3) && this.rand() < (singing ? 0.7 : 0.35)) {
         this.bell(s.key + 24 + chords[cb + Math.floor(this.rand() * 3)]!, 0.5 * human);
