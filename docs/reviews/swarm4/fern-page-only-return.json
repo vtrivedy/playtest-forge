@@ -1,0 +1,15 @@
+{
+  "sha": "075662b4af6ef3fa3f3d5ed542a789eb755a5d54",
+  "checks": {
+    "remotePending": true,
+    "remoteMotes": true,
+    "allWalkLegs": true,
+    "noRevealWhileWalking": true,
+    "revealOnPause": true,
+    "movementYields": true,
+    "optionalNotRequired": true,
+    "noErrors": true
+  },
+  "allPass": true,
+  "staging": "Initial remote meadow teleport and page-kept hook only; no creatures freed. Ordinary input walking home and movement interruption thereafter."
+}
