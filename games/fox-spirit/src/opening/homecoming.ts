@@ -55,8 +55,8 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       cap.position.y = y;
       body.add(cap);
     }
-    // the flame-glow inside: a warm core that blooms through the paper when lit
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.155, 12, 8).scale(1, 1.2, 1), new THREE.MeshBasicMaterial({ color: 0xff7a1e, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
+    // the glow: a warm shell clear of the paper (no coplanar flicker) that blooms when lit
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.175, 12, 8).scale(1, 1.2, 1), new THREE.MeshBasicMaterial({ color: 0xff7a1e, transparent: true, opacity: 0, depthWrite: false, toneMapped: false }));
     body.add(core);
     frame.add(g);
     return { g, body, paper, core, lit: -1, seed: i * 1.7 };
@@ -123,8 +123,9 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       // pinned with a little bounce, then it stirs in the wind about its tack
       const pop = Math.min(1, pinned / 0.5);
       pin.scale.setScalar(pop < 1 ? 0.2 + 0.8 * (1 - Math.pow(1 - pop, 3)) * (1 + 0.12 * Math.sin(pop * Math.PI)) : 1);
-      pin.rotation.z = Math.sin(clock * 1.3) * 0.05 + Math.sin(clock * 3.1) * 0.015;
-      pin.rotation.x = -0.06 - Math.max(0, Math.sin(clock * 0.9)) * 0.12;
+      // one slow, shallow sway (no fast component: a pinned page at rest must read still, not jittery)
+      pin.rotation.z = Math.sin(clock * 0.8) * 0.035;
+      pin.rotation.x = -0.08 - (0.5 + 0.5 * Math.sin(clock * 0.6)) * 0.06;
     }
     // the freed come home: the hare walks back, the heron wheels over (each once, whenever it is free)
     for (const c of unpressed.state().creatures) {
@@ -146,7 +147,8 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       if (l.lit < 0) continue;
       l.lit += dt;
       const k = THREE.MathUtils.smoothstep(l.lit, 0, 0.6);
-      const flick = 0.92 + 0.08 * Math.sin(clock * 9 + l.seed) * Math.sin(clock * 5.3 + l.seed * 2);
+      // a slow candle breath, not a flicker
+      const flick = 0.96 + 0.04 * Math.sin(clock * 2.2 + l.seed) * Math.sin(clock * 1.3 + l.seed * 2);
       (l.core.material as THREE.MeshBasicMaterial).opacity = 0.5 * k * flick;
       // lit paper glows amber, not white: the paper tints warm and the flame shows through as an orange bloom
       l.paper.color.copy(PAPER).lerp(AMBER, k);

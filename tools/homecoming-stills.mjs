@@ -1,13 +1,17 @@
 // Homecoming at the well (DESIGN-homecoming.md) stills: free every creature (dev unpress; the fox shadows the
 // hare along its jog so it leads), then force the kept page (dev hook) and watch the well: the page pinned,
 // lanterns kindling as each comes home, the heron's wheel, the hare's walk back, the well filled with light.
-//   node tools/homecoming-stills.mjs [outDir]
+//   node tools/homecoming-stills.mjs [outDir] [--clip]
+// --clip also renders a continuous 30 fps clip (pinned page + lit lanterns at rest, then the fox walking up to
+// the well in the chase cam) to clip.mp4, for motion/jitter review.
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
-const out = path.resolve(process.argv[2] ?? '/tmp/homecoming-stills');
+const out = path.resolve(process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : '/tmp/homecoming-stills');
+const clip = process.argv.includes('--clip');
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5194, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
 await server.listen();
@@ -61,6 +65,25 @@ try {
   await lens('05-all-lit', CAM, WELL, 360);
   await lens('06-well-full', [-5.0, 2.6, 88.0], [-8, 0.6, 85], 120);
   await lens('07-lanterns-close', [-6.2, 1.4, 87.4], [-8, 2.0, 85], 30);
+  if (clip) {
+    const dir = path.join(out, 'frames');
+    fs.mkdirSync(dir, { recursive: true });
+    let n = 0;
+    const frame = async (setup) => {
+      await page.evaluate(setup);
+      await page.screenshot({ path: path.join(dir, `f${String(n++).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 90 });
+    };
+    // 4 s fixed lens on the pinned page and lanterns (2 sim steps per 30 fps frame)
+    for (let i = 0; i < 120; i++)
+      await frame(() => { const h = window.__gameHooks; h.advance(2, 1 / 60, false); const c = window.__opening.camera; c.position.set(-7.0, 1.5, 87.9); c.lookAt(-8.9, 1.5, 85.6); c.updateMatrixWorld(); h.advance(0, 1 / 60, true); });
+    // 5 s chase cam: the fox walks in from the lane mouth to the well
+    await page.evaluate(() => { const h = window.__gameHooks; h.teleport(-3.0, 91.0, Math.atan2(-5, -6)); h.advance(30, 1 / 60, false); });
+    for (let i = 0; i < 150; i++)
+      await frame(() => { const h = window.__gameHooks; const s = h.state(); const dx = -7.4 - s.pos[0], dz = 87.6 - s.pos[2], d = Math.hypot(dx, dz); h.setStick(d > 0.6 ? (dx / d) * 0.6 : 0, d > 0.6 ? (dz / d) * 0.6 : 0); h.advance(2, 1 / 60, true); });
+    const ff = execFileSync('python3', ['-c', 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
+    execFileSync(ff, ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(dir, 'f%04d.jpg'), '-c:v', 'libx264', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, 'clip.mp4')]);
+    log.push(['clip', n]);
+  }
   log.push(['creatures', await page.evaluate(() => window.__gameHooks.state().opening.unpressed.creatures)]);
 } finally {
   fs.writeFileSync(path.join(out, 'evidence.json'), JSON.stringify({ log, errors }, null, 2));
