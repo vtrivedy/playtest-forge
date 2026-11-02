@@ -18,6 +18,8 @@ const EMBER = 0xd8743a;
 /** shed leaves glow a step hotter than the coat so the far response reads at chase distance */
 const SHED_EMBER = 0xf2954a;
 const SHED = 90;
+/** the finale's leaf river: every lobe lets go */
+const FALL = 360;
 
 function silhouette(color: number, vertexColors = false): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({ color, vertexColors, fog: false });
@@ -74,8 +76,10 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
   const PADS: Array<[number, number, number, number]> = [
     [2.5, crag + 20.5, 0.5, 4.6], [-1.5, crag + 19, 2, 3.4], [7.5, crag + 18.5, -1, 3.6], [10.5, crag + 14.5, 0.5, 3.2], [-3.5, crag + 14, 1, 3], [5, crag + 12, 2.5, 2.8], [6, crag + 22.5, 1, 2.4],
   ];
+  const pads: THREE.Object3D[] = [];
   for (const [x, y, z, r] of PADS) {
     const pad = inked(canopyPad(rand, r, r * 0.42, PRESSED), canopy, 0.03, true);
+    pads.push(pad);
     pad.position.set(x, y, z);
     pad.rotation.y = rand() * 6.28;
     root.add(pad);
@@ -135,6 +139,17 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
   ctx.scene.add(hero);
   const heroState = { age: -1, from: new THREE.Vector3() };
 
+  // the finale: every lobe lets go in a long river of leaves down the mountain, and the Crown stands bare in the snow
+  const river = new THREE.InstancedMesh(leafGeo, leafMat, FALL);
+  river.frustumCulled = false;
+  river.count = 0;
+  root.add(river);
+  const riverSeed = new Float32Array(FALL * 5);
+  for (let i = 0; i < FALL; i++) riverSeed.set([Math.floor(rand() * pads.length), rand(), rand(), rand(), rand()], i * 5);
+  const padScale = pads.map((p) => p.scale.x);
+  let fallT = -1;
+  const rv = new THREE.Vector3();
+
   let released = false;
   let release = 0;
   let leavesOut = 0;
@@ -156,8 +171,40 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
     heroState.from.set(f.x + 1.6, f.y + 5.5, f.z - 1.2);
   }
 
+  /** the finale's river: analytic per leaf (no per-frame allocation) */
+  function stepFall(dt: number): void {
+    fallT += dt;
+    let n = 0;
+    for (let i = 0; i < pads.length; i++) {
+      // lobes thin out one after another over ~9 s, the held cluster last
+      const k = 1 - THREE.MathUtils.smoothstep(fallT, 0.5 + i * 0.9, 4 + i * 0.9);
+      pads[i]!.scale.setScalar(padScale[i]! * Math.max(0.001, k));
+      pads[i]!.visible = k > 0.002;
+    }
+    limbPad.scale.setScalar(Math.max(0.001, 1 - THREE.MathUtils.smoothstep(fallT, 6, 10)));
+    for (let i = 0; i < FALL; i++) {
+      const o = i * 5;
+      const a = fallT - (i / FALL) * 9 - riverSeed[o + 1]! * 0.8;
+      const life = 11 + riverSeed[o + 2]! * 6;
+      if (a < 0 || a > life) continue;
+      const pad = pads[riverSeed[o]!]!;
+      const r = 3 + riverSeed[o + 3]! * 2;
+      rv.set(
+        pad.position.x + (riverSeed[o + 3]! - 0.5) * r * 2 - (1.6 + riverSeed[o + 4]! * 2.4) * a + Math.sin(a * 1.3 + i) * 1.4,
+        pad.position.y + (riverSeed[o + 4]! - 0.5) * 3 - (1.1 + riverSeed[o + 2]!) * a,
+        pad.position.z + (riverSeed[o + 2]! - 0.5) * r * 2 + (riverSeed[o + 1]! - 0.5) * 2 * a,
+      );
+      e.set(a * 1.7 + i, a * 0.9, Math.sin(a * 2 + i) * 0.8);
+      s.setScalar(3.2 * Math.min(1, a * 2) * (1 - THREE.MathUtils.smoothstep(a, life - 2, life)));
+      river.setMatrixAt(n++, m4.compose(rv, q.setFromEuler(e), s));
+    }
+    river.count = n;
+    river.instanceMatrix.needsUpdate = true;
+  }
+
   ctx.onUpdate((dt, t) => {
     for (const { m, base, mistK } of mats) m.color.copy(base).lerp(mist, mistK);
+    if (fallT >= 0) stepFall(dt);
     if (!released) {
       // pressed: the limb trembles very slightly, never sways
       limb.rotation.z = POSE.pressed + Math.sin(t * 7.3) * 0.002;
@@ -210,8 +257,13 @@ export function createCrown(ctx: OpeningCtx, mist: THREE.Color) {
 
   return {
     respond,
+    /** the finale: the Crown lets go of every leaf it was holding (also answers, if it hadn't yet) */
+    letGo(): void {
+      respond();
+      if (fallT < 0) fallT = 0;
+    },
     /** world point to frame the Crown from review shots */
     focus: () => root.localToWorld(V(0, crag + 12, 0)),
-    state: () => ({ released, release: +release.toFixed(2), limb: +limb.rotation.z.toFixed(3), leaves: leavesOut, heroLeaf: hero.visible }),
+    state: () => ({ released, release: +release.toFixed(2), fall: +fallT.toFixed(2), limb: +limb.rotation.z.toFixed(3), leaves: leavesOut, heroLeaf: hero.visible }),
   };
 }
