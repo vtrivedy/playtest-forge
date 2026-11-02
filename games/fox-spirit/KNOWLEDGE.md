@@ -347,7 +347,7 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
 
 ## Finale / Press Hollow (Wren, swarm4)
 
-- The vista valley past the far crag was already walkable from the meadow's south edge (x 8–16, z 58–62 slopes into it); any "one-way" gate there needs a real ledge, not an assumption. The finale gates on the Keeping having settled instead (TLA `Finale.tla`).
+- A painted lane is not a walkable lane: PATHS/pathDist only flattens the swell term, the rim term still raises a cliff under the paint. Sorrel's input-only probe (057bd1b) stalled the authored south lane at (9.2, 61.0) and two alternate meadow approaches too. Carve terrain from the same line that paints it (`SOUTH_LANE` → PATHS + `southLane()` trough in layout.ts, 77d303a) and prove it with an input-only walk both ways (`tools/finale-lane-probe.mjs`, Sorrel's `tools/finale-access-probe.mjs`). The finale's story gate is the Press itself (sealed until the Keeping settles; TLA `Finale.tla`), not terrain.
 - Walk limits come from `moveTo`'s 0.28 m forward probe: a rise ≤ step + 0.15 = 0.37 m per 0.28 m (~53°) is walkable. Only steeper than ~1.3 rise/run blocks; a 1.85 m jump apex is the other bound.
 - Glide off the far crag (top 9.46) into the hollow (floor ≈ 0.5) carries ≈ 18 m horizontally with the ember in the mouth (finale-route trace, 308958d).
 - Carry places into a bowl only when the fox stands within `bowlReach` (1.6 m) on the same floor; otherwise it sets warmth at the feet. Route bots must stop ≤ ~0.9 m from a bowl.
