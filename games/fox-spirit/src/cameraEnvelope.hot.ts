@@ -1,12 +1,14 @@
 import * as THREE from 'three';
+import { terrainBodyVisibility } from './cameraTerrain.hot';
 
 const ESCAPE_ANGLES = [15, -15, 30, -30, 45, -45, 60, -60, 90, -90, 120, -120, 150, -150, 180];
 const MAX_PITCH_TAN = Math.tan(THREE.MathUtils.degToRad(55));
 
 type EnvelopeOptions = {
-  params: { minDistance: number; distance: number; clearance: number; sideBias: number };
+  params: { minDistance: number; distance: number; clearance: number; sideBias: number; terrainBodyWidth?: number };
   previousLens: THREE.Vector3;
   surfaceAt?: (x: number, z: number, refY: number) => number;
+  terrainAt?: (x: number, z: number) => number;
   lensBlocked?: (x: number, y: number, z: number, radius: number) => boolean;
   yaw: () => number;
   sightFraction: (focus: THREE.Vector3, lens: THREE.Vector3) => number;
@@ -34,6 +36,34 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
   }
   function floorClear(point: THREE.Vector3): boolean {
     return floorClearAt(point.x, point.y, point.z);
+  }
+  function terrainVisibility(point: THREE.Vector3): number {
+    return opts.terrainAt ? terrainBodyVisibility(focus.x, focus.y, focus.z, point.x, point.y, point.z, opts.terrainAt, params.terrainBodyWidth ?? .28) : 1;
+  }
+  function keepBodyRoom(): void {
+    const cx = candidateLens.x - focus.x, cz = candidateLens.z - focus.z;
+    const cr = Math.hypot(cx, cz), minimumRoom = bodyRadius(candidateLens);
+    if (cr < minimumRoom) {
+      candidateLens.x = focus.x + (cr > .01 ? cx / cr : ux) * minimumRoom;
+      candidateLens.z = focus.z + (cr > .01 ? cz / cr : uz) * minimumRoom;
+    }
+  }
+  function boundBodyStep(maximumStep: number): boolean {
+    keepBodyRoom();
+    if (candidateLens.distanceTo(previousLens) <= maximumStep) return true;
+    // Projecting a clipped chord outside body room can exceed its travel cap.
+    const tx = candidateLens.x - previousLens.x, ty = candidateLens.y - previousLens.y, tz = candidateLens.z - previousLens.z;
+    let low = 0, high = 1;
+    for (let i = 0; i < 12; i++) {
+      const t = (low + high) * .5;
+      candidateLens.set(previousLens.x + tx * t, previousLens.y + ty * t, previousLens.z + tz * t);
+      keepBodyRoom();
+      if (candidateLens.distanceTo(previousLens) <= maximumStep) low = t;
+      else high = t;
+    }
+    candidateLens.set(previousLens.x + tx * low, previousLens.y + ty * low, previousLens.z + tz * low);
+    keepBodyRoom();
+    return candidateLens.distanceTo(previousLens) <= maximumStep + .00001;
   }
   function liftCandidate(maximumStep: number): void {
     const floor = opts.surfaceAt?.(candidateLens.x, candidateLens.z, candidateLens.y + 1.5);
@@ -76,12 +106,8 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
       if (travel > maximumStep) candidateLens.lerpVectors(previousLens, candidateLens, maximumStep / travel);
       liftCandidate(maximumStep);
     }
-    const cx = candidateLens.x - focus.x, cz = candidateLens.z - focus.z;
-    const cr = Math.hypot(cx, cz), minimumRoom = bodyRadius(candidateLens);
-    if (cr < minimumRoom) {
-      candidateLens.x = focus.x + (cr > .01 ? cx / cr : ux) * minimumRoom;
-      candidateLens.z = focus.z + (cr > .01 ? cz / cr : uz) * minimumRoom;
-    }
+    if (previousFree) { if (!boundBodyStep(Math.max(.08, 16 * dt))) return; }
+    else keepBodyRoom();
     let cost = candidateLens.distanceToSquared(lens) * .2 + goalLens.distanceToSquared(lens) * .2 + (previousFree ? candidateLens.distanceToSquared(previousLens) * .8 : 0);
     if (local) {
       const sx = candidateLens.x - previousLens.x, sz = candidateLens.z - previousLens.z;
@@ -92,8 +118,11 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
     }
     if (cost >= best || !floorClear(candidateLens) || blocked(candidateLens.x, candidateLens.y, candidateLens.z, standoff)) return;
     if (previousFree && !pathClear()) return;
-    const visibility = opts.sightFraction(focus, candidateLens);
-    const visibleCost = cost + (1 - visibility) * params.distance * params.distance * 4;
+    const visibility = Math.min(opts.sightFraction(focus, candidateLens), terrainVisibility(candidateLens));
+    // A clipped first step can still have the same obstructed view. Score the
+    // destination too, so that visibility plateaus cannot strand the recovery.
+    const goalVisibility = terrainVisibility(goalLens);
+    const visibleCost = cost + (2 - visibility - goalVisibility) * params.distance * params.distance * 4;
     if (visibleCost >= best) return;
     best = visibleCost;
     freeLens.copy(candidateLens);
@@ -102,7 +131,7 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
     const blocked = opts.lensBlocked;
     if (!blocked) return false;
     focus = nextFocus; lens = nextLens; dt = nextDt;
-    const desiredFree = !blocked(lens.x, lens.y, lens.z, .35) && bodyClear(lens) && floorClear(lens);
+    const desiredFree = !blocked(lens.x, lens.y, lens.z, .35) && bodyClear(lens) && floorClear(lens) && terrainVisibility(lens) > .99;
     if (desiredFree) {
       // Release an elevated escape pose along a checked segment instead of
       // dropping straight back to the unconstrained spring in one frame.
@@ -111,7 +140,7 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
         && !blocked(previousLens.x, previousLens.y, previousLens.z, .2)) {
         candidateLens.lerpVectors(previousLens, lens, maximumStep / travel);
         liftCandidate(maximumStep);
-        const clear = bodyClear(candidateLens) && floorClear(candidateLens) && pathClear();
+        const clear = boundBodyStep(maximumStep) && bodyClear(candidateLens) && floorClear(candidateLens) && pathClear() && terrainVisibility(candidateLens) > .99;
         if (clear) { lens.copy(candidateLens); return true; }
       }
       if (firstFrame || travel <= maximumStep) return false;

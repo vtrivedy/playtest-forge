@@ -474,6 +474,7 @@ export function createPlay(opts: {
   }
   const cam = createFollowCamera({
     surfaceAt: (x, z) => surface(x, z, false, fox.root.position.y + P.step),
+    terrainAt: groundH,
     lensBlocked,
     scenery: sightProxies,
     params: {
@@ -537,6 +538,7 @@ export function createPlay(opts: {
       c.add(cam.params, 'lag', 0, 0.5, 0.01);
       c.add(cam.params, 'fallLag', 0.02, 0.14, 0.005);
       c.add(cam.params, 'sideBias', -1, 1, 0.01);
+      c.add(cam.params, 'terrainBodyWidth', .1, .45, .01).name('terrain body reserve');
     });
   }
 

@@ -73,6 +73,8 @@ export type CameraTunables = {
   /** Weight of the predicted landing in the look target while airborne */
   landingBias: number;
   clearance: number;
+  /** Half-width of the body sight reserve against terrain; independent of point-floor clearance. */
+  terrainBodyWidth: number;
   shake: number;
 };
 
@@ -118,6 +120,7 @@ const wrap = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
 export function createFollowCamera(opts: {
   /** Walkable surface the boom must stay above; refY = height the camera is working at */
   surfaceAt?: (x: number, z: number, refY: number) => number;
+  terrainAt?: (x: number, z: number) => number;
   /** Scene-owned solid-volume query; separate from one-way walkable floors. */
   lensBlocked?: (x: number, y: number, z: number, radius: number) => boolean;
   /** Static world geometry, including decorative posts without gameplay colliders. */
@@ -146,6 +149,7 @@ export function createFollowCamera(opts: {
     jumpTrack: 0.8,
     landingBias: 0.24,
     clearance: 0.55,
+    terrainBodyWidth: .28,
     shake: 1,
     ...opts.params,
   };
@@ -377,7 +381,7 @@ export function createFollowCamera(opts: {
   const safeLens = new THREE.Vector3();
   const previousLens = new THREE.Vector3();
   const clearLensVolume = createCameraEnvelope({
-    params, previousLens, surfaceAt: opts.surfaceAt, lensBlocked: opts.lensBlocked,
+    params, previousLens, surfaceAt: opts.surfaceAt, terrainAt: opts.terrainAt, lensBlocked: opts.lensBlocked,
     yaw: () => yaw,
     sightFraction: (focus, lens) => {
       const blockerName = sceneryName;

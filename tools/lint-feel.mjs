@@ -12,6 +12,8 @@ import { lintTeachOrderSource, teachOrderSelfTest } from './teach-order-lint.mjs
 import { lintDiscoverySafety, discoverySafetySelfTest } from './discovery-safety-lint.mjs';
 import { lintSavedOpening, savedOpeningSelfTest } from './saved-opening-lint.mjs';
 import { lintAutumnSave, autumnSaveSelfTest } from './autumn-save-lint.mjs';
+import { lintTerrainCameraBinding, terrainCameraBindingSelfTest } from './camera-terrain-lint.mjs';
+terrainCameraBindingSelfTest();
 autumnSaveSelfTest();
 savedOpeningSelfTest();
 discoverySafetySelfTest();
@@ -52,6 +54,7 @@ const RULES = [
 const findings = [];
 findings.push(...lintSavedOpening(fs.readFileSync(`${ROOT}/scene.ts`, 'utf8')));
 findings.push(...lintAutumnSave(fs.readFileSync(`${ROOT}/scene.ts`, 'utf8'), fs.readFileSync(`${ROOT}/autumnProgress.hot.ts`, 'utf8')));
+findings.push(...lintTerrainCameraBinding(fs.readFileSync('games/fox-spirit/src/lookdevPlay.ts', 'utf8'), fs.readFileSync('games/fox-spirit/src/camera.ts', 'utf8')));
 findings.push(...lintDiscoverySafety(`${ROOT}/discovery.hot.ts`,fs.readFileSync(`${ROOT}/discovery.hot.ts`,'utf8')));
 for (const name of ['teach.ts', 'teach.hot.ts', 'scene.ts']) {
   const file = path.join(ROOT, name);
