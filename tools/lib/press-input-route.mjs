@@ -95,5 +95,14 @@ await shot('09-the-press');
 
 const final = await page.evaluate(()=>window.__gameHooks.state());
 if(final.opening.press.done.length!==3)throw Error('Physical Press input route did not restore all three levels');
+const progress = final.opening.worlds.progress.worlds.press;
+if(progress.ability!=='Inkstep' || progress.fill!==1 || progress.restored.length!==3)throw Error('Physical Press completion did not earn Inkstep and fill Maple');
+await page.evaluate(()=>window.__gameHooks.advance(120,1/60,false));
+await shot('10-scribe-hold');
+await page.evaluate(()=>window.__gameHooks.advance(120,1/60,false));
+await shot('11-scribe-coda');
+await page.keyboard.press('Tab');
+await shot('12-album');
+await page.keyboard.press('Tab');
 return final;
 }

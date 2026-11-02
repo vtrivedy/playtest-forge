@@ -17,6 +17,7 @@ import { bakeLaneMap } from './lanePaint';
 import { buildWorldEdge } from './worldEdge';
 import { buildWorlds } from './worldsScene';
 import { buildWarden } from './warden';
+import { buildPressStacks } from './pressStacks';
 import { SEEDWELLS, WORLDS } from './worlds';
 import { createWorldProgress } from '../worlds/progress';
 import { createPageMap } from '../worlds/pageMap';
@@ -267,6 +268,9 @@ export async function runOpening(): Promise<void> {
   const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level) });
   // world III (the Scribe's Press, x ≈ −700, Thistle): its drafts join the updraft read the controller glides on
   const pressWorld = buildPress(ctx, { complete: (level) => progress.complete('press', level), hasInkstep: () => progress.hasAbility('press'), restored: (level) => progress.isRestored('press', level) });
+  // a side climb in the Press: the Scribe's Stacks (secret page above the ridge)
+  const stacks = buildPressStacks(ctx);
+  ctx.onUpdate((dt) => stacks.update(dt, fox.root.position));
   {
     const hearthLift = hearth.updrafts.liftAt;
     hearth.updrafts.liftAt = (x, feetY, z, out) => {

@@ -145,3 +145,13 @@ positions without changing the opening spawn. Fix the landing or missing occlude
 Extend the physical portal circuit with optional Press puzzle-route acceptance. Reuse Thistle's documented movement
 sequence through a dedicated input helper after real hub entry; assert all three physical completion facts and earned
 Inkstep, then walk home. This proves solvability from the hub, not blind insight. Retain all intermediate frames.
+
+Update independent Ashwater acceptance for the Weir Heart cistern: retain the physical fresh-boot entry, then test
+that standing on a reed mat sinks it and returns the fox to dry footing. After draining the mill pool, enter the
+cistern, climb the weir and dash its third reed gate. Assert a risen pool and active flood before using the punt
+and east wall to reach the Seedwell. Retain full states at the drained, flooded and completed beats; this is
+solvability evidence, not blind puzzle discovery or a duration target.
+
+Both foreign-world physical routes must assert canonical earned ability and full Seedwell fill as well as local
+puzzle facts. Capture the Album with native Tab at completion and close it before return travel. On the Press route,
+retain two later stationary scene frames across the Scribe's lever/coda hold; sampled frames do not prove animation.
