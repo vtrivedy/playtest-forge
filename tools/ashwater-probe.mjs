@@ -41,7 +41,9 @@ const go = async (lx, lz, o = {}) => {
       const k = Math.min(1, d / 0.8) * (o.speed ?? 1);
       h.setStick(d > 0.05 ? (dx / d) * k : 0, d > 0.05 ? (dz / d) * k : 0);
       const keys = [];
-      if (o.jump && n < (o.hold ?? 40)) keys.push('Space');
+      // a running jump: hold Space from the moment the fox is within `jumpAt` of the target (default: at once)
+      if (o.jump && d < (o.jumpAt ?? 99)) o.jumped = o.jumped ?? n;
+      if (o.jump && o.jumped !== undefined && n - o.jumped < (o.hold ?? 40)) keys.push('Space');
       if (o.dash && n >= (o.dashAt ?? 0) && n < (o.dashAt ?? 0) + 4) keys.push('ShiftLeft');
       h.setKeys(keys);
       h.advance(1, 1 / 60, false);
@@ -74,27 +76,28 @@ try {
   for (const [x, z] of [[-3, -33], [0, -28.5], [0, -20], [0, -13]]) await go(x, z);
   await settle(90);
   await shot('03-reed-island');
-  // Level 2, Reed Pond: hop the mats (jump held into a glide), branch to the islet first
-  await go(-1.2, -8.6);
-  const hop = async (x, z) => { await go(x, z, { jump: true, hold: 45, max: 200, reach: 0.5, land: true }); await settle(12); };
-  await hop(-1.2, -5.6); await hop(1.2, -1.6); await hop(-1.2, 2.4);
+  // Level 2, Reed Pond: running jumps mat to mat, the branch out to the islet first
+  const hop = async (x, z) => { await go(x, z, { jump: true, jumpAt: 2.3, hold: 14, max: 240, reach: 0.6, land: true }); };
+  const M = [[-0.8, -6.0], [0.8, -3.0], [0, 0]];
+  const B = [[3.2, 0.5], [6.4, 0.2], [9.6, 0.7], [12.8, 0.4], [16.0, 0.8], [19.2, 0.6], [22.6, 1.0]];
+  await go(-0.8, -10.2);
+  for (const [x, z] of M) await hop(x, z);
   await shot('04-mats');
-  await hop(3.4, 2.8); await hop(8.0, 3.2); await hop(12.6, 3.4); await hop(17.2, 3.3); await hop(22.4, 3.4);
+  for (const [x, z] of B) await hop(x, z);
   // Level 3 part: dash the islet's dam
-  await go(25.6, 3.4, { dash: true, dashAt: 1, max: 60, reach: 0.6 });
+  await go(26.2, 1.0, { dash: true, dashAt: 1, max: 60, reach: 0.6 });
   await settle(240);
   await shot('05-pool-drained');
-  await hop(17.2, 3.3); await hop(12.6, 3.4); await hop(8.0, 3.2); await hop(3.4, 2.8); await hop(-1.2, 2.4);
-  await hop(1.2, 6.6); await hop(-1.0, 10.9); await hop(0, 15.4);
+  for (const [x, z] of [...B.slice(0, -1).reverse(), [0, 0], [-0.9, 3.0], [0.6, 6.0], [-0.5, 9.0], [0.4, 12.0], [0, 15.2]]) await hop(x, z);
   await go(0, 17.5);
   await shot('06-mill-shore');
   // the drained pool and its steps
   await go(0, 26.8);
-  for (let i = 0; i < 7; i++) await go(0, 28.3 + i * 0.86, { jump: true, hold: 14, max: 120, reach: 0.4, land: true });
+  for (let i = 0; i < 8; i++) await go(0, 27.8 + i * 0.86, { jump: true, hold: 14, max: 120, reach: 0.4, land: true });
   await go(0, 36.5, { jump: true, hold: 14, max: 120, land: true });
   await shot('07-weir');
   await go(14, 40);
-  await go(26.5, 40.5, { jump: true, hold: 200, max: 400, reach: 0.8, land: true });
+  await go(26.5, 40.5, { jump: true, jumpAt: 8.6, hold: 200, max: 400, reach: 0.8, land: true });
   await settle(200);
   await shot('08-seedwell');
 } catch (e) {
