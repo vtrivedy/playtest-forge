@@ -199,6 +199,13 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
   ctx.occluders.push(built);
 
   const weather = buildWeather(scene);
+  // travelling turns a page: a paper wash covers the lens at the jump and clears over ~0.6 s
+  const fadeMat = new THREE.MeshBasicMaterial({ color: 0xe9dfc8, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false, fog: false });
+  const fade = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), fadeMat);
+  fade.position.set(0, 0, -0.3);
+  fade.renderOrder = 9999;
+  fade.frustumCulled = false;
+  let fadeK = 0;
 
   // ---- per frame (no allocation)
   const top = new THREE.Color();
@@ -240,12 +247,32 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
       px = NaN;
       pz = NaN;
       travelled++;
+      fadeK = 1;
+    },
+    /**
+     * Coming home from `from`: stand 2.6 m inside that world's hub arch facing the well (the old wake spot sat under
+     * the other arch's lintel and the return lens filled with timber — Reed's world-tour stills).
+     */
+    hubArrival(from: WorldId): { x: number; z: number; yaw: number } {
+      const a = HUB_ARCHES.find((h) => h.to === from) ?? HUB_ARCHES[0]!;
+      const dx = a.x - WELL.x;
+      const dz = a.z - WELL.z;
+      const l = Math.hypot(dx, dz);
+      return { x: a.x - (dx / l) * 2.6, z: a.z - (dz / l) * 2.6, yaw: Math.atan2(-dx, -dz) };
+    },
+    /** the paper wash rides on the lens */
+    attach(camera: THREE.Camera): void {
+      camera.add(fade);
+      if (!camera.parent) scene.add(camera);
     },
     get travels(): number {
       return travelled;
     },
     update(dt: number, foxX: number, camPos: THREE.Vector3, sky: { setWorld: (a: THREE.Color, b: THREE.Color, c: THREE.Color, d: THREE.Color, k: number) => void }, fog: THREE.FogExp2 | null, key: THREE.DirectionalLight): void {
       time += dt;
+      fadeK = Math.max(0, fadeK - dt * 1.7);
+      fadeMat.opacity = fadeK * fadeK * (3 - 2 * fadeK);
+      fade.visible = fadeK > 0;
       current = worldAt(foxX);
       if (current !== lastWorld) {
         blend = 0;
