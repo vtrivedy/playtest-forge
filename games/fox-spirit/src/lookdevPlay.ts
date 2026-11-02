@@ -390,6 +390,8 @@ export interface PlayController {
   surfaceAt: (x: number, z: number) => number;
   step: (dt: number) => void;
   state: () => Record<string, unknown>;
+  /** Live scalar motion view; diagnostics state() allocates and is cold-only. */
+  motion: { readonly grounded: boolean; readonly dashing: boolean };
   setStick: (x: number | null, z?: number) => void;
   setKeys: (codes: string[]) => void;
   teleport: (x: number, z: number, yaw: number) => void;
@@ -820,6 +822,7 @@ export function createPlay(opts: {
 
   return {
     cam,
+    motion: { get grounded() { return grounded; }, get dashing() { return dashT > 0; } },
     surfaceAt: (x, z) => surface(x, z, true, pos.y + P.step),
     step,
     teleport(x, z, y) {

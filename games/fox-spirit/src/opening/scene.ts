@@ -27,7 +27,7 @@ import { buildGlyphs } from './glyphs';
 import { createHearthHum } from './hum';
 import { createOpeningAudio, MIX, type OpeningAudio } from './audio';
 import { createFoxFoley } from './foley';
-import { buildRunawayPage } from './page';
+import { buildRunawayPage } from './page.hot';
 import { buildHomecoming } from './homecoming';
 import { buildLeafPiles } from './leafPiles';
 import { buildCanopy } from './canopy';
@@ -262,7 +262,7 @@ export async function runOpening(): Promise<void> {
   addEventListener('resize', resize);
   resize();
 
-  let manual = false;
+  let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
   const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), finale: finale.state(), millrace: millrace.state(), millWeir: millWeir.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock

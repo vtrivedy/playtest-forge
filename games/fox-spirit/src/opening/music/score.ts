@@ -62,6 +62,11 @@ export const PLACES: ReadonlyArray<{ id: string; x: number; z: number; r: number
   { id: 'ruin', x: POP_UP_RUIN.entry.x - 2, z: POP_UP_RUIN.entry.z - 3, r: 8, c: { harp: 0.35, pad: 0.8, bass: 0.2, lead: 0.3, bells: 0, bright: 0.2, shade: 1 } },
   { id: 'glyphs', x: (GLYPHS.stones[0].x + GLYPHS.stones[2].x) / 2, z: (GLYPHS.stones[0].z + GLYPHS.stones[2].z) / 2, r: 8, c: { harp: 0.5, pad: 0.9, bass: 0.4, lead: 0.4, bells: 0.3, bright: 0.4, shade: 0.7 } },
   { id: 'keeping', x: KEEPING.hinge.x, z: KEEPING.hinge.z, r: 9, c: { harp: 1, pad: 1, bass: 0.7, lead: 0.8, bells: 0.4, bright: 0.65, shade: 0 } },
+  // Bramble's Millbrook (west): the sunken lane, the mill on the brook, the orchard, and the lookout where the tune blooms
+  { id: 'leaf-lane', x: -50, z: 89, r: 8, c: { harp: 0.7, pad: 0.6, bass: 0.4, lead: 0.4, bells: 0, bright: 0.4, shade: 0.4 } },
+  { id: 'millbrook', x: -74, z: 94, r: 14, c: { harp: 1, pad: 0.7, bass: 0.7, lead: 0.6, bells: 0.3, bright: 0.6, shade: 0 } },
+  { id: 'orchard', x: -91, z: 88, r: 8, c: { harp: 0.9, pad: 0.8, bass: 0.6, lead: 0.7, bells: 0.2, bright: 0.6, shade: 0 } },
+  { id: 'lookout', x: -100, z: 71, r: 10, c: { harp: 0.8, pad: 1, bass: 0.6, lead: 1, bells: 0.5, bright: 0.8, shade: 0 } },
   // Wren's finale hollow below the far crag (the Scribe's Press)
   { id: 'hollow', x: 20, z: 42, r: 10, c: { harp: 0.6, pad: 1, bass: 0.4, lead: 0.8, bells: 0.4, bright: 0.55, shade: 0.3 } },
   { id: 'vista', x: VISTA.x + VISTA.dx * 6, z: VISTA.z + VISTA.dz * 6, r: 8, c: { harp: 0.6, pad: 1, bass: 0.5, lead: 1, bells: 0.6, bright: 0.8, shade: 0 } },

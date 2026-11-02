@@ -156,7 +156,7 @@ class Hearthsong extends AudioWorkletProcessor {
   }
 
   /** late: max humanizing delay in seconds (a played harp is never on the grid) */
-  pluck(midi: number, vel: number, late = 0): void {
+  pluck(midi: number, vel: number, late = 0, after = 0): void {
     const i = this.hNext;
     this.hNext = (i + 1) % HARPS;
     const f = hz(midi);
@@ -188,7 +188,7 @@ class Hearthsong extends AudioWorkletProcessor {
     for (let n = 0; n < pp; n++) buf[n] = (buf[n]! - mean) * vel * 0.4;
     this.pan(i, (midi - 64) / 30, this.hL, this.hR);
     this.hAge[i] = 0;
-    this.hWait[i] = Math.floor(this.rand() * late * sampleRate);
+    this.hWait[i] = Math.floor((after + this.rand() * late) * sampleRate);
   }
 
   bell(midi: number, vel: number): void {
@@ -293,6 +293,16 @@ class Hearthsong extends AudioWorkletProcessor {
     return this.bar % 4 === 3 ? 1 + 0.09 * k * k : 1;
   }
 
+  /** waltz figure: a low root on the downbeat, soft rolled chords on beats two and three */
+  waltz(chords: number[], cb: number, slot: number, dens: number, human: number): void {
+    const key = this.s.key;
+    if (slot === 0 && dens > 0.02) this.pluck(key - 12 + chords[cb]!, 0.55 * human, 0.004);
+    else if ((slot === 2 && dens > 0.3) || (slot === 4 && dens > 0.55)) {
+      const v = (slot === 2 ? 0.26 : 0.2) * human;
+      for (let k = 0; k < 3; k++) this.pluck(key + chords[cb + k]!, v, 0.006, k * 0.028);
+    }
+  }
+
   /** one eighth-note slot: decide what plays */
   doSlot(): void {
     const s = this.s;
@@ -323,13 +333,18 @@ class Hearthsong extends AudioWorkletProcessor {
           this.bAtk = 1;
         }
       }
-      // broken chord: root, fifth, third, octave, third, fifth — sparser when the place (or the sepia world) is quiet
+      // accompaniment, sparser when the place (or the sepia world) is quiet; the figure changes every 8 bars
       const dens = lv[0]!;
-      const play = slot === 0 ? dens > 0.02 : slot === 2 || slot === 4 ? dens > 0.4 : dens > 0.75;
-      if (play) {
-        const pick = slot === 0 ? 0 : slot === 1 || slot === 5 ? 2 : slot === 3 ? 0 : 1;
-        const oct = slot === 0 ? -12 : slot === 3 ? 12 : 0;
-        this.pluck(s.key + chords[cb + pick]! + oct, (slot === 0 ? 0.55 : 0.32) * human, slot === 0 ? 0.004 : 0.018);
+      const fig = (this.pass + (this.bar >> 3)) % 3;
+      if (fig === 1) this.waltz(chords, cb, slot, dens, human);
+      else {
+        // broken chord (0: root 5 3 8 3 5) or flowing (2: root 5 8 3 5 3)
+        const play = slot === 0 ? dens > 0.02 : slot === 2 || slot === 4 ? dens > 0.4 : dens > 0.75;
+        if (play) {
+          const pick = fig === 0 ? (slot === 0 ? 0 : slot === 1 || slot === 5 ? 2 : slot === 3 ? 0 : 1) : slot === 0 || slot === 2 ? 0 : slot === 1 || slot === 4 ? 2 : 1;
+          const oct = slot === 0 ? -12 : fig === 0 ? (slot === 3 ? 12 : 0) : slot === 1 ? -12 : 0;
+          this.pluck(s.key + chords[cb + pick]! + oct, (slot === 0 ? 0.55 : 0.32) * human, slot === 0 ? 0.004 : 0.018);
+        }
       }
       // the tune: the lead sings it in a swell (or every other pass once it's allowed); otherwise the harp carries it
       const n = s.tune[(tb + this.bar) * s.slots + slot]!;
@@ -383,7 +398,7 @@ class Hearthsong extends AudioWorkletProcessor {
     const singing = this.swell === SINGING;
     const swellGain = singing ? 1 : this.swell === FADING ? 0.5 : 0;
     const harpG = 0.32 * Math.min(1, 0.4 + lv[0]!);
-    const padG = 0.035 * lv[1]! * (1 + 0.3 * swellGain);
+    const padG = 0.048 * lv[1]! * (1 + 0.3 * swellGain);
     const bassG = 0.11 * lv[2]!;
     const leadG = 0.1 * Math.max(lv[3]!, singing ? 0.85 : 0);
     const bellG = 0.07 * Math.max(lv[4]!, swellGain * 0.6);
@@ -490,7 +505,9 @@ class Hearthsong extends AudioWorkletProcessor {
         this.lPh += this.lInc * (1 + depth * Math.sin(this.lVib));
         if (this.lPh > TAU) this.lPh -= TAU;
         this.lNoise += (this.rand() * 2 - 1 - this.lNoise) * 0.18;
-        const v = (Math.sin(this.lPh) + 0.09 * Math.sin(2 * this.lPh) + 0.03 * Math.sin(3 * this.lPh) + this.lNoise * 0.05) * this.lAmp * leadG;
+        // a wooden recorder/clarinet colour (odd partials), not a bare sine: sines read as beeps
+        const ph = this.lPh;
+        const v = (Math.sin(ph) + 0.12 * Math.sin(2 * ph) + 0.3 * Math.sin(3 * ph) + 0.1 * Math.sin(5 * ph) + this.lNoise * 0.025) * this.lAmp * leadG * 0.85;
         l += v * 0.9;
         r += v;
       }

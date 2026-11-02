@@ -7,7 +7,8 @@
 import * as THREE from 'three';
 import { mapleLeafGeometry, toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
-import { brookAt, brookLength, MILLBROOK, waterY } from './millbrookLayout';
+import { BROOK, brookAt, brookLength, MILLBROOK, waterY } from './millbrookLayout';
+import { createWaterSounds } from './waterSounds.hot';
 
 export const MILLRACE = {
   /** brook section length (m) of the water ribbon */
@@ -23,7 +24,7 @@ export const MILLRACE = {
   paintR: 26,
   paintSecs: 3.2,
   /** surface flecks riding the current */
-  flecks: 110,
+  flecks: 70,
   flowSpeed: 1.5,
   pondDrift: 0.12,
   /** dam leaves */
@@ -94,9 +95,9 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
   const wheelSection = Math.round(M.wheel.s / F.section);
 
   // flecks: pale streaks drifting on the surface (slow in the pond, quick in the running brook)
-  const fleckGeo = new THREE.PlaneGeometry(0.045, 0.34);
+  const fleckGeo = new THREE.PlaneGeometry(0.035, 0.26);
   fleckGeo.rotateX(-Math.PI / 2);
-  const flecks = new THREE.InstancedMesh(fleckGeo, toon(0xd3dcd2), F.flecks);
+  const flecks = new THREE.InstancedMesh(fleckGeo, toon(0xa9c0b9), F.flecks);
   flecks.frustumCulled = false;
   scene.add(flecks);
   const fs = new Float32Array(F.flecks);
@@ -111,7 +112,7 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
   // the dam: a mound of leaves across the channel, then a burst of leaves that settle or float away
   const leafMat = toon(0xffffff);
   leafMat.side = THREE.DoubleSide;
-  const leaves = new THREE.InstancedMesh(mapleLeafGeometry(0.16), leafMat, F.leaves);
+  const leaves = new THREE.InstancedMesh(mapleLeafGeometry(0.085), leafMat, F.leaves);
   leaves.frustumCulled = false;
   scene.add(leaves);
   const lp = new Float32Array(F.leaves * 3);
@@ -150,6 +151,13 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
   const scl = new THREE.Vector3();
   const paintAt = new THREE.Vector3(M.mill.x, 0, M.mill.z);
   const PAINT_OPTS = { edgeMax: 2.6 };
+  // Ember's synthesized brook babble / wheel knocks / burst (waterSounds.hot.ts)
+  const sounds = createWaterSounds({
+    audio: ctx.audio,
+    brook: BROOK.map(([x, z]) => new THREE.Vector3(x, waterY(z), z)),
+    wheel: new THREE.Vector3(M.wheel.x, waterY(M.wheel.z) + 1.35, M.wheel.z),
+  });
+  const damAt = new THREE.Vector3(M.dam.x, waterY(M.dam.z), M.dam.z);
 
   // one teach line, like the hearth's: only while standing by the held dam
   const hud = document.createElement('div');
@@ -188,6 +196,8 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
   function burst(t: number): void {
     phase = 'burst';
     burstAt = t;
+    sounds.burst(damAt);
+    ctx.audio.cue('millrace-burst');
     for (let i = 0; i < F.leaves; i++) {
       const o = i * 3;
       const r = ctx.rand();
@@ -223,6 +233,7 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
     geo.setDrawRange(0, Math.max(1, sectionAt(front)) * PER_SECTION);
     if (!turning && front >= wheelSection * F.section) {
       turning = true;
+      ctx.audio.cue('mill-turning');
       if (!painted) {
         painted = true;
         ctx.field.restore(paintAt, F.paintR, F.paintSecs, PAINT_OPTS);
@@ -230,6 +241,7 @@ export function createMillrace(ctx: OpeningCtx, wheel: THREE.Object3D) {
     }
     spin = THREE.MathUtils.damp(spin, turning ? F.wheelRate : 0, F.spinUp, dt);
     wheel.rotateX(-spin * dt);
+    sounds.update(ctx.fox.root.position, phase === 'burst' ? Math.min(1, (front - M.dam.s) / 6) : 0, spin / F.wheelRate, dt);
 
     // flecks ride the current inside the drawn water
     const head = phase === 'held' ? M.dam.s - 0.6 : front - 0.3;
