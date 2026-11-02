@@ -604,6 +604,22 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       homeCaption: () => {
         say('One page still holds the autumn.');
         ctx.audio.cue('homecoming-onward');
+        // a slow look along the way the stream leaves (well → gate → hearth), so the hand-over is seen, not missed;
+        // any move after 1.5 s takes the lens back
+        const cam = opts.cam.camera;
+        const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
+        const well = new THREE.Vector3(WELL.x, groundH(WELL.x, WELL.z), WELL.z);
+        const toward = new THREE.Vector3(HEARTH_A.x, groundH(HEARTH_A.x, HEARTH_A.z) + 1.5, HEARTH_A.z);
+        const d = toward.clone().sub(well).setY(0).normalize();
+        const pos = well.clone().addScaledVector(d, -5.5).add(new THREE.Vector3(-d.z * 2.5, 3.8, d.x * 2.5));
+        opts.cam.playPath({
+          keys: [
+            { t: 0, pos: cam.position.clone(), look: look0 },
+            { t: 2.2, pos, look: well.clone().addScaledVector(d, 7).setY(well.y + 1.2) },
+            { t: 5.5, pos: pos.clone().addScaledVector(d, 1.5), look: toward },
+          ],
+          blendInS: 0.8, blendOutS: 2, lockS: 1.5,
+        });
       },
       snow: () => {
         ctx.audio.cue('finale-snow');
