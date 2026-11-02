@@ -276,9 +276,10 @@ export function buildAshwater(
   fade.height = 128;
   const fg = fade.getContext('2d')!;
   const grad = fg.createLinearGradient(0, 0, 0, 128);
-  grad.addColorStop(0, 'rgba(255,255,255,0)');
-  grad.addColorStop(0.55, 'rgba(255,255,255,0.35)');
-  grad.addColorStop(1, 'rgba(255,255,255,1)');
+  // (alphaMap reads the green channel: an opaque black → white ramp, not alpha on white — Reed :815)
+  grad.addColorStop(0, '#000000');
+  grad.addColorStop(0.55, '#595959');
+  grad.addColorStop(1, '#ffffff');
   fg.fillStyle = grad;
   fg.fillRect(0, 0, 4, 128);
   const glowMat = new THREE.MeshBasicMaterial({ color: C.glow, alphaMap: new THREE.CanvasTexture(fade), transparent: true, opacity: 0.22, side: THREE.DoubleSide, toneMapped: false, depthWrite: false, blending: THREE.AdditiveBlending });
