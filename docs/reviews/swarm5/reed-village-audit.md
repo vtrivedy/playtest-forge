@@ -37,3 +37,19 @@ Source review flags sent to Thistle: the changed slide resolver should move to
 `*.hot.ts`; `[slideSide, -slideSide]` allocates while sliding. An 80° rotated step
 with a damped facing can initially travel sideways. These measurements do not
 resolve that animation concern; a motion verdict is pending the slide clip.
+
+## Cohort limits after integration
+
+Kit's integrated `591e04b` retest reproduces Thistle's corrected seeds 1–3:
+8/4/8 unsticks and 4.65/2.33/5.42 stuck seconds. Thistle's same-tool baseline
+for those seeds was 20/11/22 unsticks. That is a real 2.65× reduction, while
+the independent seeds 4–6 above improve 12.75×. Across all six reported seeds,
+unsticks fall 104 → 24 (4.33×). Only seeds 4–6 were independently rerun against
+both builds by Reed; the combined figure includes Thistle's baseline report.
+
+The controller change has therefore moved the corrected metric, but the
+order-of-magnitude target is not met consistently. Neither a universal 12.75×
+claim nor a claim that only the measurement tool improved is supported.
+Blind discovery is a separate failed gate: Kit's untethered seeds 1–3 still
+have zero catches on `591e04b`. These observations do not establish whether
+sliding looks or feels good; retain that visual review as open.
