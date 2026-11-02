@@ -804,7 +804,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
     return t - c.arrived > 1.2;
   };
 
-  const idle: Record<Spec['id'], (c: (typeof creatures)[number], t: number) => void> = {
+  const idle: Record<Spec['id'], (c: (typeof creatures)[number], t: number, dt: number) => void> = {
     hedgehog(c, t) {
       // snuffle: quick nose bobs in bursts, the odd look round
       const burst = Math.max(0, Math.sin(t * 0.9 + c.idleSeed));
@@ -812,7 +812,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'head').rotation.y = Math.sin(t * 0.37 + c.idleSeed) * 0.35;
       B(c, 'body').scale.y = 1 + Math.sin(t * 3.1) * 0.02;
     },
-    heron(c, t) {
+    heron(c, t, dt) {
       if (fling >= 0) {
         // the fling: crouch under the fox, then a great downstroke as it throws you up
         const u = fling;
@@ -827,7 +827,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       // the fox comes close: the heron bows low and spreads its back, offering the lift
       const fx = ctx.fox.root.position;
       const near = 1 - THREE.MathUtils.smoothstep(Math.hypot(fx.x - c.holder.position.x, fx.z - c.holder.position.z), 1.2, HERON_FLING.bowNear);
-      c.bow = THREE.MathUtils.damp(c.bow, near, 5, 1 / 60);
+      c.bow = THREE.MathUtils.damp(c.bow, near, 5, dt);
       B(c, 'body').position.y = 1.0 - c.bow * 0.38;
       B(c, 'legL').rotation.z = B(c, 'legR').rotation.z = -c.bow * 0.5;
       if (c.bow > 0.05) {
@@ -845,9 +845,9 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'body').rotation.z = Math.sin(t * 0.3) * 0.03;
       B(c, 'wingL').rotation.x = -0.15 - preen * 0.15;
     },
-    kit(c, t) {
+    kit(c, t, dt) {
       // curled up asleep by the well: tucked head, tail wrapped round, slow breathing
-      c.bow = THREE.MathUtils.damp(c.bow, 1, 2, 1 / 60);
+      c.bow = THREE.MathUtils.damp(c.bow, 1, 2, dt);
       const tuck = c.bow;
       B(c, 'body').position.y = 0.28 - 0.1 * tuck;
       B(c, 'body').scale.y = 1 - 0.18 * tuck + Math.sin(t * 1.7) * 0.03;
@@ -857,18 +857,18 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'legF').rotation.z = -1.2 * tuck;
       B(c, 'legB').rotation.z = 1.2 * tuck;
     },
-    hare(c, t) {
+    hare(c, t, dt) {
       // sits at the ruin's entry: nose twitches, ear flicks, a face-wash every few seconds; watches the fox near
       const fx = ctx.fox.root.position;
       const dx = fx.x - c.holder.position.x;
       const dz = fx.z - c.holder.position.z;
       const watch = 1 - THREE.MathUtils.smoothstep(Math.hypot(dx, dz), 2.5, 5);
       const rel = Math.atan2(-dz, dx) - c.holder.rotation.y;
-      c.bow = THREE.MathUtils.damp(c.bow, watch, 3, 1 / 60);
+      c.bow = THREE.MathUtils.damp(c.bow, watch, 3, dt);
       const wash = smooth(0, 0.25, Math.sin(t * 0.5 + c.idleSeed)) * (1 - c.bow);
       B(c, 'body').position.y = 0.2;
       B(c, 'body').rotation.z = 0.35 + c.bow * 0.15 + Math.sin(t * 2.4) * 0.015;
-      B(c, 'head').rotation.y = lookToward(c, rel, 1.3, 1 / 60) * c.bow;
+      B(c, 'head').rotation.y = lookToward(c, rel, 1.3, dt) * c.bow;
       B(c, 'head').rotation.z = -0.3 - c.bow * 0.12 - wash * 0.35 + Math.sin(t * 19) * 0.02;
       B(c, 'legF').rotation.z = wash * (1.4 + Math.sin(t * 9) * 0.25);
       const flick = Math.max(0, Math.sin(t * 1.3 + c.idleSeed * 2)) ** 12;
@@ -877,7 +877,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
       B(c, 'tail').rotation.z = 0;
       B(c, 'tail').scale.setScalar(1);
     },
-    deer(c, t) {
+    deer(c, t, dt) {
       // graze, lift the head, chew, ear flicks and tail flicks
       // when the fox is near it stops grazing and watches it, head turned (a companion, not scenery)
       const fx = ctx.fox.root.position;
@@ -885,8 +885,8 @@ export function buildUnpressed(ctx: OpeningCtx) {
       const dz = fx.z - c.holder.position.z;
       const watch = 1 - THREE.MathUtils.smoothstep(Math.hypot(dx, dz), 3.5, 7);
       const rel = Math.atan2(-dz, dx) - c.holder.rotation.y;
-      const turn = lookToward(c, rel, 1.1, 1 / 60);
-      c.bow = THREE.MathUtils.damp(c.bow, watch, 3, 1 / 60);
+      const turn = lookToward(c, rel, 1.1, dt);
+      c.bow = THREE.MathUtils.damp(c.bow, watch, 3, dt);
       B(c, 'neck').rotation.y = turn * 0.6 * c.bow;
       B(c, 'head').rotation.y = turn * 0.4 * c.bow;
       const up = Math.max(c.bow, smooth(0.2, 0.8, Math.sin(t * 0.35 + c.idleSeed)));
@@ -981,7 +981,7 @@ export function buildUnpressed(ctx: OpeningCtx) {
         }
         continue;
       }
-      idle[c.spec.id](c, clock);
+      idle[c.spec.id](c, clock, dt);
     }
     if (fling >= 0 && (fling += dt) > 0.9) fling = -1;
   });
