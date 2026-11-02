@@ -28,9 +28,11 @@ const ROUTE = [
   ['drop to the valley', [-67.6, 101.0], { glide: true }],
   ['east of the mill', [-67.4, 93.0]],
   ['to the bridge', [-70, 87.6]],
-  ['bridge east', [-75.7, 86.1]],
+  ['bridge approach', [-75, 85.6]],
+  ['bridge east', [-76.2, 86.0]],
   ['bridge deck', [-79, 87]],
-  ['bridge west', [-82.2, 87.85]],
+  ['bridge west', [-81.8, 88]],
+  ['off the bridge', [-83.2, 88.2]],
   ['orchard', [-88, 84.5]],
   ['foot of the hill', [-93.5, 80.5]],
   ['climb', [-95.5, 75.5]],
@@ -55,7 +57,7 @@ const ROUTE = [
       const dx=to[0]-x,dz=to[1]-z,d=Math.hypot(dx,dz),mag=o.mag??1;
       ix=d>.001?dx/d*mag:0;iz=d>.001?dz/d*mag:0;
       if(o.glide){if(!s.grounded)airborne=true;arrived=airborne&&s.grounded||d<.9;}
-      else arrived=d<(o.dash?1.2:o.jump?1.7:.9);
+      else arrived=d<(name.startsWith('bridge')||name==='off the bridge'?.2:o.dash?1.2:o.jump?1.7:.9);
       jump=!!o.glide;dash=!!o.dash&&d<3.2;
     }else{
       if(o.face){const dx=o.face[0]-x,dz=o.face[1]-z,d=Math.hypot(dx,dz)||1;ix=dx/d*.05;iz=dz/d*.05;}
