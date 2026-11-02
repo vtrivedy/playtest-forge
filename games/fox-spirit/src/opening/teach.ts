@@ -25,6 +25,13 @@ export function createTeach(ctx: OpeningCtx) {
     offer(text: string): void {
       t.offered = text;
     },
+    /**
+     * Story-pace hints (not a control the player needs this second) wait while an Album caption is on screen, so two
+     * lines never talk at once (Kit, homecoming: 'Follow the warm light home' over 'One page still holds the autumn.').
+     */
+    offerAfterCaption(text: string): void {
+      if (!ctx.captions.isShowing()) t.offered = text;
+    },
     state: () => ({ showing: t.o > 0.01 ? t.drawn : null }),
   };
 }

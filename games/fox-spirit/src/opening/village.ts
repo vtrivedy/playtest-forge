@@ -593,11 +593,14 @@ export function buildVillage(ctx: OpeningCtx): void {
     g.name = `cottage-${i}`;
     scene.add(g);
     ctx.occluders.push(g);
-    colliders.push({ kind: 'box', x: h.x, z: h.z, yaw: 0, hx: h.w / 2 + 0.45, hz: h.d / 2 + 0.45, top: y0 + 0.55 + h.eave + h.rise });
-    colliders.push({ kind: 'post', x: h.x - h.w * 0.2 - 1.0, z: h.z + h.d / 2 + 0.6, r: 0.36 });
-    colliders.push({ kind: 'post', x: h.x + h.w * 0.42, z: h.z + h.d / 2 + 0.65, r: 0.38 });
+    // the front props (barrel, bench) stood as round posts half out of the wall box: a circle against a flat face
+    // makes a wedge pocket the fox wedged into (Thistle's 8-seed matrix, hotspot (-16,95)). The wall box takes them
+    // in instead, so the front is one flat face to slide along.
+    const front = h.d / 2 + 1.03;
+    colliders.push({ kind: 'box', x: h.x, z: h.z + (front - (h.d / 2 + 0.45)) / 2, yaw: 0, hx: h.w / 2 + 0.45, hz: (front + h.d / 2 + 0.45) / 2, top: y0 + 0.55 + h.eave + h.rise });
     if (h.chimney) {
-      colliders.push({ kind: 'post', x: h.x - h.w / 2 - 0.35, z: h.z - h.d * 0.18, r: 0.5 });
+      // chimney stack flush on the side wall as a box (was a round post: same wedge pocket, hotspot (-21,91))
+      colliders.push({ kind: 'box', x: h.x - h.w / 2 - 0.45, z: h.z - h.d * 0.18, yaw: 0, hx: 0.42, hz: 0.5, top: y0 + 0.55 + h.eave + h.rise + 1.2 });
       // only the cottage nearest the waking fox still keeps a fire
       if (i === 0) chimneySmoke(ctx, h.x - h.w / 2 - 0.35, y0 + 0.55 + h.eave + h.rise + 1.6, h.z - h.d * 0.18);
     }
@@ -621,7 +624,13 @@ export function buildVillage(ctx: OpeningCtx): void {
     buildGate(k, ctx, gate);
     for (const c of laneWalls(k, ctx, gate)) colliders.push({ kind: 'box', ...c });
   });
-  for (const s of [-1, 1]) colliders.push({ kind: 'post', x: gate.x + gate.nx * s * GATE_HALF, z: gate.z + gate.nz * s * GATE_HALF, r: 0.3 });
+  // gate posts as boxes on the lane walls' line and width, so post + wall are one flat run (round posts beside the
+  // walls' ends made pockets at both posts: hotspots (-2,83), (-4,82))
+  const gateYaw = Math.atan2(gate.dx, gate.dz);
+  for (const s of [-1, 1]) {
+    const x = gate.x + gate.nx * s * (GATE_HALF + 0.15), z = gate.z + gate.nz * s * (GATE_HALF + 0.15);
+    colliders.push({ kind: 'box', x, z, yaw: gateYaw, hx: 0.28, hz: 0.32, top: gate.y + 2.7 });
+  }
 
   const posts: Record<string, THREE.Vector3> = {};
   group('village-props', (props) => {
@@ -646,7 +655,8 @@ export function buildVillage(ctx: OpeningCtx): void {
         }
     }
     handCart(props, ctx, -11.2, 81.8, 0.7);
-    colliders.push({ kind: 'box', x: -11.2, z: 81.8, yaw: 0.7, hx: 0.75, hz: 1.2, top: ctx.groundH(-11.2, 81.8) + 0.9 });
+    // top at the cart bed: a hop up (jump apex ~0.83 m), not a wall just out of reach
+    colliders.push({ kind: 'box', x: -11.2, z: 81.8, yaw: 0.7, hx: 0.75, hz: 1.2, top: ctx.groundH(-11.2, 81.8) + 0.72 });
     for (const [x, z, yaw, up] of [[-24.6, 89.4, 0.3, 0], [-23.4, 89.9, 1.2, 0], [-24.1, 89.6, 0.8, 1]] as const)
       props.add(hewn(new THREE.BoxGeometry(1.0, 0.55, 0.6, 2, 1, 1), ctx.rand, 0.05), C.thatch, [x, ctx.groundH(x, z) + 0.26 + up * 0.55, z], [0, yaw, 0], 0.016);
     colliders.push({ kind: 'box', x: -24, z: 89.6, yaw: 0.6, hx: 1.1, hz: 0.7, top: ctx.groundH(-24, 89.6) + 1.1 });
