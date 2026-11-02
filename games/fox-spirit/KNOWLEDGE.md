@@ -494,3 +494,12 @@ A clear destination is not a clear connecting segment. Full staged finale route 
 - Paint restores each need a shader slot (`RESTORE_SLOTS`, now 24; `uRestore` loop breaks at the count).
   With page (4) + Keeping (3) + homecoming + ruin + finale (2) + Millbrook/Hermitage (5) the old 16 was
   exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.
+
+## Paint edges (Ember, swarm4)
+
+- Restores were hard islands: `edgeMax` ~1.2 m on most beats gives a shader edge of ~0.2 m plus a dark tide line.
+  Now each settled restore bleeds a paler feathered halo outward over ~40 s (`uRestoreBleed[i]`, set in scene.ts
+  next to `uRestore`; ground only). Keep per-slot shader work to one value noise: the loop runs for up to 24 slots
+  per fragment on every painted material.
+- Things that must read in colour inside sepia (falling lane leaves) need plain MeshToonMaterial; the paint patch
+  turns them to paper and they vanish (first lane-wind try).
