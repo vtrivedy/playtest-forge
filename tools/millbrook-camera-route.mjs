@@ -37,7 +37,7 @@ const ROUTE = [
   ['foot of the hill', [-93.5, 80.5]],
   ['climb', [-95.5, 75.5]],
   ['lookout', [-97.9, 72.8]],
-  ['the view', [-98.6, 72.4], { hold: 4, face: [-60, 84] }],
+  ['the view', null, { hold: 4, face: [-60, 84] }],
 ];
   let beat=5, entered=0, previousTime=0, airborne=false, launchY=null, first=true;
   return (t,s) => {
@@ -57,7 +57,7 @@ const ROUTE = [
       const dx=to[0]-x,dz=to[1]-z,d=Math.hypot(dx,dz),mag=o.mag??1;
       ix=d>.001?dx/d*mag:0;iz=d>.001?dz/d*mag:0;
       if(o.glide){if(!s.grounded)airborne=true;arrived=airborne&&s.grounded||d<.9;}
-      else arrived=d<(name.startsWith('bridge')||name==='off the bridge'?.2:o.dash?1.2:o.jump?1.7:.9);
+      else arrived=d<((name.startsWith('bridge') || name === 'off the bridge') ? .2 : o.dash ? 1.2 : o.jump ? 1.7 : .9);
       jump=!!o.glide;dash=!!o.dash&&d<3.2;
     }else{
       if(o.face){const dx=o.face[0]-x,dz=o.face[1]-z,d=Math.hypot(dx,dz)||1;ix=dx/d*.05;iz=dz/d*.05;}
