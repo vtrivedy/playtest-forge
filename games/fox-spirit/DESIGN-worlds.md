@@ -79,6 +79,11 @@ Russetvale's three levels + the Loft secret; the Ash Warden in every world; Albu
 secret pages; Seedwells; saved re-entry. Measured play length (Kit/Reed): Russetvale ~4.7 min, Ashwater ~2.6 min,
 Press ~1.5 min — far short of 10–15 min per world; worlds are still small places, not large explorable ones.
 
+Known story-order gap (left on purpose tonight): the Press Hollow finale ('and the year turned') still opens after
+Russetvale's Keeping alone, so the year can turn before Ashwater and the Press. Next run: `finale.settled = Keeping
+settled && progress.isRestored('press','combine')`, and move the capture/journey routes to go through the arches first
+(they all drive the autumn route into the finale today — gating it at the deadline would break every regression route).
+
 ## Progress (Hazel)
 Typed ids `russetvale|ashwater|press` × `teach|develop|combine`; monotonic `visit / restore / earn` store, versioned
 save, canvas Album page-map (Tab) and the three hub Seedwells (Kiln = Russetvale, Reed = Ashwater, Maple = Press).
