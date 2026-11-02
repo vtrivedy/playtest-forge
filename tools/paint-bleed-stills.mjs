@@ -14,6 +14,8 @@ const LENSES = {
   // a hearth-sized wash on open meadow, seen the way the chase cam sees it and from above
   low: [[4, 3.2, 90], [-1, 0, 79]],
   high: [[-1, 16, 94], [-1, 0, 80]],
+  // the chase-cam height over the plaza's hex paving at the wash's edge
+  paving: [[-4, 2.4, 89], [-1, 0.3, 82]],
 };
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5200, host: '127.0.0.1', strictPort: true, hmr: false }, logLevel: 'error' });
 await server.listen();
@@ -28,8 +30,10 @@ try {
   await page.evaluate(() => { const h = window.__gameHooks; h.setManual(true); h.audioContext?.()?.suspend?.(); h.teleport(-12, 96, 0); h.advance(30, 1 / 60, false);
     const c = window.__opening.camera.position.clone().set(-1, 0, 80);
     window.__opening.ctx.field.restore(c, 8, 2.2, { edgeMax: 1.2 }); });
-  for (const [when, secs] of [['settled', 14], ['later', 60]]) {
-    await page.evaluate((s) => window.__gameHooks.advance(Math.round(s * 60), 1 / 60, false), when === 'settled' ? secs : secs - 14);
+  let at = 0;
+  for (const [when, secs] of [['wet', 1.3], ['settled', 14], ['later', 60]]) {
+    await page.evaluate((s) => window.__gameHooks.advance(Math.round(s * 60), 1 / 60, false), secs - at);
+    at = secs;
     for (const [name, [p, l]] of Object.entries(LENSES)) {
       await page.evaluate(([p, l]) => {
         const cam = window.__opening.camera;
