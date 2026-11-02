@@ -64,7 +64,7 @@ export const CISTERN = { wallTop: 4.7, wall: 0.5, gate: { x0: -2.2, x1: 2.2 } };
 export const FLOOD = { level: 4.3, rise: 9, hold: 45, fall: 6 };
 export const DAM_C = { lx: 5.5, lz: 37.2, reach: 3.2 };
 /** the last ferry, moored by the weir's east end; it floats on whatever the cistern holds */
-export const PUNT = { lx: 12.75, lz: 31.3, hx: 0.65, hz: 1.6, rise: 0.22 };
+export const PUNT = { lx: 12.75, lz: 31.6, hx: 0.65, hz: 2.0, rise: 0.22 };
 /** a slate shelf inside the cistern's east wall at wall height: the risen punt's flank touches it */
 export const SHELF = { x0: 13.4, x1: 15, z0: 24, z1: 30.5 };
 

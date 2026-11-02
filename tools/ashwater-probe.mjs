@@ -115,7 +115,7 @@ try {
   // off the weir onto the risen punt, along it, onto the east wall, south to the Seedwell ledge
   await go(12.75, 35.4);
   log.push(['step', await state()]);
-  await go(12.75, 32.3, { jump: true, jumpAt: 2.3, hold: 16, max: 200, reach: 0.5, land: true });
+  await go(12.75, 32.3, { max: 200, reach: 0.5 });
   log.push(['step', await state()]);
   await go(12.75, 30.1);
   await go(14.2, 30.0, { max: 200, reach: 0.4 });
