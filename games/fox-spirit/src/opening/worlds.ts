@@ -88,3 +88,25 @@ export function pressH(x: number, z: number): number {
   const rim = smoothstep(e, -2, 3) * 9 + Math.max(0, e - 3) * 2.2;
   return 0.5 + drift + rim;
 }
+
+/** hub arches (walk through, along the arch's normal away from the well, to travel) — worldsScene builds them */
+export const HUB_ARCHES: ReadonlyArray<{ to: WorldId; x: number; z: number }> = [
+  { to: 'ashwater', x: -2, z: 91 },
+  { to: 'press', x: -10.5, z: 92.6 },
+];
+/** the three Seedwells round the plaza (Hazel's seedwells.ts draws them) — clear of every arrival lens */
+export const SEEDWELLS: ReadonlyArray<{ world: WorldId; x: number; z: number }> = [
+  { world: 'russetvale', x: -4, z: 77.5 },
+  { world: 'ashwater', x: 3, z: 93 },
+  { world: 'press', x: 0, z: 98 },
+];
+/** island return arches stand this far outward of the spawn (the arrival lens stays clear of them) */
+export const RETURN_ARCH_BACK = 4;
+/** a hub arrival from `from`: 3.4 m inside that world's arch, facing the well (the lens stays on the plaza side) */
+export function hubArrival(from: WorldId, well: { x: number; z: number }): { x: number; z: number; yaw: number } {
+  const a = HUB_ARCHES.find((h) => h.to === from) ?? HUB_ARCHES[0]!;
+  const dx = a.x - well.x;
+  const dz = a.z - well.z;
+  const l = Math.hypot(dx, dz);
+  return { x: a.x - (dx / l) * 3.4, z: a.z - (dz / l) * 3.4, yaw: Math.atan2(-dx, -dz) };
+}

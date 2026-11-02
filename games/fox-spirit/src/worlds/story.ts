@@ -20,7 +20,7 @@ export const WORLD_STORIES = {
   },
   press: {
     teach: { voice: 'A scorched margin', title: 'The hand behind the marks', text: 'At the Press stands someone small and old. The Scribe has kept every place close enough to touch, yet none of the pressed moments can answer them.' },
-    develop: { voice: 'An Archive leaf', title: 'The shadow at the Press', text: 'The Ash Warden is the Scribe’s own shadow: the ink of every moment they pressed. The watcher has been carrying the weight of everything its maker could not let go.' },
-    combine: { voice: 'The Scribe', title: 'The last season we were all here', text: '“I kept autumn because it was the last season we were all here.” The fox brings warmth to the Press. The Scribe lets the year turn. What returns will have room to change.' },
+    develop: { voice: 'An Archive leaf', title: 'The shadow at the Press', text: 'Every pressed moment left ink behind. In the Archive it gathers into a watcher, following the Scribe without a sound. Neither has been able to leave this last winter.' },
+    combine: { voice: 'The Scribe', title: 'The last season we were all here', text: '“I kept autumn because it was the last season we were all here.” The Warden folds into the Scribe’s shadow. The fox offers warmth; the Scribe lets the year turn.' },
   },
 } as const satisfies Record<WorldId, Record<LevelId, StoryMemory>>;
