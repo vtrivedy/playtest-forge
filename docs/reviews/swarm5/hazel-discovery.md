@@ -81,3 +81,44 @@ outside the village test area. These coordinates identify a replay target, not
 a verified geometry cause. Sent to Thistle. This independently reproduces Kit's
 blind-control finding; it does not satisfy the unaided-overlook requirement.
 Discovery TLC recheck remains112 generated /38 distinct states, no errors.
+
+## Five-minute unchanged blind control
+
+On `bcc9747821bf94c6d70a26b8621bc9b38862da81`, seed2 with the original blind
+policy ran the full300 simulation seconds: one catch, no kept page, no overlook
+visit and no completed guidance. Minimum horizontal overlook distance was
+5.5146m;32 unsticks /24.92 stuck seconds; zeroJSerrors. It left the village and
+entered Millbrook. Full state and trajectory are saved in
+`/captures/hazel/blind-bcc97478-seed2-300/naive.json`. This is simulation-only
+evidence, with no motion-quality or visual claim.
+
+The fox passed south of the canopy at20s (-10.5,57.9), then west of the ruin
+at50s (-35.4,80.6); merely extending the run to five minutes did not recover
+the missed traversal. The blind policy deliberately ignores both rendered leaf
+guides and action words. Its failure remains a failure of the requested blind
+control, even though the separate cue follower completes the route. Do not
+silently replace that requirement with the cue-policy result or weaken the
+real-landing guard to make the score pass. No gameplay change accompanies this
+control. Discovery TLC rechecked112 generated /38 distinct states, no errors.
+
+Bounded visual replay on the same source:60 simulation seconds, one screenshot
+every2 seconds,30 frames; `/captures/hazel/blind-bcc97478-seed2-visual/`
+contains the movie, full `window.__game` in `naive.json`, and `review.jpg`.
+All120 half-second rounded trajectory samples exactly match the corresponding
+prefix of the300-second state-only run. The movie plays at4x simulation speed;
+these sparse frames support only a composition/path observation, not continuous
+motion review. The first catch and leaf invitation are visible, but the blind
+fox runs around the canopy and up the adjoining slope. Large foreground geometry
+obscures part of the fox around14–22s and again near tree trunks later. This
+source predates Reed's stem-fade fix; a combined-tip comparison is required
+before calling that an unresolved integrated defect.
+
+Combined comparison completed on immutable
+`b13dfe15800b4c3a4d9e5f2f9b6e875651432216`, which includes Reed's stem fix.
+The24-second replay has12 frames and zeroJSerrors; all48 sampled positions
+match the baseline prefix. The20s still retains the same large foreground
+obstruction and partial fox. Evidence:
+`/captures/hazel/blind-b13dfe15-seed2-occlusion/` (movie, frames, full state).
+This approach therefore remains a separate camera finding after the stem fix;
+the mesh responsible has not yet been identified. It does not invalidate the
+independently approved13–16s cue-following stem improvement.
