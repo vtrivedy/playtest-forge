@@ -29,8 +29,6 @@ const RULES = [
   },
   {
     id: 'dom-text',
-    // hearth.ts: Hazel is migrating its hint to ctx.teach (swarm5); drop it from this list when that lands
-    skip: ['hearth.ts'],
     test: (l) => /createElement\(\s*['"]div['"]\s*\)|\.textContent\s*=|\.innerHTML\s*=/.test(l),
     why: 'words must be drawn in the frame (ctx.captions / ctx.teach / lettering.ts): DOM text never reaches canvas recordings, so the ending card was invisible in every review clip',
   },

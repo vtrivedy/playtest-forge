@@ -170,7 +170,7 @@ export async function runOpening(): Promise<void> {
     if (unfaded.length) console.error(`unfaded blocker:\n${unfaded.join('\n')}`);
   }
   const hearth = createOpeningHearth({
-    scene, groundH, fox: fox.root, supplyAt: (p) => field.sample(p),
+    scene, groundH, fox: fox.root, teach: ctx.teach, supplyAt: (p) => field.sample(p),
     onIgnite: (at) => field.restore(at, 12, 1.8, { edgeMax: 1.4 }),
     extraSpots: [
       { id: 'steam', ...KEEPING.steam, height: 9, medium: 'steam', bedOffset: 0.03 },
@@ -325,7 +325,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), captions: ctx.captions.state(), teach: ctx.teach.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), laneWind: laneWind.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), wayPiles: wayPiles.state(), finale: finale.state() } });
   const pxA = new THREE.Vector3();
   const pxB = new THREE.Vector3();
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
