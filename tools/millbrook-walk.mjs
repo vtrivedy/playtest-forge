@@ -26,6 +26,7 @@ const MILLBROOK_ROUTE = [
   ['wake', null, { hold: 1.5 }],
   ['plaza west', [-12.5, 89.4]],
   ['cottage lane', [-18.7, 87.4]],
+  ['between the yards', [-24.0, 88.3]],
   ['west cottages', [-29.2, 87.6]],
   ['last cottage', [-35.5, 89.2]],
   ['into the lane', [-46, 90.4]],
@@ -92,9 +93,9 @@ const which = arg('route', 'millbrook');
 const ROUTE = which === 'hermitage' ? HERMITAGE_ROUTE : which === 'grand' ? [...HERMITAGE_ROUTE, ['back past the cottage', [-5.6, 102.6]], ['north lane foot', [-5.2, 99.4]], ['by the well lane', [-6.0, 92.5]], ...MILLBROOK_ROUTE.slice(1)] : MILLBROOK_ROUTE;
 const START = {
   village: { at: [-5.2, 92.5, Math.atan2(2.2, -11.5)], beat: 0 },
-  lane: { at: [-36, 89, -1.4], beat: 5 },
-  mill: { at: [-69.5, 87.6, -0.4], beat: 9 },
-  kiln: { at: [-66.4, 97.4, 0], beat: 18 },
+  lane: { at: [-36, 89, -1.4], beat: 6 },
+  mill: { at: [-69.5, 87.6, -0.4], beat: 10 },
+  kiln: { at: [-66.4, 97.4, 0], beat: 19 },
 }[from];
 
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5195, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
