@@ -133,6 +133,33 @@ permits branch unmute; Vivek then hears the landed result on main.
 - Recorder smoke evidence: `/captures/rook/audio-recorder-final/`. Two running contexts, 304 meter samples, no silent samples, peak 0.02207, no page errors; decoded track 7.94 s stereo Opus, -41.2 LUFS, -33.0 dBFS true peak. This proves capture plumbing, not a good mix, audible spatial placement, seamless music, or event coverage.
 - Metering and source audit cannot replace listening. Review a named runtime SHA with event coverage and a loop boundary before claiming music/SFX quality. Prefer a post-mix recording bus when the runtime exposes one, and use the rendered camera for the listener pose.
 
+### Hearthsong: synthesized adaptive music (Ember, swarm4, 2083b89)
+
+- Music is one AudioWorklet (`src/opening/music/hearthsong.worklet.hot.ts`) playing a text score (`score.ts`). The
+  worklet owns the clock and sequencer (sample-exact, no main-thread timers); the main thread only eases ~10
+  k-rate AudioParams (`music.hot.ts`). Cues are AudioParam counter bumps (+ a `kind` param), not postMessage.
+- Vite: `import url from './x.worklet.hot.ts?worker&url'` then `ac.audioWorklet.addModule(url)` works in dev and
+  build (emits `assets/x.worklet.hot-*.js`). Declare `sampleRate`/`registerProcessor`/`AudioWorkletProcessor`
+  locally in the worklet file (not in lib.dom).
+- Offline listening loop: `node tools/hearthsong-render.mjs --out DIR --seconds 300` renders a scripted walk via
+  OfflineAudioContext in ~30 s (the shipped worklet; driver calls take an explicit schedule time). Iterate
+  composition there, then confirm in-game with `tools/mix-capture.mjs` (`__game…audio.music` shows bar/swell/ending).
+- TLA `tla/Hearthsong.tla` caught a real spec bug on first run: two `since'` assignments in one branch made Bar
+  disabled → stutter counterexample to liveness. Unbounded finale ForceCue also broke `SwellRests`: bounded by
+  MaxForce (and the worklet enforces the same bound).
+- Qwen2-Audio as critic: ask "describe as a music critic … flaws such as harsh/thin, mechanical timing, out of
+  tune, clashing, repetition". The sparse sepia opening read "eerie, dissonant, flat"; a pitch check
+  (`/tmp/ember/notes.py`-style FFT peaks per bar) showed notes were in tune and in the right chords, so the cause
+  was texture. Warmer floor (pad+harp), humanized onsets (≤25 ms), phrase-end rubato (+9 % on the 4th bar) and a
+  0.07 Hz breathing pad → "calming, dreamy, no flaws". One answer per window is noisy: compare versions on the
+  same windows, and keep a reference (Alba preview) in the batch.
+- Spectral references (iTunes previews, Alba / A Short Hike): 150–500 Hz holds 70–80 % of energy in Alba's
+  gentle cues, 500–2 kHz 4–16 %, centroid 260–680 Hz. Hearthsong sits at 75–80 % / 5–12 %, centroid 270–340 Hz.
+- Levels on the 60 s route (455932c): mix −33.5 LUFS, music stem −33.6, sfx −40.9, TP −20 dBTP; music never below
+  −60 dBFS for more than ~1.5 s (was 31 s of 54 with the phrase design).
+- Key: C major. Keep every synthesized chime in C (glyphs, page, homecoming already were); the hearth hum's B1 was
+  moved to C2.
+
 ### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
 
 - Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
