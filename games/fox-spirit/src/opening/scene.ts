@@ -269,7 +269,7 @@ export async function runOpening(): Promise<void> {
   // world III (the Scribe's Press, x ≈ −700, Thistle): its drafts join the updraft read the controller glides on
   const pressWorld = buildPress(ctx, { complete: (level) => progress.complete('press', level), hasInkstep: () => progress.hasAbility('press'), restored: (level) => progress.isRestored('press', level) });
   // a side climb in the Press: the Scribe's Stacks (secret page above the ridge)
-  const stacks = buildPressStacks(ctx);
+  const stacks = buildPressStacks(ctx, { foundAtLoad: progress.isSecretFound('press-stacks'), onFound: () => { progress.findSecret('press-stacks'); } });
   ctx.onUpdate((dt) => stacks.update(dt, fox.root.position));
   {
     const hearthLift = hearth.updrafts.liftAt;
@@ -312,7 +312,7 @@ export async function runOpening(): Promise<void> {
   if (progress.isRestored('russetvale', 'teach') && !homecoming.isPinned()) homecoming.force();
   // Russetvale's levels from their physical truth: page home → Keeping settled → the Press kindled
   let progressT = 0;
-  const archSaid = { ashwater: false, press: false };
+  const archSaid = { ashwater: progress.isRestored('russetvale', 'teach'), press: progress.isVisited('ashwater', 'teach') };
   ctx.onUpdate((dt) => {
     pageMap.step();
     progressT += dt;
