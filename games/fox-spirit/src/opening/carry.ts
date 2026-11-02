@@ -199,6 +199,11 @@ export function createCarry(opts: {
       const teach = carried ? placements === 0 : pickups === 0 && canPickup();
       glyph.style.opacity = grounded && !dashing && teach ? '1' : '0';
     },
+    /** where the ember is now (copied into `out`; allocation-free) and whether it is being carried */
+    where(out: THREE.Vector3): boolean {
+      out.copy(position);
+      return carried;
+    },
     /** set down (not carried, not rolling) within `r` of a point on its floor; allocation-free for per-frame checks */
     restsAt(x: number, y: number, z: number, r: number): boolean {
       return !carried && rollTime <= 0 && Math.abs(position.y - y) < 0.6 && Math.hypot(position.x - x, position.z - z) < r;

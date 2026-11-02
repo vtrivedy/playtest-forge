@@ -237,6 +237,7 @@ export async function runOpening(): Promise<void> {
   const finale = await buildFinale(ctx, {
     settled: () => settledAt >= 0,
     ember: coal,
+    homeFull: homecoming.isFull,
     cam: player.cam,
     player,
     crownLetGo: crown.letGo,
