@@ -246,6 +246,18 @@ export const UNPRESSED = (() => {
   };
 })();
 
+/** Kickable leaf piles (DESIGN-leaf-piles.md): beside the canopy → grove jog, the gate, the plaza's west side and the lane to H-a */
+export const LEAF_PILES: ReadonlyArray<{ x: number; z: number }> = [
+  { x: -5.2, z: 70.6 },
+  { x: -6.8, z: 75.0 },
+  { x: -9.8, z: 80.4 },
+  { x: -14.0, z: 81.0 },
+  { x: -17.4, z: 80.8 },
+  { x: -1.8, z: 84.2 },
+  { x: -11.2, z: 86.6 },
+  { x: 2.8, z: 78.6 },
+];
+
 /**
  * Homecoming at the well (DESIGN-homecoming.md). Well-local frame = the Great Well's build frame (village.ts
  * greatWell: yaw 0.3, +z = the lane side). `lanterns` hang under the hood's eaves (local x, z, cord top y);
