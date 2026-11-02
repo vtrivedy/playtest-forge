@@ -33,6 +33,8 @@ export type FinaleRig = {
   fox: THREE.Object3D;
   camera: THREE.Camera;
   canvas: HTMLCanvasElement;
+  /** the shared paint uniform the world's toon shader reads for settled snow */
+  snowCover: { value: number };
   groundH: (x: number, z: number) => number;
   /** cold one-shot events (may allocate) */
   events: { kindle: () => void; unbind: () => void; open: () => void; release: () => void; snow: () => void; card: () => void };
@@ -317,6 +319,8 @@ export function updateFinale(rig: FinaleRig, dt: number): void {
     u.uTime!.value = s.snowT;
     u.uAmount!.value = smooth(s.snowT, 0, T.snowRamp);
     u.uHalfH!.value = rig.canvas.height * 0.5;
+    // and it settles: a slow dusting on every sky-facing painted surface
+    rig.snowCover.value = smooth(s.snowT, 4, 80) * 0.8;
     (u.uCenter!.value as THREE.Vector3).copy(rig.camera.position);
   }
 

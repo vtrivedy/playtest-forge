@@ -7,7 +7,7 @@
  * This file builds (allocations allowed); every per-frame step lives in finale.hot.ts.
  */
 import * as THREE from 'three';
-import { buildMaple, buildRock, contactInk, hewn, inked, inkMaterial, jitter, mapleLeafGeometry, RAMP_WORLD, toon } from '../lookdevKit';
+import { buildMaple, buildRock, contactInk, hewn, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, toon } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
@@ -424,6 +424,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     fox: ctx.fox.root,
     camera: opts.cam.camera,
     canvas: ctx.renderer.domElement,
+    snowCover: paintU.uSnow,
     groundH,
     events: {
       kindle: () => {

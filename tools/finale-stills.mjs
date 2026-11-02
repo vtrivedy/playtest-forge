@@ -69,6 +69,12 @@ try {
     await H('advance', f, 1 / 60, false);
     await snap(n);
   }
+  // a minute on: the first snow has settled over the hollow and the village
+  await H('advance', 2400, 1 / 60, false);
+  await snap('26-late-chase');
+  await snap('27-late-press', 'press');
+  await snap('28-late-hollow', 'hollow');
+  await snap('29-late-hub', 'hub');
   if (clip) {
     const ff = (await import('imageio-ffmpeg').catch(() => null));
     const bin = ff?.get_ffmpeg_exe?.() ?? 'ffmpeg';
