@@ -568,7 +568,7 @@ checks and screenshots under `/captures/fern/`, mirrored in
 `keeping-swarm4-captures/fern/` volume. These are offline, sampled 15 fps, silent
 camera reviews; they do not certify real-time performance or audio.
 - Gate story hand-offs on the beat every route actually reaches, not the optional maximum: the homecoming→finale stream first waited for all five lanterns (every creature freed), which no slice route does, so the ending never appeared in Kit's clips (Fern fixed: page pin starts it). Check new gates against the shared slice route (`tools/page-motion-probe.mjs` / Kit's landing route), not a staged "everything done" state.
-- Isolated single black frames in a real-time capture with bright neighbours, evenly spread, are a recorder/drawing-buffer artifact, not the render: `tools/blink-scan.mjs --from T --every 2` reads the live WebGL canvas in-page over the slice route (617ad72: 2400 frames, min luma 112, zero dark) — prove in-canvas before chasing shaders.
+- Earlier software-only scans (617ad72: 2400 frames, min luma112, zero dark) did NOT establish that the GPU flashes were recorder-only. Reed swarm5 hardware comparison below supersedes that conclusion: native, staged and independent CDP output all flash, including one synchronous source sample. Reproduce on the affected GPU path before assigning the cause.
 
 ## Showcase continuation and teaching overlays — Fern050a7cc
 
@@ -613,3 +613,45 @@ Review timed UI overlays in motion: a bottom-center teaching card covered the fo
   still counts as home fixes it; WF suffices.
 - The rest shot frames hero + cradle (45% toward the fox) from the approach side, ~3.5 m back, and holds with a 90 s
   slow push until the player moves (after the card's lock). Fox ≈ 140-160 px tall at 720p.
+
+## Recorder boundary investigation — Reed, swarm5
+
+- b4fa63a review reports 21 isolated native GPU MediaRecorder flashes. Existing
+  software staging probes and synchronous canvas scans do not establish the GPU
+  cause. Keep this issue open until matched hardware recordings reproduce it.
+- `tools/check-black-frames.py` scans decoded frames with actual PTS, including
+  VFR clips, and fails even one near-black frame. The bright / single-flash /
+  blank negative controls are `python3 tools/tests/black-frame-gate.py` (ffmpeg
+  required, imageio-ffmpeg optional fallback). Existing fixed-clock hub gate stays
+  valid; this diagnostic handles real-time VFR recordings.
+- RecorderBoundary.tla checks synchronous render→copy→publish ordering (11 states).
+  RecorderBoundaryBad.cfg deliberately permits discard before copy and fails
+  NoBlackPublication. It proves ordering only, not GPU/browser correctness.
+
+Hardware reproduction on diagnostic764b338 (game source identical to b4fa63a):
+T4/EGL1280×720,120s wall recording, native20/2545 black frames, synchronous
+2D staging33/3400, independent CDP compositor11/1133. Stage read at simulation
+tick3000 is0luma. Independent compositor frame00007 is fully black. This proves black pixels
+exist before encoding and that2D staging does not repair the shared output. Artifacts
+`keeping-swarm5-captures/reed/boundary-764b33881c-154213-24ad01`; source/tool hashes,
+actual frame PTS, GPU attributes, screenshots and __game are preserved. Context has
+preserveDrawingBufferfalse and antialiastrue. Cause still open; flag A/B underway.
+
+Controlled follow-up on0a4862d: preserveDrawingBuffertrue still18 native/23
+staged/7 CDP flashes. Canvas antialiasfalse alone:0/2643 native,0/3422 staged,
+0/1141 CDP, minimum mean luma71.2/80.2/80.3; full SMAA/bloom/grade preserved.
+Critically, baselineMSAAtrue with NO MediaRecorder or captureStream attached
+(CDP-only8495afb) is clean0/1156. This isolates a recording-triggered GPU
+canvas/MSAA interaction rather than an autonomous game fade. Paired compositor
+black by itself did not distinguish recording-triggered corruption from a game
+defect. The forge's fullscreen output surface does not need MSAA; SMAA already
+owns scene-edge smoothing. Actual constructor antialiasfalse is the selected fix;
+AST single-aa-owner lint rejects true, dynamic flags, overriding spreads/context.
+
+Actual constructor74c7db9 (no diagnostic context override),250s recording:
+native0/5604, staged0/6948, CDP0/2316 black; noJSerrors, minimum meanluma
+67.948/76.674/76.774. **Scope limit:** probe omitted interact so the page completes
+(3catches0skips) then the journey stalls at coal pickup; this is valid250s render
+output evidence, not an ending clear. Route replay now uses a pooled immutable
+jump/dash/interact encoder (including KeyE) and asserts canonical route completion
+for long captures, making that mistaken clear claim fail automatically.
