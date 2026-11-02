@@ -29,7 +29,8 @@ function roomImpulse(ac: BaseAudioContext): AudioBuffer {
   return buf;
 }
 
-export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
+/** onReport: every conductor report (one per bar line), for trace checks against tla/Hearthsong.tla */
+export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1, onReport?: (r: Float64Array) => void) {
   const song = compileSong();
   let driver: MusicDriver | null = null;
   const reported = { bar: -1, breath: false, swell: 'idle', pass: 0, since: 0, shaded: false, ending: 'playing', forces: 2, tune: 'hearth' };
@@ -52,6 +53,7 @@ export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
       node.connect(room);
       node.port.onmessage = (e: MessageEvent<Float64Array>) => {
         const r = e.data;
+        onReport?.(r);
         reported.bar = r[0]!;
         reported.breath = r[1] === 1;
         reported.swell = SWELLS[r[2]!] ?? '?';
