@@ -9,7 +9,7 @@ import type { OpeningAudio } from './audio';
 import { CANOPY, POP_UP_RUIN } from './layout';
 
 type Surface = 'grass' | 'leaf' | 'wood' | 'stone';
-export const FOLEY = { step: 0.05, jump: 0.05, land: 0.12, glide: 0.04, warmth: 1800, gap: 0.16 };
+export const FOLEY = { step: 0.025, jump: 0.05, land: 0.12, glide: 0.04, warmth: 1800, gap: 0.16 };
 /** pad colour per surface: low-pass (Hz), resonance, decay (s) */
 const PAD: Record<Surface, { lp: number; q: number; decay: number; gain: number }> = {
   // grass is silent underfoot (as it is): a run across the meadow leaves the quiet alone
