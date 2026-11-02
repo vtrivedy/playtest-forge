@@ -11,7 +11,8 @@ did. No UI, no counters, no new systems: the unpressed creature kit, the page, a
    (the same inked tree / sun / hills art, in colour) is pinned to the well's west post at eye height, facing
    the lane mouth. It stirs in the wind. As it is pinned a warm light shaft and sparks rise out of the well
    for ~14 s, tall enough (16 m) to be seen over the trees from the ruin's overlook where the page was kept:
-   the slice's end points you home.
+   the slice's end points you home. A low stream of ember motes drifts from the overlook down past the ruin
+   entry and across the meadow to the well over the same time, so the way home is in the lower chase frame too.
 2. **The freed come home.** Creatures you have unpressed gather at the well, each in its own way:
    - hedgehog: already lives by the well (no change);
    - kit: already trots home and curls by the well (no change);

@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { inked, toon } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
-import { HOMECOMING } from './layout';
+import { HOMECOMING, POP_UP_RUIN } from './layout';
 
 type Page = { art: THREE.Texture; settled: () => boolean };
 type Unpressed = { goHome: (id: 'hare' | 'heron') => boolean; home: () => string[]; state: () => { creatures: { id: string; phase: string }[] } };
@@ -100,6 +100,22 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   const sparks = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, toneMapped: false, fog: false }), BEACON.sparks);
   sparks.visible = false;
   frame.add(sparks);
+  // the ember trail: a low stream of warm motes drifting from the ruin's overlook, down past its entry and across
+  // the meadow to the well while the beacon burns: a lower anchor in the chase frame that shows the way home
+  const TRAIL = { motes: 42, speed: 2.6, y: 1.1 };
+  const trailPath = new THREE.CatmullRomCurve3(
+    [[POP_UP_RUIN.overlook.x, POP_UP_RUIN.overlook.z], [-23.0, 75.6], ...H.harePath.map((p) => [p.x, p.z]), [H.well.x - 1.2, H.well.z + 0.6]].map(
+      ([x, z]) => new THREE.Vector3(x!, ctx.groundH(x!, z!) + TRAIL.y, z!),
+    ),
+  );
+  trailPath.points[0]!.y = POP_UP_RUIN.overlook.top + 1.4;
+  const trailLen = trailPath.getLength();
+  const trail = new THREE.InstancedMesh(new THREE.SphereGeometry(0.09, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffa040, toneMapped: false }), TRAIL.motes);
+  trail.frustumCulled = false;
+  trail.visible = false;
+  scene.add(trail);
+  const trailSeed = Array.from({ length: TRAIL.motes }, () => [ctx.rand(), ctx.rand() * 6.28, 0.6 + ctx.rand() * 0.6] as const);
+  const tp = new THREE.Vector3();
   const sparkSeed = Array.from({ length: BEACON.sparks }, () => [ctx.rand() * 6.28, ctx.rand() * 0.5, ctx.rand()] as const);
   const MOTES = 28;
   const motes = new THREE.InstancedMesh(new THREE.SphereGeometry(0.03, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffd28a, transparent: true, opacity: 0.9, toneMapped: false }), MOTES);
@@ -191,6 +207,22 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
           sparks.setMatrixAt(i, m4);
         }
         sparks.instanceMatrix.needsUpdate = true;
+      }
+      // the trail runs a little longer than the shaft so its last motes arrive home
+      const tb = THREE.MathUtils.smoothstep(pinned, 0, 1) * (1 - THREE.MathUtils.smoothstep(pinned, BEACON.secs, BEACON.secs + 5));
+      trail.visible = tb > 0.001;
+      if (trail.visible) {
+        for (let i = 0; i < TRAIL.motes; i++) {
+          const [ph, wob, size] = trailSeed[i]!;
+          const u = (ph + (pinned * TRAIL.speed) / trailLen) % 1;
+          trailPath.getPointAt(u, tp);
+          tp.y += Math.sin(clock * 1.3 + wob) * 0.25;
+          tp.x += Math.sin(clock * 0.9 + wob * 2) * 0.3;
+          const k = tb * size * Math.min(1, u * 12, (1 - u) * 6);
+          m4.makeScale(k, k, k).setPosition(tp.x, tp.y, tp.z);
+          trail.setMatrixAt(i, m4);
+        }
+        trail.instanceMatrix.needsUpdate = true;
       }
       // pinned with a little bounce, then it stirs in the wind about its tack
       const pop = Math.min(1, pinned / 0.5);
