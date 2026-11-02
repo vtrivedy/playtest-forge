@@ -39,3 +39,15 @@ The independent regional drop passes all7real movement/setup checks and all nume
 Matched latest-controller trials:1.8 fails2/15margin frames,1.9passes15/15; minimum bodyNDCy improves-.976→-.849 (~4→27px bottom padding at360h). All7statechecks and numericgates pass both; projected hero minimum68.68→66.91px across12s. Reviewed all15candidateframes; composition remains close and readable. Select1.9m opening compression floor (normal2.45m boom unchanged), then full150frame drop and affected-route regressions.
 
 Wren9e04283 isolates slide to round posts with active steering; folds/walls/boxes stop as authored. His30Hz full-slice trace is bit-identical to slide-off and60Hz completes3catches/home, with post/finale/lane checks green. Adopt this final controller correction and restore the original run-up target, withdrawing the centring workaround too. The1.9m full150frame regional drop on d0f6af4passes all strict bounds and7state checks; final source will repeat actual outcome coverage with the corrected controller.
+
+Final-source visual review of the actual missed jump found a second, independent
+visibility failure: frames f058/f059 are fully covered by the upright southern
+return stair-fold. Projection/body margins and hero size pass because those
+checks do not test world occlusion. The return pivot's twenty treads were never
+registered in `ctx.occluders`; the two leaf pivots were. Keep camera recovery,
+clearance tuning and collider transforms unchanged. Create every fold through one
+registered pivot constructor and require that returned type in `Fold`, so a plain
+unregistered group cannot silently become another fold. After the fixed-source
+queue finishes, replay the full real missed-jump route with a longer clip across
+the hidden frames, plus the successful homeward stair descent. Compare complete
+player trajectories with the pre-registration runs and review every new frame.
