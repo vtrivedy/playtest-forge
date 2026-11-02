@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import type { LetterPlane } from './lettering.hot';
 
-export type LetterLine = { text: string; px: number; italic?: boolean; spacing?: number; alpha?: number };
+/** `outline` is the warm-dark stroke width as a fraction of the font size. */
+export type LetterLine = { text: string; px: number; italic?: boolean; spacing?: number; alpha?: number; outline?: number };
 /** `left`: anchor the plane's left edge at NDC `x` and set text flush left on a dark panel (teach hints) */
 export type LetterOpts = { x?: number; left?: boolean; panel?: boolean };
 
@@ -73,6 +74,12 @@ export function createLetterPlane(cw: number, ch: number, heightFrac: number, y:
         g.shadowOffsetY = l.px * 0.04;
         g.fillStyle = '#fff3dc';
         const tx = left ? pad : cw / 2;
+        if (l.outline) {
+          g.strokeStyle = '#35251e';
+          g.lineJoin = 'round';
+          g.lineWidth = l.px * l.outline;
+          g.strokeText(l.text, tx, at);
+        }
         g.fillText(l.text, tx, at);
         if (!o.panel) g.fillText(l.text, tx, at);
         at += l.px * 0.625;

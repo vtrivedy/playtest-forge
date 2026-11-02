@@ -684,6 +684,8 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
 - `tools/naive-explore.mjs` is the in-repo naive bot (seeded mulberry32, policy runs in-page per chunk; `--tether 14` = the review's well-plaza wander; `--legacy-stuck` reproduces the seed test). Stuck = pushing the stick but < 15% of expected travel over a 1 s window; re-fires each further stuck second.
 - The seed bot's stuck test (< 0.08 m per 1/60 s step for 45 steps) means < 4.8 m/s, faster than `PLAY.runSpeed` 3.2 m/s: it "unstuck" every 0.75 s whatever happened (106 / 90 s on b4fa63a, review said 131), and its random turns made the circling-the-well random walk. Check a bot's thresholds against the controller's real speeds before trusting a stuck count. It also sent `Shift` (no dash; the controller reads `ShiftLeft`).
 - Real cause of village stops: `moveTo`'s 0.28 m nose probe points along the facing, so any diagonal push into a wall fails BOTH per-axis moves — the fox stopped dead instead of sliding. The slide used to run only for round posts; it now runs for any blocker while the player steers into it (never off a ledge) and eases the facing to the travel (`PLAY.slideTurn`).
+- Slide side comes from the stick's lean along the blocker (remembered side only breaks a square-on tie); a remembered side alone let pushing UP a wall slide the fox DOWN it. While the stick keeps pushing into the blocker (and leans within 90° of the travel) the facing follows the wall — covers both the turned-step slide and the plain one-axis wall case, which crabbed (nose into the wall, body sliding sideways) since before swarm5. Pinned in a corner releases the hold so the fox turns to the stick. Clip tool: `tools/wall-slide-clip.mjs [--at x,z] [--segs json]`.
+- Naive wander is chaotic: a small controller change reroutes a seed entirely, so compare builds on ≥ 8 seeds, never 1-3. 8-seed plaza matrix (90 s, tether 14): b4fa63a 127 unsticks / 93.9 stuck-s; wall slide f1ffac3 28 / 17.6; + facing-follows-wall 34 / 25.1 (seed 4 alone 11 / 8.4). Remaining snags are concave prop-against-wall corners (barrel/porch posts at each cottage's front, `village.ts` buildVillage), the hand cart (-11.2, 81.8, top 0.9 > jump apex 0.83) and the gate fences south-east of the well. `npm run check:stuck` gates seeds 1-3 at mean ≤ 4 stuck-s.
 
 ## Discovery observer and control teaching follow-up — Hazel
 
@@ -705,8 +707,31 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
   LRA 8.5 (the review's 4.8 was the full mix on a capture: ambience/SFX flatten it). The worklet's `mom` envelope
   (bed ×0.82, swell up to ×1.35, 2.5 s up / 4 s down, bass + brighter harp under it) → lift 8.0, LRA 12.7.
   Level-only changes leave the conductor (TLA Hearthsong) untouched; still run `npm run check:music`.
+
+### Composing the rest shot (Cedar, swarm5, 80238fd)
+
+- On the authored route the fox stops ~1 m north of the cradle facing the Press, so a fixed Crown-ward lens shows
+  its back, and any front/profile view puts the Press in frame. `familyShot()` scores 24 azimuths: fox facing
+  (3/4 front), Crown backdrop, sightBlocked, plus hard clearance from the Press *and the open cover* (local x down to
+  −3.7), and a penalty on the 4.4 m post by **distance to the lens** (apparent size). An angle-from-centre penalty
+  backfired: it preferred the post big at the frame edge over small and far in the middle.
+- `sightBlocked` does not know the Press geometry; clearance has to be explicit.
+- Render a sweep of candidate views once (`__opening.camera` + `advance(0,…,true)`) and pick by eye before
+  encoding the rule — four blind iterations cost more than one sweep.
+- The snow beat must not hand back to the follow lens: the kindle wide holds until snow, then eases (2.2 s) to the
+  family shot, so 'Let the year turn.' lands on the family.
+- `tools/finale-journey-probe.mjs OUT --motion` is the cheapest real-route check (~10 min on swiftshader).
 - World edge (Maple, swarm5): outside the bowl's rims the terrain is only a gentle slope (bowlRim grows 14 per
   rimK unit = ~0.35 m/m east/west), and the vista valley past Press Hollow's lip is walkable down. Closing one hole
   with a rail just moved the leak (seed 1: lip → then east off the far crag). The fix class is a baked world mask
   (`opening/worldBounds.ts`) read by the controller's `okAt` (`inWorld`): add new regions' shapes to `inside()`.
   Check with `node tools/naive-explore.mjs --seconds 120 --seed 1..3` (final position must stay inside).
+
+
+## Discovery safe completion — Hazel, swarm5 follow-up
+
+- An idle-at-wake1.5s trial on7a4cecdd caught the third page during ascent from the second ruin leaf (x−27.24,y0.55), before reaching the overlook. Guidance hid immediately; the bot released jump, jumpCut halved its rise, and it fell short. The overlook assertion correctly failed. That capture was stopped and retained with STATUS.md; it is not a completed final clip.
+- Guidance now remains in `land` after a third catch until CURRENT grounded contact on the overlook. It advises Hold Space, preserving the jump/glide, and a floor miss can reuse opened-leaf guidance. Page progression is unchanged. `readOverlookLanding()` returns a private unique-symbol token; only `completeGuide(token)` may set done/inactive. `discovery-safety-lint.mjs` rejects old phase-based hiding, direct done assignments and raw-token completion.
+- Discovery.tla112generated/38distinct passes; removing Finish's current-contact guard fails DoneAfterLanding in a five-state trace. This checks completion safety and stable done, not physical reachability. Probe assertions now require completed guidance and a grounded done transition as well as kept page + real overlook event.
+- Matched blind controls on591e04b9 vs4f67f9ac (same f1ffac3 random policy, manual clock fixed,120s,seeds1–3): first catches0/0/0→1/1/0; all still0overlook. Rendered-cue following is a separate policy with no hidden goal/action/leg steering, not a claim that random wandering solves platform puzzles.
+- Safe-completion trial934a6d38 landed at x−25.9017,y1.02,z71.5088: grounded on the actual pad, but1.7mm outside the ruin's authored arrival trigger. The strict same-frame arrival assertion failed correctly. The contact token now requires BOTH the ruin's authoritative `overlookVisited` milestone and current physical support; standing on the outer pad keeps the landing cue toward its centre. No copied arrival threshold or weakened assertion. The historical milestone alone never completes guidance.

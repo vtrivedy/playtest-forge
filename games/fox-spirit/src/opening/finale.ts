@@ -554,7 +554,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const card = createLetterPlane(2048, 720, 0.42, 0.5);
   card.draw([
     { text: 'Russet Vale', px: 300, italic: true, spacing: 0.02 },
-    { text: 'and the year turned', px: 84, spacing: 0.14, alpha: 0.9 },
+    { text: 'and the year turned', px: 84, spacing: 0.14, alpha: 0.95, outline: 0.09 },
   ]);
   opts.cam.camera.add(card.mesh);
   const say = (text: string) => ctx.captions.say(text);
@@ -572,7 +572,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
    * player moves after `lockS`.
    */
   const cradleAt = new THREE.Vector3(F.cradle.x, cy, F.cradle.z);
-  const familyShot = (easeS: number, lockS: number) => {
+  const familyShot = (easeS: number, lockS: number, holdS = 0) => {
     const cam = opts.cam.camera;
     const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
     const f = ctx.fox.root.position;
@@ -616,8 +616,10 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     opts.cam.playPath({
       keys: [
         { t: 0, pos: cam.position.clone(), look: look0 },
-        { t: easeS, pos: end, look },
-        { t: 90, pos: end.clone().addScaledVector(d, 0.6).add(new THREE.Vector3(0, 0.25, 0)), look: look.clone().add(new THREE.Vector3(0, 0.25, 0)) },
+        // (optionally hold the current view first: the release wide stays on the pages and the Crown)
+        ...(holdS > 0 ? [{ t: holdS, pos: cam.position.clone(), look: look0.clone() }] : []),
+        { t: holdS + easeS, pos: end, look },
+        { t: holdS + 90, pos: end.clone().addScaledVector(d, 0.6).add(new THREE.Vector3(0, 0.25, 0)), look: look.clone().add(new THREE.Vector3(0, 0.25, 0)) },
       ],
       blendInS: 0.6, blendOutS: 2.5, lockS,
     });
@@ -668,6 +670,10 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         opts.crownLetGo();
         for (let i = 0; i < 3; i++) ctx.audio.play('soft-paper', { at: rig.bookTop, gain: 0.12, rate: 0.85 + i * 0.07, delay: i * 0.35 });
         say('so it would never end.');
+        // keep the wide on the pages and the Crown, then arrive on the family just as the snow and
+        // 'Let the year turn.' come in (not still easing when the caption shows)
+        const f = ctx.fox.root.position;
+        if (Math.hypot(f.x - F.cradle.x, f.z - F.cradle.z) < FINALE_TIMING.restR) familyShot(2.2, 1, FINALE_TIMING.released - 2.0);
       },
       onward: (to: THREE.Vector3) => {
         rig.s.onwardLen = rebuildOnward(to);
@@ -699,10 +705,6 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       snow: () => {
         ctx.audio.cue('finale-snow');
         say('Let the year turn.');
-        // the wide hands straight on to the family as the kits come home (not back to a follow lens jammed
-        // against the Press); any move after a moment takes the lens back
-        const f = ctx.fox.root.position;
-        if (Math.hypot(f.x - F.cradle.x, f.z - F.cradle.z) < FINALE_TIMING.restR) familyShot(2.2, 1);
       },
       card: () => {
         ctx.audio.cue('finale-rest');
@@ -716,7 +718,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     onwardMesh, onwardLut, emberAt: new THREE.Vector3(), onwardAt, onwardFrom,
     homeReady: opts.homeReady,
     emberWhere: (out: THREE.Vector3) => opts.ember.where(out),
-    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
+    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card, teach: ctx.teach.offer,
     cradle: cradleAt,
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
     toCrown,
