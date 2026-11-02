@@ -35,3 +35,27 @@ same directory under `/captures/reed/` additionally contains `game.json`,
 `arrival-finale-sheet.jpg`, `arrival-quartersec.jpg` and extracted source stills.
 No gameplay or capture code changed for this review. Use this same route for
 the pending homecoming camera/caption/plaza candidate comparison.
+
+## Independent blind seed 2 camera reproduction
+
+An unchanged development replay on `d63f32a7` (runtime source identical to
+`b13dfe15`) independently reproduces Hazel's separate foreground obstruction.
+Command: `node tools/naive-explore.mjs --seconds 24 --seed 2 --frames 0.5`.
+SwiftShader, 960×540, fixed 60 Hz simulation, twelve screenshots, no staged
+start or progression changes. Zero JavaScript errors; one catch, two unsticks,
+1.37 stuck seconds, no kept page or overlook visit. Full `window.__game` state
+is retained inside `naive.json`.
+
+Inspected `frames/f00009.jpg`, captured at 20 simulation seconds: a large opaque
+diagonal terrain face fills most of the left image and crops the fox's body.
+This verifies the visible failure independently; Hazel's separate ray inspection
+identifies the intersected PlaneGeometry as terrain, rather than the registered
+canopy stems. This replay does not independently identify that mesh, fix camera
+clearance, or establish the duration of obstruction between two-second samples.
+The earlier cue-route stem approval therefore does not cover this approach.
+
+Artifacts: `keeping-swarm5-captures/reed/blind-b13-seed2-investigate/`, including
+the sampled movie, all twelve frames and full state. The movie plays at four
+times simulation speed and is not continuous motion evidence. A candidate
+camera correction must replay this seed and preserve the existing discovery
+landing/recovery checks; global terrain hiding is not a validated correction.
