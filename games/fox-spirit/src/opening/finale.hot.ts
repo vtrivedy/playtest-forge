@@ -405,6 +405,8 @@ function stepOnward(rig: FinaleRig, dt: number): void {
   const f = rig.fox.position;
   const near = Math.hypot(f.x - rig.emberAt.x, f.z - rig.emberAt.z) < 5;
   const want = s.phase === 0 && rig.homeReady() && !carried && !near;
+  // a page already kept when the game loads (saved progress) comes home quietly: no reveal, no caption replay
+  if (s.homeSaid === 0 && s.clock < 1 && rig.homeReady()) s.homeSaid = 1;
   if (s.phase === 0 && rig.homeReady() && !carried && s.homeSaid === 0) {
     // Remote page completion leaves the reveal pending until the fox comes home.
     if (rig.events.homeCaption()) s.homeSaid = 1;
