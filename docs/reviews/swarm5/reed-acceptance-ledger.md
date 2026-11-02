@@ -1,4 +1,4 @@
-# Swarm5 acceptance evidence — updated 22:00 UTC, November 2
+# Swarm5 acceptance evidence — updated 22:19 UTC, November 2
 
 ## Multi-world acceptance update
 
@@ -8,13 +8,13 @@ There is no single latest-build full-game approval. Exact tested commits and ret
 | Expanded request | Independently supported result | Remaining gap |
 |---|---|---|
 | Hub → three distinct worlds → return | Fresh physical five-transition circuit passes on `acc04047`; later Press route `64204175` repeats physical entry, return and re-entry with zero JavaScript errors. Autumn village, rain marsh and snowy ink Press differ visibly in retained frames. | Sampled scenery does not establish continuous camera quality or no-placeholder-art approval. |
-| Real Ashwater puzzles and earned progress | `26672adb`: fresh opening → physical arch → bank sluice, drowned roof, second culvert, sinking-mat check, rising cistern, walkable punt/shelf → all three local/canonical facts, Reedskim, Reed fill 1, both canonical side memories and native-Tab Album. Zero page or console errors. | Authored solution takes 171.55 simulated seconds including detours and deliberate tests/waits. The roof barely reads at its trigger and the shelf pier masks the fox's muzzle. Blind insight, forgiving traversal and 10–15-minute depth remain unproved. |
+| Real Ashwater puzzles and earned progress | `f90933fb`: fresh opening → physical arch → bank sluice, drowned roof, second culvert, sinking-mat check, rising cistern, walkable punt/shelf → all three local/canonical facts, Reedskim, Reed fill 1, both canonical side memories and native-Tab Album. Zero page or console errors. Final-art landing and 72-frame walking movie personally reviewed: peat, feathered standing water, sedge/cattails and low mist establish a marsh shift; 0 black among those 72 decoded frames. | Authored solution takes 171.55 simulated seconds including detours and deliberate tests/waits. The roof barely reads at its trigger; `440f7d47` subsequently fixes the matched shelf-pier view, while the Seedwell pillar still masks the muzzle. Blind insight, forgiving traversal and 10–15-minute depth remain unproved. |
 | Real Press puzzles and earned progress | `64204175`: failed direct warmth attempt, relays, two draft rides and Scribe finish → all three local/canonical facts, Inkstep, Maple fill 1 and native-Tab Album. Zero JavaScript errors. Corrected reachable approaches show the whole fox at first brazier and relay. | Authored solution takes 86.683 simulated seconds. Runtime solution hints remain; this is not puzzle-insight or 10–15-minute depth approval. |
 | Characters and story turn | `b374e01a` and `64204175`: independently inspected fox-eared/scarfed Scribe, workbench props and readable coda; banner supplies the family/last-season motive. | Sparse ledge and continuous character/lever motion remain open. A narrative banner is not proof the story works for an unfamiliar player. |
 | Saved world progress agrees with scene | `f49f3aa1`: independent staged snapshots pass saved opening, Ashwater and Press reconstruction. Hazel's later `84ac52ae` owner report covers autumn teach/develop/full reconstruction plus physical E/Shift solve → earned reload → quiet revisit, zero page/console errors, and a 96-frame fall movie. | Reed has not independently repeated the later autumn reconstruction; retain that attribution. See [the owner's exact-source report](progress/AUTUMN-SAVE-FIX.md). |
 | Bigger explorable places / 30–45-minute game | Movement-mask audit repeated on `0c187aba`: Russetvale 9,076 m²; Ashwater 13,272 m²; Press 6,993 m², unchanged from the earlier circuit audit. | Mask includes obstacles, water and possibly disconnected cells. It proves permitted footprint only. No collision-free reachable-area or requested-duration result exists. |
 
-Evidence: [Ashwater cistern](reed-cistern.md), [Press route and saved opening](reed-scribe-save.md),
+Evidence: [Ashwater cistern](reed-cistern.md), [final-art marsh replay and film](marsh-ground/REVIEW.md), [Press route and saved opening](reed-scribe-save.md),
 [physical circuit and area method](reed-world-tour.md). Each report names immutable builds, complete
 `window.__game`/hook evidence, retained screenshots, input staging and capture locations. Neither independent foreign-world
 route above recorded continuous video; neither adds a zero-black-frame claim. Optional Stacks input climb, secret-only reward, quiet reload/revisit and native Album are independently verified on `3788c5a2`; typography follow-up `a7b86f39` repeats the route twice and checks all memory spreads. These use staged developer travel/start, not physical hub discovery. Loft and broader optional-memory fixtures remain owner-reported here. See [Stacks replay](reed-stacks.md) and [Album contrast](album-contrast/REVIEW.md).
@@ -33,6 +33,10 @@ This regression run disables frame capture; it adds no screenshot, motion, camer
 The tether deliberately constrains exploration. The result does not replace the earlier independent-seed
 comparison or establish a consistent tenfold improvement. TypeScript, production Vite build, feel/camera/world
 lint and whitespace checks pass on this source. Vite retains its large-chunk warning.
+
+## Latest integrated physical replay — 440f7d47
+
+Both separate fresh T4 runs pass with zero page/console errors: full two-reach Ashwater with both memories/Reedskim/Reed fill 1, and physical hub → Ashwater → home → full Press solve (Inkstep/Maple fill 1) → home → Ashwater re-entry. The matched shelf frame confirms Cedar's late occluder registration fixes the pier masking. Roof-trigger and Seedwell-pillar framing remain open. Ashwater takes 180.183 simulated seconds including the walking capture; Press completion takes 89.183 within that world. These are authored routes, not requested-duration or blind-insight evidence. [Exact-source report, personally inspected frames and selected state evidence](reed-integrated-440f7d47/REVIEW.md).
 
 ## Earlier baseline evidence
 

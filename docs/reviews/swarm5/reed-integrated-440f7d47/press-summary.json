@@ -1,0 +1,682 @@
+{
+  "commit": "440f7d47efc5456acd805709e0881b6826edfcee",
+  "provenance": "Fresh boot; rendered invitation follower then movement only; no teleport or progress setters",
+  "pass": true,
+  "errors": [],
+  "beats": [
+    {
+      "name": "01-hub-entry",
+      "pos": [
+        700,
+        0.01,
+        34
+      ],
+      "timing": {
+        "totalSeconds": 137.01666666666353,
+        "byWorld": {
+          "russetvale": 135.01666666666353,
+          "ashwater": 2,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 1,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 3,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0.04,
+          0.81,
+          0,
+          1,
+          1
+        ]
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      }
+    },
+    {
+      "name": "tour-02-home",
+      "pos": [
+        -4.4,
+        0,
+        88.6
+      ],
+      "timing": {
+        "totalSeconds": 141.49999999999844,
+        "byWorld": {
+          "russetvale": 137.51666666666353,
+          "ashwater": 3.9833333333333263,
+          "press": 0
+        }
+      },
+      "worlds": {
+        "active": "russetvale",
+        "travels": 2,
+        "progress": {
+          "activeWorld": "hub",
+          "revision": 4,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0.99,
+          0,
+          1,
+          1
+        ]
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      }
+    },
+    {
+      "name": "tour-03-press",
+      "pos": [
+        -700,
+        0.08,
+        123
+      ],
+      "timing": {
+        "totalSeconds": 147.16666666666762,
+        "byWorld": {
+          "russetvale": 140.6833333333327,
+          "ashwater": 3.9833333333333263,
+          "press": 2.5
+        }
+      },
+      "worlds": {
+        "active": "press",
+        "travels": 3,
+        "progress": {
+          "activeWorld": "press",
+          "revision": 6,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0.02,
+          0,
+          1,
+          1
+        ]
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      }
+    },
+    {
+      "name": "press-01b-faded-at-seal",
+      "pos": [
+        -700.02,
+        0.1,
+        103.01
+      ],
+      "timing": {
+        "totalSeconds": 162.63333333334631,
+        "byWorld": {
+          "russetvale": 140.6833333333327,
+          "ashwater": 3.9833333333333263,
+          "press": 17.966666666666935
+        }
+      },
+      "worlds": {
+        "active": "press",
+        "travels": 3,
+        "progress": {
+          "activeWorld": "press",
+          "revision": 6,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      }
+    },
+    {
+      "name": "press-01c-relay-lit",
+      "pos": [
+        -707.53,
+        0.53,
+        114.81
+      ],
+      "timing": {
+        "totalSeconds": 175.46666666668958,
+        "byWorld": {
+          "russetvale": 140.6833333333327,
+          "ashwater": 3.9833333333333263,
+          "press": 30.79999999999956
+        }
+      },
+      "worlds": {
+        "active": "press",
+        "travels": 3,
+        "progress": {
+          "activeWorld": "press",
+          "revision": 6,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      },
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false
+        ],
+        "warm": 1,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      }
+    },
+    {
+      "name": "press-09-the-press",
+      "pos": [
+        -699.45,
+        11.21,
+        60.88
+      ],
+      "timing": {
+        "totalSeconds": 233.85000000006087,
+        "byWorld": {
+          "russetvale": 140.6833333333327,
+          "ashwater": 3.9833333333333263,
+          "press": 89.18333333333018
+        }
+      },
+      "worlds": {
+        "active": "press",
+        "travels": 3,
+        "progress": {
+          "activeWorld": "press",
+          "revision": 9,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "restored": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "ability": "Inkstep",
+              "well": "Maple",
+              "fill": 1,
+              "next": null
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          0.04
+        ]
+      },
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "iced": false,
+        "draftB": true,
+        "done": [
+          "teach",
+          "develop",
+          "combine"
+        ]
+      }
+    },
+    {
+      "name": "tour-04-home",
+      "pos": [
+        -9.44,
+        0,
+        89.37
+      ],
+      "timing": {
+        "totalSeconds": 261.45000000007263,
+        "byWorld": {
+          "russetvale": 143.1833333333327,
+          "ashwater": 3.9833333333333263,
+          "press": 114.28333333332898
+        }
+      },
+      "worlds": {
+        "active": "russetvale",
+        "travels": 4,
+        "progress": {
+          "activeWorld": "hub",
+          "revision": 10,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "restored": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "ability": "Inkstep",
+              "well": "Maple",
+              "fill": 1,
+              "next": null
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      },
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "iced": false,
+        "draftB": true,
+        "done": [
+          "teach",
+          "develop",
+          "combine"
+        ]
+      }
+    },
+    {
+      "name": "tour-05-reentry",
+      "pos": [
+        700,
+        0.01,
+        34
+      ],
+      "timing": {
+        "totalSeconds": 267.48333333340275,
+        "byWorld": {
+          "russetvale": 146.71666666666886,
+          "ashwater": 6.483333333333326,
+          "press": 114.28333333332898
+        }
+      },
+      "worlds": {
+        "active": "ashwater",
+        "travels": 5,
+        "progress": {
+          "activeWorld": "ashwater",
+          "revision": 11,
+          "worlds": {
+            "russetvale": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [
+                "teach"
+              ],
+              "ability": "Hearthbound",
+              "well": "Kiln",
+              "fill": 0.3333333333333333,
+              "next": "develop"
+            },
+            "ashwater": {
+              "visited": [
+                "teach"
+              ],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "restored": [
+                "teach",
+                "develop",
+                "combine"
+              ],
+              "ability": "Inkstep",
+              "well": "Maple",
+              "fill": 1,
+              "next": null
+            }
+          },
+          "secrets": []
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      },
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "iced": false,
+        "draftB": true,
+        "done": [
+          "teach",
+          "develop",
+          "combine"
+        ]
+      }
+    }
+  ]
+}
