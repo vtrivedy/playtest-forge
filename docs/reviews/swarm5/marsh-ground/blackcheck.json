@@ -1,0 +1,16 @@
+{
+  "video": "/tmp/marsh-final.mp4",
+  "sha256": "fc72c0226558b9b64c6cb3ed37a3c624fddbec2fd0cf78f3a5c84025899ef9b4",
+  "decodedFrames": 72,
+  "firstPts": 0.0,
+  "lastPts": 5.916667,
+  "minimumMeanLuma": 91.917,
+  "thresholds": {
+    "meanLuma": 12,
+    "pixelLuma": 16,
+    "fraction": 0.98
+  },
+  "darkFrameCount": 0,
+  "darkFrames": [],
+  "pass": true
+}
