@@ -812,3 +812,8 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   receding flood can otherwise put the "last dry spot" under water and teleport every frame).
 - Boarding from a cliff edge: approach straight off the edge onto the platform; diagonal approaches near a terrain
   mask edge walk the fox off the side first. Put the platform's end against the cliff face.
+- (Ashwater look) "Reeds" as single cones read as spikes. Fanned sedge tufts (9 thin cones, leaning, merged) and
+  cattail stands (stalks + capsule heads) with vertex colour dark base → light tip, one InstancedMesh each, sell a
+  marsh. `mergeGeometries` needs matching index-ness: convert everything with `.toNonIndexed()` first.
+- A probe `--clip` mode: run the in-page steering in 6-frame chunks and screenshot between chunks for a continuous
+  10 fps route film without changing the route logic (tools/ashwater-probe.mjs).
