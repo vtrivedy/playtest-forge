@@ -160,6 +160,17 @@ permits branch unmute; Vivek then hears the landed result on main.
 - Key: C major. Keep every synthesized chime in C (glyphs, page, homecoming already were); the hearth hum's B1 was
   moved to C2.
 
+- Staged in-game listening: `node tools/audio-scene.mjs --scene millbrook|finale --out DIR --seconds N` (teleport /
+  dev hook, sim paced to wall clock, pre-master stems + marks of swell/ending/finale phase each second).
+  Finale (local integration of all sw4 branches, 06:25): kindle → swell; coda ~44 s; digital silence ~60 s; then
+  epilogue after QuietBars. SwiftShader capture boxes drop ~5–20 % of ScriptProcessor audio under render load
+  (73 s recorded in 90 s wall) — a capture artefact present before Hearthsong too; don't read it as stutter.
+- Critic vocabulary → cause, found by A/B on the same window: "theremin" = 30 ms legato glide + early vibrato
+  (fix: 8 ms glide, tongue each note, vibrato after 0.4 s); "digital beeping" = 40 ms sine bubbles (few-ms
+  chirps read as water); "whip/sword strike" = a 0.35 s noise sweep to 1.8 kHz; "harsh/distorted" = FM bells at
+  ratio 3.5 / index 1.6 (ratio 4, index 0.8 = celesta); "ticking clock" = 6 ms-attack footsteps at a steady gait.
+- The model hallucinates (a "male voice", "alarm") on noise beds; confirm any flaw on the spectrogram before acting.
+
 ### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
 
 - Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
