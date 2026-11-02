@@ -78,7 +78,12 @@ try {
   for (const [x, z] of [[-14, -29], [-30, -28.6], [-43.5, -28.0]]) await go(x, z, { max: 900 });
   await settle(60);
   await shot('02b-roof');
-  for (const [x, z] of [[-20, -28.6], [0, -28.5], [0, -20], [0, -13]]) await go(x, z, { max: 900 });
+  // the west bed's north bank is a thicket: east along the bed to the sill, dash its culvert's reeds
+  await go(-6, -28.5, { max: 900 });
+  await go(-0.9, -28.5, { dash: true, dashAt: 1, max: 60, reach: 0.6 });
+  await settle(240);
+  await shot('02c-east-reach');
+  for (const [x, z] of [[-1.0, -28.5], [2.5, -28.5], [2.5, -20], [0, -13]]) await go(x, z, { max: 900 });
   await settle(90);
   await shot('03-reed-island');
   // Level 2, Reed Pond: running jumps mat to mat, the branch out to the islet first

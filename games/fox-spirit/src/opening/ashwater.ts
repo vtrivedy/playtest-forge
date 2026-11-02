@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
-import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SECRETS, SHELF, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
+import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import { updateAshwater, type AshRig } from './ashwater.hot';
 
 const C = {
@@ -75,7 +75,7 @@ export function buildAshwater(
     root.add(m);
     return m;
   };
-  const water = { channel: waterMesh('channel'), pond: waterMesh('pond'), pool: waterMesh('pool') };
+  const water = { channel: waterMesh('channel'), channelE: waterMesh('channelE'), pond: waterMesh('pond'), pool: waterMesh('pool') };
 
   // ---- reeds: blades along every bank, thick at the water's edge
   const blade = new THREE.ConeGeometry(0.05, 1.3, 4).translate(0, 0.65, 0);
@@ -129,6 +129,8 @@ export function buildAshwater(
     return { g, col };
   };
   const damA = dam(DAM_A.lx, DAM_A.lz);
+  const damA2 = dam(DAM_A2.lx, DAM_A2.lz);
+  damA2.g.position.y = -1.0;
   const damB = dam(DAM_B.lx, DAM_B.lz);
   const damC = dam(DAM_C.lx, DAM_C.lz);
   // the sluice culvert the dam chokes: a slate mouth on the channel bank behind it
@@ -400,6 +402,32 @@ export function buildAshwater(
     root.add(step);
   }
 
+  // ---- the sill between the channel's reaches (slate, a culvert mouth on its west face) and the west reach's
+  // north-bank reed thicket (a wall of cut reed bundles the fox cannot climb)
+  {
+    const a = ash(0, (WATER.channel.z0 + WATER.channel.z1) / 2);
+    const len = WATER.channel.z1 - WATER.channel.z0 + 2;
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(SILL.x1 - SILL.x0, 1.2, len), slate);
+    sill.position.set(a.x, SILL.top - 0.6, a.z);
+    root.add(sill);
+    colliders.push({ kind: 'box', x: a.x, z: a.z, yaw: 0, hx: (SILL.x1 - SILL.x0) / 2, hz: len / 2, top: SILL.top });
+    const t = ash((THICKET.x0 + THICKET.x1) / 2, (THICKET.z0 + THICKET.z1) / 2);
+    colliders.push({ kind: 'box', x: t.x, z: t.z, yaw: 0, hx: (THICKET.x1 - THICKET.x0) / 2, hz: (THICKET.z1 - THICKET.z0) / 2, top: THICKET.top });
+    const stalk = new THREE.ConeGeometry(0.07, 2.6, 4).translate(0, 1.0, 0);
+    const n = Math.round((THICKET.x1 - THICKET.x0) * 5);
+    const wall = new THREE.InstancedMesh(stalk, marsh(C.reedDry), n);
+    for (let i = 0; i < n; i++) {
+      const x = ASH_ORIGIN.x + THICKET.x0 + rand() * (THICKET.x1 - THICKET.x0);
+      const z = ASH_ORIGIN.z + THICKET.z0 + rand() * (THICKET.z1 - THICKET.z0);
+      p.set(x, H(x, z) - 0.1, z);
+      e.set((rand() - 0.5) * 0.25, rand() * 6, (rand() - 0.5) * 0.25);
+      q.setFromEuler(e);
+      sc.set(1, 0.8 + rand() * 0.5, 1);
+      wall.setMatrixAt(i, m4.compose(p, q, sc));
+    }
+    root.add(wall);
+  }
+
   // ---- the drowned roof in the channel's west reach: a slate ridge and a chimney, dry once the sluice runs
   {
     const at = ash(SECRETS.roof.lx, SECRETS.roof.lz);
@@ -434,6 +462,10 @@ export function buildAshwater(
         ctx.audio.cue('millrace-burst');
         say('The low sluice runs again.');
       },
+      burstA2: () => {
+        ctx.audio.cue('millrace-burst');
+        say('The east reach falls quiet.');
+      },
       burstB: () => {
         ctx.audio.cue('millrace-burst');
         say('The mill pool lets go.');
@@ -455,6 +487,8 @@ export function buildAshwater(
     },
     waterMesh: water,
     damA: damA.g,
+    damA2: damA2.g,
+    damA2Col: damA2.col,
     damB: damB.g,
     damC: damC.g,
     damACol: damA.col,
@@ -473,12 +507,14 @@ export function buildAshwater(
     heronMat,
     heronCol,
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
-    s: { burstA: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z, clock: 0, lastSplash: -9, secrets: 0 },
+    s: { burstA: -1, burstA2: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, channelEY: WATER.channelE.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z, clock: 0, lastSplash: -9, secrets: 0 },
   };
   // a saved game re-enters the marsh as it was left: drained channel / pool, burst dams, a lit Seedwell (no captions)
   const was = (l: (typeof LEVEL_IDS)[number]) => opts.isRestored?.(l) ?? false;
   if (was('teach')) {
     rig.s.burstA = 999;
+    rig.s.burstA2 = 999;
+    damA2.col.r = 0.001;
     rig.s.done |= 1;
     damA.col.r = 0.001;
   }
@@ -496,7 +532,7 @@ export function buildAshwater(
   return {
     spawn: { x: spawnAt.x, z: spawnAt.z, yaw: ASH_SPAWN.yaw },
     state: () => ({
-      damA: rig.s.burstA >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2),
+      damA: rig.s.burstA >= 0, damA2: rig.s.burstA2 >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2),
       secrets: rig.s.secrets, mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
     }),
   };
