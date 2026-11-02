@@ -666,3 +666,9 @@ native0/5604, staged0/6948, CDP0/2316 black; noJSerrors, minimum meanluma
 output evidence, not an ending clear. Route replay now uses a pooled immutable
 jump/dash/interact encoder (including KeyE) and asserts canonical route completion
 for long captures, making that mistaken clear claim fail automatically.
+## Painted corridors & colour coverage (Maple, swarm5 fix 2)
+
+- Measure colour with `node tools/corridor-colour.mjs [--state cold|story] [--views a,b]` (11 corridor views, real chase lens; `--images` scores any frames). Two numbers per frame: `colour` (strict, sat>0.45 off the sepia axis; review frames naive-mid .025 / end-160 .383 / t060 .728) and `tint` (any visible hue off sepia, pale washes included). Plain HSV saturation is useless here: sepia paper itself has sat ~0.35–0.42.
+- Ochre/beige is the paper's own hue: a "painted" beige lane or an ochre wash at paper value reads as unpainted sepia in frames. Anything meant to read as colour inside the sketch needs hue *off* the sepia axis (greens, madder) and must be laid darker than paper value and pushed past its chroma (~1.8×) — pastels at paper value vanish under ACES + the haze.
+- `opening/lanePaint.ts` bakes a half-float lane distance/terrain-height map (0.5 m) once from `ALL_PATHS`/`pathDist`; `patchPaint` reads it once per fragment. Uses: lane underpainting (green verges, saved-paper road), restores reaching `uLaneReach × bleed` further along lanes (story Press lane .083 → .39), and `uSketchTint` (sketch keeps 30 % of authored hue at paper value). Gate wall coverage by surface up-ness (dFdx normal), or the wash paints rainbow stripes up house walls.
+- Never run a Vite-served probe from /work while editing src — HMR reloads mid-run. Pin a worktree (`git worktree add -f /tmp/wt-x HEAD`, symlink node_modules, copy src in).
