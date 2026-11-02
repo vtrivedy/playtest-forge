@@ -10,7 +10,7 @@
     "playtest": "tsx tools/playtest.ts --game fox-spirit --port 5180 --seconds 30 --script shrine",
     "playtest:feel": "tsx tools/playtest.ts --game fox-spirit --port 5180 --seconds 12 --script feel-probe",
     "fox:turntable": "tsx tools/fox-turntable.ts --fx 0 --anim idle",
-    "lint:feel": "node tools/lint-feel.mjs"
+    "lint:feel": "node tools/lint-feel.mjs && tsx tools/camera-envelope-release-check.ts"
   },
   "devDependencies": {
     "@playwright/mcp": "^0.0.83",

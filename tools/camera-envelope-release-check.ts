@@ -4,7 +4,7 @@ import { createCameraEnvelope } from '../games/fox-spirit/src/cameraEnvelope.hot
 
 // The desired lens is free below a ledge, but its straight release segment
 // intersects that ledge. Both the free and obstructed exits must remain gradual.
-for (const ledge of [false, true]) {
+for (const dt of [1 / 30, 1 / 60, 1 / 120]) for (const ledge of [false, true]) {
   const previous = new THREE.Vector3(0, 3, 3);
   const lens = new THREE.Vector3(0, 1, 3);
   const focus = new THREE.Vector3(0, .6, 0);
@@ -16,9 +16,13 @@ for (const ledge of [false, true]) {
     previousLens: previous, surfaceAt: () => 0, lensBlocked: blocked,
     yaw: () => 0, sightFraction: () => 1,
   });
-  update(focus, lens, 1 / 60, false);
-  assert.ok(lens.distanceTo(previous) <= 16 / 60 + 1e-5, `release snapped (ledge=${ledge})`);
+  update(focus, lens, dt, false);
+  assert.ok(lens.distanceTo(previous) <= (ledge ? 16 : 12) * dt + 1e-5, `release snapped (ledge=${ledge})`);
   assert.ok(!blocked(lens.x, lens.y, lens.z, .2), 'release entered ledge');
+  for (let i=1; i<=12; i++) {
+    const p = previous.clone().lerp(lens, i / 12);
+    assert.ok(!blocked(p.x, p.y, p.z, .2), 'release segment crossed ledge');
+  }
   assert.ok(lens.y >= .16 && Math.hypot(lens.x, lens.z) >= 1.5, 'release lost floor/body room');
 }
 console.log('camera envelope: free release and obstructed release remain gradual');

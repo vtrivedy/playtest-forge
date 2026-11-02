@@ -401,3 +401,7 @@ listening claim or whole-game playtest. No runtime/mute changes in this slice.
 - Snow as `THREE.Points` falling in the vertex shader (mod-wrapped box round the camera) costs no CPU per frame; clamp `gl_PointSize` (1.6–7 px) or near flakes balloon into discs.
 - Hot-gate gap (fixed upstream request): roots were only `update/tick/frame/process` names — a `*.hot.ts` entry named `stepX` was never scanned. Name hot entries `update*` (or make every export a root).
 - This sandbox is 1 CPU: local SwiftShader continuous clips run ~0.5–1.8 fps at 640×360; run one probe at a time.
+
+## Free camera release continuity — Fern, swarm4
+
+A clear destination is not a clear connecting segment. Full staged finale route on c330e89 exposed lens release steps1.024m leaving the crag and2.444m on return to meadow. Checking only blocked candidate motion leaves the free-pose early return unconstrained; limiting direct release but falling back to the destination when the intermediate segment is blocked is also wrong. cff7a25 keeps the escape search active until swept gradual release is safe, with12m/s release bound selected over16m/s. Full affected route and ruin success/intentional miss pass (integration2afb162); see docs/reviews/swarm4/fern-finale-cff7a25.md. Regression checks now run under lint:feel at30/60/120Hz and fail against the previous solver. The nine-state CameraEnvelope model verifies ordering only, not this continuous geometry. Emergency relocation can still exceed the release bound when no continuous safe pose is available.
