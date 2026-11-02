@@ -416,6 +416,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
 
   const F2 = F.kits;
   const toCrown = new THREE.Vector3(CROWN.x - F.press.x, 0, CROWN.z - F.press.z).normalize();
+  /** the finale's view direction: between the book's face (local −z) and the Crown */
+  const view = () => new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)).lerp(toCrown, 0.6).normalize();
   const rig: FinaleRig = {
     settled: () => forced || opts.settled(),
     emberInCradle: () => forced || opts.ember.restsAt(F.cradle.x, cy, F.cradle.z, 0.7),
@@ -427,6 +429,23 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       kindle: () => {
         ctx.audio.cue('finale-kindle');
         ctx.field.restore(new THREE.Vector3(F.cradle.x, cy, F.cradle.z), 6, 1.4, { edgeMax: 1.2 });
+        // the sequence plays wide: rise out behind the ember to frame the Press, the open Album and the Crown the
+        // pages fly to; any move/jump/dash after the lock hands the lens straight back
+        const cam = opts.cam.camera;
+        const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
+        const d = view();
+        const wide = rig.cradle.clone().addScaledVector(d, -10.5).add(new THREE.Vector3(0, 4.2, 0));
+        const aim = rig.cradle.clone().addScaledVector(d, 7).add(new THREE.Vector3(0, 3.2, 0));
+        const T = FINALE_TIMING;
+        const until = T.warming + T.unbinding + T.open + T.released * 0.7;
+        opts.cam.playPath({
+          keys: [
+            { t: 0, pos: cam.position.clone(), look: look0 },
+            { t: 3.2, pos: wide, look: aim },
+            { t: until, pos: wide.clone().addScaledVector(d, 1.8).add(new THREE.Vector3(0, 0.5, 0)), look: aim.clone().add(new THREE.Vector3(0, 1.6, 0)) },
+          ],
+          blendInS: 0.8, blendOutS: 2.5, lockS: 5,
+        });
       },
       unbind: () => say('The Scribe pressed the autumn shut'),
       open: () => ctx.audio.cue('finale-open'),
@@ -446,8 +465,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         const cam = opts.cam.camera;
         const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
         // look between the book's face (local −z) and the Crown, from behind the ember
-        const face = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-        const d = face.lerp(toCrown, 0.6).normalize();
+        const d = view();
         const end = rig.cradle.clone().addScaledVector(d, -6.6).add(new THREE.Vector3(0, 2.3, 0));
         const look = rig.cradle.clone().addScaledVector(d, 5).add(new THREE.Vector3(0, 1.3, 0));
         const hold = FINALE_TIMING.cardIn + FINALE_TIMING.cardHold;
