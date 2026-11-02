@@ -4,6 +4,7 @@
 // millbrook: stand on the bank near the dam, burst it (dev hook), listen to the brook start and the wheel turn.
 // finale: force the finale (dev hook) beside the cradle, listen through the coda to silence.
 import { chromium } from 'playwright';
+import { installStemTap } from './lib/stem-tap.mjs';
 import { createServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,21 +40,7 @@ try {
     const s = h.state();
     return { pos: s.pos, millrace: s.opening.millrace, finale: s.opening.finale?.phase };
   }, scene);
-  await page.evaluate(() => {
-    const h = window.__gameHooks;
-    const ac = h.audioContext();
-    const b = h.audioBuses();
-    window.__stems = { music: [[], []], ambience: [[], []], sfx: [[], []] };
-    window.__keep = [];
-    for (const name of ['music', 'ambience', 'sfx']) {
-      const sp = ac.createScriptProcessor(4096, 2, 2);
-      sp.onaudioprocess = (e) => { for (let c = 0; c < 2; c++) window.__stems[name][c].push(e.inputBuffer.getChannelData(c).slice()); };
-      const mute = ac.createGain();
-      mute.gain.value = 0;
-      b[name].connect(sp).connect(mute).connect(ac.destination);
-      window.__keep.push(sp);
-    }
-  });
+  await page.evaluate(installStemTap, ['music', 'ambience', 'sfx']);
   const wall0 = Date.now();
   const marks = [];
   for (let f = 0; f < seconds * 60; f++) {

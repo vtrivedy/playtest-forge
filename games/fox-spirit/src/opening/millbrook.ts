@@ -13,6 +13,13 @@ import { bakeCells, bakeStatic } from './bake';
 import { box, C, cyl, fence, gable, Kit, thatchCourse } from './village';
 import { BROOK, brookAt, LANE, MILLBROOK, polyDist, waterY, westE, westFloor } from './millbrookLayout';
 
+/** a kept light: unlit and over-bright (HDR) so it blooms warm through the sepia before anything is painted */
+function glowMaterial(): THREE.MeshBasicMaterial {
+  const m = new THREE.MeshBasicMaterial({ fog: true });
+  m.color.setRGB(1.7, 0.72, 0.2);
+  return m;
+}
+
 type Tree = [number, number, number, TreeKind, number];
 
 /** groves that frame the valley floor (camera-near: occluder roots + trunk colliders) */
@@ -251,6 +258,27 @@ function buildMill(ctx: OpeningCtx) {
   });
   const house = k.build();
   house.name = 'mill';
+  // a lantern kept lit over the mill door (unlit basic material: warm in the sepia valley, the first thing
+  // the eye finds from the lane mouth)
+  {
+    const lx = -w / 2 - 0.5;
+    const ly = 2.55;
+    const lz = 0.6;
+    const c = Math.cos(M.yaw);
+    const sn = Math.sin(M.yaw);
+    const x = M.x + lx * c + lz * sn;
+    const z = M.z - lx * sn + lz * c;
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.3, 0.22), glowMaterial());
+    lamp.position.set(x, y0 + 0.4 + ly, z);
+    lamp.rotation.y = M.yaw + 0.4;
+    scene.add(lamp);
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.16, 4), toon(C.timberDark));
+    cap.position.set(x, y0 + 0.4 + ly + 0.23, z);
+    cap.rotation.y = M.yaw + 0.4 + Math.PI / 4;
+    scene.add(cap);
+    k.at(M.x, y0, M.z, M.yaw, () => k.add(box(0.7, 0.07, 0.07), C.timberDark, [-w / 2 - 0.3, 0.4 + ly + 0.36, lz]));
+    scene.add(k.build());
+  }
   scene.add(house);
   ctx.occluders.push(house);
   ctx.colliders.push({ kind: 'box', x: M.x, z: M.z, yaw: M.yaw, hx: w / 2 + 0.3, hz: d / 2 + 0.3, top: y0 + 0.4 + eave + rise });
