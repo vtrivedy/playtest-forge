@@ -27,8 +27,9 @@ export const C = {
   slateDark: 0x4a4952,
   amber: 0xe6a65a,
   door: 0x6b4a32,
-  // warm sandstone: a grey-beige flag read as unpainted paper even inside a wash (Kit, eca465e)
-  flag: 0xa08460,
+  // warm dark sandstone: grey-beige read as unpainted paper (Kit eca465e); light sandstone melted into the warm
+  // ground (Kit 9b977fb) — a step darker than the lane, with an ink edge
+  flag: 0x766150,
   bloom: [0x9a4f3c, 0xa8834a, 0x7d5a6a],
   leaf: 0x5d6040,
   cabbage: 0x6d7350,
@@ -376,7 +377,7 @@ function flagstones(ctx: OpeningCtx): THREE.Group {
     }
   }
   const g = new THREE.Group();
-  const mat = toon(C.flag, { hatchWeight: 0.6 });
+  const mat = toon(C.flag, { hatchWeight: 0.6, contour: 0.7 });
   shapes.forEach((geo, v) => {
     const mesh = new THREE.InstancedMesh(geo, mat, placed[v]!.length);
     placed[v]!.forEach((m, i) => mesh.setMatrixAt(i, m));

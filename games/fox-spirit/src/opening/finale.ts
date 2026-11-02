@@ -605,7 +605,10 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         say('One page still holds the autumn.');
         ctx.audio.cue('homecoming-onward');
         // a slow look along the way the stream leaves (well → gate → hearth), so the hand-over is seen, not missed;
-        // any move after 1.5 s takes the lens back
+        // any move after 1.5 s takes the lens back. Only when the fox is round the plaza: a homecoming that completes
+        // while it is far away (a creature arriving late) must not drag the lens across the map
+        const fox = ctx.fox.root.position;
+        if (Math.hypot(fox.x - WELL.x, fox.z - WELL.z) > 25) return;
         const cam = opts.cam.camera;
         const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
         const well = new THREE.Vector3(WELL.x, groundH(WELL.x, WELL.z), WELL.z);

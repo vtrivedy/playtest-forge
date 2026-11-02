@@ -167,7 +167,10 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           // facing the sky are lifted and warmed; walls, trunks and props keep their authored cel
           vec3 lkUp = normalize(cross(dFdx(vLkWorld), dFdy(vLkWorld)));
           float ground = smoothstep(0.75, 0.95, abs(lkUp.y));
-          cel = mix(cel, cel * vec3(1.2, 1.14, 1.0) + vec3(0.045, 0.03, 0.0), ground * 0.85);
+          // only dark painted ground is lifted (grass, earth); light paths and paving keep their tone so stones
+          // still read against the ground (Kit: "one flat mustard sheet")
+          float celLum = dot(cel, vec3(0.2126, 0.7152, 0.0722));
+          cel = mix(cel, cel * vec3(1.2, 1.14, 1.0) + vec3(0.045, 0.03, 0.0), ground * 0.85 * (1.0 - smoothstep(0.3, 0.6, celLum)));
           vec3 pigment = vec3(0.62, 0.36, 0.18) * (0.55 + 0.6 * t);
           cel = mix(cel, pigment, tide * 0.3);
           float wet = paint * (1.0 - paint) * 4.0;
