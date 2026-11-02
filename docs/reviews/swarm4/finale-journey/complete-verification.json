@@ -1,0 +1,98 @@
+{
+  "sha": "56d24693364617efcdddaabaae92bf55d91b76fd",
+  "staging": "One initial wake placement; canonical page chase/homecoming, Keeping journey, recover ember, bridge/glide/Press placement and rest. No later teleports or forced progression.",
+  "hz": 30,
+  "seconds": 240,
+  "checks": {
+    "pageHome": true,
+    "steam": true,
+    "keeping": true,
+    "bridge": true,
+    "realCarry": true,
+    "emberPlaced": true,
+    "finaleKindled": true,
+    "snow": true,
+    "kitsCurled": true,
+    "cardShown": true,
+    "cardDone": true,
+    "finite": true,
+    "noErrors": true
+  },
+  "firstSampleTimes": {
+    "warming": 181,
+    "snow": 198,
+    "cardShowing": 209,
+    "cardDone": 222,
+    "pagePinned": 49
+  },
+  "page": {
+    "stage": 2,
+    "phase": "kept",
+    "catches": 3,
+    "skips": 0,
+    "dodges": 5,
+    "winded": false,
+    "yaw": -1.6924,
+    "droop": 0,
+    "s": 0,
+    "pos": [
+      -24.4,
+      2.22,
+      71
+    ]
+  },
+  "carry": {
+    "carried": false,
+    "heat": 1,
+    "cooling": false,
+    "position": [
+      20.79181321638373,
+      0.24660261616488827,
+      39.64116513385068
+    ],
+    "lastGrounded": [
+      20.997782494983458,
+      0.26579258956832186,
+      40.5659002007003
+    ],
+    "canPickup": true,
+    "canPlace": false,
+    "pickups": 4,
+    "placements": 3,
+    "dashDrops": 1,
+    "recoveries": 0,
+    "lastAction": "place",
+    "rolling": false
+  },
+  "finale": {
+    "phase": "snow",
+    "t": 42.9,
+    "kindles": 1,
+    "cradle": [
+      20.79,
+      39.64
+    ],
+    "kits": [
+      "curled",
+      "curled",
+      "curled"
+    ],
+    "card": "done",
+    "cardShows": 1,
+    "snow": 42.93,
+    "leaves": 72,
+    "onward": 0,
+    "still": 42.93
+  },
+  "lastJump": {
+    "apex": 0,
+    "air": 5.967,
+    "timeToApex": 0
+  },
+  "dashesUsed": 5,
+  "lastDashDistance": 2.085,
+  "screenshots": 104,
+  "errors": [],
+  "evidence": "/captures/sorrel/complete-journey-production-56d2469/evidence.json",
+  "homecomingBeat": 73.03333333333333
+}
