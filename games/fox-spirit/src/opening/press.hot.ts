@@ -10,11 +10,12 @@
  */
 import type * as THREE from 'three';
 import type { Collider } from '../lookdevPlay';
-import { BRAZIER_A, BRAZIER_B, BREAK, DRAFT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PRESS_ORIGIN, RIDGE, SHELF, SHELF_TOP, WARM_S } from './pressLayout';
+import { BRAZIER_REACH, BRAZIERS, BREAK, DRAFT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PRESS_ORIGIN, RIDGE, SHELF, SHELF_TOP, WARM_S } from './pressLayout';
 
 export const HINT_WARM = 'The seal is frozen ink · carry the brazier’s warmth to it';
 export const HINT_BREAK = 'Inkstep · jump, then Shift-dash over the frozen ink';
 export const HINT_GLIDE = 'Hold Space to ride the draft up';
+export const HINT_RELAY = 'The warmth fades on the way · carry it to the cold braziers first';
 export const HINT_ICE = 'Iced over · bring warmth from the shelf’s brazier first';
 
 export type PressRig = {
@@ -22,20 +23,28 @@ export type PressRig = {
   motion: () => { readonly grounded: boolean; readonly dashing: boolean } | null;
   hasInkstep: () => boolean;
   teach: (text: string) => void;
-  events: { warmed: () => void; thawSeal: () => void; crack: (which: 0 | 1) => void; meltIce: () => void; complete: (level: 0 | 1 | 2) => void };
+  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: () => void; thawSeal: () => void; crack: (which: 0 | 1) => void; meltIce: () => void; complete: (level: 0 | 1 | 2) => void };
   seal: THREE.Object3D;
   sealCol: Extract<Collider, { kind: 'box' }>;
   /** the fox's carried warmth (glow + light), scaled by `warm` */
   warmGlow: THREE.Object3D;
   warmLight: THREE.PointLight;
   braziers: THREE.PointLight[];
+  coals: THREE.MeshStandardMaterial[];
   membranes: THREE.Object3D[];
   ice: THREE.Object3D;
   drafts: THREE.Object3D[];
+  lever: THREE.Object3D;
+  platen: THREE.Object3D;
+  scribe: THREE.Object3D;
+  scribeHead: THREE.Object3D;
+  scribeArm: THREE.Object3D;
   s: {
+    /** lit braziers (bit i = BRAZIERS[i]) */ lit: number; wasWarm: number;
     /** carried warmth 0..1 */ warm: number; sealK: number; thawed: number;
     /** per membrane: −1 frozen, ≥ 0 seconds since it cracked */ crackA: number; crackB: number;
-    iceK: number; iced: number; done: number; dashWasAir: number; time: number; hint: number;
+    iceK: number; iced: number; done: number; dashWasAir: number; time: number; hint: number; arrived: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
+    /** 0 bowed over the shut Press → 1 lever lifted, the Scribe turned to the fox */ leverK: number;
   };
 };
 
@@ -56,19 +65,42 @@ export function updatePress(rig: PressRig, dt: number): void {
   else if (s.dashWasAir === 0) s.dashWasAir = grounded ? -1 : 1;
   const airDash = dashing && s.dashWasAir === 1;
 
-  // braziers: walking into one fills the warmth; it fades on its own
+  if (here && s.arrived === 0) {
+    s.arrived = 1;
+    rig.events.arrive();
+  }
+  // braziers: a lit one fills the warmth; a cold one takes a carried flame (and stays lit); warmth fades on its own
   if (here) {
-    if (Math.hypot(lx - BRAZIER_A.lx, lz - BRAZIER_A.lz) < BRAZIER_A.reach || Math.hypot(lx - BRAZIER_B.lx, lz - BRAZIER_B.lz) < BRAZIER_B.reach) {
-      if (s.warm < 0.5) rig.events.warmed();
-      s.warm = 1;
+    for (let i = 0; i < BRAZIERS.length; i++) {
+      const B = BRAZIERS[i]!;
+      if (Math.hypot(lx - B.lx, lz - B.lz) > BRAZIER_REACH) continue;
+      const bit = 1 << i;
+      if ((s.lit & bit) === 0 && s.warm > 0) {
+        s.lit |= bit;
+        rig.events.kindled();
+      }
+      if ((s.lit & bit) !== 0) {
+        if (s.warm < 0.5) rig.events.warmed();
+        s.warm = 1;
+      }
     }
   }
   s.warm = Math.max(0, s.warm - dt / WARM_S);
+  // warmth that ran out before it melted anything: show the relay once
+  if (s.wasWarm === 1 && s.warm === 0 && (s.done & 4) === 0 && (s.hint & 2) === 0) {
+    s.hint |= 2;
+    rig.teach(HINT_RELAY);
+  }
+  s.wasWarm = s.warm > 0 ? 1 : 0;
   const glow = smooth(Math.min(1, s.warm * 3));
   rig.warmGlow.visible = glow > 0.01;
   rig.warmGlow.scale.setScalar(0.6 + 0.4 * glow);
   rig.warmLight.intensity = 0.9 * glow;
-  for (let i = 0; i < rig.braziers.length; i++) rig.braziers[i]!.intensity = 1.6 + 0.3 * Math.sin(s.time * 7.3 + i * 2) + 0.2 * Math.sin(s.time * 11.1 + i);
+  for (let i = 0; i < rig.braziers.length; i++) {
+    const on = (s.lit & (1 << i)) !== 0 ? 1 : 0;
+    rig.braziers[i]!.intensity = on * (1.6 + 0.3 * Math.sin(s.time * 7.3 + i * 2) + 0.2 * Math.sin(s.time * 11.1 + i));
+    rig.coals[i]!.emissiveIntensity = on * 1.6;
+  }
 
   // teach: the seal melts when warmth touches it
   if (s.thawed === 0) {
@@ -76,9 +108,10 @@ export function updatePress(rig: PressRig, dt: number): void {
     if (nearSeal && s.warm > 0) {
       s.thawed = 1;
       s.warm = 0;
+      s.wasWarm = 0;
       rig.events.thawSeal();
-    } else if (here && lz > RIDGE.lz && lz < RIDGE.lz + 9 && Math.abs(lx) < 8 && s.hint === 0) {
-      s.hint = 1;
+    } else if (here && lz > RIDGE.lz && lz < RIDGE.lz + 9 && Math.abs(lx) < 8 && (s.hint & 1) === 0) {
+      s.hint |= 1;
       rig.teach(HINT_WARM);
     }
   }
@@ -112,6 +145,7 @@ export function updatePress(rig: PressRig, dt: number): void {
   if (s.iced === 1 && s.warm > 0 && Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) < MEMBRANE_B.r + 1.2 && f.y < SHELF_TOP + 1.2) {
     s.iced = 0;
     s.warm = 0;
+    s.wasWarm = 0;
     rig.events.meltIce();
     rig.teach(HINT_BREAK);
   }
@@ -128,7 +162,28 @@ export function updatePress(rig: PressRig, dt: number): void {
   if ((s.done & 4) === 0 && (s.done & 2) !== 0 && grounded && lx > LEDGE.x0 && lx < LEDGE.x1 && lz > LEDGE.z0 && lz < LEDGE.z1 && f.y > LEDGE_TOP - 0.3) {
     s.done |= 4;
     rig.events.complete(2);
+    s.coda = 0;
   }
+  if (s.coda >= 0) {
+    s.coda += dt;
+    if (s.coda > 4.5) {
+      s.coda = -2;
+      rig.events.coda();
+    }
+  }
+
+  // the Scribe: bowed until the Press wakes, then turns, reaches, and lifts the lever (the platen rises off the pages)
+  if ((s.done & 4) !== 0 && s.leverK < 1) s.leverK = Math.min(1, s.leverK + dt / 2.4);
+  const lk = smooth(s.leverK);
+  const reach = smooth(Math.min(1, s.leverK * 2));
+  const lift = smooth(Math.max(0, s.leverK * 2 - 1));
+  rig.scribeHead.rotation.x = 0.45 * (1 - reach) - 0.15 * lift;
+  rig.scribeArm.rotation.x = -0.5 - 1.6 * reach + 0.9 * lift;
+  rig.lever.rotation.x = 0.55 - 1.5 * lift;
+  rig.platen.position.y = 1.5 + 0.7 * lift;
+  rig.scribe.rotation.y = -Math.PI / 2 - 0.25 + 0.9 * lk;
+  // breathing while bowed (sim time, no allocation)
+  rig.scribe.scale.y = 1 + 0.012 * Math.sin(s.time * 1.3) * (1 - lk);
 
   // drafts: rise in after the crack, then breathe
   if (s.crackA >= 0) s.crackA += dt;

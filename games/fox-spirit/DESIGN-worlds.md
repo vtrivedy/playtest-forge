@@ -83,6 +83,11 @@ Typed ids `russetvale|ashwater|press` × `teach|develop|combine`; monotonic `vis
 save, canvas Album page-map (Tab) and the three hub Seedwells (Kiln = Russetvale, Reed = Ashwater, Maple = Press).
 Completion only from physical puzzle truth, never from coordinates. The scene calls `setWorld` on travel.
 
+Saved-game acceptance also checks the opening invitation: once the page is already home, reload must not
+restart its chase or display its old instructions. Keep the complete boot state and screenshot alongside
+the foreign-world reconstruction checks; a clear travel camera does not establish a clear initial lens.
+The saved-page contract is pinned homecoming plus inactive discovery, independently of later world facts.
+
 ## Who builds what
 - **Maple** — scene integration: worlds registry, terrain dispatch, mask, arches, travel, per-world look/weather,
   island ground/dressing; then hub arch gating via Hazel's store; then Press level 1 if free.
@@ -121,3 +126,7 @@ claim. Record immutable commit in the JSON report. Use actual route simulation t
 Portal-circuit visual review on 053e9e0c found both home-return lenses almost wholly blocked despite camera
 `blocked:false`. Diagnose with staged world travel and centre-screen mesh intersections; compare return landing
 positions without changing the opening spawn. Fix the landing or missing occluder, then repeat physical circuit.
+
+Extend the physical portal circuit with optional Press puzzle-route acceptance. Reuse Thistle's documented movement
+sequence through a dedicated input helper after real hub entry; assert all three physical completion facts and earned
+Inkstep, then walk home. This proves solvability from the hub, not blind insight. Retain all intermediate frames.

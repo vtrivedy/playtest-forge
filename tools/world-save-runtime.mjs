@@ -43,7 +43,8 @@ try {
     const pressState = press.opening.press;
     const full = restored.includes('combine');
     const pressMatchesSave = restored.every(level => pressState.done.includes(level)) && pressState.sealOpen && pressState.draftA === restored.includes('develop') && pressState.draftB === full && pressState.iced === !full;
-    evidence.cases.push({ restored, boot, marsh, press, cameraDistance, pressCameraDistance, pressMatchesSave, physicalMatchesSave: restored.every(level => marsh.opening.ashwater.done.includes(level)) });
+    const savedOpeningMatches = boot.opening.homecoming.pinned && !boot.opening.discovery.active;
+    evidence.cases.push({ restored, boot, marsh, press, cameraDistance, pressCameraDistance, pressMatchesSave, savedOpeningMatches, physicalMatchesSave: restored.every(level => marsh.opening.ashwater.done.includes(level)) });
     await fs.writeFile(`${out}/evidence.partial.json`, JSON.stringify(evidence, null, 2));
     await context.close();
   }
@@ -52,6 +53,8 @@ try {
   assert.ok(evidence.cases.every(c => c.cameraDistance < 12), 'travel must leave no lens in the old world');
   assert.ok(evidence.cases.every(c => c.pressMatchesSave), 'saved Press facts must reconstruct seal, drafts and ice');
   assert.ok(evidence.cases.every(c => c.pressCameraDistance < 12), 'Press travel must relocate the lens');
+  evidence.worldReconstructionCompleted = true;
+  assert.ok(evidence.cases.every(c => c.savedOpeningMatches), 'saved returned page must not restart the discovery invitation');
   evidence.completed = true;
 } finally {
   await fs.writeFile(`${out}/evidence.json`, JSON.stringify(evidence, null, 2));

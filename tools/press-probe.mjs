@@ -92,9 +92,15 @@ const shot = async (name) => {
 };
 
 await shot('00-spawn');
-await walk(L(-8.6, 26), { r: 0.3 });
+// the direct try: lit brazier → seal fades on the way (the puzzle's lesson), then the relay
+await walk(L(-24.6, 29), { r: 0.3 });
 await shot('01-brazier');
-await walk(L(0, 20), { r: 0.4 });
+await walk(L(0, 18), { r: 0.4 });
+await shot('01b-faded-at-seal');
+await walk(L(-24.6, 29), { r: 0.3 });
+await walk(L(-7.6, 29.8), { r: 0.3 });
+await shot('01c-relay-lit');
+await walk(L(-1, 21), { r: 0.4 });
 await walk(L(0, 16.4), { r: 0.3, max: 3 });
 await page.evaluate(() => window.__gameHooks.advance(100, 1 / 60, false));
 await shot('02-seal-thawed');
@@ -106,8 +112,10 @@ await shot('04-before-membrane');
 let s = await breakAndRide([0, -1], L(0, -3.6), [...L(0, -9), 7.6], 8);
 console.log('ride1 peak', s.peak);
 await shot('05-on-shelf');
-await walk(L(10.6, -13.4), { r: 0.3 });
+await walk(L(28.6, -10.5), { r: 0.3 });
 await shot('06-brazier-b');
+await walk(L(16, -22.4), { r: 0.3 });
+await shot('06b-relay-b');
 await walk(L(0, -17.2), { r: 0.3 });
 await page.evaluate(() => window.__gameHooks.advance(80, 1 / 60, false));
 await shot('07-ice-melted');
@@ -118,6 +126,8 @@ console.log('ride2 peak', s.peak);
 await shot('08-ledge');
 await page.evaluate(() => { const h = window.__gameHooks; h.setStick(0.6, 0.8); h.advance(40, 1 / 60, false); h.setStick(null); h.advance(60, 1 / 60, false); });
 await shot('09-the-press');
+await page.evaluate(() => { const h = window.__gameHooks; h.setStick(-0.7, -0.7); h.advance(25, 1 / 60, false); h.setStick(null); h.advance(240, 1 / 60, false); });
+await shot('10-scribe-lever');
 // save re-entry: a plain reload (no ?fresh) rebuilds the solved Press from the saved progress
 await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded', timeout: 600000 });
 await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
