@@ -38,6 +38,7 @@ try {
     log.push([name, st]);
     save();
   };
+  await snap('00-lane', 'lane');
   await snap('00-hollow-sealed', 'hollow');
   await snap('01-press-sealed', 'press');
   // settle the Keeping (staged: dev release), then park the fox by the cradle facing the Press
