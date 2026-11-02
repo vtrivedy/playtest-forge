@@ -27,7 +27,7 @@ const log = [];
 const commit=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 let fi = 0;
 const O = { x: 700, z: 80 };
-const state = () => page.evaluate(() => { const s = window.__gameHooks.state(); return { pos: s.pos.map((v) => +v.toFixed(2)), grounded: s.grounded, ash: s.opening.ashwater, hooks:s, game:window.__game.state() }; });
+const state = () => page.evaluate(() => { const s = window.__gameHooks.state(); return { pos: s.pos.map((v) => +v.toFixed(2)), grounded: s.grounded, ash: s.opening.ashwater, hooks:s, game:window.__game.state(), timing:window.__routeTiming }; });
 const shot = async (name) => {
   await page.evaluate(() => window.__gameHooks.advance(0, 1 / 60, true));
   await page.screenshot({ path: path.join(out, `${name}.png`) });
@@ -70,7 +70,16 @@ try {
   await page.goto(`http://127.0.0.1:${port}/?fresh&manual=1`, { waitUntil: 'domcontentloaded', timeout: 300000 });
   await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
   await page.keyboard.press('KeyM');
-  await page.evaluate(() => { const h = window.__gameHooks; h.setManual(true); });
+  await page.evaluate(() => { const h = window.__gameHooks; h.setManual(true);
+    const advance=h.advance.bind(h);
+    const timing=window.__routeTiming={totalSeconds:0,byWorld:{russetvale:0,ashwater:0,press:0}};
+    h.advance=(frames=1,dt=1/60,render=true)=>{
+      const world=h.state().opening.worlds.active;
+      timing.totalSeconds+=frames*dt;
+      timing.byWorld[world]+=frames*dt;
+      return advance(frames,dt,render);
+    };
+  });
   console.log('boot-ready');
   const gl=await page.evaluate(()=>{const gl=window.__opening.ctx.renderer.getContext(),e=gl.getExtension('WEBGL_debug_renderer_info');return e&&gl.getParameter(e.UNMASKED_RENDERER_WEBGL);});
   console.log(JSON.stringify({renderer:gl}));
