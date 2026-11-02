@@ -537,7 +537,8 @@ export function buildAshwater(
         if (level === 1) say('The Ferrykeeper still waits.');
         if (level === 2) {
           ctx.audio.cue('finale-kindle');
-          say('The Scribe pressed the rain first.');
+          // (the Album's page toast carries the revelation line; the caption names the place)
+          say('The Reed Seedwell fills.');
         }
       },
       splash: () => ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.1, rate: 0.6 }),
