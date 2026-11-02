@@ -21,6 +21,10 @@ export const LEAF_FEEL = {
   out: [1.2, 2.6] as const,
   up: [2.8, 4.6] as const,
   dash: 1.6,
+  /** a landing faster than this (m/s) puffs the leaves within landReach, at strength land */
+  landSpeed: 4,
+  landReach: 1.5,
+  land: 1.3,
   /** falling: drag toward a slow terminal flutter (m/s) and a side sway */
   terminal: 0.75,
   sway: 0.8,
@@ -86,16 +90,23 @@ export function buildLeafPiles(ctx: OpeningCtx) {
   let lastSound = -1;
   let clock = 0;
   let flying = 0;
+  let wasGrounded = true;
+  let fallSpeed = 0;
   ctx.onUpdate((dt) => {
     clock += dt;
-    const st = ctx.player?.state() as { speed?: number; dashing?: boolean; vel?: number[] } | undefined;
+    const st = ctx.player?.state() as { speed?: number; dashing?: boolean; grounded?: boolean; vel?: number[] } | undefined;
     const fox = ctx.fox.root.position;
     const speed = Math.hypot(st?.vel?.[0] ?? 0, st?.vel?.[2] ?? 0);
     const dashing = !!st?.dashing;
     let launched = 0;
-    if (speed > F.minSpeed || dashing) {
-      const reach = dashing ? F.dashReach : F.reach;
-      const k = dashing ? F.dash : 1;
+    // a hard landing puffs the leaves out all round the paws (off the canopy, a heron fling, a long glide)
+    const grounded = st?.grounded ?? true;
+    const landed = grounded && !wasGrounded && fallSpeed > F.landSpeed;
+    if (!grounded) fallSpeed = Math.max(0, -(st?.vel?.[1] ?? 0));
+    wasGrounded = grounded;
+    if (speed > F.minSpeed || dashing || landed) {
+      const reach = landed ? F.landReach : dashing ? F.dashReach : F.reach;
+      const k = landed ? F.land : dashing ? F.dash : 1;
       for (let j = 0; j < N; j++) {
         if (!resting[j]) continue;
         const dx = pos[j * 3]! - fox.x;
