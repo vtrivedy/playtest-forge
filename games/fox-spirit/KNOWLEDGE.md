@@ -604,8 +604,19 @@ Review timed UI overlays in motion: a bottom-center teaching card covered the fo
 Hardware reproduction on diagnostic764b338 (game source identical to b4fa63a):
 T4/EGL1280×720,120s wall recording, native20/2545 black frames, synchronous
 2D staging33/3400, independent CDP compositor11/1133. Stage read at simulation
-tick3000 is0luma. Independent compositor frame00007 is fully black. This falsifies
-the MediaRecorder-only claim and the proposed2D staging fix on this path. Artifacts
+tick3000 is0luma. Independent compositor frame00007 is fully black. This proves black pixels
+exist before encoding and that2D staging does not repair the shared output. Artifacts
 `keeping-swarm5-captures/reed/boundary-764b33881c-154213-24ad01`; source/tool hashes,
 actual frame PTS, GPU attributes, screenshots and __game are preserved. Context has
 preserveDrawingBufferfalse and antialiastrue. Cause still open; flag A/B underway.
+
+Controlled follow-up on0a4862d: preserveDrawingBuffertrue still18 native/23
+staged/7 CDP flashes. Canvas antialiasfalse alone:0/2643 native,0/3422 staged,
+0/1141 CDP, minimum mean luma71.2/80.2/80.3; full SMAA/bloom/grade preserved.
+Critically, baselineMSAAtrue with NO MediaRecorder or captureStream attached
+(CDP-only8495afb) is clean0/1156. This isolates a recording-triggered GPU
+canvas/MSAA interaction rather than an autonomous game fade. Paired compositor
+black by itself did not distinguish recording-triggered corruption from a game
+defect. The forge's fullscreen output surface does not need MSAA; SMAA already
+owns scene-edge smoothing. Actual constructor antialiasfalse is the selected fix;
+AST single-aa-owner lint rejects true, dynamic flags, overriding spreads/context.

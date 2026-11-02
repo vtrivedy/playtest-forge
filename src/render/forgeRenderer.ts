@@ -50,7 +50,8 @@ export async function createForgeRenderer(opts: RendererOptions = {}): Promise<F
 
   if (!renderer) {
     renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      // SMAA owns edge smoothing; canvas MSAA intermittently blanks T4/EGL output.
+      antialias: false,
       powerPreference: 'high-performance',
       alpha: false,
     });
