@@ -590,7 +590,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       const a = (k / 24) * Math.PI * 2;
       d.set(Math.sin(a), 0, Math.cos(a));
       const front = near ? -(d.x * Math.sin(fy) + d.z * Math.cos(fy)) : 0.65;
-      pos.copy(group).addScaledVector(d, -3.5).add(new THREE.Vector3(0, 1.3, 0));
+      pos.copy(group).addScaledVector(d, -3.7).add(new THREE.Vector3(0, 1.45, 0));
       // well clear of the plinth's footprint (±1.5 × ±1.9 local) so the Press never fills the foreground, and the
       // frame's near post off the line to the fox
       const px = pos.x - F.press.x, pz = pos.z - F.press.z;
@@ -599,7 +599,10 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       const clear = Math.hypot(Math.max(0, Math.abs(lx) - 1.5), Math.max(0, Math.abs(lz) - 1.9)) > 2.6;
       const postClear = segDist(pos.x, pos.z, aimAt.x, aimAt.z, post.x, post.z) > 0.75 && Math.hypot(pos.x - post.x, pos.z - post.z) > 2.2;
       const blocked = opts.cam.sightBlocked(pos, aimAt, aimAt.y - 0.35);
-      const score = 1.5 * (1 - Math.abs(front - 0.65)) + 0.6 * d.dot(toCrown) - (clear && postClear && !blocked ? 0 : 10);
+      // the 4.4 m post anywhere near the frame dominates it: penalise it within ±45° of the view centre
+      const wx = post.x - pos.x, wz = post.z - pos.z, wl = Math.max(1e-3, Math.hypot(wx, wz));
+      const postIn = Math.max(0, (d.x * wx + d.z * wz) / wl - 0.707) / 0.293;
+      const score = 1.5 * (1 - Math.abs(front - 0.65)) + 0.6 * d.dot(toCrown) - 3 * postIn - (clear && postClear && !blocked ? 0 : 10);
       restShot.tried.push([k, +front.toFixed(2), clear ? 1 : 0, postClear ? 1 : 0, blocked ? 1 : 0]);
       if (score > bestScore) {
         bestScore = score;
@@ -607,7 +610,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       }
     }
     d.subVectors(group, end).setY(0).normalize();
-    const look = group.clone().addScaledVector(d, 2.4).add(new THREE.Vector3(0, 0.7, 0));
+    // aim just past the group, a little down, so the whole ring of kits sits in frame under the title
+    const look = group.clone().addScaledVector(d, 1.4).add(new THREE.Vector3(0, 0.55, 0));
     opts.cam.playPath({
       keys: [
         { t: 0, pos: cam.position.clone(), look: look0 },
