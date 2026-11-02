@@ -44,3 +44,24 @@ than altering the shared fader during concurrent reviews.
 Retest evidence: `/captures/sorrel/hermitage-pole-retest/`, including60 raw
 frames, four-second15fps clip, seven PNGs, window.__game and all1500 samples.
 The capture is offline30Hz640×360 without audio. The source remains frozen.
+
+## Matched moved-pole retest — e8d2e51
+
+Bramble700ec62 changes line three's endpoints, including moving its south pole
+north along the lens-to-fox axis. The identical50s replay still passes all3
+state checks, complete route,60/60 strict animated-body viewport margins,
+and camera gates with zero JS errors. TypeScript, lint:feel and production
+build pass (existing large-chunk warning).
+
+Visual verdict: **NOT YET**. Reviewed every frame of30–34s in two contact
+sheets and the exact32s PNG. The opaque pole now crosses the torso rather than
+only clipping the tail. It continues obstructing during the hold and clears
+as the fox turns away. Numeric body-margin checks establish screen bounds,
+not scenery visibility. Shared camera/fader settings remain unchanged.
+Recommended a lateral endpoint move to the geometry owner, keeping the common
+layout source for rendered pole, collider and interaction line.
+
+Evidence: `/captures/sorrel/hermitage-pole-moved/`:60raw frames,4s15fps clip,
+7timed PNGs, window.__game,1500trace samples and state/route/camera checks.
+Offline30Hz640×360, staged lane-mouth start, ordinary controller thereafter;
+no audio or real-time-performance verdict.
