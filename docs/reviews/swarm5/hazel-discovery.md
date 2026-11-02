@@ -179,3 +179,21 @@ Evidence: `/captures/hazel/blind-b13-owner/`, including `mesh-diagnosis.json`,
 full `window.__game` in `naive.json`.20s input-only replay, onecatch,
 2unsticks/1.37stuckseconds, zeroJSerrors. The owner metadata and endpoint
 measurements were sent to Thistle and Reed; no gameplay or camera code changed.
+
+## Deliberate ruin miss on integrated runtime
+
+Read-only `ef046268` replay, ordinary cue-following input, 1.5 s initial idle,
+`--mistake ruin`, 90 simulation seconds: all13 gameplay checks pass, including
+actual mistake injection, real overlook visit, kept page, grounded guidance
+completion and absence of competing homeward words. The injected miss starts
+at31.4833s and returns `jump2 -> jump1` on ordinary ground. Recovery reaches
+`jump2` again33.3333s, `jump3`34.6833s, catches the third page in flight35.8667s,
+and enters `done` only on grounded overlook support35.9s. ZeroJSerrors.
+
+Evidence: `/captures/hazel/discovery-ef046268-ruin-retry/` retains the complete
+trace and `window.__game` in completed `evidence.json`. This is an additional
+simulation recovery check, not continuous motion proof or a camera correction.
+The final `end.png` was inspected: the whole fox is visible on the overlook,
+and the homeward instruction appears after completion. No continuous frames
+were requested. Original blind-wander acceptance remains failed. No runtime
+code changed.
