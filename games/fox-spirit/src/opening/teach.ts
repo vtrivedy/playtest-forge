@@ -9,8 +9,8 @@ import { createLetterPlane } from './lettering';
 import { updateTeach, type TeachState } from './teach.hot';
 
 export function createTeach(ctx: OpeningCtx) {
-  const plane = createLetterPlane(2048, 128, 0.062, 0.8, { x: -0.94, left: true, panel: true });
-  const t: TeachState = { plane, cam: null, offered: null, drawn: null, o: 0, redraw: (text) => plane.draw([{ text, px: 60 }]) };
+  const plane = createLetterPlane(2560, 128, 0.075, 0.8, { x: -0.94, left: true, panel: true });
+  const t: TeachState = { plane, cam: null, offered: null, drawn: null, o: 0, redraw: (text) => plane.draw([{ text, px: 70 }]) };
   ctx.onUpdate((dt) => updateTeach(t, dt));
   return {
     /** fix the line to the rendered lens (the camera must be in the scene) */
