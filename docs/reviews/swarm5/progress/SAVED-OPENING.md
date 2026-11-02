@@ -64,3 +64,17 @@ the wrong level. Arrival geometry has Maple's independent lint. TypeScript,
 production build, lint:feel, Discovery112/38, RunawayPage24/9 and TeachOrder4/4
 pass. The models still cover fresh play; saved initialization has the separate
 runtime fixture and updated skill sync notes.
+
+## Quiet saved arch announcements
+
+`37ac2e37` initializes each arch's announcement flag from its existing unlock
+predicate (`russetvale.teach` restored, or `ashwater.teach` visited). It leaves
+the runtime unlock checks intact. `af559797` saved replay:
+`/captures/hazel/world-save-quiet-arches/evidence.json`, all three saved cases
+PASS with zero JS errors, including quiet arch announcements, opening and
+physical Ashwater/Press reconstruction. Inspected full hub frame: no new-arch
+caption, whole fox visible. Existing onward warmth teaching remains present;
+this change does not claim to remove valid onward guidance or reconstruct the
+original autumn Keeping/finale. The saved-opening AST lint now rejects a false
+arch flag or a mismatched unlock predicate; runtime fixtures assert silence
+separately from physical reconstruction.

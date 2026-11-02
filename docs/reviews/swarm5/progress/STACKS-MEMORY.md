@@ -26,3 +26,25 @@ normalization, reset, and no-ability/no-Seedwell assertions alongside existing
 prerequisite gates. TypeScript, lint:feel and diff checks pass on the initial
 source. Physical callback/reload verification follows after the Stacks owner
 wires the new store callbacks; no earned-secret claim until that replay passes.
+
+## Integrated earned-memory replay
+
+Source `22b73a2b` connects the physical stand to the canonical store. The stand
+initializes from `isSecretFound`, and `onFound` reports the first arrival. The
+Album owns the returned-page notice, avoiding a duplicate caption of the same
+words at the bottom of the screen.
+
+`node tools/press-stacks-probe.mjs /captures/hazel/stacks-secret-integrated`
+completed with zero JS errors and `completed:true`. After a labeled developer
+travel/staged starting position, actual stick and jump inputs reach all eight
+stacks and the stand (`k:9`). The recorded full runtime state contains only
+`secrets:["press-stacks"]`; every world has zero fill and no ability. Native Tab
+opens the earned-memory spread. Reload retains the secret, and a staged visit
+to the stand does not replay the discovery caption or returned-page notice.
+
+Inspected `climb.png`, `earned-memory.png`, and `revisited-stand.png`. The fox
+and returned-page notice are readable and separate; the memory fits the Album.
+The 640px capture is a bounded integration check, not Press art acceptance or
+an uninterrupted hub route. Existing slab-like geometry remains in this source
+and is being replaced by the world owners. Component fixture at 960px above
+provides the closer typography review. No movement parameters changed.
