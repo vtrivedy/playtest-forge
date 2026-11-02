@@ -705,6 +705,20 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
   LRA 8.5 (the review's 4.8 was the full mix on a capture: ambience/SFX flatten it). The worklet's `mom` envelope
   (bed ×0.82, swell up to ×1.35, 2.5 s up / 4 s down, bass + brighter harp under it) → lift 8.0, LRA 12.7.
   Level-only changes leave the conductor (TLA Hearthsong) untouched; still run `npm run check:music`.
+
+### Composing the rest shot (Cedar, swarm5, 80238fd)
+
+- On the authored route the fox stops ~1 m north of the cradle facing the Press, so a fixed Crown-ward lens shows
+  its back, and any front/profile view puts the Press in frame. `familyShot()` scores 24 azimuths: fox facing
+  (3/4 front), Crown backdrop, sightBlocked, plus hard clearance from the Press *and the open cover* (local x down to
+  −3.7), and a penalty on the 4.4 m post by **distance to the lens** (apparent size). An angle-from-centre penalty
+  backfired: it preferred the post big at the frame edge over small and far in the middle.
+- `sightBlocked` does not know the Press geometry; clearance has to be explicit.
+- Render a sweep of candidate views once (`__opening.camera` + `advance(0,…,true)`) and pick by eye before
+  encoding the rule — four blind iterations cost more than one sweep.
+- The snow beat must not hand back to the follow lens: the kindle wide holds until snow, then eases (2.2 s) to the
+  family shot, so 'Let the year turn.' lands on the family.
+- `tools/finale-journey-probe.mjs OUT --motion` is the cheapest real-route check (~10 min on swiftshader).
 - World edge (Maple, swarm5): outside the bowl's rims the terrain is only a gentle slope (bowlRim grows 14 per
   rimK unit = ~0.35 m/m east/west), and the vista valley past Press Hollow's lip is walkable down. Closing one hole
   with a rail just moved the leak (seed 1: lip → then east off the far crag). The fix class is a baked world mask
