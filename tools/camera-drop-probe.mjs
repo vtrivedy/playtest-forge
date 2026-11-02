@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { FOX_PX, foxPx, gate as foxSizeGate } from './lib/fox-size.mjs';
 const out = path.resolve(process.argv[2]);
 const fallLag = Number(process.argv[3] ?? '0.07');
 const seconds = Number(process.argv[4] ?? '62');
@@ -48,7 +49,7 @@ const testDt = Number(option('dt', String(1 / 60)));
 if (!Number.isFinite(testDt) || testDt <= 0 || testDt > .05) throw Error('dt must be in (0, .05]');
 const stillFrames = option('stills-at', '').split(',').filter(Boolean).map(t => Math.round(Number(t) / testDt));
 const [width, height] = option('size', '1280x720').split('x').map(Number);
-const minFoxPixels=Number(option('min-fox-pixels',String(height/15)));
+const minFoxPixels=Number(option('min-fox-pixels',String(FOX_PX.min*height/FOX_PX.refHeight)));
 if(!Number.isFinite(minFoxPixels)||minFoxPixels<0||minFoxPixels>height)throw Error('min-fox-pixels must be within viewport height');
 if (![width, height].every(v => Number.isInteger(v) && v > 0) || !Number.isFinite(clipSeconds) || clipSeconds <= 0) throw Error('Invalid clip dimensions/duration');
 const clipFrames = Math.round(clipSeconds / testDt / 2) * 2;
@@ -75,15 +76,15 @@ page.setDefaultTimeout(300000);
 try {
   await page.goto(`http://127.0.0.1:${port}/?manual=1`,{waitUntil:'domcontentloaded',timeout:180000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true);
-  await page.evaluate(({source,start,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare})=>{
+  await page.evaluate(({source,start,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare,foxMeasure})=>{
     const h=window.__gameHooks,c=window.__opening.camera;
     h.setManual(true); h.camera.fallLag=fallLag; if(minDistance!==null)h.camera.minDistance=minDistance;
     if (cameraHeight !== null) h.camera.height = cameraHeight;
     if (sideBias !== null) h.camera.sideBias = sideBias;
     if (prepare) new Function(`return (${prepare})`)()(h);
     h.teleport(start.x,start.z,start.yaw);
-    window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1,silhouette:[],head:c.position.clone(),feet:c.position.clone()};
-  },{source:createSliceRoute.toString(),start:sliceStart,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare:prepareSlice?.toString()??null});
+    window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1,silhouette:[],foxPx:new Function(`return (${foxMeasure})`)()};
+  },{source:createSliceRoute.toString(),start:sliceStart,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare:prepareSlice?.toString()??null,foxMeasure:foxPx.toString()});
   let done=false, n=0, checkpoint=-1;
   while(!done){
     const result=await page.evaluate(({total,clip,clipBeat,clipFrames,testDt,stillFrames,clipFrom,missOverlook,sparseStills,checkSilhouette})=>{
@@ -121,9 +122,7 @@ try {
           });
           p.silhouette.push({f,vertices,minX,maxX,minY,maxY,inside:vertices>0&&minX>-.96&&maxX<.96&&minY>-.96&&maxY<.96});
         }
-        p.head.set(s.pos[0],s.pos[1]+.6,s.pos[2]).project(c);
-        p.feet.set(s.pos[0],s.pos[1],s.pos[2]).project(c);
-        const foxPixels=p.head.z< -1||p.head.z>1||p.feet.z< -1||p.feet.z>1?0:Math.abs(p.head.y-p.feet.y)*innerHeight/2;
+        const foxPixels=p.foxPx();
         p.trace.push({f,foxPixels,beat:p.beat,pos:s.pos,vel:s.vel,grounded:s.grounded,camera:s.camera,lensPitch,lastJump:s.lastJump,page:s.opening.page,canopy:s.opening.canopy,popUpRuin:s.opening.popUpRuin});
         if(!prev.grounded&&s.grounded)p.touchdown=f;
         if(shot||clipFrame){
@@ -180,7 +179,8 @@ try {
       if(!follow||groundedTime<1)continue;
       maxGroundedFollowDistance=Math.max(maxGroundedFollowDistance,Math.hypot(s.camera.pos[0]-s.pos[0],s.camera.pos[1]-s.pos[1]-.6,s.camera.pos[2]-s.pos[2]));
     }
-    const cameraCheck = { fromSeconds: checkFrom, minChestDistance, maxPitch, maxStepSpeed, maxGroundedFollowDistance, maxGroundedDistance, minFollowFoxPixels, minFoxPixels, longestSmallFoxSeconds, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && maxGroundedFollowDistance<=maxGroundedDistance && longestSmallFoxSeconds<=1 && !errors.length };
+    const foxSizeError=foxSizeGate(evidence.trace.map(s=>s.f*testDt>=checkFrom&&s.camera.boom.includes('shot=0.00')?s.foxPixels:Infinity),{dt:testDt,height,min:minFoxPixels});
+    const cameraCheck = { foxSizeError, fromSeconds: checkFrom, minChestDistance, maxPitch, maxStepSpeed, maxGroundedFollowDistance, maxGroundedDistance, minFollowFoxPixels, minFoxPixels, longestSmallFoxSeconds, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && maxGroundedFollowDistance<=maxGroundedDistance && !foxSizeError && !errors.length };
     fs.writeFileSync(path.join(out, 'camera-check.json'), JSON.stringify(cameraCheck, null, 2));
     console.log('CAMERA', JSON.stringify(cameraCheck));
     if (process.argv.includes('--check-camera') && !cameraCheck.pass) process.exitCode = 1;

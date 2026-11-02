@@ -172,8 +172,10 @@ export function createSliceRoute(startBeat = 'wake in paper') {
       mark ??= since;
       return { ...steer(s, [-26.7, 75]), jump: true, done: since - mark > 0.4 && s.grounded };
     } },
-    walk('to the second fold', [-28.2, 74.8], 0.15),
-    { beat: 'dash the second fold', run: (s) => ({ x: 0, z: since < 0.6 ? -0.08 : since < 1.0 ? -1 : 0, dash: since > 0.75 && since < 0.95, done: since > 1.8 }) },
+    walk('to the second fold', [-28.2, 74.0], 0.15),
+    // Dash along the current page beside the tab, then jump north once it opens.
+    // Do not rely on the folded guard stopping a dash through the future page.
+    { beat: 'dash the second fold', run: (s) => ({ x: since < 0.6 ? 0.08 : since < 1.0 ? 1 : 0, z: 0, dash: since > 0.75 && since < 0.95, done: since > 1.8 }) },
     walk('back for the climb', [-28.4, 75.7], 0.15),
     { beat: 'leap north', run: (s) => {
       if (s.pos[2] > 73.9 && mark === null) return { x: 0, z: -1, done: false };
