@@ -431,6 +431,8 @@ export function createPlay(opts: {
   cutout?: THREE.Object3D[];
   /** Opening heat teach: existing chemistry volume, sampled by real movement. */
   updrafts?: UpdraftSystem;
+  /** the playable world (opening/worldBounds.ts): a step that would leave it is refused like a wall, on foot or in the air */
+  inWorld?: (x: number, z: number) => boolean;
 }): PlayController {
   const { fox, groundH, colliders } = opts;
   const P = PLAY;
@@ -668,6 +670,7 @@ export function createPlay(opts: {
     const fwdX = Math.sin(yaw) * 0.28;
     const fwdZ = Math.cos(yaw) * 0.28;
     const okAt = (x: number, z: number, px: number, pz: number) =>
+      (!opts.inWorld || opts.inWorld(x, z)) &&
       surface(x, z, true, feetY + tol + 0.15) <= feetY + tol && surface(x + px, z + pz, true, feetY + tol + 0.15) <= feetY + tol + 0.15;
     const ok = (x: number, z: number) => okAt(x, z, fwdX, fwdZ);
     const dx = nx - pos.x;
