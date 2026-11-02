@@ -586,3 +586,30 @@ Review timed UI overlays in motion: a bottom-center teaching card covered the fo
 
 - `tools/complete-journey-route.mjs` composes the canonical wake-to-Keeping journey with the same finale factory in bridge-start mode; it stays transferable with `toString()`. Production `56d2469` completes all 13 checks at 30 Hz with one initial wake placement and no later teleports or forced progression: homecoming at 73.033 s, final placement at 180.467 s, first title sample at 209 s, title done at 222 s. Use 230 s for a full ending capture; 160 s is the shorter Keeping showcase. The original opening regression intentionally holds forever at homecoming.
 - Bowl-center waypoints are not pickup positions: stop when Carry reports `canPickup`. Press placement must be within the authored 1.6 m bowl reach; the tested approach target (21.0, 40.7) with a 0.15 m stop radius snaps warmth into the cradle. A point 1.65 m out silently places on the ground and leaves the finale sealed. Review/state/evidence: `docs/reviews/swarm4/finale-journey/`. This authored offline route does not prove unaided discovery or fix the external GPU recorder.
+
+## Words on screen must be in the canvas (Cedar, swarm5)
+
+- DOM overlays (captions, end card, teach prompts) never reach canvas recordings (MediaRecorder / canvas
+  captureStream). Kit's b4fa63a review clip had no ending title at all for that reason, while page.screenshot stills
+  did show DOM text — so "it's in the screenshot" does not prove "it's in the clip". Draw words with
+  `opening/lettering.ts` (camera-fixed CanvasTexture plane, redraw on change, `fitLetterPlane` per frame), or use
+  `ctx.captions.say` (bottom band) / `ctx.teach.offer` (upper-left hint, offered every frame it should show).
+  `lint:feel` rule `dom-text` bans `createElement('div')` / `.textContent =` / `.innerHTML =` in `src/opening`.
+- Camera children only render if the camera is in the scene: `scene.ts` does `scene.add(view)`.
+- Planes on the lens go through the whole post stack (bloom, grade, ACES in OutputPass); `toneMapped:false` on the
+  material does not bypass the OutputPass tone map. Set `userData.forgeSkipAO` so GTAO ignores them.
+- Editing source while a Vite-served probe runs reloads the page mid-run (HMR) and the run dies with
+  `__gameHooks undefined`. Run long probes from a pinned worktree: `git worktree add /tmp/wt-<sha> <sha>` +
+  symlink node_modules.
+
+## Finale kits and the rest shot (Cedar, swarm5)
+
+- The "duplicate foxes" at the end were the authored kits curling 1.0 m from the cradle while the hero stood in it.
+  Kits now take the free slot (ring of 9 on the cradle's open side, r 1.35) farthest from the hero and siblings, are
+  0.42× scale, and a curled kit the standing hero comes within 0.95 m of shuffles to a new slot, steering round the
+  fox. Staged probe (`tools/finale-ending-probe.mjs`): closest kit during the held rest shot 0.95 m (was overlapping).
+- TLA caught a real starvation: if a disturbed kit went back to `trotting`, a player weaving through the kits could
+  keep one uncurled forever and the end card never shows (EndsOnce violated). A separate `shuffling` phase that
+  still counts as home fixes it; WF suffices.
+- The rest shot frames hero + cradle (45% toward the fox) from the approach side, ~3.5 m back, and holds with a 90 s
+  slow push until the player moves (after the card's lock). Fox ≈ 140-160 px tall at 720p.
