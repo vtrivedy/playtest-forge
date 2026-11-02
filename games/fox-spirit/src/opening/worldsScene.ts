@@ -31,6 +31,29 @@ function buildArch(k: Kit, x: number, y: number, z: number, yaw: number, banner:
   });
 }
 
+/** a painted name board: the world's name in ink on old paper with its colour as a band */
+function plaqueTexture(name: string, band: number): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 108;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#e9dfc8';
+  g.fillRect(0, 0, 512, 108);
+  g.fillStyle = `#${band.toString(16).padStart(6, '0')}`;
+  g.fillRect(0, 92, 512, 16);
+  g.strokeStyle = '#2b2018';
+  g.lineWidth = 6;
+  g.strokeRect(3, 3, 506, 102);
+  g.fillStyle = '#2b2018';
+  g.font = 'italic 54px Georgia, serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(name, 256, 48, 480);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 function islandGround(scene: THREE.Scene, cx: number, cz: number, size: number, colour: (x: number, z: number, h: number, c: THREE.Color) => void, groundH: (x: number, z: number) => number): void {
   const geo = new THREE.PlaneGeometry(size, size, 110, 110);
   geo.rotateX(-Math.PI / 2);
@@ -113,6 +136,11 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
     glow.position.set(x, groundH(x, z) + 1.35, z);
     glow.rotation.y = yaw;
     scene.add(glow);
+    // the destination's name on a board under the lintel, readable from both sides (in the canvas, so clips carry it)
+    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.5), new THREE.MeshBasicMaterial({ map: plaqueTexture(WORLDS[to].name, ARCH_COLOR[to]), transparent: true, side: THREE.DoubleSide, toneMapped: false }));
+    plaque.position.set(x, groundH(x, z) + 3.5, z);
+    plaque.rotation.y = yaw + Math.PI;
+    scene.add(plaque);
     arches.push({ x, z, nx, nz, to, open, glow });
   };
   // hub: through the arch, away from the well
