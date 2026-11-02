@@ -812,6 +812,11 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   receding flood can otherwise put the "last dry spot" under water and teleport every frame).
 - Boarding from a cliff edge: approach straight off the edge onto the platform; diagonal approaches near a terrain
   mask edge walk the fox off the side first. Put the platform's end against the cliff face.
+
+### Marsh ground and static rainwater — Reed, swarm5
+
+- A rain layer over lawn did not establish the Ashwater scenery shift. On `f90933fb`, personally inspected T4 landing/sluice frames show peat/olive hummocks, grey-green standing water, Cedar sedge/cattails and Maple low mist; the fox remains saturated and readable. First `215f8e3c` water was too dark; `c0e97406` lightens it and feathers shore opacity using terrain depth. Puddles are construction-only clipped triangles with no state/collider changes, excluded from puzzle water and a 1.2 m margin.
+- Independent fresh physical hub→all three Ashwater levels on final `f90933fb`: both canonical memories, Reedskim, Reed fill1, three splashes, zero page/console errors. Extra six-second stick-walk movie: 72 decoded frames, 0 black. Offline12fps, not real-time performance or whole-route black approval. Report, exact source, full `window.__game`, movie and all-frame sheet: `docs/reviews/swarm5/marsh-ground/REVIEW.md`. Large slate walls, roof-trigger framing and shelf-pier masking remain open.
 - (Ashwater look) "Reeds" as single cones read as spikes. Fanned sedge tufts (9 thin cones, leaning, merged) and
   cattail stands (stalks + capsule heads) with vertex colour dark base → light tip, one InstancedMesh each, sell a
   marsh. `mergeGeometries` needs matching index-ness: convert everything with `.toNonIndexed()` first.
