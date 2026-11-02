@@ -52,7 +52,7 @@ try {
     // run south off the crag lip and hold jump the whole way down: glide
     { to: [21.4, 46], keys: ['Space'], jumpAt: 0.9, until: (s) => s.grounded && s.pos[1] < 3, max: 600 },
     // walk to the cradle (stops short; E sets the ember in the bowl ahead of the feet)
-    { to: [21.2, 39.75], keys: [], until: (s, d) => d < 0.35, max: 900 },
+    { to: 'cradle', keys: [], until: (s, d) => d < 0.35, max: 900 },
     { to: null, keys: ['KeyE'], until: () => true, max: 2 },
     // rest by the cradle while the finale plays to the card and past it
     { to: null, keys: [], until: (s) => s.opening.finale.card === 'done', max: 60 * 60 },
@@ -69,7 +69,10 @@ try {
         let s = h.state();
         let d = 0;
         if (leg.to) {
-          const dx = leg.to[0] - s.pos[0], dz = leg.to[1] - s.pos[2];
+          // 'cradle': stop 0.9 m short of the cradle on the approach side, so E sets the ember in its bowl
+          const c = s.opening.finale.cradle;
+          const to = leg.to === 'cradle' ? [c[0] + (s.pos[0] - c[0]) / Math.hypot(s.pos[0] - c[0], s.pos[2] - c[1]) * 0.9, c[1] + (s.pos[2] - c[1]) / Math.hypot(s.pos[0] - c[0], s.pos[2] - c[1]) * 0.9] : leg.to;
+          const dx = to[0] - s.pos[0], dz = to[1] - s.pos[2];
           d = Math.hypot(dx, dz);
           h.setStick(dx / d, dz / d);
         } else h.setStick(null);

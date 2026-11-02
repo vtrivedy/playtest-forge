@@ -317,3 +317,14 @@ Verification: all eight matched analyses exited0; duration29.9s; diagnostic PNGs
 reviewed for Summer Night, Hello?, Pine Grove, Beach Buds and full Hush. Python
 compile passed. This is a programmatic/visual audio critique, not a real-time
 listening claim or whole-game playtest. No runtime/mute changes in this slice.
+
+## Finale / Press Hollow (Wren, swarm4)
+
+- The vista valley past the far crag was already walkable from the meadow's south edge (x 8–16, z 58–62 slopes into it); any "one-way" gate there needs a real ledge, not an assumption. The finale gates on the Keeping having settled instead (TLA `Finale.tla`).
+- Walk limits come from `moveTo`'s 0.28 m forward probe: a rise ≤ step + 0.15 = 0.37 m per 0.28 m (~53°) is walkable. Only steeper than ~1.3 rise/run blocks; a 1.85 m jump apex is the other bound.
+- Glide off the far crag (top 9.46) into the hollow (floor ≈ 0.5) carries ≈ 18 m horizontally with the ember in the mouth (finale-route trace, 308958d).
+- Carry places into a bowl only when the fox stands within `bowlReach` (1.6 m) on the same floor; otherwise it sets warmth at the feet. Route bots must stop ≤ ~0.9 m from a bowl.
+- A second ground sheet must abut the bowl sheet on its exact vertex columns (bowl: x −64..56 in 170 segs → 0.706 m) or edges crack; overlapping sheets z-fight.
+- Snow as `THREE.Points` falling in the vertex shader (mod-wrapped box round the camera) costs no CPU per frame; clamp `gl_PointSize` (1.6–7 px) or near flakes balloon into discs.
+- Hot-gate gap (fixed upstream request): roots were only `update/tick/frame/process` names — a `*.hot.ts` entry named `stepX` was never scanned. Name hot entries `update*` (or make every export a root).
+- This sandbox is 1 CPU: local SwiftShader continuous clips run ~0.5–1.8 fps at 640×360; run one probe at a time.

@@ -16,6 +16,8 @@ export const FINALE_TIMING = {
   /** the card: fox still this long by the cradle (within `restR`), or `timeout` s after snow begins */
   rest: 1.6, restR: 4.2, timeout: 24, cardIn: 2.5, cardHold: 7.5, cardOut: 2.5,
   snowRamp: 14,
+  /** each Album caption: fade in, hold, fade out (s) */
+  capIn: 1.0, capHold: 3.6, capOut: 1.2,
 };
 const T = FINALE_TIMING;
 
@@ -33,7 +35,7 @@ export type FinaleRig = {
   canvas: HTMLCanvasElement;
   groundH: (x: number, z: number) => number;
   /** cold one-shot events (may allocate) */
-  events: { kindle: () => void; open: () => void; release: () => void; snow: () => void; card: () => void };
+  events: { kindle: () => void; unbind: () => void; open: () => void; release: () => void; snow: () => void; card: () => void };
   /** scene parts */
   hinge: THREE.Object3D;
   screw: THREE.Object3D;
@@ -45,6 +47,10 @@ export type FinaleRig = {
   emblemMat: THREE.MeshBasicMaterial;
   glowMat: THREE.MeshBasicMaterial;
   light: THREE.PointLight;
+  /** the way to the cradle: motes along a pre-sampled path (xyz LUT, evenly spaced by arc length) */
+  wayMesh: THREE.InstancedMesh;
+  wayLut: Float32Array;
+  wayLen: number;
   pageMeshes: THREE.InstancedMesh[];
   leafMesh: THREE.InstancedMesh;
   pageSeed: Float32Array;
@@ -53,6 +59,7 @@ export type FinaleRig = {
   kitFoxes: HearthFox[];
   kitPages: THREE.Mesh[];
   card: HTMLElement;
+  caption: HTMLElement;
   /** fixed points */
   cradle: THREE.Vector3;
   bookTop: THREE.Vector3;
@@ -63,7 +70,7 @@ export type FinaleRig = {
   cover0: THREE.Color; cover1: THREE.Color; paper0: THREE.Color; paper1: THREE.Color; ember: THREE.Color; emblem0: THREE.Color;
   /** mutable state (numbers only) */
   s: {
-    phase: number; t: number; clock: number; snowT: number; still: number;
+    phase: number; t: number; clock: number; snowT: number; still: number; settledT: number; capT: number;
     card: 0 | 1 | 2; cardT: number; foxX: number; foxZ: number; kindles: number; cardShows: number; wheel: number; leavesOut: number;
   };
   kitPhase: Int8Array;
@@ -95,7 +102,8 @@ function enter(rig: FinaleRig, phase: number): void {
   if (phase === 1) {
     rig.s.kindles++;
     rig.events.kindle();
-  } else if (phase === 3) rig.events.open();
+  } else if (phase === 2) rig.events.unbind();
+  else if (phase === 3) rig.events.open();
   else if (phase === 4) rig.events.release();
   else if (phase === 5) rig.events.snow();
 }
@@ -225,7 +233,40 @@ function stepKit(rig: FinaleRig, i: number, dt: number, since: number): void {
   kit.update(dt);
 }
 
-export function stepFinale(rig: FinaleRig, dt: number): void {
+/** the way: sparse motes drift from the root-hearth to the cradle while the Press waits, and fade once it is kindled */
+function stepWay(rig: FinaleRig, dt: number): void {
+  const s = rig.s;
+  if (rig.settled()) s.settledT += dt;
+  const on = smooth(s.settledT, 3, 6) * (s.phase === 0 ? 1 : 1 - smooth(s.t + (s.phase > 1 ? 9 : 0), 0, 2.5));
+  const mesh = rig.wayMesh;
+  if (on <= 0.001) {
+    mesh.count = 0;
+    return;
+  }
+  const n = mesh.instanceMatrix.count;
+  const lut = rig.wayLut;
+  const N = lut.length / 3;
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    const u = (i / n + (s.settledT * 1.6) / rig.wayLen) % 1;
+    const f = u * (N - 1);
+    const j = Math.min(N - 2, Math.floor(f));
+    const w = f - j;
+    p3.set(
+      lut[j * 3]! + (lut[j * 3 + 3]! - lut[j * 3]!) * w + Math.sin(s.clock * 0.9 + i * 2.1) * 0.22,
+      lut[j * 3 + 1]! + (lut[j * 3 + 4]! - lut[j * 3 + 1]!) * w + Math.sin(s.clock * 1.3 + i) * 0.16,
+      lut[j * 3 + 2]! + (lut[j * 3 + 5]! - lut[j * 3 + 2]!) * w,
+    );
+    const size = on * (0.6 + 0.4 * Math.sin(i * 7.3)) * Math.min(1, u * 14, (1 - u) * 8);
+    sc.setScalar(Math.max(0.001, size));
+    q.identity();
+    mesh.setMatrixAt(k++, m4.compose(p3, q, sc));
+  }
+  mesh.count = k;
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
+export function updateFinale(rig: FinaleRig, dt: number): void {
   const s = rig.s;
   s.clock += dt;
   s.t += dt;
@@ -233,6 +274,7 @@ export function stepFinale(rig: FinaleRig, dt: number): void {
   if (s.phase === 0) {
     if (rig.settled() && rig.emberInCradle()) enter(rig, 1);
   } else if (s.phase < 5 && s.t >= durationOf(s.phase)) enter(rig, s.phase + 1);
+  stepWay(rig, dt);
   const ph = s.phase;
   if (ph === 0) return;
   // (fox travel since last frame is read below; the position is stored at the end of the step)
@@ -290,6 +332,12 @@ export function stepFinale(rig: FinaleRig, dt: number): void {
       s.cardShows++;
       rig.events.card();
     }
+  }
+  if (s.capT >= 0) {
+    s.capT += dt;
+    const o = smooth(s.capT, 0, T.capIn) * (1 - smooth(s.capT, T.capIn + T.capHold, T.capIn + T.capHold + T.capOut));
+    rig.caption.style.opacity = o.toFixed(3);
+    if (s.capT > T.capIn + T.capHold + T.capOut) s.capT = -1;
   }
   s.foxX = rig.fox.position.x;
   s.foxZ = rig.fox.position.z;

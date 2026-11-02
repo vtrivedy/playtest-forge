@@ -12,8 +12,8 @@ import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
 import type { FollowCamera } from '../camera';
-import { CROWN, FINALE, pathDist } from './layout';
-import { FINALE_TIMING, KIT_PHASES, PHASES, stepFinale, type FinaleRig } from './finale.hot';
+import { CROWN, FINALE, KEEPING, pathDist } from './layout';
+import { FINALE_TIMING, KIT_PHASES, PHASES, updateFinale, type FinaleRig } from './finale.hot';
 
 /** album paper, ink-frost, iron and the warm colours the hollow wakes into */
 const PAPER = 0xe9dcc0;
@@ -193,9 +193,31 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     const p = local(FRAME.x, sz);
     colliders.push({ kind: 'post', x: p.x, z: p.z, r: 0.24 });
   }
-  const beam = inked(hewn(new THREE.BoxGeometry(0.4, 0.36, FRAME.z * 2 + 0.5, 1, 1, 4), rand, 0.04), timber, 0.02);
+  const beam = inked(hewn(new THREE.BoxGeometry(0.46, 0.5, FRAME.z * 2 + 0.6, 1, 1, 4), rand, 0.04), timber, 0.02);
   beam.position.set(FRAME.x, FRAME.top, 0);
   frame.add(beam);
+  // a press, not a gate: squat stone feet, knee braces into the beam, iron straps where the timber is worked
+  const footMat = toon(0x6a5a4a, { contour: 0.5 });
+  const strap = toon(0x2a2420);
+  for (const sz of [-FRAME.z, FRAME.z]) {
+    const foot = inked(hewn(new THREE.BoxGeometry(0.7, 0.5, 0.7, 1, 1, 1), rand, 0.06), footMat, 0.018);
+    foot.position.set(FRAME.x, 0.22, sz);
+    frame.add(foot);
+    const brace = inked(hewn(new THREE.BoxGeometry(0.16, 1.15, 0.16, 1, 2, 1), rand, 0.04), timber, 0.014);
+    brace.position.set(FRAME.x, FRAME.top - 0.62, sz * 0.8);
+    brace.rotation.x = Math.sign(sz) * 0.75;
+    frame.add(brace);
+    for (const y of [FRAME.top - 0.05, 1.0]) {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.08, 0.36), strap);
+      band.position.set(FRAME.x, y + (y > 2 ? 0 : 0), sz);
+      frame.add(band);
+    }
+  }
+  for (const y of [-0.18, 0.18]) {
+    const band = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.56, 0.08), strap);
+    band.position.set(FRAME.x, FRAME.top, y);
+    frame.add(band);
+  }
   const ironMat = new THREE.MeshToonMaterial({ color: IRON, emissive: 0x000000, gradientMap: RAMP_WORLD });
   // the screw assembly (thread + platen) slides up when the Press unbinds; the wheel turns on top of the beam
   const screw = new THREE.Group();
@@ -282,6 +304,27 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const pageSeed = new Float32Array(PAGES * 4);
   for (let i = 0; i < PAGES; i++) pageSeed.set([rand(), rand(), rand(), rand()], i * 4);
 
+  // loose album pages caught in the grass round the Press: the Scribe's work, blown about and left
+  const scrapGeo = new THREE.PlaneGeometry(0.3, 0.4).rotateX(-Math.PI / 2);
+  for (const m of pageMats) {
+    const scraps = new THREE.InstancedMesh(scrapGeo, new THREE.MeshToonMaterial({ color: 0x8c7c68, map: m.map, gradientMap: RAMP_WORLD, side: THREE.DoubleSide }), 6);
+    const mm = new THREE.Matrix4();
+    for (let i = 0; i < 6; i++) {
+      const a = rand() * Math.PI * 2;
+      const r = 3 + rand() * 9;
+      const x = F.press.x + Math.cos(a) * r;
+      const z = F.press.z + 4 + Math.sin(a) * r;
+      mm.compose(
+        new THREE.Vector3(x, groundH(x, z) + 0.03, z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler((rand() - 0.5) * 0.3, rand() * 6.28, (rand() - 0.5) * 0.3)),
+        new THREE.Vector3(1, 1, 1).multiplyScalar(0.8 + rand() * 0.5),
+      );
+      scraps.setMatrixAt(i, mm);
+    }
+    scraps.receiveShadow = true;
+    scene.add(scraps);
+  }
+
   // ---- snow: a camera-centred box of flakes that falls in the shader (no per-frame CPU work)
   const snowGeo = new THREE.BufferGeometry();
   const sp = new Float32Array(SNOW * 3);
@@ -332,6 +375,21 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     return p;
   });
 
+  // ---- the way: once the Keeping has settled, a thin stream of warm motes runs from the root-hearth (where the
+  // ember rests) across the bridge, off the crag's lip and down into the hollow to the cradle, until it is kindled
+  const wayCurve = new THREE.CatmullRomCurve3([
+    [KEEPING.root.x, KEEPING.root.y + 0.7, KEEPING.root.z], [KEEPING.hinge.x, KEEPING.terrace.top + 1.0, KEEPING.hinge.z],
+    [KEEPING.crag.x, KEEPING.crag.top + 1.0, KEEPING.crag.z], [25.3, KEEPING.crag.top + 0.9, 62.4],
+    [23.6, 6.2, 55.5], [21.9, 2.4, 48], [21.3, cy + 0.9, 42.2], [F.cradle.x, cy + 0.5, F.cradle.z],
+  ].map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  const WAY_N = 160;
+  const wayLut = new Float32Array(WAY_N * 3);
+  for (let i = 0; i < WAY_N; i++) wayCurve.getPointAt(i / (WAY_N - 1)).toArray(wayLut, i * 3);
+  const wayMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.07, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffa548, toneMapped: false }), 34);
+  wayMesh.frustumCulled = false;
+  wayMesh.count = 0;
+  scene.add(wayMesh);
+
   // ---- the end card
   const card = document.createElement('div');
   card.dataset.finale = 'card';
@@ -342,6 +400,19 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   });
   card.innerHTML = 'The Keeping<div style="font:18px Georgia,serif;letter-spacing:.12em;margin-top:14px;opacity:.8">and the year turned</div>';
   document.body.append(card);
+  // Album captions (seed DESIGN: ≤ 6 words, the only words in the slice): one per beat, lower third
+  const caption = document.createElement('div');
+  caption.dataset.finale = 'caption';
+  Object.assign(caption.style, {
+    position: 'fixed', left: '0', right: '0', bottom: '17%', textAlign: 'center', pointerEvents: 'none',
+    color: '#f4e5cb', font: 'italic 24px Georgia,serif', letterSpacing: '0.03em', opacity: '0',
+    textShadow: '0 1px 12px rgba(40,24,12,.7)',
+  });
+  document.body.append(caption);
+  const say = (text: string) => {
+    caption.textContent = text;
+    rig.s.capT = 0;
+  };
 
   const F2 = F.kits;
   const toCrown = new THREE.Vector3(CROWN.x - F.press.x, 0, CROWN.z - F.press.z).normalize();
@@ -357,20 +428,28 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         ctx.audio.cue('finale-kindle');
         ctx.field.restore(new THREE.Vector3(F.cradle.x, cy, F.cradle.z), 6, 1.4, { edgeMax: 1.2 });
       },
+      unbind: () => say('The Scribe pressed the autumn shut'),
       open: () => ctx.audio.cue('finale-open'),
       release: () => {
         // the year the Album held lets go: the hollow floods with colour and the Crown sheds everything
         ctx.field.restore(new THREE.Vector3(F.press.x, base, F.press.z), 34, 2.2, { edgeMax: 3 });
         opts.crownLetGo();
+        say('so it would never end.');
       },
-      snow: () => ctx.audio.cue('finale-snow'),
+      snow: () => {
+        ctx.audio.cue('finale-snow');
+        say('Let the year turn.');
+      },
       card: () => {
         ctx.audio.cue('finale-rest');
         // ease out to a held composition: fox, kits and ember in front, the open Album, the bare Crown beyond
         const cam = opts.cam.camera;
         const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
-        const end = rig.cradle.clone().addScaledVector(toCrown, -6.8).add(new THREE.Vector3(-toCrown.z * 1.6, 2.5, toCrown.x * 1.6));
-        const look = new THREE.Vector3(F.press.x, base + 1.7, F.press.z).addScaledVector(toCrown, 2);
+        // look between the book's face (local −z) and the Crown, from behind the ember
+        const face = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+        const d = face.lerp(toCrown, 0.6).normalize();
+        const end = rig.cradle.clone().addScaledVector(d, -6.6).add(new THREE.Vector3(0, 2.3, 0));
+        const look = rig.cradle.clone().addScaledVector(d, 5).add(new THREE.Vector3(0, 1.3, 0));
         const hold = FINALE_TIMING.cardIn + FINALE_TIMING.cardHold;
         opts.cam.playPath({
           keys: [
@@ -384,7 +463,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       },
     },
     hinge, screw, wheel, coverMat, paperMat, ironMat, lampPaper, emblemMat, glowMat, light,
-    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
+    wayMesh, wayLut, wayLen: wayCurve.getLength(),
+    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card, caption,
     cradle: new THREE.Vector3(F.cradle.x, cy, F.cradle.z),
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
     toCrown,
@@ -392,14 +472,14 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, capT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
     kitX: new Float32Array(F2.length),
     kitZ: new Float32Array(F2.length),
     kitYaw: new Float32Array(F2.length),
   };
-  ctx.onUpdate((dt) => stepFinale(rig, dt));
+  ctx.onUpdate((dt) => updateFinale(rig, dt));
 
   return {
     /** world points for review lenses */
@@ -410,7 +490,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       forced = true;
     },
     state: () => ({
-      phase: PHASES[rig.s.phase], t: +rig.s.t.toFixed(2), kindles: rig.s.kindles,
+      phase: PHASES[rig.s.phase], t: +rig.s.t.toFixed(2), kindles: rig.s.kindles, cradle: [+rig.cradle.x.toFixed(2), +rig.cradle.z.toFixed(2)],
       kits: Array.from(rig.kitPhase, (k) => KIT_PHASES[k]), card: ['hidden', 'showing', 'done'][rig.s.card], cardShows: rig.s.cardShows,
       snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, still: +rig.s.still.toFixed(2),
     }),
