@@ -49,3 +49,10 @@ positive visibility verdict comes from the completed quarter-second development
 capture and its before/after descent sheets. Its later ruin retry sheet remains
 readable. Evidence also includes source hashes, the exact tested patch, all 200
 frames, the 50-second movie, final screenshot and `window.__game` in evidence.json.
+
+Subsequent diagnosis and independent replay: Hazel's onward-teaching gate
+`f8442a9d` allows recovery with the current controller. The independent production
+T4 replay on `c0eb9d41` passes all 13 checks and completes grounded at 55.95 s
+after four misses. The controller isolation above is retained as experiment
+history, not evidence that a rollback is necessary. See
+`reed-discovery-priority.md` for source review and captured recovery evidence.
