@@ -1,0 +1,44 @@
+{
+  "baseline": {
+    "sha": "c91a470848ae30e8196732c6f948b3fef67e4131",
+    "checks": {
+      "triggered": true,
+      "wellFull": true,
+      "onwardFadeIn": true,
+      "naturalEnd": true,
+      "yields": true,
+      "ended": true,
+      "finite": true,
+      "noErrors": true,
+      "remoteHasNoReveal": false,
+      "cameraStaysNearFox": false
+    },
+    "samples": 240,
+    "frames": 120,
+    "maxHorizontalCameraDistance": 44.54536641543346,
+    "onward48Samples": 225,
+    "errors": [],
+    "capturePath": "/captures/sorrel/homecoming-remote-baseline-c91a470"
+  },
+  "fixed": {
+    "sha": "8d24dd7296aaa6b62828d32656ee7c507b3b9978",
+    "checks": {
+      "triggered": true,
+      "wellFull": true,
+      "onwardFadeIn": true,
+      "naturalEnd": true,
+      "yields": true,
+      "ended": true,
+      "finite": true,
+      "noErrors": true,
+      "remoteHasNoReveal": true,
+      "cameraStaysNearFox": true
+    },
+    "samples": 240,
+    "frames": 120,
+    "maxHorizontalCameraDistance": 2.450000000000003,
+    "onward48Samples": 225,
+    "errors": [],
+    "capturePath": "/captures/sorrel/homecoming-remote-fixed"
+  }
+}

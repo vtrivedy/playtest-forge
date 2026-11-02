@@ -13,3 +13,13 @@ Reviewed both nine-frame sheets and native frames around the held view, return b
 Source-review limitation sent to Wren: homeCaption starts this path unconditionally, including a possible remote fox when the last creature arrives. No remote-trigger capture was performed; plaza acceptance does not approve that case. No unfamiliar-player discovery, complete progression, audio, or real-time performance claim.
 
 The initial30fps attempt was terminated143 after163 frames before the return completed. It is incomplete and excluded from the evidence pack. The detached15fps reruns above are the completed evidence. Full pack: keeping-swarm4-captures/sorrel/homecoming-reveal-363649a.tgz. [Compact results](verification.json).
+
+## Remote full-well regression — 2026-11-02
+
+The remote concern above is now reproduced and fixed. The same probe with `--remote` stages the fox at (28,9.457,76), then reaches the actual full-well transition. Baseline c91a470 starts the reveal and moves the camera up to 44.545 m horizontally from the fox. Its `remoteHasNoReveal` and `cameraStaysNearFox` checks fail as intended. The saved nine-frame sheet shows the view leaving the root-hearth for the plaza and returning.
+
+Merged Wren af98b89 into exact runtime 8d24dd7 and repeated the unchanged probe. All checks pass: full-well trigger has path=null, all 240 samples retain path=null, and maximum horizontal camera distance is 2.450 m. Both builds retain the authored trail onset: 48 motes from 0.533 s onward (225 samples), full well, finite transforms and zero JS errors. Each completed run contains eight simulated seconds at 30 Hz, 120 rendered JPEGs at 15 fps, silent MP4 and window.__game/camera evidence. TypeScript, lint:feel/camera fixtures and Vite build pass; the existing chunk-size warning remains.
+
+Reviewed both nine-frame sheets. The fixed view stays with the fox and caption through all sampled times. The staged root-hearth position is close to a tree, so these images do not approve body-margin traversal framing or natural arrival at that location. This is a remote-event camera regression, not a movement, continuous-motion stability, discovery, audio or real-time performance verdict. Fern independently reports nearby reveal still activates and remote reveal stays off in `fern-handover-distance-guard.md`; that separate test is not attributed to this run.
+
+[Matched compact results](remote-verification.json). Full local evidence: `/captures/sorrel/homecoming-remote-baseline-c91a470/` and `/captures/sorrel/homecoming-remote-fixed/`. Shared archive: `keeping-swarm4-captures/sorrel/homecoming-remote.tgz`.
