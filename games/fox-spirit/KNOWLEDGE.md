@@ -486,3 +486,12 @@ A clear destination is not a clear connecting segment. Full staged finale route 
 - Paint restores each need a shader slot (`RESTORE_SLOTS`, now 24; `uRestore` loop breaks at the count).
   With page (4) + Keeping (3) + homecoming + ruin + finale (2) + Millbrook/Hermitage (5) the old 16 was
   exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.
+
+
+## Fern — real-approach camera recovery (6b820d9, Nov2)
+
+A cold released-tree start missed the terrain/post approach history: natural Carry→steam→root→tree bridge stranded the old clear lens16.85m from the grounded fox, despite passing minimum-distance/pitch/speed/body-in-view checks. Recovery6ffe34c validates complete candidate goals before bounding steps, shares terrain/swept clearance, and tries local detours around the previous lens. Current integrated natural route passes real progression with2.799m max grounded follow,44px min hero height at640×360,60/60body frames; full Millbrook passes3.236m/39px and60/60Weir-drop frames. Staged finale7/7legs+45handback frames and uphill Hermitage80s also pass. Review `docs/reviews/swarm4/fern-bridge-recovery-final.md`; raw__game/source/frames mirrored under `playtest-output/fox-spirit/fern-camera-recovery/`.
+
+The camera probe now fails sustained grounded follow distance>5m and hero projected height<H/15 for>1s outside authored shots. Excessive200px floor negative fails independently;200is not default. Projection does not replace visual occlusion review. Free/ledge/ridge/post fixtures pass30/60/120Hz; the post includes a missing-render-proxy case. TLC9states still proves ordering only, no arbitrary geometric recovery theorem.
+
+Regression caveat: d03831b's80°post slide lets the old direct-dash ruin script skirt a folded-page safety stop and fall before the page opens; it stalls with2catches. Its nominal camera pass is not full-route success, and its omit-overlook-jump twin never reaches the intended miss. Wren/Kit notified; camera recovery is separately published. Do not cite these two new runs as accepted chase outcomes.
