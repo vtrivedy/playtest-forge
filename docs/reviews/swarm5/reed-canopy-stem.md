@@ -33,6 +33,16 @@ Hazel independently reproduced the landing miss without the stem fix on current
 source and is isolating the controller changes. This patch does not claim to
 repair discovery or reproduce the older 66dac775 successful landing.
 
+Follow-up isolation reported by Hazel: rebuilt current source e3f785b1 with
+only `lookdevPlay.ts` restored from 66dac775 passes all 13 checks in a production
+state-only run, completing on ground at 44.5167 seconds, matching the original
+successful capture. Current-controller source instead remains at `jump1` through
+90 seconds. Hazel retained the isolation at
+`/captures/hazel/recheck-current-old-controller/{evidence.json,control.json}`.
+This is Hazel's execution evidence, not a new independent Reed run. Thistle owns
+the controller correction; current-source discovery remains an open gate until
+the corrected controller is played and its landing footage reviewed.
+
 A focused 15fps production attempt was stopped during slow SwiftShader rendering
 before its first retained descent frame; it supplies no visual verdict. The
 positive visibility verdict comes from the completed quarter-second development
