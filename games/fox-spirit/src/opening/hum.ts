@@ -2,7 +2,7 @@
  * Hearth hum (DESIGN v1 orientation: "hearths hum first"). Every lit hearth drones a low warm chord whose
  * loudness follows the fox's distance, so a lit hearth can be found by ear; cold ones are silent. Lit hearths
  * and the carried coal crackle where they are; a hearth catching swells and the music dips under it. The Runaway
- * Page rustles while it flees, turns a soft page when it startles and gives a low chime per catch.
+ * Page turns a soft page when it startles and gives a low chime per catch (no continuous rustle).
  * A Keeping completion swells one rising chord. All on the opening's one graph (audio.ts), placed in 3D.
  */
 import * as THREE from 'three';
@@ -12,16 +12,16 @@ import type { OpeningAudio } from './audio';
 /**
  * Levels for a gentle mix (Kit :1144; DESIGN-audio-moss.md): nothing here runs as a bed the player can't get away
  * from. A lit hearth hums and crackles only within a few metres (`near`..`far`); the coal crackles only close to
- * the fox; the page rustles only while it is fleeing; flaps are rate-limited soft paper turns.
+ * the fox; the page has no continuous rustle (its 9 Hz flutter read as a pulse); flaps are rate-limited soft paper turns.
  */
-const HUM = { near: 2, far: 8, gain: 0.03, crackle: 0.12, rustle: 0.012, flap: 0.14, flapGap: 1.5 };
+const HUM = { near: 2, far: 8, gain: 0.03, crackle: 0.12, flap: 0.14, flapGap: 1.5 };
 
 export function createHearthHum(opts: {
   audio: OpeningAudio;
   hearths: Hearth[];
   fox: THREE.Object3D;
   coal: () => THREE.Vector3;
-  /** the Runaway Page: a dry paper flutter you can find by ear; a flap per startle; a rising note per catch */
+  /** the Runaway Page: a soft page turn per startle; a low note per catch */
   page?: () => { pos: THREE.Vector3; fleeing: boolean; catches: number; flaps: number; kept: boolean };
 }) {
   const { audio } = opts;
@@ -51,22 +51,6 @@ export function createHearthHum(opts: {
   // the coal crackles where it is (carried, set down, in a bowl)
   const coalPan = audio.at(opts.coal(), 1.5);
   const coalCrackle = audio.loop('hearth-crackle', coalPan);
-  // page flutter: band-passed noise, amplitude-beaten like wingbeats, panned at the page
-  const flutter = ac.createBufferSource();
-  const fb = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
-  const fd = fb.getChannelData(0);
-  for (let i = 0; i < fd.length; i++) fd[i] = (Math.random() * 2 - 1) * (0.55 + 0.45 * Math.sin((i / ac.sampleRate) * Math.PI * 2 * 9));
-  flutter.buffer = fb;
-  flutter.loop = true;
-  const rustleBand = ac.createBiquadFilter();
-  rustleBand.type = 'bandpass';
-  rustleBand.frequency.value = 2600;
-  rustleBand.Q.value = 0.9;
-  const rustle = ac.createGain();
-  rustle.gain.value = 0;
-  const pagePan = audio.at(new THREE.Vector3(), 28);
-  flutter.connect(rustleBand).connect(rustle).connect(pagePan);
-  flutter.start();
   let caught = 0;
   let flapped = 0;
   let lastFlap = -Infinity;
@@ -116,9 +100,6 @@ export function createHearthHum(opts: {
       coalCrackle.set(HUM.crackle * (1 - THREE.MathUtils.smoothstep(f.distanceTo(c), 1, 6)), 0.2);
       const pg = opts.page?.();
       if (pg) {
-        set(pagePan, pg.pos);
-        rustle.gain.setTargetAtTime(!pg.kept && pg.fleeing ? HUM.rustle : 0, now, 0.25);
-        rustleBand.frequency.setTargetAtTime(pg.fleeing ? 3400 : 2400, now, 0.2);
         if (pg.flaps > flapped) {
           flapped = pg.flaps;
           if (now - lastFlap >= HUM.flapGap) {
