@@ -591,12 +591,12 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       d.set(Math.sin(a), 0, Math.cos(a));
       const front = near ? -(d.x * Math.sin(fy) + d.z * Math.cos(fy)) : 0.65;
       pos.copy(group).addScaledVector(d, -3.7).add(new THREE.Vector3(0, 1.45, 0));
-      // well clear of the plinth's footprint (±1.5 × ±1.9 local) so the Press never fills the foreground, and the
-      // frame's near post off the line to the fox
+      // well clear of the Press's footprint so it never fills the foreground: the plinth (±1.5 × ±1.9 local) plus the
+      // open cover lying out on the −x side to its rest stone (−3.4); and the frame's near post off the line to the fox
       const px = pos.x - F.press.x, pz = pos.z - F.press.z;
       const lx = Math.cos(F.press.yaw) * px - Math.sin(F.press.yaw) * pz;
       const lz = Math.sin(F.press.yaw) * px + Math.cos(F.press.yaw) * pz;
-      const clear = Math.hypot(Math.max(0, Math.abs(lx) - 1.5), Math.max(0, Math.abs(lz) - 1.9)) > 2.6;
+      const clear = Math.hypot(Math.max(0, lx - 1.5, -3.7 - lx), Math.max(0, Math.abs(lz) - 1.9)) > 2.6;
       const postClear = segDist(pos.x, pos.z, aimAt.x, aimAt.z, post.x, post.z) > 0.75 && Math.hypot(pos.x - post.x, pos.z - post.z) > 2.2;
       const blocked = opts.cam.sightBlocked(pos, aimAt, aimAt.y - 0.35);
       // the 4.4 m post looms when it is in view and close to the lens (its apparent size, not its angle, matters):
@@ -702,7 +702,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         // the wide hands straight on to the family as the kits come home (not back to a follow lens jammed
         // against the Press); any move after a moment takes the lens back
         const f = ctx.fox.root.position;
-        if (Math.hypot(f.x - F.cradle.x, f.z - F.cradle.z) < FINALE_TIMING.restR) familyShot(3.5, 1);
+        if (Math.hypot(f.x - F.cradle.x, f.z - F.cradle.z) < FINALE_TIMING.restR) familyShot(2.2, 1);
       },
       card: () => {
         ctx.audio.cue('finale-rest');
