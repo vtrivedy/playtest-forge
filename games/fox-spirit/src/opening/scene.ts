@@ -233,7 +233,13 @@ export async function runOpening(): Promise<void> {
   const view = player.cam.camera;
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
+  let warnedSlots = false;
   function syncPaint(): void {
+    // every permanent wash needs a shader slot; one past the budget would silently never show
+    if (!warnedSlots && field.restores.length > RESTORE_SLOTS) {
+      warnedSlots = true;
+      console.error(`paint restore budget exceeded: ${field.restores.length} > RESTORE_SLOTS ${RESTORE_SLOTS}`);
+    }
     paintU.uRestoreCount.value = Math.min(RESTORE_SLOTS, field.restores.length);
     field.restores.slice(0, RESTORE_SLOTS).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
   }
