@@ -81,7 +81,7 @@ export function buildPressStacks(ctx: OpeningCtx) {
       page.position.y = stand.top + 0.1 + Math.sin(t * 1.6) * 0.03;
       if (!found && Math.hypot(fox.x - stand.x, fox.z - stand.z) < STAND.half + 0.3 && fox.y > stand.top - 0.3) {
         found = true;
-        ctx.captions.say('A page never pressed: everyone, together, laughing.');
+        ctx.captions.say('A page never pressed: all of them, laughing.');
         light.intensity = 3;
       }
     },

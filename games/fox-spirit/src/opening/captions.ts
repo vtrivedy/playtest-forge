@@ -22,7 +22,8 @@ export function createCaptions(ctx: OpeningCtx) {
     },
     /** show one line now (replaces any line still showing) */
     say(text: string): void {
-      plane.draw([{ text, px: 84, italic: true, spacing: 0.03 }]);
+      // a dark ink outline under the cream: captions must read over snow (the Press) as well as autumn (Kit, 20:51)
+      plane.draw([{ text, px: 84, italic: true, spacing: 0.03, outline: 0.12 }]);
       showing = text;
       c.t = 0;
       said.push(text);
