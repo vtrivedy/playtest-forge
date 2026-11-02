@@ -174,7 +174,8 @@ export function createSliceRoute(startBeat = 'wake in paper') {
     } },
     walk('to the second fold', [-28.2, 74.8], 0.15),
     { beat: 'dash the second fold', run: (s) => ({ x: 0, z: since < 0.6 ? -0.08 : since < 1.0 ? -1 : 0, dash: since > 0.75 && since < 0.95, done: since > 1.8 }) },
-    walk('back for the climb', [-28.4, 75.7], 0.15),
+    // Leave room for either direction of the bounded180-degree run-up turn.
+    walk('back for the climb', [-27.6, 75.7], 0.15),
     { beat: 'leap north', run: (s) => {
       if (s.pos[2] > 73.9 && mark === null) return { x: 0, z: -1, done: false };
       mark ??= since;

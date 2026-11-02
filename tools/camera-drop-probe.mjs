@@ -153,7 +153,7 @@ try {
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
   fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,routeModule:path.relative(process.cwd(),routeModule),checkFrom,staging:SLICE_STAGING??'one start teleport; controller input thereafter',start:sliceStart,cameraHeight,clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
   if (verifySlice) {
-    const checks=verifySlice(evidence.game.state);
+    const checks=verifySlice(evidence.game.state,evidence.trace);
     const stateCheck={checks,pass:!!checks&&Object.keys(checks).length>0&&Object.values(checks).every(v=>v===true)};
     fs.writeFileSync(path.join(out,'state-check.json'),JSON.stringify(stateCheck,null,2));
     console.log('STATE',JSON.stringify(stateCheck));
@@ -165,6 +165,15 @@ try {
     fs.writeFileSync(path.join(out,'route-check.json'),JSON.stringify(routeCheck,null,2));
     console.log('ROUTE',JSON.stringify(routeCheck));
     if(!routeCheck.pass)process.exitCode=1;
+  }
+  if (missOverlook) {
+    const miss = evidence.trace.filter(s => s.beat === 'leap to the overlook');
+    const leftLeaf = miss.some(s => !s.grounded);
+    const fellBelowLeaf = evidence.trace.some(s => s.f >= (miss[0]?.f ?? Infinity) && s.pos[1] < .3);
+    const coverage = { requiredBeat: 'leap to the overlook', reached:miss.length>0, leftLeaf, fellBelowLeaf, pass:miss.length>0 && leftLeaf && fellBelowLeaf };
+    fs.writeFileSync(path.join(out,'miss-coverage.json'),JSON.stringify(coverage,null,2));
+    console.log('MISS_COVERAGE',JSON.stringify(coverage));
+    if (!coverage.pass) process.exitCode=1;
   }
   const late = evidence.trace.filter(s => s.f * testDt >= checkFrom);
   if (late.length) {
