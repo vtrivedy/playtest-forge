@@ -68,7 +68,7 @@ export const PLAY = {
 const TAU = Math.PI * 2;
 const wrap = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
 
-function colliderTop(c: Collider, x: number, z: number): number {
+export function colliderTop(c: Collider, x: number, z: number): number {
   const dx = x - c.x;
   const dz = z - c.z;
   if (c.kind === 'post') return dx * dx + dz * dz < c.r * c.r ? Infinity : -Infinity;

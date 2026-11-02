@@ -309,8 +309,10 @@ function stepHeroRest(rig: FinaleRig, dt: number): void {
     s.getUpT = 0;
     rig.player.setMoveScale(0);
     rig.heroLie.paused = false;
-    rig.heroLie.timeScale = -rig.lieDur / T.getUp;
-    if (s.lieT >= rig.lieDur) rig.heroLie.time = rig.lieDur;
+    rig.heroLie.timeScale = -(rig.lieDur * 0.4) / (T.getUp * 0.8);
+    // skip the settle (f16-24 barely moves): the body visibly starts up within a frame or two of the input
+    rig.heroLie.time = Math.min(rig.heroLie.time, rig.lieDur * 0.4);
+    if (s.lieT >= rig.lieDur) rig.heroLie.time = rig.lieDur * 0.4;
     rig.heroLie.play();
     return;
   }
