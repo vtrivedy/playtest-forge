@@ -17,7 +17,7 @@ import { bakeLaneMap } from './lanePaint';
 import { buildWorldEdge } from './worldEdge';
 import { buildWorlds } from './worldsScene';
 import { buildWarden } from './warden';
-import { WORLDS } from './worlds';
+import { SEEDWELLS, WORLDS } from './worlds';
 import { createWorldProgress } from '../worlds/progress';
 import { createPageMap } from '../worlds/pageMap';
 import { buildSeedwells } from '../worlds/seedwells';
@@ -301,11 +301,7 @@ export async function runOpening(): Promise<void> {
   // the Ash Warden, always one step ahead (DESIGN-worlds.md story)
   const warden = buildWarden(ctx, progress);
   ctx.onUpdate((dt) => warden.update(dt));
-  buildSeedwells(scene, progress, [
-    { world: 'russetvale', x: -4, z: 77.5, y: groundH(-4, 77.5) },
-    { world: 'ashwater', x: 3, z: 93, y: groundH(3, 93) },
-    { world: 'press', x: -5, z: 95.2, y: groundH(-5, 95.2) },
-  ]);
+  buildSeedwells(scene, progress, SEEDWELLS.map((w) => ({ ...w, y: groundH(w.x, w.z) })));
   // re-entry from a save: a restored first level rebuilds its world state (the page is home, the well lit), so the
   // open Ashwater arch never sits beside a page that is still running away
   if (progress.isRestored('russetvale', 'teach') && !homecoming.isPinned()) homecoming.force();

@@ -6,18 +6,13 @@
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import { WELL } from './layout';
-import { ashwaterE, outward, pressE, WORLDS, worldAt, type WorldId } from './worlds';
+import { ashwaterE, HUB_ARCHES, hubArrival, outward, pressE, RETURN_ARCH_BACK, WORLDS, worldAt, type WorldId } from './worlds';
 import { rng, toon } from '../lookdevKit';
 import { bakeCells } from './bake';
 import { box, C, cyl, Kit } from './village';
 
 type Arch = { x: number; z: number; nx: number; nz: number; to: WorldId; open: () => boolean; glow: THREE.Mesh };
 
-/** hub arches: walk through (along the arch's normal, within its posts) to travel */
-export const HUB_ARCHES: ReadonlyArray<{ to: WorldId; x: number; z: number }> = [
-  { to: 'ashwater', x: -2, z: 91 },
-  { to: 'press', x: -10.5, z: 92.6 },
-];
 
 const ARCH_COLOR: Record<WorldId, number> = { russetvale: 0xc8622e, ashwater: 0x3f7f8c, press: 0xe8e6e0 };
 
@@ -154,7 +149,7 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
   for (const id of ['ashwater', 'press'] as const) {
     const w = WORLDS[id];
     const o = outward(id === 'ashwater' ? ashwaterE : pressE, w.spawn);
-    addArch(w.spawn.x + o.x * 3, w.spawn.z + o.z * 3, o.x, o.z, 'russetvale', () => true);
+    addArch(w.spawn.x + o.x * RETURN_ARCH_BACK, w.spawn.z + o.z * RETURN_ARCH_BACK, o.x, o.z, 'russetvale', () => true);
   }
 
   // Ashwater Reach's ground, water and puzzle are Cedar's (ashwater.ts); this module gives it the rain and sky
@@ -254,11 +249,7 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
      * the other arch's lintel and the return lens filled with timber — Reed's world-tour stills).
      */
     hubArrival(from: WorldId): { x: number; z: number; yaw: number } {
-      const a = HUB_ARCHES.find((h) => h.to === from) ?? HUB_ARCHES[0]!;
-      const dx = a.x - WELL.x;
-      const dz = a.z - WELL.z;
-      const l = Math.hypot(dx, dz);
-      return { x: a.x - (dx / l) * 2.6, z: a.z - (dz / l) * 2.6, yaw: Math.atan2(-dx, -dz) };
+      return hubArrival(from, WELL);
     },
     /** the paper wash rides on the lens */
     attach(camera: THREE.Camera): void {
