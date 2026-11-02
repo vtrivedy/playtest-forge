@@ -100,7 +100,9 @@ export function buildWeir(ctx: OpeningCtx) {
   colliders.push({ kind: 'box', x: R.x, z: R.z, yaw: R.yaw, hx: R.half, hz: R.half, top: R.top });
   // taller columns behind (north): the shelf backs onto the rim, never a climb
   for (const [lx, lz, r, h] of [[-3.6, -4.8, 2.1, 3.2], [0.6, -5.2, 2.3, 4.1], [4.2, -4.4, 1.9, 2.6]] as const) {
-    root.add(column(rand, lx, lz, r, g0 - 2, R.top + h, h < 3.5));
+    const back = column(rand, lx, lz, r, g0 - 2, R.top + h, h < 3.5);
+    root.add(back);
+    ctx.occluders.push(back);
     const c = Math.cos(R.yaw);
     const s = Math.sin(R.yaw);
     colliders.push({ kind: 'post', x: R.x + lx * c + lz * s, z: R.z - lx * s + lz * c, r: r * 0.95 });

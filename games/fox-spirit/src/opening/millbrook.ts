@@ -182,8 +182,12 @@ function buildLane(ctx: OpeningCtx, background: THREE.Object3D[]): void {
   // waymark at the lane mouth: a standing stone with the mill wheel scratched on it
   const [wx, wz] = [-62.0, 90.2];
   const wy = groundH(wx, wz);
-  k.add(hewn(box(0.55, 1.5, 0.32), rand, 0.06), C.stoneField, [wx, wy + 0.65, wz], [0.05, -0.5, 0.04], 0.022);
-  k.add(cyl(0.2, 0.2, 0.05, 10, 'z'), C.stoneDark, [wx - 0.07, wy + 1.0, wz + 0.15], [0, -0.5, 0]);
+  const wk = new Kit();
+  wk.add(hewn(box(0.55, 1.5, 0.32), rand, 0.06), C.stoneField, [wx, wy + 0.65, wz], [0.05, -0.5, 0.04], 0.022);
+  wk.add(cyl(0.2, 0.2, 0.05, 10, 'z'), C.stoneDark, [wx - 0.07, wy + 1.0, wz + 0.15], [0, -0.5, 0]);
+  const waymark = wk.build();
+  ctx.scene.add(waymark);
+  ctx.occluders.push(waymark);
   ctx.colliders.push({ kind: 'post', x: wx, z: wz, r: 0.4 });
   background.push(k.build());
 }
