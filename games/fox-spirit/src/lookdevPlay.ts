@@ -655,6 +655,9 @@ export function createPlay(opts: {
   }
 
   /** horizontal move with step / wall blocking, per axis so the fox slides along walls */
+  /** a round post (trunk, pillar) right ahead: the only blocker the slide steers round — boxes (walls, the ruin's folds)
+   *  keep their authored stops, and scripted routes that lean on them stay exact */
+  const postAhead = (x: number, z: number) => opts.colliders.some((c) => c.kind === 'post' && Math.hypot(x - c.x, z - c.z) < c.r + 0.3);
   /** last side the fox slid round a blocker on (+1 left / −1 right), so it doesn't dither between sides */
   let slideSide = 1;
   function moveTo(nx: number, nz: number, feetY: number) {
@@ -675,8 +678,9 @@ export function createPlay(opts: {
     // 30° then 60° to either side (last side first), probing ahead along the turned step, never through the blocker
     const x0 = nx - dx;
     const z0 = nz - dz;
-    // only while the player is steering at walk/run pace: momentum (post-dash skid, coasting) still stops dead at a blocker
-    if (P.slide && dashT <= 0 && wish.lengthSq() > 0.01 && speed <= P.runSpeed * 1.05 && grounded && len > 1e-5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5) {
+    // only round posts, while the player is steering at walk/run pace INTO them (wish agrees with the step): momentum
+    // (post-dash skid, coasting, turning round) and walls/boxes still stop dead
+    if (P.slide && dashT <= 0 && wish.lengthSq() > 0.01 && speed <= P.runSpeed * 1.05 && grounded && len > 1e-5 && (wish.x * dx + wish.y * dz) / (wish.length() * len) > 0.5 && Math.hypot(pos.x - x0, pos.z - z0) < len * 0.5 && postAhead(x0 + dx / len * 0.28, z0 + dz / len * 0.28)) {
       {
         for (const a of [0.52, 1.05, 1.4]) {
           for (const side of [slideSide, -slideSide]) {
