@@ -18,6 +18,7 @@ const clipTo = Number(arg('clip-to', '999'));
 const fps = Number(arg('fps', '30'));
 const [width, height] = arg('size', '480x270').split('x').map(Number);
 fs.mkdirSync(`${out}/frames`, { recursive: true });
+fs.writeFileSync(`${out}/trace.partial.jsonl`, '');
 const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const server = production
   ? await preview({ configFile: 'games/fox-spirit/vite.config.ts', preview: { port: 5211, host: '127.0.0.1', strictPort: true }, logLevel: 'error' })
@@ -35,7 +36,7 @@ try {
   await page.evaluate(({ source, start, tape }) => {
     const h = window.__gameHooks;
     h.setManual(true); h.teleport(start.x, start.z, start.yaw);
-    window.__pageProbe = { route: new Function(`return (${source})`)()(), state: h.advance(60, 1 / 60, false), f: 0, trace: [], tape, mismatches: [], keptStart: null, visual: [] };
+    window.__pageProbe = { route: new Function(`return (${source})`)()(), state: h.advance(60, 1 / 60, false), f: 0, trace: [], tape, mismatches: [], keptStart: null, visual: [], sent: 0 };
   }, { source: createSliceRoute.toString(), start: SLICE_START, tape: replay?.trace ?? null });
   let image = 0, lastBeat = '', done = false;
   while (!done) {
@@ -44,6 +45,7 @@ try {
       let shot = false, beat = '';
       for (let i = 0; i < 60 && p.f * dt < seconds; i++) {
         const expected = p.tape?.[p.f];
+        if (p.tape && !expected) throw new Error(`Replay tape ended at frame ${p.f}`);
         const input = expected?.input ?? p.route(p.f * dt, p.state);
         h.setStick(input.x, input.z); h.setKeys([...(input.jump ? ['Space'] : []), ...(input.dash ? ['ShiftLeft'] : [])]);
         const capture = frames && p.f * dt >= clipFrom && p.f * dt < clipTo && (input.beat === 'the page bolts' || input.beat === 'it flings away' || input.beat === 'leap to the overlook' || input.beat === 'catch it on the overlook' || input.beat === 'the page opens' || input.beat === 'colour rolls out');
@@ -71,15 +73,29 @@ try {
         p.trace.push({ frame: p.f++, input, pos: s.pos, vel: s.vel, grounded: s.grounded, dashesUsed: s.dashesUsed, lastJump: s.lastJump, lastDashDistance: s.lastDashDistance, camera: s.camera, opening: { page: s.opening.page } }); beat = input.beat;
         if (shot) break;
       }
-      return { done: p.f * dt >= seconds, shot, beat, t: p.f * dt, catches: p.state.opening.page.catches };
+      const records = p.trace.slice(p.sent); p.sent = p.trace.length;
+      return { done: p.f * dt >= seconds, shot, beat, t: p.f * dt, catches: p.state.opening.page.catches, state: p.state, records };
     }, { dt, seconds, frames, clipFrom, clipTo, fps });
+    fs.appendFileSync(`${out}/trace.partial.jsonl`, r.records.map(row => JSON.stringify(row)).join('\n') + '\n');
+    fs.writeFileSync(`${out}/checkpoint.tmp`, JSON.stringify({ complete: false, sha, dt, production, images: image, seconds: r.t, state: r.state }));
+    fs.renameSync(`${out}/checkpoint.tmp`, `${out}/checkpoint.json`);
     if (r.beat !== lastBeat) { console.log(r.t.toFixed(2), r.beat, r.catches); lastBeat = r.beat; }
     if (r.shot) await page.screenshot({ path: `${out}/frames/f${String(image++).padStart(5, '0')}.jpg`, type: 'jpeg', quality: 88 });
     done = r.done;
   }
   const evidence = await page.evaluate(() => ({ trace: window.__pageProbe.trace, keptStart: window.__pageProbe.keptStart, visual: window.__pageProbe.visual, mismatches: window.__pageProbe.mismatches, game: { mode: window.__game.mode, state: window.__game.state() } }));
-  const checks = { revealFramed: evidence.visual.every(s => s.inFrame), returnedHome: seconds < 80 || evidence.game.state.opening.homecoming.pinned === true, deterministicReplay: !replay || evidence.mismatches.length === 0, catches: evidence.game.state.opening.page.catches === 3, kept: evidence.game.state.opening.page.phase === 'kept', noErrors: !errors.length, finite: evidence.trace.every(s => s.pos.every(Number.isFinite)) };
-  fs.writeFileSync(`${out}/evidence.json`, JSON.stringify({ sha, dt, runtime: production ? 'vite-production-preview' : 'vite-dev', replay: replayPath || null, staging: 'Initial wake position only; game input route; no forced catches or midroute teleport.', frames: image, errors, checks, ...evidence }, null, 2));
+  const checks = {
+    catches: evidence.game.state.opening.page.catches === 3,
+    kept: evidence.game.state.opening.page.phase === 'kept',
+    noErrors: !errors.length,
+    finite: evidence.trace.every(s => s.pos.every(Number.isFinite) && s.opening.page.pos.every(Number.isFinite) && Number.isFinite(s.opening.page.yaw)),
+  };
+  if (seconds >= 80) checks.returnedHome = evidence.game.state.opening.homecoming.pinned === true;
+  if (replay) checks.deterministicReplay = evidence.mismatches.length === 0;
+  if (evidence.visual.length) checks.revealFramed = evidence.visual.every(s => s.inFrame);
+  fs.writeFileSync(`${out}/evidence.tmp`, JSON.stringify({ sha, dt, runtime: production ? 'vite-production-preview' : 'vite-dev', replay: replayPath || null, staging: 'Initial wake position only; game input route; no forced catches or midroute teleport.', frames: image, errors, checks, ...evidence }, null, 2));
+  fs.renameSync(`${out}/evidence.tmp`, `${out}/evidence.json`);
+  fs.renameSync(`${out}/trace.partial.jsonl`, `${out}/trace.jsonl`);
   await page.evaluate(() => window.__gameHooks.advance(0, 0, true));
   await page.screenshot({ path: `${out}/final.png` });
   if (variants) {
@@ -108,6 +124,8 @@ try {
     fs.writeFileSync(`${out}/variants.json`, JSON.stringify(reports,null,2));
     console.log(JSON.stringify(reports));
   }
+  fs.writeFileSync(`${out}/checkpoint.tmp`, JSON.stringify({ complete: true, sha, dt, production, images: image, seconds, checks }));
+  fs.renameSync(`${out}/checkpoint.tmp`, `${out}/checkpoint.json`);
   console.log(JSON.stringify(checks));
   if (Object.values(checks).some(v => !v)) process.exitCode = 1;
 } finally { await browser.close(); if (production) await new Promise(resolve => server.httpServer.close(resolve)); else await server.close(); }

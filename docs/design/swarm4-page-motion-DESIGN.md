@@ -1,19 +1,37 @@
-# Runaway page — stable motion and deterministic pursuit
+# Runaway page — stable motion and a readable release
 
-The page should feel like a single loose sheet: readable folds, a deliberate turn, a continuous catch arc, then an unhurried release. No extra input or collection mechanic.
+The page should feel like one loose sheet: readable folds, a deliberate turn, a continuous catch arc, then an unhurried release. Preserve the existing three-stage pursuit and move/jump/dash controls.
 
-First preserve the three catches / staged pursuit state machine. TLC `games/fox-spirit/tla/RunawayPage` checks catch accounting, absorbing kept state, and eventual completion under fair catch/fling actions. Continuous movement and camera composition still require actual play.
+## Final release
 
-Review the current chase/catch/rise continuously before tuning. Eliminate per-frame temporary allocations and nondeterministic dodge choices; migrate touched runtime to `page.hot.ts`. A syntax-tree regression gate will reject allocations in the registered frame callback and its local helpers, including nested callbacks. Constructors and vectors belong in build setup. Add failing fixtures proving the guard catches the old fleck loop and map/filter perch selection.
+Anchor xz at the page's catch location and y at its walkable perch. Ease from the caught pose into a small float (+1.05m → +1.2m), opening from1x to1.25x. Keep the existing4.5s fade and spreading world paint. A radial alpha falloff softens the amber halo. The player can land or turn without dragging the expanding sheet.
 
-Catch trajectories must keep their initial momentum, damp heading, and open folds without snapping. Any changed rise target must follow a continuous smoothed path, so a landing or sharp player movement does not shake the enlarging sheet. Preserve reach, three-stage progression, and player feel parameters unless a played failure requires a change.
+Baseline f866379 enlarged the page5x and raised it5.4m over the moving fox, leaving the chase view before its release finished. A first smaller fox-anchored attempt still brought the sheet too close to the lens after landing. Anchor the reveal at the sheet, then keep the entire outline visible.
 
-Acceptance: named SHA, continuous chase/catch/rise clip with frame trace and `window.__game`; 60Hz and 50ms trigger replay; screenshots reviewed for hero/page readability; retest after the largest issue is fixed. tsc, vite, lint:feel, TLC green. No claim that formal verification proves motion quality.
+Production variants on1f4b805 (release+2s, page-catch anchor):
 
-Baseline visual review (f866379): full input route catches all three pages with zero skips, but the final page grows to 5x and rises 5.4m over the moving fox; it leaves the chase frame before the release finishes. The revised release anchors at the catch-time fox pose, rises from +1.25m to +1.7m, and opens to 1.8x. This keeps the intimate sheet readable while the spreading paint provides the broad payoff. Recheck the full catch/landing/release sequence, rather than accepting a still of the final empty platform.
+| Variant | Height above perch | Scale | Projected top (NDC) | Result |
+| --- | --- | --- | --- | --- |
+| Low/wide |1.0m|1.4x|.697|Fits; lower edge approaches ears|
+| Middle |1.2m|1.25x|.794|Chosen: readable with space above fox|
+| High/small |1.35m|1.15x|.875|Fits; less top margin|
 
-## Production verification follow-up
+These stills select composition; the final continuous catch/landing/release must pass projected bounds throughout, not only at the held pose.
 
-A production build must contain the fox it displays. Source inspection found that `loadHearthFox` hardcodes a `/assets/` URL served only by Vite's dev middleware; no GLB is present in `dist/fox-spirit`. Migrate runtime model/texture URLs to Vite `?url` imports, add a guard rejecting new dev-only loader literals, then run the page motion capture against `vite.preview` (production output). This is packaging, with no state-machine change; use the already checked page model unchanged. Keep legacy alternate game mode assets bundled too so fixing default boot does not silently leave the same failure elsewhere.
+## Runtime contract
 
-Production variants (`1f4b805`) compare page-catch xz anchors at: low/wide +1.0m/1.4x, middle +1.2m/1.25x, high/small +1.35m/1.15x. All three fit the sheet at release+2s; the middle keeps a gap above the fox while leaving more top margin than high/small (projected y-max .794 versus .875). Choose middle: anchor xz at page catch; y at the walkable perch; settle from +1.05m to +1.2m; scale to1.25x. The source fox-anchor candidate remained cropped and is rejected. Replace the hard rectangular additive backing with a radial alpha falloff, so the reveal reads as loose paper with warmth rather than two stacked cards.
+Touched runtime lives in `page.hot.ts`. Allocate fleck matrices/quaternions/Eulers/scales and the three paint washes during build. Select the next perch with a scalar loop. Clamp expired particle scales to zero. Read a live `player.motion` scalar view, never the allocating diagnostic `state()` snapshot. Reuse one page voice view for audio.
+
+Gameplay dodge and cosmetic fleck RNG use separate seeded streams. Cosmetic density must not change the next dodge. `?manual=1` prevents a variable startup rAF step before capture tools take control. This bounds repeatability to the page/player replay; it does not promise that every unrelated ambient system is deterministic.
+
+`lint:feel` traverses hot frame/update/tick/process callbacks and called local helpers, including AudioWorklet methods. It rejects explicit allocations, allocating collection methods, unseeded random, diagnostic snapshots, fixed frame dt, bare atan2 heading assignments, and unclamped particle lifetime scales. Setup allocations and cold diagnostics remain allowed. Negative fixtures run with every lint invocation.
+
+## State and packaging checks
+
+TLC `games/fox-spirit/tla/RunawayPage` checks catch accounting, absorbing kept state, and eventual completion under fair catch/fling actions. Negative kept-after-one invariant must fail. Continuous movement, timing/reach geometry and camera composition require actual play.
+
+Runtime models and textures use Vite `?url` imports. The old dev-only `/assets/` middleware hid absent production GLBs; the production output must contain the fox it displays. A source guard rejects new absolute `/assets/` literals in game code. Existing asset provenance remains in `assets/LICENSES.md` and `assets/library/CREDITS.md`.
+
+## Acceptance
+
+Named SHA; full input-driven production chase/return; continuous catch/release clip and screenshots; `window.__game`; 60Hz and50ms trigger replay; exact tape comparison; projected visible-sheet bounds; tsc/vite/lint/TLC green. Record limits: initial wake spot staged, offline fixed-step render, no real-time performance or audio verdict from these clips.

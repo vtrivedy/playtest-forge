@@ -1,4 +1,4 @@
-Baseline f866379 treated as a hot module: 19 findings.
+Baseline f866379 treated as a hot module: 20 findings.
 
 pre-fix-page.hot.ts:214  [no-diagnostic-snapshot-in-hot] state() is a cold diagnostic snapshot; read a reusable live scalar view in frame code
     const st = player.state() as { dashing?: boolean; grounded?: boolean };
@@ -38,3 +38,5 @@ pre-fix-page.hot.ts:406  [no-alloc-in-hot] allocate during build setup, never in
     const sc = new THREE.Vector3();
 pre-fix-page.hot.ts:413  [no-alloc-in-hot] allocate during build setup, never inside a frame callback or its local helpers
     q.setFromEuler(new THREE.Euler(f.age * 5, f.age * 3, 0));
+pre-fix-page.hot.ts:414  [no-unclamped-lifetime-scale] a particle can expire during this step; clamp lifetime scale to zero before applying it
+    sc.setScalar(1 - f.age / f.life);
