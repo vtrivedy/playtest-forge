@@ -186,6 +186,14 @@ export async function runOpening(): Promise<void> {
   keeping.onSettled(() => {
     settledAt = time;
     hum.swell();
+    ctx.captions.say('The tree finished falling, at last.');
+  });
+  // the Album's story in a few lines (DESIGN-finale.md captions): the runaway page is the first hint whose book it is
+  let pageSaid = false;
+  ctx.onUpdate(() => {
+    if (pageSaid || !runaway.settled()) return;
+    pageSaid = true;
+    ctx.captions.say("A page escaped the Scribe's Album.");
   });
   // the finale (DESIGN-finale.md): warmth set in the Scribe's Press cradle once the Keeping has settled
   const finale = await buildFinale(ctx, {

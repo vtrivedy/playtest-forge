@@ -20,7 +20,7 @@ Past the Hearthtree bridge the far crag looks down the vista gap at the Still Cr
 5. **Released** (~6 s): pages peel off in a spiral and fly up the valley toward the Crown, turning to leaves; the Crown (crown.ts) lets go of everything — a long leaf river over the horizon. Three pages drift down and unpress into fox kits.
 6. **Snow:** the first snow begins everywhere, soft and slow; the light warms around the cradle. The kits trot to the cradle and curl up round it.
 
-Album captions (≤ 6 words, the slice's only words): unbinding — *The Scribe pressed the autumn shut*; release — *so it would never end.*; snow — *Let the year turn.* The sequence plays wide (a camera path rises behind the ember to frame Press, Album and Crown; any input after 5 s takes it back).
+Album captions (≤ 6 words, the slice's only words; `ctx.captions.say`), the whole arc: page kept — *A page escaped the Scribe's Album.*; Hearthtree settles — *The tree finished falling, at last.*; the Hermitage desk (Bramble) — *Here the Scribe kept every autumn*; unbinding — *The Scribe pressed the autumn shut*; release — *so it would never end.*; snow — *Let the year turn.* The sequence plays wide (a camera path rises behind the ember to frame Press, Album and Crown; any input after 5 s takes it back).
 
 7. **Rest:** when the fox stands still by the cradle (or after a grace timeout, so it's never missed), the camera eases out to a held composition — fox, kits, ember, the open Album, the bare Crown in snow — and a title card fades: *The Keeping*. It fades, play continues in the snow.
 
