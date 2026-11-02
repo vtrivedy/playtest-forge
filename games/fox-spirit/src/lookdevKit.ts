@@ -133,7 +133,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             // bleed outward so the world visibly warms; no hard island edge). Ground level only.
             float bl = uRestoreBleed[i];
             if (bl > 0.0) {
-              float hd = d + (lkFbm(xz * 0.21 + 5.3) - 0.5) * bl * 0.6;
+              float hd = d + (lkNoise(xz * 0.17 + float(i) * 3.1) - 0.5) * bl * 0.6;
               soft = max(soft, (1.0 - smoothstep(-0.2 * bl, bl, hd)) * (1.0 - step(0.2, lift)));
             }
             // pigment pools in a dark line just inside the front; water pushes a pale paper bloom ahead of it
