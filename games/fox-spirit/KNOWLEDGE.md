@@ -586,3 +586,17 @@ Review timed UI overlays in motion: a bottom-center teaching card covered the fo
 
 - `tools/complete-journey-route.mjs` composes the canonical wake-to-Keeping journey with the same finale factory in bridge-start mode; it stays transferable with `toString()`. Production `56d2469` completes all 13 checks at 30 Hz with one initial wake placement and no later teleports or forced progression: homecoming at 73.033 s, final placement at 180.467 s, first title sample at 209 s, title done at 222 s. Use 230 s for a full ending capture; 160 s is the shorter Keeping showcase. The original opening regression intentionally holds forever at homecoming.
 - Bowl-center waypoints are not pickup positions: stop when Carry reports `canPickup`. Press placement must be within the authored 1.6 m bowl reach; the tested approach target (21.0, 40.7) with a 0.15 m stop radius snaps warmth into the cradle. A point 1.65 m out silently places on the ground and leaves the finale sealed. Review/state/evidence: `docs/reviews/swarm4/finale-journey/`. This authored offline route does not prove unaided discovery or fix the external GPU recorder.
+
+## Recorder boundary investigation — Reed, swarm5
+
+- b4fa63a review reports 21 isolated native GPU MediaRecorder flashes. Existing
+  software staging probes and synchronous canvas scans do not establish the GPU
+  cause. Keep this issue open until matched hardware recordings reproduce it.
+- `tools/check-black-frames.py` scans decoded frames with actual PTS, including
+  VFR clips, and fails even one near-black frame. The bright / single-flash /
+  blank negative controls are `python3 tools/tests/black-frame-gate.py` (ffmpeg
+  required, imageio-ffmpeg optional fallback). Existing fixed-clock hub gate stays
+  valid; this diagnostic handles real-time VFR recordings.
+- RecorderBoundary.tla checks synchronous render→copy→publish ordering (11 states).
+  RecorderBoundaryBad.cfg deliberately permits discard before copy and fails
+  NoBlackPublication. It proves ordering only, not GPU/browser correctness.
