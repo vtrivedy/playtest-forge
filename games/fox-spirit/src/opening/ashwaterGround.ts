@@ -7,6 +7,7 @@ export function buildAshwaterPuddles(terrain: THREE.BufferGeometry): THREE.Mesh 
   const pos = terrain.getAttribute('position');
   const index = terrain.index!;
   const vertices: number[] = [];
+  const colors: number[] = [];
   type Point = { x: number; y: number; z: number };
   for (let i = 0; i < index.count; i += 3) {
     const triangle: Point[] = [];
@@ -32,15 +33,19 @@ export function buildAshwaterPuddles(terrain: THREE.BufferGeometry): THREE.Mesh 
       }
     }
     for (let k = 1; k + 1 < clipped.length; k++) {
-      for (const p of [clipped[0], clipped[k], clipped[k + 1]]) vertices.push(p.x, surface + 0.004, p.z);
+      for (const p of [clipped[0], clipped[k], clipped[k + 1]]) {
+        vertices.push(p.x, surface + 0.004, p.z);
+        colors.push(1, 1, 1, THREE.MathUtils.smoothstep(surface - p.y, 0, 0.07));
+      }
     }
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
   geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-    color: 0x405b59, roughness: 0.24, metalness: 0.12,
-    transparent: true, opacity: 0.76,
+    color: 0x708781, roughness: 0.24, metalness: 0.04,
+    vertexColors: true, transparent: true, opacity: 0.76,
   }));
   mesh.name = 'ashwater-rain-puddles';
   mesh.position.set(ASH_ORIGIN.x, 0, ASH_ORIGIN.z);

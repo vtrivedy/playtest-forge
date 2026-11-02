@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 const args = process.argv.slice(2);
 const out = path.resolve(args[0] && !args[0].startsWith('--') ? args[0] : '/tmp/ashwater-probe');
 const frames = args.includes('--frames');
+const marshClip = args.includes('--marsh-clip');
 const pressRoute = args.includes('--press-route');
 const entryTour = args.includes('--entry-tour') || pressRoute;
 let tourPassed = false;
@@ -112,6 +113,22 @@ try {
   if((await state()).hooks.opening.worlds.active!=='ashwater')throw Error('Hub arch did not enter Ashwater');
   if((await state()).game.opening.teach.showing==='Follow the warm light home')throw Error('Autumn hint leaked into Ashwater');
   await shot('00-landing');
+  if (marshClip) {
+    // Continuous walking review after physical hub arrival, before the puzzle route.
+    // 6 simulated seconds at 12 fps; input only, no placement or progress setters.
+    for (let f = 0; f < 72; f++) {
+      await page.evaluate(f => {
+        const h = window.__gameHooks;
+        h.setStick(f < 36 ? 0.45 : -0.45, 0.15);
+        h.setKeys([]);
+        h.advance(5, 1 / 60, true);
+      }, f);
+      await page.screenshot({path: path.join(out, `marsh-${String(f).padStart(4,'0')}.jpg`), type:'jpeg', quality:85});
+    }
+    await shot('00-marsh-walk');
+    await go(0,-46,{max:900});
+    await settle(60);
+  }
   if (entryTour) {
     const expectWorld = async (world, travels, name) => {
       await settle(150);
@@ -217,6 +234,7 @@ try {
 } finally {
   const last = log.length ? log[log.length - 1][1] : null;
   fs.writeFileSync(path.join(out, 'log.json'), JSON.stringify({ commit, provenance:"Fresh boot; rendered invitation follower then movement only; no teleport or progress setters", log, errors, pass: errors.length===0 && !!last && (entryTour ? tourPassed : last.ash.done.length === 3) }, null, 1));
+  if (marshClip) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '12', '-i', path.join(out, 'marsh-%04d.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'marsh-walk.mp4')]);
   if (frames && fi > 0) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '6', '-i', path.join(out, 'f%04d.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'route.mp4')]);
   console.log(JSON.stringify({ errors, last:last?{pos:last.pos,ash:last.ash}:null }, null, 1));
   process.exitCode=errors.length===0 && (entryTour ? tourPassed : last?.ash.done.length===3) ? 0 : 1;
