@@ -2,9 +2,10 @@
 // node tools/camera-drop-probe.mjs <out> [fallLag=0.07] [seconds=62] [port=5198] [--clip|--encode-only]
 // Motion window: --clip --clip-from 64 --clip-seconds 6
 // Optional: --dt 0.03333333333333333 --stills-at 65,72,80,89 --clip-beat 'unfold the way home' --clip-seconds 6 --size 640x360
+// Region route: --route-module tools/REGION-route.mjs --check-from 1 (exports createSliceRoute and SLICE_START).
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
-import { createSliceRoute, SLICE_START } from './opening-hero-route.mjs';
+import { pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -17,6 +18,11 @@ const missOverlook = process.argv.includes('--miss-overlook');
 const sparseStills = process.argv.includes('--sparse-stills');
 const checkSilhouette = process.argv.includes('--check-silhouette');
 const option = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
+const routeModule = path.resolve(option('route-module', 'tools/opening-hero-route.mjs'));
+const { createSliceRoute, SLICE_START } = await import(pathToFileURL(routeModule).href);
+if (typeof createSliceRoute !== 'function' || !SLICE_START || ![SLICE_START.x, SLICE_START.z, SLICE_START.yaw].every(Number.isFinite)) throw Error('Route module must export createSliceRoute and finite SLICE_START x/z/yaw');
+const checkFrom = Number(option('check-from', '60'));
+if (!Number.isFinite(checkFrom) || checkFrom < 0 || checkFrom >= seconds) throw Error('check-from must be nonnegative and less than seconds');
 const clipBeat = option('clip-beat', 'off the canopy');
 const clipSeconds = Number(option('clip-seconds', '3'));
 const clipFrom = option('clip-from', '') === '' ? null : Number(option('clip-from', ''));
@@ -78,7 +84,7 @@ try {
         const clipFrame=clip&&p.clipStart>=0&&f-p.clipStart<clipFrames&&(f-p.clipStart)%2===0;
         p.beat=input.beat;
         h.setStick(input.x,input.z);
-        h.setKeys([...(input.jump?['Space']:[]),...(input.dash?['ShiftLeft']:[])]);
+        h.setKeys([...(input.jump?['Space']:[]),...(input.dash?['ShiftLeft']:[]),...(input.interact?['KeyE']:[])]);
         const s=h.advance(1,testDt,shot||clipFrame);
         const lensPitch=-Math.asin(c.getWorldDirection(c.position.clone()).y)*180/Math.PI;
         p.state=s;
@@ -123,13 +129,13 @@ try {
   }
   const evidence=await page.evaluate(()=>({trace:window.__cameraProbe.trace,silhouette:window.__cameraProbe.silhouette,cameraTunables:{...window.__gameHooks.camera},game:{mode:window.__game.mode,state:window.__game.state()}}));
   const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
-  const late = evidence.trace.filter(s => s.f * testDt >= 60);
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({...evidence,errors,fallLag,minDistance,missOverlook,testDt,seconds,sha,routeModule:path.relative(process.cwd(),routeModule),checkFrom,staging:'one start teleport; controller input thereafter',clipBeat,clipFrom,clipSeconds,viewport:[width,height]},null,2));
+  const late = evidence.trace.filter(s => s.f * testDt >= checkFrom);
   if (late.length) {
     const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));
     const maxPitch = Math.max(...late.map(s => Math.abs(s.lensPitch)));
     const maxStepSpeed = Math.max(0, ...late.slice(1).map((s, i) => Math.hypot(...s.camera.pos.map((v, axis) => v - late[i].camera.pos[axis])) / testDt));
-    const cameraCheck = { fromSeconds: 60, minChestDistance, maxPitch, maxStepSpeed, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && !errors.length };
+    const cameraCheck = { fromSeconds: checkFrom, minChestDistance, maxPitch, maxStepSpeed, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && !errors.length };
     fs.writeFileSync(path.join(out, 'camera-check.json'), JSON.stringify(cameraCheck, null, 2));
     console.log('CAMERA', JSON.stringify(cameraCheck));
     if (process.argv.includes('--check-camera') && !cameraCheck.pass) process.exitCode = 1;
