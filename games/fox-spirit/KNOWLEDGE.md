@@ -486,3 +486,13 @@ A clear destination is not a clear connecting segment. Full staged finale route 
 - Paint restores each need a shader slot (`RESTORE_SLOTS`, now 24; `uRestore` loop breaks at the count).
   With page (4) + Keeping (3) + homecoming + ruin + finale (2) + Millbrook/Hermitage (5) the old 16 was
   exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.
+- Input-route verification of the new places: `node tools/millbrook-walk.mjs --route millbrook|hermitage|grand
+  [--from lane|mill|kiln] --every N --size WxH` (stick/Shift/Space only; teleport at start). It records beats,
+  stuck spans (no progress >3 s), final `__game` state and fox legibility from `__gameHooks.foxScreenPx()`
+  (the one shared definition). Scripted routes steering straight into a concave corner (porch post + wall)
+  pin forever — waypoint round it rather than reshaping the world. Acceptance on main 671a290: 0 stuck,
+  all states true, fox ≥36 px @360p. Evidence `/captures/bramble/grand-671a290/`.
+- Waypoints inside a collider's footprint look like "stuck" in the log; check the target against box/post
+  colliders first (the mill box swallowed a "round the mill" waypoint; the lookout plateau rim is >1.3 m/m).
+- Render clips from a pinned `git worktree` (with node_modules symlinked) so /work stays editable — editing
+  src under a running Vite probe reloads it (HMR) and invalidates the run.
