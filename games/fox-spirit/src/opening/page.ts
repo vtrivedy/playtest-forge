@@ -154,6 +154,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   let hopTo = 0;
   let wasDashing = false;
   let wasGrounded = true;
+  const foxPrev = new THREE.Vector3();
+  const sweep = new THREE.Vector3();
+  let foxSeen = false;
   /** sideways jink offset (world xz), eased back to the flight line */
   const side = new THREE.Vector3();
   /** jink goal: the offset eases toward it (never steps), and the goal itself relaxes back to the line */
@@ -210,6 +213,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     if (!player) return;
     const st = player.state() as { dashing?: boolean; grounded?: boolean };
     const fox = ctx.fox.root.position;
+    if (!foxSeen) foxPrev.copy(fox);
+    foxSeen = true;
     prev.copy(pos);
     const d = Math.hypot(fox.x - pos.x, fox.z - pos.z);
     const dy = pos.y - fox.y;
@@ -217,6 +222,8 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     wasDashing = !!st.dashing;
     // in the high stages a spring/jump toward it is the lunge it watches for
     const launchStart = !st.grounded && wasGrounded;
+    // airborne at either end of this step: a long frame can carry a leap through the page and onto the ground
+    const aloft = !st.grounded || !wasGrounded;
     wasGrounded = !!st.grounded;
     windedT = Math.max(0, windedT - dt);
     if ((phase === 'perched' || phase === 'fleeing') && dashStart && windedT <= 0 && d > TUNE.dodgeFrom[stage]! && d < TUNE.dodgeTo) {
@@ -233,7 +240,18 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       for (let i = 0; i < 8; i++) emit(pos, 0.9, 1.6);
     }
     if (phase === 'perched' || phase === 'fleeing') {
-      const pounce = !(TUNE.hop[stage] && phase === 'fleeing') && (st.dashing || !st.grounded) && d < TUNE.reach && dy > -0.4 && dy < TUNE.reachY;
+      // swept: the closest the fox came to the page along this step's path (a 50 ms frame moves a leaping fox
+      // ~0.4 m, enough to pass through the reach between two samples)
+      sweep.subVectors(fox, foxPrev);
+      // (a teleport is not a path)
+      const k = sweep.lengthSq() > 1e-8 && sweep.lengthSq() < 9 ? THREE.MathUtils.clamp(tmp.subVectors(pos, foxPrev).dot(sweep) / sweep.lengthSq(), 0, 1) : 1;
+      tmp.copy(foxPrev).addScaledVector(sweep, k);
+      const sd = Math.hypot(tmp.x - pos.x, tmp.z - pos.z);
+      const sdy = pos.y - tmp.y;
+      // a sagging (winded) page on a high perch is a little easier to reach: landing just short of it still counts
+      const reach = TUNE.reach * (TUNE.hop[stage] && windedT > 0 ? 1.2 : 1);
+      const near = (d < reach && dy > -0.4 && dy < TUNE.reachY) || (sd < reach && sdy > -0.4 && sdy < TUNE.reachY);
+      const pounce = !(TUNE.hop[stage] && phase === 'fleeing') && (st.dashing || aloft) && near;
       if (pounce) caught();
       else if (d < 1.1 && st.grounded && t - lastSkip > 0.7) {
         lastSkip = t;
@@ -246,6 +264,9 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     }
     // high stages: a leap at it from the next leaf startles it — it jerks up, then sags winded on the same perch,
     // so landing beneath it and springing straight up is the catch; dawdle under it and it flits to the other perch
+    // already sagging when the fox leaps at it: it stays winded through that leap (it used to run out mid-air and bolt
+    // from under a fox about to land beneath it — a real-time frame rate made that the common case)
+    if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 4.6 && windedT > 0) windedT = Math.max(windedT, TUNE.hopRest);
     if (TUNE.hop[stage] && phase === 'perched' && launchStart && d < 4.6 && windedT <= 0) {
       windedT = TUNE.hopRest + 0.6;
       dodges++;
@@ -394,6 +415,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
       flecks.setMatrixAt(n++, m.compose(f.p, q, sc));
     }
     flecks.count = n;
+    foxPrev.copy(fox);
     flecks.instanceMatrix.needsUpdate = true;
   });
 
