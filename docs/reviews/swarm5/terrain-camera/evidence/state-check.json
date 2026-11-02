@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "pageHome": true,
+    "steam": true,
+    "keeping": true,
+    "bridge": true,
+    "realCarry": true,
+    "emberPlaced": true,
+    "finaleKindled": true,
+    "snow": true,
+    "kitsCurled": true,
+    "cardShown": true,
+    "cardDone": true
+  },
+  "pass": true
+}

@@ -1,0 +1,46 @@
+{
+  "scope": "unchanged all-frame gate still fails baseline authored handover pops",
+  "followMaximum": 12.96350647008726,
+  "over24": [
+    {
+      "t": 184.53333333333333,
+      "speed": 281.6054378026107,
+      "follow": false
+    },
+    {
+      "t": 184.63333333333333,
+      "speed": 24.01205322332929,
+      "follow": false
+    },
+    {
+      "t": 184.66666666666666,
+      "speed": 26.814395387552583,
+      "follow": false
+    },
+    {
+      "t": 184.7,
+      "speed": 27.893934824617318,
+      "follow": false
+    },
+    {
+      "t": 184.73333333333332,
+      "speed": 27.614392986267138,
+      "follow": false
+    },
+    {
+      "t": 184.76666666666665,
+      "speed": 26.40105679702994,
+      "follow": false
+    },
+    {
+      "t": 184.8,
+      "speed": 24.683765920134675,
+      "follow": false
+    },
+    {
+      "t": 204.76666666666665,
+      "speed": 114.08081740590751,
+      "follow": false
+    }
+  ]
+}
