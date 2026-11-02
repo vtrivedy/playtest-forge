@@ -51,12 +51,14 @@ console.log('camera envelope: terrain-ridge release recovers continuously at30/6
 
 // The last clear pose can be closer than the preferred standoff to a post.
 // Recovery needs a local detour; only sampling around the fox leaves it stuck.
-for (const dt of [1 / 30, 1 / 60, 1 / 120]) {
+for (const visibleProxy of [false,true]) for (const dt of [1 / 30, 1 / 60, 1 / 120]) {
   const previous=new THREE.Vector3(0,3,8),goal=new THREE.Vector3(0,1.6,2.45);
   const lens=goal.clone(),focus=new THREE.Vector3(0,.6,0);
   const blocked=(x:number,_y:number,z:number,r:number)=>Math.hypot(x,z-7.3)<.4+r;
   const update=createCameraEnvelope({params:{minDistance:1.8,distance:2.45,clearance:.35,sideBias:0},previousLens:previous,surfaceAt:()=>0,lensBlocked:blocked,yaw:()=>0,sightFraction:(from,to)=>{
-    // Visibility ray against the same post, as the live camera's proxy raycast does.
+    // Collision posts can extend beyond their rendered visibility proxy.
+    if(!visibleProxy)return 1;
+    // Otherwise use an actual visibility segment against the same post.
     const dx=to.x-from.x,dz=to.z-from.z,fx=from.x,fz=from.z-7.3;
     const a=dx*dx+dz*dz,b=2*(fx*dx+fz*dz),c=fx*fx+fz*fz-.4*.4;
     const disc=b*b-4*a*c;if(disc<0||a===0)return 1;
