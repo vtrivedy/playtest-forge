@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import { createSliceRoute, SLICE_START } from './opening-hero-route.mjs';
 const arg = (k, d) => (process.argv.includes(`--${k}`) ? process.argv[process.argv.indexOf(`--${k}`) + 1] : d);
-const seconds = Number(arg('seconds', '130')), every = Number(arg('every', '2')), min = Number(arg('min', '12'));
+const seconds = Number(arg('seconds', '130')), every = Number(arg('every', '2')), min = Number(arg('min', '12')), from = Number(arg('from', '0'));
 const [w, h] = arg('size', '320x180').split('x').map(Number);
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port: 5193, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
 await server.listen();
@@ -25,12 +25,12 @@ await page.evaluate(({ source, start }) => {
 }, { source: createSliceRoute.toString(), start: SLICE_START });
 let done = false;
 while (!done) {
-  done = await page.evaluate(({ seconds, every, min }) => {
+  done = await page.evaluate(({ seconds, every, min, from }) => {
     const p = window.__blink, hk = window.__gameHooks, dt = 1 / 60;
     for (let i = 0; i < 120 && p.f * dt < seconds; i++) {
       const input = p.route(p.f * dt, p.state);
       hk.setStick(input.x, input.z); hk.setKeys([...(input.jump ? ['Space'] : []), ...(input.dash ? ['ShiftLeft'] : [])]);
-      const render = p.f % every === 0;
+      const render = p.f * dt >= from && p.f % every === 0;
       p.state = hk.advance(1, dt, render);
       if (render) {
         p.g.drawImage(window.__opening.ctx.renderer.domElement, 0, 0, 32, 18);
@@ -43,7 +43,7 @@ while (!done) {
       p.f++;
     }
     return p.f * dt >= seconds;
-  }, { seconds, every, min });
+  }, { seconds, every, min, from });
 }
 const r = await page.evaluate(() => { const p = window.__blink; const s = [...p.lum].sort((a, b) => a - b); return { frames: p.lum.length, min: s[0], median: s[s.length >> 1], dark: p.dark }; });
 console.log(JSON.stringify({ errors, ...r }, null, 1));
