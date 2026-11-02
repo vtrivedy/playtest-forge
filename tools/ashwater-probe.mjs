@@ -97,7 +97,7 @@ try {
   await go(0, 36.5, { jump: true, hold: 14, max: 120, land: true });
   await shot('07-weir');
   await go(14, 40);
-  await go(26.5, 40.5, { jump: true, hold: 200, max: 400, reach: 0.8, land: true });
+  await go(26.5, 40.5, { jump: true, jumpAt: 8.6, hold: 200, max: 400, reach: 0.8, land: true });
   await settle(200);
   await shot('08-seedwell');
 } catch (e) {

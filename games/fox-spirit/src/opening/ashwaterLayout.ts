@@ -54,7 +54,7 @@ export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8
 export const STEP_HALF = { x: 1.6, z: 0.48 };
 
 /** the Reed Seedwell on its own ledge east of the weir: reached by gliding off the plateau's east lip */
-export const LEDGE = { x0: 23, x1: 31, z0: 36, z1: 46, top: 2.6 };
+export const LEDGE = { x0: 22.5, x1: 31, z0: 36, z1: 46, top: 2.6 };
 export const SEEDWELL = { lx: 27.5, lz: 41 };
 
 /** spawn (and the return arch) on the landing, facing north */
