@@ -24,6 +24,9 @@ if (typeof createSliceRoute !== 'function' || !SLICE_START || ![SLICE_START.x, S
 const cameraHeightRaw = option('camera-height', '');
 const cameraHeight = cameraHeightRaw === '' ? null : Number(cameraHeightRaw);
 if (cameraHeight !== null && (!Number.isFinite(cameraHeight) || cameraHeight < .3 || cameraHeight > 3)) throw Error('camera-height must be in [.3,3]');
+const sideBiasRaw = option('side-bias', '');
+const sideBias = sideBiasRaw === '' ? null : Number(sideBiasRaw);
+if (sideBias !== null && (!Number.isFinite(sideBias) || Math.abs(sideBias)>1)) throw Error('side-bias must be in [-1,1]');
 const startYawRaw = option('start-yaw', '');
 const startYaw = startYawRaw === '' ? SLICE_START.yaw : Number(startYawRaw);
 if (!Number.isFinite(startYaw)) throw Error('start-yaw must be finite');
@@ -68,14 +71,15 @@ page.setDefaultTimeout(300000);
 try {
   await page.goto(`http://127.0.0.1:${port}/?manual=1`,{waitUntil:'domcontentloaded',timeout:180000});
   await page.waitForFunction(()=>window.__gameHooks?.ready===true);
-  await page.evaluate(({source,start,fallLag,testDt,minDistance,cameraHeight,prepare})=>{
+  await page.evaluate(({source,start,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare})=>{
     const h=window.__gameHooks;
     h.setManual(true); h.camera.fallLag=fallLag; if(minDistance!==null)h.camera.minDistance=minDistance;
     if (cameraHeight !== null) h.camera.height = cameraHeight;
+    if (sideBias !== null) h.camera.sideBias = sideBias;
     if (prepare) new Function(`return (${prepare})`)()(h);
     h.teleport(start.x,start.z,start.yaw);
     window.__cameraProbe={route:new Function(`return (${source})`)()(),state:h.advance(1,testDt,false),f:0,beat:'',trace:[],apex:false,touchdown:-1,clipStart:-1,silhouette:[]};
-  },{source:createSliceRoute.toString(),start:sliceStart,fallLag,testDt,minDistance,cameraHeight,prepare:prepareSlice?.toString()??null});
+  },{source:createSliceRoute.toString(),start:sliceStart,fallLag,testDt,minDistance,cameraHeight,sideBias,prepare:prepareSlice?.toString()??null});
   let done=false, n=0, checkpoint=-1;
   while(!done){
     const result=await page.evaluate(({total,clip,clipBeat,clipFrames,testDt,stillFrames,clipFrom,missOverlook,sparseStills,checkSilhouette})=>{
