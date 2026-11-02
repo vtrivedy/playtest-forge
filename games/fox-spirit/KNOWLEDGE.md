@@ -768,6 +768,15 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
 - `tools/ashwater-probe.mjs` (staged landing start, then stick/keys): its `go()` helper with `jumpAt` (running jump)
   and `land` is reusable for any world's route.
 - Authored reveal paths must frame from the fox, not from the landmark: the homecoming look framed off the Great Well put its roof between lens and fox. Pick the lens from a few angles round the fox with `cam.sightBlocked(lens, chest, feetY)` (as finale familyShot does) and look just past the fox so it sits slightly below centre.
+- (Ashwater, later) Water-level puzzles: model the flood as a timed state (rise/hold/fall) that always returns, so a
+  missed attempt resets itself; TLA needs the hold as a move budget plus a clock tick that runs only while the
+  goal-directed player is waiting, or TLC finds an adversarial "recede the instant you board" loop.
+- Moving-up platforms work: a box collider whose `top` rises under a grounded fox carries it (the punt). Make the
+  last hop a walk: a 0.18 m rise is under the controller's 0.22 m step-up; a 0.48 m rise with a running jump failed.
+- Wading resets need a loop guard: two resets within 0.5 s fall back to a fixed bank anchor (a sinking mat or a
+  receding flood can otherwise put the "last dry spot" under water and teleport every frame).
+- Boarding from a cliff edge: approach straight off the edge onto the platform; diagonal approaches near a terrain
+  mask edge walk the fox off the side first. Put the platform's end against the cliff face.
 
 ## Multi-world integration (Maple, swarm5 repoint)
 

@@ -50,6 +50,9 @@ for (const world of WORLD_IDS) {
 assert.deepEqual(createWorldProgress(storage).snapshot().secrets, ['press-stacks'], 'secret persists independently');
 raw = JSON.stringify({ version: 1, worlds: {}, secrets: ['unknown', 'press-stacks', 'press-stacks'] });
 assert.deepEqual(createWorldProgress(storage).snapshot().secrets, ['press-stacks'], 'unknown and duplicate secret ids normalize');
+assert.equal(secretOnly.findSecret('vale-loft'), true);
+assert.deepEqual(createWorldProgress(storage).snapshot().secrets, ['press-stacks', 'vale-loft'], 'both optional memories persist independently');
+assert.equal(createWorldProgress(storage).snapshot().worlds.russetvale.fill, 0, 'loft does not restore autumn');
 secretOnly.reset();
 assert.deepEqual(createWorldProgress(storage).snapshot().secrets, [], 'reset clears persisted secrets');
 assert.deepEqual(createWorldProgress(broken).snapshot().secrets, [], 'storage failure starts without secrets');

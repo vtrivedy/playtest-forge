@@ -18,6 +18,7 @@ import { buildWorldEdge } from './worldEdge';
 import { buildWorlds } from './worldsScene';
 import { buildWarden } from './warden';
 import { buildPressStacks } from './pressStacks';
+import { buildValeLoft } from './valeLoft';
 import { SEEDWELLS, WORLDS } from './worlds';
 import { createWorldProgress } from '../worlds/progress';
 import { createPageMap } from '../worlds/pageMap';
@@ -265,12 +266,15 @@ export async function runOpening(): Promise<void> {
   // the finale (DESIGN-finale.md): warmth set in the Scribe's Press cradle once the Keeping has settled
   // world progress (Hazel's store, DESIGN-worlds.md) is the one truth for levels, abilities and the hub arches
   // world II (Ashwater Reach, x ≈ +700, Cedar): its levels report physical completion to the store
-  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level) });
+  const ashwater = buildAshwater(ctx, { complete: (level) => progress.complete('ashwater', level), hasReedskim: () => progress.hasAbility('ashwater'), isRestored: (level) => progress.isRestored('ashwater', level), secretFound: (id) => progress.isSecretFound(id), onSecret: (id) => void progress.findSecret(id) });
   // world III (the Scribe's Press, x ≈ −700, Thistle): its drafts join the updraft read the controller glides on
   const pressWorld = buildPress(ctx, { complete: (level) => progress.complete('press', level), hasInkstep: () => progress.hasAbility('press'), restored: (level) => progress.isRestored('press', level) });
   // a side climb in the Press: the Scribe's Stacks (secret page above the ridge)
   const stacks = buildPressStacks(ctx, { foundAtLoad: progress.isSecretFound('press-stacks'), onFound: () => { progress.findSecret('press-stacks'); } });
   ctx.onUpdate((dt) => stacks.update(dt, fox.root.position));
+  // a Russetvale secret: the Loft on the east cottage's ridge
+  const loft = buildValeLoft(ctx, { foundAtLoad: progress.isSecretFound('vale-loft'), onFound: () => { progress.findSecret('vale-loft'); } });
+  ctx.onUpdate((dt) => loft.update(dt, fox.root.position));
   {
     const hearthLift = hearth.updrafts.liftAt;
     hearth.updrafts.liftAt = (x, feetY, z, out) => {
@@ -319,8 +323,9 @@ export async function runOpening(): Promise<void> {
     if (progressT < 0.5) return;
     progressT = 0;
     if (homecoming.isPinned()) progress.complete('russetvale', 'teach');
-    if (settledAt >= 0) progress.complete('russetvale', 'develop');
-    if ((finale.state() as { kindles: number }).kindles > 0) progress.complete('russetvale', 'combine');
+    // Hazel's catalogue: develop = Millbrook Kiln (the kiln lit), combine = Hearthtree Keeping (settled into the bridge)
+    if ((millWeir.state() as { lit: boolean }).lit) progress.complete('russetvale', 'develop');
+    if (settledAt >= 0) progress.complete('russetvale', 'combine');
     // tell the player when a hub arch opens (the arches stand north of the well, behind the wake spot)
     if (!archSaid.ashwater && progress.isRestored('russetvale', 'teach') && worlds.active === 'russetvale') {
       archSaid.ashwater = true;

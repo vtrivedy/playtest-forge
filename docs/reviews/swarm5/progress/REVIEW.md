@@ -70,3 +70,23 @@ Component playtest retained at `/captures/hazel/album-story-fcf23aff/`: ordinary
 Visual review found faint text in the first 960px captures. Increased body size and contrast and darkened world headings; reran and inspected the final Press spread, returned-page overlay, and returned autumn spread. Text fits its cards, the overlay leaves the fox visible, and locked pages reveal no future words. `tsc`, `lint:feel`, Vite build, tool syntax and diff checks pass. Existing world duration, art and physical encounter acceptance remains with world owners.
 
 Final text follow-up `fec85f64` keeps the Warden identity explicit only on Press combine (develop foreshadows the accumulated ink). Repeated the complete component harness on this exact gameplay source with a unique output directory: `/captures/hazel/album-story-final/`. All three reveal checks, native keys and zero-error checks pass; final Press spread inspected and fits. Full runtime state and staged returned-page frames retained. No global game-complete or duration claim.
+
+## Resumed integration check — 21:27 UTC
+
+On unchanged `1781415d` (includes `keeping-d3` `4901c674`),
+`tools/hearthbound-runtime.mjs` passes both independent locked/learned boots
+with zero JavaScript errors. Native E picks up the authored ember; native Shift
+drops it in the locked fixture (`dashDrops:1`, `carriedDashes:0`) and retains
+it in the saved-teach fixture (`dashDrops:0`, `carriedDashes:1`). Full runtime
+states and six screenshots: `/captures/hazel/hearthbound-resume-1781415d/`.
+Both side inspection frames were personally read: the locked ember rests behind
+the fox; the learned ember is visibly held at the muzzle. These are staged starts
+and a saved ability fixture, not an earning-route or continuous-motion claim.
+No movement parameters, geometry, audio or gameplay source changed.
+`world-progress-check.ts` and diff whitespace checks pass.
+
+Saved autumn reconstruction still disagrees with the Album for develop/full
+fixtures, as recorded in `SAVED-AUTUMN-AUDIT.md`. Requested Maple's canonical
+mechanism mapping again before attempting restoration; Reed owns the separate
+Album contrast follow-up. Optional-memory reload success does not close either
+issue or the game's duration gap.

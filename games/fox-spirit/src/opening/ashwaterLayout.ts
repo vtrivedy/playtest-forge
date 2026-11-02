@@ -19,8 +19,10 @@ const RZ = 62;
 
 /** water rectangles in local coords [x0, x1, z0, z1]; `full` = surface height when held, `drained` = after the sluice */
 export const WATER = {
-  /** level 1: the Low Sluice channel spans the whole marsh, landing ↔ Reed Island */
-  channel: { x0: -80, x1: 80, z0: -33, z1: -24, full: -0.15, drained: -1.25 },
+  /** level 1: the Low Sluice channel spans the marsh, landing ↔ Reed Island, in two reaches split by a sill: the west
+   * reach (its north bank a reed thicket) drains at the bank sluice; the east reach only through the sill's culvert */
+  channel: { x0: -80, x1: -0.35, z0: -33, z1: -24, full: -0.15, drained: -1.25 },
+  channelE: { x0: 0.35, x1: 80, z0: -33, z1: -24, full: -0.15, drained: -1.25 },
   /** level 2: Reed Pond spans the marsh, Reed Island ↔ Mill Shore; only the earned reed mats cross it */
   pond: { x0: -80, x1: 80, z0: -8, z1: 14, full: -0.15, drained: -0.15 },
   /** level 3: the Mill Pool below the weir; its steps only stand clear once it is drained */
@@ -28,12 +30,17 @@ export const WATER = {
 } as const;
 export type WaterId = keyof typeof WATER;
 /** fixed iteration order (module-level: no array literal per call on the hot path) */
-export const WATER_IDS: ReadonlyArray<WaterId> = ['channel', 'pond', 'pool'];
+export const WATER_IDS: ReadonlyArray<WaterId> = ['channel', 'channelE', 'pond', 'pool'];
 /** channel / pond / pool bed height (below a full surface, above a drained one) */
 export const BED = -1.0;
 
 /** the Low Sluice's reed dam (on the landing bank, west of the path) and the mill race's dam (on an islet in the pond) */
 export const DAM_A = { lx: -11, lz: -35.2, reach: 3.2 };
+/** the sill between the reaches and the reed-choked culvert on its west face (reached from the drained west bed) */
+export const SILL = { x0: -0.35, x1: 0.35, top: -0.8 };
+export const DAM_A2 = { lx: -1.5, lz: -28.5, reach: 3.2 };
+/** the west reach's north bank: a reed thicket the fox cannot climb (box), so the way on is east along the bed */
+export const THICKET = { x0: -66, x1: 0.7, z0: -23.9, z1: -23.2, top: 2.4 };
 export const ISLET = { lx: 23.6, lz: 1.0, r: 2.6 };
 export const DAM_B = { lx: 24.4, lz: 1.0, reach: 3.2 };
 
