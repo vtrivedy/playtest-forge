@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import { WELL } from './layout';
+import { AshwaterMistMaterial } from './ashwaterMist';
 import { ashwaterE, HUB_ARCHES, hubArrival, outward, pressE, RETURN_ARCH_BACK, WORLDS, worldAt, type WorldId } from './worlds';
 import { RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { bakeCells } from './bake';
@@ -206,12 +207,12 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
     t.repeat.set(3, 3);
     return t;
   })();
-  const mistSheets: THREE.Mesh[] = [];
-  // kept below the fox's chest (a veil over the hero is a fail): the sheets lie on the water, the fox stands through them
+  const mistSheets: THREE.Mesh<THREE.CircleGeometry, AshwaterMistMaterial>[] = [];
+  // Drained beds lie below these sheets: the typed material feathers them clear there.
   for (const [h, op, rot] of [[-0.12, 0.38, 0.3], [0.12, 0.2, 1.7]] as const) {
     const m = new THREE.Mesh(
       new THREE.CircleGeometry(70, 40).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ map: mistTex, color: 0xb9c6c4, transparent: true, opacity: op, depthWrite: false, fog: true }),
+      new AshwaterMistMaterial(mistTex, op),
     );
     m.position.set(WORLDS.ashwater.origin.x, h, WORLDS.ashwater.origin.z);
     m.rotation.y = rot;
