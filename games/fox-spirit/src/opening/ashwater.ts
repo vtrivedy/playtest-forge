@@ -197,10 +197,10 @@ export function buildAshwater(
   basin.position.set(wellAt.x, LEDGE.top + 0.3, wellAt.z);
   root.add(basin);
   colliders.push({ kind: 'post', x: wellAt.x, z: wellAt.z, r: 1.5 });
-  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 14, 14, 1, true), new THREE.MeshBasicMaterial({ color: C.glow, transparent: true, opacity: 0.55, side: THREE.DoubleSide, toneMapped: false, depthWrite: false }));
+  const glowMat = new THREE.MeshBasicMaterial({ color: C.glow, transparent: true, opacity: 0.22, side: THREE.DoubleSide, toneMapped: false, depthWrite: false });
+  const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.1, 14, 14, 1, true), glowMat);
   glow.geometry.translate(0, 7, 0);
   glow.position.set(wellAt.x, LEDGE.top + 0.3, wellAt.z);
-  glow.visible = false;
   root.add(glow);
 
   // ---- lanterns along the way: warm notes in the rain, at each gate
@@ -302,6 +302,7 @@ export function buildAshwater(
     mats,
     matCols,
     glow,
+    glowMat,
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
     s: { burstA: -1, burstB: -1, channelY: WATER.channel.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0 },
   };
