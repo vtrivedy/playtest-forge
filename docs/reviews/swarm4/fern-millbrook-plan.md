@@ -1,0 +1,7 @@
+# Millbrook camera verification design
+
+On the combined Fern/Wren/Ember/Bramble integration, follow Bramble's authored route from a single staged start at the east mouth of the sunken lane (-36,89). Controller input thereafter: lane → mill exterior → dash leaf dam → kiln updraft → Weir glide → valley return → bridge → orchard/lookout. No forced dam state. Record all route beats, camera pose and __game; use a sparse numeric/still pass first to identify continuous capture windows. Check leaning maples, lane banks, mill thatch and Weir columns. If an authored leg is blocked, distinguish route-bot failure from camera behavior before changing either. Preserve a named source SHA during every live capture.
+
+Do not change character feel or region geometry without played evidence. The new shared camera release already has cff7a25 finale and2afb162 ruin evidence; recheck only affected camera segments if a new defect requires a solver change. Report offline render limits and staged starts explicitly.
+
+First sparse pass at e1d7e77: camera gate passes1.524m/46.60°/12.02m/s, mill turning/painted, kiln lit/rode, Weir reached. The bot stalls on bridge west at(-76.865,-1.453,87.323). Inspection shows the authored east/west route targets cross the side rails diagonally. Test centerline points(-75.7,86.1)→(-79,87)→(-82.2,87.85), derived from the actual bridge tangent, before considering a geometry defect. No route timeout may count as completing a leg.
