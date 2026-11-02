@@ -18,6 +18,9 @@ const arg = (k, d) => {
 const out = path.resolve(arg('out', '/tmp/mix-capture'));
 const seconds = Number(arg('seconds', '60'));
 const port = Number(arg('port', '5194'));
+// --late: after the route the fox idles in the painted meadow (birds come back); the Keeping is released with its
+// dev hook at 85 s (disclosed staging; use --seconds 130). The homecoming needs every creature walked home first.
+const late = process.argv.includes('--late');
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port, host: '127.0.0.1', strictPort: true, hmr: false }, logLevel: 'error' });
 await server.listen();
@@ -55,6 +58,7 @@ try {
   const frames = Math.round(seconds * 60);
   for (let f = 0; f < frames; f++) {
     const input = route(f / 60, state);
+    if (late && (f === 85 * 60)) await page.evaluate((k) => window.__gameHooks[k](), 'keepingRelease');
     state = await page.evaluate((input) => {
       const h = window.__gameHooks;
       h.setStick(input.x, input.z);
@@ -129,7 +133,7 @@ try {
   const perMinute = {};
   for (const e of events) perMinute[e.kind] = +(((perMinute[e.kind] ?? 0) + 60 / (n / sr))).toFixed(2);
   fs.writeFileSync(path.join(out, 'events.json'), JSON.stringify(events));
-  const evidence = { perMinute, route: 'createSliceRoute (no teleports), sim paced to wall clock', simSeconds: seconds, wallSeconds: wall, audioSeconds: n / sr, sampleRate: sr, mixNote: 'stem sum at MIX bus gains, master at unity, pre-limiter', final: { ...stems.final, log: undefined }, events, errors };
+  const evidence = { perMinute, staging: late ? 'keepingRelease() at 85 s (dev hook)' : 'none', route: 'createSliceRoute (no teleports), sim paced to wall clock', simSeconds: seconds, wallSeconds: wall, audioSeconds: n / sr, sampleRate: sr, mixNote: 'stem sum at MIX bus gains, master at unity, pre-limiter', final: { ...stems.final, log: undefined }, events, errors };
   fs.writeFileSync(path.join(out, 'evidence.json'), JSON.stringify(evidence, null, 2));
   fs.writeFileSync(path.join(out, 'meter-50ms.json'), JSON.stringify(meter));
   fs.writeFileSync(path.join(out, 'trace.json'), JSON.stringify(trace));
