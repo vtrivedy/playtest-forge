@@ -33,6 +33,8 @@ if (!Number.isFinite(startYaw)) throw Error('start-yaw must be finite');
 const sliceStart = {...SLICE_START,yaw:startYaw};
 if (prepareSlice !== undefined && typeof prepareSlice !== 'function') throw Error('prepareSlice must be a cold setup function');
 const expectedBeat = option('expect-beat', '');
+const maxGroundedDistance=Number(option('max-grounded-distance','5'));
+if(!Number.isFinite(maxGroundedDistance)||maxGroundedDistance<=1)throw Error('max-grounded-distance must exceed1m');
 const checkFrom = Number(option('check-from', '60'));
 if (!Number.isFinite(checkFrom) || checkFrom < 0 || checkFrom >= seconds) throw Error('check-from must be nonnegative and less than seconds');
 const clipBeat = option('clip-beat', 'off the canopy');
@@ -165,7 +167,13 @@ try {
     const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));
     const maxPitch = Math.max(...late.map(s => Math.abs(s.lensPitch)));
     const maxStepSpeed = Math.max(0, ...late.slice(1).map((s, i) => Math.hypot(...s.camera.pos.map((v, axis) => v - late[i].camera.pos[axis])) / testDt));
-    const cameraCheck = { fromSeconds: checkFrom, minChestDistance, maxPitch, maxStepSpeed, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && !errors.length };
+    let groundedTime=0,maxGroundedFollowDistance=0;
+    for(const s of evidence.trace){
+      groundedTime=s.grounded?groundedTime+testDt:0;
+      if(s.f*testDt<checkFrom||groundedTime<1||!s.camera.boom.includes('shot=0.00'))continue;
+      maxGroundedFollowDistance=Math.max(maxGroundedFollowDistance,Math.hypot(s.camera.pos[0]-s.pos[0],s.camera.pos[1]-s.pos[1]-.6,s.camera.pos[2]-s.pos[2]));
+    }
+    const cameraCheck = { fromSeconds: checkFrom, minChestDistance, maxPitch, maxStepSpeed, maxGroundedFollowDistance, maxGroundedDistance, pass: minChestDistance >= 1.1 && maxPitch < 70 && maxStepSpeed < 24 && maxGroundedFollowDistance<=maxGroundedDistance && !errors.length };
     fs.writeFileSync(path.join(out, 'camera-check.json'), JSON.stringify(cameraCheck, null, 2));
     console.log('CAMERA', JSON.stringify(cameraCheck));
     if (process.argv.includes('--check-camera') && !cameraCheck.pass) process.exitCode = 1;

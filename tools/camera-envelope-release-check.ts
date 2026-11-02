@@ -26,3 +26,25 @@ for (const dt of [1 / 30, 1 / 60, 1 / 120]) for (const ledge of [false, true]) {
   assert.ok(lens.y >= .16 && Math.hypot(lens.x, lens.z) >= 1.5, 'release lost floor/body room');
 }
 console.log('camera envelope: free release and obstructed release remain gradual');
+
+// A raised strip just beyond the previous lens blocks a downward release. The
+// camera must climb continuously over it and recover, rather than hold forever.
+for (const dt of [1 / 30, 1 / 60, 1 / 120]) {
+  const previous = new THREE.Vector3(0, 3, 8);
+  const goal = new THREE.Vector3(0, 1.6, 2.45);
+  const lens = goal.clone(), focus = new THREE.Vector3(0, .6, 0);
+  const floor = (_x: number, z: number) => z > 6.8 && z < 7.9 ? 3.15 : 0;
+  const update = createCameraEnvelope({
+    params: { minDistance: 1.8, distance: 2.45, clearance: .35, sideBias: 0 },
+    previousLens: previous, surfaceAt: floor, lensBlocked: () => false,
+    yaw: () => 0, sightFraction: () => 1,
+  });
+  for (let i=0; i<Math.ceil(2/dt); i++) {
+    lens.copy(goal);update(focus,lens,dt,false);
+    assert.ok(lens.distanceTo(previous)<=16*dt+1e-5,'ridge recovery snapped');
+    assert.ok(lens.y>=floor(lens.x,lens.z)+.28-1e-5,'ridge recovery entered terrain');
+    previous.copy(lens);
+  }
+  assert.ok(lens.distanceTo(goal)<.1,'camera stayed stranded behind the terrain ridge');
+}
+console.log('camera envelope: terrain-ridge release recovers continuously at30/60/120Hz');

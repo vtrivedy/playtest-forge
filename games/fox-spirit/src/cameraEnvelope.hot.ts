@@ -27,9 +27,12 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
   function bodyClear(point: THREE.Vector3): boolean {
     return Math.hypot(point.x - focus.x, point.z - focus.z) >= bodyRadius(point) - .00001;
   }
+  function floorClearAt(x: number, y: number, z: number): boolean {
+    const floor = opts.surfaceAt?.(x, z, y + 1.5);
+    return floor === undefined || !Number.isFinite(floor) || y >= floor + params.clearance * .8 - .00001;
+  }
   function floorClear(point: THREE.Vector3): boolean {
-    const floor = opts.surfaceAt?.(point.x, point.z, point.y + 1.5);
-    return floor === undefined || !Number.isFinite(floor) || point.y >= floor + params.clearance * .8 - .00001;
+    return floorClearAt(point.x, point.y, point.z);
   }
   function check(x: number, z: number): void {
     const blocked = opts.lensBlocked!;
@@ -74,13 +77,26 @@ export function createCameraEnvelope(opts: EnvelopeOptions) {
       if (!firstFrame && travel > maximumStep && bodyClear(previousLens) && floorClear(previousLens)
         && !blocked(previousLens.x, previousLens.y, previousLens.z, .2)) {
         candidateLens.lerpVectors(previousLens, lens, maximumStep / travel);
+        // Climb before crossing a terrain edge instead of stranding the lens
+        // at the last clear pose while its downhill destination remains free.
+        const floor = opts.surfaceAt?.(candidateLens.x, candidateLens.z, candidateLens.y + 1.5);
+        if (floor !== undefined && Number.isFinite(floor) && candidateLens.y < floor + params.clearance * .8) {
+          const needed = floor + params.clearance * .8 + .01;
+          if (previousLens.y < needed) {
+            candidateLens.copy(previousLens);
+            candidateLens.y += Math.min(maximumStep, needed - previousLens.y);
+          } else candidateLens.y = needed;
+          const liftedTravel = candidateLens.distanceTo(previousLens);
+          if (liftedTravel > maximumStep) candidateLens.lerpVectors(previousLens, candidateLens, maximumStep / liftedTravel);
+        }
         let clear = bodyClear(candidateLens) && floorClear(candidateLens);
         const steps = Math.ceil(maximumStep / .1);
         for (let i = 1; clear && i <= steps; i++) {
           const t = i / steps;
-          clear = !blocked(THREE.MathUtils.lerp(previousLens.x, candidateLens.x, t),
-            THREE.MathUtils.lerp(previousLens.y, candidateLens.y, t),
-            THREE.MathUtils.lerp(previousLens.z, candidateLens.z, t), .2);
+          const sx = THREE.MathUtils.lerp(previousLens.x, candidateLens.x, t);
+          const sy = THREE.MathUtils.lerp(previousLens.y, candidateLens.y, t);
+          const sz = THREE.MathUtils.lerp(previousLens.z, candidateLens.z, t);
+          clear = !blocked(sx, sy, sz, .2) && floorClearAt(sx, sy, sz);
         }
         if (clear) { lens.copy(candidateLens); return true; }
       }
