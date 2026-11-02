@@ -426,7 +426,12 @@ that traversal output must pass through the body-envelope constraint after floor
 correction; authored shots keep their separate composition. Continuous failed-
 catch footage plus a successful return route, screenshots and __game are required.
 
-Chosen clearance:1.5m. Both1.5 and1.8 pass the missed-jump camera and skinned-body
+Current clearance:1.9m, superseding the earlier1.5m selection below. With the
+integrated Keeping release, the new staged ruin drop puts the tail inside the
+strict2% margin for two frames at1.8m;1.9m passes the matched90-frame drop and
+60-frame original missed-overlook replay. Keep the normal2.45m boom unchanged.
+
+Earlier sizing trial: both1.5 and1.8 passed its missed-jump camera and skinned-body
 framing gates;1.5 retains a larger creature in the tight view with adequate pounce
 margin. The normal2.45m follow distance remains the authored traversal setting.
 Expose body clearance in the existing camera GUI for further place-specific tests.

@@ -31,3 +31,10 @@ superseding the independent Sorrel solver. Use the game's shared
 separate 0.8m projection. Retain trace-based regional checks and explicit
 missed-overlook coverage. Recheck natural Keeping and the staged ledge drop on
 the merged source, including the controller correction for the old route stall.
+
+Final padding selection is 1.9m minimum body clearance. The integrated 1.8m
+regional replay fails two strict-margin frames (bottom NDC −0.976); the matched
+1.9m replay passes all 90 recorded frames and all seven actual-state checks.
+Original missed-overlook coverage on Wren's post-only slide correction also
+passes all 60 recorded body frames at 1.9m. Keep the normal 2.45m boom and the
+2% screen-margin gate unchanged; adopt the tested minimum as the default.
