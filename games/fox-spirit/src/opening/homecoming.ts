@@ -69,6 +69,38 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
   const fill = new THREE.Mesh(new THREE.CircleGeometry(1.0, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffc27a, transparent: true, opacity: 0, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
   fill.position.y = 0.57;
   frame.add(fill);
+  // the beacon: when the page is pinned, a warm shaft and sparks rise out of the well for a while, tall enough
+  // to be seen from the ruin's overlook where the page is kept, so the slice's end points back home
+  const BEACON = { secs: 14, height: 16, sparks: 48 };
+  // a soft camera-facing light shaft: bright warm core, transparent edges, fading out toward its top
+  const shaftTex = (() => {
+    const cv = document.createElement('canvas');
+    cv.width = 64;
+    cv.height = 256;
+    const g = cv.getContext('2d')!;
+    const img = g.createImageData(64, 256);
+    for (let y = 0; y < 256; y++)
+      for (let x = 0; x < 64; x++) {
+        const u = (x - 31.5) / 32;
+        const v = y / 255;
+        const a = Math.exp(-u * u * 6) * Math.pow(v, 0.7) * Math.min(1, (1 - v) * 12);
+        img.data.set([255, 255, 255, Math.round(255 * a)], (y * 64 + x) * 4);
+      }
+    g.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  const shaft = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, BEACON.height).translate(0, BEACON.height / 2 + 0.6, 0),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.3, 0.55), map: shaftTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false }),
+  );
+  shaft.visible = false;
+  frame.add(shaft);
+  const sparks = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, toneMapped: false, fog: false }), BEACON.sparks);
+  sparks.visible = false;
+  frame.add(sparks);
+  const sparkSeed = Array.from({ length: BEACON.sparks }, () => [ctx.rand() * 6.28, ctx.rand() * 0.5, ctx.rand()] as const);
   const MOTES = 28;
   const motes = new THREE.InstancedMesh(new THREE.SphereGeometry(0.03, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffd28a, transparent: true, opacity: 0.9, toneMapped: false }), MOTES);
   motes.visible = false;
@@ -129,6 +161,22 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
     }
     if (pinned >= 0) {
       pinned += dt;
+      const b = THREE.MathUtils.smoothstep(pinned, 0, 1.5) * (1 - THREE.MathUtils.smoothstep(pinned, BEACON.secs - 4, BEACON.secs));
+      shaft.visible = sparks.visible = b > 0.001;
+      if (shaft.visible) {
+        (shaft.material as THREE.MeshBasicMaterial).opacity = b * (0.9 + 0.1 * Math.sin(clock * 1.7));
+        // turn the shaft to the camera (about its own vertical axis)
+        const cam = ctx.player?.cam.camera;
+        if (cam) shaft.rotation.y = Math.atan2(cam.position.x - H.well.x, cam.position.z - H.well.z) - H.well.yaw;
+        for (let i = 0; i < BEACON.sparks; i++) {
+          const [a, r, ph] = sparkSeed[i]!;
+          const u = (pinned * 0.16 + ph) % 1;
+          const k = b * Math.sin(u * Math.PI);
+          m4.makeScale(k, k, k).setPosition(Math.cos(a + u * 4) * r, 0.7 + u * BEACON.height, Math.sin(a + u * 4) * r);
+          sparks.setMatrixAt(i, m4);
+        }
+        sparks.instanceMatrix.needsUpdate = true;
+      }
       // pinned with a little bounce, then it stirs in the wind about its tack
       const pop = Math.min(1, pinned / 0.5);
       pin.scale.setScalar(pop < 1 ? 0.2 + 0.8 * (1 - Math.pow(1 - pop, 3)) * (1 + 0.12 * Math.sin(pop * Math.PI)) : 1);
