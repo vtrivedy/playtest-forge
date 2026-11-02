@@ -7,6 +7,7 @@
  * Here: two-tone cel coat (hatched shadow tone, hard warm rim), skinned inverted-hull ink, banded ember tail glow, cel flame tongues on the burn-out third, drifting ember motes, ember kick-up at footfalls and landings.
  */
 import * as THREE from 'three';
+import hearthFoxUrl from '../../../assets/hero/hearth_fox.glb?url';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export type FoxClip = 'idle' | 'walk' | 'trot' | 'lope' | 'run' | 'jumpUp' | 'fall' | 'land';
@@ -138,7 +139,7 @@ function flameMaterial(size: [number, number], seed: number, uLean: { value: THR
 }
 
 export async function loadHearthFox(inkMaterial: (width: number) => THREE.Material, inkWidth = 0.02): Promise<HearthFox> {
-  const gltf = await new GLTFLoader().loadAsync('/assets/hero/hearth_fox.glb');
+  const gltf = await new GLTFLoader().loadAsync(hearthFoxUrl);
   const root = new THREE.Group();
   const model = gltf.scene;
   root.add(model);

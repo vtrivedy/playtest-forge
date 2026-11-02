@@ -10,12 +10,17 @@ export function lintHotSource(file, source) {
     if (ts.isFunctionDeclaration(node) && node.name && node.body) functions.set(node.name.text, node);
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
       functions.set(node.name.text, node.initializer);
-      if (/^(update|tick|frame)/i.test(node.name.text)) roots.push(node.initializer);
+      if (/^(update|tick|frame|process)/i.test(node.name.text)) roots.push(node.initializer);
     }
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && /^(onUpdate|onTick|onFrame)$/.test(node.expression.name.text)) {
       for (const arg of node.arguments) roots.push(arg);
     }
-    if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && node.name && /^(update|tick|frame)/i.test(node.name.getText(sf))) roots.push(node);
+    if (ts.isMethodDeclaration(node) && node.name && node.body) functions.set(node.name.getText(sf), node);
+    if (ts.isPropertyDeclaration(node) && node.name && node.initializer && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) {
+      functions.set(node.name.getText(sf), node.initializer);
+      if (/^(update|tick|frame|process)/i.test(node.name.getText(sf))) roots.push(node.initializer);
+    }
+    if ((ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) && node.name && /^(update|tick|frame|process)/i.test(node.name.getText(sf))) roots.push(node);
     ts.forEachChild(node, visit);
   };
   visit(sf);
@@ -38,6 +43,8 @@ export function lintHotSource(file, source) {
       if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && /rotation\.y$/.test(node.left.getText(sf)) && ts.isCallExpression(node.right) && node.right.expression.getText(sf) === 'Math.atan2') report(node, 'no-bare-yaw-assign', 'damp wrapped bearing and preserve the turn side at the rear boundary');
       if (ts.isCallExpression(node)) {
         if (ts.isIdentifier(node.expression)) scanFunction(functions.get(node.expression.text));
+        if (ts.isPropertyAccessExpression(node.expression) && node.expression.expression.kind === ts.SyntaxKind.ThisKeyword) scanFunction(functions.get(node.expression.name.getText(sf)));
+        if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'setScalar' && node.arguments[0] && /^1\s*-.*\.(age|life)/.test(node.arguments[0].getText(sf))) report(node, 'no-unclamped-lifetime-scale', 'a particle can expire during this step; clamp lifetime scale to zero before applying it');
         if (ts.isPropertyAccessExpression(node.expression) && ['map', 'filter', 'slice', 'concat', 'flat', 'flatMap', 'toArray', 'clone'].includes(node.expression.name.text)) report(node, 'no-alloc-in-hot', 'this method creates a temporary collection/object on the hot path');
         if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'state') report(node, 'no-diagnostic-snapshot-in-hot', 'state() is a cold diagnostic snapshot; read a reusable live scalar view in frame code');
         if (node.expression.getText(sf) === 'Math.random') report(node, 'no-unseeded-hot-random', 'use a seeded stream so gameplay replays from identical inputs');
@@ -57,6 +64,8 @@ export function hotLintSelfTest() {
     'function build(){ctx.onUpdate((dt)=>{const ahead = perches.map(p=>p+1).filter(p=>p>0);});}',
     'function update(dt){const options = [];}',
     'function tick(dt){Math.random();}',
+    'class Worklet { process(){this.voice();} voice(){return new Float32Array(128);} }',
+    'function update(dt){scale.setScalar(1 - f.age / f.life);}',
     'function update(dt){y += 1 / 30;}',
     'function frame(dt){body.rotation.y = Math.atan2(x,z);}',
     'function update(dt){const s=player.state();}',

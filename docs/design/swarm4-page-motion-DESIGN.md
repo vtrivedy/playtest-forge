@@ -11,3 +11,7 @@ Catch trajectories must keep their initial momentum, damp heading, and open fold
 Acceptance: named SHA, continuous chase/catch/rise clip with frame trace and `window.__game`; 60Hz and 50ms trigger replay; screenshots reviewed for hero/page readability; retest after the largest issue is fixed. tsc, vite, lint:feel, TLC green. No claim that formal verification proves motion quality.
 
 Baseline visual review (f866379): full input route catches all three pages with zero skips, but the final page grows to 5x and rises 5.4m over the moving fox; it leaves the chase frame before the release finishes. The revised release anchors at the catch-time fox pose, rises from +1.25m to +1.7m, and opens to 1.8x. This keeps the intimate sheet readable while the spreading paint provides the broad payoff. Recheck the full catch/landing/release sequence, rather than accepting a still of the final empty platform.
+
+## Production verification follow-up
+
+A production build must contain the fox it displays. Source inspection found that `loadHearthFox` hardcodes a `/assets/` URL served only by Vite's dev middleware; no GLB is present in `dist/fox-spirit`. Migrate runtime model/texture URLs to Vite `?url` imports, add a guard rejecting new dev-only loader literals, then run the page motion capture against `vite.preview` (production output). This is packaging, with no state-machine change; use the already checked page model unchanged. Keep legacy alternate game mode assets bundled too so fixing default boot does not silently leave the same failure elsewhere.

@@ -1,0 +1,30 @@
+
+> playtest-forge@0.1.0 lint:feel
+> node tools/lint-feel.mjs
+
+games/fox-spirit/src/chem/water.ts:50  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const deckMap = new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_Color.jpg');
+games/fox-spirit/src/chem/water.ts:51  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const deckNormal = new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_NormalGL.jpg');
+games/fox-spirit/src/encounters/shades.ts:61  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const gltf = await new GLTFLoader().loadAsync('/assets/library/animals/quaternius_stag.glb');
+games/fox-spirit/src/fox.ts:52  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const gltf = await new GLTFLoader().loadAsync('/assets/hero/spirit_fox.glb');
+games/fox-spirit/src/lookdevFox.ts:141  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const gltf = await new GLTFLoader().loadAsync('/assets/hero/hearth_fox.glb');
+games/fox-spirit/src/russetNature.ts:180  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const gltf = await new GLTFLoader().loadAsync('/assets/env/quaternius/nature.glb');
+games/fox-spirit/src/russetRubble.ts:8  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const gltf = await new GLTFLoader().loadAsync('/assets/library/models/ruins/moss_rubble.glb');
+games/fox-spirit/src/russetRubble.ts:48  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const gltf = await new GLTFLoader().loadAsync('/assets/library/models/ruins/quaternius_column.glb');
+games/fox-spirit/src/worldSurfaces.ts:8  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    ? '/assets/library/textures/bark_brown_02/bark_brown_02_Diffuse_1k.jpg'
+games/fox-spirit/src/worldSurfaces.ts:9  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    : rock ? '/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg'
+games/fox-spirit/src/worldSurfaces.ts:10  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    : '/assets/library/textures/ambientcg/Bricks085/Bricks085_1K-JPG_Color.jpg');
+games/fox-spirit/src/worldSurfaces.ts:14  [no-dev-only-asset-url] import repo assets with ?url; /assets/ literals work only through dev middleware
+    const topTexture = timber || rock ? texture : new THREE.TextureLoader().load('/assets/library/textures/ambientcg/Rock035/Rock035_1K-JPG_Color.jpg');
+
+lint-feel: 12 finding(s)

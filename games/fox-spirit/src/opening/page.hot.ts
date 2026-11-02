@@ -118,6 +118,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
   const body = new THREE.Group();
   body.add(glow, page);
   const holder = new THREE.Group();
+  holder.name = 'runaway-page';
   holder.add(body);
   ctx.scene.add(holder);
 

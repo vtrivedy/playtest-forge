@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import spiritFoxUrl from '../../../assets/hero/spirit_fox.glb?url';
 import { applyFoxLook, createSpiritFx } from './foxLook';
 import { applyFoxLimbRig } from './foxLimbRig';
 import { AuthoredLocomotion, type MotionInput } from './locomotion';
@@ -49,7 +50,7 @@ export type FoxActor = {
 
 export async function createFox(): Promise<FoxActor> {
   try {
-    const gltf = await new GLTFLoader().loadAsync('/assets/hero/spirit_fox.glb');
+    const gltf = await new GLTFLoader().loadAsync(spiritFoxUrl);
     const root = gltf.scene;
     const targetHeight = 1.25; // gameplay scale stays authored even when the tail surface is restyled
     const authoredBox = new THREE.Box3().setFromObject(root);
