@@ -35,3 +35,27 @@ Keep durable findings here by topic. Name the tested SHA and evidence; separate 
 
 - Vivek's #swarm :1027 replaces fixed pitch rounds, required two-vote verdicts, and single-channel coordination. Choose a useful split and focused channels; deliver fun, beautiful work proven on a named build and clip.
 - Priorities from that message: page jitter first, then music and sound. Never touch main, use normal pushes, preserve others' work, and use freely licensed assets with recorded provenance.
+
+## Local probes and captures (Moss)
+
+- Run Playwright/SwiftShader probes one at a time: two at once starve each other and `page.screenshot` times out (30 s default, even 300 s in the smoke).
+- Don't edit `src/` while a Vite-served probe is running: HMR can reload the page mid-route and the run dies or lies.
+- A watcher like `until ! pgrep -f "<cmd>"` can match its own command line and never exit; wait on the output file or use `run_in_background` instead.
+- Local mp4 without a system ffmpeg: `pip install imageio-ffmpeg`, then `imageio_ffmpeg.get_ffmpeg_exe()`; render jpg frames at 2 sim steps per frame for 30 fps.
+- For motion proof, frame-diff a fixed-lens stretch (PIL `ImageChops.difference` mean per frame): spikes flag snaps; cuts show as one deliberate spike.
+- Review lenses: park the fox ~1/3 of the way from the camera to the subject so the chase-cam occlusion fade never hides the subject.
+
+## Scene authoring pitfalls (Moss)
+
+- The chase-cam occlusion fade clones the materials of every root in `ctx.occluders`. Never parent decals under an occluder root (they get cloned and lose their own opacity control); push only the stone/solid meshes.
+- Head or neck "look at the fox" via `clamp(atan2(...))` flips sides in one frame when the fox crosses behind. Damp the turn and hold the current side while the target is behind.
+- Damping in idle code must use the real frame `dt`, not `1 / 60`, or it runs at refresh-dependent speed.
+- `layout.ts` builds many consts with IIFEs; one that reads a const declared further down throws a TDZ error at module load. Declare in dependency order.
+- The patch-paint toon converts unpainted surfaces to sepia whatever their emissive; things that must read in colour before the payoff (creatures, the kept page) use plain toon/basic materials.
+- `field.restore` has a small shared slot budget (the Keeping and ruin use it); features shouldn't spend it.
+- Collider surfaces are a max over all colliders: a creature that walks with `floorAt` will climb onto any box it passes (the deer pins its y on the crag for this reason).
+
+## Assets (Moss)
+
+- Kenney (CC0) zips: the page's `data-download-id` → `GET https://kenney.nl/download-link/<id>` with `Referer: https://kenney.nl/assets/<pack>` returns a signed URL; without the Referer it returns nothing. Each zip has a License.txt (CC0).
+- Import sound/texture files from `src/` with `?url` so the production build bundles them; the `/assets/` middleware only serves in dev.
