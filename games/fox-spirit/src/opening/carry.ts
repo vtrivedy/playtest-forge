@@ -27,6 +27,8 @@ export function createCarry(opts: {
   surfaceAt: (x: number, z: number) => number;
   /** Authored bowl beds on the same walkable floor; optional for other scenes. */
   bowls?: THREE.Vector3[];
+  /** the shared in-frame teach line (teach.ts) */
+  teach: { offer: (text: string) => void };
 }) {
   if (new URLSearchParams(location.search).has('gui')) {
     void import('lil-gui').then(({ default: GUI }) => {
@@ -73,15 +75,6 @@ export function createCarry(opts: {
   const sparks = Array.from({ length: 5 }, () => new THREE.Mesh(sparkGeometry, fire));
   for (const spark of sparks) opts.scene.add(spark);
 
-  const glyph = document.createElement('div');
-  glyph.dataset.keepingCarry = 'glyph';
-  Object.assign(glyph.style, {
-    position: 'fixed', bottom: '15%', left: '50%', transform: 'translateX(-50%)',
-    color: '#f4e5cb', background: 'rgba(43,35,30,.78)', padding: '7px 14px',
-    border: '1px solid rgba(222,173,105,.28)', borderRadius: '5px',
-    font: '15px Georgia,serif', pointerEvents: 'none', opacity: '0',
-  });
-  document.body.append(glyph);
 
   let carried = false;
   let grounded = true;
@@ -195,9 +188,8 @@ export function createCarry(opts: {
       pulse = Math.max(0, pulse - dt * 2.5);
       fire.emissiveIntensity = CARRY.glow * (1 + 0.08 * Math.sin(t * 4) + pulse * 0.4);
       sync(t);
-      glyph.textContent = carried ? 'E · set warmth down' : 'E · carry warmth';
       const teach = carried ? placements === 0 : pickups === 0 && canPickup();
-      glyph.style.opacity = grounded && !dashing && teach ? '1' : '0';
+      if (grounded && !dashing && teach) opts.teach.offer(carried ? 'E · set warmth down' : 'E · carry warmth');
     },
     /** where the ember is now (copied into `out`; allocation-free) and whether it is being carried */
     where(out: THREE.Vector3): boolean {

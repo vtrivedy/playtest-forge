@@ -9,12 +9,13 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import foxRestUrl from '../../../../assets/hero/hearth_fox_rest.glb?url';
-import { buildMaple, buildRock, CANOPY, CANOPY_MOSS, canopyPad, RAMP_CANOPY, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
+import { buildMaple, buildRock, roundStone, CANOPY, CANOPY_MOSS, canopyPad, RAMP_CANOPY, contactInk, hewn, hullGeometry, inked, inkMaterial, jitter, mapleLeafGeometry, paintU, RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import type { OpeningCtx } from './scene';
 import type { FollowCamera } from '../camera';
 import { CROWN, FINALE, HEARTH_A, KEEPING, pathDist, VISTA, WELL } from './layout';
+import { createLetterPlane } from './lettering';
 import { FINALE_TIMING, KIT_PHASES, PHASES, updateFinale, type FinaleRig } from './finale.hot';
 
 /** album paper, ink-frost, iron and the warm colours the hollow wakes into */
@@ -71,6 +72,13 @@ function paperTexture(rand: () => number, sketch: number): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(cv);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+
+/** distance from (px, pz) to the segment (ax, az)–(bx, bz) on the ground plane */
+function segDist(ax: number, az: number, bx: number, bz: number, px: number, pz: number): number {
+  const vx = bx - ax, vz = bz - az;
+  const u = Math.max(0, Math.min(1, ((px - ax) * vx + (pz - az) * vz) / Math.max(1e-6, vx * vx + vz * vz)));
+  return Math.hypot(ax + vx * u - px, az + vz * u - pz);
 }
 
 export async function buildFinale(ctx: OpeningCtx, opts: {
@@ -374,7 +382,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const sootMat = toon(0x4a3c34, { contour: 0.5 });
   for (let i = 0; i < 7; i++) {
     const a = (i / 7) * Math.PI * 2;
-    const s = inked(jitter(new THREE.DodecahedronGeometry(0.17, 0), 0.12, rand), sootMat, 0.012);
+    const s = inked(roundStone(jitter(new THREE.DodecahedronGeometry(0.17, 0), 0.12, rand)), sootMat, 0.012);
     s.position.set(Math.cos(a) * 0.5, 0.06, Math.sin(a) * 0.5);
     s.scale.set(1.2, 0.7, 1);
     cradle.add(s);
@@ -542,22 +550,80 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     return curve.getLength();
   };
 
-  // ---- the end card
-  const card = document.createElement('div');
-  card.dataset.finale = 'card';
-  Object.assign(card.style, {
-    position: 'fixed', left: '0', right: '0', top: '34%', textAlign: 'center', pointerEvents: 'none',
-    color: '#f6ead2', font: 'italic 54px Georgia,serif', letterSpacing: '0.04em', opacity: '0',
-    textShadow: '0 2px 18px rgba(40,24,12,.55)',
-  });
-  card.innerHTML = 'Russet Vale<div style="font:18px Georgia,serif;letter-spacing:.12em;margin-top:14px;opacity:.8">and the year turned</div>';
-  document.body.append(card);
+  // ---- the end card: drawn in the frame (lettering.ts) so every recording carries it; big, in the upper third
+  const card = createLetterPlane(2048, 720, 0.42, 0.5);
+  card.draw([
+    { text: 'Russet Vale', px: 300, italic: true, spacing: 0.02 },
+    { text: 'and the year turned', px: 84, spacing: 0.14, alpha: 0.9 },
+  ]);
+  opts.cam.camera.add(card.mesh);
   const say = (text: string) => ctx.captions.say(text);
 
   const F2 = F.kits;
+  /** review: the rest shot's candidate angles [k, front, inFront, postClear, blocked] */
+  const restShot = { tried: [] as number[][] };
   const toCrown = new THREE.Vector3(CROWN.x - F.press.x, 0, CROWN.z - F.press.z).normalize();
   /** the finale's view direction: between the book's face (local −z) and the Crown */
   const view = () => new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)).lerp(toCrown, 0.6).normalize();
+  /**
+   * Ease to a held composition on the family: fox, kits and ember big in front, Press and Crown behind. The angle is
+   * picked: the fox seen 3/4 from the front (never its back as it lies facing the Press), the Crown behind if
+   * possible, the lens clear of the Press and its near post, and a clear sight line. Holds (a slow push) until the
+   * player moves after `lockS`.
+   */
+  const cradleAt = new THREE.Vector3(F.cradle.x, cy, F.cradle.z);
+  const familyShot = (easeS: number, lockS: number, holdS = 0) => {
+    const cam = opts.cam.camera;
+    const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
+    const f = ctx.fox.root.position;
+    const near = Math.hypot(f.x - F.cradle.x, f.z - F.cradle.z) < FINALE_TIMING.restR;
+    const group = near ? cradleAt.clone().lerp(new THREE.Vector3(f.x, cy, f.z), 0.45) : cradleAt.clone();
+    const fy = ctx.fox.root.rotation.y;
+    const post = F.local(0.3, 2.05);
+    const aimAt = near ? new THREE.Vector3(f.x, f.y + 0.35, f.z) : cradleAt.clone().setY(cy + 0.35);
+    const d = new THREE.Vector3();
+    const pos = new THREE.Vector3();
+    const end = new THREE.Vector3();
+    let bestScore = -Infinity;
+    restShot.tried.length = 0;
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2;
+      d.set(Math.sin(a), 0, Math.cos(a));
+      const front = near ? -(d.x * Math.sin(fy) + d.z * Math.cos(fy)) : 0.65;
+      pos.copy(group).addScaledVector(d, -3.7).add(new THREE.Vector3(0, 1.45, 0));
+      // well clear of the Press's footprint so it never fills the foreground: the plinth (±1.5 × ±1.9 local) plus the
+      // open cover lying out on the −x side to its rest stone (−3.4); and the frame's near post off the line to the fox
+      const px = pos.x - F.press.x, pz = pos.z - F.press.z;
+      const lx = Math.cos(F.press.yaw) * px - Math.sin(F.press.yaw) * pz;
+      const lz = Math.sin(F.press.yaw) * px + Math.cos(F.press.yaw) * pz;
+      const clear = Math.hypot(Math.max(0, lx - 1.5, -3.7 - lx), Math.max(0, Math.abs(lz) - 1.9)) > 2.6;
+      const postClear = segDist(pos.x, pos.z, aimAt.x, aimAt.z, post.x, post.z) > 0.75 && Math.hypot(pos.x - post.x, pos.z - post.z) > 2.2;
+      const blocked = opts.cam.sightBlocked(pos, aimAt, aimAt.y - 0.35);
+      // the 4.4 m post looms when it is in view and close to the lens (its apparent size, not its angle, matters):
+      // far behind the family it is just part of the Press
+      const wx = post.x - pos.x, wz = post.z - pos.z, wl = Math.max(1e-3, Math.hypot(wx, wz));
+      const postNear = (d.x * wx + d.z * wz) / wl > 0.5 ? THREE.MathUtils.clamp((5.2 - wl) / 2.5, 0, 1) : 0;
+      const score = 1.5 * (1 - Math.abs(front - 0.65)) + 0.6 * d.dot(toCrown) - 3 * postNear - (clear && postClear && !blocked ? 0 : 10);
+      restShot.tried.push([k, +front.toFixed(2), clear ? 1 : 0, postClear ? 1 : 0, blocked ? 1 : 0]);
+      if (score > bestScore) {
+        bestScore = score;
+        end.copy(pos);
+      }
+    }
+    d.subVectors(group, end).setY(0).normalize();
+    // aim just past the group, a little down, so the whole ring of kits sits in frame under the title
+    const look = group.clone().addScaledVector(d, 1.4).add(new THREE.Vector3(0, 0.55, 0));
+    opts.cam.playPath({
+      keys: [
+        { t: 0, pos: cam.position.clone(), look: look0 },
+        // (optionally hold the current view first: the release wide stays on the pages and the Crown)
+        ...(holdS > 0 ? [{ t: holdS, pos: cam.position.clone(), look: look0.clone() }] : []),
+        { t: holdS + easeS, pos: end, look },
+        { t: holdS + 90, pos: end.clone().addScaledVector(d, 0.6).add(new THREE.Vector3(0, 0.25, 0)), look: look.clone().add(new THREE.Vector3(0, 0.25, 0)) },
+      ],
+      blendInS: 0.6, blendOutS: 2.5, lockS,
+    });
+  };
   const rig: FinaleRig = {
     settled: () => forced || opts.settled(),
     emberInCradle: () => forced || opts.ember.restsAt(F.cradle.x, cy, F.cradle.z, 0.7),
@@ -578,7 +644,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         const wide = rig.cradle.clone().addScaledVector(d, -10.5).add(new THREE.Vector3(0, 4.2, 0));
         const aim = rig.cradle.clone().addScaledVector(d, 7).add(new THREE.Vector3(0, 3.2, 0));
         const T = FINALE_TIMING;
-        const until = T.warming + T.unbinding + T.open + T.released * 0.7;
+        // the wide holds until the snow, which eases straight on to the family (familyShot) when the fox is by the cradle
+        const until = T.warming + T.unbinding + T.open + T.released + 0.5;
         opts.cam.playPath({
           keys: [
             { t: 0, pos: cam.position.clone(), look: look0 },
@@ -603,6 +670,10 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         opts.crownLetGo();
         for (let i = 0; i < 3; i++) ctx.audio.play('soft-paper', { at: rig.bookTop, gain: 0.12, rate: 0.85 + i * 0.07, delay: i * 0.35 });
         say('so it would never end.');
+        // keep the wide on the pages and the Crown, then arrive on the family just as the snow and
+        // 'Let the year turn.' come in (not still easing when the caption shows)
+        const f = ctx.fox.root.position;
+        if (Math.hypot(f.x - F.cradle.x, f.z - F.cradle.z) < FINALE_TIMING.restR) familyShot(2.2, 1, FINALE_TIMING.released - 2.0);
       },
       onward: (to: THREE.Vector3) => {
         rig.s.onwardLen = rebuildOnward(to);
@@ -637,22 +708,8 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       },
       card: () => {
         ctx.audio.cue('finale-rest');
-        // ease out to a held composition: fox, kits and ember in front, the open Album, the bare Crown beyond
-        const cam = opts.cam.camera;
-        const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
-        // look between the book's face (local −z) and the Crown, from behind the ember
-        const d = view();
-        const end = rig.cradle.clone().addScaledVector(d, -6.6).add(new THREE.Vector3(0, 2.3, 0));
-        const look = rig.cradle.clone().addScaledVector(d, 5).add(new THREE.Vector3(0, 1.3, 0));
-        const hold = FINALE_TIMING.cardIn + FINALE_TIMING.cardHold;
-        opts.cam.playPath({
-          keys: [
-            { t: 0, pos: cam.position.clone(), look: look0 },
-            { t: 4.5, pos: end, look },
-            { t: hold + 1, pos: end.clone().add(new THREE.Vector3(0, 0.6, 0)).addScaledVector(toCrown, -0.8), look: look.clone().add(new THREE.Vector3(0, 0.8, 0)) },
-          ],
-          blendInS: 0.6, blendOutS: 2.5, lockS: hold,
-        });
+        // the held composition on the family with the title over it; it holds (a slow push) until the player moves
+        familyShot(4.5, FINALE_TIMING.cardIn + FINALE_TIMING.cardHold);
         opts.onCard?.();
       },
     },
@@ -662,14 +719,15 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     homeReady: opts.homeReady,
     emberWhere: (out: THREE.Vector3) => opts.ember.where(out),
     pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
-    cradle: new THREE.Vector3(F.cradle.x, cy, F.cradle.z),
+    cradle: cradleAt,
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
     toCrown,
     kitLand: new Float32Array(F2.flatMap((k) => [k.land.x, k.land.z])),
-    kitCurl: new Float32Array(F2.flatMap((k) => [k.curl.x, k.curl.z])),
+    kitCurl: new Float32Array(F2.length * 2),
+    kitSlots: new Float32Array(F.slots.flatMap((p) => [p.x, p.z])),
     cover0: new THREE.Color(FROST), cover1: new THREE.Color(COVER), paper0: new THREE.Color(0x9c8e78), paper1: new THREE.Color(PAPER),
     ember: new THREE.Color(0xf08a3a), emblem0: new THREE.Color(0x4a3a30),
-    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, onwardT: 0, onwardLen: 1, homeSaid: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
+    s: { phase: 0, t: 0, clock: 0, snowT: 0, still: 0, settledT: 0, onwardT: 0, onwardLen: 1, homeSaid: 0, restK: 0, lieT: 0, getUpT: -1, card: 0, cardT: 0, kitNear: 99, foxX: 0, foxZ: 0, kindles: 0, cardShows: 0, wheel: 0, leavesOut: 0 },
     player: opts.player, heroLie: hero.lie, heroRest: hero.rest, lieDur: lieClip.duration,
     kitPhase: new Int8Array(F2.length),
     kitT: new Float32Array(F2.length),
@@ -690,7 +748,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     state: () => ({
       phase: PHASES[rig.s.phase], t: +rig.s.t.toFixed(2), kindles: rig.s.kindles, cradle: [+rig.cradle.x.toFixed(2), +rig.cradle.z.toFixed(2)],
       kits: Array.from(rig.kitPhase, (k) => KIT_PHASES[k]), card: ['hidden', 'showing', 'done'][rig.s.card], cardShows: rig.s.cardShows,
-      snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, onward: rig.onwardMesh.count, still: +rig.s.still.toFixed(2),
+      kitNear: +rig.s.kitNear.toFixed(2), restShot: restShot.tried, snow: +rig.s.snowT.toFixed(2), leaves: rig.s.leavesOut, onward: rig.onwardMesh.count, still: +rig.s.still.toFixed(2),
     }),
   };
 }

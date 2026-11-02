@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { createTrailUniforms, TRAIL_DECLARATIONS, TRAIL_BLEND } from './opening/paint';
+import { createLaneUniforms, LANE_BAND, LANE_DECLARATIONS } from './opening/lanePaint';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export const INK = new THREE.Color(0x24160e);
@@ -43,6 +44,7 @@ export const RAMP_CANOPY = toonRamp([118, 178, 255]);
 export const RESTORE_SLOTS = 24;
 export const paintU = {
   ...createTrailUniforms(),
+  ...createLaneUniforms(),
   uRestore: { value: Array.from({ length: RESTORE_SLOTS }, () => new THREE.Vector4()) },
   uRestoreCount: { value: 0 },
   /** per restore: how far (m) its colour has bled out past the washed front (grows for a while after it settles) */
@@ -101,6 +103,7 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
         uniform int uRestoreCount;
         uniform float uRestoreBleed[${RESTORE_SLOTS}];
         ${TRAIL_DECLARATIONS}
+        ${LANE_DECLARATIONS}
         uniform vec3 uPaper;
         uniform vec3 uPaperInk;
         uniform float uLkContour;
@@ -119,10 +122,13 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           float lift = max(0.0, vLkWorld.y - uLkClimb.x) * uLkClimb.y;
           float drops = smoothstep(0.7, 0.78, lkNoise(xz * 1.3 + 11.0)) * (1.0 - step(0.2, lift));
           float paint = 0.0, tide = 0.0, bloom = 0.0, soft = 0.0;
+          ${LANE_BAND}
           for (int i = 0; i < ${RESTORE_SLOTS}; i++) {
             if (i >= uRestoreCount) break;
             vec4 r = uRestore[i];
             float d = length(xz - r.xy) - r.z + rag * min(1.0, r.z / 12.0) + lift;
+            // ...and runs on down the roads (DESIGN-corridors.md) as its colour bleeds
+            d -= laneRun * uLaneReach * uRestoreBleed[i];
             // tight front so the edge reads as a wet brush stroke, not an airbrushed blur
             float e = max(0.06, r.w * 0.16);
             float p = 1.0 - smoothstep(-e, e, d);
@@ -178,6 +184,40 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           // the bled halo: colour without the wet front (paler, part-way to paper), feathering the island's edge
           vec3 faded = mix(sepia, cel, 0.78);
           sepia = mix(sepia, faded, soft * (1.0 - paint));
+          // the roads' underpainting (DESIGN-corridors.md): painted verges either side of a saved-paper road, and a
+          // faint broken tide at the verge. Beige lane cel alone reads as paper, so the wash brings its own pigment.
+          const vec3 lw = vec3(0.2126, 0.7152, 0.0722);
+          // the sketch is not grey: it keeps a little of its authored hue at the paper's value, like a coloured-pencil
+          // underdrawing the fox's paint completes (DESIGN-corridors.md)
+          {
+            float cl = max(1e-3, dot(cel, lw));
+            vec3 hueAtPaper = cel * (dot(sepia, lw) / cl);
+            sepia = mix(sepia, hueAtPaper, uSketchTint * uLaneOn);
+          }
+          if (lane > 0.0) {
+            // ochre alone is the paper's own hue and vanishes into it: the verges are one olive / sap-green family (never lime) laid in
+            // value (pigment settles in the paper's valleys), with crisp-edged gold autumn-grass islands and madder
+            // flecks — washes with edges, never a rainbow airbrush
+            float gran = lkNoise(xz * 5.3 + 2.0) * 0.6 + lkNoise(xz * 1.4 + 8.0) * 0.4;
+            vec3 wash = mix(vec3(0.44, 0.52, 0.22), vec3(0.56, 0.6, 0.3), gran);
+            float gold = smoothstep(0.545, 0.565, lkFbm(xz * 0.16 + 7.0) + (lkNoise(xz * 1.9) - 0.5) * 0.06);
+            wash = mix(wash, vec3(0.92, 0.66, 0.18) * (0.9 + 0.2 * gran), gold);
+            // fallen-leaf rust flecks (madder red read as stains at chase distance)
+            float fleck = smoothstep(0.83, 0.86, lkNoise(xz * 1.1 + 2.0));
+            wash = mix(wash, vec3(0.88, 0.42, 0.16), fleck * 0.8);
+            float sl = dot(sepia, lw);
+            // laid a little darker than the paper and pushed past its own chroma: a pastel at paper value
+            // washes out under the haze and tone map
+            vec3 washC = wash * (0.8 * sl / dot(wash, lw));
+            washC = max(vec3(0.0), sl * 0.8 + (washC - sl * 0.8) * 1.55);
+            // the trodden middle is left as paper with a light warm-gold glaze, the way a watercolourist
+            // saves the white of a road between painted verges
+            washC = mix(washC, mix(sepia, vec3(0.98, 0.78, 0.42) * sl / 0.78, 0.5), laneCore * 0.85);
+            // pigment pools at the wash's edges: a darker, more saturated tide line on the verge side
+            washC = mix(washC, washC * vec3(0.72, 0.78, 0.66), laneEdge * (1.0 - laneCore) * 0.8);
+            float under = lane * uLaneUnder * (0.85 + 0.3 * gran) * (1.0 - paint);
+            sepia = mix(sepia, washC, clamp(under, 0.0, 1.0));
+          }
           outgoingLight = mix(sepia, cel, paint);
           outgoingLight = mix(outgoingLight, pigment, wet * 0.22);
           // brushy contour ink where the surface turns away from the eye
@@ -279,6 +319,69 @@ export function hewn(geo: THREE.BufferGeometry, rand: () => number, amount = 0.0
   const g = jitter(geo, amount, rand, 1.1).toNonIndexed();
   g.computeVertexNormals();
   return g;
+}
+
+/** A deterministic seed from a geometry's first vertices (so a replaced stone keeps its own lumps per instance) */
+function geoSeed(geo: THREE.BufferGeometry): number {
+  const p = geo.getAttribute('position') as THREE.BufferAttribute;
+  let h = 2166136261;
+  for (let i = 0; i < Math.min(p.count, 12); i++) h = Math.imul(h ^ Math.round((p.getX(i) + p.getY(i) * 3 + p.getZ(i) * 7) * 1e4), 16777619);
+  return h >>> 0;
+}
+
+/**
+ * Field stone: a smooth, lumpy, flat-bottomed boulder filling `src`'s bounds. Replaces faceted dodecahedra (Kit:
+ * "blocky hex stones") without touching the shared build rand — callers still build `src` exactly as before.
+ */
+export function roundStone(src: THREE.BufferGeometry): THREE.BufferGeometry {
+  src.computeBoundingBox();
+  const bb = src.boundingBox!;
+  const size = bb.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+  const centre = bb.getCenter(new THREE.Vector3());
+  const r = rng(geoSeed(src));
+  const lumps = Array.from({ length: 4 }, () => [new THREE.Vector3(r() - 0.5, r() * 0.6, r() - 0.5).normalize(), 0.08 + r() * 0.12] as const);
+  const g = mergeVertices(new THREE.IcosahedronGeometry(1, 2).deleteAttribute('normal').deleteAttribute('uv'), 1e-4);
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i);
+    let k = 1;
+    for (const [d, a] of lumps) k += a * Math.max(0, v.dot(d)) ** 2;
+    v.multiplyScalar(k);
+    // a settled stone: broad flat underside, shoulders rounding into it
+    if (v.y < -0.35) v.y = -0.35 + (v.y + 0.35) * 0.2;
+    p.setXYZ(i, centre.x + v.x * size.x, centre.y + v.y * size.y, centre.z + v.z * size.z);
+  }
+  g.computeVertexNormals();
+  // smooth normals, then non-indexed like hewn() so kit merges and bakes mix them freely
+  return g.toNonIndexed();
+}
+
+/**
+ * Worn flagstone: a low pillow slab whose outline follows `lobes` (radius multipliers round the rim, interpolated
+ * smoothly — 24 sides, never a hexagon) with a softly domed top and rounded edge.
+ */
+export function roundSlab(lobes: ReadonlyArray<number>, rTop: number, rBottom: number, h: number): THREE.BufferGeometry {
+  const seg = 24;
+  const g = mergeVertices(new THREE.CylinderGeometry(1, 1, 1, seg, 1, false).deleteAttribute('normal').deleteAttribute('uv'), 1e-4);
+  const p = g.getAttribute('position') as THREE.BufferAttribute;
+  const n = lobes.length;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const rad = Math.hypot(x, z);
+    const t = ((Math.atan2(z, x) + Math.PI) / (Math.PI * 2)) * n;
+    const i0 = Math.floor(t) % n;
+    const f = t - Math.floor(t);
+    const w = (1 - Math.cos(f * Math.PI)) / 2;
+    const k = lobes[i0]! * (1 - w) + lobes[(i0 + 1) % n]! * w;
+    const top = y > 0;
+    // the top rim tucks in and the cap domes: a pillow, not a die-cut prism
+    const rr = rad * k * (top ? rTop * 0.88 : rBottom);
+    const yy = top ? h * (0.5 + 0.35 * (1 - rad * rad)) - h * 0.15 * rad : -h * 0.5;
+    p.setXYZ(i, rad > 1e-6 ? (x / rad) * rr : 0, yy, rad > 1e-6 ? (z / rad) * rr : 0);
+  }
+  g.computeVertexNormals();
+  return g.toNonIndexed();
 }
 
 /**

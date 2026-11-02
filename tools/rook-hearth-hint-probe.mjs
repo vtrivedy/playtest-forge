@@ -9,7 +9,7 @@ const page=await browser.newPage({viewport:{width:960,height:540}});page.setDefa
 try {
 await page.goto('http://127.0.0.1:5196/');await page.waitForFunction(()=>window.__gameHooks?.ready);
 for(const [label,x,z,frames,stick] of [['far',5.6,83,180,0],['near',5.6,79,180,0],['walk-away',5.6,79,100,1],['ruin',-23.6,75,180,0]]){
-const sample=await page.evaluate(([label,x,z,frames,stick])=>{const h=window.__gameHooks;h.setManual(true);h.setKeys([]);h.setStick(0,0);h.teleport(x,z,0);h.advance(180,1/60,false);h.setStick(0,stick);const state=h.advance(frames,1/60,true);h.setStick(0,0);return {label,state,game:window.__game,hud:document.querySelector('[data-opening-teach="heat"]').style.opacity}},[label,x,z,frames,stick]);samples.push(sample);await page.waitForTimeout(500);await page.screenshot({path:`${out}/${label}.png`});
+const sample=await page.evaluate(([label,x,z,frames,stick])=>{const h=window.__gameHooks;h.setManual(true);h.setKeys([]);h.setStick(0,0);h.teleport(x,z,0);h.advance(180,1/60,false);h.setStick(0,stick);const state=h.advance(frames,1/60,true);h.setStick(0,0);return {label,state,game:window.__game,hud:(h.state().opening.hearth.hint?1:0)}},[label,x,z,frames,stick]);samples.push(sample);await page.waitForTimeout(500);await page.screenshot({path:`${out}/${label}.png`});
 }
 const assertions=samples.map(s=>({name:s.label,pass:s.hud===(s.label==='near'?'1':'0')}));assertions.push({name:'no page errors',pass:!errors.length});fs.writeFileSync(`${out}/evidence.json`,JSON.stringify({samples,errors,assertions},null,2));console.log(JSON.stringify(assertions));if(assertions.some(a=>!a.pass))process.exitCode=1;
 } finally {await browser.close();await server.close();}

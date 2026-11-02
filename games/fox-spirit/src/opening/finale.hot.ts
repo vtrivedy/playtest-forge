@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import type { HearthFox } from '../lookdevFox';
+import { fitLetterPlane, type LetterPlane } from './lettering.hot';
 
 export const FINALE_TIMING = {
   /** seconds in each automatic phase after Kindle */
@@ -12,7 +13,9 @@ export const FINALE_TIMING = {
   /** pages leave the book over this long; each flies `pageLife` s */
   pageSpread: 3.2, pageLife: 13,
   /** kits drift down this long after release starts, one every `kitGap` s; drift and pop seconds */
-  kitFirst: 1.8, kitGap: 1.1, kitDrift: 3.2, kitPop: 0.6, kitScale: 0.55,
+  kitFirst: 1.8, kitGap: 1.1, kitDrift: 3.2, kitPop: 0.6, kitScale: 0.42,
+  /** a curled kit the standing hero comes this close to hops up and shuffles to a free slot */
+  kitRoom: 0.95,
   /** the card: fox still this long by the cradle (within `restR`), or `timeout` s after snow begins */
   rest: 1.6, restR: 4.2, timeout: 24, cardIn: 2.5, cardHold: 7.5, cardOut: 2.5,
   snowRamp: 14,
@@ -23,15 +26,16 @@ const T = FINALE_TIMING;
 
 export const PHASES = ['sealed', 'warming', 'unbinding', 'open', 'released', 'snow'] as const;
 export type FinalePhase = (typeof PHASES)[number];
-/** a kit: 0 pressed (in the Album), 1 drifting down as a page, 2 popped and trotting home, 3 curled by the ember */
-export const KIT_PHASES = ['pressed', 'drifting', 'trotting', 'curled'] as const;
+/** a kit: 0 pressed (in the Album), 1 drifting down as a page, 2 popped and trotting home, 3 curled by the ember,
+ * 4 shuffling to a free slot because the hero came too close (still home: tla/Finale.tla `Disturb` / `Resettle`) */
+export const KIT_PHASES = ['pressed', 'drifting', 'trotting', 'curled', 'shuffling'] as const;
 
 export type FinaleRig = {
   /** live inputs */
   settled: () => boolean;
   emberInCradle: () => boolean;
   fox: THREE.Object3D;
-  camera: THREE.Camera;
+  camera: THREE.PerspectiveCamera;
   canvas: HTMLCanvasElement;
   /** the shared paint uniform the world's toon shader reads for settled snow */
   snowCover: { value: number };
@@ -69,19 +73,21 @@ export type FinaleRig = {
   snowMat: THREE.ShaderMaterial;
   kitFoxes: HearthFox[];
   kitPages: THREE.Mesh[];
-  card: HTMLElement;
+  card: LetterPlane;
   /** fixed points */
   cradle: THREE.Vector3;
   bookTop: THREE.Vector3;
   /** unit xz direction from the Press down the valley to the Still Crown */
   toCrown: THREE.Vector3;
   kitLand: Float32Array;
+  /** each kit's current curl spot (x, z), picked from `kitSlots` */
   kitCurl: Float32Array;
+  kitSlots: Float32Array;
   cover0: THREE.Color; cover1: THREE.Color; paper0: THREE.Color; paper1: THREE.Color; ember: THREE.Color; emblem0: THREE.Color;
   /** mutable state (numbers only) */
   s: {
     phase: number; t: number; clock: number; snowT: number; still: number; settledT: number; onwardT: number; onwardLen: number; homeSaid: number; restK: number; lieT: number; getUpT: number;
-    card: 0 | 1 | 2; cardT: number; foxX: number; foxZ: number; kindles: number; cardShows: number; wheel: number; leavesOut: number;
+    card: 0 | 1 | 2; cardT: number; kitNear: number; foxX: number; foxZ: number; kindles: number; cardShows: number; wheel: number; leavesOut: number;
   };
   /** the hero's rest clips on its own mixer, blended over the controller while it lies by the ember */
   player: { setMoveScale: (k: number) => void; intent: () => number };
@@ -180,6 +186,27 @@ function stepPages(rig: FinaleRig, since: number): void {
   rig.s.leavesOut = Math.max(rig.s.leavesOut, leaves);
 }
 
+/** the free slot farthest from the hero and from every other kit's spot (a kit is never asked to lie inside the fox) */
+function pickSlot(rig: FinaleRig, i: number): void {
+  const f = rig.fox.position;
+  const sl = rig.kitSlots;
+  let best = 0, bestScore = -1;
+  for (let j = 0; j < sl.length; j += 2) {
+    const x = sl[j]!, z = sl[j + 1]!;
+    let score = Math.hypot(x - f.x, z - f.z);
+    for (let k = 0; k < rig.kitFoxes.length; k++) {
+      if (k === i || rig.kitPhase[k]! < 2) continue;
+      score = Math.min(score, 1.6 * Math.hypot(x - rig.kitCurl[k * 2]!, z - rig.kitCurl[k * 2 + 1]!));
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = j;
+    }
+  }
+  rig.kitCurl[i * 2] = sl[best]!;
+  rig.kitCurl[i * 2 + 1] = sl[best + 1]!;
+}
+
 function stepKit(rig: FinaleRig, i: number, dt: number, since: number): void {
   const kit = rig.kitFoxes[i]!;
   const page = rig.kitPages[i]!;
@@ -210,6 +237,7 @@ function stepKit(rig: FinaleRig, i: number, dt: number, since: number): void {
       rig.kitX[i] = lx;
       rig.kitZ[i] = lz;
       rig.kitYaw[i] = Math.atan2(rig.cradle.x - lx, rig.cradle.z - lz);
+      pickSlot(rig, i);
       kit.root.visible = true;
       kit.play('idle');
     }
@@ -222,7 +250,7 @@ function stepKit(rig: FinaleRig, i: number, dt: number, since: number): void {
   page.scale.set(1 - pop, 1 - pop, 1 - pop);
   kit.root.scale.setScalar(T.kitScale * Math.max(0.001, spring));
   const cx = rig.kitCurl[i * 2]!, cz = rig.kitCurl[i * 2 + 1]!;
-  if (rig.kitPhase[i] === 2 && t > T.kitPop + 0.3) {
+  if ((rig.kitPhase[i] === 2 && t > T.kitPop + 0.3) || rig.kitPhase[i] === 4) {
     const dx = cx - rig.kitX[i]!, dz = cz - rig.kitZ[i]!;
     const d = Math.hypot(dx, dz);
     if (d < 0.08) {
@@ -234,13 +262,33 @@ function stepKit(rig: FinaleRig, i: number, dt: number, since: number): void {
       kit.play('walk');
       // stride-matched: the authored walk speed scaled with the kit, easing into its spot (never below a slow
       // amble, so it always arrives); it steps straight at the spot while its body turns to face the way
+      // (a kit making room hurries a little more)
       const walk = (kit.clipSpeed.walk ?? 0.53) * T.kitScale;
-      const v = Math.max(0.12, Math.min(walk * 1.6, d * 2.5));
+      const v = Math.max(0.12, Math.min(walk * (rig.kitPhase[i] === 4 ? 2.4 : 1.6), d * 2.5));
       kit.mixer.timeScale = v / Math.max(0.01, walk);
-      rig.kitYaw[i] = dampAngle(rig.kitYaw[i]!, Math.atan2(dx, dz), 8, dt);
+      // it goes round the hero, never through: lean the heading away from the fox inside `kitRoom` + a margin
+      const f = rig.fox.position;
+      const hx = rig.kitX[i]! - f.x, hz = rig.kitZ[i]! - f.z;
+      const hd = Math.max(1e-3, Math.hypot(hx, hz));
+      const push = Math.max(0, (T.kitRoom + 0.25 - hd) / 0.25) * 1.5;
+      let ux = dx / d + (hx / hd) * push, uz = dz / d + (hz / hd) * push;
+      const ul = Math.max(1e-3, Math.hypot(ux, uz));
+      ux /= ul;
+      uz /= ul;
+      rig.kitYaw[i] = dampAngle(rig.kitYaw[i]!, Math.atan2(ux, uz), 8, dt);
       const step = Math.min(v * dt, d);
-      rig.kitX[i]! += (dx / d) * step;
-      rig.kitZ[i]! += (dz / d) * step;
+      rig.kitX[i]! += ux * step;
+      rig.kitZ[i]! += uz * step;
+    }
+  }
+  if (rig.kitPhase[i] === 3 && rig.s.restK <= 0 && rig.s.getUpT < 0) {
+    // the standing hero walks into a curled kit: it hops up and shuffles over to a free slot
+    const f = rig.fox.position;
+    if (Math.hypot(f.x - rig.kitX[i]!, f.z - rig.kitZ[i]!) < T.kitRoom) {
+      rig.kitPhase[i] = 4;
+      // past the pop: the kit keeps its size, it only gets up and walks
+      rig.kitT[i] = T.kitPop + 1;
+      pickSlot(rig, i);
     }
   }
   if (rig.kitPhase[i] === 3) {
@@ -449,7 +497,8 @@ export function updateFinale(rig: FinaleRig, dt: number): void {
   stepHeroRest(rig, dt);
   if (s.card === 0 && ph === 5) {
     let curled = true;
-    for (let i = 0; i < rig.kitPhase.length; i++) if (rig.kitPhase[i] !== 3) curled = false;
+    // home = curled, or shuffling to a new spot after the hero came close
+    for (let i = 0; i < rig.kitPhase.length; i++) if (rig.kitPhase[i]! < 3) curled = false;
     if (curled && (s.still >= T.rest || s.snowT >= T.timeout)) {
       s.card = 1;
       s.cardT = 0;
@@ -462,10 +511,11 @@ export function updateFinale(rig: FinaleRig, dt: number): void {
   if (s.card === 1) {
     s.cardT += dt;
     const o = smooth(s.cardT, 0, T.cardIn) * (1 - smooth(s.cardT, T.cardIn + T.cardHold, T.cardIn + T.cardHold + T.cardOut));
-    rig.card.style.opacity = o.toFixed(3);
-    if (s.cardT >= T.cardIn + T.cardHold + T.cardOut) {
-      s.card = 2;
-      rig.card.style.opacity = '0';
-    }
+    if (s.cardT >= T.cardIn + T.cardHold + T.cardOut) s.card = 2;
+    fitLetterPlane(rig.card, rig.camera, s.card === 1 ? o : 0);
   }
+  // review metric: the closest any landed kit stands to the hero (≥ ~0.8 m = no kit drawn inside the fox)
+  s.kitNear = 99;
+  const f = rig.fox.position;
+  for (let i = 0; i < rig.kitPhase.length; i++) if (rig.kitPhase[i]! >= 2) s.kitNear = Math.min(s.kitNear, Math.hypot(f.x - rig.kitX[i]!, f.z - rig.kitZ[i]!));
 }

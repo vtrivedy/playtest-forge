@@ -4,7 +4,7 @@
  * leaf-stones on the south lip. The drying lines and their pressed leaves live in hermitage.hot.ts.
  */
 import * as THREE from 'three';
-import { buildMaple, buildRock, hewn, jitter, mapleLeafGeometry, toon, type TreeKind } from '../lookdevKit';
+import { buildMaple, buildRock, hewn, jitter, mapleLeafGeometry, RAMP_WORLD, toon, type TreeKind } from '../lookdevKit';
 import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import type { OpeningCtx } from './scene';
 import { pathDist, rimK } from './layout';
@@ -208,6 +208,31 @@ function buildDesk(k: Kit, ctx: OpeningCtx): void {
     for (let i = 0; i < 3; i++) k.add(cyl(0.025, 0.03, 0.46, 5), C.timberDark, [0.1 + Math.cos(i * 2.1) * 0.14, 0.22, -0.75 + Math.sin(i * 2.1) * 0.14]);
   });
   colliders.push({ kind: 'box', x: D.x, z: D.z, yaw: D.yaw, hx: 0.85, hz: 0.45, top: y + 0.9 });
+  // what the Scribe kept: pressed leaves on the open book and three cakes of pigment by the inkpot, in full colour
+  // on the sepia desk (plain toon, no paper patch — DESIGN-corridors.md). Fixed offsets: no build rand drawn.
+  const kept = new THREE.Group();
+  kept.position.set(D.x, y, D.z);
+  kept.rotation.y = D.yaw;
+  const plain = (c: number) => new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP_WORLD });
+  const leaf = mapleLeafGeometry(0.12);
+  for (const [lx, lz, a, c] of [[0.06, 0.04, 0.4, 0xc0422a], [0.34, -0.02, -0.7, 0xd8902e], [0.22, 0.12, 2.2, 0xa83a26]] as const) {
+    const m = new THREE.Mesh(leaf, plain(c));
+    m.position.set(lx, 0.918 + lz * 0.12, lz);
+    m.rotation.set(0.12, a, 0);
+    kept.add(m);
+  }
+  const pot = new THREE.CylinderGeometry(0.07, 0.062, 0.06, 14);
+  const cake = new THREE.CylinderGeometry(0.06, 0.06, 0.014, 14);
+  [0xb8321e, 0xe0a12a, 0x5c8a34].forEach((c, i) => {
+    const px = 0.36 + i * 0.16;
+    const pz = 0.16 - i * 0.02;
+    const p = new THREE.Mesh(pot, plain(0xe8dcc0));
+    p.position.set(px, 0.905 + pz * 0.12, pz);
+    const k2 = new THREE.Mesh(cake, plain(c));
+    k2.position.set(px, 0.93 + pz * 0.12, pz);
+    kept.add(p, k2);
+  });
+  ctx.scene.add(kept);
 }
 
 /** a broken flower-press by the door: two boards, the iron screw and its T-handle (the Press's small cousin) */
