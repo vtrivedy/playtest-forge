@@ -11,6 +11,7 @@ import { bakeCells } from './bake';
 import { C, cyl, Kit } from './village';
 import { CANOPY as CANOPY_ROUTE, GLYPHS, HEARTH_A, HOUSES, inVista, JOGS, KEEPING, LEAF_PILES, PAGE, pathDist, POP_UP_RUIN, rimK, SHELF, SPAWN, UNPRESSED, WELL } from './layout';
 import { BROOK, MILLBROOK, polyDist, westE } from './millbrookLayout';
+import { HERMITAGE, northE } from './hermitageLayout';
 
 /** [x, z, r]: authored spaces dressing never enters */
 const KEEP_OUT: ReadonlyArray<readonly [number, number, number]> = [
@@ -39,6 +40,10 @@ const KEEP_OUT: ReadonlyArray<readonly [number, number, number]> = [
   [MILLBROOK.weir.x, MILLBROOK.weir.z, 6],
   [MILLBROOK.hay.x, MILLBROOK.hay.z, 8],
   [MILLBROOK.lookout.x, MILLBROOK.lookout.z, 7],
+  [HERMITAGE.house.x, HERMITAGE.house.z, 5.5],
+  [HERMITAGE.desk.x, HERMITAGE.desk.z, 3],
+  [HERMITAGE.pond.x, HERMITAGE.pond.z, HERMITAGE.pond.r + 1.5],
+  ...HERMITAGE.lines.flatMap(([ax, az, bx, bz]) => [[ax, az, 2], [bx, bz, 2], [(ax + bx) / 2, (az + bz) / 2, 2.6]] as const),
 ];
 
 /** inside the playable world and clear of lanes, houses, play spaces and the brook */
@@ -54,7 +59,8 @@ function open(x: number, z: number, lane: number): boolean {
 function edge(x: number, z: number): number {
   const bowl = rimK(x, z);
   const west = 1 + westE(x, z) / 12;
-  return Math.min(bowl, west);
+  const north = 1 + northE(x, z) / 10;
+  return Math.min(bowl, west, north);
 }
 
 let bushMat: THREE.MeshToonMaterial | null = null;
@@ -85,7 +91,7 @@ export function buildDressing(ctx: OpeningCtx): void {
     let placed = 0;
     for (let i = 0; i < n * 40 && placed < n; i++) {
       const x = -118 + rand() * 162;
-      const z = 46 + rand() * 76;
+      const z = 46 + rand() * 102;
       const e = edge(x, z);
       if (e > 1.35) continue;
       if (fn(x, z, e)) placed++;

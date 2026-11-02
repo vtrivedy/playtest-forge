@@ -34,6 +34,8 @@ import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
 import { buildMillbrook } from './millbrook';
 import { buildDressing } from './dressing';
+import { buildHermitage } from './hermitage';
+import { createDryingLines } from './hermitage.hot';
 import { createMillrace } from './millrace.hot';
 import { buildKiln, buildWeir } from './millWeir';
 import { createMillWeir } from './millWeir.hot';
@@ -102,7 +104,7 @@ export async function runOpening(): Promise<void> {
     colliders: [],
     cutout: [],
     occluders: [],
-    field: createColorField({ bounds: { minX: -120, maxX: 50, minZ: 40, maxZ: 125 }, maskSize: 768 }),
+    field: createColorField({ bounds: { minX: -120, maxX: 50, minZ: 20, maxZ: 150 }, maskSize: 896 }),
     fox,
     player: null,
     onUpdate: (fn) => void updates.push(fn),
@@ -117,6 +119,8 @@ export async function runOpening(): Promise<void> {
   const westCtx: OpeningCtx = { ...ctx, rand: rng(4217) };
   const millbrook = buildMillbrook(westCtx);
   const millrace = createMillrace(westCtx, millbrook.mill.wheel);
+  buildHermitage(westCtx);
+  const dryingLines = createDryingLines(westCtx);
   buildDressing(westCtx);
   const kilnParts = buildKiln(westCtx);
   const weirParts = buildWeir(westCtx);
@@ -258,7 +262,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), millrace: millrace.state(), millWeir: millWeir.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -319,6 +323,8 @@ export async function runOpening(): Promise<void> {
     homecoming: homecoming.force,
     /** dev: burst Millbrook's leaf dam without the dash */
     millBurst: millrace.burst,
+    /** dev: free the Hermitage's drying lines without running under them */
+    hermitageFree: dryingLines.freeAll,
     /** dev: open the glyph shrine without solving it */
     glyphSolve: glyphs.solve,
     /** dev: unfold the steam stair without the steam latch */
