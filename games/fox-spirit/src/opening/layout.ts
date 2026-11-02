@@ -4,6 +4,7 @@
  */
 import * as THREE from 'three';
 import { WEST_PATHS, westBase, westK, westRim } from './millbrookLayout';
+import { NORTH_PATHS, northRim, northRise } from './hermitageLayout';
 
 /** wake spot by the plaza, facing down the hub lane toward the meadow (−3, 81) */
 export const SPAWN = { x: -5.2, z: 92.5, yaw: Math.atan2(2.2, -11.5) } as const;
@@ -44,7 +45,7 @@ export const HOUSES = [
 ] as const;
 
 /** The south lane's line, meadow → Press Hollow: painted by PATHS and carved through the rim by southLane() (one source) */
-export const SOUTH_LANE: ReadonlyArray<readonly [number, number]> = [[4.2, 75.6], [6.2, 69], [7.5, 63.5], [12.5, 53], [18.8, 44.2], [21.1, 40.2]];
+export const SOUTH_LANE: ReadonlyArray<readonly [number, number]> = [[4.2, 75.6], [3.4, 72.4], [6.2, 69], [7.5, 63.5], [12.5, 53], [18.8, 44.2], [21.1, 40.2]];
 
 /** Lanes as segments [ax, az, bx, bz]; the last ones lead the opening route out to H-a */
 export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
@@ -58,7 +59,7 @@ export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
 ];
 
 /** every lane the ground flattens and colours: the village's and Millbrook's (millbrookLayout.ts) */
-const ALL_PATHS = [...PATHS, ...WEST_PATHS];
+const ALL_PATHS = [...PATHS, ...WEST_PATHS, ...NORTH_PATHS];
 
 /** The bowl's play area (ellipse); the ground climbs into a cliffed rim outside it, except where Millbrook's lane breaks through */
 export const BOUNDS = { cx: -4, cz: 83, rx: 40, rz: 25 } as const;
@@ -194,6 +195,12 @@ function southLane(x: number, z: number, h: number): number {
   return Math.min(h, bank);
 }
 
+/** smooth min (polynomial, blend width k): where two rims meet they fillet instead of creasing */
+function smin(a: number, b: number, k: number): number {
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.min(a, b) - h * h * k * 0.25;
+}
+
 /** Base terrain (no props): gentle swells, flattened lanes and house pads, cliffed rim */
 export function groundH(x: number, z: number): number {
   const swell = Math.sin(x * 0.11) * Math.cos(z * 0.09) * 0.7 + Math.sin(x * 0.31 + z * 0.17) * 0.18;
@@ -207,11 +214,8 @@ export function groundH(x: number, z: number): number {
   const r = rimK(x, z);
   const bowlRim = THREE.MathUtils.smoothstep(r, 0.92, 1.08) * 7 + Math.max(0, r - 1.08) * 14;
   // the world is the union of the bowl and Millbrook: the lower rim wins, filleted where they meet
-  const a = bowlRim;
-  const b = westRim(x, z);
-  const k = Math.max(2 - Math.abs(a - b), 0) / 2;
-  const rim = Math.min(a, b) - k * k * 0.5;
-  const base = THREE.MathUtils.lerp(swell * flat * 0.8 + meadow, westBase(x, z), westK(x));
+  const rim = smin(smin(bowlRim, westRim(x, z), 2), northRim(x, z), 2);
+  const base = THREE.MathUtils.lerp(swell * flat * 0.8 + meadow, westBase(x, z), westK(x)) + northRise(x, z);
   return vistaCut(x, z, base + rim);
 }
 

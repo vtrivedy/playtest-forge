@@ -32,13 +32,16 @@ import { buildHomecoming } from './homecoming';
 import { buildLeafPiles } from './leafPiles';
 import { buildCanopy } from './canopy';
 import { buildPopUpRuin } from './popUpRuin';
-import { buildFinale } from './finale';
 import { buildMillbrook } from './millbrook';
 import { buildDressing } from './dressing';
+import { buildHermitage } from './hermitage';
+import { createDryingLines } from './hermitage.hot';
 import { createMillrace } from './millrace.hot';
 import { buildKiln, buildWeir } from './millWeir';
 import { createMillWeir } from './millWeir.hot';
 import { MILLBROOK } from './millbrookLayout';
+import { buildFinale } from './finale';
+import { laneBlocks } from './lanes';
 import { createCaptions, type Captions } from './captions';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
@@ -110,7 +113,7 @@ export async function runOpening(): Promise<void> {
     colliders: [],
     cutout: [],
     occluders: [],
-    field: createColorField({ bounds: { minX: -120, maxX: 50, minZ: 40, maxZ: 125 }, maskSize: 768 }),
+    field: createColorField({ bounds: { minX: -120, maxX: 50, minZ: 20, maxZ: 150 }, maskSize: 896 }),
     fox,
     player: null,
     onUpdate: (fn) => void updates.push(fn),
@@ -128,6 +131,8 @@ export async function runOpening(): Promise<void> {
   const westCtx: OpeningCtx = { ...ctx, rand: rng(4217) };
   const millbrook = buildMillbrook(westCtx);
   const millrace = createMillrace(westCtx, millbrook.mill.wheel);
+  buildHermitage(westCtx);
+  const dryingLines = createDryingLines(westCtx);
   buildDressing(westCtx);
   const kilnParts = buildKiln(westCtx);
   const weirParts = buildWeir(westCtx);
@@ -159,6 +164,9 @@ export async function runOpening(): Promise<void> {
   });
   // the controller exists only after every build; its callbacks reach the carry through this binding
   let carry: ReturnType<typeof createCarry> | null = null;
+  // every builder has run: nothing that blocks may stand on a painted lane (lanes.ts)
+  const blocked = laneBlocks(ctx.colliders, groundH);
+  if (blocked.length) console.warn(`lane blocked:\n${blocked.join('\n')}`);
   const player = createPlay({
     fox,
     groundH,
@@ -219,6 +227,7 @@ export async function runOpening(): Promise<void> {
     settled: () => settledAt >= 0,
     ember: coal,
     cam: player.cam,
+    player,
     crownLetGo: crown.letGo,
   });
   ctx.onUpdate((_dt, t) => {
@@ -229,7 +238,13 @@ export async function runOpening(): Promise<void> {
   const view = player.cam.camera;
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
+  let warnedSlots = false;
   function syncPaint(): void {
+    // every permanent wash needs a shader slot; one past the budget would silently never show
+    if (!warnedSlots && field.restores.length > RESTORE_SLOTS) {
+      warnedSlots = true;
+      console.error(`paint restore budget exceeded: ${field.restores.length} > RESTORE_SLOTS ${RESTORE_SLOTS}`);
+    }
     paintU.uRestoreCount.value = Math.min(RESTORE_SLOTS, field.restores.length);
     field.restores.slice(0, RESTORE_SLOTS).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
   }
@@ -284,7 +299,7 @@ export async function runOpening(): Promise<void> {
 
   let manual = new URLSearchParams(location.search).has('manual');
   let ready = false;
-  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), finale: finale.state(), millrace: millrace.state(), millWeir: millWeir.state() } });
+  const state = () => ({ ...player.state(), opening: { canopy: canopy.state(), hearth: hearth.state(), paint: paint.state(), visibility: occlusion.state(), restores: field.restores.length, carry: coal.state(), chemistry: chemistry.state(), crown: crown.state(), keeping: keeping.state(), unpressed: unpressed.state(), glyphs: glyphs.state(), hum: hum.state(), audio: { ...ctx.audio.state(), foley: foley.state() }, page: runaway.state(), popUpRuin: popUpRuin.state(), homecoming: homecoming.state(), leafPiles: leafPiles.state(), millrace: millrace.state(), millWeir: millWeir.state(), hermitage: dryingLines.state(), finale: finale.state() } });
   // same harness surface as the game (main.ts __gameHooks): world-relative stick, keys, manual clock
   const gameHooks = {
     get ready() {
@@ -343,10 +358,12 @@ export async function runOpening(): Promise<void> {
     unpress: unpressed.unpress,
     /** dev: the homecoming as if the page were kept (pins it, sends the freed home) */
     homecoming: homecoming.force,
-    /** dev: the finale as if the Keeping had settled and the ember sat in the Press cradle */
-    finale: finale.force,
     /** dev: burst Millbrook's leaf dam without the dash */
     millBurst: millrace.burst,
+    /** dev: free the Hermitage's drying lines without running under them */
+    hermitageFree: dryingLines.freeAll,
+    /** dev: the finale as if the Keeping had settled and the ember sat in the Press cradle */
+    finale: finale.force,
     /** dev: open the glyph shrine without solving it */
     glyphSolve: glyphs.solve,
     /** dev: unfold the steam stair without the steam latch */

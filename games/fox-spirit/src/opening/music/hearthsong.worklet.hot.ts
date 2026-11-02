@@ -49,6 +49,27 @@ const MAX_FORCE = 2;
 /** the coda sings the tune's last line (tla CodaFrom = bars - 4) */
 const CODA_BARS = 4;
 
+/**
+ * the pad's single cycle: a soft bowed-string spectrum (20 partials falling as 1/n^1.4), RMS matched to the old
+ * three-sine organ (which every critic heard as "synth"); read with linear interpolation, one table for all notes
+ * (pad notes stay under ~600 Hz, so 20 partials never alias)
+ */
+const TABLE_N = 2048;
+const TABLE_SCALE = TABLE_N / TAU;
+const STRINGS = (() => {
+  const t = new Float32Array(TABLE_N + 1);
+  let e = 0;
+  for (let i = 0; i < TABLE_N; i++) {
+    let v = 0;
+    for (let n = 1; n <= 20; n++) v += Math.sin((TAU * n * i) / TABLE_N) / Math.pow(n, 1.4);
+    t[i] = v;
+    e += v * v;
+  }
+  const k = 0.754 / Math.sqrt(e / TABLE_N);
+  for (let i = 0; i < TABLE_N; i++) t[i]! *= k;
+  t[TABLE_N] = t[0]!;
+  return t;
+})();
 /** semitones down to the diatonic third below a note (C major; semis = note above the key) */
 const THIRD_DOWN = Int8Array.from([3, 3, 3, 3, 4, 3, 4, 3, 4, 4, 4, 4]);
 // cold:end
@@ -229,6 +250,17 @@ class Hearthsong extends AudioWorkletProcessor {
       this.pInc[k * 3 + 1] = (TAU * f * 1.0035) / sampleRate;
       this.pInc[k * 3 + 2] = (TAU * f * 0.9968) / sampleRate;
       this.pTo[k] = v === 0 ? 0.9 : 0.7;
+    }
+  }
+
+  /** a quick run up the sounding chord over two octaves (~0.4 s), placed on the harp */
+  flourish(): void {
+    const s = this.s;
+    const chords = this.shaded ? s.shadeChords : s.chords;
+    const cb = (this.tune * s.bars + (this.breath ? s.bars - 1 : Math.max(0, this.bar))) * 3;
+    for (let k = 0; k < 7; k++) {
+      const tone = chords[cb + (k % 3)]! + 12 * Math.floor(k / 3);
+      this.pluck(s.key + tone, 0.3 - k * 0.015, 0.006, k * 0.055);
     }
   }
 
@@ -434,6 +466,8 @@ class Hearthsong extends AudioWorkletProcessor {
         // tla ForceCue: a finale moment sings even inside the gap (re-arms a fading swell)
         if ((this.swell === IDLE || this.swell === FADING) && this.forces > 0) { this.swell = ARMED; this.forced = true; this.forces--; }
       } else if (this.swell === IDLE && this.since >= this.s.swell.gap) this.swell = ARMED;
+      // every moment, sung or not, gets an immediate soft harp run up the current chord (juice that stays in key)
+      if (this.ending === PLAYING || this.ending === EPILOGUE) this.flourish();
       this.lastCue = cue;
     }
     const singing = this.swell === SINGING;
@@ -508,7 +542,9 @@ class Hearthsong extends AudioWorkletProcessor {
           let ph = this.pPh[k]! + this.pInc[k]!;
           if (ph > TAU) ph -= TAU;
           this.pPh[k] = ph;
-          w += Math.sin(ph) + 0.35 * Math.sin(2 * ph) + 0.12 * Math.sin(3 * ph);
+          const x = ph * TABLE_SCALE;
+          const j = x | 0;
+          w += STRINGS[j]! + (STRINGS[j + 1]! - STRINGS[j]!) * (x - j);
         }
         w *= a;
         if (v % 2 === 0) { pl += w; pr += w * 0.6; } else { pr += w; pl += w * 0.6; }

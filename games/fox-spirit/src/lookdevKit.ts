@@ -40,7 +40,7 @@ export const RAMP_CANOPY = toonRamp([118, 178, 255]);
 
 /** Shared paint uniforms: restores as (x, z, radius, edge) */
 /** permanent restore regions the paint shader reads (H-a, steam, root, ruin, page… — one slot each) */
-export const RESTORE_SLOTS = 16;
+export const RESTORE_SLOTS = 24;
 export const paintU = {
   ...createTrailUniforms(),
   uRestore: { value: Array.from({ length: RESTORE_SLOTS }, () => new THREE.Vector4()) },

@@ -171,6 +171,15 @@ permits branch unmute; Vivek then hears the landed result on main.
   ratio 3.5 / index 1.6 (ratio 4, index 0.8 = celesta); "ticking clock" = 6 ms-attack footsteps at a steady gait.
 - The model hallucinates (a "male voice", "alarm") on noise beds; confirm any flaw on the spectrogram before acting.
 
+- Place tunes: a `SONG.tunes` entry with `places: [...]` is taken at the next pass start while one of its places
+  leads (weight > 0.5), never twice running, alternating with the shared rotation. Add new regions' places to
+  `PLACES` and, if they deserve it, a tune. 15-minute offline render: stable level (−34…−30 dB RMS/min), no NaN.
+
+- Model ↔ code conformance: `npm run check:music` renders the stress walk offline and checks every worklet
+  bar-line report against the TLA spec's rules (render.ts `checkTrace`). Mutating the worklet (drop the gap
+  check) fails it; the first run caught a checker bug instead (an armed swell legitimately waits across a breath,
+  so judge the start against the state before arming). Run it after touching the conductor.
+
 ### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
 
 - Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
@@ -467,3 +476,13 @@ A clear destination is not a clear connecting segment. Full staged finale route 
 -60e4a2c's full70s west route completes without debug restores or timeout skips: mill turning/painted,kiln lit/rode,Weir reached,bank-height bridge crossed,lookout painted.510/510 continuous body frames pass; all reviewed. Route module has precise bridge waypoints and an explicit completion beat; the runner's --expect-beat fails unfinished paths. Bramble42af413 fixes the genuine0.56m bridge-entry step that aligning the bot revealed.
 - A framed body can still be veiled by particles.8292211 caps shared updraft ember/leaf billboards at12/24px and fades both near the lens. No lift/heat/collider change. The actual-shader GPU probe measures pixels at known depths and proves the old shader fails4/6cases; farther-visible checks prevent a broken blank shader passing. d0a3ee3 full route+120-frame in-game hold/rise retest passes and remains readable with bloom. Workflow: .claude/skills/updraft-sprite-visibility/SKILL.md.
 - Final integrated7ea02f2 original90s success:3catches0skips,page pinnedhome,0JS/console errors; all7 staged finale legs and45 handoff frames pass. Review docs/reviews/swarm4/fern-millbrook-final.md names exact per-run scope. Body clearance/appearance proof is not a whole-game gait or unfamiliar-player discovery verdict. Source stays fixed during captures; tools now start ?manual=1 and retain console shader errors too.
+## World build determinism and restore capacity
+
+- Shared build rand: every opening builder draws from one `ctx.rand` (rng 11). A new region that consumes
+  it, or a new `continue` before a rand call in an old loop, re-lays-out every later builder (and can break
+  other teams' recorded tapes). New regions get their own seed (`{ ...ctx, rand: rng(N) }`); check with
+  `tools/rand-fingerprint.mjs` on both trees (equal next values ⇒ identical layouts). Note `jitter()`
+  consumes rand per vertex, so changing a geometry's segment count shifts the sequence too.
+- Paint restores each need a shader slot (`RESTORE_SLOTS`, now 24; `uRestore` loop breaks at the count).
+  With page (4) + Keeping (3) + homecoming + ruin + finale (2) + Millbrook/Hermitage (5) the old 16 was
+  exactly full; slots past the budget silently never showed. scene.ts now console.errors when exceeded.

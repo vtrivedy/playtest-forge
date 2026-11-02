@@ -68,6 +68,7 @@ export const PLAY = {
 const TAU = Math.PI * 2;
 const wrap = (a: number) => a - TAU * Math.floor((a + Math.PI) / TAU);
 
+export { colliderTop } from './cameraCollider.hot';
 type AnimState = 'idle' | 'loco' | 'jumpUp' | 'fall' | 'land';
 const STATE_FADE: Record<Exclude<AnimState, 'loco' | 'idle'>, number> = { jumpUp: 0.06, fall: 0.16, land: 0.06 };
 const BINS = 32;
@@ -395,6 +396,10 @@ export interface PlayController {
   setStick: (x: number | null, z?: number) => void;
   setKeys: (codes: string[]) => void;
   teleport: (x: number, z: number, yaw: number) => void;
+  /** scale the move wish (0 holds the fox in place, e.g. while an authored get-up plays); 1 = normal */
+  setMoveScale: (k: number) => void;
+  /** length of the raw move wish this frame (before setMoveScale): the player is asking to move */
+  intent: () => number;
 }
 
 export function createPlay(opts: {
@@ -609,6 +614,8 @@ export function createPlay(opts: {
   teleport(opts.start.x, opts.start.z, opts.start.yaw);
 
   const wish = new THREE.Vector2();
+  let moveScale = 1;
+  let intentLen = 0;
   function readInput() {
     if (stick) wish.copy(stick);
     else {
@@ -626,8 +633,10 @@ export function createPlay(opts: {
       if (wish.lengthSq() > 1) wish.normalize();
       if (keys.has('ControlLeft') || keys.has('ControlRight')) wish.multiplyScalar(P.walkSpeed / P.runSpeed);
     }
+    intentLen = wish.length();
+    wish.multiplyScalar(moveScale);
     const jump = keys.has('Space');
-    if (jump && !jumpHeld) bufferT = P.buffer;
+    if (jump && !jumpHeld && moveScale > 0.5) bufferT = P.buffer;
     jumpHeld = jump;
     const interact = keys.has('KeyE');
     if (interact && !interactHeld) opts.onInteract?.();
@@ -828,6 +837,10 @@ export function createPlay(opts: {
     teleport(x, z, y) {
       teleport(x, z, y);
     },
+    setMoveScale(k) {
+      moveScale = THREE.MathUtils.clamp(k, 0, 1);
+    },
+    intent: () => intentLen,
     setStick(x, z = 0) {
       stick = x === null ? null : new THREE.Vector2(x, z);
       if (stick && stick.length() > 1) stick.normalize();

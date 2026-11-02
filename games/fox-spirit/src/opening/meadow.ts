@@ -9,6 +9,7 @@ import { buildGrass, buildGround, buildLeaves } from '../lookdevGround';
 import type { OpeningCtx } from './scene';
 import { BOUNDS, bowlPathDist, HEARTH_A, HOUSES, inVista, JOGS, pathDist, rimK, SHELF, WELL } from './layout';
 import { westE } from './millbrookLayout';
+import { northE } from './hermitageLayout';
 
 /** Stone strata, base → cap: warm grey-ochre bands so the shelf reads as layered rock, not a crate */
 const STRATA = [0x6e5c4c, 0x8a7560, 0x7a6754, 0x93806a];
@@ -240,7 +241,7 @@ export function buildMeadow(ctx: OpeningCtx): void {
     t.position.set(x, y - 0.1, z);
     t.rotation.y = rand() * 6;
     // built even where Millbrook's lane cuts the rim, so the shared rand sequence (and every later layout) is unchanged
-    if (westE(x, z) < 3) continue;
+    if (westE(x, z) < 3 || northE(x, z) < 3) continue;
     scene.add(t);
   }
   // a second, deeper row of crowns up the slope, offset between the first
@@ -254,7 +255,7 @@ export function buildMeadow(ctx: OpeningCtx): void {
     const t = buildMaple(rand, 1.6 + rand() * 0.5, 'grove', 4 + (i & 1), y2);
     t.position.set(x2, y2 - 0.1, z2);
     t.rotation.y = rand() * 6;
-    if (westE(x2, z2) < 3) continue;
+    if (westE(x2, z2) < 3 || northE(x2, z2) < 3) continue;
     scene.add(t);
   }
   for (const [x, z, sc, kind, pal] of TREES) {
@@ -290,7 +291,7 @@ export function buildMeadow(ctx: OpeningCtx): void {
   // no ridge in the vista gap past the far crag: the Crown is framed there
   buildDistance(scene, rand, {
     cx: BOUNDS.cx, cz: BOUNDS.cz, dir: -Math.PI / 2, arc: Math.PI * 1.9, count: 16, y: 2,
-    keep: (x, z) => !inVista(x, z, 18) && westE(x, z) > 22,
+    keep: (x, z) => !inVista(x, z, 18) && westE(x, z) > 22 && northE(x, z) > 22,
   });
 }
 

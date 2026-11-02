@@ -1,0 +1,3 @@
+# Independent Hermitage access review
+
+Review Bramble's fixed source SHA in an isolated production bundle. Start at the north village lane, follow every NORTH_LANE bend with movement input, visit the desk and all three drying lines, then return by the same lane. A staged initial position is explicit; no forced restoration or teleport is permitted during the route. Require completed legs, finite transforms, no runtime errors, saved window.__game and arrival/return screenshots. Review images and repeat after any fix. This checks terrain/collider access and interaction state, not continuous animation or audio quality.

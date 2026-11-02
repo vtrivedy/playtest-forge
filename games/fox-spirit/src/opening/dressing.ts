@@ -5,12 +5,13 @@
  * nothing inside an authored play space (keep-outs below). Everything is baked by cell (bake.ts).
  */
 import * as THREE from 'three';
-import { CANOPY, CANOPY_MOSS, canopyPad, RAMP_CANOPY, toon, type CanopyTones } from '../lookdevKit';
+import { CANOPY, CANOPY_MOSS, canopyPad, mapleLeafGeometry, RAMP_CANOPY, toon, type CanopyTones } from '../lookdevKit';
 import type { OpeningCtx } from './scene';
 import { bakeCells } from './bake';
-import { C, cyl, Kit } from './village';
+import { box, C, cyl, Kit } from './village';
 import { CANOPY as CANOPY_ROUTE, GLYPHS, HEARTH_A, HOUSES, inVista, JOGS, KEEPING, LEAF_PILES, PAGE, pathDist, POP_UP_RUIN, rimK, SHELF, SPAWN, UNPRESSED, WELL } from './layout';
 import { BROOK, MILLBROOK, polyDist, westE } from './millbrookLayout';
+import { HERMITAGE, northE } from './hermitageLayout';
 
 /** [x, z, r]: authored spaces dressing never enters */
 const KEEP_OUT: ReadonlyArray<readonly [number, number, number]> = [
@@ -39,6 +40,10 @@ const KEEP_OUT: ReadonlyArray<readonly [number, number, number]> = [
   [MILLBROOK.weir.x, MILLBROOK.weir.z, 6],
   [MILLBROOK.hay.x, MILLBROOK.hay.z, 8],
   [MILLBROOK.lookout.x, MILLBROOK.lookout.z, 7],
+  [HERMITAGE.house.x, HERMITAGE.house.z, 5.5],
+  [HERMITAGE.desk.x, HERMITAGE.desk.z, 3],
+  [HERMITAGE.pond.x, HERMITAGE.pond.z, HERMITAGE.pond.r + 1.5],
+  ...HERMITAGE.lines.flatMap(([ax, az, bx, bz]) => [[ax, az, 2], [bx, bz, 2], [(ax + bx) / 2, (az + bz) / 2, 2.6]] as const),
 ];
 
 /** inside the playable world and clear of lanes, houses, play spaces and the brook */
@@ -54,7 +59,8 @@ function open(x: number, z: number, lane: number): boolean {
 function edge(x: number, z: number): number {
   const bowl = rimK(x, z);
   const west = 1 + westE(x, z) / 12;
-  return Math.min(bowl, west);
+  const north = 1 + northE(x, z) / 10;
+  return Math.min(bowl, west, north);
 }
 
 let bushMat: THREE.MeshToonMaterial | null = null;
@@ -85,7 +91,7 @@ export function buildDressing(ctx: OpeningCtx): void {
     let placed = 0;
     for (let i = 0; i < n * 40 && placed < n; i++) {
       const x = -118 + rand() * 162;
-      const z = 46 + rand() * 76;
+      const z = 46 + rand() * 102;
       const e = edge(x, z);
       if (e > 1.35) continue;
       if (fn(x, z, e)) placed++;
@@ -158,4 +164,35 @@ export function buildDressing(ctx: OpeningCtx): void {
   });
   roots.push(kit.build());
   for (const g of bakeCells(roots, 28, 'dressing')) scene.add(g);
+  fingerpost(ctx);
+}
+
+/**
+ * The fingerpost where the village gives out at its west end: two carved arms, no words — a little wheel on the arm toward Millbrook's lane,
+ * a pressed leaf on the arm up the hill to the Hermitage. Wayfinding for the two new places.
+ */
+function fingerpost(ctx: OpeningCtx): void {
+  const { groundH, rand, scene } = ctx;
+  const [x, z] = [-36.2, 91.9];
+  const y = groundH(x, z);
+  const k = new Kit();
+  k.add(cyl(0.08, 0.1, 2.3, 7), C.timber, [x, y + 1.15, z], [(rand() - 0.5) * 0.05, 0, (rand() - 0.5) * 0.05], 0.014);
+  k.add(new THREE.ConeGeometry(0.13, 0.18, 7), C.timberDark, [x, y + 2.38, z], [0, 0, 0], 0.012);
+  const arms: Array<[number, number, number, 'wheel' | 'leaf']> = [
+    [-36.5, 88.6, 1.9, 'wheel'],
+    [-9.7, 102.3, 1.6, 'leaf'],
+  ];
+  for (const [tx, tz, h, sign] of arms) {
+    const yaw = Math.atan2(tx - x, tz - z);
+    k.at(x, y + h, z, yaw, () => {
+      k.add(box(0.07, 0.2, 0.95), C.door, [0, 0, 0.5], [0, 0, 0], 0.012);
+      k.add(new THREE.ConeGeometry(0.1, 0.2, 4).rotateX(Math.PI / 2), C.door, [0, 0, 1.06], [0, 0, Math.PI / 4], 0.012);
+      if (sign === 'wheel') {
+        k.add(new THREE.TorusGeometry(0.07, 0.015, 5, 12).rotateY(Math.PI / 2), C.timberDark, [0.045, 0, 0.55], [0, 0, 0], 0.004);
+        for (let i = 0; i < 3; i++) k.add(box(0.01, 0.14, 0.012), C.timberDark, [0.05, 0, 0.55], [(i / 3) * Math.PI, 0, 0], 0.003);
+      } else k.add(mapleLeafGeometry(0.035).rotateZ(Math.PI / 2), C.bloom[0]!, [0.045, 0, 0.55], [0, 0, 0], 0.004);
+    });
+  }
+  scene.add(k.build());
+  ctx.colliders.push({ kind: 'post', x, z, r: 0.14 });
 }

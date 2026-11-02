@@ -22,7 +22,7 @@ fs.rmSync(frames, { recursive: true, force: true });
 fs.mkdirSync(frames, { recursive: true });
 
 // [beat, target xz | null, options]; hold = seconds standing; dash = Shift on arrival; until = state test
-const ROUTE = [
+const MILLBROOK_ROUTE = [
   ['wake', null, { hold: 1.5 }],
   ['plaza west', [-12.5, 89.4]],
   ['cottage lane', [-18.7, 87.4]],
@@ -56,8 +56,40 @@ const ROUTE = [
   ['foot of the hill', [-93.5, 80.5]],
   ['climb', [-95.5, 75.5]],
   ['lookout', [-97.9, 72.8]],
-  ['the view', [-98.6, 72.4], { hold: 4, face: [-60, 84] }],
+  ['the view', [-98.6, 72.4]],
+  ['look back east', null, { hold: 4, face: [-60, 84] }],
 ];
+// the Hermitage: up the north hanger lane, free the three drying lines, the desk, the view, back down to the village
+const HERMITAGE_ROUTE = [
+  ['wake', null, { hold: 1.5 }],
+  ['north lane', [-5.2, 100.4]],
+  ['past the cottage', [-5.6, 102.6]],
+  ['lane corner', [-9.7, 102.6]],
+  ['the hanger', [-12.6, 108.2]],
+  ['climbing', [-14.2, 114.6]],
+  ['bend', [-11.4, 120.8]],
+  ['top of the lane', [-7.6, 124.6]],
+  ['plateau', [-7.0, 129.4], { hold: 1 }],
+  ['line one run-up', [-9.2, 131.8]],
+  ['under line one', [-13.8, 127.3]],
+  ['line two run-up', [-1.1, 131.5]],
+  ['under line two', [1.5, 128.5]],
+  ['back across', [-3.0, 132.6]],
+  ['south of the desk', [-10.4, 133.2]],
+  ['line three run-up', [-10.4, 139.4]],
+  ['under line three', [-14.4, 138.4]],
+  ['round the pole', [-11.2, 134.4]],
+  ['to the desk', [-8.4, 134.0]],
+  ['at the desk', null, { hold: 4.5 }],
+  ['the lip', [-7.2, 126.8]],
+  ['look over the village', null, { hold: 4, face: [-6, 90] }],
+  ['down the lane', [-11.4, 120.8]],
+  ['down', [-14.2, 114.6]],
+  ['down again', [-12.6, 108.2]],
+  ['back in the village', [-9.7, 102.3]],
+];
+const which = arg('route', 'millbrook');
+const ROUTE = which === 'hermitage' ? HERMITAGE_ROUTE : which === 'grand' ? [...HERMITAGE_ROUTE, ['to the west lane', [-12.6, 96.6]], ['west yard', [-14, 95]], ...MILLBROOK_ROUTE.slice(1)] : MILLBROOK_ROUTE;
 const START = {
   village: { at: [-5.2, 92.5, Math.atan2(2.2, -11.5)], beat: 0 },
   lane: { at: [-36, 89, -1.4], beat: 5 },
@@ -173,7 +205,7 @@ try {
   }
   log.final = await page.evaluate(() => {
     const s = window.__gameHooks.state();
-    return { pos: s.pos, millrace: s.opening.millrace, millWeir: s.opening.millWeir, restores: s.opening.restores };
+    return { pos: s.pos, millrace: s.opening.millrace, millWeir: s.opening.millWeir, hermitage: s.opening.hermitage, restores: s.opening.restores };
   });
   log.simSeconds = frame / 60;
   fs.writeFileSync(path.join(out, 'route.json'), JSON.stringify(log, null, 1));
