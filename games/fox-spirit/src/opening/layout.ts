@@ -49,6 +49,8 @@ export const PATHS: ReadonlyArray<readonly [number, number, number, number]> = [
   [-37.7, 88.7, -34, 90], [-34, 90, -32, 88.5], [-32, 88.5, -29.2, 87.5], [-8, 88, -4, 88], [-4, 88, -3, 81], [-3, 81, 0, 80],
   [12, 98, 8, 99], [8, 99, 0, 94], [0, 80, 9, 88], [9, 88, 25, 88],
   [-6, 92, -7.2, 87], [0, 80, 4.2, 75.6], [0, 80, -3, 62],
+  // the south lane out of the meadow, down into Press Hollow to the foot of the Press (DESIGN-finale.md)
+  [4.2, 75.6, 6.2, 69], [6.2, 69, 7.5, 63.5], [7.5, 63.5, 12.5, 53], [12.5, 53, 18.8, 44.2], [18.8, 44.2, 21.1, 40.2],
 ];
 
 /** Play area (ellipse); the ground climbs into a cliffed rim outside it */
@@ -98,7 +100,8 @@ export const FINALE = (() => {
     x: press.x + lx * Math.cos(press.yaw) + lz * Math.sin(press.yaw),
     z: press.z - lx * Math.sin(press.yaw) + lz * Math.cos(press.yaw),
   });
-  const cradle = local(0, 2.75);
+  // off the frame's near post (local x 0.3, z 2.05) so ember, kits and post never stack in one line of sight
+  const cradle = local(-0.95, 2.9);
   const round = (r: number, ang: number) => ({ x: cradle.x + Math.sin(press.yaw + ang) * r, z: cradle.z + Math.cos(press.yaw + ang) * r });
   return {
     at,
