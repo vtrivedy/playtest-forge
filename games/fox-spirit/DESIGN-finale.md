@@ -84,3 +84,13 @@ DOM, so canvas recordings never contain them.
   hops up and trots to a free slot (a new `Disturb` step in `tla/Finale.tla`; card liveness re-checked).
 - Measure: min hero↔kit distance over the rest hold (target ≥ 0.8 m); hero on-screen px in the card frame; card
   pixels present in a canvas readback.
+
+### Subtitle contrast correction (Reed, swarm5)
+
+The full-route native title frame on 417c558 shows cream subtitle letters crossing
+both the bright open Album and dark timber. Depth testing is already disabled;
+this is background contrast, not geometry occlusion. Give only the end-card
+subtitle a restrained warm-dark outline (rounded joins, drawn before cream fill),
+so every letter remains continuous across either background. Keep the family
+composition and title size. Verify on rendered title frames with runtime state,
+then review the shot again after the change.

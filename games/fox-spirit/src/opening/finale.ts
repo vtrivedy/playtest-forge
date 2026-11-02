@@ -554,7 +554,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const card = createLetterPlane(2048, 720, 0.42, 0.5);
   card.draw([
     { text: 'Russet Vale', px: 300, italic: true, spacing: 0.02 },
-    { text: 'and the year turned', px: 84, spacing: 0.14, alpha: 0.9 },
+    { text: 'and the year turned', px: 84, spacing: 0.14, alpha: 0.95, outline: 0.09 },
   ]);
   opts.cam.camera.add(card.mesh);
   const say = (text: string) => ctx.captions.say(text);
