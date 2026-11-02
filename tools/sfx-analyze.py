@@ -16,12 +16,12 @@ MIX_SFX, MIX_MUSIC = 0.9, 0.75
 SR = 44100
 # event: (sample, gain, rate) as in the code
 EVENTS = {
-    'creature pop (paper)': ('soft-paper', 0.35, 0.8),
+    'creature pop (paper)': ('soft-paper', 0.22, 0.8),
     'heron wingbeat (x3 max)': ('soft-wing', 0.2, 0.7),
     'canopy leaf touch (entry)': ('soft-leaf', 0.2, 0.8),
     'canopy leaf touch (roost)': ('soft-leaf', 0.2, 0.95),
-    'ruin fold unfold': ('soft-unfold', 0.5, 0.7),
-    'page pinned': ('soft-pin', 0.08, 0.85),
+    'ruin fold unfold': ('soft-unfold', 0.3, 0.7),
+    'page pinned': ('soft-pin', 0.06, 0.85),
 }
 # synth voices: (label, [(Hz, amp)], attack s, decay s, low-pass Hz) as in the code
 SYNTH = {

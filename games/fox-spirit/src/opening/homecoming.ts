@@ -180,7 +180,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
     if (pinned < 0) {
       pinned = 0;
       pin.visible = true;
-      ctx.audio.play('soft-pin', { at: at(pin), gain: 0.08, rate: 0.85 });
+      ctx.audio.play('soft-pin', { at: at(pin), gain: 0.06, rate: 0.85 });
       queue.push('page');
     }
     if (pinned >= 0) {

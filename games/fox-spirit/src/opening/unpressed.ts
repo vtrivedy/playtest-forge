@@ -412,7 +412,7 @@ function createUnpressedAudio(audio: OpeningAudio) {
   return {
     pop(id: string, at: THREE.Vector3) {
       if (ac.state !== 'running') return;
-      audio.play('soft-paper', { at, rate: 0.8, gain: 0.35 });
+      audio.play('soft-paper', { at, rate: 0.8, gain: 0.22 });
       // one soft harp pluck per creature (sits with the music's harp phrases)
       const src = ac.createBufferSource();
       src.buffer = pluck(ac, NOTE[id] ?? 440, 2);

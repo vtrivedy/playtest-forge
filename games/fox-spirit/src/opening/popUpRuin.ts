@@ -257,7 +257,7 @@ export function buildPopUpRuin(ctx: OpeningCtx): { state(): Record<string, unkno
         f.phase = 'opening';
         lastDash = dash;
         // the paper unfolds: one low, slow page-open
-        ctx.audio.play('soft-unfold', { at: new THREE.Vector3(f.x, f.y, f.z), rate: 0.7, gain: 0.5 });
+        ctx.audio.play('soft-unfold', { at: new THREE.Vector3(f.x, f.y, f.z), rate: 0.7, gain: 0.3 });
       }
       if (f.phase === 'opening') {
         f.elapsed += dt;
