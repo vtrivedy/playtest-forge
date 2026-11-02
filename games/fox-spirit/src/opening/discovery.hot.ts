@@ -44,12 +44,12 @@ function invitationLeaf(): THREE.CanvasTexture {
 }
 
 /** Guidance observes progression; only actual contacts/landings advance its traversal invitation. */
-export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyView, ruin: RuinView) {
+export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyView, ruin: RuinView, finishedAtLoad = false) {
   // cold:begin
   const target = new THREE.Vector3();
   const completionAt = new THREE.Vector3();
   let action: ActionIndex = 0;
-  let active = true;
+  let active = !finishedAtLoad;
   const scraps = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.28, 0.4), new THREE.MeshBasicMaterial({ map: invitationLeaf(), side: THREE.DoubleSide, transparent: true, alphaTest: 0.05 }), 4);
   scraps.name = 'page-invitation';
   scraps.frustumCulled = false;
@@ -60,8 +60,8 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   const euler = new THREE.Euler();
   const position = new THREE.Vector3();
   const scale = new THREE.Vector3(1, 1, 1);
-  let leg: Leg = 'page';
-  let seenCatches = -1;
+  let leg: Leg = finishedAtLoad ? 'done' : 'page';
+  let seenCatches = finishedAtLoad ? page.catches : -1;
   const landingToken = Symbol('grounded-overlook');
   // cold:end
 
@@ -200,6 +200,6 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
   });
   return {
     get finished() { return leg === 'done'; },
-    state: () => ({ active, visible: scraps.visible, leg, completionAt: leg === 'done' ? completionAt.toArray() : null, target: target.toArray(), action: ACTIONS[action], hint: HINTS[action] }),
+    state: () => ({ active, visible: scraps.visible, leg, restoredAtLoad: finishedAtLoad, completionAt: leg === 'done' && !finishedAtLoad ? completionAt.toArray() : null, target: target.toArray(), action: ACTIONS[action], hint: HINTS[action] }),
   };
 }
