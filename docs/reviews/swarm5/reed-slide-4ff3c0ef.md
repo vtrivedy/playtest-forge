@@ -62,6 +62,23 @@ not a consistent order-of-magnitude result. Thistle's separately reported eight
 seeds also fall short (127 → 34 unsticks; 93.9 → 25.1 stuck seconds).
 These tests do not assess unaided opening discovery.
 
+## Remaining trap locations
+
+Mapped the retained event coordinates to `opening/village.ts` and `HOUSES`
+without changing controller or geometry. These are source-based candidates for
+focused replays, not verified individual collision causes.
+
+| Seed / event time | Repeated position (x, z) | Nearby authored geometry |
+|---|---|---|
+| 9 / 21.37–26.35 s (six events) | approximately (-16.2, 94.6) | Cottage 0 front edge z=94.55 and crate post at (-15.816, 94.75), radius 0.38 |
+| 11 / 64.65–67.63 s (four events) | approximately (-16.63, 87.0) | Cottage 3 front edge z=86.95 and crate post at (-16.236, 87.15), radius 0.38 |
+| 11 / 44.33–45.32 s (two events) | approximately (-20.3, 86.97) | Cottage 3 barrel post at (-19.84, 87.1), radius 0.36 |
+| 11 / 56.77–57.75 s (two events) | approximately (-20.6, 84.7) | Cottage 3 west wall x=-20.55 |
+
+The two crate pockets account for ten of nineteen events across seeds 9 and 11.
+Test those pockets directly before broadening the slide algorithm. Sent these
+locations to Thistle, who owns movement work.
+
 ## Evidence and verification
 
 Durable volume `keeping-swarm5-captures/reed/slide-motion-review-4ff3c0ef/`:
