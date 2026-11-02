@@ -76,8 +76,8 @@ function paperTexture(rand: () => number, sketch: number): THREE.CanvasTexture {
 export async function buildFinale(ctx: OpeningCtx, opts: {
   settled: () => boolean;
   ember: { restsAt: (x: number, y: number, z: number, r: number) => boolean; where: (out: THREE.Vector3) => boolean };
-  /** the homecoming has filled the well: from then on a stream of motes leads on from it to the ember */
-  homeFull: () => boolean;
+  /** the page is pinned at home: from then on a stream of motes leads from the well to the ember */
+  homeReady: () => boolean;
   cam: FollowCamera;
   player: { setMoveScale: (k: number) => void; intent: () => number };
   crownLetGo: () => void;
@@ -515,7 +515,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   wayMesh.count = 0;
   scene.add(wayMesh);
 
-  // ---- onward: when the homecoming fills the well, a second stream leaves the well and leads to wherever the ember
+  // ---- onward: when the page is pinned, a second stream leaves the well and leads to wherever the ember
   // rests (the shelf before the Keeping, the root-hearth after), so the homecoming hands over instead of ending.
   // Rebuilt (cold) only when the ember has moved; the hot step just walks the LUT.
   // a little larger than the bridge stream: it has to read across the plaza and meadow from the well
@@ -602,13 +602,13 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
         rig.s.onwardLen = rebuildOnward(to);
       },
       homeCaption: () => {
+        // a slow look along the way the stream leaves (well → gate → hearth), so the hand-over is seen, not missed;
+        // any move after 1.5 s takes the lens back. Wait for a pause in the plaza so catching the page
+        // at the ruin cannot spend this reveal before the fox actually comes home.
+        const fox = ctx.fox.root.position;
+        if (Math.hypot(fox.x - WELL.x, fox.z - WELL.z) > 9 || opts.player.intent() > 0.05) return false;
         say('One page still holds the autumn.');
         ctx.audio.cue('homecoming-onward');
-        // a slow look along the way the stream leaves (well → gate → hearth), so the hand-over is seen, not missed;
-        // any move after 1.5 s takes the lens back. Only when the fox is round the plaza: a homecoming that completes
-        // while it is far away (a creature arriving late) must not drag the lens across the map
-        const fox = ctx.fox.root.position;
-        if (Math.hypot(fox.x - WELL.x, fox.z - WELL.z) > 25) return;
         const cam = opts.cam.camera;
         const look0 = cam.getWorldDirection(new THREE.Vector3()).multiplyScalar(6).add(cam.position);
         const well = new THREE.Vector3(WELL.x, groundH(WELL.x, WELL.z), WELL.z);
@@ -623,6 +623,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
           ],
           blendInS: 0.8, blendOutS: 2, lockS: 1.5,
         });
+        return true;
       },
       snow: () => {
         ctx.audio.cue('finale-snow');
@@ -652,7 +653,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     hinge, screw, wheel, coverMat, paperMat, ironMat, lampPaper, emblemMat, glowMat, light,
     wayMesh, wayLut, wayLen: wayCurve.getLength(),
     onwardMesh, onwardLut, emberAt: new THREE.Vector3(), onwardAt,
-    homeFull: opts.homeFull,
+    homeReady: opts.homeReady,
     emberWhere: (out: THREE.Vector3) => opts.ember.where(out),
     pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
     cradle: new THREE.Vector3(F.cradle.x, cy, F.cradle.z),

@@ -37,7 +37,7 @@ export type FinaleRig = {
   snowCover: { value: number };
   groundH: (x: number, z: number) => number;
   /** cold one-shot events (may allocate) */
-  events: { onward: (to: THREE.Vector3) => void; homeCaption: () => void; kindle: () => void; unbind: () => void; open: () => void; release: () => void; snow: () => void; card: () => void };
+  events: { onward: (to: THREE.Vector3) => void; homeCaption: () => boolean; kindle: () => void; unbind: () => void; open: () => void; release: () => void; snow: () => void; card: () => void };
   /** scene parts */
   hinge: THREE.Object3D;
   screw: THREE.Object3D;
@@ -53,12 +53,12 @@ export type FinaleRig = {
   wayMesh: THREE.InstancedMesh;
   wayLut: Float32Array;
   wayLen: number;
-  /** the onward stream from the filled well to the ember (LUT rebuilt cold via events.onward when the ember moves) */
+  /** the onward stream from the pinned page at the well to the ember (LUT rebuilt cold via events.onward when the ember moves) */
   onwardMesh: THREE.InstancedMesh;
   onwardLut: Float32Array;
   onwardAt: THREE.Vector3;
   emberAt: THREE.Vector3;
-  homeFull: () => boolean;
+  homeReady: () => boolean;
   emberWhere: (out: THREE.Vector3) => boolean;
   pageMeshes: THREE.InstancedMesh[];
   leafMesh: THREE.InstancedMesh;
@@ -342,17 +342,17 @@ function stepHeroRest(rig: FinaleRig, dt: number): void {
   rig.heroRest.setEffectiveWeight(30 * s.restK * toRest);
 }
 
-/** onward: after the homecoming, motes stream from the well to wherever the ember rests, until it is carried or kindled */
+/** onward: after the page comes home, motes stream from the well to wherever the ember rests, until it is carried or kindled */
 function stepOnward(rig: FinaleRig, dt: number): void {
   const s = rig.s;
   const mesh = rig.onwardMesh;
   const carried = rig.emberWhere(rig.emberAt);
   const f = rig.fox.position;
   const near = Math.hypot(f.x - rig.emberAt.x, f.z - rig.emberAt.z) < 5;
-  const want = s.phase === 0 && rig.homeFull() && !carried && !near;
-  if (rig.homeFull() && s.homeSaid === 0) {
-    s.homeSaid = 1;
-    rig.events.homeCaption();
+  const want = s.phase === 0 && rig.homeReady() && !carried && !near;
+  if (s.phase === 0 && rig.homeReady() && !carried && s.homeSaid === 0) {
+    // Remote page completion leaves the reveal pending until the fox comes home.
+    if (rig.events.homeCaption()) s.homeSaid = 1;
   }
   if (want && rig.emberAt.distanceToSquared(rig.onwardAt) > 1) rig.events.onward(rig.emberAt);
   s.onwardT = want ? Math.min(3, s.onwardT + dt) : Math.max(0, s.onwardT - dt * 2);

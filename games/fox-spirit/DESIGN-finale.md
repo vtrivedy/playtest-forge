@@ -38,3 +38,20 @@ Album captions (≤ 6 words, the slice's only words; `ctx.captions.say`), the wh
 ## Hooks
 
 `state().opening.finale` = `{ phase, t, kits, card, snow }`; dev `__gameHooks.finale()` (settle the Keeping + put the ember in the cradle).
+
+## Homecoming handover correction (Fern, Nov 2)
+
+The main path catches the runaway page and returns to the well without freeing
+all four optional creatures. Requiring five lit lanterns for the onward trail
+therefore strands the main path in an idle plaza. Returning the page is enough
+to reveal the next story step; the full bucket remains the separate reward for
+bringing every creature home.
+
+Start the existing well-to-ember mote stream as soon as the page is pinned.
+Keep the reveal pending while the fox is away, and play it once when the fox enters the
+well's 9 m plaza and pauses. The camera must never travel from a remote region to
+the well. The shot keeps its accepted timings and movement interruption.
+Carry/near-ember fade and the actual finale's settled-Keeping + placed-ember
+requirements remain intact. Verify page-only homecoming (zero optional frees),
+remote pin then return, and the prior full-well case with rendered screenshots
+and window.__game. Explicitly distinguish staged hooks from natural traversal.
