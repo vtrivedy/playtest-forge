@@ -7,7 +7,7 @@ Keep durable findings here by topic. Name the tested SHA and evidence; separate 
 - Inspect the complete chase → catch → carried/collected → resting transition in uninterrupted motion. A stable homecoming page does not prove the runaway page is stable.
 - Source suspects in the pre-fix page implementation included a near-player full fold at 11.2 Hz, yaw assigned from each frame's displacement, a winded glow at 20 rad/s, and an abrupt droop release. These were hypotheses reported in #swarm :949, not individually proven causes or a verified fix.
 - Audit transform ownership before changing attachments. Tallow's Carry audit found no competing transform writer; do not change Carry blindly to solve a page animation defect.
-- Feed real update dt through damping and retain a consistent turn side across the ±π rear-bearing boundary. Moss 7edfc46 resolved the fixed-1/60 idle creature head-damping source concern. An isolated 30/60/120 Hz calculation agreed after one second, but that arithmetic is not a watched rear-crossing motion test.
+- Feed real update dt through damping and retain a consistent turn side across the ±π rear-bearing boundary. Moss 7edfc46 resolved the fixed-1/60 idle creature head-damping source concern. An isolated 30/60/120 Hz calculation agreed after one second, but that arithmetic is not a watched rear-crossing motion test. The subsequent b24c9fe hare probe was reviewed across all 240 decoded frames: no visible side snap in either rear pass. That bounded fixed-lens result does not cover stag/heron or page motion; evidence: `/captures/rook/head-turn-b24c9fe/`.
 
 ## Motion review and sampled stills
 
@@ -18,7 +18,7 @@ Keep durable findings here by topic. Name the tested SHA and evidence; separate 
 
 ## Capture throughput and hero timeouts
 
-- Measure actual render throughput before scheduling long captures. Flint reported roughly 58 frames/minute and a Modal 1800-second timeout for default 3300-frame hero jobs (#swarm :921). At that speed 3300 frames needs about 57 minutes; the 30-minute job cannot finish. Reduce frame count/resolution or choose an appropriate runner; do not repeatedly submit the same impossible budget.
+- Measure actual render throughput before scheduling long captures. Flint reported roughly 58 frames/minute and a Modal 1800-second timeout for default 3300-frame hero jobs (#swarm :921). At that speed 3300 frames needs about 57 minutes; the 30-minute job cannot finish. The hero path reportedly ignored route-seconds and retained its default 110 s / 3300 frames; verify the effective frame count before submitting again. Reduce frame count/resolution or choose an appropriate runner; do not repeatedly submit the same impossible budget.
 - Distinguish deterministic simulation time from wall time and playback rate. Rook's ruin motion probe used deterministic 10 fps frame capture at 640×360; identify those settings alongside the clip rather than implying real-time performance.
 - Save `window.__game`, assertions, and errors before video encoding. An ffmpeg ENOENT in the ruin capture occurred after gameplay evidence was already saved; preserve that evidence and report export failure separately.
 - Pin source while Vite is live. Changing a detached candidate during a curb replay triggered HMR and invalidated the run; rerun on an unchanged exact SHA.
