@@ -150,11 +150,11 @@ export function buildDiscovery(ctx: OpeningCtx, page: PageView, canopy: CanopyVi
     updateTarget();
     scraps.visible = active;
     if (!active) return;
-    ctx.teach.offer(HINTS[action]!);
     const fox = ctx.fox.root.position;
     const dx = target.x - fox.x;
     const dz = target.z - fox.z;
     const distance = Math.hypot(dx, dz);
+    if (page.catches > 0 || distance < 12) ctx.teach.offer(HINTS[action]!);
     const count = distance < 0.8 ? 0 : Math.min(4, Math.max(1, Math.ceil(distance / 2.25)));
     scraps.count = count;
     const step = Math.min(2.25, distance / Math.max(1, count));

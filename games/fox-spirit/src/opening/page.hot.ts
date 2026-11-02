@@ -14,7 +14,7 @@ const TUNE = {
   wait: 9,
   /** First chase stays within reach at a trot. Contact still needs jump/dash; walking only skips it ahead. */
   slow: 1.6,
-  fast: 3.05,
+  fast: 2.7,
   /** catch: dash or airborne contact, horizontal / vertical reach from the fox's feet */
   reach: 1.35,
   reachY: 1.25,
@@ -22,8 +22,7 @@ const TUNE = {
   skip: 1.8,
   fling: 2.6,
   /** a dash launched from this far reads as a lunge it can see coming: it jinks aside unless winded.
-   *  Stage 1 accepts the first lunge (teach); later stages dodge every fresh lunge — bait, then catch */
-  dodgeFrom: [4.2, 0, 0],
+   *  The intro accepts every lunge; high stages dodge a fresh lunge — bait, then catch. */
   dodgeTo: 4.2,
   jink: 2.4,
   /** after a dodge it is winded for a moment: slower, glow dims — the opening (shrinks per stage) */
@@ -266,7 +265,7 @@ export function buildRunawayPage(ctx: OpeningCtx) {
     const aloft = !st.grounded || !wasGrounded;
     wasGrounded = !!st.grounded;
     windedT = Math.max(0, windedT - dt);
-    if ((phase === 'perched' || phase === 'fleeing') && dashStart && windedT <= 0 && d > TUNE.dodgeFrom[stage]! && d < TUNE.dodgeTo) {
+    if (stage > 0 && (phase === 'perched' || phase === 'fleeing') && dashStart && windedT <= 0 && d > 0 && d < TUNE.dodgeTo) {
       // it sees the lunge: a quick jink across the fox's line and a little ahead
       dodges++;
       flaps++;

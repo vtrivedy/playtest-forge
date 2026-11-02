@@ -4,6 +4,8 @@
 export function createDiscoveryObserver(scene, camera, fox) {
   const mesh = scene.getObjectByName('page-invitation');
   if (!mesh) throw new Error('No rendered paper invitation');
+  const teachPanel = camera.children.find(n => n.material?.map?.image?.width === 2560 && n.material?.map?.image?.height === 128);
+  if (!teachPanel) throw new Error('No rendered teach panel');
   const matrix = fox.matrix.clone();
   const world = fox.position.clone();
   const screen = fox.position.clone();
@@ -27,11 +29,12 @@ export function createDiscoveryObserver(scene, camera, fox) {
     if (visible) seenAt = t;
     cue.active = visible || t - seenAt < 0.75;
     cue.search = !cue.active;
-    if (/dash into/.test(shown ?? '')) cue.action = 'unfold';
-    else if (/dash to catch/.test(shown ?? '')) cue.action = 'dash';
-    else if (/hold to spring/.test(shown ?? '')) cue.action = 'spring';
-    else if (/jump across/.test(shown ?? '')) cue.action = 'jump';
-    else if (/unfold/.test(shown ?? '')) cue.action = 'wait';
+    const words = teachPanel.visible && teachPanel.material.opacity >= 0.6 ? shown : null;
+    if (/dash into/.test(words ?? '')) cue.action = 'unfold';
+    else if (/dash to catch/.test(words ?? '')) cue.action = 'dash';
+    else if (/hold to spring/.test(words ?? '')) cue.action = 'spring';
+    else if (/jump across/.test(words ?? '')) cue.action = 'jump';
+    else if (/unfold/.test(words ?? '')) cue.action = 'wait';
     else cue.action = 'follow';
     return cue;
   };
