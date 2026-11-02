@@ -15,3 +15,12 @@ Add route acceptance for projected fox height, using a documented 0.8m body-heig
 proxy and a 5% viewport-height floor outside the initial settling second. Preserve
 full state, screenshots and a continuous payoff clip. Recheck the failed-catch
 regression and review the worst frames, then replay once after correction.
+
+The inherited full-page route currently stalls at `back for the climb`, before
+the overlook jump. Reject it as missed-jump coverage even if camera math passes.
+Require the requested jump beat to be observed when using `--miss-overlook`.
+Use a separate disclosed ledge-drop probe: two real dash actions open the ruin
+folds during staged setup, then place the fox once on the second leaf and walk
+off toward the overlook without jumping. Record the fall and jump retries with
+normal follow camera; never force page catches, physics, folds or restoration.
+This is a regional collision/framing test, not a full-page completion claim.

@@ -166,6 +166,12 @@ try {
     console.log('ROUTE',JSON.stringify(routeCheck));
     if(!routeCheck.pass)process.exitCode=1;
   }
+  if (missOverlook) {
+    const coverage = { requiredBeat: 'leap to the overlook', pass: evidence.trace.some(s => s.beat === 'leap to the overlook') };
+    fs.writeFileSync(path.join(out,'miss-coverage.json'),JSON.stringify(coverage,null,2));
+    console.log('MISS_COVERAGE',JSON.stringify(coverage));
+    if (!coverage.pass) process.exitCode=1;
+  }
   const late = evidence.trace.filter(s => s.f * testDt >= checkFrom);
   if (late.length) {
     const minChestDistance = Math.min(...late.map(s => Math.hypot(s.camera.pos[0] - s.pos[0], s.camera.pos[1] - s.pos[1] - .6, s.camera.pos[2] - s.pos[2])));
