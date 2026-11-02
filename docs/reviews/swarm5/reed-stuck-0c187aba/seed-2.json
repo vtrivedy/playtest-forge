@@ -1,0 +1,1617 @@
+{
+  "sourceCommit": "0c187aba8022ce2fb4acca32a3e7e7f55104acc0",
+  "policy": "blind",
+  "seconds": 90,
+  "seed": 2,
+  "tether": 14,
+  "perception": "random forward-biased control",
+  "capture": {
+    "sampleHz": 0,
+    "playbackSpeed": 0
+  },
+  "stuckTest": "1 s window < 15% of stick travel",
+  "unsticks": 2,
+  "stuckSeconds": 0.63,
+  "events": [
+    {
+      "t": 65.32,
+      "x": -8.03,
+      "y": 0,
+      "z": 97.31
+    },
+    {
+      "t": 70.27,
+      "x": -15.3,
+      "y": 0,
+      "z": 95.16
+    }
+  ],
+  "path": [
+    [
+      -5.2,
+      92.5
+    ],
+    [
+      -5.2,
+      90
+    ],
+    [
+      -5.2,
+      88
+    ],
+    [
+      -5,
+      86.7
+    ],
+    [
+      -4.7,
+      85.4
+    ],
+    [
+      -4.7,
+      84.7
+    ],
+    [
+      -4.6,
+      84.2
+    ],
+    [
+      -4.5,
+      83.3
+    ],
+    [
+      -4.3,
+      82.1
+    ],
+    [
+      -4.2,
+      80.8
+    ],
+    [
+      -4.2,
+      79.4
+    ],
+    [
+      -4.2,
+      78
+    ],
+    [
+      -4.2,
+      76.7
+    ],
+    [
+      -4.2,
+      75.4
+    ],
+    [
+      -4.2,
+      74
+    ],
+    [
+      -4.2,
+      72.7
+    ],
+    [
+      -4.2,
+      71.3
+    ],
+    [
+      -4.8,
+      70.7
+    ],
+    [
+      -5.4,
+      71.5
+    ],
+    [
+      -5.9,
+      72.7
+    ],
+    [
+      -6.4,
+      74
+    ],
+    [
+      -6.8,
+      75.2
+    ],
+    [
+      -7.3,
+      76.5
+    ],
+    [
+      -7.8,
+      77.7
+    ],
+    [
+      -8.3,
+      79
+    ],
+    [
+      -8.8,
+      80.3
+    ],
+    [
+      -9.3,
+      81.5
+    ],
+    [
+      -9.8,
+      82.8
+    ],
+    [
+      -10.3,
+      84.1
+    ],
+    [
+      -10.8,
+      85.3
+    ],
+    [
+      -11.3,
+      86.5
+    ],
+    [
+      -12.2,
+      87.5
+    ],
+    [
+      -14.3,
+      89.9
+    ],
+    [
+      -14.9,
+      91.3
+    ],
+    [
+      -14.9,
+      92.5
+    ],
+    [
+      -14.9,
+      93.5
+    ],
+    [
+      -14.9,
+      94.5
+    ],
+    [
+      -15.2,
+      95.5
+    ],
+    [
+      -16,
+      96.5
+    ],
+    [
+      -16.9,
+      96.8
+    ],
+    [
+      -16.8,
+      95.9
+    ],
+    [
+      -16,
+      95.2
+    ],
+    [
+      -15.1,
+      95.2
+    ],
+    [
+      -14.5,
+      94.6
+    ],
+    [
+      -13.9,
+      93.5
+    ],
+    [
+      -13.2,
+      92.4
+    ],
+    [
+      -12.6,
+      91.2
+    ],
+    [
+      -11.9,
+      90
+    ],
+    [
+      -11.2,
+      88.8
+    ],
+    [
+      -10.5,
+      87.7
+    ],
+    [
+      -9.9,
+      86.5
+    ],
+    [
+      -9.8,
+      85.3
+    ],
+    [
+      -10.1,
+      84.4
+    ],
+    [
+      -9.5,
+      83.4
+    ],
+    [
+      -8.8,
+      82.2
+    ],
+    [
+      -8.1,
+      81
+    ],
+    [
+      -7.5,
+      79.9
+    ],
+    [
+      -6.8,
+      78.7
+    ],
+    [
+      -6.1,
+      77.5
+    ],
+    [
+      -5.4,
+      76.3
+    ],
+    [
+      -4.8,
+      75.1
+    ],
+    [
+      -4.1,
+      74
+    ],
+    [
+      -3.4,
+      72.8
+    ],
+    [
+      -2.7,
+      71.6
+    ],
+    [
+      -2,
+      71.6
+    ],
+    [
+      -2,
+      72.7
+    ],
+    [
+      -2.4,
+      73.9
+    ],
+    [
+      -2.8,
+      75.2
+    ],
+    [
+      -3.2,
+      76.5
+    ],
+    [
+      -3.6,
+      77.8
+    ],
+    [
+      -4,
+      79.1
+    ],
+    [
+      -4.3,
+      80.4
+    ],
+    [
+      -4.8,
+      81.7
+    ],
+    [
+      -5.3,
+      82.8
+    ],
+    [
+      -5.7,
+      84.2
+    ],
+    [
+      -6.2,
+      85.4
+    ],
+    [
+      -6.6,
+      86.6
+    ],
+    [
+      -7.3,
+      87.8
+    ],
+    [
+      -7.9,
+      89
+    ],
+    [
+      -8.5,
+      90.1
+    ],
+    [
+      -9.2,
+      91.3
+    ],
+    [
+      -9.8,
+      92.5
+    ],
+    [
+      -10.4,
+      93.7
+    ],
+    [
+      -11.1,
+      94.9
+    ],
+    [
+      -11.7,
+      96.1
+    ],
+    [
+      -12.3,
+      97.3
+    ],
+    [
+      -13,
+      98.5
+    ],
+    [
+      -13.7,
+      98.5
+    ],
+    [
+      -13.7,
+      97.4
+    ],
+    [
+      -13.3,
+      96.2
+    ],
+    [
+      -13,
+      94.8
+    ],
+    [
+      -12.6,
+      93.5
+    ],
+    [
+      -12.3,
+      92.2
+    ],
+    [
+      -11.9,
+      90.9
+    ],
+    [
+      -11.4,
+      88.9
+    ],
+    [
+      -10.5,
+      85.7
+    ],
+    [
+      -10,
+      83.9
+    ],
+    [
+      -9.6,
+      82.5
+    ],
+    [
+      -9.3,
+      81.2
+    ],
+    [
+      -8.9,
+      79.9
+    ],
+    [
+      -8.6,
+      78.6
+    ],
+    [
+      -8.2,
+      77.3
+    ],
+    [
+      -7.8,
+      76
+    ],
+    [
+      -7.5,
+      74.6
+    ],
+    [
+      -7.1,
+      73.3
+    ],
+    [
+      -6.8,
+      72
+    ],
+    [
+      -6.4,
+      70.7
+    ],
+    [
+      -5.7,
+      70.5
+    ],
+    [
+      -5.5,
+      71.6
+    ],
+    [
+      -5.6,
+      72.9
+    ],
+    [
+      -5.7,
+      74.2
+    ],
+    [
+      -5.8,
+      75.6
+    ],
+    [
+      -5.8,
+      76.9
+    ],
+    [
+      -5.9,
+      78.3
+    ],
+    [
+      -6,
+      79.7
+    ],
+    [
+      -6.1,
+      81
+    ],
+    [
+      -6.2,
+      82.4
+    ],
+    [
+      -6.3,
+      84.2
+    ],
+    [
+      -6.3,
+      84.2
+    ],
+    [
+      -5.6,
+      86.2
+    ],
+    [
+      -5.7,
+      87.7
+    ],
+    [
+      -5.8,
+      89
+    ],
+    [
+      -5.9,
+      90.4
+    ],
+    [
+      -6,
+      91.8
+    ],
+    [
+      -6.1,
+      93.1
+    ],
+    [
+      -6.2,
+      94.4
+    ],
+    [
+      -6.5,
+      97.1
+    ],
+    [
+      -6.6,
+      97.2
+    ],
+    [
+      -7.3,
+      97.3
+    ],
+    [
+      -7.9,
+      97.2
+    ],
+    [
+      -7.9,
+      97.2
+    ],
+    [
+      -8.2,
+      97.3
+    ],
+    [
+      -10.3,
+      97.3
+    ],
+    [
+      -11.3,
+      97.3
+    ],
+    [
+      -11.7,
+      97.4
+    ],
+    [
+      -12.7,
+      97.5
+    ],
+    [
+      -14,
+      97.4
+    ],
+    [
+      -15.2,
+      97.2
+    ],
+    [
+      -15.6,
+      96.2
+    ],
+    [
+      -15.5,
+      95.2
+    ],
+    [
+      -15.5,
+      95.2
+    ],
+    [
+      -15,
+      95.1
+    ],
+    [
+      -13.8,
+      95.1
+    ],
+    [
+      -12.5,
+      95.1
+    ],
+    [
+      -11.1,
+      95.1
+    ],
+    [
+      -9.7,
+      95.1
+    ],
+    [
+      -8.4,
+      95.1
+    ],
+    [
+      -7,
+      95.1
+    ],
+    [
+      -5.7,
+      95.1
+    ],
+    [
+      -4.3,
+      95.1
+    ],
+    [
+      -3,
+      95
+    ],
+    [
+      0.3,
+      94.3
+    ],
+    [
+      1.9,
+      93.9
+    ],
+    [
+      4.5,
+      93.2
+    ],
+    [
+      5.4,
+      91.7
+    ],
+    [
+      4.4,
+      90.8
+    ],
+    [
+      3.3,
+      90.1
+    ],
+    [
+      2.1,
+      89.4
+    ],
+    [
+      0.9,
+      89.2
+    ],
+    [
+      -1.5,
+      88.3
+    ],
+    [
+      -3.6,
+      87.5
+    ],
+    [
+      -5,
+      87
+    ],
+    [
+      -6,
+      86.3
+    ],
+    [
+      -6.1,
+      85.1
+    ],
+    [
+      -6,
+      84
+    ],
+    [
+      -6.5,
+      83
+    ],
+    [
+      -7.1,
+      81.8
+    ],
+    [
+      -7.7,
+      80.6
+    ],
+    [
+      -8.5,
+      79.5
+    ],
+    [
+      -9.4,
+      78.5
+    ],
+    [
+      -10.2,
+      77.5
+    ],
+    [
+      -11,
+      76.4
+    ],
+    [
+      -11.9,
+      75.4
+    ],
+    [
+      -12.8,
+      74.3
+    ],
+    [
+      -13.6,
+      73.3
+    ],
+    [
+      -14.5,
+      72.3
+    ],
+    [
+      -15.3,
+      72.3
+    ],
+    [
+      -15.1,
+      73.4
+    ],
+    [
+      -14.7,
+      74.6
+    ],
+    [
+      -14.2,
+      75.9
+    ]
+  ],
+  "disc": {
+    "catches": 1,
+    "stageMax": 1,
+    "kept": false,
+    "guidanceFinished": false,
+    "overlookMin": 9.170560342748962,
+    "overlook": false,
+    "millbrook": false,
+    "hermitage": false,
+    "pressHollow": false,
+    "leftVillage": false,
+    "captions": []
+  },
+  "final": [
+    -13.66,
+    -0.659,
+    77.13
+  ],
+  "game": {
+    "pos": [
+      -13.66,
+      -0.659,
+      77.13
+    ],
+    "vel": [
+      0.996,
+      0,
+      2.529
+    ],
+    "speed": 2.718,
+    "yaw": 0.375,
+    "grounded": true,
+    "gliding": false,
+    "dashing": false,
+    "dashesUsed": 12,
+    "lastDashDistance": 2,
+    "updraft": {
+      "hearths": [
+        {
+          "id": "H-a",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            5.6,
+            0.47024262712306353,
+            74.2
+          ],
+          "height": 9
+        },
+        {
+          "id": "steam",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            24.95187386065252,
+            4.986607380995244,
+            79.36271871937427
+          ],
+          "height": 9
+        },
+        {
+          "id": "root",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            28.310371506590094,
+            9.486607380995244,
+            76.19878231637375
+          ],
+          "height": 7
+        },
+        {
+          "id": "kiln",
+          "heat": 0,
+          "state": "cold",
+          "supply": 0,
+          "holdLeft": 0,
+          "restored": false,
+          "pos": [
+            -65.64789605154716,
+            -1.1058396548043123,
+            96.13936055605392
+          ],
+          "height": 12
+        }
+      ],
+      "lastRide": null,
+      "tun": {
+        "threshold": 0.3,
+        "igniteTime": 0.25,
+        "holdTime": 3,
+        "gutterTime": 0.8,
+        "radius": 2.2,
+        "topFalloff": 2,
+        "maxRise": 6.5,
+        "liftResponse": 4,
+        "columnSteer": 0.65,
+        "centerPull": 1.5,
+        "fallLift": 0.35,
+        "probeRing": 0.9
+      }
+    },
+    "airTime": 0.383,
+    "apexY": -0.117,
+    "lastJump": {
+      "apex": 0.248,
+      "air": 0.383,
+      "timeToApex": 0.167
+    },
+    "anim": "loco",
+    "gait": "lope",
+    "playback": 1.466,
+    "stanceFeet": 2,
+    "maxSlide": 0,
+    "paws": {
+      "fpawL": [
+        -13.588496277057216,
+        -0.6345428190404285,
+        77.16908369841046
+      ],
+      "fpawR": [
+        -13.633721902559758,
+        -0.603202674371529,
+        77.33885614557232
+      ],
+      "hpawL": [
+        -13.647064791450388,
+        -0.6078654204476286,
+        77.01083236773418
+      ],
+      "hpawR": [
+        -13.765998419405975,
+        -0.6479940785288423,
+        77.01320554560606
+      ]
+    },
+    "camera": {
+      "pos": [
+        -11.422,
+        0.65,
+        77.631
+      ],
+      "boom": "shot=0.00 boomT=1.00 lift=0.00 floorLift=0.00 focusY=-0.67 lock=-0.66 dist=2.44 scenery=0.99 limit=1.00 fade=0.00 lensUnresolved=false blocker=",
+      "blocked": false
+    },
+    "opening": {
+      "canopy": {
+        "launches": 0,
+        "contacts": 0,
+        "retries": 0,
+        "roostVisits": 0,
+        "lastLeaf": null,
+        "lastFlight": null,
+        "activeFlight": null,
+        "lensTucked": 0,
+        "profile": {
+          "launchSpeed": 8.66,
+          "loadTime": 0.12,
+          "bow": 0.19
+        },
+        "leaves": [
+          {
+            "id": "entry",
+            "x": -0.2,
+            "z": 71.5,
+            "top": -0.16081268242076513,
+            "touched": false
+          },
+          {
+            "id": "middle",
+            "x": -0.2,
+            "z": 69.3,
+            "top": 1.296937770277265,
+            "touched": false
+          },
+          {
+            "id": "high",
+            "x": 0.9,
+            "z": 67.1,
+            "top": 2.373411979422167,
+            "touched": false
+          },
+          {
+            "id": "roost",
+            "x": -1,
+            "z": 64.7,
+            "top": 2.8959259519471163,
+            "touched": false
+          }
+        ]
+      },
+      "hearth": {
+        "hearths": [
+          {
+            "id": "H-a",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              5.6,
+              0.47024262712306353,
+              74.2
+            ],
+            "height": 9
+          },
+          {
+            "id": "steam",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              24.95187386065252,
+              4.986607380995244,
+              79.36271871937427
+            ],
+            "height": 9
+          },
+          {
+            "id": "root",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              28.310371506590094,
+              9.486607380995244,
+              76.19878231637375
+            ],
+            "height": 7
+          },
+          {
+            "id": "kiln",
+            "heat": 0,
+            "state": "cold",
+            "supply": 0,
+            "holdLeft": 0,
+            "restored": false,
+            "pos": [
+              -65.64789605154716,
+              -1.1058396548043123,
+              96.13936055605392
+            ],
+            "height": 12
+          }
+        ],
+        "lastRide": null,
+        "tun": {
+          "threshold": 0.3,
+          "igniteTime": 0.25,
+          "holdTime": 3,
+          "gutterTime": 0.8,
+          "radius": 2.2,
+          "topFalloff": 2,
+          "maxRise": 6.5,
+          "liftResponse": 4,
+          "columnSteer": 0.65,
+          "centerPull": 1.5,
+          "fallLift": 0.35,
+          "probeRing": 0.9
+        },
+        "latched": false,
+        "ignition": null,
+        "complete": false,
+        "hint": null
+      },
+      "captions": {
+        "showing": null,
+        "said": 0
+      },
+      "teach": {
+        "showing": null
+      },
+      "paint": {
+        "trailSamples": 86,
+        "supply": 1,
+        "distance": 244.34876783735814,
+        "restores": 1
+      },
+      "visibility": {
+        "occluders": 182,
+        "faded": 0
+      },
+      "restores": 1,
+      "carry": {
+        "carried": false,
+        "heat": 1,
+        "cooling": false,
+        "position": [
+          15.1,
+          4.956607380995243,
+          77.4
+        ],
+        "lastGrounded": [
+          -13.659811014912506,
+          -0.6585566563944182,
+          77.13049695734463
+        ],
+        "canPickup": false,
+        "canPlace": false,
+        "pickups": 0,
+        "placements": 0,
+        "dashDrops": 0,
+        "carriedDashes": 0,
+        "recoveries": 0,
+        "lastAction": "source",
+        "rolling": false
+      },
+      "chemistry": {
+        "steam": {
+          "id": "steam",
+          "position": [
+            24.95187386065252,
+            4.956607380995243,
+            79.36271871937427
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "root": {
+          "id": "root",
+          "position": [
+            28.310371506590094,
+            9.456607380995244,
+            76.19878231637375
+          ],
+          "heat": 0,
+          "supply": 0,
+          "state": "cold",
+          "restored": false
+        },
+        "steamLatched": false,
+        "completed": false,
+        "steamReactions": 0,
+        "releases": 0
+      },
+      "crown": {
+        "released": false,
+        "release": 0,
+        "fall": -1,
+        "limb": -0.621,
+        "leaves": 0,
+        "heroLeaf": false
+      },
+      "keeping": {
+        "phase": "arrested",
+        "t": 0,
+        "angle": 0.95,
+        "bridge": false,
+        "answered": {
+          "kicked": 0,
+          "creaks": 0,
+          "resting": 0
+        },
+        "impact": false,
+        "impacts": 0,
+        "bridgeTop": 9.577,
+        "crownLobes": 10,
+        "stair": "pressed"
+      },
+      "unpressed": {
+        "flings": 0,
+        "found": [
+          "hedgehog"
+        ],
+        "creatures": [
+          {
+            "id": "hedgehog",
+            "phase": "alive",
+            "t": 27.75,
+            "at": [
+              -6.77,
+              0,
+              87.49
+            ]
+          },
+          {
+            "id": "heron",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              7.42,
+              0.53,
+              74.76
+            ]
+          },
+          {
+            "id": "deer",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              24.46,
+              9.46,
+              64.54
+            ]
+          },
+          {
+            "id": "kit",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              32.56,
+              0.3,
+              88.6
+            ]
+          },
+          {
+            "id": "hare",
+            "phase": "pressed",
+            "t": 0,
+            "at": [
+              -6.86,
+              -0.7,
+              70.26
+            ]
+          }
+        ]
+      },
+      "glyphs": {
+        "progress": 0,
+        "solved": false,
+        "gutters": 0,
+        "lastGutter": "",
+        "order": [
+          "moon",
+          "leaf",
+          "flame"
+        ],
+        "stones": [
+          {
+            "id": "leaf",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "flame",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          },
+          {
+            "id": "moon",
+            "painted": false,
+            "lit": false,
+            "reveal": 0
+          }
+        ]
+      },
+      "hum": {
+        "running": true,
+        "voices": [
+          {
+            "id": "H-a",
+            "gain": 0
+          },
+          {
+            "id": "steam",
+            "gain": 0
+          },
+          {
+            "id": "root",
+            "gain": 0
+          },
+          {
+            "id": "kiln",
+            "gain": 0
+          }
+        ]
+      },
+      "audio": {
+        "context": "running",
+        "master": 1,
+        "music": {
+          "ready": true,
+          "bar": 3,
+          "breath": false,
+          "swell": "idle",
+          "pass": 1,
+          "since": 12,
+          "shaded": false,
+          "ending": "playing",
+          "forces": 2,
+          "tune": "lantern",
+          "cues": 1,
+          "levels": {
+            "harp": 0.9,
+            "pad": 0.89,
+            "bass": 0.69,
+            "lead": 0.63,
+            "bells": 0,
+            "bright": 0.42,
+            "shade": 0.18
+          },
+          "cued": [
+            {
+              "cue": "page",
+              "t": 9.96
+            }
+          ]
+        },
+        "ambience": {
+          "wind": 0
+        },
+        "loaded": 13,
+        "files": 13,
+        "counts": {
+          "soft-paper": 3,
+          "cloth-1": 6,
+          "cloth-0": 5,
+          "cloth-3": 3,
+          "soft-leaf": 5,
+          "cloth-2": 3
+        },
+        "last": [
+          {
+            "id": "cloth-1",
+            "t": 49.99
+          },
+          {
+            "id": "cloth-2",
+            "t": 50.93
+          },
+          {
+            "id": "cloth-0",
+            "t": 52.06
+          },
+          {
+            "id": "cloth-1",
+            "t": 57.53
+          },
+          {
+            "id": "cloth-3",
+            "t": 58.47
+          },
+          {
+            "id": "cloth-0",
+            "t": 59.31
+          },
+          {
+            "id": "cloth-1",
+            "t": 60.8
+          },
+          {
+            "id": "soft-leaf",
+            "t": 60.95
+          }
+        ],
+        "log": [
+          {
+            "id": "soft-paper",
+            "t": 9.83
+          },
+          {
+            "id": "soft-paper",
+            "t": 9.96
+          },
+          {
+            "id": "cloth-1",
+            "t": 10.97
+          },
+          {
+            "id": "cloth-0",
+            "t": 11.3
+          },
+          {
+            "id": "cloth-1",
+            "t": 13.05
+          },
+          {
+            "id": "cloth-3",
+            "t": 14.43
+          },
+          {
+            "id": "soft-leaf",
+            "t": 14.54
+          },
+          {
+            "id": "cloth-0",
+            "t": 16.98
+          },
+          {
+            "id": "soft-leaf",
+            "t": 17.35
+          },
+          {
+            "id": "soft-leaf",
+            "t": 17.85
+          },
+          {
+            "id": "cloth-1",
+            "t": 32.82
+          },
+          {
+            "id": "cloth-3",
+            "t": 34.95
+          },
+          {
+            "id": "soft-leaf",
+            "t": 38.47
+          },
+          {
+            "id": "cloth-2",
+            "t": 38.68
+          },
+          {
+            "id": "soft-paper",
+            "t": 44.75
+          },
+          {
+            "id": "cloth-0",
+            "t": 45
+          },
+          {
+            "id": "cloth-2",
+            "t": 47.34
+          },
+          {
+            "id": "cloth-1",
+            "t": 49.99
+          },
+          {
+            "id": "cloth-2",
+            "t": 50.93
+          },
+          {
+            "id": "cloth-0",
+            "t": 52.06
+          },
+          {
+            "id": "cloth-1",
+            "t": 57.53
+          },
+          {
+            "id": "cloth-3",
+            "t": 58.47
+          },
+          {
+            "id": "cloth-0",
+            "t": 59.31
+          },
+          {
+            "id": "cloth-1",
+            "t": 60.8
+          },
+          {
+            "id": "soft-leaf",
+            "t": 60.95
+          }
+        ],
+        "foley": {
+          "steps": {
+            "grass": 144,
+            "leaf": 0,
+            "wood": 0,
+            "stone": 0
+          },
+          "glide": 0
+        }
+      },
+      "page": {
+        "stage": 1,
+        "phase": "perched",
+        "catches": 1,
+        "skips": 0,
+        "dodges": 0,
+        "winded": false,
+        "yaw": -0.8295,
+        "droop": 0,
+        "s": 0,
+        "pos": [
+          -1,
+          4.4959,
+          64.7
+        ]
+      },
+      "discovery": {
+        "active": true,
+        "visible": true,
+        "leg": "entry",
+        "restoredAtLoad": false,
+        "completionAt": null,
+        "target": [
+          -0.2,
+          -0.010812682420765135,
+          71.5
+        ],
+        "action": "spring",
+        "hint": "Space · hold to spring from a leaf"
+      },
+      "popUpRuin": {
+        "folds": [
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          },
+          {
+            "phase": "folded",
+            "progress": 0
+          }
+        ],
+        "reached": false,
+        "returns": 0,
+        "misses": 0,
+        "tunables": {
+          "unfold": 0.55,
+          "hitRadius": 1.35
+        }
+      },
+      "homecoming": {
+        "pinned": false,
+        "sent": false,
+        "home": [
+          "hedgehog"
+        ],
+        "lit": [],
+        "full": false
+      },
+      "leafPiles": {
+        "piles": 8,
+        "kicks": 5,
+        "flying": 0
+      },
+      "laneWind": {
+        "gusts": 0,
+        "flying": 0
+      },
+      "millrace": {
+        "phase": "held",
+        "front": 13,
+        "turning": false,
+        "painted": false,
+        "spin": 0,
+        "lookoutPainted": false
+      },
+      "millWeir": {
+        "lit": false,
+        "heat": 0,
+        "rode": false,
+        "reached": false
+      },
+      "hermitage": {
+        "freed": [
+          0,
+          0,
+          0
+        ],
+        "painted": false,
+        "captioned": false
+      },
+      "wayPiles": {
+        "piles": 12,
+        "kicks": 0,
+        "flying": 0
+      },
+      "finale": {
+        "phase": "sealed",
+        "t": 90,
+        "kindles": 0,
+        "cradle": [
+          20.79,
+          39.64
+        ],
+        "kits": [
+          "pressed",
+          "pressed",
+          "pressed"
+        ],
+        "card": "hidden",
+        "cardShows": 0,
+        "kitNear": 99,
+        "restShot": [],
+        "snow": 0,
+        "leaves": 0,
+        "onward": 0,
+        "still": 0
+      },
+      "ashwater": {
+        "damA": false,
+        "damB": false,
+        "flood": false,
+        "channelY": -0.15,
+        "poolY": -0.15,
+        "mats": 0,
+        "done": [],
+        "splashes": 0,
+        "glow": 0
+      },
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "iced": true,
+        "draftB": false,
+        "done": []
+      },
+      "worlds": {
+        "active": "russetvale",
+        "travels": 0,
+        "progress": {
+          "activeWorld": "hub",
+          "revision": 0,
+          "worlds": {
+            "russetvale": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Kiln",
+              "fill": 0,
+              "next": "teach"
+            },
+            "ashwater": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Reed",
+              "fill": 0,
+              "next": "teach"
+            },
+            "press": {
+              "visited": [],
+              "restored": [],
+              "ability": null,
+              "well": "Maple",
+              "fill": 0,
+              "next": "teach"
+            }
+          }
+        },
+        "mapOpen": false,
+        "warden": [
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      }
+    }
+  },
+  "errors": []
+}
