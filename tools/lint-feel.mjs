@@ -10,6 +10,8 @@ import { lintRenderSurface, renderSurfaceSelfTest } from './render-surface-lint.
 import { lintAssetSource, assetLintSelfTest } from './asset-path-lint.mjs';
 import { lintTeachOrderSource, teachOrderSelfTest } from './teach-order-lint.mjs';
 import { lintDiscoverySafety, discoverySafetySelfTest } from './discovery-safety-lint.mjs';
+import { lintSavedOpening, savedOpeningSelfTest } from './saved-opening-lint.mjs';
+savedOpeningSelfTest();
 discoverySafetySelfTest();
 teachOrderSelfTest();
 assetLintSelfTest();
@@ -34,6 +36,11 @@ const RULES = [
     why: 'heading from a raw per-frame displacement flip-flops near half turns (the page jitter); smooth the velocity and cap the turn rate',
   },
   {
+    id: 'wall-clock-timer',
+    test: (l) => /\bset(?:Timeout|Interval)\s*\(/.test(l),
+    why: 'game beats must run on sim time (onUpdate dt): a wall-clock timer fires at a different sim moment under the manual clock and breaks replay (the Press coda line, swarm5)',
+  },
+  {
     id: 'dom-text',
     test: (l) => /createElement\(\s*['"]div['"]\s*\)|\.textContent\s*=|\.innerHTML\s*=/.test(l),
     why: 'words must be drawn in the frame (ctx.captions / ctx.teach / lettering.ts): DOM text never reaches canvas recordings, so the ending card was invisible in every review clip',
@@ -41,6 +48,7 @@ const RULES = [
 ];
 
 const findings = [];
+findings.push(...lintSavedOpening(fs.readFileSync(`${ROOT}/scene.ts`, 'utf8')));
 findings.push(...lintDiscoverySafety(`${ROOT}/discovery.hot.ts`,fs.readFileSync(`${ROOT}/discovery.hot.ts`,'utf8')));
 for (const name of ['teach.ts', 'teach.hot.ts', 'scene.ts']) {
   const file = path.join(ROOT, name);
@@ -69,7 +77,7 @@ function scanHot(dir) {
 scanHot('games/fox-spirit/src');
 findings.push(...lintRenderSurface('src/render/forgeRenderer.ts', fs.readFileSync('src/render/forgeRenderer.ts', 'utf8')));
 // world checks that need the TypeScript layout (tools/checks/*.ts via tsx): painted lanes must be walkable (Wren 77d303a)
-for (const check of ['tools/checks/paths-walkable.ts', 'tools/tests/route-input.ts', 'tools/checks/ashwater-terrain.ts']) {
+for (const check of ['tools/checks/paths-walkable.ts', 'tools/tests/route-input.ts', 'tools/checks/ashwater-terrain.ts', 'tools/camera-relocation-check.ts']) {
   const r = spawnSync(process.execPath, ['--import', 'tsx', check], { encoding: 'utf8' });
   if (r.status !== 0) findings.push(`${check}  [world-check] ${(r.stdout + r.stderr).trim()}`);
 }

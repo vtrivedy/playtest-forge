@@ -6,18 +6,13 @@
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import { WELL } from './layout';
-import { ashwaterE, outward, pressE, WORLDS, worldAt, type WorldId } from './worlds';
-import { rng, toon } from '../lookdevKit';
+import { ashwaterE, HUB_ARCHES, hubArrival, outward, pressE, RETURN_ARCH_BACK, WORLDS, worldAt, type WorldId } from './worlds';
+import { RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { bakeCells } from './bake';
 import { box, C, cyl, Kit } from './village';
 
 type Arch = { x: number; z: number; nx: number; nz: number; to: WorldId; open: () => boolean; glow: THREE.Mesh };
 
-/** hub arches: walk through (along the arch's normal, within its posts) to travel */
-export const HUB_ARCHES: ReadonlyArray<{ to: WorldId; x: number; z: number }> = [
-  { to: 'ashwater', x: -2, z: 91 },
-  { to: 'press', x: -10.5, z: 92.6 },
-];
 
 const ARCH_COLOR: Record<WorldId, number> = { russetvale: 0xc8622e, ashwater: 0x3f7f8c, press: 0xe8e6e0 };
 
@@ -29,6 +24,29 @@ function buildArch(k: Kit, x: number, y: number, z: number, yaw: number, banner:
     // the destination's colour hangs in the arch: a banner each side
     for (const s of [-1, 1]) k.add(box(0.42, 1.1, 0.04), banner, [s * 0.85, 2.15, 0.13], [0, 0, 0], 0.006);
   });
+}
+
+/** a painted name board: the world's name in ink on old paper with its colour as a band */
+function plaqueTexture(name: string, band: number): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 108;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#e9dfc8';
+  g.fillRect(0, 0, 512, 108);
+  g.fillStyle = `#${band.toString(16).padStart(6, '0')}`;
+  g.fillRect(0, 92, 512, 16);
+  g.strokeStyle = '#2b2018';
+  g.lineWidth = 6;
+  g.strokeRect(3, 3, 506, 102);
+  g.fillStyle = '#2b2018';
+  g.font = 'italic 54px Georgia, serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(name, 256, 48, 480);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 function islandGround(scene: THREE.Scene, cx: number, cz: number, size: number, colour: (x: number, z: number, h: number, c: THREE.Color) => void, groundH: (x: number, z: number) => number): void {
@@ -100,7 +118,7 @@ function buildWeather(scene: THREE.Scene) {
 }
 
 export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => boolean }) {
-  const { scene, groundH } = ctx;
+  const { scene, groundH, colliders } = ctx;
   const k = new Kit();
   const arches: Arch[] = [];
   const glowMat = (c: number) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
@@ -113,6 +131,11 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
     glow.position.set(x, groundH(x, z) + 1.35, z);
     glow.rotation.y = yaw;
     scene.add(glow);
+    // the destination's name on a board under the lintel, readable from both sides (in the canvas, so clips carry it)
+    const plaque = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.5), new THREE.MeshBasicMaterial({ map: plaqueTexture(WORLDS[to].name, ARCH_COLOR[to]), transparent: true, side: THREE.DoubleSide, toneMapped: false }));
+    plaque.position.set(x, groundH(x, z) + 3.5, z);
+    plaque.rotation.y = yaw + Math.PI;
+    scene.add(plaque);
     arches.push({ x, z, nx, nz, to, open, glow });
   };
   // hub: through the arch, away from the well
@@ -126,7 +149,7 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
   for (const id of ['ashwater', 'press'] as const) {
     const w = WORLDS[id];
     const o = outward(id === 'ashwater' ? ashwaterE : pressE, w.spawn);
-    addArch(w.spawn.x + o.x * 3, w.spawn.z + o.z * 3, o.x, o.z, 'russetvale', () => true);
+    addArch(w.spawn.x + o.x * RETURN_ARCH_BACK, w.spawn.z + o.z * RETURN_ARCH_BACK, o.x, o.z, 'russetvale', () => true);
   }
 
   // Ashwater Reach's ground, water and puzzle are Cedar's (ashwater.ts); this module gives it the rain and sky
@@ -155,22 +178,19 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
     spire.rotation.set((rp() - 0.5) * 0.15, rp() * 6, (rp() - 0.5) * 0.15);
     scene.add(spire);
   }
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2;
-    const rr = 14 + rp() * 16;
-    const x = P.x + Math.cos(a) * rr;
-    const z = P.z + Math.sin(a) * rr;
-    const slab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.4, 0.18), pageMat);
-    slab.position.set(x, groundH(x, z) + 1.5, z);
-    slab.rotation.set((rp() - 0.5) * 0.25, a + Math.PI / 2, (rp() - 0.5) * 0.2);
-    scene.add(slab);
-    ctx.colliders.push({ kind: 'box', x, z, yaw: a + Math.PI / 2, hx: 1.2, hz: 0.15, top: groundH(x, z) + 3.2 });
-  }
+  // the Press's interior (ridge, shelf, ledge, page dressing) is press.ts; only the rim spires stand here
   const built = k.build();
   scene.add(built);
   ctx.occluders.push(built);
 
   const weather = buildWeather(scene);
+  // travelling turns a page: a paper wash covers the lens at the jump and clears over ~0.6 s
+  const fadeMat = new THREE.MeshBasicMaterial({ color: 0xe9dfc8, transparent: true, opacity: 0, depthTest: false, depthWrite: false, toneMapped: false, fog: false });
+  const fade = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), fadeMat);
+  fade.position.set(0, 0, -0.3);
+  fade.renderOrder = 9999;
+  fade.frustumCulled = false;
+  let fadeK = 0;
 
   // ---- per frame (no allocation)
   const top = new THREE.Color();
@@ -212,12 +232,28 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
       px = NaN;
       pz = NaN;
       travelled++;
+      fadeK = 1;
+    },
+    /**
+     * Coming home from `from`: stand 2.6 m inside that world's hub arch facing the well (the old wake spot sat under
+     * the other arch's lintel and the return lens filled with timber — Reed's world-tour stills).
+     */
+    hubArrival(from: WorldId): { x: number; z: number; yaw: number } {
+      return hubArrival(from, WELL);
+    },
+    /** the paper wash rides on the lens */
+    attach(camera: THREE.Camera): void {
+      camera.add(fade);
+      if (!camera.parent) scene.add(camera);
     },
     get travels(): number {
       return travelled;
     },
     update(dt: number, foxX: number, camPos: THREE.Vector3, sky: { setWorld: (a: THREE.Color, b: THREE.Color, c: THREE.Color, d: THREE.Color, k: number) => void }, fog: THREE.FogExp2 | null, key: THREE.DirectionalLight): void {
       time += dt;
+      fadeK = Math.max(0, fadeK - dt * 1.7);
+      fadeMat.opacity = fadeK * fadeK * (3 - 2 * fadeK);
+      fade.visible = fadeK > 0;
       current = worldAt(foxX);
       if (current !== lastWorld) {
         blend = 0;

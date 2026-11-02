@@ -38,3 +38,55 @@ After merging Maple `60a5ba83` (including Cedar's first Ashwater) and keeping-d3
 - Both pickups succeed. Locked dash drops at safe ground (`dashDrops=1`, `carried=false`); learned dash retains warmth (`carriedDashes=1`, `dashDrops=0`, `carried=true`). Full before/pickup/dash/after `window.__game` states retained in `evidence.json`; zero page errors.
 - Chase frame visually reviewed: saturated fox and readable carry instruction; mouth/ember hidden by the rear lens. A second run adds an explicitly staged side inspection lens after the same action. No controller or carry parameter changed.
 - Retest `/captures/hazel/hearthbound-runtime-06e1eda0-retest/`: PASS, zero errors. Both side screenshots inspected: learned ember sits at the muzzle; locked ember remains behind the fox on safe source footing. This bounded still comparison confirms visible attachment/drop behavior, not continuous attachment stability. Script syntax and diff checks pass.
+
+## Saved-world reconstruction and teleport camera — Cedar 6a69bb62
+
+`tools/world-save-runtime.mjs` stages two isolated saved-fact boots (teach only, then teach/develop/combine for autumn and Ashwater), captures hub state, developer-travels to Ashwater and opens the Album with native Tab. This is a reconstruction diagnostic, not an earned-puzzle or arch-walking route. Reports retain full `window.__game` states and screenshots.
+
+- Baseline Maple cd906ce9: page pinned correctly, but both Ashwater fixtures reset dams and completion to unsolved despite saved Album facts. Evidence `/captures/hazel/world-save-cd906ce9/`.
+- Cedar d3136ef7 physical reconstruction independently passes teach/full: channel drained to -1.25; full completion also drains pool to -1.25, breaks both dams and restores all three done bits + glow 1. Both cases have zero JS errors. Evidence `/captures/hazel/world-save-d3136ef7/`.
+- Both pre-camera-fix runs expose the same stale homecoming path: fox at Ashwater, lens still at the village, distance 712.60 m after three seconds. Reported to Cedar; canonical fix 6a69bb62 adds `cancelShots()` to controller teleport. No duplicate camera implementation retained.
+- Retest on local ef55b2b7 (Cedar 6a69bb62 merged): both physical cases still agree with saved facts, page pinned, zero JS errors, camera distance now 2.797 m. Evidence `/captures/hazel/world-save-6a69bb62/`. Inspected teach marsh and full Album frames: fox visible at the marsh spawn; restored ticks and Reed Seedwell bands match the fixture. An earlier equivalent local camera patch also produced correct marsh framing; that patch was discarded in favor of Cedar's canonical implementation.
+- `tools/camera-relocation-check.ts` exercises active authored paths and reactive shots across a 700 m relocation. PASS; removing cancellation from a temporary negative fixture fails with `path kept the lens at the old island`. Added to `lint:feel`. tsc, lint:feel, Vite build, progress/store and Hearthbound checks PASS.
+
+Remaining scope limit: saved autumn develop/combine facts do not yet reconstruct their original Keeping/finale mechanisms. Saved teach still replays the homecoming reveal/caption at boot, so its short caption may briefly carry into the marsh; cancellation fixes the lens stranding, not quiet-load presentation. Reported separately to scene owners. Press is outside this diagnostic.
+
+## Independent Press save reconstruction — Thistle 06cc050f
+
+Merged Thistle's canonical Press implementation and save reconstruction into local `cb5f469d`; no gameplay changes in this verification pass. Extended `tools/world-save-runtime.mjs` to cover teach-only, teach/develop and full saved facts across both foreign worlds. This remains injected-save/developer-travel verification, not an earned puzzle or hub-arch route.
+
+- Completed final run: `/captures/hazel/world-save-press-06cc050f-final/evidence.json`, all three cases PASS, zero JS errors, `completed:true`. Each case retains full runtime snapshots, ordinary follow-lens frames, native-Tab Album frames and a separately staged Press overview.
+- Teach opens the seal but leaves both drafts closed and upper ice intact. Develop additionally opens the first draft. Combine opens the second draft and removes the upper ice. Exact physical done facts match saves; Ashwater reconstruction continues passing in all three cases. Follow-lens distance at each Press arrival is 2.797 m.
+- Visual review and retest: initial spawn frames hid the upper route. Added explicit inspection lens; inspected teach, develop and full overviews. Draft columns and upper ice correctly distinguish the three states. These inspection frames do not prove player-reachable viewpoints. Bare beige Archive slabs dominate the view and the Press is small; sent this quality concern to Thistle, without changing his world art.
+- Earlier two-case run `/captures/hazel/world-save-press-06cc050f` completed successfully. The first three-case retest was interrupted by managed-session SIGTERM after teach/develop screenshots; it is incomplete and superseded by the detached final run above. Per-case partial reports now survive interruption.
+- TypeScript, lint:feel, Vite build, progress normalization/prerequisite checks, Hearthbound checks, script syntax and diff checks PASS. Remaining autumn reconstruction/presentation limitations above are unchanged.
+
+## Earned story Album — fcf23aff
+
+Added three world memory spreads alongside the map. Native Tab opens/closes; [ / ] turns pages without consuming movement arrows. The nine entries follow Maple's a9ed01c3 arc: the runaway page belongs to the Album, the Ferrykeeper remembers the first pressed flood, and the Scribe's shadow and motive resolve at the Press. Combine completion stages a short page line; opening the Album reads the relevant spread. Constructor initialization from known facts prevents a completed-save celebration replay.
+
+Component playtest retained at `/captures/hazel/album-story-fcf23aff/`: ordinary native-key Album opening plus an explicitly staged progress fixture, full `window.__game`, progress snapshot, canvas text logs, 1280×720 and 960×540 frames. `story-checks.json`: visited-only autumn has 3 missing pages, Ashwater teach/develop has 1 and no combine title, completed Press has 0. Zero JavaScript errors; close/open/wrap to map passed. Fixture completion then produced `returned-page-960.png`; Tab dismissed that card into `returned-story-960.png`. These are UI/progression fixtures, not proof of earned world routes or in-world character staging.
+
+Visual review found faint text in the first 960px captures. Increased body size and contrast and darkened world headings; reran and inspected the final Press spread, returned-page overlay, and returned autumn spread. Text fits its cards, the overlay leaves the fox visible, and locked pages reveal no future words. `tsc`, `lint:feel`, Vite build, tool syntax and diff checks pass. Existing world duration, art and physical encounter acceptance remains with world owners.
+
+Final text follow-up `fec85f64` keeps the Warden identity explicit only on Press combine (develop foreshadows the accumulated ink). Repeated the complete component harness on this exact gameplay source with a unique output directory: `/captures/hazel/album-story-final/`. All three reveal checks, native keys and zero-error checks pass; final Press spread inspected and fits. Full runtime state and staged returned-page frames retained. No global game-complete or duration claim.
+
+## Resumed integration check — 21:27 UTC
+
+On unchanged `1781415d` (includes `keeping-d3` `4901c674`),
+`tools/hearthbound-runtime.mjs` passes both independent locked/learned boots
+with zero JavaScript errors. Native E picks up the authored ember; native Shift
+drops it in the locked fixture (`dashDrops:1`, `carriedDashes:0`) and retains
+it in the saved-teach fixture (`dashDrops:0`, `carriedDashes:1`). Full runtime
+states and six screenshots: `/captures/hazel/hearthbound-resume-1781415d/`.
+Both side inspection frames were personally read: the locked ember rests behind
+the fox; the learned ember is visibly held at the muzzle. These are staged starts
+and a saved ability fixture, not an earning-route or continuous-motion claim.
+No movement parameters, geometry, audio or gameplay source changed.
+`world-progress-check.ts` and diff whitespace checks pass.
+
+Saved autumn reconstruction still disagrees with the Album for develop/full
+fixtures, as recorded in `SAVED-AUTUMN-AUDIT.md`. Requested Maple's canonical
+mechanism mapping again before attempting restoration; Reed owns the separate
+Album contrast follow-up. Optional-memory reload success does not close either
+issue or the game's duration gap.

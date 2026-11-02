@@ -735,6 +735,7 @@ old ending composition; Cedar's separate fix 3 handles that visual problem.
 - Discovery.tla112generated/38distinct passes; removing Finish's current-contact guard fails DoneAfterLanding in a five-state trace. This checks completion safety and stable done, not physical reachability. Probe assertions now require completed guidance and a grounded done transition as well as kept page + real overlook event.
 - Matched blind controls on591e04b9 vs4f67f9ac (same f1ffac3 random policy, manual clock fixed,120s,seeds1–3): first catches0/0/0→1/1/0; all still0overlook. Rendered-cue following is a separate policy with no hidden goal/action/leg steering, not a claim that random wandering solves platform puzzles.
 - Safe-completion trial934a6d38 landed at x−25.9017,y1.02,z71.5088: grounded on the actual pad, but1.7mm outside the ruin's authored arrival trigger. The strict same-frame arrival assertion failed correctly. The contact token now requires BOTH the ruin's authoritative `overlookVisited` milestone and current physical support; standing on the outer pad keeps the landing cue toward its centre. No copied arrival threshold or weakened assertion. The historical milestone alone never completes guidance.
+- Authored reveal paths must frame from the fox, not from the landmark: the homecoming look framed off the Great Well put its roof between lens and fox. Pick the lens from a few angles round the fox with `cam.sightBlocked(lens, chest, feetY)` (as finale familyShot does) and look just past the fox so it sits slightly below centre.
 
 ### Discovery final evidence — Hazel, swarm5
 
@@ -776,3 +777,29 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   receding flood can otherwise put the "last dry spot" under water and teleport every frame).
 - Boarding from a cliff edge: approach straight off the edge onto the platform; diagonal approaches near a terrain
   mask edge walk the fox off the side first. Put the platform's end against the cliff face.
+
+## Multi-world integration (Maple, swarm5 repoint)
+
+- Worlds are islands in ONE scene far along x (`opening/worlds.ts`): `layout.groundH` dispatches `|x| > 350`, the
+  world mask (`worldBounds.ts inside()`) and `tools/world-bounds-check.ts` anchors include every world's spawn/origin.
+  Add a new island = registry entry + H/E pair + mask rule; never a second runtime/boot path.
+- patchPaint treats `|x| > 350` as painted (own colours) and scopes snow per world (finale snow = Russetvale only,
+  Press always winter). Anything global in paintU (uSnow, restores) leaks into every world unless position-scoped.
+- Travel = walking through an arch plane between its posts (`worldsScene.crossing`), then teleport + paper fade +
+  `progress.enterWorld/visit`. Return lands inside the hub arch you left, facing the well — spawning at the old wake
+  spot put the chase lens under the other arch's lintel (Reed's return stills).
+- Re-entry from saved progress must rebuild physical state (kept page → homecoming.force at boot) or an open arch sits
+  beside a page that is still running away.
+- `Object.assign(mesh, { position })` throws at boot (read-only Object3D props) — boot-test every builder.
+- Integration: merge all sw5-* into one tip, resolve, then run `tools/ashwater-probe.mjs` + `tools/press-probe.mjs`
+  + a hub walk on that exact tip before asking Kit to land.
+
+## The Scribe's Press levels (Thistle, swarm5)
+
+- `opening/pressLayout.ts` (data, local lx/lz from (−700, 85)), `press.ts` (build), `press.hot.ts` (per frame), `tla/Press.tla` (TypeOK, Caused, Monotone, Finishes; negative control without the shelf brazier fails Finishes), `tools/press-probe.mjs` (one staged travel, then stick/Space/Shift; reloads to check save reconstruction).
+- Heights on an island must be sampled inside it: `groundTop` over ±60 m first took the rim (rises 9 m) and floated the whole ridge and seal at rim height — the opened gate was still a wall.
+- Extra glide drafts join the controller through the one updraft read: scene wraps `hearth.updrafts.liftAt` once and folds `press.liftAt` into the same `Lift` (hearth = null, so ride logging skips them).
+- A cracked draft takes ~0.9 s to build and the air-dash carries the fox past the column: the play is crack → land → step back in → jump and hold glide. Probes must do that too.
+- Warmth relay is the puzzle: warmth fades in 6.5 s (~21 m); each lit brazier is ≥ 24 m from its gate and the cold relay stands OFF the straight line (on the line, players solve it by accident).
+- Point lights on near-white toon paper + bloom wash the fox out: braziers ≤ 1.6, the fox's warmth ≤ 0.9, paper ≤ 0xcfc6b2.
+- `lint:feel` wall-clock-timer: setTimeout/setInterval in opening/ fires at a different sim moment under the manual clock; put beats on onUpdate dt.
