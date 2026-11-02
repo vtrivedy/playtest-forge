@@ -1,0 +1,257 @@
+{
+  "sha": "e07e170870300cd8943ba7c752e83e0c28daf4b9",
+  "checks": {
+    "pageOnly": true,
+    "onward": true,
+    "remotePending": true,
+    "remoteCameraNearFox": true,
+    "walkingPending": true,
+    "pausedReveal": true,
+    "heldReveal": true,
+    "moveYield": true,
+    "moveReturns": true,
+    "revisitNoReplay": true,
+    "finite": true,
+    "noErrors": true
+  },
+  "errors": [],
+  "staging": "Page-only homecoming dev hook; initial remote root-hearth and later plaza teleports. Ordinary stick before/after pause. No creature release or camera override. 30Hz manual simulation.",
+  "samples": [
+    {
+      "name": "01-remote-page",
+      "pos": [
+        28,
+        9.457,
+        76
+      ],
+      "homecoming": {
+        "pinned": true,
+        "sent": true,
+        "home": [],
+        "lit": [
+          "page"
+        ],
+        "full": false
+      },
+      "onward": 48,
+      "path": null,
+      "camera": {
+        "pos": [
+          28.840099628265857,
+          10.806607380995244,
+          78.30146314647608
+        ],
+        "quat": [
+          -0.12546408530905026,
+          0.17268917816872476,
+          0.022183131422795616,
+          0.9767011414558973
+        ]
+      }
+    },
+    {
+      "name": "02-plaza-walking",
+      "pos": [
+        -7.2,
+        0,
+        87.542
+      ],
+      "homecoming": {
+        "pinned": true,
+        "sent": true,
+        "home": [],
+        "lit": [
+          "page"
+        ],
+        "full": false
+      },
+      "onward": 48,
+      "path": null,
+      "camera": {
+        "pos": [
+          -9.266258053747736,
+          1.3499999999999999,
+          88.89302446159648
+        ],
+        "quat": [
+          -0.1112337438361851,
+          -0.4717370712377476,
+          -0.06013241634789762,
+          0.8726255109474976
+        ]
+      }
+    },
+    {
+      "name": "03-plaza-paused",
+      "pos": [
+        -7.2,
+        0,
+        87.444
+      ],
+      "homecoming": {
+        "pinned": true,
+        "sent": true,
+        "home": [],
+        "lit": [
+          "page"
+        ],
+        "full": false
+      },
+      "onward": 48,
+      "path": {
+        "t": 0.9666666666666666,
+        "w": 1,
+        "yielding": false
+      },
+      "camera": {
+        "pos": [
+          -9.88088717383253,
+          2.2472936666944925,
+          89.43395980292723
+        ],
+        "quat": [
+          -0.10799937973733637,
+          -0.40339849663227334,
+          -0.04801493949680864,
+          0.907358998674885
+        ]
+      }
+    },
+    {
+      "name": "04-reveal-held",
+      "pos": [
+        -7.2,
+        0,
+        87.444
+      ],
+      "homecoming": {
+        "pinned": true,
+        "sent": true,
+        "home": [],
+        "lit": [
+          "page"
+        ],
+        "full": false
+      },
+      "onward": 48,
+      "path": {
+        "t": 1.9666666666666694,
+        "w": 1,
+        "yielding": false
+      },
+      "camera": {
+        "pos": [
+          -10.697244576396951,
+          3.6401060884325362,
+          90.30836680991086
+        ],
+        "quat": [
+          -0.09719457958050975,
+          -0.34434166455334236,
+          -0.03586728078705729,
+          0.9331106954277955
+        ]
+      }
+    },
+    {
+      "name": "05-move-yield",
+      "pos": [
+        -7.06,
+        0,
+        86.68
+      ],
+      "homecoming": {
+        "pinned": true,
+        "sent": true,
+        "home": [],
+        "lit": [
+          "page"
+        ],
+        "full": false
+      },
+      "onward": 48,
+      "path": {
+        "t": 2.4666666666666677,
+        "w": 0.7857142857142865,
+        "yielding": true
+      },
+      "camera": {
+        "pos": [
+          -10.602759780160492,
+          4.11838214840919,
+          90.02497607090667
+        ],
+        "quat": [
+          -0.11029394363306123,
+          -0.349336638194314,
+          -0.04144942860592164,
+          0.9295596291154239
+        ]
+      }
+    },
+    {
+      "name": "06-move-return",
+      "pos": [
+        -6.167,
+        -0.058,
+        81.313
+      ],
+      "homecoming": {
+        "pinned": true,
+        "sent": true,
+        "home": [],
+        "lit": [
+          "page"
+        ],
+        "full": false
+      },
+      "onward": 48,
+      "path": null,
+      "camera": {
+        "pos": [
+          -8.316508882553405,
+          1.3155949509882725,
+          80.41724201648502
+        ],
+        "quat": [
+          -0.07722276209847478,
+          -0.8144399386846819,
+          -0.11147774088020575,
+          0.5641781142311528
+        ]
+      }
+    },
+    {
+      "name": "07-plaza-revisit",
+      "pos": [
+        -7.2,
+        0,
+        88
+      ],
+      "homecoming": {
+        "pinned": true,
+        "sent": true,
+        "home": [],
+        "lit": [
+          "page"
+        ],
+        "full": false
+      },
+      "onward": 48,
+      "path": null,
+      "camera": {
+        "pos": [
+          -9.530755331020645,
+          1.3499999999999999,
+          88.75503612229903
+        ],
+        "quat": [
+          -0.10304388115763188,
+          -0.5833487020981271,
+          -0.07493521657744955,
+          0.8021664189137396
+        ]
+      }
+    }
+  ]
+}

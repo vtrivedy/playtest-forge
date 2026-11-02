@@ -1,0 +1,136 @@
+{
+  "baseline": {
+    "sha": "5a43cd393d41e51dd6d7f8887ec811f10c12ed45",
+    "samples": 150,
+    "seconds": 150,
+    "checks": {
+      "complete": true,
+      "pageKept": true,
+      "pagePinned": true,
+      "wellFull": false,
+      "onward": false,
+      "noErrors": true,
+      "finite": true
+    },
+    "pagePinnedFirstSample": 50,
+    "onwardFirstSample": null,
+    "homecomingBeatFirstSample": 74,
+    "pathSamples": [],
+    "finalHomecoming": {
+      "pinned": true,
+      "sent": true,
+      "home": [],
+      "lit": [
+        "page"
+      ],
+      "full": false
+    },
+    "lastJump": {
+      "apex": 0.792,
+      "air": 0.633,
+      "timeToApex": 0.317
+    },
+    "lastDashDistance": 1.998,
+    "dashesUsed": 4,
+    "errors": [],
+    "evidence": "/captures/sorrel/homecoming-natural-slice-5a43cd3"
+  },
+  "candidate": {
+    "sha": "e07e170870300cd8943ba7c752e83e0c28daf4b9",
+    "samples": 150,
+    "seconds": 150,
+    "checks": {
+      "complete": true,
+      "pageKept": true,
+      "pagePinned": true,
+      "optionalWellRemainsIncomplete": true,
+      "optionalCreaturesRemainPressed": true,
+      "onward": true,
+      "revealSeen": true,
+      "finalFollow": true,
+      "noErrors": true,
+      "finite": true
+    },
+    "pagePinnedFirstSample": 50,
+    "onwardFirstSample": 50,
+    "homecomingBeatFirstSample": 74,
+    "pathSamples": [
+      {
+        "t": 74,
+        "path": {
+          "t": 0.733333333333334,
+          "w": 0.9166666666666674,
+          "yielding": false
+        }
+      },
+      {
+        "t": 75,
+        "path": {
+          "t": 1.733333333333332,
+          "w": 1,
+          "yielding": false
+        }
+      },
+      {
+        "t": 76,
+        "path": {
+          "t": 2.7333333333333285,
+          "w": 1,
+          "yielding": false
+        }
+      },
+      {
+        "t": 77,
+        "path": {
+          "t": 3.733333333333325,
+          "w": 1,
+          "yielding": false
+        }
+      },
+      {
+        "t": 78,
+        "path": {
+          "t": 4.733333333333322,
+          "w": 1,
+          "yielding": false
+        }
+      },
+      {
+        "t": 79,
+        "path": {
+          "t": 5.733333333333318,
+          "w": 0.8833333333333409,
+          "yielding": false
+        }
+      },
+      {
+        "t": 80,
+        "path": {
+          "t": 6.733333333333315,
+          "w": 0.38333333333334263,
+          "yielding": false
+        }
+      }
+    ],
+    "finalHomecoming": {
+      "pinned": true,
+      "sent": true,
+      "home": [],
+      "lit": [
+        "page"
+      ],
+      "full": false
+    },
+    "lastJump": {
+      "apex": 0.792,
+      "air": 0.633,
+      "timeToApex": 0.317
+    },
+    "lastDashDistance": 1.998,
+    "dashesUsed": 4,
+    "errors": [],
+    "evidence": "/captures/sorrel/homecoming-natural-slice-fixed"
+  },
+  "matchingPositionSamples": 150,
+  "limits": "One-second state samples and ten 640x360 chase PNGs per run; no performance, continuous motion, audio or unaided discovery verdict. Only initial shared wake teleport; no page, creature or Keeping dev staging."
+}
