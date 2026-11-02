@@ -554,7 +554,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
   const card = createLetterPlane(2048, 720, 0.42, 0.5);
   card.draw([
     { text: 'Russet Vale', px: 300, italic: true, spacing: 0.02 },
-    { text: 'and the year turned', px: 84, spacing: 0.14, alpha: 0.9 },
+    { text: 'and the year turned', px: 84, spacing: 0.14, alpha: 0.95, outline: 0.09 },
   ]);
   opts.cam.camera.add(card.mesh);
   const say = (text: string) => ctx.captions.say(text);
@@ -718,7 +718,7 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
     onwardMesh, onwardLut, emberAt: new THREE.Vector3(), onwardAt, onwardFrom,
     homeReady: opts.homeReady,
     emberWhere: (out: THREE.Vector3) => opts.ember.where(out),
-    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card,
+    pageMeshes, leafMesh, pageSeed, snow, snowMat, kitFoxes, kitPages, card, teach: ctx.teach.offer,
     cradle: cradleAt,
     bookTop: new THREE.Vector3(local(0.1, 0).x, base + coverY, local(0.1, 0).z),
     toCrown,

@@ -14,10 +14,12 @@ const port=Number(arg('port','5224'));
 const mistake=arg('mistake','none');
 const perception=arg('perception','rendered');
 const snapshot=arg('snapshot','1')!=='0';
+const idle=Number(arg('idle','0'));
+if(!Number.isFinite(idle)||idle<0)throw new Error('idle must be nonnegative seconds');
 const width=Number(arg('width','640')),height=Math.round(width*9/16);
 if(fs.existsSync(`${out}/frames`)&&fs.readdirSync(`${out}/frames`).length)throw new Error('Output already has frames; use a fresh directory to preserve evidence');
 fs.mkdirSync(`${out}/frames`,{recursive:true});
-const evidence={toolSha256:createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'),policySha256:createHash('sha256').update(createDiscoveryPolicy.toString()).digest('hex'),observerSha256:createHash('sha256').update(createDiscoveryObserver.toString()).digest('hex'),commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),tool:'Route-independent invitation follower; no teleports or forced state. Rendered mode observes only fragment instances inside camera viewport and shown hint text; geometry observation, not pixel vision or an occlusion guarantee. Semantic mode is a separate instrumentation control.',seconds,mistake,perception,capture:{clock:'fixed 60Hz simulation, offline screenshots',fps:renderEvery?60/renderEvery:0,audio:false},completed:false,simulationCompleted:false,captureCompleted:false,errors:[],trace:[]};
+const evidence={toolSha256:createHash('sha256').update(fs.readFileSync(new URL(import.meta.url))).digest('hex'),policySha256:createHash('sha256').update(createDiscoveryPolicy.toString()).digest('hex'),observerSha256:createHash('sha256').update(createDiscoveryObserver.toString()).digest('hex'),commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),tool:'Route-independent invitation follower; no teleports or forced state. Rendered mode observes only fragment instances inside camera viewport and shown hint text; geometry observation, not pixel vision or an occlusion guarantee. Semantic mode is a separate instrumentation control.',seconds,idle,mistake,perception,capture:{clock:'fixed 60Hz simulation, offline screenshots',fps:renderEvery?60/renderEvery:0,audio:false},completed:false,simulationCompleted:false,captureCompleted:false,errors:[],trace:[]};
 const server=arg('production','0')==='1'?await preview({configFile:'games/fox-spirit/vite.config.ts',preview:{host:'127.0.0.1',port,strictPort:true},logLevel:'error'}):await createServer({configFile:'games/fox-spirit/vite.config.ts',server:{host:'127.0.0.1',port,strictPort:true},logLevel:'error'});
 if(server.listen)await server.listen();
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -27,7 +29,7 @@ try{
  await page.evaluate(({source,observer})=>{const h=window.__gameHooks;h.setManual(true);window.__discoveryProbe={f:0,s:h.advance(1,1/60,false),rows:[],policy:new Function(`return (${source})`)()(),injected:false,missLeft:0,observe:new Function(`return (${observer})`)()(window.__opening.ctx.scene,window.__opening.camera,window.__opening.ctx.fox.root)};},{source:createDiscoveryPolicy.toString(),observer:createDiscoveryObserver.toString()});
  let image=0,lastSaved=0;
  for(let tick=0;tick<seconds*60;){
-  const r=await page.evaluate(({limit,renderEvery,mistake,perception})=>{
+  const r=await page.evaluate(({limit,renderEvery,mistake,perception,idle})=>{
    const p=window.__discoveryProbe,h=window.__gameHooks;let shot=false;
    for(let i=0;i<60&&p.f<limit;i++){
     const s=p.s,c=s.opening.discovery;
@@ -40,6 +42,7 @@ try{
     }
     if(p.missLeft>0){x=0.7;z=0.7;jump=false;dash=false;p.missLeft--;}
 
+    if(p.f/60<idle){x=0;z=0;jump=false;dash=false;}
     h.setStick(x,z);h.setKeys(jump?(dash?['Space','ShiftLeft']:['Space']):dash?['ShiftLeft']:[]);
     shot=renderEvery>0&&p.f%renderEvery===0;
     p.s=h.advance(1,1/60,shot);p.f++;
@@ -47,7 +50,7 @@ try{
     if(shot)break;
    }
    const rows=p.rows;p.rows=[];return{f:p.f,shot,rows,s:p.s};
-  },{limit:seconds*60,renderEvery,mistake,perception});
+  },{limit:seconds*60,renderEvery,mistake,perception,idle});
   tick=r.f;evidence.trace.push(...r.rows);
   if(r.shot)await page.screenshot({path:`${out}/frames/f${String(image++).padStart(5,'0')}.jpg`});
   if(tick-lastSaved>=600){lastSaved=tick;console.log(JSON.stringify({t:tick/60,pos:r.s.pos,cue:r.s.opening.discovery,page:r.s.opening.page.catches}));fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));}
@@ -55,6 +58,12 @@ try{
  evidence.game=await page.evaluate(()=>window.__game.state());
  fs.writeFileSync(`${out}/evidence.partial.json`,JSON.stringify(evidence));
  evidence.checks={firstCatch:evidence.game.opening.page.catches>0,canopy:evidence.game.opening.canopy.launches>0&&evidence.game.opening.page.catches>=2,overlook:evidence.game.opening.popUpRuin.reached,kept:evidence.game.opening.page.phase==='kept',noErrors:evidence.errors.length===0,finite:evidence.trace.every(r=>r.pos.every(Number.isFinite)),noCompetingHearthHint:evidence.trace.every(r=>!r.cue.active||!/cold hearth|warm air/.test(r.teach?.showing??'')),landingGates:evidence.trace.filter(r=>['jump1->fold2','jump1->jump2','jump2->jump3','jump3->catch'].includes(r.transition)).every(r=>r.grounded),mistakeInjected:mistake==='none'||evidence.trace.some(r=>r.injected)};
+ const intro=evidence.trace.filter(r=>r.t>=0.5&&r.t<idle);
+ evidence.checks.initialFollow=idle<0.5||intro.length>0&&intro.every(r=>r.page.phase==='perched'&&r.teach?.showing==='Follow the loose page');
+ evidence.checks.dashAfterBolt=evidence.trace.every(r=>r.cue.leg!=='page'||r.cue.action!=='dash'||r.page.phase==='fleeing');
+ evidence.checks.guidanceFinished=evidence.game.opening.discovery.leg==='done'&&!evidence.game.opening.discovery.active;
+ const finishes=evidence.trace.filter(r=>r.transition?.endsWith('->done'));
+ evidence.checks.finishOnGround=finishes.length>0&&finishes.every(r=>r.grounded&&r.ruin.reached);
  evidence.frames=image;
  evidence.simulationCompleted=true;
  evidence.observations={roostVisits:evidence.game.opening.canopy.roostVisits,ruinMisses:evidence.game.opening.popUpRuin.misses};
