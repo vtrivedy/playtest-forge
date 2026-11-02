@@ -27,6 +27,8 @@ export function createCaptions(ctx: OpeningCtx) {
       c.t = 0;
       said.push(text);
     },
+    /** primitive hot read: a story line is on screen */
+    isShowing: () => c.t >= 0,
     state: () => ({ showing: c.t >= 0 ? showing : null, said: said.length }),
   };
 }

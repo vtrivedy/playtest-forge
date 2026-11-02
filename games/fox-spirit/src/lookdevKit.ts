@@ -148,6 +148,8 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
             bloom = max(bloom, exp(-pow((d - 0.35 - 0.25 * lkNoise(xz * 1.7)) / 0.3, 2.0)) * step(0.5, r.z));
           }
           ${TRAIL_BLEND}
+          // the other worlds (opening/worlds.ts) are islands far along x, in their own colours from the start
+          paint = max(paint, uLaneOn * step(350.0, abs(xz.x)));
           float lum = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
           float t = clamp(lum / 1.25, 0.0, 1.0);
           // paper: tooth + laid fibres (screen) and old-paper stains / foxing (world)
@@ -226,12 +228,16 @@ export function patchPaint(mat: THREE.MeshToonMaterial, contour: number, climbBa
           float cont = (1.0 - smoothstep(0.1, 0.1 + 0.22 * brush, ndv)) * uLkContour;
           outgoingLight = mix(outgoingLight, uPaperInk * 0.8, cont);
           // first snow settles in patches on whatever faces the sky, growing in from the patch noise
-          if (uSnow > 0.001) {
+          // snow is per world (DESIGN-worlds.md): the finale's first snow belongs to Russetvale, the Press is always
+          // winter, Ashwater's marsh never takes it
+          float snowAmt = uSnow;
+          if (uLaneOn > 0.5 && abs(xz.x) > 350.0) snowAmt = xz.x < 0.0 ? 0.85 : 0.0;
+          if (snowAmt > 0.001) {
             vec3 upV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
             float up = smoothstep(0.5, 0.85, dot(normalize(normal), upV));
-            float patchK = smoothstep(0.62, 0.42, lkFbm(xz * 0.45 + 31.0) + (lkNoise(xz * 3.1) - 0.5) * 0.15 - uSnow * 0.55 + 0.3);
+            float patchK = smoothstep(0.62, 0.42, lkFbm(xz * 0.45 + 31.0) + (lkNoise(xz * 3.1) - 0.5) * 0.15 - snowAmt * 0.55 + 0.3);
             vec3 snowC = vec3(0.95, 0.93, 0.9) * (0.62 + 0.42 * t) * (0.97 + 0.05 * tooth);
-            outgoingLight = mix(outgoingLight, snowC, up * patchK * uSnow * 0.9);
+            outgoingLight = mix(outgoingLight, snowC, up * patchK * snowAmt * 0.9);
           }
         }
         #include <opaque_fragment>`,
@@ -902,7 +908,13 @@ export const SKY = {
   sun: 0xffc27a,
 };
 
-export type LookdevSky = { setPaint: (k: number, dir: THREE.Vector2) => void; mist: THREE.Color; update: (dt: number) => void };
+export type LookdevSky = {
+  setPaint: (k: number, dir: THREE.Vector2) => void;
+  mist: THREE.Color;
+  update: (dt: number) => void;
+  /** another world's sky (opening/worlds.ts): blend the painted gradient and mist toward it by k (0 = autumn) */
+  setWorld: (top: THREE.Color, mid: THREE.Color, hor: THREE.Color, mist: THREE.Color, k: number) => void;
+};
 
 export function buildSky(scene: THREE.Scene, sunDir: THREE.Vector3): LookdevSky {
   const C = (h: number) => new THREE.Color(h);
@@ -1034,6 +1046,15 @@ export function buildSky(scene: THREE.Scene, sunDir: THREE.Vector3): LookdevSky 
     },
     update(dt) {
       u.uTime.value += dt;
+    },
+    setWorld(top, mid, hor, wMist, k) {
+      u.uTop.value.set(SKY.autumn.top).lerp(top, k);
+      u.uMid.value.set(SKY.autumn.mid).lerp(mid, k);
+      u.uHor.value.set(SKY.autumn.horizon).lerp(hor, k);
+      if (k > 0) {
+        u.uPaint.value = Math.max(u.uPaint.value, k);
+        mist.lerp(wMist, k);
+      }
     },
   };
 }
