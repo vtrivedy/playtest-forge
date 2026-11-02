@@ -12,7 +12,8 @@ import { buildSky, inkMaterial, paintU, RESTORE_SLOTS, rng } from '../lookdevKit
 import { buildContactShadow } from '../lookdevGround';
 import { loadHearthFox, type HearthFox } from '../lookdevFox';
 import { createPlay, PLAY, type Collider, type PlayController } from '../lookdevPlay';
-import { FINALE, groundH, KEEPING, SPAWN } from './layout';
+import { ALL_PATHS, FINALE, groundH, KEEPING, pathDist, SPAWN } from './layout';
+import { bakeLaneMap } from './lanePaint';
 import { buildMeadow } from './meadow';
 import { buildVillage } from './village';
 import { createOpeningHearth } from './hearth';
@@ -165,6 +166,8 @@ export async function runOpening(): Promise<void> {
   scene.add(fox.root);
 
   const paint = createOpeningPaint({ field, renderer, uniforms: paintU, groundH });
+  // the roads are underpainted and restores run down them (DESIGN-corridors.md)
+  bakeLaneMap({ uniforms: paintU, paths: ALL_PATHS, pathDist, groundH });
   const occlusion = createOpeningOcclusion([...ctx.occluders, ...ctx.cutout]);
   {
     const unfaded = unfadedBlockers(ctx.colliders, [...ctx.occluders, ...ctx.cutout], groundH);

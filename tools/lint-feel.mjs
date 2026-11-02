@@ -6,10 +6,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { lintHotSource, hotLintSelfTest } from './hot-path-lint.mjs';
+import { lintRenderSurface, renderSurfaceSelfTest } from './render-surface-lint.mjs';
 import { lintAssetSource, assetLintSelfTest } from './asset-path-lint.mjs';
 import { lintTeachOrderSource, teachOrderSelfTest } from './teach-order-lint.mjs';
 teachOrderSelfTest();
 assetLintSelfTest();
+renderSurfaceSelfTest();
 hotLintSelfTest();
 
 const ROOT = 'games/fox-spirit/src/opening';
@@ -56,13 +58,15 @@ function scanHot(dir) {
     else if (entry.name.endsWith('.ts')) {
       const source = fs.readFileSync(file, 'utf8');
       findings.push(...lintAssetSource(file, source));
+      findings.push(...lintRenderSurface(file, source));
       if (entry.name.endsWith('.hot.ts')) findings.push(...lintHotSource(file, source));
     }
   }
 }
 scanHot('games/fox-spirit/src');
+findings.push(...lintRenderSurface('src/render/forgeRenderer.ts', fs.readFileSync('src/render/forgeRenderer.ts', 'utf8')));
 // world checks that need the TypeScript layout (tools/checks/*.ts via tsx): painted lanes must be walkable (Wren 77d303a)
-for (const check of ['tools/checks/paths-walkable.ts']) {
+for (const check of ['tools/checks/paths-walkable.ts', 'tools/tests/route-input.ts']) {
   const r = spawnSync(process.execPath, ['--import', 'tsx', check], { encoding: 'utf8' });
   if (r.status !== 0) findings.push(`${check}  [world-check] ${(r.stdout + r.stderr).trim()}`);
 }

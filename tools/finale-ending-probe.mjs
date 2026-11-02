@@ -82,7 +82,10 @@ try {
   };
   const w1 = await walkTo(cx, cz, 400);
   const w2 = await walkTo(cx + (cx - f0.fox[0]) * 0.25, cz + (cz - f0.fox[2]) * 0.25, 200);
-  const w3 = await walkTo(cx + 0.4, cz + 0.3, 200);
+  // last leg like the scripted route: come back in from the north so the fox lies facing the Press (its back to the
+  // old fixed lens)
+  await walkTo(cx + 0.2, cz + 1.8, 200);
+  const w3 = await walkTo(cx + 0.1, cz + 0.2, 200);
   metrics.disturbs = w1.shuffles + w2.shuffles + w3.shuffles;
   metrics.walkNearMin = Math.min(w1.near, w2.near, w3.near);
   await shot('03-walked-through');

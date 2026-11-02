@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {createRouteKeyEncoder} from '../route-input.hot.ts';
+const encode=createRouteKeyEncoder();
+assert.deepEqual(encode({}),[]);
+assert.deepEqual(encode({interact:true}),['KeyE'],'Carry/placement input must survive route replay');
+assert.deepEqual(encode({jump:true,interact:true}),['Space','KeyE']);
+assert.deepEqual(encode({dash:true,interact:true}),['ShiftLeft','KeyE']);
+assert.deepEqual(encode({jump:true,dash:true,interact:true}),['Space','ShiftLeft','KeyE']);
+assert.deepEqual(encode({jump:true,dash:true}),['Space','ShiftLeft']);
+assert.equal(encode({interact:true}),encode({interact:true}),'No allocation during replay');
+assert.ok(Object.isFrozen(encode({interact:true})),'Hooks must not mutate pooled input');
+console.log('Route key encoder PASS: interaction, combinations, pooled immutable output');
