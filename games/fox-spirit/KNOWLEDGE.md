@@ -180,6 +180,14 @@ permits branch unmute; Vivek then hears the landed result on main.
   check) fails it; the first run caught a checker bug instead (an armed swell legitimately waits across a breath,
   so judge the start against the state before arming). Run it after touching the conductor.
 
+- Capture taps: ScriptProcessor stem taps run on the main thread; on a loaded SwiftShader box they drop buffers
+  AND loop stale ones (a 15 s periodic "buzz" + ±25-cent ghost pitches in a grand-route capture that the offline
+  render of the same walk never had). Use `tools/lib/stem-tap.mjs` (AudioWorklet tap, batched port messages):
+  the same route recorded clean. Check a suspicious capture against `hearthsong-render.mjs` before blaming the synth.
+- Grand tour (`millbrook-walk.mjs --route grand --audio`, village → Hermitage → Millbrook → lookout, 146 s):
+  −33.1 LUFS, LRA 6.2 LU, −19.5 dBTP, never below −60 dBFS; sfx −39 LUFS; critic per 30 s window: calm,
+  soothing, nothing aggressive or repetitive.
+
 ### Catch/trigger tests at real-time frame rates (Flint, 2026-11-02)
 
 - Probes step a fixed 1/60; Kit's live capture runs rAF with dt up to 50 ms. Two page bugs only showed there: a
@@ -496,3 +504,4 @@ A clear destination is not a clear connecting segment. Full staged finale route 
   colliders first (the mill box swallowed a "round the mill" waypoint; the lookout plateau rim is >1.3 m/m).
 - Render clips from a pinned `git worktree` (with node_modules symlinked) so /work stays editable — editing
   src under a running Vite probe reloads it (HMR) and invalidates the run.
+- Controller slide (moveTo glides round posts/corners) must only act while the player steers at walk/run pace: authored routes and puzzles rely on momentum (dash, post-dash skid, coasting) stopping dead at a blocker — the pop-up ruin folds broke when a post-dash skid slid round the fold (Fern, b24bf90 → fixed). `PLAY.slide` toggles it for A/B; `node tools/page-motion-probe.mjs --out DIR` (sim-only, ~2 min) is the full-slice regression: 3 catches, kept, home.

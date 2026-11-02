@@ -6,6 +6,7 @@
 // The mix is pre-limiter (the limiter only acts above −6 dBFS); the route's first input unlocks the graph as a
 // real keypress does.
 import { chromium } from 'playwright';
+import { installStemTap } from './lib/stem-tap.mjs';
 import { createServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,22 +36,8 @@ try {
   await page.evaluate(() => window.__gameHooks.setManual(true));
   await page.keyboard.press('ShiftRight'); // a real first input (no game action on its own)
   await page.waitForFunction(() => { const a = window.__gameHooks.state().opening.audio; return a.context === 'running' && a.loaded >= a.files; }, null, { timeout: 60000 });
-  await page.evaluate(() => {
-    const h = window.__gameHooks;
-    const ac = h.audioContext();
-    const b = h.audioBuses();
-    window.__stems = { music: [[], []], ambience: [[], []], sfx: [[], []] };
-    window.__keep = [];
-    for (const name of ['music', 'ambience', 'sfx']) {
-      const sp = ac.createScriptProcessor(4096, 2, 2);
-      sp.onaudioprocess = (e) => { for (let c = 0; c < 2; c++) window.__stems[name][c].push(e.inputBuffer.getChannelData(c).slice()); };
-      const mute = ac.createGain();
-      mute.gain.value = 0;
-      b[name].connect(sp).connect(mute).connect(ac.destination);
-      window.__keep.push(sp);
-    }
-    window.__t0 = ac.currentTime;
-  });
+  await page.evaluate(installStemTap, ['music', 'ambience', 'sfx']);
+  await page.evaluate(() => { window.__t0 = window.__gameHooks.audioContext().currentTime; });
   const route = createSliceRoute();
   let state = await page.evaluate((s) => { const h = window.__gameHooks; h.teleport(s.x, s.z, s.yaw); return h.advance(1, 1 / 60, false); }, SLICE_START);
   const trace = [];
