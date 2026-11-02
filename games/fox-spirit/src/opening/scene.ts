@@ -249,6 +249,11 @@ export async function runOpening(): Promise<void> {
     }
     paintU.uRestoreCount.value = Math.min(RESTORE_SLOTS, field.restores.length);
     field.restores.slice(0, RESTORE_SLOTS).forEach((r, i) => paintU.uRestore.value[i]!.set(r.center.x, r.center.z, r.radius, Math.max(0.3, Math.min(r.edgeMax, r.radius * 0.18))));
+    // after a wash settles its colour keeps seeping outward for ~40 s (up to 0.8 of its radius, ≤ 16 m)
+    for (let i = 0; i < paintU.uRestoreCount.value; i++) {
+      const r = field.restores[i]!;
+      paintU.uRestoreBleed.value[i] = Math.min(16, r.targetRadius * 0.8) * THREE.MathUtils.smoothstep(r.age, r.durationS * 0.5, r.durationS + 40);
+    }
   }
 
   let time = 0;
