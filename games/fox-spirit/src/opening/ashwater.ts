@@ -15,9 +15,10 @@ import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import { updateAshwater, type AshRig } from './ashwater.hot';
+import { buildAshwaterPuddles } from './ashwaterGround';
 
 const C = {
-  moss: new THREE.Color(0x3f7448), peat: new THREE.Color(0x3a3a2e), mud: new THREE.Color(0x3b3226), levee: new THREE.Color(0x8a7d5a), sedge: new THREE.Color(0x6f8f4a), bank: new THREE.Color(0x56705e),
+  moss: new THREE.Color(0x3c493d), peat: new THREE.Color(0x35352f), mud: new THREE.Color(0x3b322b), levee: new THREE.Color(0x74664e), sedge: new THREE.Color(0x505a40), bank: new THREE.Color(0x505e55),
   water: 0x2a6a74, reed: 0x6f8a3e, reedDry: 0xa08a4e, willow: 0x4f7f6a, pad: 0x5d8f3f, bloom: 0xf2e6c4, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
 };
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
@@ -60,7 +61,7 @@ export function buildAshwater(
     const wet = 1 - THREE.MathUtils.smoothstep(h, -0.6, 0.12);
     const w = waterAt(x, z) !== null ? 1 : 0;
     c.copy(C.moss).lerp(C.sedge, 0.5 + 0.5 * Math.sin(x * 0.37 + z * 0.23));
-    c.lerp(C.mud, Math.max(wet, w * 0.8));
+    c.lerp(C.peat, wet * 0.6).lerp(C.mud, Math.max(wet * 0.7, w * 0.8));
     if (h > 0.32 && h < 0.75 && w === 0) c.lerp(C.levee, 0.35);
     if (h > 2) c.lerp(C.bank, 0.6);
     c.toArray(col, i * 3);
@@ -71,6 +72,7 @@ export function buildAshwater(
   ground.position.set(ASH_ORIGIN.x, 0, ASH_ORIGIN.z);
   ground.receiveShadow = true;
   root.add(ground);
+  root.add(buildAshwaterPuddles(geo));
 
   // ---- water: the channel and the pool drop when drained; the pond holds
   const waterMat = new THREE.MeshStandardMaterial({ color: C.water, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.86, emissive: 0x0d2a2e });

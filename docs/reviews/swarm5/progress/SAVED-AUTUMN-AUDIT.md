@@ -46,3 +46,7 @@ zero JS errors, `autumnReconstructionCompleted:false`, per-case results
 new-arch announcement) and retained its Album comparison in this directory as
 `saved-autumn-full-hub.png` and `saved-autumn-full-album.png`. TypeScript,
 progress prerequisites/persistence tests, tool syntax and diff checks pass.
+
+Canonical mapping was subsequently confirmed and the physical reconstruction
+corrected. See [the correction and replay evidence](AUTUMN-SAVE-FIX.md); the
+earlier failed snapshots above remain historical negative evidence.

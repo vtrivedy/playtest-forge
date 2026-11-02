@@ -71,12 +71,13 @@ frozen membrane into a glide draft)** (Thistle)
 
 **Hub** — Lanternhollow's well: three Seedwells fill, arches light as worlds open, Album (Tab) shows pages earned.
 
-## Honest scope for 6 PM
-All nine levels exist as playable code (Russetvale 3 shipped; Ashwater 3 and Press 3 pushed with input-only
-probes). Bigger *walkable area* (10–15 min per world) and the story pages/characters are the next work, in that
-order: characters + pages (Hazel: Album pages; Cedar: Ferrykeeper; Thistle: Scribe at the Press; Maple: Ash Warden
-footprints across worlds + hub), then side paths/secrets per world. Placeholder art (disc mats, flat lawn, glass
-tubes) is not done — each builder replaces theirs before calling a level shipped.
+## Honest scope for 6 PM (updated 21:40 UTC)
+Built and probed on the integration tip (sw5-maple b4cb20c8): hub arches + travel + return; Ashwater three levels
+(Low Sluice in two reaches, Reed Pond, Weir Heart with flood + punt; Ferrykeeper; drowned roof + mooring lantern side
+places); the Press three levels (warmth relays, Inkstep membranes, the Scribe and the coda) + the Scribe's Stacks secret;
+Russetvale's three levels + the Loft secret; the Ash Warden in every world; Album with nine earned memories and two
+secret pages; Seedwells; saved re-entry. Measured play length (Kit/Reed): Russetvale ~4.7 min, Ashwater ~2.6 min,
+Press ~1.5 min — far short of 10–15 min per world; worlds are still small places, not large explorable ones.
 
 ## Progress (Hazel)
 Typed ids `russetvale|ashwater|press` × `teach|develop|combine`; monotonic `visit / restore / earn` store, versioned

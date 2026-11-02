@@ -40,7 +40,7 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
   let open = false;
   let spread = 0;
   function text(value: string, x: number, y: number, size: number, color = '#382b31') {
-    g.fillStyle = color; g.font = `${size}px ${FONT}`; g.fillText(value, x, y);
+    g.fillStyle = color; g.font = `600 ${size}px ${FONT}`; g.fillText(value, x, y);
   }
   function landscape(world: WorldId, x: number, y: number, color: string, restored: boolean) {
     g.save(); g.translate(x, y);
@@ -69,11 +69,11 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     g.restore();
   }
   function wrap(value: string, x: number, y: number, width: number, size: number, color: string) {
-    g.font = `${size}px ${FONT}`;
+    g.font = `600 ${size}px ${FONT}`;
     let line = '', yy = y;
     for (const word of value.split(' ')) {
       const next = line ? `${line} ${word}` : word;
-      if (line && g.measureText(next).width > width) { text(line, x, yy, size, color); yy += size * 1.4; line = word; }
+      if (line && g.measureText(next).width > width) { text(line, x, yy, size, color); yy += size * 1.25; line = word; }
       else line = next;
     }
     if (line) text(line, x, yy, size, color);
@@ -87,10 +87,10 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     for (let li = 0; li < LEVEL_IDS.length; li++) {
       const level = LEVEL_IDS[li], recovered = progress.isRestored(world, level), memory = WORLD_STORIES[world][level], y = 300 + li * 150;
       g.fillStyle = recovered ? '#e4d4b8' : '#ded4c3';
-      g.beginPath(); g.roundRect(120, y - 25, 1200, 130, 10); g.fill();
-      text(recovered ? memory.title : 'A page still missing', 150, y + 9, 27, recovered ? '#241824' : '#625354');
+      g.beginPath(); g.roundRect(120, y - 25, 1200, 144, 10); g.fill();
+      text(recovered ? memory.title : 'A page still missing', 150, y + 9, 27, recovered ? '#241824' : '#48383c');
       if (recovered) { g.textAlign = 'right'; text(memory.voice, 1290, y + 9, 22, '#48383c'); g.textAlign = 'left'; }
-      wrap(recovered ? memory.text : 'Only a torn edge remains. The rest has not returned to the Album.', 150, y + 48, 1130, 25, recovered ? '#302330' : '#625354');
+      wrap(recovered ? memory.text : 'Only a torn edge remains. The rest has not returned to the Album.', 150, y + 48, 1130, 25, recovered ? '#302330' : '#48383c');
     }
     g.textAlign = 'center';
   }
@@ -101,7 +101,7 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
     g.fillStyle = '#eee1c8'; g.beginPath(); g.roundRect(12, 12, WIDTH - 24, HEIGHT - 24, 22); g.fill();
     g.strokeStyle = '#9d7f68'; g.lineWidth = 2; g.strokeRect(32, 32, WIDTH - 64, HEIGHT - 64);
     g.textAlign = 'center'; text('The Hearthfox Album', WIDTH / 2, 90, 42);
-    text('Restore the three Seedwells · Find the Wellspring', WIDTH / 2, 135, 23, '#75615c');
+    text('Restore the three Seedwells · Find the Wellspring', WIDTH / 2, 135, 23, '#51404a');
     if (spread > 0) {
       if (spread < 4) drawStory(WORLD_IDS[spread - 1]);
       else {
@@ -111,12 +111,12 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
         text('Unpressed pages', WIDTH / 2, 220, 36, '#302334');
         g.fillStyle = '#e4d4b8'; g.beginPath(); g.roundRect(180, 295, 1080, 380, 16); g.fill();
         text(found ? memory.title : 'A loose binding', WIDTH / 2, 355, 32, '#302334');
-        text(found ? memory.voice : 'There is room for another memory.', WIDTH / 2, 405, 24, '#625354');
+        text(found ? memory.voice : 'There is room for another memory.', WIDTH / 2, 405, 24, '#48383c');
         g.textAlign = 'left';
         wrap(found ? memory.text : 'Some moments were never pressed into the Album. An empty space waits between these pages.', 235, 475, 970, 28, '#302330');
         g.textAlign = 'center';
       }
-      text('[ / ] · turn pages     Tab · close Album', WIDTH / 2, 844, 22);
+      text('[ / ] · turn pages     Tab · close Album', WIDTH / 2, 838, 26);
       texture.needsUpdate = true;
       return;
     }
@@ -125,7 +125,7 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
       const cx = 256 + wi * 464;
       if (wi) { g.strokeStyle = '#c8b79e'; g.beginPath(); g.moveTo(cx - 232, 177); g.lineTo(cx - 232, 750); g.stroke(); }
       if (state.activeWorld === world) { g.fillStyle = def.color; g.beginPath(); g.arc(cx - 175, 188, 5, 0, Math.PI * 2); g.fill(); }
-      text(def.name, cx, 197, 29); text(def.season, cx, 233, 21, '#75615c');
+      text(def.name, cx, 197, 29); text(def.season, cx, 233, 21, '#51404a');
       landscape(world, cx, 360, def.color, data.visited.length > 0);
       for (let li = 0; li < LEVEL_IDS.length; li++) {
         const level = LEVEL_IDS[li], solved = data.restored.includes(level), seen = data.visited.includes(level), yy = 459 + li * 64;
@@ -133,14 +133,14 @@ export function createPageMap(camera: THREE.PerspectiveCamera, progress: WorldPr
         g.fillStyle = solved ? def.color : seen ? '#d4c6ae' : '#eee1c8'; g.strokeStyle = solved ? '#574c4c' : '#ab9c8e'; g.lineWidth = 2;
         g.beginPath(); g.arc(cx - 168, yy, 12, 0, Math.PI * 2); g.fill(); g.stroke();
         if (solved) { g.strokeStyle = '#fff9e7'; g.lineWidth = 3; g.beginPath(); g.moveTo(cx - 174, yy); g.lineTo(cx - 169, yy + 5); g.lineTo(cx - 161, yy - 6); g.stroke(); }
-        g.textAlign = 'left'; text(def.levels[level], cx - 141, yy + 7, 24, solved ? '#382b31' : '#796b68'); g.textAlign = 'center';
+        g.textAlign = 'left'; text(def.levels[level], cx - 141, yy + 7, 24, solved ? '#382b31' : '#51404a'); g.textAlign = 'center';
       }
       text(`${def.well} Seedwell`, cx, 677, 23);
       for (let i = 0; i < 3; i++) { g.fillStyle = i < data.restored.length ? def.color : '#cec1ae'; g.beginPath(); g.roundRect(cx - 120 + i * 83, 698, 74, 13, 6); g.fill(); }
-      text(data.ability ? `${data.ability} learned` : `${def.ability} · undiscovered`, cx, 749, 22, data.ability ? '#483c46' : '#8d7c73');
+      text(data.ability ? `${data.ability} learned` : `${def.ability} · undiscovered`, cx, 749, 22, data.ability ? '#483c46' : '#51404a');
     }
-    text('Outline: undiscovered     Wash: visited     Color + tick: restored', WIDTH / 2, 805, 21, '#75615c');
-    text('[ / ] · read memories     Tab · close Album', WIDTH / 2, 844, 22);
+    text('Outline: undiscovered     Wash: visited     Color + tick: restored', WIDTH / 2, 805, 21, '#51404a');
+    text('[ / ] · read memories     Tab · close Album', WIDTH / 2, 838, 26);
     texture.needsUpdate = true;
   }
   function setOpen(value: boolean) { open = value; if (open) pendingRevelation = false; if (open) draw(); stepPageMap(plane, camera, open, badge, revelation, pendingRevelation); }

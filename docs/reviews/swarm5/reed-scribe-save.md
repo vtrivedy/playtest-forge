@@ -76,3 +76,55 @@ Full evidence: `/captures/reed/press-route-b374e01a/`; persistent volume
 `keeping-swarm5-captures/reed/press-route-b374e01af5/`. TypeScript, production build, feel/arrival lint and diff
 checks pass. Saved/fresh evidence above is also persisted under `reed/save-f49f3aa1/` and `reed/discovery-f49f3aa1/`
 on the same volume.
+
+
+## Press floor and moved brazier — bd4a2e7823361f5d7eed9c6a8f6a8cd9c3e9da3f
+
+Thistle's `882c7fd1` integrated. Fresh physical opening/home/arch/Press/return/re-entry route on NVIDIA A10/EGL
+passes with zero JavaScript errors. Direct warmth expires with seal closed; relays light, both drafts open,
+all three local and canonical facts restore, Inkstep is earned and Maple fill reaches 1. All five portal
+transitions pass. Native Tab opens the Album. Full hook and `window.__game` snapshots accompany every beat.
+
+The old white-plane obstruction is fixed at the moved first brazier: hero [-721.77, 1.50, 113.39],
+camera [-720.708, 2.848, 115.594], `blocked:false`. Personally inspected first brazier, relay, arrival, shelf
+and final composition. Snow-crowned ink trees and lanterns add readable winter scenery. The relay bowl hides
+most of the hero in its close approach frame, and the final ledge remains sparse. This is bounded still review,
+not whole-route camera or continuous animation approval.
+
+This probe targeted the brazier centres, walking into their solid posts until the timeout. Its 126.583-second
+Press spawn-to-completion time therefore includes harness waste and must not count as added puzzle depth.
+The corrected reachable-approach replay is tracked separately below. Both routes remain authored solvability
+evidence, not blind discovery or game-length proof.
+
+Runtime teaching prompts in `press.hot.ts` still spell out warmth to seal, cold-brazier relay, and warming the
+iced membrane. Observational event captions in `press.ts` do not resolve that solution-hint gap. No video or
+zero-black-frame claim follows from these screenshots. TypeScript, production Vite build, feel/camera/world
+lint and whitespace checks pass on this candidate.
+
+Full evidence: `/captures/reed/press-route-bd4a2e78/`; persistent volume
+`keeping-swarm5-captures/reed/press-route-bd4a2e7823/`.
+
+
+## Reachable-approach retest — 642041758ff0880163ca44bee140fe7c585fe157
+
+Probe-only correction: use the author's reachable first-brazier approach [-20.6, 27.4] and relay approach
+[-7.6, 29.8], instead of targeting solid post centres. NVIDIA A10G/EGL, same fresh physical route: **PASS**,
+zero JavaScript errors. All three Press facts, Inkstep, Maple fill 1, native Album and all five portal
+transitions pass again. Direct approach still reaches the seal with warmth 0 and seal closed.
+
+Personally inspected [first brazier](reed-scribe-save/brazier-clear.png) and
+[lit relay](reed-scribe-save/relay-clear.png): whole fox readable in both, old white-plane issue absent.
+First-brazier camera [-719.438, 2.872, 114.587], `blocked:false`. This clears the reported rim obstruction
+for this approach. The centre-target close-up retained above remains a separate occluded composition;
+these stills do not establish every approach or continuous camera behavior.
+
+Press spawn to first final-scene frame: **86.683 simulated seconds**, including the failed direct try.
+This corrected authored route is shorter than the earlier 91.517-second route; it does not support the
+requested 10–15-minute world. Last draft-assisted jump: apex 7.767 m, air 4.900 s, time-to-apex 1.583 s;
+6 cumulative dashes, last dash 2 m. These are route metrics, not a change in character tuning.
+The [final composition](reed-scribe-save/scribe-floor-retest.png) retains the readable Scribe/hero arrangement;
+solution hints, sparse ledge, world depth and full-motion review remain open.
+
+Full retained hook/game states and screenshots: `/captures/reed/press-route-64204175/`;
+persistent volume `keeping-swarm5-captures/reed/press-route-642041758f/`. Node syntax and whitespace checks
+pass after the probe correction; no game source changed after the preceding full static gates.

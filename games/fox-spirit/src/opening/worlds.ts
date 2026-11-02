@@ -51,7 +51,7 @@ export const WORLDS: Record<WorldId, WorldDef> = {
   russetvale: { id: 'russetvale', name: 'Russetvale', origin: { x: -8, z: 85 }, spawn: { x: -5.2, z: 92.5, yaw: Math.atan2(2.2, -11.5) }, look: null },
   ashwater: {
     id: 'ashwater', name: 'Ashwater Reach', origin: { x: ASH_ORIGIN.x, z: ASH_ORIGIN.z }, spawn: { ...ash(ASH_SPAWN.lx, ASH_SPAWN.lz), yaw: inwardYaw(cedarAshE, ash(ASH_SPAWN.lx, ASH_SPAWN.lz)) },
-    look: { sky: [0x45525d, 0x6f7c84, 0x9aa5a3], mist: 0x7f8c8c, fog: 0.028, key: 0xb8c6d4, precip: 1 },
+    look: { sky: [0x45525d, 0x6f7c84, 0x9aa5a3], mist: 0x7d8b86, fog: 0.028, key: 0xb3c2cc, precip: 1 },
   },
   press: {
     id: 'press', name: "The Scribe's Press", origin: { x: PRESS.x, z: PRESS.z }, spawn: { x: PRESS.x, z: PRESS.z + PRESS.r - 8, yaw: inwardYaw((x, z) => pressE(x, z), { x: PRESS.x, z: PRESS.z + PRESS.r - 8 }) },
