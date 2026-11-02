@@ -100,13 +100,25 @@ try {
   for (const [x, z] of [...B.slice(0, -1).reverse(), [0, 0], [-0.9, 3.0], [0.6, 6.0], [-0.5, 9.0], [0.4, 12.0], [0, 15.2]]) await hop(x, z);
   await go(0, 17.5);
   await shot('06-mill-shore');
-  // the drained pool and its steps
-  await go(0, 26.8);
-  for (let i = 0; i < 8; i++) await go(0, 27.8 + i * 0.86, { jump: true, hold: 14, max: 120, reach: 0.4, land: true });
-  await go(0, 36.5, { jump: true, hold: 14, max: 120, land: true });
+  // Weir Heart: through the cistern gate, down the ramp, up the steps onto the weir
+  await go(0, 19.6);
+  await go(0, 22.8);
+  await go(0, 26.9);
+  for (let i = 0; i < 9; i++) await go(0, 27.75 + i * 0.68, { jump: true, hold: 14, max: 120, reach: 0.4, land: true });
+  await go(0, 35.2, { jump: true, hold: 14, max: 120, land: true });
   await shot('07-weir');
-  await go(14, 40);
-  await go(26.5, 40.5, { jump: true, jumpAt: 8.6, hold: 200, max: 400, reach: 0.8, land: true });
+  // dash the weir's reed gate: the race floods the cistern and lifts the punt
+  await go(2.0, 37.2);
+  await go(6.5, 37.2, { dash: true, dashAt: 1, max: 60, reach: 0.6 });
+  await settle(60 * 10);
+  await shot('07b-flooded');
+  // off the weir onto the risen punt, along it, onto the east wall, south to the Seedwell ledge
+  await go(10.2, 34.0);
+  await go(10.4, 32.2, { jump: true, jumpAt: 3, hold: 16, max: 200, reach: 0.5, land: true });
+  await go(12.6, 32.2);
+  await go(15.25, 32.0, { jump: true, jumpAt: 2.5, hold: 16, max: 200, reach: 0.5, land: true });
+  await go(15.25, 28.5);
+  await go(18.0, 26.5);
   await settle(200);
   await shot('08-seedwell');
 } catch (e) {

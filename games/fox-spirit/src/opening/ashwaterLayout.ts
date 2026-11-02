@@ -49,13 +49,22 @@ export const MAT_HALF = 1.15;
 export const MAT_RISE = 0.14;
 
 /** the weir plateau north of the Mill Pool, and the steps that climb out of the drained pool onto it */
-export const WEIR = { z0: 33.6, top: 3.6, xMax: 18 };
-export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2, 3.6].map((top, i) => ({ lz: 27.8 + i * 0.86, top }));
-export const STEP_HALF = { x: 1.6, z: 0.48 };
+export const WEIR = { z0: 33.6, top: 4.4, xMax: 12 };
+export const STEPS: ReadonlyArray<{ lz: number; top: number }> = [-0.4, 0.2, 0.8, 1.4, 2.0, 2.6, 3.2, 3.8, 4.4].map((top, i) => ({ lz: 27.75 + i * 0.68, top }));
+export const STEP_HALF = { x: 1.6, z: 0.38 };
 
 /** the Reed Seedwell on its own ledge east of the weir: reached by gliding off the plateau's east lip */
-export const LEDGE = { x0: 22.5, x1: 31, z0: 36, z1: 46, top: 2.6 };
-export const SEEDWELL = { lx: 27.5, lz: 41 };
+/** the Seedwell ledge stands against the cistern's east wall, higher than the weir and too far to glide to: only the
+ * Ferrykeeper's punt, lifted by a flooded cistern, reaches it */
+export const LEDGE = { x0: 15.5, x1: 22, z0: 21, z1: 30, top: 5.0 };
+export const SEEDWELL = { lx: 19, lz: 25.5 };
+/** the Mill Pool is a walled cistern (slate walls W/S/E; the weir is its north side); its south gate shuts in a flood */
+export const CISTERN = { wallTop: 5.0, wall: 0.5, gate: { x0: -2.2, x1: 2.2 } };
+/** dashing the weir's reed gate floods the cistern to `level` for `hold` s, then it washes out and the gate re-forms */
+export const FLOOD = { level: 4.3, rise: 9, hold: 45, fall: 6 };
+export const DAM_C = { lx: 5.5, lz: 37.2, reach: 3.2 };
+/** the last ferry, moored by the weir's east end; it floats on whatever the cistern holds */
+export const PUNT = { lx: 11.4, lz: 32.2, hx: 1.6, hz: 0.65, rise: 0.22 };
 
 /** spawn (and the return arch) on the landing, facing north */
 export const ASH_SPAWN = { lx: 0, lz: -46, yaw: Math.PI };
