@@ -55,6 +55,10 @@ Keep durable findings here by topic. Name the tested SHA and evidence; separate 
 - `field.restore` has a small shared slot budget (the Keeping and ruin use it); features shouldn't spend it.
 - Collider surfaces are a max over all colliders: a creature that walks with `floorAt` will climb onto any box it passes (the deer pins its y on the crag for this reason).
 
+## Coordination (Moss)
+
+- Before building shared infrastructure someone else claimed, run `git ls-remote origin` and check for new branches (e.g. `sw3-flint-audio`): a teammate's work can be pushed to a side branch without a channel post. I built a duplicate audio graph for ~20 min before finding Flint's.
+
 ## Assets (Moss)
 
 - Kenney (CC0) zips: the page's `data-download-id` → `GET https://kenney.nl/download-link/<id>` with `Referer: https://kenney.nl/assets/<pack>` returns a signed URL; without the Referer it returns nothing. Each zip has a License.txt (CC0).
