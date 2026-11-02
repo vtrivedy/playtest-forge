@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
 import { WELL } from './layout';
 import { ashwaterE, HUB_ARCHES, hubArrival, outward, pressE, RETURN_ARCH_BACK, WORLDS, worldAt, type WorldId } from './worlds';
-import { rng, toon } from '../lookdevKit';
+import { RAMP_WORLD, rng, toon } from '../lookdevKit';
 import { bakeCells } from './bake';
 import { box, C, cyl, Kit } from './village';
 
@@ -118,7 +118,7 @@ function buildWeather(scene: THREE.Scene) {
 }
 
 export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => boolean }) {
-  const { scene, groundH } = ctx;
+  const { scene, groundH, colliders } = ctx;
   const k = new Kit();
   const arches: Arch[] = [];
   const glowMat = (c: number) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false });
@@ -178,17 +178,136 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
     spire.rotation.set((rp() - 0.5) * 0.15, rp() * 6, (rp() - 0.5) * 0.15);
     scene.add(spire);
   }
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2;
-    const rr = 14 + rp() * 16;
-    const x = P.x + Math.cos(a) * rr;
-    const z = P.z + Math.sin(a) * rr;
+  // ---- the Press's snowfield dressing (Kit 20:51: "an empty white floor"): bare ink trees, frozen ink pools with
+  // pressed leaves caught in the ice, half-buried Album pages, lantern posts — kept off the level's run line, the ink
+  // ridge, the braziers, the Stacks and the arrival (local lx, lz from the island origin)
+  const free = (lx: number, lz: number, r = 0): boolean => {
+    if (pressE(P.x + lx, P.z + lz) > -3 - r) return false;
+    if (Math.abs(lx) < 12 + r && lz > -33 && lz < 44) return false;
+    if (lx > 11 - r && lx < 31 + r && lz > 18 - r && lz < 34 + r) return false;
+    if (Math.abs(lz - 16) < 3.5 + r) return false;
+    for (const [bx, bz] of [[-26, 30], [-6, 30], [30, -10], [16, -24]] as const) if (Math.hypot(lx - bx, lz - bz) < 3.5 + r) return false;
+    // the warmth-relay legs between braziers and gates stay open ground
+    if (lx > -31 - r && lx < 2 + r && lz > 13 - r && lz < 35 + r) return false;
+    if (lx > -2 - r && lx < 35 + r && lz > -29 - r && lz < -4 + r) return false;
+    return true;
+  };
+  // flat things (pools, leaves, buried pages) never block: they may lie by the relay legs, just not on the centre line
+  const freeFlat = (lx: number, lz: number, r = 0): boolean => {
+    if (pressE(P.x + lx, P.z + lz) > -3 - r) return false;
+    if (Math.abs(lx) < 4 + r && lz > -33 && lz < 44) return false;
+    if (lx > 11 - r && lx < 31 + r && lz > 18 - r && lz < 34 + r) return false;
+    if (Math.abs(lz - 16) < 3 + r) return false;
+    for (const [bx, bz] of [[-26, 30], [-6, 30], [30, -10], [16, -24]] as const) if (Math.hypot(lx - bx, lz - bz) < 3 + r) return false;
+    return true;
+  };
+  const dress: THREE.Object3D[] = [];
+  const inkBark = toon(0x1f2128, { contour: 0.5 });
+  const branch = (parent: THREE.Object3D, len: number, rad: number, depth: number, rr: () => number) => {
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.6, rad, len, 5).translate(0, len / 2, 0), inkBark);
+    seg.castShadow = true;
+    parent.add(seg);
+    if (depth <= 0) return;
+    const n = 2 + Math.floor(rr() * 2);
+    for (let i = 0; i < n; i++) {
+      const pivot = new THREE.Group();
+      pivot.position.y = len * (0.55 + rr() * 0.4);
+      pivot.rotation.set((rr() - 0.5) * 0.4, (i / n) * Math.PI * 2 + rr(), 0.5 + rr() * 0.5);
+      seg.add(pivot);
+      branch(pivot, len * (0.5 + rr() * 0.2), rad * 0.55, depth - 1, rr);
+    }
+  };
+  const rd = rng(6311);
+  let trees = 0;
+  for (let i = 0; i < 400 && trees < 18; i++) {
+    const lx = (rd() - 0.5) * 84;
+    const lz = (rd() - 0.5) * 84;
+    if (!free(lx, lz, 1.5)) continue;
+    const t = new THREE.Group();
+    t.position.set(P.x + lx, groundH(P.x + lx, P.z + lz) - 0.1, P.z + lz);
+    t.rotation.y = rd() * 6;
+    branch(t, 2.2 + rd() * 1.6, 0.16 + rd() * 0.08, 3, rd);
+    dress.push(t);
+    colliders.push({ kind: 'post', x: P.x + lx, z: P.z + lz, r: 0.25 });
+    trees++;
+  }
+  const poolMat = new THREE.MeshToonMaterial({ color: 0x1b2232, gradientMap: RAMP_WORLD });
+  const rimMat = new THREE.MeshToonMaterial({ color: 0xb9d2e2, gradientMap: RAMP_WORLD, transparent: true, opacity: 0.7 });
+  const leafCols = [0xb8432a, 0xd0802e, 0x9a3a24, 0xc9a032];
+  const leafMats = leafCols.map((c) => new THREE.MeshToonMaterial({ color: c, gradientMap: RAMP_WORLD, side: THREE.DoubleSide }));
+  const leafGeo = new THREE.CircleGeometry(0.16, 5).rotateX(-Math.PI / 2);
+  let pools = 0;
+  for (let i = 0; i < 600 && pools < 14; i++) {
+    const lx = (rd() - 0.5) * 80;
+    const lz = (rd() - 0.5) * 80;
+    const r = 1.6 + rd() * 2.2;
+    if (!freeFlat(lx, lz, r)) continue;
+    const y = groundH(P.x + lx, P.z + lz) + 0.04;
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(r, 24).rotateX(-Math.PI / 2), poolMat);
+    pool.position.set(P.x + lx, y, P.z + lz);
+    const rim = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.35, 24).rotateX(-Math.PI / 2), rimMat);
+    rim.position.set(P.x + lx, y + 0.01, P.z + lz);
+    dress.push(pool, rim);
+    // last autumn's leaves, pressed into the ice: the only warm colour on the field
+    for (let j = 0; j < 7; j++) {
+      const a = rd() * Math.PI * 2;
+      const d = rd() * r * 0.85;
+      const leaf = new THREE.Mesh(leafGeo, leafMats[Math.floor(rd() * leafMats.length)]!);
+      leaf.position.set(P.x + lx + Math.cos(a) * d, y + 0.015, P.z + lz + Math.sin(a) * d);
+      leaf.rotation.y = rd() * 6;
+      dress.push(leaf);
+    }
+    pools++;
+  }
+  const buried = toon(0xe0d8c4, { contour: 0.6 });
+  let pages = 0;
+  for (let i = 0; i < 400 && pages < 16; i++) {
+    const lx = (rd() - 0.5) * 84;
+    const lz = (rd() - 0.5) * 84;
+    if (!freeFlat(lx, lz, 1)) continue;
+    const pg = new THREE.Mesh(new THREE.BoxGeometry(1.1 + rd() * 0.6, 0.06, 1.5 + rd() * 0.6), buried);
+    pg.position.set(P.x + lx, groundH(P.x + lx, P.z + lz) + 0.15, P.z + lz);
+    pg.rotation.set(0.5 + rd() * 0.5, rd() * 6, (rd() - 0.5) * 0.3);
+    dress.push(pg);
+    pages++;
+  }
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xffc27a, toneMapped: false });
+  let lamps = 0;
+  for (let i = 0; i < 200 && lamps < 7; i++) {
+    const lx = (rd() - 0.5) * 70;
+    const lz = (rd() - 0.5) * 70;
+    if (!free(lx, lz, 0.8)) continue;
+    const x = P.x + lx;
+    const z = P.z + lz;
+    const y = groundH(x, z);
+    k.add(cyl(0.07, 0.09, 2.2, 6), C.timberDark, [x, y + 1.1, z], [0, 0, 0], 0.01);
+    k.add(box(0.5, 0.08, 0.08), C.timberDark, [x + 0.2, y + 2.15, z]);
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.28, 0.22), lampMat);
+    lamp.position.set(x + 0.4, y + 1.95, z);
+    dress.push(lamp);
+    colliders.push({ kind: 'post', x, z, r: 0.12 });
+    lamps++;
+  }
+  // standing page slabs, where the run never goes; solid, so they fade for the chase lens like any blocker
+  let slabs = 0;
+  for (let i = 0; i < 300 && slabs < 8; i++) {
+    const lx = (rd() - 0.5) * 80;
+    const lz = (rd() - 0.5) * 80;
+    if (!free(lx, lz, 2)) continue;
+    const x = P.x + lx;
+    const z = P.z + lz;
+    const yaw = rd() * Math.PI;
     const slab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.4, 0.18), pageMat);
     slab.position.set(x, groundH(x, z) + 1.5, z);
-    slab.rotation.set((rp() - 0.5) * 0.25, a + Math.PI / 2, (rp() - 0.5) * 0.2);
+    slab.rotation.set((rd() - 0.5) * 0.2, yaw, (rd() - 0.5) * 0.15);
+    slab.castShadow = true;
     scene.add(slab);
-    ctx.colliders.push({ kind: 'box', x, z, yaw: a + Math.PI / 2, hx: 1.2, hz: 0.15, top: groundH(x, z) + 3.2 });
+    ctx.occluders.push(slab);
+    colliders.push({ kind: 'box', x, z, yaw, hx: 1.2, hz: 0.15, top: groundH(x, z) + 3.2 });
+    slabs++;
   }
+  for (const g of bakeCells(dress, 30, 'press-dress')) scene.add(g);
+
   const built = k.build();
   scene.add(built);
   ctx.occluders.push(built);
