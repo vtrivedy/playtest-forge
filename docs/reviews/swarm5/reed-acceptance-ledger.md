@@ -1,4 +1,4 @@
-# Swarm5 acceptance evidence — updated 22:19 UTC, November 2
+# Swarm5 acceptance evidence — updated 22:42 UTC, November 2
 
 ## Multi-world acceptance update
 
@@ -37,6 +37,12 @@ lint and whitespace checks pass on this source. Vite retains its large-chunk war
 ## Latest integrated physical replay — 440f7d47
 
 Both separate fresh T4 runs pass with zero page/console errors: full two-reach Ashwater with both memories/Reedskim/Reed fill 1, and physical hub → Ashwater → home → full Press solve (Inkstep/Maple fill 1) → home → Ashwater re-entry. The matched shelf frame confirms Cedar's late occluder registration fixes the pier masking. Roof-trigger and Seedwell-pillar framing remain open. Ashwater takes 180.183 simulated seconds including the walking capture; Press completion takes 89.183 within that world. These are authored routes, not requested-duration or blind-insight evidence. [Exact-source report, personally inspected frames and selected state evidence](reed-integrated-440f7d47/REVIEW.md).
+
+## Final Ashwater payoff retest — 2d56efb3
+
+Fresh physical opening → hub → complete Ashwater passes again with zero page/console errors, all three canonical levels, both memories, Reedskim and Reed fill 1. Exact runtime includes Cedar `f7bc0e0d`. Matched screenshots independently confirm the Seedwell stone now clears the muzzle, the shelf-pier correction holds, and the revelation toast no longer repeats its caption. The roof-trigger view remains unchanged and open. Reed identified the beam alphaMap channel bug with Chromium pixel evidence; Cedar corrected it to opaque grayscale and Reed replayed the final source. The Seedwell close-up still reads as a large pale column, so visual verdict remains **NEEDS REVISION** rather than complete payoff approval.
+
+Ashwater takes 180.183 simulated seconds including the six-second walk, side detours, deliberate failure and waits. The offline 12fps walking movie has zero black frames among 72 decoded frames; every walking frame was personally inspected. These results do not establish requested duration, blind insight or whole-route continuous camera/black-frame quality. TS/Vite/lint and whitespace checks pass. [Matched before/intermediate/final screenshots, full state snapshots, movies, channel repro and exact-source report](reed-payoff/REVIEW.md). The earlier Press/circuit result above remains the latest independent Press evidence; it was not rerun on this art-only candidate.
 
 ## Earlier baseline evidence
 

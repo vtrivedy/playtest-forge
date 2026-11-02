@@ -824,3 +824,7 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   10 fps route film without changing the route logic (tools/ashwater-probe.mjs).
 - Press clip: `tools/press-clip.mjs` (node-driven, every 2nd step rendered → 30 fps) runs ~0.6 frames/s on SwiftShader: 74 s of play took ~58 min. Start it from a pinned worktree early; if it is cut short, encode the frames already on disk.
 - Dressing must keep the first view busy: a spawn that faces an empty field with one ink blot reads as "empty" even if the island is full behind the camera. Place a few props in the arrival frustum deliberately, then scatter.
+
+### Canvas alphaMap ramps — Reed, swarm5
+
+- Three's `alphamap_fragment` reads texture green, not texture alpha. A white Canvas2D gradient varying transparency can leave green near 255 throughout, producing a solid beam despite plausible alpha stops. Chromium samples from Cedar `b2f781c8` reproduce this (green255/252/255 at y16/64/96 while alpha21/82/164). Cedar `f7bc0e0d` uses an opaque black→grey→white ramp; the same samples become green21/81/164, alpha255. Retained source-channel evidence: `docs/reviews/swarm5/reed-payoff/alphaMap-pixels.json`. Pixel-channel correctness alone is not a GPU appearance verdict.
