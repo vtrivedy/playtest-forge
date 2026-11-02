@@ -1,0 +1,71 @@
+[
+  {
+    "world": "russetvale",
+    "missing": 3,
+    "expectedMissing": 3,
+    "spoiler": false,
+    "visibleText": [
+      "The Hearthfox Album",
+      "Restore the three Seedwells · Find the Wellspring",
+      "Russetvale",
+      "Memories returned to the Album",
+      "A page still missing",
+      "Only a torn edge remains. The rest has not returned to the Album.",
+      "A page still missing",
+      "Only a torn edge remains. The rest has not returned to the Album.",
+      "A page still missing",
+      "Only a torn edge remains. The rest has not returned to the Album.",
+      "[ / ] · turn pages     Tab · close Album"
+    ]
+  },
+  {
+    "world": "ashwater",
+    "missing": 1,
+    "expectedMissing": 1,
+    "spoiler": false,
+    "visibleText": [
+      "The Hearthfox Album",
+      "Restore the three Seedwells · Find the Wellspring",
+      "Ashwater Reach",
+      "Memories returned to the Album",
+      "The last crossing",
+      "The Ferrykeeper",
+      "The heron has held the last ferry for years, pressed in the middle of a wade. The",
+      "Warden froze the sluices. Even the water has been waiting to finish its journey.",
+      "Before the endless autumn",
+      "The Ferrykeeper",
+      "The Scribe once lived beside this marsh. The Ferrykeeper remembers a house, a",
+      "flood, and the moment the rain stopped moving. The river was their first page.",
+      "A page still missing",
+      "Only a torn edge remains. The rest has not returned to the Album.",
+      "[ / ] · turn pages     Tab · close Album"
+    ]
+  },
+  {
+    "world": "press",
+    "missing": 0,
+    "expectedMissing": 0,
+    "spoiler": false,
+    "visibleText": [
+      "The Hearthfox Album",
+      "Restore the three Seedwells · Find the Wellspring",
+      "The Scribe’s Press",
+      "Memories returned to the Album",
+      "The hand behind the marks",
+      "A scorched margin",
+      "At the Press stands someone small and old. The Scribe has kept every place",
+      "close enough to touch, yet none of the pressed moments can answer them.",
+      "The shadow at the Press",
+      "An Archive leaf",
+      "Every pressed moment left ink behind. In the Archive it gathers into a watcher,",
+      "following the Scribe without a sound. Neither has been able to leave this last",
+      "winter.",
+      "The last season we were all here",
+      "The Scribe",
+      "“I kept autumn because it was the last season we were all here.” The Warden",
+      "folds into the Scribe’s shadow. The fox offers warmth; the Scribe lets the year",
+      "turn.",
+      "[ / ] · turn pages     Tab · close Album"
+    ]
+  }
+]
