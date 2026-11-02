@@ -44,7 +44,7 @@ export const createSliceRoute = new Function(`return function createFinaleJourne
 export function verifySlice(s) {
   const o=s.opening;
   return {steam:o.chemistry.steamLatched,keeping:o.chemistry.completed,bridge:o.keeping.phase==='bridge',
-    realCarry:o.carry.pickups>=4 && o.carry.placements>=3,emberPlaced:!o.carry.carried,
+    realCarry:o.carry.pickups>=(o.carry.carriedDashes>0?3:4) && o.carry.placements>=3,emberPlaced:!o.carry.carried,
     finaleKindled:o.finale.kindles===1,snow:o.finale.snow>0,kitsCurled:o.finale.kits.every(k=>k==='curled'),
     cardShown:o.finale.cardShows===1,cardDone:o.finale.card==='done'};
 }

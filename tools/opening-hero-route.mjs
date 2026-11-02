@@ -107,8 +107,9 @@ export function createKeepingRoute() {
       if (y > launchY + leg.rise) next();
     }
     to = target();
-    // E is edge-triggered by the controller: press on the first frame of the beat only
-    const interact = !!leg.interact && since < 1 / 30;
+    // E toggles pickup/place. Hearthbound may already retain the ember through
+    // the dash, so an already-satisfied pickup must not put it down instead.
+    const interact = !!leg.interact && since < 1 / 30 && !leg.until?.(state);
     if (leg.dash) {
       const dx = leg.toward[0] - x, dz = leg.toward[1] - z, d = Math.hypot(dx, dz) || 1;
       return { x: dx / d, z: dz / d, jump: false, dash: since < 1 / 30, interact: false, beat: leg.beat };
