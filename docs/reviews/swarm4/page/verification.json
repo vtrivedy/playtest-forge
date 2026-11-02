@@ -1,0 +1,92 @@
+{
+  "runtime_sha": "6f769d7f247e8b1fd189c677163a637f8f0f564b",
+  "runtime": "vite-production-preview",
+  "checks": {
+    "revealFramed": true,
+    "returnedHome": true,
+    "catches": true,
+    "kept": true,
+    "noErrors": true,
+    "finite": true
+  },
+  "catches": [
+    {
+      "catch": 1,
+      "seconds": 4.2667,
+      "skips": 0
+    },
+    {
+      "catch": 2,
+      "seconds": 17.8667,
+      "skips": 0
+    },
+    {
+      "catch": 3,
+      "seconds": 44.5167,
+      "skips": 0
+    }
+  ],
+  "final_jump_60hz": {
+    "apex": 0.792,
+    "air": 0.633,
+    "timeToApex": 0.317
+  },
+  "final_dash_distance": 1.998,
+  "dashes": 4,
+  "homecoming": {
+    "pinned": true,
+    "sent": true,
+    "home": [],
+    "lit": [
+      "page"
+    ],
+    "full": false
+  },
+  "visible_release_samples": 63,
+  "projected_bounds": {
+    "minX": -0.048713095190988175,
+    "maxX": 0.2739471963557049,
+    "minY": -0.0916773216250473,
+    "maxY": 0.8503323838287041
+  },
+  "clip": "/captures/sorrel/page-final-production-v2/clip.mp4",
+  "clip_sha256": "0ec52640f636a46366fd764a247a831bf143570e9811609b7a970b53ba0abbb9",
+  "frames": 90,
+  "fps": 15,
+  "size": [
+    480,
+    270
+  ],
+  "limits": [
+    "Only initial wake pose is staged; input route thereafter",
+    "Offline fixed-step frames, no audio or real-time performance verdict",
+    "Final page motion only; not entire new map/finale/audio acceptance"
+  ],
+  "50ms": {
+    "runtime_sha": "6f769d7f247e8b1fd189c677163a637f8f0f564b",
+    "dt": 0.05,
+    "checks": {
+      "returnedHome": true,
+      "catches": true,
+      "kept": true,
+      "noErrors": true,
+      "finite": true
+    },
+    "mismatches": [],
+    "evidence": "/captures/sorrel/page-final-50ms/evidence.json"
+  },
+  "replay": {
+    "runtime_sha": "6f769d7f247e8b1fd189c677163a637f8f0f564b",
+    "dt": 0.016666666666666666,
+    "checks": {
+      "returnedHome": true,
+      "deterministicReplay": true,
+      "catches": true,
+      "kept": true,
+      "noErrors": true,
+      "finite": true
+    },
+    "mismatches": [],
+    "evidence": "/captures/sorrel/page-final-replay/evidence.json"
+  }
+}

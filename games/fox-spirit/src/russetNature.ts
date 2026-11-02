@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import natureUrl from '../../../assets/env/quaternius/nature.glb?url';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { rng, vnoise3 } from './russetKit';
@@ -177,7 +178,7 @@ function softenFoliage(geo: THREE.BufferGeometry, k: number): { clump: Uint16Arr
 }
 
 export async function loadNatureKit(): Promise<NatureKit> {
-  const gltf = await new GLTFLoader().loadAsync('/assets/env/quaternius/nature.glb');
+  const gltf = await new GLTFLoader().loadAsync(natureUrl);
   const foliageMat = (name: string, src: THREE.MeshStandardMaterial) => {
     const m = new THREE.MeshStandardMaterial({
       name,

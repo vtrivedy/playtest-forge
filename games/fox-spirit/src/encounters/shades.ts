@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import stagUrl from '../../../../assets/library/animals/quaternius_stag.glb?url';
 import { touchShade } from './contact';
 import { heroSoftUniforms, HERO_SOFT_VERTEX, HERO_SOFT_FRAGMENT } from '../cameraSoftOcclusion';
 import type GUI from 'lil-gui';
@@ -58,7 +59,7 @@ function animalGeometry(): Promise<THREE.BufferGeometry> {
   return preparedAnimal ??= bakeAnimalGeometry();
 }
 async function bakeAnimalGeometry(): Promise<THREE.BufferGeometry> {
-  const gltf = await new GLTFLoader().loadAsync('/assets/library/animals/quaternius_stag.glb');
+  const gltf = await new GLTFLoader().loadAsync(stagUrl);
   const mixer = new THREE.AnimationMixer(gltf.scene);
   const headLow = gltf.animations.find(c => c.name === 'Idle_Headlow')!;
   const lowAction = mixer.clipAction(headLow).play();
