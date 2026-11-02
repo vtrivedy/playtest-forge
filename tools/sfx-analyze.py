@@ -18,8 +18,8 @@ SR = 44100
 EVENTS = {
     'creature pop (paper)': ('soft-paper', 0.22, 0.8),
     'heron wingbeat (x3 max)': ('soft-wing', 0.2, 0.7),
-    'canopy leaf touch (entry)': ('soft-leaf', 0.2, 0.8),
-    'canopy leaf touch (roost)': ('soft-leaf', 0.2, 0.95),
+    'canopy leaf touch (entry)': ('soft-leaf', 0.12, 0.8),
+    'canopy leaf touch (roost)': ('soft-leaf', 0.12, 0.95),
     'ruin fold unfold': ('soft-unfold', 0.3, 0.7),
     'page pinned': ('soft-pin', 0.06, 0.85),
 }
