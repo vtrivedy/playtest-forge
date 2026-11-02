@@ -317,3 +317,33 @@ Verification: all eight matched analyses exited0; duration29.9s; diagnostic PNGs
 reviewed for Summer Night, Hello?, Pine Grove, Beach Buds and full Hush. Python
 compile passed. This is a programmatic/visual audio critique, not a real-time
 listening claim or whole-game playtest. No runtime/mute changes in this slice.
+
+## Ruin camera clearance — Fern, swarm4
+
+- Seed `f866379` already contains `f3ddb6f`'s lens recovery; do not repeat the
+  original head-penetration fix. Its remaining review request is pounce margin.
+- On `f866379`, the current 30Hz 90s input route succeeds: three catches, zero
+  skips, page pinned home, no errors. Late minimum chest distance 2.013m,
+  maximum pitch24.66°, maximum lens speed19.00m/s. Evidence:
+  `/captures/fern/baseline/evidence.json`. Final jump .750m apex/.300s to apex/
+  .633s air; four dashes, last dash2.132m. This is scripted play, not human fun.
+- Reproduce the failed-catch geometry intentionally with
+  `tools/camera-drop-probe.mjs --miss-overlook`: it omits jump while walking
+  toward the overlook, then permits genuine pounce retries. No page state is
+  forced. At1.2m, the late camera gate passes (1.233m/59.10°/10.80m/s), but the
+  view is tight. `/captures/fern/miss-12/drop.webm` retains64–68s at15fps, plus
+  all60 source frames; inspect complete pounces, not only timed stills.
+- `78ab7db` extracts the existing candidate search to `cameraEnvelope.hot.ts`.
+  Its workspace and helper closures are constructed once; the hot update reuses
+  them. `cameraCollider.hot.ts` removes the controller's per-sphere `.some` /
+  `.map` temporary arrays, while preserving its nine footprint samples.
+- `CameraEnvelope.tla` models only the discrete publication pipeline: floor
+  adjustment precedes the follow-envelope check; authored shots bypass it.
+  TLC checks9states. Removing the envelope call/guard violates FollowChecked
+  in5states. It does not prove the geometric search finds a clear pose, nor
+  silhouette, world visibility, continuity, or pitch. Recheck via
+  `.claude/skills/camera-envelope-check/SKILL.md`.
+- Long capture sessions can terminate before final JSON is written. Keep
+  periodically replaced `checkpoint.json` marked `complete:false`; require a
+  final evidence file and clean DONE for a completion claim. `--sparse-stills`
+  skips unrelated early images while keeping every simulation step and trace.
