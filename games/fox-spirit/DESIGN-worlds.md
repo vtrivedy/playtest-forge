@@ -60,3 +60,9 @@ Builders: register colliders/occluders through `ctx`; add new walkable shapes to
 Real build `/`: chase → page home → walk through each hub arch → island (frames differ: rain marsh vs winter ink vs
 autumn) → solve ≥1 puzzle → progress visible (Album / Seedwell) → return arch home. Baselines: cue discovery,
 corridor colour (`tools/corridor-colour.mjs`), ending, `check:stuck`, 0 black frames. Honest duration measured.
+
+### Independent Ashwater acceptance harness (Reed)
+`tools/world-ashwater-acceptance.mjs` starts fresh, follows the rendered discovery invitation with ordinary stick/jump/dash,
+walks the kept page home and crosses the hub arch before replaying the Ashwater movement route. It records full hook
+and `window.__game` states at each beat. No teleport, progress setters or saved-unlock fixture count as route proof.
+A failure is retained with the last position; later stages may not mask a failed entry.
