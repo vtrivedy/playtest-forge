@@ -6,9 +6,13 @@ import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 const out = path.resolve(process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : '/tmp/jogs-stills');
-const hare = process.argv.includes('--hare');
+const hare = process.argv.includes('--hare') || process.argv.includes('--clip');
+// --clip: after the hare sits at the ruin entry, a continuous 30 fps clip of the fox circling behind it (rear
+// crossings of its head turn) from a fixed lens, to clip.mp4
+const clip = process.argv.includes('--clip');
 fs.mkdirSync(out, { recursive: true });
 // [name, from x, z, toward x, z]
 const POSES = [
@@ -96,6 +100,31 @@ try {
     await page.evaluate(() => { window.__gameHooks.advance(300, 1 / 60, false); const c = window.__opening.camera; c.position.set(-20.4, 1.0, 79.2); c.lookAt(-22.0, 0.3, 77.4); c.updateMatrixWorld(); window.__gameHooks.advance(0, 1 / 60, true); });
     await page.screenshot({ path: path.join(out, 'h11-alive.png') });
     log.push(await hareState());
+    if (clip) {
+      const dir = path.join(out, 'frames');
+      fs.mkdirSync(dir, { recursive: true });
+      // 8 s: the fox walks two slow circles (r 1.6 m) round the sitting hare, crossing behind it each lap
+      for (let i = 0; i < 240; i++) {
+        await page.evaluate((i) => {
+          const h = window.__gameHooks;
+          const a = h.state().opening.unpressed.creatures.find((k) => k.id === 'hare').at;
+          const s = h.state();
+          const ang = (i / 120) * Math.PI * 2;
+          const tx = a[0] + Math.cos(ang) * 1.6, tz = a[2] + Math.sin(ang) * 1.6;
+          const dx = tx - s.pos[0], dz = tz - s.pos[2], d = Math.hypot(dx, dz);
+          h.setStick(d > 0.05 ? (dx / d) * Math.min(1, d * 1.5) : 0, d > 0.05 ? (dz / d) * Math.min(1, d * 1.5) : 0);
+          h.advance(2, 1 / 60, false);
+          const c = window.__opening.camera;
+          c.position.set(a[0] + 2.6, a[1] + 1.4, a[2] + 2.2);
+          c.lookAt(a[0], a[1] + 0.3, a[2]);
+          c.updateMatrixWorld();
+          h.advance(0, 1 / 60, true);
+        }, i);
+        await page.screenshot({ path: path.join(dir, `f${String(i).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 90 });
+      }
+      const ff = execFileSync('python3', ['-c', 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
+      execFileSync(ff, ['-y', '-v', 'error', '-framerate', '30', '-i', path.join(dir, 'f%04d.jpg'), '-c:v', 'libx264', '-crf', '18', '-pix_fmt', 'yuv420p', path.join(out, 'clip.mp4')]);
+    }
     for (const l of log) console.log(JSON.stringify(l));
   }
 } finally {
