@@ -286,5 +286,7 @@ export function buildHomecoming(ctx: OpeningCtx, page: Page, unpressed: Unpresse
       ctx.field.restore(new THREE.Vector3(H.well.x, 0, H.well.z), 30, 0.5, { edgeMax: 2.5 });
     },
     state: () => ({ pinned: pinned >= 0, sent, home: unpressed.home(), lit: kindled, full: full >= 0 }),
+    /** the well has filled (allocation-free, for per-frame checks) */
+    isFull: () => full >= 0,
   };
 }

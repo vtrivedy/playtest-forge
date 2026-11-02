@@ -37,7 +37,7 @@ export type FinaleRig = {
   snowCover: { value: number };
   groundH: (x: number, z: number) => number;
   /** cold one-shot events (may allocate) */
-  events: { kindle: () => void; unbind: () => void; open: () => void; release: () => void; snow: () => void; card: () => void };
+  events: { onward: (to: THREE.Vector3) => void; homeCaption: () => void; kindle: () => void; unbind: () => void; open: () => void; release: () => void; snow: () => void; card: () => void };
   /** scene parts */
   hinge: THREE.Object3D;
   screw: THREE.Object3D;
@@ -53,6 +53,13 @@ export type FinaleRig = {
   wayMesh: THREE.InstancedMesh;
   wayLut: Float32Array;
   wayLen: number;
+  /** the onward stream from the filled well to the ember (LUT rebuilt cold via events.onward when the ember moves) */
+  onwardMesh: THREE.InstancedMesh;
+  onwardLut: Float32Array;
+  onwardAt: THREE.Vector3;
+  emberAt: THREE.Vector3;
+  homeFull: () => boolean;
+  emberWhere: (out: THREE.Vector3) => boolean;
   pageMeshes: THREE.InstancedMesh[];
   leafMesh: THREE.InstancedMesh;
   pageSeed: Float32Array;
@@ -71,7 +78,7 @@ export type FinaleRig = {
   cover0: THREE.Color; cover1: THREE.Color; paper0: THREE.Color; paper1: THREE.Color; ember: THREE.Color; emblem0: THREE.Color;
   /** mutable state (numbers only) */
   s: {
-    phase: number; t: number; clock: number; snowT: number; still: number; settledT: number; restK: number; lieT: number; getUpT: number;
+    phase: number; t: number; clock: number; snowT: number; still: number; settledT: number; onwardT: number; onwardLen: number; homeSaid: number; restK: number; lieT: number; getUpT: number;
     card: 0 | 1 | 2; cardT: number; foxX: number; foxZ: number; kindles: number; cardShows: number; wheel: number; leavesOut: number;
   };
   /** the hero's rest clips on its own mixer, blended over the controller while it lies by the ember */
@@ -335,6 +342,46 @@ function stepHeroRest(rig: FinaleRig, dt: number): void {
   rig.heroRest.setEffectiveWeight(30 * s.restK * toRest);
 }
 
+/** onward: after the homecoming, motes stream from the well to wherever the ember rests, until it is carried or kindled */
+function stepOnward(rig: FinaleRig, dt: number): void {
+  const s = rig.s;
+  const mesh = rig.onwardMesh;
+  const carried = rig.emberWhere(rig.emberAt);
+  const f = rig.fox.position;
+  const near = Math.hypot(f.x - rig.emberAt.x, f.z - rig.emberAt.z) < 5;
+  const want = s.phase === 0 && rig.homeFull() && !carried && !near;
+  if (rig.homeFull() && s.homeSaid === 0) {
+    s.homeSaid = 1;
+    rig.events.homeCaption();
+  }
+  if (want && rig.emberAt.distanceToSquared(rig.onwardAt) > 1) rig.events.onward(rig.emberAt);
+  s.onwardT = want ? Math.min(3, s.onwardT + dt) : Math.max(0, s.onwardT - dt * 2);
+  const on = smooth(s.onwardT, 0.5, 3);
+  if (on <= 0.001) {
+    mesh.count = 0;
+    return;
+  }
+  const n = mesh.instanceMatrix.count;
+  const lut = rig.onwardLut;
+  const N = lut.length / 3;
+  for (let i = 0; i < n; i++) {
+    const u = (i / n + (s.clock * 1.8) / s.onwardLen) % 1;
+    const fu = u * (N - 1);
+    const j = Math.min(N - 2, Math.floor(fu));
+    const w = fu - j;
+    p3.set(
+      lut[j * 3]! + (lut[j * 3 + 3]! - lut[j * 3]!) * w + Math.sin(s.clock * 0.9 + i * 2.1) * 0.22,
+      lut[j * 3 + 1]! + (lut[j * 3 + 4]! - lut[j * 3 + 1]!) * w + Math.sin(s.clock * 1.3 + i) * 0.16,
+      lut[j * 3 + 2]! + (lut[j * 3 + 5]! - lut[j * 3 + 2]!) * w,
+    );
+    sc.setScalar(Math.max(0.001, on * (0.6 + 0.4 * Math.sin(i * 7.3)) * Math.min(1, u * 14, (1 - u) * 8)));
+    q.identity();
+    mesh.setMatrixAt(i, m4.compose(p3, q, sc));
+  }
+  mesh.count = n;
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
 export function updateFinale(rig: FinaleRig, dt: number): void {
   const s = rig.s;
   s.clock += dt;
@@ -344,6 +391,7 @@ export function updateFinale(rig: FinaleRig, dt: number): void {
     if (rig.settled() && rig.emberInCradle()) enter(rig, 1);
   } else if (s.phase < 5 && s.t >= durationOf(s.phase)) enter(rig, s.phase + 1);
   stepWay(rig, dt);
+  stepOnward(rig, dt);
   const ph = s.phase;
   if (ph === 0) return;
   // (fox travel since last frame is read below; the position is stored at the end of the step)
