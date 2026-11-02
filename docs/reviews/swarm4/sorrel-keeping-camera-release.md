@@ -1,117 +1,73 @@
-# Keeping chase-camera release
+# Keeping camera — integrated verification
 
-Final selection: merge `671a290` using its complete Fern camera envelope and
-release fixtures. The independent Sorrel solver and inline 0.8m measurement are
-superseded. The probe uses the game's `foxScreenPx()` and shared fox-size gate,
-retaining trace-based regional checks and required missed-jump coverage.
+Runtime `41ea3ec` merges `671a290` with Fern's complete camera envelope and release
+fixtures, Wren's `9e04283` post-only steering slide, and the jointly verified
+**1.9m** opening body clearance. The normal boom remains **2.45m**. The earlier
+independent Sorrel solver is superseded; there is one current camera path.
 
-The results below archive the independent candidate. They are not claims about
-the merged runtime; integrated replay results are recorded separately.
+The probe calls the game's `__gameHooks.foxScreenPx()` and the shared
+`tools/lib/fox-size.mjs` gate. Default floor: 24px at 360p, scaled to 18px at 270p;
+more than one second below it fails. No separate 0.8m projection remains.
 
-## Archived independent candidate
+## Played results
 
-Runtime: `4626a72` on `sw4-sorrel`; baseline `ac3c711` inherits the camera from
-Kit's reported `d03831b`. The normal opening boom remains 2.45m and the effective
-body clearance remains 1.8m. No movement, animation, world or story-shot changes.
+| Case | Source / effective clearance | Progression or coverage | Full-body frames | Minimum fox px at 270p |
+| --- | --- | --- | ---: | ---: |
+| Keeping, 90s | `41ea3ec`, default 1.9m | Steam, root, bridge, crag and final leaf beat pass | 30/30 | 33.00 |
+| Regional ledge drop, 14s | `22d4b4c`, 1.9m override | Seven actual-state checks and expected final beat pass | 90/90 | 50.18 |
+| Original missed overlook, 90s | `ebbdc98` incl. Wren 9e, 1.9m override | Requested jump, airborne departure and below-leaf fall observed | 60/60 | 39.86 |
 
-## Cause and correction
+All cases have zero JS errors and pass the 2% full-body screen-margin gate.
+Keeping's maximum sustained grounded follow range is **2.792m** against the
+unchanged 5m cap (the reported broken camera reached about 16.9m). The missed
+route intentionally retains two catches and retries below the overlook; this is
+failure-camera coverage, not a claimed page clear.
 
-The rendered lens stayed at `(30.635,13.087,82.448)` behind the post at
-`(30.2,81.6)` as the fox crossed the bridge. Its final range was 16.92m. Every
-goal-centred escape ray converged into that post after the movement clamp, so
-the fallback repeatedly reused the previous clear position.
+Keeping and the original page route have one initial placement, then ordinary
+controller inputs. The regional test discloses two setup placements and real
+dashes to open both folds, followed by one placement on the second leaf. It
+records an actual fall and jump retries; no fold flags, catches, restoration or
+physics are forced. Evidence includes `window.__game`, all route states, stills,
+clips, source frames and body bounds. Offline 30Hz simulation, 480×270 at 15fps,
+without audio; these runs do not measure real-time rendering performance.
 
-When that search finds no candidate, search short local tangents around the
-previous lens too. Retain the existing swept collision, body and floor checks.
-A second defect appeared at 120Hz: the release sweep permits a 0.2m sphere, but
-the escape endpoint demanded 0.35m, so a small step could not leave the gap
-between those margins. Retain the swept 0.2m clearance while leaving that shell,
-then recover the wider endpoint margin when room permits.
+## Review, correction and retest
 
-## Played Keeping evidence
+Reviewed every recorded accepted frame on contact sheets and the full-sized
+stills. The fox stays readable through the bridge, with the Crown ahead. During
+ledge drops and retries the lens stays outside the animal and the world-face
+cutout keeps it visible. Tail room remains comfortable in the accepted clips.
 
-`/captures/sorrel/keeping-camera-final480-4626a72/` retains the full 90-second
-input route, `window.__game`, all 2,700 state frames, eight stills, and the
-uninterrupted 40–60s payoff (`clip.webm`, 300 source frames). One disclosed initial
-placement beside H-a; no later teleports, forced latches, camera overrides or
-forced restoration. Offline 30Hz simulation, 480×270 at 15fps, without audio.
-This is framing/progression evidence, not a real-time performance measurement.
+The integrated 1.8m drop passed distance/size/progression checks but failed the
+strict body margin at frames 136 and 138 (bottom NDC −0.976). The matched 1.9m
+trial passes all 90 frames; its worst bottom NDC is −0.892. All fox positions and
+velocities match between those trials. The margin gate was not weakened. The
+selected default then passed the final 90s Keeping replay without an override.
 
-Steam, root restoration, bridge and far-crag checks all pass; Crown is released,
-one dash recorded, zero JS errors. All 2,700 fox positions and route beats match
-the baseline exactly. The last jump includes the steam lift: 9.069m apex,
-1.8s to apex and 5.467s air; these are not ordinary ground-jump measurements.
+The earlier inherited full-page probe stalled before the requested miss while
+its camera-only checks passed. The new `MISS_COVERAGE` gate requires the jump
+beat, airborne departure and a subsequent fall. That old run is rejected. After
+Wren's controller correction, the original route passes the stronger checks.
+`verifySlice` also receives the full trace, enabling the regional test to require
+a real leaf start, airborne fall and jump retry rather than a stationary end pose.
 
-| Late window, 35–90s | Result |
-| --- | ---: |
-| Minimum lens/chest range | 2.546m |
-| Minimum projected body proxy | 12.61% of viewport height |
-| Maximum absolute pitch | 38.36° |
-| Maximum lens step speed | 15.90m/s |
+TypeScript and `npm run lint:feel` pass on the final source; the merged release
+fixtures cover free/ledge/ridge/post recovery at 30/60/120Hz. The shared size gate
+also passes the actual Keeping samples and correctly rejects those same samples
+with a deliberately impossible 270px floor (55s below it).
 
-The route probe now fails its camera gate below 5% viewport height, using a
-documented 0.8m vertical body proxy through the rendered camera. The original
-envelope with this added measurement fails (4.999% by 55s). This measures framing,
-not opaque-world visibility or the exact animated ears/tail outline.
+## Evidence
 
-## Visual review and retest
+- `/captures/sorrel/camera-final-41ea3ec/acceptance.json` — structured acceptance.
+- `keeping/` — final default's 90s states, 46–48s bridge clip and five stills.
+- `regionalDrop/` — matched 1.9m trial, seven state checks, 2–8s drop/retry clip.
+- `originalMiss/` — corrected natural route, actual 42.4–46.4s miss/retry clip.
+- `shared-gate-negative.json` — positive and negative gate evaluation.
 
-Reviewed every retained payoff frame across contact sheets, plus full-sized
-35/42/45/50/55/60/70/89s stills. The camera follows around the bowl, onto the
-bridge, and to the Crown. The orange fox remains readable with room for ears and
-tail. The story leaf crosses the foreground near 58s; it no longer falls outside
-a parked view. Existing white Crown values are bright, but the fox separates
-from the bridge and the target remains visible ahead.
-
-The first local-tangent candidate passed the full 30Hz route, then failed the
-new 120Hz pole test. Corrected the margin mismatch and repeated the full route
-on the pinned runtime above. CPU tests require eventual reacquisition and swept
-clearance at 30/60/120Hz, alongside the existing ledge-release test. TypeScript,
-`lint:feel`, and `tools/checks/camera.ts` pass.
-
-The separate 36–42s recovery-onset clip in
-`/captures/sorrel/keeping-camera-onset-4626a72-attempt2/` retains the initial
-landing and post detour. All 90 recorded frames keep the complete skinned body
-inside a 2% viewport margin; reviewed all frames on three sheets. Its independent
-full 90-second route also passes progression and camera gates with zero errors.
-The first close-up attempt stopped after two frames and is retained separately;
-only `attempt2` is counted. Both runs use the same pinned runtime and settings.
-
-## Rejected full-page regression attempt
-
-`/captures/sorrel/camera-missed-pounce-4626a72/` did **not** reach the overlook
-jump: its second-fold dash landed north of the newly raised leaf, then its
-`back for the climb` walk stalled against that leaf's face. The camera-only gate
-and silhouette check passed while stationary. Reject that run as missed-jump
-evidence; `coverage-review.json` records this explicitly. It does not establish a
-full-page clear or a missed-catch recovery.
-
-Harness commits `e21e1bc` and `1f08984` now fail `--miss-overlook` unless the
-requested jump beat, airborne departure and subsequent fall were observed.
-They also supply a separate staged ruin ledge-drop route:
-two setup placements and real dashes open both folds, then one recorded start
-on the second leaf. No page catches, fold flags, restoration, or physics are
-forced. This isolates camera collision after a genuine walk-off and jump retries;
-it is not unassisted full-page progression. Game camera code remains `4626a72`.
-
-The completed regional run is `/captures/sorrel/ruin-camera-drop-final/`, source
-`1f08984`: first/second folds open, start on the 0.47m leaf, real airborne fall
-to −0.84m, real jump retries, grounded below the leaf, and the expected final
-beat all pass. All 180 recorded body frames fit the 2% viewport margin. Minimum
-lens/chest range 1.851m, minimum body proxy 26.40%, maximum pitch 35.50° and
-maximum lens speed 5.93m/s; zero errors. The complete 0–12s clip and every frame
-were reviewed on three sheets. The lens stays outside the body during the drop
-and the undercroft faces fade around the fox during retries. These are headless
-480×270, 15fps recordings of a 30Hz simulation, without audio.
-
-The longer 640×360 attempt terminated with SIGTERM after 243 payoff frames;
-it remains at `/captures/sorrel/keeping-camera-final-4626a72/` and is not counted
-as a completed run. Its overlapping camera frames match the complete 480×270
-run exactly. Do not mix its partial checkpoint with the completed report.
-
-Artifacts are also copied to
-`playtest-output/fox-spirit/sorrel-keeping-camera-4626a72/` and uploaded to Modal
-volume `keeping-swarm4-captures`, path `sorrel/keeping-camera-final480-4626a72/`.
-Baseline and the negative screen-height check are on that volume under
-`sorrel/keeping-camera-before-ac3c711/` and
-`sorrel/keeping-camera-negative-screen-height.json`.
+The same pack is copied to
+`playtest-output/fox-spirit/sorrel-camera-final-41ea3ec/`. Shared archive:
+`keeping-swarm4-captures/sorrel/camera-final-41ea3ec.tgz`.
+Original raw runs remain under their named `/captures/sorrel/` directories,
+including the rejected 1.8m trial and interrupted captures; they are not mixed
+with accepted reports. Proxy size and animated-body bounds measure framing;
+world occlusion was reviewed in the actual images.
