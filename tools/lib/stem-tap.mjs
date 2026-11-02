@@ -31,3 +31,42 @@ export async function installStemTap(names) {
     window.__keep.push(tap);
   }
 }
+
+/** pull the tapped stems out of the page (base64 int16: float JSON of minutes of audio exhausts the heap) and write
+ *  stem-<name>.wav + mix.wav (stem sum) into `out`; returns the recorded seconds */
+export async function saveStems(page, out, names = ['music', 'ambience', 'sfx']) {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const sr = await page.evaluate(() => window.__gameHooks.audioContext().sampleRate);
+  const S = {};
+  for (const k of names) {
+    S[k] = [];
+    for (const c of [0, 1]) {
+      const b64 = await page.evaluate(({ k, c }) => {
+        const chunks = window.__stems[k][c];
+        const n = chunks.reduce((a, x) => a + x.length, 0);
+        const o = new Int16Array(n);
+        let i = 0;
+        for (const x of chunks) for (let j = 0; j < x.length; j++) o[i++] = Math.max(-32768, Math.min(32767, Math.round(x[j] * 32767)));
+        const u8 = new Uint8Array(o.buffer);
+        let s = '';
+        for (let j = 0; j < u8.length; j += 0x8000) s += String.fromCharCode(...u8.subarray(j, j + 0x8000));
+        return btoa(s);
+      }, { k, c });
+      const buf = Buffer.from(b64, 'base64');
+      S[k].push(new Int16Array(buf.buffer, buf.byteOffset, buf.length / 2));
+    }
+  }
+  const n = Math.min(...Object.values(S).flatMap((x) => x.map((c) => c.length)));
+  const wav = (name, L, R) => {
+    const buf = Buffer.alloc(44 + n * 4);
+    buf.write('RIFF', 0); buf.writeUInt32LE(36 + n * 4, 4); buf.write('WAVE', 8); buf.write('fmt ', 12);
+    buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(2, 22); buf.writeUInt32LE(sr, 24);
+    buf.writeUInt32LE(sr * 4, 28); buf.writeUInt16LE(4, 32); buf.writeUInt16LE(16, 34); buf.write('data', 36); buf.writeUInt32LE(n * 4, 40);
+    for (let i = 0; i < n; i++) { buf.writeInt16LE(Math.max(-32768, Math.min(32767, L(i))), 44 + i * 4); buf.writeInt16LE(Math.max(-32768, Math.min(32767, R(i))), 46 + i * 4); }
+    fs.writeFileSync(path.join(out, `${name}.wav`), buf);
+  };
+  for (const k of names) wav(`stem-${k}`, (i) => S[k][0][i], (i) => S[k][1][i]);
+  wav('mix', (i) => names.reduce((a, k) => a + S[k][0][i], 0), (i) => names.reduce((a, k) => a + S[k][1][i], 0));
+  return n / sr;
+}

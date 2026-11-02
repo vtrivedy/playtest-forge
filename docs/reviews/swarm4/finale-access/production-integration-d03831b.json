@@ -1,0 +1,188 @@
+{
+  "sha": "d03831b894d7999ca737c3893e81d960d2bfef84",
+  "runtime": "vite-production-preview",
+  "staging": "Each case has an explicit initial teleport; no teleport after movement starts; no forced finale/Keeping state; no coal carried.",
+  "checks": {
+    "allLegsComplete": true,
+    "finite": true,
+    "noErrors": true
+  },
+  "errors": [],
+  "cases": [
+    {
+      "id": "authored-lane-in-and-out",
+      "legs": [
+        {
+          "id": 0,
+          "goal": [
+            7.5,
+            63.5
+          ],
+          "done": true,
+          "minDistance": 0.40971819583709124,
+          "pos": [
+            7.287,
+            -0.6,
+            63.85
+          ]
+        },
+        {
+          "id": 1,
+          "goal": [
+            12.5,
+            53
+          ],
+          "done": true,
+          "minDistance": 0.23259406699226073,
+          "pos": [
+            12.4,
+            0.357,
+            53.21
+          ]
+        },
+        {
+          "id": 2,
+          "goal": [
+            18.8,
+            44.2
+          ],
+          "done": true,
+          "minDistance": 0.5056836956042748,
+          "pos": [
+            18.504,
+            0.446,
+            44.61
+          ]
+        },
+        {
+          "id": 3,
+          "goal": [
+            21.1,
+            40.2
+          ],
+          "done": true,
+          "minDistance": 0.32162244946520446,
+          "pos": [
+            20.94,
+            0.264,
+            40.479
+          ]
+        },
+        {
+          "id": 4,
+          "goal": [
+            18.8,
+            44.2
+          ],
+          "done": true,
+          "minDistance": 0.490156097585252,
+          "pos": [
+            19.022,
+            0.409,
+            43.763
+          ]
+        },
+        {
+          "id": 5,
+          "goal": [
+            12.5,
+            53
+          ],
+          "done": true,
+          "minDistance": 0.44150877680970413,
+          "pos": [
+            12.757,
+            0.381,
+            52.641
+          ]
+        },
+        {
+          "id": 6,
+          "goal": [
+            7.5,
+            63.5
+          ],
+          "done": true,
+          "minDistance": 0.2393010656056517,
+          "pos": [
+            7.603,
+            -0.6,
+            63.284
+          ]
+        },
+        {
+          "id": 7,
+          "goal": [
+            6,
+            66
+          ],
+          "done": true,
+          "minDistance": 0.27731750756127455,
+          "pos": [
+            6.144,
+            -0.6,
+            65.763
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crag-glide-and-walk-out",
+      "legs": [
+        {
+          "id": "glide",
+          "done": true,
+          "pos": [
+            21.495,
+            0.51,
+            46.401
+          ],
+          "glidingFrames": 340
+        },
+        {
+          "id": 0,
+          "goal": [
+            14.5,
+            50
+          ],
+          "done": true,
+          "minDistance": 0.5211842284643691,
+          "pos": [
+            14.947,
+            0.482,
+            49.732
+          ]
+        },
+        {
+          "id": 1,
+          "goal": [
+            11.5,
+            58
+          ],
+          "done": true,
+          "minDistance": 0.5318430219529087,
+          "pos": [
+            11.684,
+            0.032,
+            57.501
+          ]
+        },
+        {
+          "id": 2,
+          "goal": [
+            6,
+            66
+          ],
+          "done": true,
+          "minDistance": 0.332295049617054,
+          "pos": [
+            6.188,
+            -0.6,
+            65.726
+          ]
+        }
+      ]
+    }
+  ],
+  "artifacts": "/captures/sorrel/finale-access-production-d03831b"
+}
