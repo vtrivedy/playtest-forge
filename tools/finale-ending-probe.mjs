@@ -86,24 +86,27 @@ try {
   metrics.disturbs = w1.shuffles + w2.shuffles + w3.shuffles;
   metrics.walkNearMin = Math.min(w1.near, w2.near, w3.near);
   await shot('03-walked-through');
-  // stand still: kits resettle, fox lies down, card + composed shot
+  // stand still: kits resettle, fox lies down, card + composed shot (--frames: record this as a 30 fps clip)
   const restStart = await step(60);
   metrics.kitNearMin = restStart.near;
-  for (let t = 0; t < 26; t++) {
-    const q = await step(30);
+  let fi = 0;
+  for (let t = 0; t < 32; t++) {
+    let q = { near: 99 };
+    if (frames) {
+      for (let k = 0; k < 15; k++) {
+        const r = await step(2);
+        q.near = Math.min(q.near, r.near);
+        await H('advance', 0, 1 / 60, true);
+        await page.screenshot({ path: path.join(out, `h${String(fi++).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 85 });
+      }
+    } else q = await step(30);
     metrics.kitNearMinRest = Math.min(metrics.kitNearMinRest, q.near);
     const f = await fin();
     metrics.cardMax = Math.max(metrics.cardMax, f.card === 'showing' ? 1 : 0);
     if (f.card === 'showing' || f.card === 'done') metrics.foxPxHold.push(+f.foxPx.toFixed(1));
-    if (t % 2 === 1) await shot(`10-rest-${String(t).padStart(2, '0')}`);
+    if (t % 4 === 1) await shot(`10-rest-${String(t).padStart(2, '0')}`);
   }
-  if (frames) {
-    for (let i = 0; i < 150; i++) {
-      await H('advance', 2, 1 / 60, true);
-      await page.screenshot({ path: path.join(out, `h${String(i).padStart(4, '0')}.jpg`), type: 'jpeg', quality: 85 });
-    }
-    execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-pattern_type', 'glob', '-i', path.join(out, 'h*.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'hold.mp4')]);
-  }
+  if (frames) execFileSync('ffmpeg', ['-y', '-v', 'error', '-framerate', '30', '-pattern_type', 'glob', '-i', path.join(out, 'h*.jpg'), '-pix_fmt', 'yuv420p', path.join(out, 'hold.mp4')]);
   // the player moves on: the lens hands back, play continues in the snow
   await step(90, [0.8, 0]);
   await shot('20-moved-on');
