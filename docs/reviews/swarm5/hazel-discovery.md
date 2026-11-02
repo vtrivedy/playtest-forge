@@ -13,7 +13,7 @@ Final production source: `66dac7757b17ce8b335a8ff9f01323aa74d031ee`.
 - Frames and final still live beside the clip. Capture is 50 simulation seconds, 640×360, 15 fps, offline fixed-60-Hz simulation, silent. It does not measure real-time rendering performance.
 - All 13 assertions pass, all 750 frames and the final still captured. First/second/third catches: 1.7167 / 13.1333 / 43.8333 s. Grounded `land → done`: 44.5167 s. One roost visit, two ruin misses and recovery, zero skips, zero JS errors.
 - Rendered versus simulation-only counterpart: all 217 common samples have identical rounded positions and full page state. This comparison covers this route, not every possible input.
-- Final own visual review: fox silhouette and page goal readable, four anchored leaf guides distinct from rectangular Album page, action words readable against the sky, landing pose fully in frame. Earlier independent reviews are recorded below; final independent verdict is requested.
+- Final own visual review: fox silhouette and page goal readable, four anchored leaf guides distinct from rectangular Album page, action words readable against the sky, landing pose fully in frame. Independent final verdict is recorded below, including a canopy camera limitation.
 
 The route-independent cue policy starts at the ordinary wake position, including 1.5 seconds idle. It uses ordinary movement/jump/dash inputs, camera-frustum fragment geometry and currently shown teaching words. It has no authored waypoint route and does not read hidden discovery goal/action/leg to steer. Geometry observation is not pixel vision or an occlusion guarantee. This proves the cue-following policy, not an unfamiliar human trial.
 
@@ -33,3 +33,5 @@ Additional checks:
 ## Visual iteration and preserved failures
 
 Peer reviews identified an exhaust-like swarm of tiny scraps and confusion between rectangular guide cards and the real page. The final version uses four anchored leaf silhouettes, a brighter glow on the real page, Follow before Dash, and immediate instruction replacement. Earlier captures remain under `/captures/hazel/`; the aborted `discovery-final-7a4cecdd` exposed the airborne completion bug, and `discovery-safe-land-sim` exposed an outer-pad/arrival-event discrepancy. Neither is presented as a successful final capture.
+
+Independent final review — Reed, 2026-11-02 18:30 UTC: first goal PASS; leaf-versus-page PASS; action words PASS. He reviewed a 2 s continuity sheet, 13–16 s at 4 fps, all 13 evidence checks and the recorded game state. Recovery and retries read clearly. He flagged a separate camera defect: an opaque canopy branch/trunk briefly crosses the lens around 14–15.25 s, nearly filling it at 15 s. This is retained in the final clip and sent to Thistle; the discovery evidence does not claim camera perfection or classify that obstruction as a GPU black frame.
