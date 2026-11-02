@@ -127,6 +127,9 @@ const HighlightShader = {
     ${HIGHLIGHT_GLSL}
     void main() {
       vec4 c = texture2D(tDiffuse, vUv);
+      // one NaN/Inf pixel (a degenerate normal, a half-float overflow) would be smeared over the whole frame by
+      // the bloom mips below and blink it black on GPU: drop it here, before the blur
+      if (any(isnan(c.rgb)) || any(isinf(c.rgb))) c.rgb = vec3(0.0);
       gl_FragColor = vec4(compressHighlights(c.rgb), c.a);
     }`,
 };
