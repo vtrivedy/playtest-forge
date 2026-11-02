@@ -1,0 +1,108 @@
+{
+  "sourceBroad": "aeaa2f1",
+  "sourceRegistration": "653492e",
+  "reviewedContinuousFrames": 585,
+  "strictBodyMarginFrames": 540,
+  "runs": [
+    {
+      "route": "Regional ledge drop",
+      "directory": "final-posts-regional-drop",
+      "runtimeSha": "aeaa2f1efe9975dc8f0a5e69e26d57bc9e2879f0",
+      "cameraPass": true,
+      "outcome": "7 real setup/fall/retry checks",
+      "reviewedContinuousFrames": 150,
+      "bodyMarginFrames": 150,
+      "errors": []
+    },
+    {
+      "route": "Original chase",
+      "directory": "final-posts-ruin-success",
+      "runtimeSha": "aeaa2f1efe9975dc8f0a5e69e26d57bc9e2879f0",
+      "cameraPass": true,
+      "outcome": "3 catches, 0 skips, kept and pinned home",
+      "reviewedContinuousFrames": 60,
+      "bodyMarginFrames": 60,
+      "errors": []
+    },
+    {
+      "route": "Missed overlook jump",
+      "directory": "registered-fold-miss",
+      "runtimeSha": "653492e91f7b652d30ff74cbcc9bc1134df03734",
+      "cameraPass": true,
+      "outcome": "Required jump beat, airborne departure and fall",
+      "reviewedContinuousFrames": 120,
+      "bodyMarginFrames": 120,
+      "errors": []
+    },
+    {
+      "route": "Natural Keeping",
+      "directory": "final-posts-natural-keeping",
+      "runtimeSha": "aeaa2f1efe9975dc8f0a5e69e26d57bc9e2879f0",
+      "cameraPass": true,
+      "outcome": "Steam, root heat, bridge and crag",
+      "reviewedContinuousFrames": 60,
+      "bodyMarginFrames": 60,
+      "errors": []
+    },
+    {
+      "route": "Millbrook",
+      "directory": "final-posts-millbrook",
+      "runtimeSha": "aeaa2f1efe9975dc8f0a5e69e26d57bc9e2879f0",
+      "cameraPass": true,
+      "outcome": "Dam, kiln, Weir and lookout completed",
+      "reviewedContinuousFrames": 60,
+      "bodyMarginFrames": 60,
+      "errors": []
+    },
+    {
+      "route": "Finale handoff",
+      "directory": "final-posts-finale",
+      "runtimeSha": "aeaa2f1efe9975dc8f0a5e69e26d57bc9e2879f0",
+      "cameraPass": true,
+      "outcome": "7 staged live-input legs completed",
+      "reviewedContinuousFrames": 45,
+      "bodyMarginFrames": null,
+      "errors": []
+    },
+    {
+      "route": "Homeward stairs",
+      "directory": "registered-fold-home",
+      "runtimeSha": "653492e91f7b652d30ff74cbcc9bc1134df03734",
+      "cameraPass": true,
+      "outcome": "3 catches, return unfolded, home pinned",
+      "reviewedContinuousFrames": 90,
+      "bodyMarginFrames": 90,
+      "errors": []
+    },
+    {
+      "route": "Hermitage desk",
+      "directory": "final-posts-desk",
+      "runtimeSha": "aeaa2f1efe9975dc8f0a5e69e26d57bc9e2879f0",
+      "cameraPass": true,
+      "outcome": "3 lines freed, paint and caption",
+      "reviewedContinuousFrames": 0,
+      "bodyMarginFrames": 0,
+      "errors": []
+    }
+  ],
+  "traceComparison": [
+    {
+      "new": "registered-fold-miss",
+      "sha": "653492e91f7b652d30ff74cbcc9bc1134df03734",
+      "baseline": "aeaa2f1efe9975dc8f0a5e69e26d57bc9e2879f0",
+      "samples": 2700,
+      "sameLength": true,
+      "differentSamples": 0,
+      "firstMismatch": []
+    },
+    {
+      "new": "registered-fold-home",
+      "sha": "653492e91f7b652d30ff74cbcc9bc1134df03734",
+      "baseline": "aeaa2f1efe9975dc8f0a5e69e26d57bc9e2879f0",
+      "samples": 3300,
+      "sameLength": true,
+      "differentSamples": 0,
+      "firstMismatch": []
+    }
+  ]
+}
