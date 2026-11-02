@@ -30,11 +30,12 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
   let started = false;
   /** the finale's first snow: 0 → 1, thins the song to pad, ocarina and bells */
   let snow = 0;
+  let lifted = false;
   let lastSet = -1;
   // cold:end
 
   /** `now` defaults to the context clock; offline renders pass their own schedule time */
-  function update(x: number, z: number, restored: number, now = ac.currentTime): void {
+  function update(x: number, z: number, restored: number, now = ac.currentTime, glide = 0): void {
     if (!started) {
       started = true;
       level.setValueAtTime(0, now);
@@ -72,7 +73,14 @@ export function createMusicDriver(ac: BaseAudioContext, node: AudioWorkletNode) 
       mix[5] = mix[5]! + (0.85 - mix[5]!) * snow;
       mix[6] = mix[6]! * (1 - snow);
     }
-    for (let k = 0; k < KEYS.length; k++) params[k]!.setTargetAtTime(mix[k]!, now, LEAN);
+    // gliding lifts the song (A Short Hike's strings join flying): bells shimmer in, the light opens, quickly
+    if (glide > 0) {
+      mix[4] = Math.max(mix[4]!, 0.55);
+      mix[5] = Math.min(1, mix[5]! + 0.25);
+    }
+    const tc = glide > 0 || lifted ? 0.5 : LEAN;
+    lifted = glide > 0;
+    for (let k = 0; k < KEYS.length; k++) params[k]!.setTargetAtTime(mix[k]!, now, tc);
   }
 
   // cold:begin (built once)

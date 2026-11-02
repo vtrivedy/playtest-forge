@@ -198,7 +198,7 @@ class Hearthsong extends AudioWorkletProcessor {
     this.ePh[i] = 0;
     this.eMod[i] = 0;
     this.eAmp[i] = vel;
-    this.eIdx[i] = 1.6;
+    this.eIdx[i] = 0.8;
     this.pan(i, this.rand() * 1.2 - 0.6, this.eL, this.eR);
   }
 
@@ -320,7 +320,9 @@ class Hearthsong extends AudioWorkletProcessor {
     const cb = (tb + (this.breath ? s.bars - 1 : this.bar)) * 3;
     const root = chords[cb]!;
     const singing = this.swell === SINGING;
-    const human = 0.85 + this.rand() * 0.3;
+    // hairpins: each 4-bar phrase swells toward its middle and settles (dynamics, not a flat velocity)
+    const arc = Math.sin((Math.PI * ((this.bar & 3) + slot / s.slots)) / 4);
+    const human = (0.85 + this.rand() * 0.3) * (0.8 + 0.35 * arc);
     if (this.breath) {
       // a breath: the pad rests on the last chord; one high harp note to lead back in
       if (slot === 0 && this.bar === 0) this.padChord(chords, cb);
@@ -361,7 +363,7 @@ class Hearthsong extends AudioWorkletProcessor {
         const hint = this.pass % 4 === 2;
         if (n >= 0 && (!hint || slot === 0)) this.pluck(n + 12, 0.5 * human, 0.025);
       }
-      if (singing && lv[4]! > 0.02 && (slot === 0 || slot === 3) && this.rand() < 0.7) {
+      if ((singing ? lv[4]! > 0.02 : lv[4]! > 0.4) && (slot === 0 || slot === 3) && this.rand() < (singing ? 0.7 : 0.35)) {
         this.bell(s.key + 24 + chords[cb + Math.floor(this.rand() * 3)]!, 0.5 * human);
       }
     }
@@ -404,7 +406,7 @@ class Hearthsong extends AudioWorkletProcessor {
     const bellG = 0.07 * Math.max(lv[4]!, swellGain * 0.6);
     const master = lv[8]!;
     const bright = lv[5]!;
-    const harpLp = 1 - Math.exp((-TAU * (1800 + 4200 * bright)) / sampleRate);
+    const harpLp = 1 - Math.exp((-TAU * (1700 + 3600 * bright)) / sampleRate);
     const padLp = 1 - Math.exp((-TAU * (500 + 1300 * bright)) / sampleRate);
     const padAtk = 1 / (sampleRate * 1.4);
     const padRel = 1 / (sampleRate * 2.2);
@@ -511,12 +513,12 @@ class Hearthsong extends AudioWorkletProcessor {
         l += v * 0.9;
         r += v;
       }
-      // bells (FM, ratio 3.5: glassy)
+      // bells (FM, ratio 4, gentle index: a celesta; 3.5 read as harsh/distorted)
       for (let v = 0; v < BELLS; v++) {
         const a = this.eAmp[v]!;
         if (a < 1e-5) continue;
         this.ePh[v] = this.ePh[v]! + this.eInc[v]!;
-        this.eMod[v] = this.eMod[v]! + this.eInc[v]! * 3.5;
+        this.eMod[v] = this.eMod[v]! + this.eInc[v]! * 4;
         const e = Math.sin(this.ePh[v]! + this.eIdx[v]! * Math.sin(this.eMod[v]!)) * a * bellG;
         this.eAmp[v] = a * bellDec;
         this.eIdx[v] = this.eIdx[v]! * idxDec;

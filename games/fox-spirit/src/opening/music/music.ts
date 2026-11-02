@@ -69,8 +69,8 @@ export function createMusic(ac: BaseAudioContext, out: AudioNode, seed = 1) {
   return {
     ready,
     /** per frame: where the fox is and how much colour is back */
-    update(x: number, z: number, restored: number, at?: number): void {
-      driver?.update(x, z, restored, at);
+    update(x: number, z: number, restored: number, at?: number, glide = 0): void {
+      driver?.update(x, z, restored, at, glide);
     },
     /** a moment: the lead sings from the next bar line, if the music has rested (≥ SWELL.gap bars) */
     cue(kind = 0, at?: number): void {
