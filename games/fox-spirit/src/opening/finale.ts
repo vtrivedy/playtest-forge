@@ -599,10 +599,11 @@ export async function buildFinale(ctx: OpeningCtx, opts: {
       const clear = Math.hypot(Math.max(0, Math.abs(lx) - 1.5), Math.max(0, Math.abs(lz) - 1.9)) > 2.6;
       const postClear = segDist(pos.x, pos.z, aimAt.x, aimAt.z, post.x, post.z) > 0.75 && Math.hypot(pos.x - post.x, pos.z - post.z) > 2.2;
       const blocked = opts.cam.sightBlocked(pos, aimAt, aimAt.y - 0.35);
-      // the 4.4 m post anywhere near the frame dominates it: penalise it within ±45° of the view centre
+      // the 4.4 m post looms when it is in view and close to the lens (its apparent size, not its angle, matters):
+      // far behind the family it is just part of the Press
       const wx = post.x - pos.x, wz = post.z - pos.z, wl = Math.max(1e-3, Math.hypot(wx, wz));
-      const postIn = Math.max(0, (d.x * wx + d.z * wz) / wl - 0.707) / 0.293;
-      const score = 1.5 * (1 - Math.abs(front - 0.65)) + 0.6 * d.dot(toCrown) - 3 * postIn - (clear && postClear && !blocked ? 0 : 10);
+      const postNear = (d.x * wx + d.z * wz) / wl > 0.5 ? THREE.MathUtils.clamp((5.2 - wl) / 2.5, 0, 1) : 0;
+      const score = 1.5 * (1 - Math.abs(front - 0.65)) + 0.6 * d.dot(toCrown) - 3 * postNear - (clear && postClear && !blocked ? 0 : 10);
       restShot.tried.push([k, +front.toFixed(2), clear ? 1 : 0, postClear ? 1 : 0, blocked ? 1 : 0]);
       if (score > bestScore) {
         bestScore = score;
