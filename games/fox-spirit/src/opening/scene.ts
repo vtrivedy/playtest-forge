@@ -46,6 +46,7 @@ import { NORTH_PILES } from './hermitageLayout';
 import { buildFinale } from './finale';
 import { laneBlocks } from './lanes';
 import { createCaptions, type Captions } from './captions';
+import { createTeach, type Teach } from './teach';
 
 /** Fixed review cameras for art checks (harness: __gameHooks.shot(name, paint)) */
 const SHOTS: Record<string, { pos: [number, number, number]; look: [number, number, number]; fov?: number }> = {
@@ -86,6 +87,8 @@ export interface OpeningCtx {
   audio: OpeningAudio;
   /** Album captions (captions.ts): `ctx.captions.say('≤ 6 words')` for a story beat */
   captions: Captions;
+  /** the in-frame control hint (teach.ts): `ctx.teach.offer(text)` each frame a place wants to teach */
+  teach: Teach;
 }
 
 export async function runOpening(): Promise<void> {
@@ -123,8 +126,10 @@ export async function runOpening(): Promise<void> {
     audio: createOpeningAudio(),
     // bound just below: the caption line registers its fade through ctx.onUpdate
     captions: null as unknown as Captions,
+    teach: null as unknown as Teach,
   };
   ctx.captions = createCaptions(ctx);
+  ctx.teach = createTeach(ctx);
   const { field } = ctx;
 
   buildMeadow(ctx);
@@ -196,7 +201,7 @@ export async function runOpening(): Promise<void> {
   const foley = createFoxFoley({ audio: ctx.audio, groundH });
   ctx.player = player;
   carry = createCarry({
-    scene, fox: fox.root,
+    scene, fox: fox.root, teach: ctx.teach,
     source: new THREE.Vector3(KEEPING.coal.x, player.surfaceAt(KEEPING.coal.x, KEEPING.coal.z), KEEPING.coal.z),
     surfaceAt: player.surfaceAt,
     bowls: [...[KEEPING.steam, KEEPING.root].map(b => new THREE.Vector3(b.x, b.y, b.z)), new THREE.Vector3(FINALE.cradle.x, player.surfaceAt(FINALE.cradle.x, FINALE.cradle.z), FINALE.cradle.z)],
@@ -251,6 +256,7 @@ export async function runOpening(): Promise<void> {
   // the lens carries the in-frame lettering (captions, end card), so it joins the scene graph
   scene.add(view);
   ctx.captions.mount(view);
+  ctx.teach.mount(view);
   const post = createPostStack(renderer, scene, view, { bloomStrength: 0.35, bloomThreshold: 0.9, vignette: 0.3, grain: 0.012, pixelRatio: 1 });
 
   let warnedSlots = false;
