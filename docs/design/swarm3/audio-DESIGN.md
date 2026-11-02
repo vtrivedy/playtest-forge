@@ -15,8 +15,9 @@ and hidden birds, four-paw Kenney footsteps). The redo makes silence the default
   again. A cue within 30 s of the last phrase is dropped — no backlog, no stacking. Moments: first hearth lit
   (`hearth`), a page caught (`page`, alternating two phrases), the Keeping (`keeping`, its own long phrase replaces
   the old synth chord), home at the well (`home`). One instrument = one voice for the slice.
-- **Wind is a breath, not a recording.** Band-limited synth noise (~420 Hz, Q 0.6, low-passed 1.4 kHz) drifting in
-  slow gusts, ~−50 dBFS RMS on the ground, louder and brighter with height (gliding, canopy).
+- **Wind is a breath, not a recording.** Pink noise under a low-pass that opens as a gust rises (450 Hz → 2.2 kHz);
+  between gusts it falls to nothing (a steady noise band read as a fan/engine to machine listening). Faint on the
+  ground, fuller with height (gliding, canopy).
 - **Birds are rare and far.** Single calls (five isolated, denoised calls), only once the colour is back
   (restored > 0.3), 28–70 s apart, 18–34 m away in a random direction, never the same call twice running.
 - **Foley is soft.** Forepaws only, ≥160 ms apart: each plant is a synthesized pad (a 6 ms-rise, 35–80 ms-fall
