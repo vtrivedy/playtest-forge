@@ -8,7 +8,9 @@ import type { OpeningCtx } from './scene';
 import { WELL } from './layout';
 import { AshwaterMistMaterial } from './ashwaterMist';
 import { ashwaterE, HUB_ARCHES, hubArrival, outward, pressE, RETURN_ARCH_BACK, WORLDS, worldAt, type WorldId } from './worlds';
-import { RAMP_WORLD, rng, toon } from '../lookdevKit';
+import { RAMP_WORLD, rng } from '../lookdevKit';
+import { inkWash } from '../inkWash';
+import { buildPressScenery, pressVisualH } from '../pressScenery';
 import { bakeCells } from './bake';
 import { box, C, cyl, Kit } from './village';
 
@@ -50,8 +52,8 @@ function plaqueTexture(name: string, band: number): THREE.CanvasTexture {
   return t;
 }
 
-function islandGround(scene: THREE.Scene, cx: number, cz: number, size: number, colour: (x: number, z: number, h: number, c: THREE.Color) => void, groundH: (x: number, z: number) => number): void {
-  const geo = new THREE.PlaneGeometry(size, size, 110, 110);
+function islandGround(scene: THREE.Scene, cx: number, cz: number, size: number, colour: (x: number, z: number, h: number, c: THREE.Color) => void, groundH: (x: number, z: number) => number, mat: THREE.Material, segs = 110): void {
+  const geo = new THREE.PlaneGeometry(size, size, segs, segs);
   geo.rotateX(-Math.PI / 2);
   geo.translate(cx, 0, cz);
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
@@ -67,7 +69,7 @@ function islandGround(scene: THREE.Scene, cx: number, cz: number, size: number, 
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, toon(0xffffff, { vertexColors: true, hatchWeight: 0.2 }));
+  const m = new THREE.Mesh(geo, mat);
   m.receiveShadow = true;
   scene.add(m);
 }
@@ -160,25 +162,15 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
   const snow = new THREE.Color(0xbfc5cf);
   const blue = new THREE.Color(0x9eabbf);
   const ink = new THREE.Color(0x2a2c33);
-  islandGround(scene, P.x, P.z, 150, (x, z, _h, c) => {
+  islandGround(scene, P.x, P.z, 300, (x, z, _h, c) => {
     const n = Math.sin(x * 0.3 + Math.cos(z * 0.21) * 2) * 0.5 + 0.5;
     c.copy(snow).lerp(blue, n * 0.45);
-    c.lerp(ink, THREE.MathUtils.smoothstep(pressE(x, z), 0, 4) * 0.85);
-  }, groundH);
-  const rp = rng(6203);
-  const inkMat = toon(0x24262c, { contour: 0.4 });
-  const pageMat = toon(0xd6d0c2, { contour: 0.6 });
-  for (let i = 0; i < 22; i++) {
-    const a = (i / 22) * Math.PI * 2 + rp() * 0.2;
-    const rr = 44 + rp() * 6;
-    const x = P.x + Math.cos(a) * rr;
-    const z = P.z + Math.sin(a) * rr;
-    const h = 8 + rp() * 14;
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(1.6 + rp() * 1.5, h, 5), inkMat);
-    spire.position.set(x, groundH(x, z) + h / 2 - 1, z);
-    spire.rotation.set((rp() - 0.5) * 0.15, rp() * 6, (rp() - 0.5) * 0.15);
-    scene.add(spire);
-  }
+    // the bank's inner face is ink-stained, the plain beyond is clean paper
+    const e = pressE(x, z);
+    c.lerp(ink, THREE.MathUtils.smoothstep(e, 0, 4) * (1 - THREE.MathUtils.smoothstep(e, 5, 9)) * 0.55);
+  }, pressVisualH, inkWash(0xffffff, { vertexColors: true, scale: 0.18, tide: 0.25, drip: 0.2, splat: 1 }), 200);
+  // rim spires, ink nets, far forest and the painted horizon: pressScenery.ts (DESIGN-sumiro-look.md)
+  const pressScenery = buildPressScenery(ctx);
   // the Press's interior (ridge, shelf, ledge, page dressing) is press.ts; only the rim spires stand here
   const built = k.build();
   scene.add(built);
@@ -301,6 +293,7 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
         mistSheets[i]!.rotation.y += dt * (0.004 + i * 0.003);
       }
       for (const a of arches) (a.glow.material as THREE.MeshBasicMaterial).opacity = a.open() ? 0.28 + 0.1 * Math.sin(time * 2 + a.x) : 0;
+      pressScenery.backdrop.follow(camPos, current === 'press');
       const look = WORLDS[current].look;
       if (!look) {
         weather.update(time, camPos, 0, 0);

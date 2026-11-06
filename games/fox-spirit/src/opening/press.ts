@@ -8,7 +8,8 @@
  * (allocations allowed); every per-frame step lives in press.hot.ts.
  */
 import * as THREE from 'three';
-import { RAMP_WORLD, rng } from '../lookdevKit';
+import { rng } from '../lookdevKit';
+import { inkWash } from '../inkWash';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressE, pressH } from './worlds';
@@ -23,8 +24,9 @@ const segD = (px: number, pz: number, ax: number, az: number, bx: number, bz: nu
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / (dx * dx + dz * dz)));
   return Math.hypot(px - ax - dx * t, pz - az - dz * t);
 };
+// ink as a material (DESIGN-sumiro-look.md): wash, grain, tide-lines and drips over the paper patch
 const winter = (color: THREE.ColorRepresentation, extra: THREE.MeshToonMaterialParameters = {}) =>
-  new THREE.MeshToonMaterial({ color, gradientMap: RAMP_WORLD, ...extra });
+  Object.assign(inkWash(color, { scale: 0.3, tide: 0.6, drip: 0.45, density: 0.8 }), extra);
 
 export function buildPress(
   ctx: OpeningCtx,
