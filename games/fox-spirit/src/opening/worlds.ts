@@ -55,7 +55,7 @@ export const WORLDS: Record<WorldId, WorldDef> = {
   },
   press: {
     id: 'press', name: "The Scribe's Press", origin: { x: PRESS.x, z: PRESS.z }, spawn: { x: PRESS.x, z: PRESS.z + PRESS.r - 8, yaw: inwardYaw((x, z) => pressE(x, z), { x: PRESS.x, z: PRESS.z + PRESS.r - 8 }) },
-    look: { sky: [0x9aa6b8, 0xc4cad4, 0xe2e0dc], mist: 0xc9ccd2, fog: 0.016, key: 0xd8d6d2, precip: 2 },
+    look: { sky: [0xaaa6a4, 0xd2cec6, 0xe4e0d8], mist: 0xdad6ce, fog: 0.0055, key: 0xe2dccf, precip: 2 },
   },
 };
 
