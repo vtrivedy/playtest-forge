@@ -186,6 +186,28 @@ export function buildPress(
   lever.add(arm, grip);
   lever.rotation.x = 0.55;
   thePress.add(beam, screw, platen, bed, pressLight, lever);
+  // the bible's press is heavy joinery: sills under the posts, a head beam doubled, knee braces and the screw's bar
+  // (inside the press's collider footprint; visual only)
+  for (const sx of [-1.4, 1.4]) {
+    const sill = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.26, 1.5), timber);
+    sill.position.set(sx, 0.13, 0);
+    thePress.add(sill);
+    for (const sz of [-1, 1]) {
+      const knee = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.8, 0.14), timber);
+      knee.position.set(sx, 0.42, sz * 0.42);
+      knee.rotation.x = sz * 0.75;
+      thePress.add(knee);
+    }
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.95, 0.14), timber);
+    brace.position.set(sx * 0.82, 2.75, 0);
+    brace.rotation.z = sx > 0 ? 0.8 : -0.8;
+    thePress.add(brace);
+  }
+  const headBeam = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.3, 0.6), timber);
+  headBeam.position.y = 3.55;
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.5, 6).rotateZ(Math.PI / 2), timber);
+  bar.position.y = 2.65;
+  thePress.add(headBeam, bar);
   // the Scribe: small and old, in a flared ink-grey robe and a fox-eared hood (the Warden's shape, in daylight), a
   // crimson scarf the eye finds against the snow, spectacles, ink to the elbows — bowed over the Press it held shut
   const scribe = new THREE.Group();
