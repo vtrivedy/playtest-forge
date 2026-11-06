@@ -287,7 +287,8 @@ export function buildAshwater(
   const flow = ribbon([[GULLY.ax, GULLY.az + 0.4], [GULLY.bx, GULLY.bz], [SOAK.lx, SOAK.lz]], 0.55, 0.9, flowMat);
   // the decoy tarn's runnel: the same water, running north down into the channel
   const runnelMat = flowMat.clone();
-  const runnel = ribbon([[RUNNEL.ax, RUNNEL.az], [RUNNEL.ax, RUNNEL.bz + 0.6]], 0.35, 0.5, runnelMat);
+  // (wide enough to read from the mound: the decoy only teaches if the water is seen running toward the channel)
+  const runnel = ribbon([[RUNNEL.ax, RUNNEL.az], [RUNNEL.ax, RUNNEL.bz + 1.4]], 0.6, 1.0, runnelMat);
   const tarnAt = ash(TARN.lx, TARN.lz);
   const tarn = new THREE.Mesh(new THREE.CircleGeometry(TARN.r + 0.6, 24).rotateX(-Math.PI / 2), waterMat);
   tarn.position.set(tarnAt.x, TARN.full, tarnAt.z);
