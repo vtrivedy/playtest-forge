@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { rng } from '../lookdevKit';
 import { inkWash, washCourses } from '../inkWash';
-import { ashVisualH } from '../ashwaterScenery';
+import { ashVisualH, poleRaftGeometry, sluiceFrameGeometry } from '../ashwaterScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
@@ -191,16 +191,15 @@ export function buildAshwater(
   // the sluice gate the dam chokes: two timber posts and a plank gate on the channel bank behind it
   const sluiceAt = ash(DAM_A.lx, WATER.channel.z0 - 0.2);
   const sluiceY = H(sluiceAt.x, sluiceAt.z);
-  for (const sx of [-1.7, 1.7]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.6, 0.32), timber);
-    post.position.set(sluiceAt.x + sx, sluiceY + 0.5, sluiceAt.z);
-    root.add(post);
+  // the bible's frame (ashwaterScenery.sluiceFrameGeometry): posts, overhanging beam, brace, a gate of upright planks
+  const sluice = sluiceFrameGeometry(rng(5150), 3.4, 2.9);
+  const frame = new THREE.Mesh(sluice.frame, timber);
+  const gate = new THREE.Mesh(sluice.gate, marsh(0x6a5440));
+  for (const m of [frame, gate]) {
+    m.position.set(sluiceAt.x, sluiceY, sluiceAt.z);
+    m.castShadow = true;
+    root.add(m);
   }
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.3, 0.34), timber);
-  beam.position.set(sluiceAt.x, sluiceY + 1.8, sluiceAt.z);
-  const gate = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.1, 0.14), marsh(0x6a5440));
-  gate.position.set(sluiceAt.x, sluiceY - 0.2, sluiceAt.z);
-  root.add(beam, gate);
 
   // ---- reed mats over the pond (sunk until Reedskim): bundles of cut reed lashed into a raft with a bound rim and
   // a few green tips still standing; they ride low and sink under a fox that lingers
@@ -411,7 +410,8 @@ export function buildAshwater(
   // the last ferry: a flat punt moored by the weir's east end; it rides whatever the cistern holds (PUNT)
   const puntAt = ash(PUNT.lx, PUNT.lz);
   const punt = new THREE.Group();
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(PUNT.hx * 2, 0.3, PUNT.hz * 2), timber);
+  // lashed poles, the bible's raft (ashwaterScenery.poleRaftGeometry), on the same footprint
+  const hull = new THREE.Mesh(poleRaftGeometry(rng(5151), PUNT.hx, PUNT.hz, 0.3), timber);
   hull.position.y = -0.05;
   const thwart = new THREE.Mesh(new THREE.BoxGeometry(PUNT.hx * 2, 0.12, 0.16), marsh(0x6a5440));
   thwart.position.set(0, 0.14, 0.4);

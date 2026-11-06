@@ -76,6 +76,49 @@ function stoneGeometry(r: () => number): THREE.BufferGeometry {
   return g;
 }
 
+/**
+ * The bible's sluice frame (shot 1): two tall posts with a beam that overhangs both, a lower rail, a diagonal brace
+ * and a gate of upright planks with gaps between them. Local to the frame's foot, spanning x ± span / 2.
+ */
+export function sluiceFrameGeometry(r: () => number, span: number, h: number): { frame: THREE.BufferGeometry; gate: THREE.BufferGeometry } {
+  const frame: THREE.BufferGeometry[] = [];
+  const jag = (g: THREE.BufferGeometry, k: number) => g.rotateZ((r() - 0.5) * k).rotateY((r() - 0.5) * k);
+  for (const s of [-1, 1]) {
+    frame.push(jag(new THREE.BoxGeometry(0.26, h, 0.26).translate(0, h / 2 - 0.6, 0), 0.04).translate((s * span) / 2, 0, 0));
+    // a stub post leaning against each, as old sluices are propped
+    frame.push(new THREE.BoxGeometry(0.16, h * 0.55, 0.16).translate(0, h * 0.27 - 0.6, 0).rotateZ(s * 0.18).translate((s * (span + 0.7)) / 2, 0, 0.18));
+  }
+  frame.push(jag(new THREE.BoxGeometry(span + 1.1, 0.24, 0.3).translate(0, h - 0.62, 0), 0.03));
+  frame.push(jag(new THREE.BoxGeometry(span + 0.4, 0.16, 0.22).translate(0, h * 0.62 - 0.6, 0.06), 0.03));
+  const brace = Math.hypot(span, h * 0.55);
+  frame.push(new THREE.BoxGeometry(brace, 0.12, 0.12).rotateZ(Math.atan2(h * 0.55, span) * (r() > 0.5 ? 1 : -1)).translate(0, h * 0.62 - 0.6 - h * 0.27, -0.14));
+  const gate: THREE.BufferGeometry[] = [];
+  const n = Math.max(4, Math.round(span / 0.32));
+  for (let i = 0; i < n; i++) {
+    const x = -span / 2 + 0.2 + ((span - 0.4) * (i + 0.5)) / n;
+    const ph = h * (0.5 + r() * 0.12);
+    gate.push(new THREE.BoxGeometry(span / n - 0.06, ph, 0.08).translate(x, ph / 2 - 0.75, 0.16).rotateZ((r() - 0.5) * 0.03));
+  }
+  gate.push(new THREE.BoxGeometry(span - 0.2, 0.1, 0.1).translate(0, h * 0.36 - 0.75, 0.22));
+  return { frame: mergeGeometries(frame.map((g) => g.toNonIndexed()))!, gate: mergeGeometries(gate.map((g) => g.toNonIndexed()))! };
+}
+
+/** a raft of lashed poles (shot 4) filling hx × hz, poles along z, two lashing bands across: the punt's hull */
+export function poleRaftGeometry(r: () => number, hx: number, hz: number, t: number): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  const n = Math.max(4, Math.round((hx * 2) / 0.2));
+  const rad = hx / n;
+  for (let i = 0; i < n; i++) {
+    const len = hz * 2 * (0.94 + r() * 0.1);
+    parts.push(new THREE.CylinderGeometry(rad * 0.95, rad, len, 7).rotateX(Math.PI / 2).translate(-hx + rad * (2 * i + 1), (r() - 0.5) * 0.03, (r() - 0.5) * 0.12).toNonIndexed());
+  }
+  for (const z of [-hz * 0.62, hz * 0.62]) parts.push(new THREE.CylinderGeometry(rad * 0.7, rad * 0.7, hx * 2.1, 6).rotateZ(Math.PI / 2).translate(0, rad * 0.9, z).toNonIndexed());
+  const g = mergeGeometries(parts)!;
+  g.scale(1, t / (rad * 2), 1);
+  g.computeVertexNormals();
+  return g;
+}
+
 /** horizontal clearance from a point to a registered collider (m) */
 function clearance(c: Collider, x: number, z: number): number {
   if (c.kind === 'post') return Math.hypot(x - c.x, z - c.z) - c.r;

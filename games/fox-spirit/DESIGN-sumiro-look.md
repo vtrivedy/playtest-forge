@@ -35,3 +35,20 @@ place around it read as the bible.
 2. **Rain horizon**: misty hill silhouettes and tree clumps in wet grey wash, low cloud ceiling.
 3. **Hummock banks**: mossy stones and grass tussocks along the channels instead of flat green.
 4. **Reed raft / mooring**: bound poles and a leaning mast where the punt lies.
+
+## Built (sumiro-look, Nov 6 03:30–07:27 ET)
+| shot | status |
+|---|---|
+| Press 1 arrival | snowfield with granulated wash and blue-black ink pools; ridge and spire forest beyond |
+| Press 2 the net | 15 rim formations (2–4 tiered dripping spires each), ink webs between the tallest, flung droplets |
+| Press 3 page stacks | six clusters of pressed-page stacks (leaves drawn by the wash), climbable box colliders, 5 m off puzzle pieces |
+| Press 4 gate | ridge in flat ink + wash; still a box with ribs (open) |
+| Press 5 shelf | Archive shelf laid in page leaves by `washCourses(-h)` |
+| Press 6 the Press | unchanged geometry (Thistle's); framed by the spire forest |
+| Press 7 horizon | painted sphere: paper sky, three washes of spire silhouettes, drawn ground falling away past the rim |
+| Ash 1 Low Sluice | tussocks thick on the banks, bank stones, the bible's sluice frame and plank gate |
+| Ash 2 rain horizon | overcast painted sphere with low hills and tree clumps; drawn ground falls away past the rim |
+| Ash 3 banks | tussocks + mossy stones keep off every collider and all water |
+| Ash 4 raft | punt hull is lashed poles on the same footprint |
+Cut: modelled willow clumps in the rain fog (read as lollipops). Open: Press ridge and Press frame still box-built;
+Ashwater cistern walls are boxes laid in courses by the material; Russetvale not touched this pass.
