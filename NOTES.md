@@ -41,7 +41,7 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
 - A tarn perched on a mound east of the landing, behind its own reed dam; its runnel falls INTO the channel. Dashing
   it spills the tarn and changes nothing ("The tarn spills into the channel."); the sluice dam (gully away, downhill)
   is the one that drains. ashwater-probe dashes the tarn first and asserts the channel unchanged, then plays on: pass.
-- For the look stream: the runnel ribbon is hard to see from the mound lens; foam where it meets the channel would help.
+- The runnel ribbon is now wide enough to read (staged lens `ashwater-tarn/00c`); foam where it meets the channel would still help (look stream).
 
 ## Baselines (Nov 6, this branch)
 - check:stuck 1.33 stuck-s / 90 s (budget 4) PASS on 490996f5 (and at slice 1); check:music clean (no audio edits).
@@ -59,3 +59,9 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
   lint:feel) fails if any reachable ground below −0.5 is left under mist (negative control: drop the gully capsule).
 - Press Archive floor place line: "Pages the Scribe let fall, white under the snow." (the walk from gate to shelf
   face was a bare beat).
+- Merged tip (look stream's Press cauldrons/webs and Ashwater sluice frame/punt + my slices): full ashwater-probe pass
+  (3/3, tarn, gully, soak, both secrets, 0 errors) and full press-probe pass (3/3, Maple fill 1, 0 errors).
+  Evidence: `docs/reviews/sumiro-play/merged-tip/`.
+- check:stuck on the final tip: my run was terminated (exit 143) while Kit's landing gate (`sumiro-land`) ran its own
+  check:stuck; per the steer I did not start a second copy. Russetvale code is untouched by this branch since the
+  490996f5 PASS.

@@ -102,6 +102,21 @@ try {
   const tarnTry = await state();
   log.push(['tarn-spilled', tarnTry]);
   await shot('00b-tarn-spills');
+  // disclosed staged lens (inspection only): from the mound's east shoulder, down the runnel to the channel
+  await page.evaluate(([x, z]) => {
+    const { camera } = window.__opening;
+    window.__ashSavedCamera = { pos: camera.position.clone(), quat: camera.quaternion.clone() };
+    camera.position.set(x + 16.5, 2.9, z - 39.0);
+    camera.lookAt(x + 12.6, -0.3, z - 33.4);
+    window.__gameHooks.advance(0, 1 / 60, true);
+  }, [O.x, O.z]);
+  await page.screenshot({ path: path.join(out, '00c-runnel-staged-lens.png') });
+  await page.evaluate(() => {
+    const { camera } = window.__opening;
+    camera.position.copy(window.__ashSavedCamera.pos);
+    camera.quaternion.copy(window.__ashSavedCamera.quat);
+    window.__gameHooks.advance(0, 1 / 60, true);
+  });
   if (!tarnTry.ash.tarn || Math.abs(tarnTry.ash.channelY + 0.15) > 0.02) throw Error('tarn dash did not spill, or the channel moved');
   await go(4, -37.5, { max: 600 });
   await go(-6.5, -35.4);
