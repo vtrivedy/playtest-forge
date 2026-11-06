@@ -20,7 +20,7 @@ export type AshRig = {
   hasReedskim: () => boolean;
   teleport: (x: number, z: number, yaw: number) => void;
   teach: (text: string) => void;
-  events: { secret: (which: 0 | 1) => void; burstA: () => void; burstA2: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
+  events: { place: (which: 0) => void; secret: (which: 0 | 1) => void; burstA: () => void; burstA2: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
   waterMesh: { channel: THREE.Object3D; channelE: THREE.Object3D; pond: THREE.Object3D; pool: THREE.Object3D };
   /** the water the channel lets go, running down the sluice gully (streaks scrolled downhill) into the soak */
   flow: THREE.Object3D;
@@ -54,6 +54,7 @@ export type AshRig = {
   s: {
     burstA: number; burstA2: number; burstB: number; burstC: number; channelY: number; channelEY: number; poolY: number; matK: number; glowK: number;
     done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number; clock: number; lastSplash: number; secrets: number;
+    /** place lines already said (bit 0: the soak, once water has reached it) */ places: number;
   };
 };
 
@@ -186,6 +187,11 @@ export function updateAshwater(rig: AshRig, dt: number): void {
       s.secrets |= 2;
       rig.events.secret(1);
     }
+  }
+  // the soak says its line once, the first time the fox stands by it after the sluice has run
+  if (s.inMarsh && grounded && (s.places & 1) === 0 && s.burstA > 1 && Math.hypot(lx - SOAK.lx, lz - SOAK.lz) < SOAK.r + 3) {
+    s.places |= 1;
+    rig.events.place(0);
   }
   // levels complete on arrival beyond each gate (the store also checks prerequisites)
   if (s.inMarsh && grounded) {

@@ -19,7 +19,7 @@ export type PressRig = {
   fox: THREE.Object3D;
   motion: () => { readonly grounded: boolean; readonly dashing: boolean } | null;
   hasInkstep: () => boolean;
-  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: (i: number) => void; thawSeal: () => void; crack: (which: 0 | 1 | 2) => void; meltIce: () => void; seam: () => void; stood: () => void; complete: (level: 0 | 1 | 2) => void };
+  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: (i: number) => void; thawSeal: () => void; crack: (which: 0 | 1 | 2) => void; meltIce: () => void; seam: () => void; stood: () => void; place: (which: 0) => void; complete: (level: 0 | 1 | 2) => void };
   seal: THREE.Object3D;
   sealCol: Extract<Collider, { kind: 'box' }>;
   /** the fox's carried warmth (glow + light), scaled by `warm` */
@@ -56,7 +56,8 @@ export type PressRig = {
     /** carried warmth 0..1 */ warm: number; sealK: number; thawed: number;
     /** per membrane: −1 frozen, ≥ 0 seconds since it cracked */ crackA: number; crackB: number; crackC: number;
     iceK: number; iced: number; done: number; dashWasAir: number; time: number; arrived: number;
-    /** sim seconds since the pillar's brazier lit (−1 before): the seam runs, then the stacks stand */ seam: number; stood: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
+    /** sim seconds since the pillar's brazier lit (−1 before): the seam runs, then the stacks stand */ seam: number; stood: number;
+    /** place lines already said (bit 0: the alcove) */ places: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
     /** 0 bowed over the shut Press → 1 lever lifted, the Scribe turned to the fox */ leverK: number;
   };
 };
@@ -168,6 +169,12 @@ export function updatePress(rig: PressRig, dt: number): void {
   if (s.crackB < 0 && s.iced === 0 && dashing && Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) < BREAK.reach && f.y - rig.membranes[1]!.position.y < BREAK.above) {
     s.crackB = 0;
     rig.events.crack(1);
+  }
+  // places say their line once, when the fox first stands in them (a place and a feeling, never an action)
+  // (the alcove's chimney holds the fox aloft: inside it at any height below the shelf top counts)
+  if ((s.places & 1) === 0 && s.crackC >= 0 && lx > ALCOVE.x0 && lx < ALCOVE.x1 && lz > ALCOVE.z0 && lz < SHELF.z1 && f.y < SHELF_TOP - 0.3) {
+    s.places |= 1;
+    rig.events.place(0);
   }
   // the seam: heat runs from the pillar's foot to the stair (the ink wets, then pales), then the stacks unpress from
   // the foot up; a fox standing on one rides it (the collider's top rises under it)

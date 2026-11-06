@@ -118,8 +118,12 @@ try {
     camera.quaternion.copy(window.__ashSavedCamera.quat);
     window.__gameHooks.advance(0, 1 / 60, true);
   });
-  await settle(130);
+  // walk down beside the gully to the soak (its place line), then back up to the channel
+  await go(-14.5, -40.2, { max: 600 });
+  await go(-18.2, -46.4, { max: 600 });
+  await settle(30);
   log.push(['soak-filled', await state()]);
+  await shot('01c-soak');
   await shot('02-drained');
   // side place: the drowned roof in the drained channel's west reach
   for (const [x, z] of [[-14, -29], [-30, -28.6], [-43.5, -28.0]]) await go(x, z, { max: 900 });

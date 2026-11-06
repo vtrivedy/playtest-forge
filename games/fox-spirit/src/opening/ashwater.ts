@@ -607,6 +607,7 @@ export function buildAshwater(
     teleport: (x, z, yaw) => ctx.player?.teleport(x, z, yaw),
     teach: ctx.teach.offer,
     events: {
+      place: () => say('Where the flood was always meant to go.'),
       secret: (which) => {
         // the Album's page toast speaks the place's line (no caption on top of it)
         if (opts.onSecret) opts.onSecret(which === 0 ? 'ashwater-roof' : 'ashwater-mooring');
@@ -666,12 +667,13 @@ export function buildAshwater(
     heronMat,
     heronCol,
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
-    s: { burstA: -1, burstA2: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, channelEY: WATER.channelE.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z, clock: 0, lastSplash: -9, secrets: 0 },
+    s: { burstA: -1, burstA2: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, channelEY: WATER.channelE.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z, clock: 0, lastSplash: -9, secrets: 0, places: 0 },
   };
   // a saved game re-enters the marsh as it was left: drained channel / pool, burst dams, a lit Seedwell (no captions)
   const was = (l: (typeof LEVEL_IDS)[number]) => opts.isRestored?.(l) ?? false;
   if (was('teach')) {
     rig.s.burstA = 999;
+    rig.s.places |= 1;
     rig.s.burstA2 = 999;
     damA2.col.r = 0.001;
     rig.s.done |= 1;
@@ -695,7 +697,7 @@ export function buildAshwater(
     spawn: { x: spawnAt.x, z: spawnAt.z, yaw: ASH_SPAWN.yaw },
     state: () => ({
       damA: rig.s.burstA >= 0, damA2: rig.s.burstA2 >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2), gullyRun: +rig.flowMat.opacity.toFixed(2), soakY: +rig.soak.position.y.toFixed(2),
-      secrets: rig.s.secrets, mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
+      secrets: rig.s.secrets, places: rig.s.places, mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
     }),
   };
 }

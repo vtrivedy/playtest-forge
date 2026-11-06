@@ -19,6 +19,7 @@
      "gullyRun": 0,
      "soakY": -2.15,
      "secrets": 0,
+     "places": 0,
      "mats": 0,
      "done": [],
      "splashes": 0,
@@ -47,6 +48,7 @@
      "gullyRun": 0,
      "soakY": -2.15,
      "secrets": 0,
+     "places": 0,
      "mats": 0,
      "done": [],
      "splashes": 0,
@@ -75,6 +77,7 @@
      "gullyRun": 0,
      "soakY": -2.15,
      "secrets": 0,
+     "places": 0,
      "mats": 0,
      "done": [],
      "splashes": 1,
@@ -103,6 +106,7 @@
      "gullyRun": 0.8,
      "soakY": -2.01,
      "secrets": 0,
+     "places": 0,
      "mats": 0,
      "done": [],
      "splashes": 1,
@@ -116,9 +120,9 @@
    "soak-filled",
    {
     "pos": [
-     687.55,
-     -0.14,
-     44.79
+     681.75,
+     -1.8,
+     33.51
     ],
     "grounded": true,
     "ash": {
@@ -128,9 +132,39 @@
      "flood": false,
      "channelY": -1.25,
      "poolY": -0.15,
-     "gullyRun": 0.71,
+     "gullyRun": 0.16,
      "soakY": -1.88,
      "secrets": 0,
+     "places": 1,
+     "mats": 0,
+     "done": [],
+     "splashes": 1,
+     "glow": 0
+    },
+    "secrets": [],
+    "restored": []
+   }
+  ],
+  [
+   "01c-soak",
+   {
+    "pos": [
+     681.75,
+     -1.8,
+     33.51
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": false,
+     "damB": false,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -0.15,
+     "gullyRun": 0.16,
+     "soakY": -1.88,
+     "secrets": 0,
+     "places": 1,
      "mats": 0,
      "done": [],
      "splashes": 1,
@@ -144,9 +178,9 @@
    "02-drained",
    {
     "pos": [
-     687.55,
-     -0.14,
-     44.79
+     681.75,
+     -1.8,
+     33.51
     ],
     "grounded": true,
     "ash": {
@@ -156,9 +190,10 @@
      "flood": false,
      "channelY": -1.25,
      "poolY": -0.15,
-     "gullyRun": 0.71,
+     "gullyRun": 0.16,
      "soakY": -1.88,
      "secrets": 0,
+     "places": 1,
      "mats": 0,
      "done": [],
      "splashes": 1,
@@ -172,7 +207,7 @@
    "02b-roof",
    {
     "pos": [
-     656.37,
+     656.39,
      -1,
      52.01
     ],
@@ -184,9 +219,10 @@
      "flood": false,
      "channelY": -1.25,
      "poolY": -0.15,
-     "gullyRun": 0.16,
+     "gullyRun": 0,
      "soakY": -1.88,
      "secrets": 1,
+     "places": 1,
      "mats": 0,
      "done": [],
      "splashes": 1,
@@ -202,8 +238,8 @@
    "02c-east-reach",
    {
     "pos": [
-     699.09,
-     -0.56,
+     699.1,
+     -0.55,
      51.5
     ],
     "grounded": true,
@@ -217,6 +253,7 @@
      "gullyRun": 0.39,
      "soakY": -1.6,
      "secrets": 1,
+     "places": 1,
      "mats": 0,
      "done": [],
      "splashes": 1,
@@ -247,6 +284,7 @@
      "gullyRun": 0.16,
      "soakY": -1.6,
      "secrets": 1,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach"
@@ -281,6 +319,7 @@
      "gullyRun": 0.12,
      "soakY": -1.6,
      "secrets": 1,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach"
@@ -315,6 +354,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 1,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach"
@@ -349,6 +389,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach"
@@ -384,6 +425,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
@@ -421,6 +463,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
@@ -458,6 +501,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
@@ -495,6 +539,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
@@ -532,6 +577,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
@@ -569,6 +615,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
@@ -606,6 +653,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
@@ -643,6 +691,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
@@ -682,6 +731,7 @@
      "gullyRun": 0,
      "soakY": -1.6,
      "secrets": 3,
+     "places": 1,
      "mats": 1,
      "done": [
       "teach",
