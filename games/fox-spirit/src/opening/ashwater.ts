@@ -13,7 +13,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
-import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
+import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, GULLY, SOAK, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import { updateAshwater, type AshRig } from './ashwater.hot';
 import { buildAshwaterPuddles } from './ashwaterGround';
 
@@ -198,6 +198,89 @@ export function buildAshwater(
   const gate = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.1, 0.14), marsh(0x6a5440));
   gate.position.set(sluiceAt.x, sluiceY - 0.2, sluiceAt.z);
   root.add(beam, gate);
+
+  // ---- where the drained channel goes (DESIGN-sumiro-play.md §3): water running down the sluice gully into the soak
+  // in the marsh's low corner. A ribbon draped on the gully bed, its streak texture scrolled downhill by the hot step
+  const streaks = document.createElement('canvas');
+  streaks.width = 64;
+  streaks.height = 256;
+  {
+    const g = streaks.getContext('2d')!;
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, 64, 256);
+    const rs = rng(8803);
+    for (let i = 0; i < 70; i++) {
+      const x = rs() * 64, y = rs() * 256, len = 14 + rs() * 50, a = 0.25 + rs() * 0.6;
+      const grad = g.createLinearGradient(0, y, 0, y + len);
+      grad.addColorStop(0, 'rgba(255,255,255,0)');
+      grad.addColorStop(0.5, `rgba(255,255,255,${a})`);
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grad;
+      g.fillRect(x, y, 1.5 + rs() * 2.5, len);
+    }
+  }
+  const flowTex = new THREE.CanvasTexture(streaks);
+  flowTex.wrapS = flowTex.wrapT = THREE.RepeatWrapping;
+  // (alphaMap reads green: the canvas is an opaque black → white ramp, Reed :815)
+  const flowMat = new THREE.MeshStandardMaterial({ color: C.water, emissive: 0x9fc4c8, emissiveIntensity: 0.35, emissiveMap: flowTex, alphaMap: flowTex, roughness: 0.1, transparent: true, opacity: 0, depthWrite: false });
+  // the sluice's culvert runs under the bank (the dam chokes its intake) and comes out at a slate headwall at the
+  // gully's head; the water shows from the outlet down
+  const outlet = ash(GULLY.ax, GULLY.az + 0.5);
+  const headwall = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.3, 0.5), marsh(C.slate));
+  headwall.position.set(outlet.x, GULLY.bed0 + 0.45, outlet.z + 0.25);
+  headwall.castShadow = true;
+  const pipe = new THREE.Mesh(new THREE.CircleGeometry(0.42, 16), new THREE.MeshBasicMaterial({ color: 0x0b0f10 }));
+  pipe.position.set(outlet.x, GULLY.bed0 + 0.42, outlet.z - 0.01);
+  pipe.rotation.y = Math.PI;
+  root.add(headwall, pipe);
+  const gullyPath: ReadonlyArray<readonly [number, number]> = [[GULLY.ax, GULLY.az + 0.4], [GULLY.bx, GULLY.bz], [SOAK.lx, SOAK.lz]];
+  let flowLen = 0;
+  for (let i = 1; i < gullyPath.length; i++) flowLen += Math.hypot(gullyPath[i]![0] - gullyPath[i - 1]![0], gullyPath[i]![1] - gullyPath[i - 1]![1]);
+  const SEG = 48;
+  const flowPos = new Float32Array((SEG + 1) * 2 * 3);
+  const flowUv = new Float32Array((SEG + 1) * 2 * 2);
+  const flowIdx: number[] = [];
+  for (let k = 0; k <= SEG; k++) {
+    // the point at arc length u along the path, and its side normal
+    let u = (k / SEG) * flowLen;
+    let j = 1;
+    for (; j < gullyPath.length - 1; j++) {
+      const l = Math.hypot(gullyPath[j]![0] - gullyPath[j - 1]![0], gullyPath[j]![1] - gullyPath[j - 1]![1]);
+      if (u <= l) break;
+      u -= l;
+    }
+    const [ax, az] = gullyPath[j - 1]!;
+    const [bx, bz] = gullyPath[j]!;
+    const l = Math.hypot(bx - ax, bz - az) || 1;
+    const t = Math.min(1, u / l);
+    const cx = ax + (bx - ax) * t, cz = az + (bz - az) * t;
+    const nx = -(bz - az) / l, nz = (bx - ax) / l;
+    const w = 0.55 + 0.35 * (k / SEG);
+    for (let side = 0; side < 2; side++) {
+      const sx = cx + nx * w * (side ? 1 : -1), sz = cz + nz * w * (side ? 1 : -1);
+      const at = ash(sx, sz);
+      const v = (k * 2 + side) * 3;
+      flowPos[v] = at.x;
+      flowPos[v + 1] = Math.max(H(at.x, at.z), H(ash(cx, cz).x, ash(cx, cz).z)) + 0.07;
+      flowPos[v + 2] = at.z;
+      flowUv[(k * 2 + side) * 2] = side;
+      flowUv[(k * 2 + side) * 2 + 1] = (k / SEG) * flowLen * 0.18;
+    }
+    if (k < SEG) flowIdx.push(k * 2, k * 2 + 1, k * 2 + 2, k * 2 + 1, k * 2 + 3, k * 2 + 2);
+  }
+  const flowGeo = new THREE.BufferGeometry();
+  flowGeo.setAttribute('position', new THREE.BufferAttribute(flowPos, 3));
+  flowGeo.setAttribute('uv', new THREE.BufferAttribute(flowUv, 2));
+  flowGeo.setIndex(flowIdx);
+  flowGeo.computeVertexNormals();
+  const flow = new THREE.Mesh(flowGeo, flowMat);
+  flow.visible = false;
+  root.add(flow);
+  // the soak: a reed-ringed hollow that fills with what the channel lets go
+  const soakAt = ash(SOAK.lx, SOAK.lz);
+  const soak = new THREE.Mesh(new THREE.CircleGeometry(SOAK.r + 1.2, 28).rotateX(-Math.PI / 2), waterMat);
+  soak.position.set(soakAt.x, SOAK.low, soakAt.z);
+  root.add(soak);
 
   // ---- reed mats over the pond (sunk until Reedskim): bundles of cut reed lashed into a raft with a bound rim and
   // a few green tips still standing; they ride low and sink under a fox that lingers
@@ -557,6 +640,10 @@ export function buildAshwater(
       splash: () => ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.1, rate: 0.6 }),
     },
     waterMesh: water,
+    flow,
+    flowMat,
+    flowTex,
+    soak,
     damA: damA.g,
     damA2: damA2.g,
     damA2Col: damA2.col,
@@ -606,7 +693,7 @@ export function buildAshwater(
     occluders,
     spawn: { x: spawnAt.x, z: spawnAt.z, yaw: ASH_SPAWN.yaw },
     state: () => ({
-      damA: rig.s.burstA >= 0, damA2: rig.s.burstA2 >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2),
+      damA: rig.s.burstA >= 0, damA2: rig.s.burstA2 >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2), gullyRun: +rig.flowMat.opacity.toFixed(2), soakY: +rig.soak.position.y.toFixed(2),
       secrets: rig.s.secrets, mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
     }),
   };

@@ -5,7 +5,7 @@
  * still deep puts the fox back on the bank it left. Levels complete on arrival in the region beyond each gate.
  */
 import type * as THREE from 'three';
-import { ASH_ORIGIN, CISTERN, DAM_A, DAM_A2, DAM_B, DAM_C, FLOOD, LEDGE, MATS, MAT_RISE, PUNT, SECRETS, WATER, waterAt } from './ashwaterLayout';
+import { ASH_ORIGIN, CISTERN, SOAK, DAM_A, DAM_A2, DAM_B, DAM_C, FLOOD, LEDGE, MATS, MAT_RISE, PUNT, SECRETS, WATER, waterAt } from './ashwaterLayout';
 import type { Collider } from '../lookdevPlay';
 
 export const ASH_TIMING = { drain: 3.2, matRise: 0.9, matStagger: 0.18, damFall: 1.1, glow: 2.5, matHold: 1.2, matSink: 0.7, matRecover: 0.8 };
@@ -22,6 +22,11 @@ export type AshRig = {
   teach: (text: string) => void;
   events: { secret: (which: 0 | 1) => void; burstA: () => void; burstA2: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
   waterMesh: { channel: THREE.Object3D; channelE: THREE.Object3D; pond: THREE.Object3D; pool: THREE.Object3D };
+  /** the water the channel lets go, running down the sluice gully (streaks scrolled downhill) into the soak */
+  flow: THREE.Object3D;
+  flowMat: THREE.MeshStandardMaterial;
+  flowTex: THREE.Texture;
+  soak: THREE.Object3D;
   damA: THREE.Object3D;
   damA2: THREE.Object3D;
   damB: THREE.Object3D;
@@ -107,6 +112,14 @@ export function updateAshwater(rig: AshRig, dt: number): void {
   rig.waterMesh.channel.position.y = s.channelY;
   rig.waterMesh.channelE.position.y = s.channelEY;
   rig.waterMesh.pool.position.y = s.poolY;
+  // water runs downhill: while either reach drains (the east one through the culvert into the west bed, then out of
+  // the sluice), the gully runs, strongest at the start of each drain; the soak fills with what left the channel
+  const run = Math.max(flowOf(s.burstA), flowOf(s.burstA2));
+  rig.flow.visible = run > 0.01;
+  rig.flowMat.opacity = 0.8 * run;
+  rig.flowTex.offset.y -= dt * (0.6 + 1.6 * run);
+  const drained = 0.5 * (smooth(s.burstA / T.drain) + (s.burstA2 < 0 ? 0 : smooth(s.burstA2 / T.drain)));
+  rig.soak.position.y = SOAK.low + (SOAK.high - SOAK.low) * drained;
   // the punt floats (resting on the floor when dry); the gate shuts once water stands in the cistern
   const puntY = Math.max(s.poolY, -0.95);
   rig.punt.position.y = puntY + 0.05;
@@ -207,6 +220,12 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     if (fly > 0.2) rig.heronCol.r = 0.001;
   }
 
+}
+
+/** how hard the sluice gully runs `t` s after a reach's dam burst (0 before, a surge, then a long trickle) */
+function flowOf(t: number): number {
+  if (t < 0) return 0;
+  return smooth(t / 0.5) * (1 - 0.8 * smooth((t - T.drain) / 2.5)) * (1 - smooth((t - T.drain - 14) / 4));
 }
 
 /** a burst reed dam slumps and scatters into the water over `damFall` s */

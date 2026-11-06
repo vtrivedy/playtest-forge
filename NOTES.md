@@ -25,3 +25,9 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
 - Proof: fresh `tools/press-probe.mjs` run — floor draft alone peaks under the shelf; crest Inkstep tears the face;
   chimney peak 8.0; then the whole combine; Maple fill 1; reload restores; 0 errors. TLA 54 states, no error.
 - Evidence: `docs/reviews/sumiro-play/{folded-archive,unpressed-stair}/`.
+
+## Slice 3 — Ashwater: water runs downhill (Low Sluice)
+- Sluice gully + soak carved in `ashwaterLayout.H`; a streaked water ribbon runs down the gully while either reach
+  drains, and the soak rises. The dam stays on the bank; the water leaves by a culvert to a slate headwall at the gully head.
+- For the look stream: the soak is a plain water disc with the marsh water material; reeds round it and some foam at
+  the gully foot would sell it.
