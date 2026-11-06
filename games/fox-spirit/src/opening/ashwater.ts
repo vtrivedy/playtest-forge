@@ -21,7 +21,7 @@ import { buildAshwaterPuddles } from './ashwaterGround';
 
 const C = {
   moss: new THREE.Color(0x3c493d), peat: new THREE.Color(0x35352f), mud: new THREE.Color(0x3b322b), levee: new THREE.Color(0x74664e), sedge: new THREE.Color(0x505a40), bank: new THREE.Color(0x505e55),
-  water: 0x2a6a74, reed: 0x6f8a3e, reedDry: 0xa08a4e, willow: 0x4f7f6a, pad: 0x5d8f3f, bloom: 0xf2e6c4, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
+  water: 0x4f6268, reed: 0x6f8a3e, reedDry: 0xa08a4e, willow: 0x4f7f6a, pad: 0x5d8f3f, bloom: 0xf2e6c4, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
 };
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
 
@@ -80,7 +80,7 @@ export function buildAshwater(
   root.add(buildAshwaterPuddles(geo));
 
   // ---- water: the channel and the pool drop when drained; the pond holds
-  const waterMat = new THREE.MeshStandardMaterial({ color: C.water, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.86, emissive: 0x0d2a2e });
+  const waterMat = new THREE.MeshStandardMaterial({ color: C.water, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.86, emissive: 0x1c2629 });
   const waterMesh = (id: keyof typeof WATER) => {
     const w = WATER[id];
     const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(150, w.x1 - w.x0) + 1.4, w.z1 - w.z0 + 1.4).rotateX(-Math.PI / 2), waterMat);
