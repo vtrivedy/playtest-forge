@@ -18,7 +18,7 @@ const entryTour = args.includes('--entry-tour') || pressRoute;
 let tourPassed = false;
 const started=Date.now();
 fs.mkdirSync(out, { recursive: true });
-const port = 5251;
+const port = Number(process.env.ACCEPT_PORT ?? 5251);
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
 await server.listen();
 const browser = await chromium.launch({ headless: true, args: process.env.FOX_TEST_GPU==='1' ? ['--use-gl=angle','--use-angle=gl-egl','--ignore-gpu-blocklist'] : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });

@@ -855,3 +855,8 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   (Reed's physical acceptance, `world-ashwater-acceptance --press-route`). Changing a Press level means changing
   both, or the acceptance circuit fails on the old route. The lib asserts the anti-bypass facts too (floor draft under
   the shelf, short draft under the ledge).
+- A decoy is the cheapest way to turn a one-answer gate into a question: same verb, same-looking object, visibly
+  opposite consequence (the tarn's water runs into the channel). Make it unable to change modelled state, then it
+  needs no TLA change and cannot softlock (Ashwater.tla unchanged for the tarn).
+- Probe assertions: watch operator precedence in `a > b === false` (it is `(a > b) === false`). Prefer
+  `Math.abs(x - want) > tol`.
