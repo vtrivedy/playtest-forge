@@ -95,6 +95,35 @@ export const SECRETS = {
 /** spawn (and the return arch) on the landing, facing north */
 export const ASH_SPAWN = { lx: 0, lz: -46, yaw: Math.PI };
 
+/**
+ * Where the mist sheets (worldsScene, at about bank height) feather clear: every place a fox can stand below them.
+ * One list drives the shader (ashwaterMist.ts) and tools/checks/ashwater-terrain.ts, which fails if any low ground
+ * the fox can reach is left under mist (a camera that drops below a sheet reads as a flat grey wash).
+ */
+export const MIST_CLEAR = {
+  /** the drainable beds (the pond never drains: its water keeps the fox up) */
+  rects: [WATER.channel, WATER.channelE, WATER.pool] as ReadonlyArray<{ x0: number; x1: number; z0: number; z1: number }>,
+  /** the sluice gully, banks included */
+  capsules: [{ ax: GULLY.ax, az: GULLY.az, bx: GULLY.bx, bz: GULLY.bz, r: GULLY.half + 2.4 }] as ReadonlyArray<{ ax: number; az: number; bx: number; bz: number; r: number }>,
+  /** the soak */
+  discs: [{ x: SOAK.lx, z: SOAK.lz, r: SOAK.r + 3.6 }] as ReadonlyArray<{ x: number; z: number; r: number }>,
+  feather: 1.25,
+} as const;
+
+/** mist opacity factor at a local point (0 clear … 1 full), the CPU twin of the shader's mask */
+export function mistAt(lx: number, lz: number): number {
+  const ss = (e: number) => smoothstep(e, 0, MIST_CLEAR.feather);
+  let k = 1;
+  for (const w of MIST_CLEAR.rects) k *= ss(Math.max(Math.max(w.x0 - lx, lx - w.x1), Math.max(w.z0 - lz, lz - w.z1)));
+  for (const c of MIST_CLEAR.capsules) {
+    const ex = c.bx - c.ax, ez = c.bz - c.az;
+    const t = Math.max(0, Math.min(1, ((lx - c.ax) * ex + (lz - c.az) * ez) / (ex * ex + ez * ez)));
+    k *= ss(Math.hypot(lx - c.ax - ex * t, lz - c.az - ez * t) - c.r);
+  }
+  for (const d of MIST_CLEAR.discs) k *= ss(Math.hypot(lx - d.x, lz - d.z) - d.r);
+  return k;
+}
+
 /** signed distance to an axis-aligned local rectangle (negative inside) */
 function sdRect(lx: number, lz: number, x0: number, x1: number, z0: number, z1: number): number {
   const dx = Math.max(x0 - lx, lx - x1);
