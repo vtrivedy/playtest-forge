@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import { rng } from '../lookdevKit';
-import { inkWash, washCourses } from '../inkWash';
+import { inkWash, washCourses, washDripFrom } from '../inkWash';
 import { inkTreeGeometry } from '../pressScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
@@ -43,8 +43,11 @@ export function buildPress(
   root.add(solids);
   ctx.occluders.push(solids);
 
-  const inkMat = winter(0x23252d);
+  // the ridge is dried ink: runs hang from its top lip (the wash's drip from that height)
+  const inkMat = washDripFrom(inkWash(0x46445a, { scale: 0.3, tide: 0.9, drip: 0.95 }), RIDGE_BASE + RIDGE.rise);
   const ribMat = winter(0xc9c0ac);
+  // the ridge's spine ribs sit a value above the ink, not paper-white (pale ribs read as a fence)
+  const spineMat = inkWash(0x77718a, { scale: 0.3, tide: 0.6, drip: 0.5 });
   const paperMat = washCourses(winter(0xcfc6b2), -0.16);
   const paperEdge = washCourses(winter(0x9c927c), -0.16);
   const timber = winter(0x3b2f2a);
@@ -75,7 +78,7 @@ export function buildPress(
     solid(x0, x1, RIDGE.lz - RIDGE.half, RIDGE.lz + RIDGE.half, ridgeTop);
     // pale page ribs down both faces
     for (let x = Math.min(x0, x1) + 1; x < Math.max(x0, x1); x += 2.2) {
-      for (const face of [-1, 1]) box(x - 0.12, x + 0.12, RIDGE.lz + face * (RIDGE.half + 0.02) - 0.04, RIDGE.lz + face * (RIDGE.half + 0.02) + 0.04, RIDGE_BASE - 0.5, ridgeTop - 0.25, ribMat);
+      for (const face of [-1, 1]) box(x - 0.12, x + 0.12, RIDGE.lz + face * (RIDGE.half + 0.02) - 0.04, RIDGE.lz + face * (RIDGE.half + 0.02) + 0.04, RIDGE_BASE - 0.5, ridgeTop - 0.25, spineMat);
     }
   }
   // gateposts and a lintel of folded pages
