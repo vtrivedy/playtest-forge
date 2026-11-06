@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import type { OpeningCtx } from './scene';
-import { toon } from '../lookdevKit';
+import { inkWash, washCourses } from '../inkWash';
 
 const O = { x: -700, z: 85 } as const;
 /** a spiral of stacks round (22, 24): each 0.55 m higher (jump apex 0.83 m), 2.3 m apart centre to centre */
@@ -25,8 +25,9 @@ export function buildPressStacks(ctx: OpeningCtx, memory: { foundAtLoad: boolean
   const { scene, groundH, colliders } = ctx;
   const g = new THREE.Group();
   g.name = 'press-stacks';
-  const paper = toon(0xddd5c2, { contour: 0.7 });
-  const ink = toon(0x25272e);
+  // ink as a material (DESIGN-sumiro-look.md): pressed leaves on the paper, flat ink on the covers
+  const paper = washCourses(inkWash(0xddd5c2, { contour: 0.7, scale: 0.5, tide: 0.5, drip: 0.2 }), -0.14);
+  const ink = inkWash(0x25272e, { density: 0.8 });
   const ice = new THREE.MeshToonMaterial({ color: 0xa8c8dc, transparent: true, opacity: 0.8 });
   // tops are absolute (from the first stack's footing) so the snow drift under each stack can't make a step too tall
   const base = groundH(O.x + STEPS[0]![0], O.z + STEPS[0]![1]);
