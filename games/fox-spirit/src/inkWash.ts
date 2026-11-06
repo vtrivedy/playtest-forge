@@ -68,6 +68,20 @@ const WASH_GLSL = /* glsl */ `
   float halo = smoothstep(0.68, 0.73, lkFbm(wp.xz * 0.5 + 9.0)) * (1.0 - pool);
   c = mix(c, mix(c, uWashShade * 0.9, 0.55), halo * up * uWashA.w);
   c = mix(c, mix(uWashInk, vec3(0.16, 0.2, 0.3), 0.6) * (0.8 + 0.5 * gran), max(pool * 0.85, dots) * up * uWashA.w);
+  // laid courses on standing faces (uWashCourse.x = course height, 0 = off): mortar lines, staggered joints, and each
+  // stone its own tone of the wash
+  if (uWashCourse > 0.0) {
+    float row = floor(wp.y / uWashCourse);
+    float run = along / (uWashCourse * 2.3) + row * 0.5;
+    float fy = fract(wp.y / uWashCourse);
+    float fx = fract(run);
+    float jag = (lkNoise(vec2(along, wp.y) * 7.0) - 0.5) * 0.03;
+    float mortar = max(1.0 - smoothstep(0.035, 0.075, min(fy, 1.0 - fy) + jag), 1.0 - smoothstep(0.015, 0.04, min(fx, 1.0 - fx) * uWashCourse * 2.3 / 1.2 + jag));
+    float tone = lkHash(vec2(row, floor(run)));
+    float wall = smoothstep(0.6, 0.85, vert);
+    c *= mix(1.0, 0.82 + 0.3 * tone, wall);
+    c = mix(c, uWashInk, mortar * wall * 0.7);
+  }
   outgoingLight = c;
 }
 `;
@@ -82,6 +96,7 @@ export function inkWash(color: THREE.ColorRepresentation, o: WashOpts = {}): THR
   const paper = m.onBeforeCompile;
   m.userData.lk = `${m.userData.lk}|wash${a.toArray().join(',')},${o.density ?? 0}|${ink.getHexString()}|${shade.getHexString()}`;
   m.userData.washTop = { value: 1e4 };
+  m.userData.washCourse = { value: 0 };
   m.onBeforeCompile = (shader, renderer) => {
     paper.call(m, shader, renderer);
     shader.uniforms.uWashA = { value: a };
@@ -89,8 +104,9 @@ export function inkWash(color: THREE.ColorRepresentation, o: WashOpts = {}): THR
     shader.uniforms.uWashShade = { value: shade };
     shader.uniforms.uWashTop = m.userData.washTop;
     shader.uniforms.uWashDensity = { value: o.density ?? 0 };
+    shader.uniforms.uWashCourse = m.userData.washCourse;
     shader.fragmentShader = shader.fragmentShader
-      .replace('uniform float uSnow;', 'uniform float uSnow;\nuniform vec4 uWashA;\nuniform vec3 uWashInk;\nuniform vec3 uWashShade;\nuniform float uWashTop;\nuniform float uWashDensity;')
+      .replace('uniform float uSnow;', 'uniform float uSnow;\nuniform vec4 uWashA;\nuniform vec3 uWashInk;\nuniform vec3 uWashShade;\nuniform float uWashTop;\nuniform float uWashDensity;\nuniform float uWashCourse;')
       .replace('#include <opaque_fragment>', `${WASH_GLSL}\n#include <opaque_fragment>`);
   };
   m.customProgramCacheKey = () => 'lk-paint-wash';
@@ -101,5 +117,12 @@ export function inkWash(color: THREE.ColorRepresentation, o: WashOpts = {}): THR
 export function washDripFrom(m: THREE.MeshToonMaterial, y: number): THREE.MeshToonMaterial {
   (m.userData.washTop as { value: number }).value = y;
   m.userData.lk = `${m.userData.lk}|top${Math.round(y * 2) / 2}`;
+  return m;
+}
+
+/** lay a wash material's standing faces in courses of stone this high (m): masonry from the material, not boxes */
+export function washCourses(m: THREE.MeshToonMaterial, h: number): THREE.MeshToonMaterial {
+  (m.userData.washCourse as { value: number }).value = h;
+  m.userData.lk = `${m.userData.lk}|course${h}`;
   return m;
 }
