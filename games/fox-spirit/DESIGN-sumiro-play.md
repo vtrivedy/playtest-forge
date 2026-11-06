@@ -37,6 +37,7 @@ Words: none that teach. Place lines only (captions band, see § Lines). Album pa
 already authored).
 
 ## Lines (sound off, no dialogue box, no actions named)
+- Archive floor, ~10 m past the gate (once): "Pages the Scribe let fall, white under the snow."
 - Seam thaws: "The pressed stair remembers its height."
 - Stair stands: none (the camera already sees it).
 Removed: all five `HINT_*` control captions in the Press; the ability notice no longer names a key or action.
