@@ -40,12 +40,12 @@ function paint(kind: BackdropKind): HTMLCanvasElement {
     ? ['120,118,140', '150,146,160', '176,160,128', '96,98,118']
     : ['70,78,84', '96,104,108', '140,146,146', '58,64,70'];
   g.filter = kind === 'press' ? 'blur(10px)' : 'blur(22px)';
-  for (let i = 0; i < (kind === 'press' ? 120 : 260); i++) {
+  for (let i = 0; i < (kind === 'press' ? 170 : 260); i++) {
     const x = r() * W;
     const y = H * (0.02 + r() * (kind === 'press' ? 0.5 : 0.45));
     const rad = 40 + r() * 170;
     const tone = bloomTones[Math.floor(r() * bloomTones.length)]!;
-    const a = (kind === 'press' ? 0.07 : 0.06) + r() * (kind === 'press' ? 0.1 : 0.07);
+    const a = (kind === 'press' ? 0.12 : 0.06) + r() * (kind === 'press' ? 0.14 : 0.07);
     // rain cloud lies in long low smears; the press paper blooms rounder. The gradient is drawn in the ellipse's own
     // scaled space so it fades to nothing at the rim (a circular gradient clipped by a flat ellipse leaves a hard lid)
     const sx = kind === 'press' ? 1.4 + r() : 2.6 + r() * 2;

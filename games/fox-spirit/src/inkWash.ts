@@ -64,7 +64,7 @@ const WASH_GLSL = /* glsl */ `
   // splatter on what faces the sky: big pooled blots with ragged edges, and flung dots
   float up = smoothstep(0.6, 0.9, wN.y);
   float pool = smoothstep(0.735, 0.75, lkFbm(wp.xz * 0.5 + 9.0) + (lkNoise(wp.xz * 4.1) - 0.5) * 0.06);
-  float dots = smoothstep(0.9, 0.92, lkNoise(wp.xz * 3.3 + 1.0)) * smoothstep(0.45, 0.62, lkFbm(wp.xz * 0.3 + 2.0));
+  float dots = max(smoothstep(0.9, 0.92, lkNoise(wp.xz * 3.3 + 1.0)) * smoothstep(0.45, 0.62, lkFbm(wp.xz * 0.3 + 2.0)), smoothstep(0.94, 0.955, lkNoise(wp.xz * 7.1 + 4.0)) * smoothstep(0.35, 0.55, lkFbm(wp.xz * 0.17 + 6.0)));
   float halo = smoothstep(0.68, 0.73, lkFbm(wp.xz * 0.5 + 9.0)) * (1.0 - pool);
   c = mix(c, mix(c, uWashShade * 0.9, 0.55), halo * up * uWashA.w);
   c = mix(c, mix(uWashInk, vec3(0.16, 0.2, 0.3), 0.6) * (0.8 + 0.5 * gran), max(pool * 0.85, dots) * up * uWashA.w);
