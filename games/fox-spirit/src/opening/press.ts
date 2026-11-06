@@ -103,12 +103,19 @@ export function buildPress(
     g.position.set(at.x, B.shelf ? SHELF_TOP : pressH(at.x, at.z), at.z);
     const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.55, 7), stone);
     plinth.position.y = 0.27;
-    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.3, 0.32, 9, 1, true), timber);
-    bowl.position.y = 0.7;
+    // an iron cauldron on three legs (the bible's brazier), sitting on the stone
+    const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.56, 12, 6, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.58), timber);
+    bowl.position.y = 1.1;
+    for (let k = 0; k < 3; k++) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.5, 5), timber);
+      leg.position.set(Math.cos(k * 2.094) * 0.36, 0.8, Math.sin(k * 2.094) * 0.36);
+      leg.rotation.set(Math.sin(k * 2.094) * 0.25, 0, -Math.cos(k * 2.094) * 0.25);
+      g.add(leg);
+    }
     const coalMat = new THREE.MeshStandardMaterial({ color: 0x2b2522, roughness: 0.9, emissive: 0xff7a2a, emissiveIntensity: B.lit ? 1.6 : 0 });
     const coals = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0), coalMat);
     coals.scale.y = 0.45;
-    coals.position.y = 0.8;
+    coals.position.y = 1.12;
     const light = new THREE.PointLight(0xff8a3a, B.lit ? 1.6 : 0, 7, 1.8);
     light.position.y = 1.4;
     g.add(plinth, bowl, coals, light);

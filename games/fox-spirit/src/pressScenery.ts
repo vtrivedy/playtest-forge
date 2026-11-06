@@ -14,10 +14,11 @@ import { paintedBackdrop } from './paperBackdrop';
 import { BRAZIERS, MEMBRANE_A } from './opening/pressLayout';
 
 const P = WORLDS.press.origin;
-/** page-stack clusters (local to the Press origin): off the brazier relays, the ridge gate, the spawn and the shelf */
+/** page-stack clusters (local to the Press origin): off the brazier relays, the ridge gate, the spawn and the shelf;
+ *  the last two stand in the arrival frame (the bible's foreground stacks) */
 /** puzzle pieces a stack must keep its distance from (local) */
 const CLEAR: ReadonlyArray<readonly [number, number]> = [...BRAZIERS.map((b) => [b.lx, b.lz] as const), [MEMBRANE_A.lx, MEMBRANE_A.lz]];
-const STACK_SPOTS: ReadonlyArray<readonly [number, number]> = [[-31, 23], [27, 21], [-33, 3], [33, 5], [24, 37], [-26, 36]];
+const STACK_SPOTS: ReadonlyArray<readonly [number, number]> = [[-31, 23], [27, 21], [-33, 3], [33, 5], [24, 37], [-26, 36], [17, 34], [-15, 21]];
 const { smoothstep } = THREE.MathUtils;
 
 /**
