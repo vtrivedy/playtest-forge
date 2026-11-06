@@ -1,0 +1,713 @@
+{
+ "log": [
+  [
+   "00-landing",
+   {
+    "pos": [
+     700,
+     0.01,
+     34
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": false,
+     "damA2": false,
+     "damB": false,
+     "flood": false,
+     "channelY": -0.15,
+     "poolY": -0.15,
+     "gullyRun": 0,
+     "soakY": -2.15,
+     "secrets": 0,
+     "mats": 0,
+     "done": [],
+     "splashes": 0,
+     "glow": 0
+    },
+    "secrets": [],
+    "restored": []
+   }
+  ],
+  [
+   "wade-test",
+   {
+    "pos": [
+     700,
+     -0.18,
+     48.6
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": false,
+     "damA2": false,
+     "damB": false,
+     "flood": false,
+     "channelY": -0.15,
+     "poolY": -0.15,
+     "gullyRun": 0,
+     "soakY": -2.15,
+     "secrets": 0,
+     "mats": 0,
+     "done": [],
+     "splashes": 0,
+     "glow": 0
+    },
+    "secrets": [],
+    "restored": []
+   }
+  ],
+  [
+   "01-dam",
+   {
+    "pos": [
+     693.83,
+     0.11,
+     44.7
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": false,
+     "damA2": false,
+     "damB": false,
+     "flood": false,
+     "channelY": -0.15,
+     "poolY": -0.15,
+     "gullyRun": 0,
+     "soakY": -2.15,
+     "secrets": 0,
+     "mats": 0,
+     "done": [],
+     "splashes": 1,
+     "glow": 0
+    },
+    "secrets": [],
+    "restored": []
+   }
+  ],
+  [
+   "gully-runs",
+   {
+    "pos": [
+     687.56,
+     -0.14,
+     44.79
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": false,
+     "damB": false,
+     "flood": false,
+     "channelY": -0.72,
+     "poolY": -0.15,
+     "gullyRun": 0.8,
+     "soakY": -2.01,
+     "secrets": 0,
+     "mats": 0,
+     "done": [],
+     "splashes": 1,
+     "glow": 0
+    },
+    "secrets": [],
+    "restored": []
+   }
+  ],
+  [
+   "soak-filled",
+   {
+    "pos": [
+     687.55,
+     -0.14,
+     44.79
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": false,
+     "damB": false,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -0.15,
+     "gullyRun": 0.71,
+     "soakY": -1.88,
+     "secrets": 0,
+     "mats": 0,
+     "done": [],
+     "splashes": 1,
+     "glow": 0
+    },
+    "secrets": [],
+    "restored": []
+   }
+  ],
+  [
+   "02-drained",
+   {
+    "pos": [
+     687.55,
+     -0.14,
+     44.79
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": false,
+     "damB": false,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -0.15,
+     "gullyRun": 0.71,
+     "soakY": -1.88,
+     "secrets": 0,
+     "mats": 0,
+     "done": [],
+     "splashes": 1,
+     "glow": 0
+    },
+    "secrets": [],
+    "restored": []
+   }
+  ],
+  [
+   "02b-roof",
+   {
+    "pos": [
+     656.37,
+     -1,
+     52.01
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": false,
+     "damB": false,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -0.15,
+     "gullyRun": 0.16,
+     "soakY": -1.88,
+     "secrets": 1,
+     "mats": 0,
+     "done": [],
+     "splashes": 1,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof"
+    ],
+    "restored": []
+   }
+  ],
+  [
+   "02c-east-reach",
+   {
+    "pos": [
+     699.09,
+     -0.56,
+     51.5
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": false,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -0.15,
+     "gullyRun": 0.39,
+     "soakY": -1.6,
+     "secrets": 1,
+     "mats": 0,
+     "done": [],
+     "splashes": 1,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof"
+    ],
+    "restored": []
+   }
+  ],
+  [
+   "03-reed-island",
+   {
+    "pos": [
+     699.96,
+     0,
+     67.12
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": false,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -0.15,
+     "gullyRun": 0.16,
+     "soakY": -1.6,
+     "secrets": 1,
+     "mats": 1,
+     "done": [
+      "teach"
+     ],
+     "splashes": 1,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof"
+    ],
+    "restored": [
+     "teach"
+    ]
+   }
+  ],
+  [
+   "linger",
+   {
+    "pos": [
+     699.19,
+     -0.05,
+     71.66
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": false,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -0.15,
+     "gullyRun": 0.12,
+     "soakY": -1.6,
+     "secrets": 1,
+     "mats": 1,
+     "done": [
+      "teach"
+     ],
+     "splashes": 2,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof"
+    ],
+    "restored": [
+     "teach"
+    ]
+   }
+  ],
+  [
+   "04-mats",
+   {
+    "pos": [
+     700.18,
+     -0.01,
+     79.45
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": false,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -0.15,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 1,
+     "mats": 1,
+     "done": [
+      "teach"
+     ],
+     "splashes": 2,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof"
+    ],
+    "restored": [
+     "teach"
+    ]
+   }
+  ],
+  [
+   "05-pool-drained",
+   {
+    "pos": [
+     725.75,
+     -0.03,
+     81.03
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -1.25,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach"
+     ],
+     "splashes": 3,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach"
+    ]
+   }
+  ],
+  [
+   "06-mill-shore",
+   {
+    "pos": [
+     700,
+     -0.04,
+     97.16
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -1.25,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop"
+     ],
+     "splashes": 3,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop"
+    ]
+   }
+  ],
+  [
+   "07-weir",
+   {
+    "pos": [
+     699.75,
+     3.8,
+     112.78
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": false,
+     "channelY": -1.25,
+     "poolY": -1.25,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop"
+     ],
+     "splashes": 3,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop"
+    ]
+   }
+  ],
+  [
+   "07b-flooded",
+   {
+    "pos": [
+     705.56,
+     4.4,
+     118.02
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": true,
+     "channelY": -1.25,
+     "poolY": 4.3,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop"
+     ],
+     "splashes": 3,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop"
+    ]
+   }
+  ],
+  [
+   "step",
+   {
+    "pos": [
+     712.44,
+     4.4,
+     115.51
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": true,
+     "channelY": -1.25,
+     "poolY": 4.3,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop"
+     ],
+     "splashes": 3,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop"
+    ]
+   }
+  ],
+  [
+   "step",
+   {
+    "pos": [
+     712.78,
+     4.52,
+     112.8
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": true,
+     "channelY": -1.25,
+     "poolY": 4.3,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop"
+     ],
+     "splashes": 3,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop"
+    ]
+   }
+  ],
+  [
+   "step",
+   {
+    "pos": [
+     713.83,
+     4.7,
+     109.89
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": true,
+     "channelY": -1.25,
+     "poolY": 4.3,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop"
+     ],
+     "splashes": 3,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop"
+    ]
+   }
+  ],
+  [
+   "step",
+   {
+    "pos": [
+     715.01,
+     4.7,
+     106.13
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": true,
+     "channelY": -1.25,
+     "poolY": 4.3,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop"
+     ],
+     "splashes": 3,
+     "glow": 0
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop"
+    ]
+   }
+  ],
+  [
+   "08-seedwell",
+   {
+    "pos": [
+     717.87,
+     4.7,
+     106.64
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": true,
+     "channelY": -1.25,
+     "poolY": 4.3,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop",
+      "combine"
+     ],
+     "splashes": 3,
+     "glow": 1
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop",
+     "combine"
+    ]
+   }
+  ],
+  [
+   "album",
+   {
+    "pos": [
+     717.87,
+     4.7,
+     106.64
+    ],
+    "grounded": true,
+    "ash": {
+     "damA": true,
+     "damA2": true,
+     "damB": true,
+     "flood": true,
+     "channelY": -1.25,
+     "poolY": 4.3,
+     "gullyRun": 0,
+     "soakY": -1.6,
+     "secrets": 3,
+     "mats": 1,
+     "done": [
+      "teach",
+      "develop",
+      "combine"
+     ],
+     "splashes": 3,
+     "glow": 1
+    },
+    "secrets": [
+     "ashwater-roof",
+     "ashwater-mooring"
+    ],
+    "restored": [
+     "teach",
+     "develop",
+     "combine"
+    ]
+   }
+  ]
+ ],
+ "errors": [],
+ "linger": {
+  "splashesBefore": 1,
+  "splashesAfter": 2,
+  "z": -8.340000000000003
+ },
+ "pass": true
+}
