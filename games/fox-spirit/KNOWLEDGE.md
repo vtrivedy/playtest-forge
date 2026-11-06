@@ -851,3 +851,7 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   it (a culvert to a headwall) rather than cutting the bank away.
 - `pkill -f <pattern>` from a Bash tool call matches its own shell's command line and kills the call (exit 144).
   Kill by PID from `pgrep` output instead.
+- Two scripts play the Press: `tools/press-probe.mjs` (staged travel, evidence) and `tools/lib/press-input-route.mjs`
+  (Reed's physical acceptance, `world-ashwater-acceptance --press-route`). Changing a Press level means changing
+  both, or the acceptance circuit fails on the old route. The lib asserts the anti-bypass facts too (floor draft under
+  the shelf, short draft under the ledge).
