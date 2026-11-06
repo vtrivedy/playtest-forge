@@ -11,6 +11,7 @@ import { ashwaterE, HUB_ARCHES, hubArrival, outward, pressE, RETURN_ARCH_BACK, W
 import { RAMP_WORLD, rng } from '../lookdevKit';
 import { inkWash } from '../inkWash';
 import { buildPressScenery, pressVisualH } from '../pressScenery';
+import { buildAshwaterScenery } from '../ashwaterScenery';
 import { bakeCells } from './bake';
 import { box, C, cyl, Kit } from './village';
 
@@ -155,7 +156,10 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
     addArch(w.spawn.x + o.x * RETURN_ARCH_BACK, w.spawn.z + o.z * RETURN_ARCH_BACK, o.x, o.z, 'russetvale', () => true);
   }
 
-  // Ashwater Reach's ground, water and puzzle are Cedar's (ashwater.ts); this module gives it the rain and sky
+  // Ashwater Reach's ground, water and puzzle are Cedar's (ashwater.ts); this module gives it the rain and sky, and
+  // ashwaterScenery.ts its tussocks, bank stones, willow clumps and overcast horizon (built after ashwater.ts, so it
+  // keeps off every collider registered there)
+  const ashScenery = buildAshwaterScenery(ctx);
 
   // ---- The Scribe's Press: snowfield under ink spires, standing page slabs
   const P = WORLDS.press.origin;
@@ -294,6 +298,7 @@ export function buildWorlds(ctx: OpeningCtx, opts: { hubOpen: (to: WorldId) => b
       }
       for (const a of arches) (a.glow.material as THREE.MeshBasicMaterial).opacity = a.open() ? 0.28 + 0.1 * Math.sin(time * 2 + a.x) : 0;
       pressScenery.backdrop.follow(camPos, current === 'press');
+      ashScenery.backdrop.follow(camPos, current === 'ashwater');
       const look = WORLDS[current].look;
       if (!look) {
         weather.update(time, camPos, 0, 0);

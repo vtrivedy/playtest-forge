@@ -10,7 +10,9 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { RAMP_WORLD, rng } from '../lookdevKit';
+import { rng } from '../lookdevKit';
+import { inkWash, washCourses } from '../inkWash';
+import { ashVisualH } from '../ashwaterScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
@@ -23,9 +25,9 @@ const C = {
 };
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
 
-/** an unpatched toon: the marsh keeps its own colour (the vale's sketch/paint field is not wired here) */
+/** the marsh keeps its own colour under a wet wash (DESIGN-sumiro-look.md): granulation, tide-lines, rain runs */
 const marsh = (color: THREE.ColorRepresentation, extra: THREE.MeshToonMaterialParameters = {}) =>
-  new THREE.MeshToonMaterial({ color, gradientMap: RAMP_WORLD, ...extra });
+  Object.assign(inkWash(color, { scale: 0.4, tide: 0.45, drip: 0.35, ink: 0x1e2422, shade: 0x46524f }), extra);
 
 export function buildAshwater(
   ctx: OpeningCtx,
@@ -56,7 +58,8 @@ export function buildAshwater(
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i) + ASH_ORIGIN.x;
     const z = pos.getZ(i) + ASH_ORIGIN.z;
-    const h = H(x, z);
+    // drawn ground: H wherever anything walks, falling away past the rim (ashwaterScenery.ashVisualH; visual only)
+    const h = ashVisualH(x, z);
     pos.setY(i, h);
     // moss on the hummocks, sedge in the hollows, black-brown mud wherever the ground dips toward water,
     // pale dug peat on the levees, slate-green on the weir and the rim
@@ -424,7 +427,7 @@ export function buildAshwater(
 
   // ---- the cistern: slate walls west, south and east of the Mill Pool (the weir is its north side); the south wall's
   // gate stands open over a dry or low pool and shuts as a flood rises
-  const wallMat = marsh(0x6c7880);
+  const wallMat = washCourses(marsh(0x6c7880), 0.42);
   const W = WATER.pool, T2 = CISTERN.wall / 2;
   const cWall = (x0: number, x1: number, z0: number, z1: number) => {
     const a = ash((x0 + x1) / 2, (z0 + z1) / 2);
