@@ -46,3 +46,10 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
 ## Baselines (Nov 6, this branch)
 - check:stuck 1.33 stuck-s / 90 s (budget 4) PASS on 490996f5 (and at slice 1); check:music clean (no audio edits).
 - Reed's fresh-boot acceptances: Ashwater pass (ef7491a1); entry tour + Press route pass (583fd7da + route lib).
+
+## Measured route time (scripted, knowledge-perfect — a floor, not a stranger's time)
+- Reed's fresh-boot acceptance `__routeTiming` (sim seconds in each world): Press 163.8 s (~2.7 min) on the new
+  route (accept-1, 583fd7da + route lib); Ashwater 171.6 s (~2.9 min) incl. the tarn and the gully (accept-3,
+  28e6f294). Not comparable 1:1 with the earlier ~1.5 / ~2.6 min (those were measured play, not this bot).
+- Still far under 10–15 min per world. Next: more Press places between the shelf and the ledge, and an Ashwater
+  order puzzle at Weir Heart (DESIGN-worlds: draining the pond first should flood the channel again — not built).
