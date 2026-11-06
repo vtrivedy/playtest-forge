@@ -11,8 +11,13 @@ import type { OpeningCtx } from './opening/scene';
 import { pressE, pressH, WORLDS } from './opening/worlds';
 import { inkWash } from './inkWash';
 import { paintedBackdrop } from './paperBackdrop';
+import { BRAZIERS, MEMBRANE_A } from './opening/pressLayout';
 
 const P = WORLDS.press.origin;
+/** page-stack clusters (local to the Press origin): off the brazier relays, the ridge gate, the spawn and the shelf */
+/** puzzle pieces a stack must keep its distance from (local) */
+const CLEAR: ReadonlyArray<readonly [number, number]> = [...BRAZIERS.map((b) => [b.lx, b.lz] as const), [MEMBRANE_A.lx, MEMBRANE_A.lz]];
+const STACK_SPOTS: ReadonlyArray<readonly [number, number]> = [[-31, 23], [27, 21], [-33, 3], [33, 5], [24, 37], [-26, 36]];
 const { smoothstep } = THREE.MathUtils;
 
 /**
@@ -48,9 +53,12 @@ export function spireGeometry(r: () => number, h: number, base: number, detail =
   const leanA = r() * Math.PI * 2;
   const lobes = 2 + Math.floor(r() * 3);
   const shoulder = 0.35 + r() * 0.3;
+  // [angle, how far up it starts (t), width] per run
+  const drips: number[] = [];
+  for (let k = 0; k < 5 + Math.floor(r() * 4); k++) drips.push(r() * Math.PI * 2, 0.35 + r() * 0.6, 0.12 + r() * 0.12);
   const c = new THREE.Color();
   const ink = new THREE.Color(0x121119);
-  const violet = new THREE.Color(0x4a4760);
+  const violet = new THREE.Color(0x56526e);
   const pale = new THREE.Color(0xa9a8b8);
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
@@ -61,15 +69,25 @@ export function spireGeometry(r: () => number, h: number, base: number, detail =
     // taper with a shoulder (a second, narrower spire growing out of the first) and ragged vertical ridges
     const taper = Math.pow(1 - t, 0.85) * (1 - 0.28 * THREE.MathUtils.smoothstep(t, shoulder - 0.05, shoulder + 0.05)) + 0.02;
     const ridge = 1 + 0.22 * Math.sin(a * lobes + seed + t * 3) + 0.1 * Math.sin(a * (lobes * 2 + 1) - seed * 2 + t * 7);
-    const lump = 1 + 0.12 * Math.sin(t * 19 + a * 2 + seed) * (1 - t);
-    const R = base * taper * ridge * lump * (rr > 0.01 ? 1 : 0);
+    // melting lumps: the mass reads as ink that has run and set in tiers, not a turned cone
+    const tier = Math.sin(t * (9 + lobes * 2) + seed + Math.sin(a * 2 + seed) * 1.4);
+    const lump = 1 + (0.16 * tier + 0.1 * Math.sin(a * 3 + t * 13 - seed) * Math.sin(t * 7 + a)) * (1 - t * 0.7);
+    // drip grooves: runs of ink down the face from where each one starts
+    let groove = 0;
+    for (let k = 0; k < drips.length; k += 3) {
+      const da = Math.atan2(Math.sin(a - drips[k]!), Math.cos(a - drips[k]!));
+      if (t < drips[k + 1]!) groove = Math.max(groove, Math.exp(-(da * da) / (drips[k + 2]! * drips[k + 2]!)) * THREE.MathUtils.smoothstep(t, 0, drips[k + 1]!));
+    }
+    const R = base * taper * ridge * lump * (1 + 0.14 * groove) * (rr > 0.01 ? 1 : 0);
     const bend = lean * h * t * t;
     pos.setXYZ(i, Math.cos(a) * R + Math.cos(leanA) * bend, t * h, Math.sin(a) * R + Math.sin(leanA) * bend);
-    // pigment: dense ink on the ridge crests and up high, wash in the hollows, a pale blown skirt at the foot
+    // pigment, mottled like the bible: ink on the crests, the runs and up high; violet wash pools in the hollows;
+    // pale blown snow at the foot and caught on the tier ledges
     const crest = 0.5 + 0.5 * Math.sin(a * lobes + seed + t * 3);
-    const n = 0.5 + 0.5 * Math.sin(a * 5.3 + t * 23 + seed * 3);
-    c.copy(violet).lerp(ink, Math.min(1, crest * 0.8 + t * 0.7 + n * 0.3));
-    c.lerp(pale, (1 - THREE.MathUtils.smoothstep(t, 0.02, 0.16)) * 0.8 + (n > 0.85 ? 0.25 : 0) * (1 - t));
+    const n = 0.5 + 0.5 * Math.sin(a * 5.3 + t * 23 + seed * 3) * Math.sin(a * 2.1 - t * 11 + seed);
+    c.copy(violet).lerp(ink, Math.min(1, crest * 0.6 + t * 0.5 + n * 0.5 + groove * 0.6));
+    const ledge = Math.max(0, tier) > 0.85 && n < 0.45 ? 0.55 : 0;
+    c.lerp(pale, Math.min(1, (1 - THREE.MathUtils.smoothstep(t, 0.02, 0.14)) * 0.85 + ledge * (1 - t)));
     col.set([c.r, c.g, c.b], i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -195,11 +213,11 @@ export function buildPressScenery(ctx: OpeningCtx) {
     const x = P.x + Math.cos(a) * rr;
     const z = P.z + Math.sin(a) * rr;
     const y = footY(x, z, 3);
-    const hMain = 14 + r() * 13;
+    const hMain = 19 + r() * 17;
     const count = 2 + Math.floor(r() * 3);
     for (let k = 0; k < count; k++) {
       const h = k === 0 ? hMain : hMain * (0.35 + r() * 0.45);
-      const base = (k === 0 ? 2.6 : 1.4) + r() * 1.2;
+      const base = (k === 0 ? 3.2 : 1.6) + r() * 1.5;
       const ox = k === 0 ? 0 : (r() - 0.5) * 7;
       const oz = k === 0 ? 0 : (r() - 0.5) * 7;
       const sg = spireGeometry(r, h, base).translate(x + ox, footY(x + ox, z + oz, base * 1.3) - 0.4, z + oz);
@@ -245,10 +263,7 @@ export function buildPressScenery(ctx: OpeningCtx) {
   for (let i = 0; i < DROPS; i++) {
     const F = forms[Math.floor(r() * forms.length)]!;
     const k = 0.4 + r();
-    v.set(F.x + (r() - 0.5) * 16, F.tip.y * (0.4 + r() * 0.8), F.z + (r() - 0.5) * 16);
-    // pull them a little inward (toward the play) so the camera finds them against the paper sky
-    v.x += (P.x - v.x) * 0.08;
-    v.z += (P.z - v.z) * 0.08;
+    v.set(F.x + (r() - 0.5) * 12, F.tip.y * (0.5 + r() * 0.7), F.z + (r() - 0.5) * 12);
     s.setScalar(k);
     m4.compose(v, q, s);
     drops.setMatrixAt(i, m4);
@@ -268,6 +283,103 @@ export function buildPressScenery(ctx: OpeningCtx) {
   }
   const far = new THREE.Mesh(mergeGeometries(farGeos), spireMat);
   root.add(far);
+  // ---- page stacks (shot 3): pressed pages stacked like quarry stone in clusters off the relay routes
+  const paperMat = inkWash(0xd9d1bf, { scale: 0.5, tide: 0.5, drip: 0.25 });
+  const edgeMat = inkWash(0x9a8f78, { scale: 0.5, tide: 0.5, drip: 0.25 });
+  const stackGeos: { paper: THREE.BufferGeometry[]; edge: THREE.BufferGeometry[]; snow: THREE.BufferGeometry[] } = { paper: [], edge: [], snow: [] };
+  const rs = rng(3307);
+  for (const [lx, lz] of STACK_SPOTS) {
+    const n = 2 + Math.floor(rs() * 3);
+    for (let k = 0; k < n; k++) {
+      const x = P.x + lx + (k === 0 ? 0 : (rs() - 0.5) * 5);
+      const z = P.z + lz + (k === 0 ? 0 : (rs() - 0.5) * 5);
+      if (pressE(x, z) > -5 || CLEAR.some(([cx, cz]) => Math.hypot(x - P.x - cx, z - P.z - cz) < 5)) continue;
+      const w = 1.6 + rs() * 0.9;
+      const d = 1.2 + rs() * 0.5;
+      const h = k === 0 ? 1.6 + rs() * 0.8 : 0.7 + rs() * 1.3;
+      const yaw = rs() * Math.PI;
+      const y = footY(x, z, Math.max(w, d) * 0.6) - 0.05;
+      const st = pageStackGeometry(rs, w, d, h);
+      const place = (g: THREE.BufferGeometry) => g.rotateY(yaw).translate(x, y, z);
+      stackGeos.paper.push(place(st.paper));
+      stackGeos.edge.push(place(st.edge));
+      stackGeos.snow.push(place(st.snow));
+      ctx.colliders.push({ kind: 'box', x, z, yaw, hx: w / 2, hz: d / 2, top: y + h });
+    }
+  }
+  for (const [geos, mat] of [[stackGeos.paper, paperMat], [stackGeos.edge, edgeMat], [stackGeos.snow, snowMat]] as const) {
+    if (!geos.length) continue;
+    const m = new THREE.Mesh(mergeGeometries(geos), mat);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    root.add(m);
+  }
+
   const backdrop = paintedBackdrop(scene, 'press');
   return { root, backdrop };
+}
+
+/**
+ * A bare winter tree drawn in ink: a crooked trunk that forks, limbs reaching out and up, snow caught on the top of
+ * each limb. One merged geometry for the wood (`wood`) and one for the snow (`snow`), local to the tree's foot.
+ */
+export function inkTreeGeometry(r: () => number, h: number): { wood: THREE.BufferGeometry; snow: THREE.BufferGeometry } {
+  const wood: THREE.BufferGeometry[] = [];
+  const snow: THREE.BufferGeometry[] = [];
+  const up = new THREE.Vector3(0, 1, 0);
+  const q = new THREE.Quaternion();
+  const limb = (from: THREE.Vector3, dir: THREE.Vector3, len: number, rad: number, depth: number) => {
+    const segs = 3;
+    let p = from.clone();
+    let d = dir.clone().normalize();
+    for (let s = 0; s < segs; s++) {
+      const l = len / segs;
+      const r0 = rad * (1 - s / segs * 0.6);
+      const r1 = rad * (1 - (s + 1) / segs * 0.6);
+      const g = new THREE.CylinderGeometry(r1, r0, l, 6, 1).translate(0, l / 2, 0);
+      g.applyQuaternion(q.setFromUnitVectors(up, d));
+      g.translate(p.x, p.y, p.z);
+      wood.push(g);
+      // snow lies along the upper side of near-level limbs
+      if (d.y < 0.75 && depth > 0) {
+        const sg = new THREE.SphereGeometry(1, 6, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(r0 * 1.5, r0 * 0.9, l * 0.45).translate(0, r0 * 0.6, l / 2);
+        const flat = new THREE.Vector3(d.x, 0, d.z).normalize();
+        sg.applyQuaternion(q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), flat.lengthSq() > 0 ? flat : new THREE.Vector3(0, 0, 1)));
+        sg.translate(p.x, p.y + l * d.y * 0.5, p.z);
+        snow.push(sg);
+      }
+      p = p.addScaledVector(d, l);
+      // crook: each segment bends a little, sometimes against the last
+      d = d.add(new THREE.Vector3((r() - 0.5) * 0.5, (r() - 0.3) * 0.25, (r() - 0.5) * 0.5)).normalize();
+    }
+    if (depth <= 0 || rad < 0.025) return;
+    const kids = depth > 1 ? 3 : 2 + Math.floor(r() * 2);
+    for (let k = 0; k < kids; k++) {
+      const a = r() * Math.PI * 2;
+      const out = new THREE.Vector3(Math.cos(a), 0.25 + r() * 0.7, Math.sin(a)).normalize().lerp(d, 0.3).normalize();
+      limb(p, out, len * (0.55 + r() * 0.2), rad * 0.62, depth - 1);
+    }
+  };
+  limb(new THREE.Vector3(0, -0.2, 0), new THREE.Vector3((r() - 0.5) * 0.15, 1, (r() - 0.5) * 0.15), h * 0.5, 0.17 + h * 0.025, 2);
+  return { wood: mergeGeometries(wood)!, snow: mergeGeometries(snow.length ? snow : [new THREE.BufferGeometry()])! };
+}
+
+/**
+ * Bundles of pressed pages stacked like quarry stone (shot 3): uneven slabs, alternate leaves of pale paper and
+ * edge-browned paper, a snow lid. Local to the stack's foot; `hx`/`hz`/`top` give its collider.
+ */
+export function pageStackGeometry(r: () => number, w: number, d: number, h: number): { paper: THREE.BufferGeometry; edge: THREE.BufferGeometry; snow: THREE.BufferGeometry } {
+  const paper: THREE.BufferGeometry[] = [];
+  const edge: THREE.BufferGeometry[] = [];
+  let y = 0;
+  let i = 0;
+  while (y < h) {
+    const t = 0.1 + r() * 0.22;
+    const g = new THREE.BoxGeometry(w * (0.92 + r() * 0.1), t, d * (0.92 + r() * 0.1)).translate((r() - 0.5) * 0.12, y + t / 2, (r() - 0.5) * 0.12);
+    g.rotateY((r() - 0.5) * 0.08);
+    (i++ % 3 === 1 ? edge : paper).push(g);
+    y += t;
+  }
+  const snow = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(w * 0.52, 0.22, d * 0.52).translate(0, y - 0.02, 0);
+  return { paper: mergeGeometries(paper)!, edge: mergeGeometries(edge.length ? edge : [new THREE.BoxGeometry(0.01, 0.01, 0.01)])!, snow };
 }

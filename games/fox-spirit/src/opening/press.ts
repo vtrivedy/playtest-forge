@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { rng } from '../lookdevKit';
 import { inkWash } from '../inkWash';
+import { inkTreeGeometry } from '../pressScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressE, pressH } from './worlds';
@@ -388,9 +389,11 @@ export function buildPress(
     const at = press(lx, lz);
     return pressE(at.x, at.z) < -4 - pad && pressH(at.x, at.z) < RIDGE_BASE + 0.8;
   };
-  const trunkMat = winter(0x1f2128);
-  const crownMat = winter(0xe9ecf2);
-  const crownTint = winter(0xc9cfe0);
+  // bare ink trees with snow on their limbs (pressScenery.inkTreeGeometry); shapes draw their own rng so the shared
+  // `rd` stream (and every later placement) keeps exactly the draws the old crowns used: 2 + 4 × 6
+  const trunkMat = winter(0x15161c);
+  const crownMat = winter(0xeef0f2);
+  const treeR = rng(7741);
   let trees = 0;
   // three placed in the arrival view first (the spawn faces south down the margin), then the scatter
   const PLACED: ReadonlyArray<readonly [number, number]> = [[9, 31], [13.5, 27.5], [-12, 35.5]];
@@ -403,16 +406,10 @@ export function buildPress(
     const h = 2.4 + rd() * 2.2;
     const tree = new THREE.Group();
     tree.position.set(at.x, y, at.z);
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.22, h, 6).translate(0, h / 2, 0), trunkMat);
-    trunk.rotation.z = (rd() - 0.5) * 0.12;
-    tree.add(trunk);
-    for (let k = 0; k < 4; k++) {
-      const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.55 + rd() * 0.45, 0), k % 2 ? crownTint : crownMat);
-      c.position.set((rd() - 0.5) * 1.1, h - 0.2 + (rd() - 0.3) * 0.8, (rd() - 0.5) * 1.1);
-      c.scale.y = 0.7;
-      c.rotation.set(rd() * 3, rd() * 3, 0);
-      tree.add(c);
-    }
+    tree.rotation.y = rd() * 6.3;
+    for (let k = 0; k < 24; k++) rd();
+    const shape = inkTreeGeometry(treeR, h * 1.7);
+    tree.add(new THREE.Mesh(shape.wood, trunkMat), new THREE.Mesh(shape.snow, crownMat));
     solids.add(tree);
     colliders.push({ kind: 'post', x: at.x, z: at.z, r: 0.28 });
     trees++;
