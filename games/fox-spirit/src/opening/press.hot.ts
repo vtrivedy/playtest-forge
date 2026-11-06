@@ -19,7 +19,7 @@ export type PressRig = {
   fox: THREE.Object3D;
   motion: () => { readonly grounded: boolean; readonly dashing: boolean } | null;
   hasInkstep: () => boolean;
-  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: (i: number) => void; thawSeal: () => void; crack: (which: 0 | 1 | 2) => void; meltIce: () => void; seam: () => void; stood: () => void; place: (which: 0) => void; complete: (level: 0 | 1 | 2) => void };
+  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: (i: number) => void; thawSeal: () => void; crack: (which: 0 | 1 | 2) => void; meltIce: () => void; seam: () => void; stood: () => void; place: (which: 0 | 1) => void; complete: (level: 0 | 1 | 2) => void };
   seal: THREE.Object3D;
   sealCol: Extract<Collider, { kind: 'box' }>;
   /** the fox's carried warmth (glow + light), scaled by `warm` */
@@ -57,7 +57,7 @@ export type PressRig = {
     /** per membrane: −1 frozen, ≥ 0 seconds since it cracked */ crackA: number; crackB: number; crackC: number;
     iceK: number; iced: number; done: number; dashWasAir: number; time: number; arrived: number;
     /** sim seconds since the pillar's brazier lit (−1 before): the seam runs, then the stacks stand */ seam: number; stood: number;
-    /** place lines already said (bit 0: the alcove) */ places: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
+    /** place lines already said (bit 0: the alcove, bit 1: the Archive floor) */ places: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
     /** 0 bowed over the shut Press → 1 lever lifted, the Scribe turned to the fox */ leverK: number;
   };
 };
@@ -171,6 +171,11 @@ export function updatePress(rig: PressRig, dt: number): void {
     rig.events.crack(1);
   }
   // places say their line once, when the fox first stands in them (a place and a feeling, never an action)
+  // the Archive floor, well past the gate (after the Inkstep line has been read), before the shelf face
+  if ((s.places & 2) === 0 && grounded && (s.done & 1) !== 0 && lz < RIDGE.lz - 9 && lz > SHELF.z1 + 1.5 && Math.abs(lx) < 30) {
+    s.places |= 2;
+    rig.events.place(1);
+  }
   // (the alcove's chimney holds the fox aloft: inside it at any height below the shelf top counts)
   if ((s.places & 1) === 0 && s.crackC >= 0 && lx > ALCOVE.x0 && lx < ALCOVE.x1 && lz > ALCOVE.z0 && lz < SHELF.z1 && f.y < SHELF_TOP - 0.3) {
     s.places |= 1;

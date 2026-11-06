@@ -53,3 +53,9 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
   28e6f294). Not comparable 1:1 with the earlier ~1.5 / ~2.6 min (those were measured play, not this bot).
 - Still far under 10–15 min per world. Next: more Press places between the shelf and the ledge, and an Ashwater
   order puzzle at Weir Heart (DESIGN-worlds: draining the pond first should flood the channel again — not built).
+
+## After main absorbed slices 1–5 (merged origin/main 00469c63, fast-forward)
+- Mist bug class closed: `MIST_CLEAR` in ashwaterLayout drives the mist shader and `mistAt()`; ashwater-terrain (in
+  lint:feel) fails if any reachable ground below −0.5 is left under mist (negative control: drop the gully capsule).
+- Press Archive floor place line: "Pages the Scribe let fall, white under the snow." (the walk from gate to shelf
+  face was a bare beat).

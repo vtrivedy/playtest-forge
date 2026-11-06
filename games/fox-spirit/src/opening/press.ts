@@ -588,7 +588,7 @@ export function buildPress(
         ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.12, rate: 0.7 });
         if (i !== HIGH_BRAZIER) say('A cold brazier takes the flame.');
       },
-      place: () => say('Old drafts, kept where the winter could not reach.'),
+      place: (which) => say(which === 0 ? 'Old drafts, kept where the winter could not reach.' : 'Pages the Scribe let fall, white under the snow.'),
       seam: () => {
         ctx.audio.cue('millrace-burst');
         say('The pressed stair remembers its height.');
@@ -664,13 +664,14 @@ export function buildPress(
     rig.s.thawed = 1;
     rig.s.sealK = 1;
     rig.s.done |= 1;
+    rig.s.places |= 2;
     seal.visible = false;
     sealCol.top = seal.userData.base;
   }
   if (opts.restored('develop')) {
     rig.s.crackA = 5;
     rig.s.crackC = 5;
-    rig.s.places |= 1;
+    rig.s.places |= 3;
     faceCol.top = SILL_TOP;
     rig.s.done |= 2;
   }
