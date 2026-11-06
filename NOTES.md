@@ -59,3 +59,6 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
   lint:feel) fails if any reachable ground below −0.5 is left under mist (negative control: drop the gully capsule).
 - Press Archive floor place line: "Pages the Scribe let fall, white under the snow." (the walk from gate to shelf
   face was a bare beat).
+- Merged tip (look stream's Press cauldrons/webs and Ashwater sluice frame/punt + my slices): full ashwater-probe pass
+  (3/3, tarn, gully, soak, both secrets, 0 errors) and full press-probe pass (3/3, Maple fill 1, 0 errors).
+  Evidence: `docs/reviews/sumiro-play/merged-tip/`.
