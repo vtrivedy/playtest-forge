@@ -54,6 +54,15 @@ export const WARM_S = 6;
 export const SHELF = { z0: -30, z1: -6, xMax: 60, rise: 4.4 };
 export const SHELF_TOP = groundTop(-SHELF.xMax, SHELF.xMax, SHELF.z0, SHELF.z1) + SHELF.rise;
 export const MEMBRANE_A = { lx: 0, lz: -3.6, r: 1.25 };
+/** the Folded Archive's second membrane hangs across an alcove cut into the shelf's face (DESIGN-sumiro-play.md §2):
+ *  its sill is above any jump from the floor, and the floor membrane's draft crests just above the sill — so the only
+ *  way through is an Inkstep in the air ("in the air, the Ink Step carries you on"). Behind it a chimney breathes. */
+export const ALCOVE = { x0: -1.3, x1: 1.3, z0: -8.6, sillBelowTop: 2.2 };
+export const SILL_TOP = SHELF_TOP - ALCOVE.sillBelowTop;
+/** the face membrane: a vertical sheet of frozen ink across the alcove's mouth (a wall until it tears) */
+export const MEMBRANE_C = { lx: 0, lz: SHELF.z1, half: 0.2 };
+/** the chimney draft inside the alcove: crests over the shelf top */
+export const CHIMNEY = { lx: 0, lz: -7.3, height: ALCOVE.sillBelowTop + 1.3 };
 
 /** level 3 (combine): the Wellspring ledge on the shelf; its membrane is iced over until warmth melts it */
 export const LEDGE = { x0: -7, x1: 7, z0: -30, z1: -21, rise: 4.6 };

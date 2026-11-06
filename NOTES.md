@@ -17,3 +17,11 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
 ## For the look stream (do not edit from PLAY)
 - The pillar, seam and stair are built from the existing Press paper/ink materials in `press.ts`; a lookdev pass on
   the stacks' "pages swelling apart" and the seam's wet-ink run would help. No scenery files were touched.
+
+## Slice 2 — the Folded Archive, deepened (Press, develop)
+- The floor membrane's draft is now short (crest +5.3 abs vs shelf 6.6): it tops out at an alcove cut in the shelf
+  face, sealed by a hanging sheet of frozen ink. An air-dash from the crest tears it (Inkstep in the air); the chimney
+  behind it rises over the shelf. Floor membranes crack to any dash; the air rule is physical (height).
+- Proof: fresh `tools/press-probe.mjs` run — floor draft alone peaks under the shelf; crest Inkstep tears the face;
+  chimney peak 8.0; then the whole combine; Maple fill 1; reload restores; 0 errors. TLA 54 states, no error.
+- Evidence: `docs/reviews/sumiro-play/{folded-archive,unpressed-stair}/`.

@@ -92,6 +92,34 @@ const breakAndRide = (dir, center, glideTo, holdS) => page.evaluate(({ dir, cent
   s = h.advance(20, 1 / 60, false);
   return { ...s, peak };
 }, { dir, center, glideTo, holdS });
+/** step into the draft at `center`, jump and hold glide to the crest, then air-dash south holding glide */
+const inkstepFromCrest = (center) => page.evaluate((center) => {
+  const h = window.__gameHooks;
+  let s = h.advance(1, 1 / 60, false);
+  for (let f = 0; f < 240; f++) {
+    const dx = center[0] - s.pos[0], dz = center[1] - s.pos[2], d = Math.hypot(dx, dz);
+    if (d < 0.25) break;
+    h.setStick(dx / d * 0.5, dz / d * 0.5);
+    s = h.advance(1, 1 / 60, false);
+  }
+  h.setStick(null);
+  s = h.advance(20, 1 / 60, false);
+  h.setKeys(['Space']);
+  let best = s.pos[1];
+  let still = 0;
+  for (let f = 0; f < 240 && still < 8; f++) {
+    s = h.advance(1, 1 / 60, false);
+    if (s.pos[1] > best + 0.005) { best = s.pos[1]; still = 0; } else if (f > 20) still++;
+  }
+  h.setStick(0, -1);
+  h.setKeys(['Space', 'ShiftLeft']);
+  s = h.advance(4, 1 / 60, false);
+  h.setKeys(['Space']);
+  s = h.advance(50, 1 / 60, false);
+  h.setStick(null);
+  h.setKeys([]);
+  return h.advance(40, 1 / 60, false);
+}, center);
 /** a running hop onto world [x, z]: steer there holding Space for the first 14 frames, until landed within 0.4 m */
 const hop = (to) => page.evaluate((to) => {
   const h = window.__gameHooks;
@@ -140,8 +168,19 @@ await shot('03-through-gate');
 await walk(L(0, -0.2), { r: 0.3 });
 await walk(L(0, -1.0), { r: 0.2, mag: 0.3, max: 2 });
 await shot('04-before-membrane');
-s = await breakAndRide([0, -1], L(0, -3.6), [...L(0, -9), 7.6], 8);
-console.log('ride1 peak', s.peak);
+// the Folded Archive: crack the floor membrane (dash across it), ride its short draft to the crest — it tops out
+// under the shelf — and air-dash into the frozen sheet hung across the alcove (Inkstep, in the air)
+s = await breakAndRide([0, -1], L(0, -3.6), [...L(0, -3.6), 99], 3.2);
+evidence.floorDraftOnly = { peak: +s.peak.toFixed(2), shelfTop: s.opening.press.shelfTop, sillTop: s.opening.press.sillTop };
+console.log('floor draft alone', JSON.stringify(evidence.floorDraftOnly));
+await shot('04b-floor-draft-under-shelf');
+s = await inkstepFromCrest(L(0, -3.6));
+console.log('crest inkstep', JSON.stringify({ pos: s.pos.map((v) => +v.toFixed(2)), faceTorn: s.opening.press.faceTorn }));
+await shot('04c-face-torn');
+if (s.pos[1] < s.opening.press.sillTop - 0.3) s = await breakAndRide(null, L(0, -3.6), [...L(0, -7.3), s.opening.press.sillTop + 0.7], 6);
+console.log('in alcove', s.pos.map((v) => +v.toFixed(2)));
+s = await breakAndRide(null, L(0, -7.3), [...L(0, -10.5), s.opening.press.shelfTop + 0.9], 8);
+console.log('chimney ride peak', s.peak);
 s = await shot('05-on-shelf');
 }
 const shelfY = s.pos[1];

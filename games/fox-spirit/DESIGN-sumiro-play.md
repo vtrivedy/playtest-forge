@@ -45,3 +45,21 @@ Removed: all five `HINT_*` control captions in the Press; the ability notice no 
 `tools/press-probe.mjs` drives stick/Space/Shift through the whole Press after one staged travel; it is updated to
 the new combine (relay → melt → crack → re-warm → ride draft with warmth → kindle the pillar → climb the stair).
 `tla/Press.tla` gains the pillar, the kindle and the stair; TLC checks TypeOK, Caused, Monotone, Finishes.
+
+## §2 The Folded Archive, deepened (develop) — "in the air, the Ink Step carries you on"
+What was thin: one floor membrane; crack it, ride a 7.5 m draft straight onto the shelf. The Inkstep was a ground
+trick. Sumiro's Ink Step is a verb of the air; the bible still hangs ink membranes up between the spires.
+
+Shots:
+1. *Under the shelf face.* The Archive shelf is a wall of pages. In its face, an alcove, its mouth sealed by a
+   hanging sheet of frozen ink — above any jump.
+2. *The floor membrane* in front of it. A dash across it (Inkstep earned) cracks a draft — but a short one: it
+   crests just over the alcove's sill and well under the shelf top. Riding it alone gets you nowhere.
+3. *The insight.* At the crest, dash: the Inkstep carries you on through the hanging sheet; it shrinks up into the
+   lintel and the alcove opens.
+4. *The chimney.* Inside the alcove a second draft breathes up through the shelf; ride it out onto the top.
+
+Rules: the face membrane is a wall (collider top = shelf top) until it tears (top drops to the sill); it tears only
+to an air-dash at its height (feet within [sill − 0.7, shelf top]). Floor membranes now crack to any dash (the
+air-only rule lives where height makes it physical). Draft A's height is derived: crest ≈ sill + 0.95, shelf − 1.25.
+Restore: a saved develop tears the face and lowers its wall at boot.

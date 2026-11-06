@@ -13,7 +13,7 @@ import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressE, pressH } from './worlds';
-import { BRAZIER_REACH, BRAZIERS, DRAFT, HIGH_BRAZIER, DRAFT_B_HEIGHT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PILLAR, PILLAR_TOP, press, RIDGE, RIDGE_BASE, SEAM, SHELF, SHELF_TOP, STAIR, stairStep, THE_PRESS } from './pressLayout';
+import { ALCOVE, BRAZIER_REACH, BRAZIERS, CHIMNEY, DRAFT, HIGH_BRAZIER, DRAFT_B_HEIGHT, MEMBRANE_C, SILL_TOP, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PILLAR, PILLAR_TOP, press, RIDGE, RIDGE_BASE, SEAM, SHELF, SHELF_TOP, STAIR, stairStep, THE_PRESS } from './pressLayout';
 import { pressLift, updatePress, type PressRig } from './press.hot';
 
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
@@ -123,9 +123,22 @@ export function buildPress(
     const y0 = shelfBase + ((SHELF_TOP - shelfBase) * i) / layers;
     const y1 = shelfBase + ((SHELF_TOP - shelfBase) * (i + 1)) / layers;
     const lip = (i % 2) * 0.35;
-    box(-SHELF.xMax, SHELF.xMax, SHELF.z0, SHELF.z1 + lip, y0, y1 - 0.04, i % 2 ? paperEdge : paperMat);
+    const mat = i % 2 ? paperEdge : paperMat;
+    // the alcove is cut out of every layer above its sill (left, right, and the back behind it)
+    if (y1 <= SILL_TOP + 0.01) box(-SHELF.xMax, SHELF.xMax, SHELF.z0, SHELF.z1 + lip, y0, y1 - 0.04, mat);
+    else {
+      box(-SHELF.xMax, ALCOVE.x0, SHELF.z0, SHELF.z1 + lip, y0, y1 - 0.04, mat);
+      box(ALCOVE.x1, SHELF.xMax, SHELF.z0, SHELF.z1 + lip, y0, y1 - 0.04, mat);
+      box(ALCOVE.x0, ALCOVE.x1, SHELF.z0, ALCOVE.z0, y0, y1 - 0.04, mat);
+      if (y0 < SILL_TOP) box(ALCOVE.x0, ALCOVE.x1, ALCOVE.z0, SHELF.z1 + lip, y0, SILL_TOP, mat);
+    }
   }
-  solid(-SHELF.xMax, SHELF.xMax, SHELF.z0, SHELF.z1, SHELF_TOP);
+  solid(-SHELF.xMax, ALCOVE.x0, SHELF.z0, SHELF.z1, SHELF_TOP);
+  solid(ALCOVE.x1, SHELF.xMax, SHELF.z0, SHELF.z1, SHELF_TOP);
+  solid(ALCOVE.x0, ALCOVE.x1, SHELF.z0, ALCOVE.z0, SHELF_TOP);
+  solid(ALCOVE.x0, ALCOVE.x1, ALCOVE.z0, SHELF.z1, SILL_TOP);
+  // the face membrane's wall across the alcove mouth: shelf-high until it tears, then down to the sill
+  const faceCol = solid(ALCOVE.x0, ALCOVE.x1, MEMBRANE_C.lz - MEMBRANE_C.half, MEMBRANE_C.lz + MEMBRANE_C.half, SHELF_TOP);
   // ---- level 3: the Wellspring ledge on the shelf, and the Press on it
   for (let i = 0; i < 4; i++) {
     const y0 = SHELF_TOP + (LEDGE.rise * i) / 4;
@@ -315,7 +328,17 @@ export function buildPress(
     return g;
   };
   const ma = press(MEMBRANE_A.lx, MEMBRANE_A.lz);
-  const membranes = [membrane(MEMBRANE_A.lx, MEMBRANE_A.lz, pressH(ma.x, ma.z), MEMBRANE_A.r), membrane(MEMBRANE_B.lx, MEMBRANE_B.lz, SHELF_TOP, MEMBRANE_B.r)];
+  // the face membrane: a sheet of frozen ink across the alcove's mouth, hung from the lintel (scales up into it)
+  const faceAt = press(MEMBRANE_C.lx, MEMBRANE_C.lz + 0.05);
+  const faceSheet = new THREE.Group();
+  faceSheet.position.set(faceAt.x, SHELF_TOP, faceAt.z);
+  const faceH = SHELF_TOP - SILL_TOP;
+  const faceW = ALCOVE.x1 - ALCOVE.x0;
+  faceSheet.add(new THREE.Mesh(new THREE.PlaneGeometry(faceW, faceH).translate(0, -faceH / 2, 0), new THREE.MeshStandardMaterial({ color: 0x14161f, roughness: 0.05, metalness: 0.3, emissive: 0x2a2a66, emissiveIntensity: 0.6, side: THREE.DoubleSide })));
+  const faceRim = new THREE.Mesh(new THREE.PlaneGeometry(faceW + 0.24, faceH + 0.12).translate(0, -faceH / 2, -0.02), rimMat);
+  faceSheet.add(faceRim);
+  root.add(faceSheet);
+  const membranes = [membrane(MEMBRANE_A.lx, MEMBRANE_A.lz, pressH(ma.x, ma.z), MEMBRANE_A.r), membrane(MEMBRANE_B.lx, MEMBRANE_B.lz, SHELF_TOP, MEMBRANE_B.r), faceSheet];
   const iceMat = new THREE.MeshStandardMaterial({ color: 0xdfe9f5, roughness: 0.2, transparent: true, opacity: 0.85, emissive: 0x8aa0c8, emissiveIntensity: 0.25 });
   const ice = new THREE.Mesh(new THREE.IcosahedronGeometry(MEMBRANE_B.r * 1.05, 1), iceMat);
   ice.scale.y = 0.28;
@@ -326,10 +349,14 @@ export function buildPress(
   // ink-violet over the snow (additive light vanishes against white)
   const draftMat = new THREE.MeshBasicMaterial({ color: 0x6a6cc0, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide });
   const draftCore = new THREE.MeshBasicMaterial({ color: 0x8f92e0, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide });
-  const drafts = membranes.map((mem, m) => {
+  // A's draft crests just over the alcove's sill (never the shelf); B's reaches the pillar; C, the chimney, the shelf
+  const chimneyAt = press(CHIMNEY.lx, CHIMNEY.lz);
+  const draftBase = [membranes[0]!.position, membranes[1]!.position, new THREE.Vector3(chimneyAt.x, SILL_TOP, chimneyAt.z)];
+  const draftH = new Float32Array([SILL_TOP + 0.75 - membranes[0]!.position.y, DRAFT_B_HEIGHT, CHIMNEY.height]);
+  const drafts = draftBase.map((base, m) => {
     const g = new THREE.Group();
-    g.position.copy(mem.position);
-    const height = m === 0 ? DRAFT.height : DRAFT_B_HEIGHT;
+    g.position.copy(base);
+    const height = draftH[m]!;
     const outer = new THREE.Mesh(new THREE.CylinderGeometry(DRAFT.radius * 0.9, DRAFT.radius * 0.7, height, 20, 1, true).translate(0, height / 2, 0), draftMat);
     const inner = new THREE.Mesh(new THREE.CylinderGeometry(DRAFT.radius * 0.35, DRAFT.radius * 0.45, height * 0.9, 12, 1, true).translate(0, height * 0.45, 0), draftCore);
     g.add(outer, inner);
@@ -358,7 +385,7 @@ export function buildPress(
   const sc = new THREE.Vector3();
   const caps: [number, number, number, number, number][] = [];
   for (const side of [-1, 1]) caps.push([side < 0 ? -RIDGE.xMax : RIDGE.gate + 0.35, side < 0 ? -RIDGE.gate - 0.35 : RIDGE.xMax, RIDGE.lz, ridgeTop, RIDGE.half + 0.12]);
-  caps.push([-SHELF.xMax, SHELF.xMax, SHELF.z1, SHELF_TOP, 0.5]);
+  caps.push([-SHELF.xMax, ALCOVE.x0 - 0.3, SHELF.z1, SHELF_TOP, 0.5], [ALCOVE.x1 + 0.3, SHELF.xMax, SHELF.z1, SHELF_TOP, 0.5]);
   caps.push([LEDGE.x0, LEDGE.x1, LEDGE.z1, LEDGE_TOP, 0.45]);
   for (const [x0, x1, lz, top, d] of caps) {
     const c = press((x0 + x1) / 2, lz);
@@ -375,7 +402,9 @@ export function buildPress(
     const onLedge = i > EDGES * 0.85;
     const x0 = onLedge ? LEDGE.x0 : -SHELF.xMax + 2;
     const x1 = onLedge ? LEDGE.x1 : SHELF.xMax - 2;
-    const lx = x0 + rd() * (x1 - x0);
+    let lx = x0 + rd() * (x1 - x0);
+    // keep the alcove's mouth clear of strips (they would hang across the opening)
+    if (!onLedge && Math.abs(lx) < ALCOVE.x1 + 4.2) lx = Math.sign(lx || 1) * (ALCOVE.x1 + 4.2 + Math.abs(lx));
     const y = onLedge ? SHELF_TOP + 0.1 + rd() * (LEDGE.rise - 0.2) : RIDGE_BASE - 0.4 + rd() * (SHELF_TOP - RIDGE_BASE + 0.2);
     const at = press(lx, (onLedge ? LEDGE.z1 : SHELF.z1) + 0.02 + (onLedge ? 0.3 : 0.35) * rd());
     sc.set(1.5 + rd() * 6, 1, 1);
@@ -602,6 +631,8 @@ export function buildPress(
     stackTop,
     coals: coalsOf,
     membranes,
+    faceCol,
+    draftH,
     ice,
     drafts,
     lever,
@@ -610,7 +641,7 @@ export function buildPress(
     scribeHead: head,
     scribeArm: armR,
     leafMat,
-    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, arrived: 0, seam: -1, stood: 0, coda: -1, leverK: 0 },
+    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, crackC: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, arrived: 0, seam: -1, stood: 0, coda: -1, leverK: 0 },
   };
   // a saved world comes back as it was left, quietly: open seal, breathing drafts, melted ice, lit Press
   if (opts.restored('teach')) {
@@ -623,6 +654,8 @@ export function buildPress(
   }
   if (opts.restored('develop')) {
     rig.s.crackA = 5;
+    rig.s.crackC = 5;
+    faceCol.top = SILL_TOP;
     rig.s.done |= 2;
   }
   if (opts.restored('combine')) {
@@ -646,7 +679,8 @@ export function buildPress(
     liftAt: (x: number, feetY: number, z: number, out: { k: number; radialK: number; ax: number; az: number }) => pressLift(rig, x, feetY, z, out),
     state: () => ({
       lit: BRAZIERS.map((_, i) => (rig.s.lit & (1 << i)) !== 0),
-      warm: +rig.s.warm.toFixed(2), sealOpen: rig.s.sealK >= 1, draftA: rig.s.crackA >= 0, iced: rig.s.iced === 1, draftB: rig.s.crackB >= 0,
+      warm: +rig.s.warm.toFixed(2), sealOpen: rig.s.sealK >= 1, draftA: rig.s.crackA >= 0, faceTorn: rig.s.crackC >= 0, iced: rig.s.iced === 1, draftB: rig.s.crackB >= 0,
+      shelfTop: +SHELF_TOP.toFixed(2), sillTop: +SILL_TOP.toFixed(2),
       seam: rig.s.seam >= 0, stair: rig.s.stood === 1, stairTop: +rig.stackCols[STAIR.n - 1]!.top.toFixed(2),
       done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0),
     }),

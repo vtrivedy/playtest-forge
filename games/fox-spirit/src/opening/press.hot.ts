@@ -2,8 +2,9 @@
  * The Scribe's Press per-frame step (press.ts builds it; DESIGN-worlds.md, tla/Press.tla). No allocation, real dt,
  * no Math.random. Gates are physical:
  *   teach    — warmth carried from a brazier melts the ridge's frozen seal; crossing the gate earns Inkstep
- *   develop  — with Inkstep, an air-dash over the frozen membrane cracks it into a glide draft (it never closes);
- *              standing on the Archive shelf completes the level
+ *   develop  — with Inkstep, a dash across the frozen floor membrane cracks it into a short draft (it never closes);
+ *              at its crest an air-dash tears the membrane hung across the shelf face's alcove, and the chimney
+ *              behind it breathes up over the shelf; standing on the Archive shelf completes the level
  *   combine  — the shelf's membrane is iced: carried warmth melts the ice, then an air-dash cracks it into a short
  *              draft; warmth carried UP that draft kindles the pillar's brazier, the seam thaws and the pressed stair
  *              stands; standing on the Wellspring ledge completes the world
@@ -12,13 +13,13 @@
  */
 import type * as THREE from 'three';
 import type { Collider } from '../lookdevPlay';
-import { BRAZIER_REACH, BRAZIERS, BREAK, DRAFT, DRAFT_B_HEIGHT, HIGH_BRAZIER, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PRESS_ORIGIN, RIDGE, SEAM_S, SHELF, SHELF_TOP, STACK, STAIR, WARM_S } from './pressLayout';
+import { ALCOVE, BRAZIER_REACH, BRAZIERS, BREAK, DRAFT, HIGH_BRAZIER, MEMBRANE_C, SILL_TOP, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PRESS_ORIGIN, RIDGE, SEAM_S, SHELF, SHELF_TOP, STACK, STAIR, WARM_S } from './pressLayout';
 
 export type PressRig = {
   fox: THREE.Object3D;
   motion: () => { readonly grounded: boolean; readonly dashing: boolean } | null;
   hasInkstep: () => boolean;
-  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: (i: number) => void; thawSeal: () => void; crack: (which: 0 | 1) => void; meltIce: () => void; seam: () => void; stood: () => void; complete: (level: 0 | 1 | 2) => void };
+  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: (i: number) => void; thawSeal: () => void; crack: (which: 0 | 1 | 2) => void; meltIce: () => void; seam: () => void; stood: () => void; complete: (level: 0 | 1 | 2) => void };
   seal: THREE.Object3D;
   sealCol: Extract<Collider, { kind: 'box' }>;
   /** the fox's carried warmth (glow + light), scaled by `warm` */
@@ -35,7 +36,12 @@ export type PressRig = {
   /** each stack's full top and base */
   stackTop: Float32Array;
   coals: THREE.MeshStandardMaterial[];
+  /** floor membrane A, the shelf's iced membrane B, the face membrane C (vertical, torn rather than cracked) */
   membranes: THREE.Object3D[];
+  /** the face membrane's wall (its top drops to the sill once torn) */
+  faceCol: Extract<Collider, { kind: 'box' }>;
+  /** each draft's column height above its group's position (A short, B short, C the chimney) */
+  draftH: Float32Array;
   ice: THREE.Object3D;
   drafts: THREE.Object3D[];
   lever: THREE.Object3D;
@@ -48,7 +54,7 @@ export type PressRig = {
   s: {
     /** lit braziers (bit i = BRAZIERS[i]) */ lit: number; wasWarm: number;
     /** carried warmth 0..1 */ warm: number; sealK: number; thawed: number;
-    /** per membrane: −1 frozen, ≥ 0 seconds since it cracked */ crackA: number; crackB: number;
+    /** per membrane: −1 frozen, ≥ 0 seconds since it cracked */ crackA: number; crackB: number; crackC: number;
     iceK: number; iced: number; done: number; dashWasAir: number; time: number; arrived: number;
     /** sim seconds since the pillar's brazier lit (−1 before): the seam runs, then the stacks stand */ seam: number; stood: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
     /** 0 bowed over the shut Press → 1 lever lifted, the Scribe turned to the fox */ leverK: number;
@@ -132,9 +138,15 @@ export function updatePress(rig: PressRig, dt: number): void {
   }
 
   // develop: an air-dash over the frozen membrane (Inkstep earned) cracks the draft
-  if (s.crackA < 0 && airDash && rig.hasInkstep() && Math.hypot(lx - MEMBRANE_A.lx, lz - MEMBRANE_A.lz) < BREAK.reach && f.y - rig.membranes[0]!.position.y < BREAK.above) {
+  if (s.crackA < 0 && dashing && rig.hasInkstep() && Math.hypot(lx - MEMBRANE_A.lx, lz - MEMBRANE_A.lz) < BREAK.reach && f.y - rig.membranes[0]!.position.y < BREAK.above) {
     s.crackA = 0;
     rig.events.crack(0);
+  }
+  // the face membrane tears to an air-dash at its height (only the floor draft's crest gets there)
+  if (s.crackC < 0 && airDash && rig.hasInkstep() && lx > ALCOVE.x0 - 0.4 && lx < ALCOVE.x1 + 0.4 && lz < MEMBRANE_C.lz + 2.6 && lz > ALCOVE.z0 && f.y > SILL_TOP - 0.7 && f.y < SHELF_TOP) {
+    s.crackC = 0;
+    rig.faceCol.top = SILL_TOP;
+    rig.events.crack(2);
   }
   if ((s.done & 2) === 0 && (s.done & 1) !== 0 && grounded && lz < SHELF.z1 && lz > SHELF.z0 && f.y > SHELF_TOP - 0.3) {
     s.done |= 2;
@@ -153,7 +165,7 @@ export function updatePress(rig: PressRig, dt: number): void {
     rig.ice.scale.setScalar(Math.max(0.01, 1 - smooth(s.iceK)));
     rig.ice.visible = s.iceK < 0.99;
   }
-  if (s.crackB < 0 && s.iced === 0 && airDash && Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) < BREAK.reach && f.y - rig.membranes[1]!.position.y < BREAK.above) {
+  if (s.crackB < 0 && s.iced === 0 && dashing && Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) < BREAK.reach && f.y - rig.membranes[1]!.position.y < BREAK.above) {
     s.crackB = 0;
     rig.events.crack(1);
   }
@@ -207,11 +219,17 @@ export function updatePress(rig: PressRig, dt: number): void {
   // drafts: rise in after the crack, then breathe
   if (s.crackA >= 0) s.crackA += dt;
   if (s.crackB >= 0) s.crackB += dt;
+  if (s.crackC >= 0) s.crackC += dt;
   draftLook(rig.drafts[0]!, rig.membranes[0]!, s.crackA, s.time);
   draftLook(rig.drafts[1]!, rig.membranes[1]!, s.crackB, s.time + 1.7);
+  draftLook(rig.drafts[2]!, null, s.crackC, s.time + 0.8);
+  // the torn face membrane: the sheet shrinks up into the lintel and is gone
+  const tear = s.crackC < 0 ? 0 : smooth(s.crackC / 0.5);
+  rig.membranes[2]!.scale.y = Math.max(0.01, 1 - tear);
+  rig.membranes[2]!.visible = tear < 0.99;
 }
 
-function draftLook(draft: THREE.Object3D, membrane: THREE.Object3D, t: number, time: number): void {
+function draftLook(draft: THREE.Object3D, membrane: THREE.Object3D | null, t: number, time: number): void {
   if (t < 0) {
     draft.visible = false;
     return;
@@ -220,18 +238,18 @@ function draftLook(draft: THREE.Object3D, membrane: THREE.Object3D, t: number, t
   draft.visible = true;
   draft.scale.set(k, 0.2 + 0.8 * k, k);
   draft.rotation.y = time * 0.6;
-  membrane.scale.setScalar(1 + 0.25 * k);
+  if (membrane) membrane.scale.setScalar(1 + 0.25 * k);
 }
 
 /** the drafts' lift for the controller (k as the hearth columns report it): full inside 0.6·radius */
 export function pressLift(rig: PressRig, x: number, feetY: number, z: number, out: { k: number; radialK: number; ax: number; az: number }): void {
   const s = rig.s;
-  for (let i = 0; i < 2; i++) {
-    const t = i === 0 ? s.crackA : s.crackB;
+  for (let i = 0; i < 3; i++) {
+    const t = i === 0 ? s.crackA : i === 1 ? s.crackB : s.crackC;
     if (t < 0.3) continue;
-    const mem = rig.membranes[i]!.position;
+    const mem = rig.drafts[i]!.position;
     const dy = feetY - mem.y;
-    const height = i === 0 ? DRAFT.height : DRAFT_B_HEIGHT;
+    const height = rig.draftH[i]!;
     if (dy < -0.6 || dy > height) continue;
     const d = Math.hypot(x - mem.x, z - mem.z);
     const radialK = 1 - smooth((d - DRAFT.radius * 0.6) / (DRAFT.radius * 0.4 + 0.5));
