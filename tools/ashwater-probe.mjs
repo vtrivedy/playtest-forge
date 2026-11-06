@@ -98,7 +98,28 @@ try {
   await go(-6.5, -35.4);
   await shot('01-dam');
   await go(-12.5, -35.2, { dash: true, dashAt: 2, max: 90, reach: 0.6 });
-  await settle(240);
+  // water runs downhill: the channel leaves through the sluice gully into the soak (DESIGN-sumiro-play.md §3)
+  await settle(40);
+  log.push(['gully-runs', await state()]);
+  // disclosed staged lens (inspection only; the route keeps the chase cam): from the bank above the gully's head,
+  // down the gully to the soak while it runs
+  await page.evaluate(([x, z]) => {
+    const { camera } = window.__opening;
+    window.__ashSavedCamera = { pos: camera.position.clone(), quat: camera.quaternion.clone() };
+    camera.position.set(x - 6.2, 3.2, z - 35.4);
+    camera.lookAt(x - 16.5, -1.6, z - 44.5);
+    window.__gameHooks.advance(0, 1 / 60, true);
+  }, [O.x, O.z]);
+  await page.screenshot({ path: path.join(out, '01b-gully-runs-staged-lens.png') });
+  if (args.includes('--until-gully')) { await browser.close(); await server.close(); process.exit(0); }
+  await page.evaluate(() => {
+    const { camera } = window.__opening;
+    camera.position.copy(window.__ashSavedCamera.pos);
+    camera.quaternion.copy(window.__ashSavedCamera.quat);
+    window.__gameHooks.advance(0, 1 / 60, true);
+  });
+  await settle(130);
+  log.push(['soak-filled', await state()]);
   await shot('02-drained');
   // side place: the drowned roof in the drained channel's west reach
   for (const [x, z] of [[-14, -29], [-30, -28.6], [-43.5, -28.0]]) await go(x, z, { max: 900 });

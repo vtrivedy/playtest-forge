@@ -39,6 +39,10 @@ export const DAM_A = { lx: -11, lz: -35.2, reach: 3.2 };
 /** the sill between the reaches and the reed-choked culvert on its west face (reached from the drained west bed) */
 export const SILL = { x0: -0.35, x1: 0.35, top: -0.8 };
 export const DAM_A2 = { lx: -1.5, lz: -28.5, reach: 3.2 };
+/** where the drained channel goes (water runs downhill, DESIGN-sumiro-play.md §3): a gully from behind the sluice
+ *  dam falls south-west to the soak in the marsh's low corner; both beds sit below the channel's (BED) */
+export const GULLY = { ax: -11, az: -38.4, bx: -21, bz: -47, bed0: -1.3, bed1: -2.0, half: 0.7 };
+export const SOAK = { lx: -22.5, lz: -49.2, r: 3.0, bed: -2.3, low: -2.15, high: -1.6 };
 /** the west reach's north bank: a reed thicket the fox cannot climb (box), so the way on is east along the bed */
 export const THICKET = { x0: -66, x1: 0.7, z0: -23.9, z1: -23.2, top: 2.4 };
 export const ISLET = { lx: 23.6, lz: 1.0, r: 2.6 };
@@ -125,6 +129,15 @@ export function H(x: number, z: number): number {
     // a low levee of dug peat along every bank, then the slope down to the bed
     h += 0.32 * smoothstep(d, 0.6, 1.2) * (1 - smoothstep(d, 1.6, 3.2));
     h = THREE.MathUtils.lerp(h, BED, 1 - smoothstep(d, -0.9, 0.7));
+  }
+  // the sluice gully and the soak it drains into (soft banks: a fox that wanders in walks out)
+  {
+    const gx = GULLY.bx - GULLY.ax, gz = GULLY.bz - GULLY.az;
+    const t = Math.max(0, Math.min(1, ((lx - GULLY.ax) * gx + (lz - GULLY.az) * gz) / (gx * gx + gz * gz)));
+    const d = Math.hypot(lx - GULLY.ax - gx * t, lz - GULLY.az - gz * t) - GULLY.half;
+    h = THREE.MathUtils.lerp(h, GULLY.bed0 + (GULLY.bed1 - GULLY.bed0) * t, 1 - smoothstep(d, 0, 2.4));
+    const ds = Math.hypot(lx - SOAK.lx, lz - SOAK.lz) - SOAK.r;
+    h = THREE.MathUtils.lerp(h, SOAK.bed, 1 - smoothstep(ds, 0, 3.6));
   }
   // the weir plateau and the Seedwell ledge (after the water cut, so no bank slope eats the wall): sheer peat walls
   const weir = smoothstep(lz, WEIR.z0 - 0.4, WEIR.z0) * (1 - smoothstep(lx, WEIR.xMax - 0.2, WEIR.xMax + 0.3));

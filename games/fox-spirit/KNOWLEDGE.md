@@ -844,3 +844,10 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   a grounded fox rides it. Restore = set the seam clock past the end, the hot step lands every stack on frame one.
 - `tools/press-probe.mjs --from shelf` stages a saved teach+develop and teleports onto the shelf: ~4 min per
   combine iteration instead of ~12. It is iteration only; the fresh route is the proof.
+- (Ashwater gully) Any new low ground in the marsh must join the mist mask (`ashwaterMist.ts`): the mist sheets sit
+  at bank height and veil a camera that drops below them — the lens reads as a flat grey wash with a faded fox. The
+  mask covers the drained beds, the sluice gully (capsule) and the soak (disc).
+- A reed dam sunk in a ditch put the chase lens inside the reed pile. Keep dash-gates on the bank; carry water under
+  it (a culvert to a headwall) rather than cutting the bank away.
+- `pkill -f <pattern>` from a Bash tool call matches its own shell's command line and kills the call (exit 144).
+  Kill by PID from `pgrep` output instead.

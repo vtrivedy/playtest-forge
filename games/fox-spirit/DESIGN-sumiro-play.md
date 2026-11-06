@@ -63,3 +63,21 @@ Rules: the face membrane is a wall (collider top = shelf top) until it tears (to
 to an air-dash at its height (feet within [sill − 0.7, shelf top]). Floor membranes now crack to any dash (the
 air-only rule lives where height makes it physical). Draft A's height is derived: crest ≈ sill + 0.95, shelf − 1.25.
 Restore: a saved develop tears the face and lowers its wall at boot.
+
+## §3 Ashwater: where the water goes (Low Sluice)
+What was wrong: bursting the sluice dam dropped the channel from −0.15 to −1.25 while the dam stood on a bank at
++0.3 — the water had nowhere downhill to go, and nothing showed it leaving. "Which dam drains which pool" cannot be an
+insight if the water's road is invisible.
+
+Shots:
+1. *The sluice.* From the landing, the reed dam chokes the sluice on the channel's south bank; behind it a slate
+   headwall with a dark culvert mouth heads a gully that falls away south-west to a hollow (the soak) in the
+   marsh's low corner. The dam stays on the bank (in a ditch the chase lens ended up inside the reed pile).
+2. *The burst.* Dash through the dam: water surges out of the culvert mouth down the gully (streaks running downhill) and
+   the soak fills; the channel sinks to its bed.
+3. *The culvert.* Later, dashing the sill's culvert lets the east reach into the west bed — and the gully runs again,
+   the soak rising a second time. Both reaches visibly leave by the same road.
+
+Rules: the gully and soak are terrain (beds −1.3 → −2.0 → −2.3, under the channel bed −1.0; banks ≤ 0.87 slope, a
+fox that wanders in walks out). Flow is a function of each burst's clock (surge, then a trickle, then still), so a
+saved marsh comes back still and full-soaked with no event.
