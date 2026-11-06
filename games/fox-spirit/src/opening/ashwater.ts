@@ -15,7 +15,7 @@ import { inkWash, washCourses } from '../inkWash';
 import { ashVisualH } from '../ashwaterScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
-import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, GULLY, SOAK, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
+import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, DAM_T, GULLY, RUNNEL, SOAK, TARN, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
 import { updateAshwater, type AshRig } from './ashwater.hot';
 import { buildAshwaterPuddles } from './ashwaterGround';
 
@@ -181,6 +181,7 @@ export function buildAshwater(
     return { g, col };
   };
   const damA = dam(DAM_A.lx, DAM_A.lz);
+  const damT = dam(DAM_T.lx, DAM_T.lz);
   const damA2 = dam(DAM_A2.lx, DAM_A2.lz);
   damA2.g.position.y = -1.0;
   const damB = dam(DAM_B.lx, DAM_B.lz);
@@ -237,7 +238,9 @@ export function buildAshwater(
   pipe.position.set(outlet.x, GULLY.bed0 + 0.42, outlet.z - 0.01);
   pipe.rotation.y = Math.PI;
   root.add(headwall, pipe);
-  const gullyPath: ReadonlyArray<readonly [number, number]> = [[GULLY.ax, GULLY.az + 0.4], [GULLY.bx, GULLY.bz], [SOAK.lx, SOAK.lz]];
+  /** a water ribbon draped along a local path (w0 → w1 half-width), streaks scrolled by the hot step */
+  const ribbon = (path: ReadonlyArray<readonly [number, number]>, w0: number, w1: number, mat: THREE.Material) => {
+  const gullyPath = path;
   let flowLen = 0;
   for (let i = 1; i < gullyPath.length; i++) flowLen += Math.hypot(gullyPath[i]![0] - gullyPath[i - 1]![0], gullyPath[i]![1] - gullyPath[i - 1]![1]);
   const SEG = 48;
@@ -259,7 +262,7 @@ export function buildAshwater(
     const t = Math.min(1, u / l);
     const cx = ax + (bx - ax) * t, cz = az + (bz - az) * t;
     const nx = -(bz - az) / l, nz = (bx - ax) / l;
-    const w = 0.55 + 0.35 * (k / SEG);
+    const w = w0 + (w1 - w0) * (k / SEG);
     for (let side = 0; side < 2; side++) {
       const sx = cx + nx * w * (side ? 1 : -1), sz = cz + nz * w * (side ? 1 : -1);
       const at = ash(sx, sz);
@@ -277,9 +280,19 @@ export function buildAshwater(
   flowGeo.setAttribute('uv', new THREE.BufferAttribute(flowUv, 2));
   flowGeo.setIndex(flowIdx);
   flowGeo.computeVertexNormals();
-  const flow = new THREE.Mesh(flowGeo, flowMat);
-  flow.visible = false;
-  root.add(flow);
+  const m = new THREE.Mesh(flowGeo, mat);
+  m.visible = false;
+  root.add(m);
+  return m;
+  };
+  const flow = ribbon([[GULLY.ax, GULLY.az + 0.4], [GULLY.bx, GULLY.bz], [SOAK.lx, SOAK.lz]], 0.55, 0.9, flowMat);
+  // the decoy tarn's runnel: the same water, running north down into the channel
+  const runnelMat = flowMat.clone();
+  const runnel = ribbon([[RUNNEL.ax, RUNNEL.az], [RUNNEL.ax, RUNNEL.bz + 0.6]], 0.35, 0.5, runnelMat);
+  const tarnAt = ash(TARN.lx, TARN.lz);
+  const tarn = new THREE.Mesh(new THREE.CircleGeometry(TARN.r + 0.6, 24).rotateX(-Math.PI / 2), waterMat);
+  tarn.position.set(tarnAt.x, TARN.full, tarnAt.z);
+  root.add(tarn);
   // the soak: a reed-ringed hollow that fills with what the channel lets go
   const soakAt = ash(SOAK.lx, SOAK.lz);
   const soak = new THREE.Mesh(new THREE.CircleGeometry(SOAK.r + 1.2, 28).rotateX(-Math.PI / 2), waterMat);
@@ -611,6 +624,10 @@ export function buildAshwater(
     teach: ctx.teach.offer,
     events: {
       place: () => say('Where the flood was always meant to go.'),
+      burstT: () => {
+        ctx.audio.cue('millrace-burst');
+        say('The tarn spills into the channel.');
+      },
       secret: (which) => {
         // the Album's page toast speaks the place's line (no caption on top of it)
         if (opts.onSecret) opts.onSecret(which === 0 ? 'ashwater-roof' : 'ashwater-mooring');
@@ -649,6 +666,11 @@ export function buildAshwater(
     flowMat,
     flowTex,
     soak,
+    tarn,
+    damT: damT.g,
+    damTCol: damT.col,
+    runnel,
+    runnelMat,
     damA: damA.g,
     damA2: damA2.g,
     damA2Col: damA2.col,
@@ -670,7 +692,7 @@ export function buildAshwater(
     heronMat,
     heronCol,
     safe: new THREE.Vector3(spawnAt.x, 0, spawnAt.z),
-    s: { burstA: -1, burstA2: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, channelEY: WATER.channelE.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z, clock: 0, lastSplash: -9, secrets: 0, places: 0 },
+    s: { burstA: -1, burstA2: -1, burstB: -1, burstC: -1, channelY: WATER.channel.full, channelEY: WATER.channelE.full, poolY: WATER.pool.full, matK: 0, glowK: 0, done: 0, safeYaw: ASH_SPAWN.yaw, splashes: 0, inMarsh: 0, heronT: 0, heronY: heron.position.y, heronZ: heron.position.z, clock: 0, lastSplash: -9, secrets: 0, places: 0, burstT: -1 },
   };
   // a saved game re-enters the marsh as it was left: drained channel / pool, burst dams, a lit Seedwell (no captions)
   const was = (l: (typeof LEVEL_IDS)[number]) => opts.isRestored?.(l) ?? false;
@@ -700,7 +722,7 @@ export function buildAshwater(
     spawn: { x: spawnAt.x, z: spawnAt.z, yaw: ASH_SPAWN.yaw },
     state: () => ({
       damA: rig.s.burstA >= 0, damA2: rig.s.burstA2 >= 0, damB: rig.s.burstB >= 0, flood: rig.s.burstC >= 0, channelY: +rig.s.channelY.toFixed(2), poolY: +rig.s.poolY.toFixed(2), gullyRun: +rig.flowMat.opacity.toFixed(2), soakY: +rig.soak.position.y.toFixed(2),
-      secrets: rig.s.secrets, places: rig.s.places, mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
+      secrets: rig.s.secrets, places: rig.s.places, tarn: rig.s.burstT >= 0, mats: +Math.min(1, rig.s.matK).toFixed(2), done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0), splashes: rig.s.splashes, glow: +rig.s.glowK.toFixed(2),
     }),
   };
 }

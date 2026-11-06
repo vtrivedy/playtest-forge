@@ -5,7 +5,7 @@
  * still deep puts the fox back on the bank it left. Levels complete on arrival in the region beyond each gate.
  */
 import type * as THREE from 'three';
-import { ASH_ORIGIN, CISTERN, SOAK, DAM_A, DAM_A2, DAM_B, DAM_C, FLOOD, LEDGE, MATS, MAT_RISE, PUNT, SECRETS, WATER, waterAt } from './ashwaterLayout';
+import { ASH_ORIGIN, CISTERN, DAM_T, SOAK, TARN, DAM_A, DAM_A2, DAM_B, DAM_C, FLOOD, LEDGE, MATS, MAT_RISE, PUNT, SECRETS, WATER, waterAt } from './ashwaterLayout';
 import type { Collider } from '../lookdevPlay';
 
 export const ASH_TIMING = { drain: 3.2, matRise: 0.9, matStagger: 0.18, damFall: 1.1, glow: 2.5, matHold: 1.2, matSink: 0.7, matRecover: 0.8 };
@@ -20,13 +20,19 @@ export type AshRig = {
   hasReedskim: () => boolean;
   teleport: (x: number, z: number, yaw: number) => void;
   teach: (text: string) => void;
-  events: { place: (which: 0) => void; secret: (which: 0 | 1) => void; burstA: () => void; burstA2: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
+  events: { place: (which: 0) => void; burstT: () => void; secret: (which: 0 | 1) => void; burstA: () => void; burstA2: () => void; burstB: () => void; burstC: () => void; complete: (level: 0 | 1 | 2) => void; splash: () => void };
   waterMesh: { channel: THREE.Object3D; channelE: THREE.Object3D; pond: THREE.Object3D; pool: THREE.Object3D };
   /** the water the channel lets go, running down the sluice gully (streaks scrolled downhill) into the soak */
   flow: THREE.Object3D;
   flowMat: THREE.MeshStandardMaterial;
   flowTex: THREE.Texture;
   soak: THREE.Object3D;
+  /** the decoy tarn: its water, its dam (and collider), and its runnel's ribbon (runs into the channel) */
+  tarn: THREE.Object3D;
+  damT: THREE.Object3D;
+  damTCol: Extract<Collider, { kind: 'post' }>;
+  runnel: THREE.Object3D;
+  runnelMat: THREE.MeshStandardMaterial;
   damA: THREE.Object3D;
   damA2: THREE.Object3D;
   damB: THREE.Object3D;
@@ -55,6 +61,7 @@ export type AshRig = {
     burstA: number; burstA2: number; burstB: number; burstC: number; channelY: number; channelEY: number; poolY: number; matK: number; glowK: number;
     done: number; safeYaw: number; splashes: number; inMarsh: number; heronT: number; heronY: number; heronZ: number; clock: number; lastSplash: number; secrets: number;
     /** place lines already said (bit 0: the soak, once water has reached it) */ places: number;
+    /** seconds since the decoy tarn's dam burst (−1 before) */ burstT: number;
   };
 };
 
@@ -97,6 +104,13 @@ export function updateAshwater(rig: AshRig, dt: number): void {
     rig.damCCol.r = 0.001;
     rig.events.burstC();
   }
+  // the tarn's dam: same dash, same reeds — its water runs the other way (into the channel), so nothing drains
+  if (s.burstT < 0 && dashing && Math.hypot(lx - DAM_T.lx, lz - DAM_T.lz) < DAM_T.reach) {
+    s.burstT = 0;
+    rig.damTCol.r = 0.001;
+    rig.events.burstT();
+  }
+  if (s.burstT >= 0) s.burstT += dt;
   if (s.burstA >= 0) s.burstA += dt;
   if (s.burstA2 >= 0) s.burstA2 += dt;
   if (s.burstB >= 0) s.burstB += dt;
@@ -121,6 +135,11 @@ export function updateAshwater(rig: AshRig, dt: number): void {
   rig.flowTex.offset.y -= dt * (0.6 + 1.6 * run);
   const drained = 0.5 * (smooth(s.burstA / T.drain) + (s.burstA2 < 0 ? 0 : smooth(s.burstA2 / T.drain)));
   rig.soak.position.y = SOAK.low + (SOAK.high - SOAK.low) * drained;
+  const spill = flowOf(s.burstT);
+  rig.runnel.visible = spill > 0.01;
+  rig.runnelMat.opacity = 0.8 * spill;
+  rig.tarn.position.y = TARN.full + (TARN.empty - TARN.full) * (s.burstT < 0 ? 0 : smooth(s.burstT / T.drain));
+  stepDam(rig.damT, s.burstT);
   // the punt floats (resting on the floor when dry); the gate shuts once water stands in the cistern
   const puntY = Math.max(s.poolY, -0.95);
   rig.punt.position.y = puntY + 0.05;

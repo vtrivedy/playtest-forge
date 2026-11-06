@@ -81,3 +81,18 @@ Shots:
 Rules: the gully and soak are terrain (beds −1.3 → −2.0 → −2.3, under the channel bed −1.0; banks ≤ 0.87 slope, a
 fox that wanders in walks out). Flow is a function of each burst's clock (surge, then a trickle, then still), so a
 saved marsh comes back still and full-soaked with no event.
+
+## §5 Low Sluice gets a choice: the tarn (Ashwater teach)
+What was thin: one dam on the landing, so "which dam drains which pool" had one answer and no question.
+
+Shots:
+1. *From the landing* two reed dams, both reachable with the dash the fox already has. West: the sluice dam over the
+   culvert, its gully falling away to the soak (§3). East: a small tarn perched on a mound, brimming behind its own
+   reed dam, a runnel cut down its face to the channel.
+2. *The wrong one first (likely).* Dash the tarn's dam: the tarn empties down its runnel *into* the channel — the
+   water runs downhill, toward you. The channel stays deep (wading still puts you back).
+3. *The read.* Water goes down. The sluice dam's gully goes down and away; that one drains the channel.
+
+Rules: the tarn's burst never changes the channel's level and never blocks anything (no softlock, no reset needed);
+it only shows the rule. Its line names what happened: "The tarn spills into the channel." It is not persisted (a
+teach-by-contrast beat, not progress): a reload shows it brimming again.
