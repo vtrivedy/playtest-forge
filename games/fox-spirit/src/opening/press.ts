@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { rng } from '../lookdevKit';
 import { inkWash, washCourses, washDripFrom } from '../inkWash';
-import { inkTreeGeometry } from '../pressScenery';
+import { inkTreeGeometry, membraneWebMaterial } from '../pressScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressE, pressH } from './worlds';
@@ -267,6 +267,11 @@ export function buildPress(
     const ring = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.12, 32).rotateX(-Math.PI / 2), rimMat);
     ring.position.y = 0.01;
     g.add(ring);
+    // its face is a piece of the rim nets' ink web (pressScenery.membraneWebMaterial; visual only)
+    const web = new THREE.Mesh(new THREE.CircleGeometry(r * 0.98, 32).rotateX(-Math.PI / 2), membraneWebMaterial());
+    web.position.y = 0.015;
+    web.renderOrder = 1;
+    g.add(web);
     root.add(g);
     return g;
   };
