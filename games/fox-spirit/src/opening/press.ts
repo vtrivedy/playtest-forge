@@ -574,6 +574,7 @@ export function buildPress(
         ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.12, rate: 0.7 });
         if (i !== HIGH_BRAZIER) say('A cold brazier takes the flame.');
       },
+      place: () => say('Old drafts, kept where the winter could not reach.'),
       seam: () => {
         ctx.audio.cue('millrace-burst');
         say('The pressed stair remembers its height.');
@@ -641,7 +642,7 @@ export function buildPress(
     scribeHead: head,
     scribeArm: armR,
     leafMat,
-    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, crackC: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, arrived: 0, seam: -1, stood: 0, coda: -1, leverK: 0 },
+    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, crackC: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, arrived: 0, seam: -1, stood: 0, places: 0, coda: -1, leverK: 0 },
   };
   // a saved world comes back as it was left, quietly: open seal, breathing drafts, melted ice, lit Press
   if (opts.restored('teach')) {
@@ -655,6 +656,7 @@ export function buildPress(
   if (opts.restored('develop')) {
     rig.s.crackA = 5;
     rig.s.crackC = 5;
+    rig.s.places |= 1;
     faceCol.top = SILL_TOP;
     rig.s.done |= 2;
   }
@@ -681,7 +683,7 @@ export function buildPress(
       lit: BRAZIERS.map((_, i) => (rig.s.lit & (1 << i)) !== 0),
       warm: +rig.s.warm.toFixed(2), sealOpen: rig.s.sealK >= 1, draftA: rig.s.crackA >= 0, faceTorn: rig.s.crackC >= 0, iced: rig.s.iced === 1, draftB: rig.s.crackB >= 0,
       shelfTop: +SHELF_TOP.toFixed(2), sillTop: +SILL_TOP.toFixed(2),
-      seam: rig.s.seam >= 0, stair: rig.s.stood === 1, stairTop: +rig.stackCols[STAIR.n - 1]!.top.toFixed(2),
+      seam: rig.s.seam >= 0, places: rig.s.places, stair: rig.s.stood === 1, stairTop: +rig.stackCols[STAIR.n - 1]!.top.toFixed(2),
       done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0),
     }),
   };

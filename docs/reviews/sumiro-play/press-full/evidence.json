@@ -1,0 +1,1056 @@
+{
+  "staging": "one dev travel(\"press\") at the start; every later action is stick/Space/Shift",
+  "beats": [
+    {
+      "name": "00-spawn",
+      "pos": [
+        -700,
+        0.08,
+        123
+      ],
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "faceTorn": false,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 0,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": []
+      },
+      "progress": {
+        "visited": [],
+        "restored": [],
+        "ability": null,
+        "well": "Maple",
+        "fill": 0,
+        "next": "teach"
+      }
+    },
+    {
+      "name": "01-brazier",
+      "pos": [
+        -720.68,
+        1.51,
+        112.36
+      ],
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 1,
+        "sealOpen": false,
+        "draftA": false,
+        "faceTorn": false,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 0,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": []
+      },
+      "progress": {
+        "visited": [],
+        "restored": [],
+        "ability": null,
+        "well": "Maple",
+        "fill": 0,
+        "next": "teach"
+      }
+    },
+    {
+      "name": "01b-faded-at-seal",
+      "pos": [
+        -700.01,
+        0.1,
+        103
+      ],
+      "press": {
+        "lit": [
+          true,
+          false,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": false,
+        "draftA": false,
+        "faceTorn": false,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 0,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": []
+      },
+      "progress": {
+        "visited": [],
+        "restored": [],
+        "ability": null,
+        "well": "Maple",
+        "fill": 0,
+        "next": "teach"
+      }
+    },
+    {
+      "name": "01c-relay-lit",
+      "pos": [
+        -707.51,
+        0.53,
+        114.81
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 1,
+        "sealOpen": false,
+        "draftA": false,
+        "faceTorn": false,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 0,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": []
+      },
+      "progress": {
+        "visited": [],
+        "restored": [],
+        "ability": null,
+        "well": "Maple",
+        "fill": 0,
+        "next": "teach"
+      }
+    },
+    {
+      "name": "02-seal-thawed",
+      "pos": [
+        -700.05,
+        0.18,
+        101.68
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": false,
+        "faceTorn": false,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 0,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": []
+      },
+      "progress": {
+        "visited": [],
+        "restored": [],
+        "ability": null,
+        "well": "Maple",
+        "fill": 0,
+        "next": "teach"
+      }
+    },
+    {
+      "name": "03-through-gate",
+      "pos": [
+        -700,
+        1.01,
+        93.13
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": false,
+        "faceTorn": false,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 0,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach"
+        ],
+        "restored": [
+          "teach"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.3333333333333333,
+        "next": "develop"
+      }
+    },
+    {
+      "name": "04-before-membrane",
+      "pos": [
+        -700,
+        1.27,
+        84.09
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": false,
+        "faceTorn": false,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 0,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach"
+        ],
+        "restored": [
+          "teach"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.3333333333333333,
+        "next": "develop"
+      }
+    },
+    {
+      "name": "04b-floor-draft-under-shelf",
+      "pos": [
+        -700,
+        3.5,
+        82.22
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": false,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 0,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach"
+        ],
+        "restored": [
+          "teach"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.3333333333333333,
+        "next": "develop"
+      }
+    },
+    {
+      "name": "04c-face-torn",
+      "pos": [
+        -699.93,
+        5.32,
+        76.68
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach"
+        ],
+        "restored": [
+          "teach"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.3333333333333333,
+        "next": "develop"
+      }
+    },
+    {
+      "name": "05-on-shelf",
+      "pos": [
+        -699.93,
+        6.61,
+        74.36
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "06-brazier-b",
+      "pos": [
+        -671.3,
+        6.61,
+        74.5
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          false,
+          false,
+          false
+        ],
+        "warm": 1,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "06b-relay-b",
+      "pos": [
+        -686.07,
+        6.61,
+        65.36
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          false,
+          false
+        ],
+        "warm": 1,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "06c-near-brazier",
+      "pos": [
+        -691.65,
+        6.61,
+        73.88
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        "warm": 1,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": true,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "07-ice-melted",
+      "pos": [
+        -694.62,
+        6.61,
+        72.48
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        "warm": 0.74,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": false,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "07b-short-draft",
+      "pos": [
+        -695.96,
+        6.61,
+        70.16
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": true,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "07c-short-draft-falls-short",
+      "pos": [
+        -696.02,
+        8.21,
+        69.47
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": true,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": false,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "08-pillar-kindled",
+      "pos": [
+        -696.11,
+        9.61,
+        68.76
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 1,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": true,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": true,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "08b-seam-running",
+      "pos": [
+        -696.1,
+        9.61,
+        68.73
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 1,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": true,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": true,
+        "places": 1,
+        "stair": false,
+        "stairTop": 6.74,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "08c-stair-stands",
+      "pos": [
+        -696.1,
+        9.61,
+        68.73
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 1,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": true,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": true,
+        "places": 1,
+        "stair": true,
+        "stairTop": 11.2,
+        "done": [
+          "teach",
+          "develop"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop"
+        ],
+        "restored": [
+          "teach",
+          "develop"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 0.6666666666666666,
+        "next": "combine"
+      }
+    },
+    {
+      "name": "08d-ledge",
+      "pos": [
+        -704.51,
+        11.21,
+        62.57
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": true,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": true,
+        "places": 1,
+        "stair": true,
+        "stairTop": 11.2,
+        "done": [
+          "teach",
+          "develop",
+          "combine"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop",
+          "combine"
+        ],
+        "restored": [
+          "teach",
+          "develop",
+          "combine"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 1,
+        "next": null
+      }
+    },
+    {
+      "name": "09-the-press",
+      "pos": [
+        -703.87,
+        11.21,
+        63.01
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": true,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": true,
+        "places": 1,
+        "stair": true,
+        "stairTop": 11.2,
+        "done": [
+          "teach",
+          "develop",
+          "combine"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop",
+          "combine"
+        ],
+        "restored": [
+          "teach",
+          "develop",
+          "combine"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 1,
+        "next": null
+      }
+    },
+    {
+      "name": "10-scribe-lever",
+      "pos": [
+        -703.98,
+        11.21,
+        62.99
+      ],
+      "press": {
+        "lit": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        "warm": 0,
+        "sealOpen": true,
+        "draftA": true,
+        "faceTorn": true,
+        "iced": false,
+        "draftB": true,
+        "shelfTop": 6.6,
+        "sillTop": 4.4,
+        "seam": true,
+        "places": 1,
+        "stair": true,
+        "stairTop": 11.2,
+        "done": [
+          "teach",
+          "develop",
+          "combine"
+        ]
+      },
+      "progress": {
+        "visited": [
+          "teach",
+          "develop",
+          "combine"
+        ],
+        "restored": [
+          "teach",
+          "develop",
+          "combine"
+        ],
+        "ability": "Inkstep",
+        "well": "Maple",
+        "fill": 1,
+        "next": null
+      }
+    }
+  ],
+  "errors": [],
+  "floorDraftOnly": {
+    "peak": 5.3,
+    "shelfTop": 6.6,
+    "sillTop": 4.4
+  },
+  "shortDraftTry": {
+    "peakAboveShelf": 4.07,
+    "landedAboveShelf": 1.74,
+    "pos": [
+      -696.02,
+      8.34,
+      69.48
+    ],
+    "ledgeRise": 4.6
+  },
+  "reload": {
+    "lit": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "warm": 0,
+    "sealOpen": true,
+    "draftA": true,
+    "faceTorn": true,
+    "iced": false,
+    "draftB": true,
+    "shelfTop": 6.6,
+    "sillTop": 4.4,
+    "seam": true,
+    "places": 1,
+    "stair": true,
+    "stairTop": 11.2,
+    "done": [
+      "teach",
+      "develop",
+      "combine"
+    ]
+  }
+}

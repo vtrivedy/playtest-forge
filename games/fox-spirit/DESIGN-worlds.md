@@ -54,7 +54,8 @@ and the feeling, never the action). Each level is a place with a landmark you wa
 
 **Ashwater Reach — rain marsh (system: water levels; ability: Reedskim — reed mats hold you)** (Cedar)
 1. *Low Sluice* — the marsh is too deep to wade; burst the right dam and the channel drains to expose footing.
-   Insight: which dam drains *which* pool (water runs downhill along visible channels).
+   Insight: which dam drains *which* pool (water runs downhill along visible channels). The drained water runs out
+   of a culvert headwall down the sluice gully into the soak (DESIGN-sumiro-play.md §3).
 2. *Reed Pond* — reed mats only bear weight once Reedskim is earned; chain jumps, then drain the islet pool from
    above (the second dam is only reachable from the mats).
 3. *Weir Heart* — the weir steps are under water until BOTH pools are drained *in the right order* (draining the
@@ -64,10 +65,13 @@ and the feeling, never the action). Each level is a place with a landmark you wa
 frozen membrane into a glide draft)** (Thistle)
 1. *White Margin* — the seal in the ink ridge melts only to warmth carried from the brazier before it fades (11 s):
    route-finding against a clock you can see (the ember dims).
-2. *Folded Archive* — the membrane over the shelf is solid; Inkstep (jump + air-dash) breaks it into a draft;
-   ride it onto the 4.4 m Archive shelf.
-3. *Wellspring Press* — the iced membrane must first be warmed (Press brazier) AND then broken with Inkstep while
-   gliding — warmth and ink together; the Scribe lifts the lever → Maple Seedwell, the ending.
+2. *Folded Archive* — a dash cracks the floor membrane into a short draft that crests under the shelf, at an alcove
+   sealed by a hanging sheet of frozen ink; only an Inkstep from the crest tears it, and the chimney behind it rises
+   onto the shelf (DESIGN-sumiro-play.md §2).
+3. *Wellspring Press* — relay warmth across the shelf, melt the iced membrane, crack its short draft, then ride it
+   *carrying warmth* onto the page pillar: its brazier lights, the ink seam thaws and the pressed stair stands up to
+   the Press — warmth and ink together; the Scribe lifts the lever → Maple Seedwell, the ending
+   (DESIGN-sumiro-play.md, the Unpressed Stair).
 
 **Hub** — Lanternhollow's well: three Seedwells fill, arches light as worlds open, Album (Tab) shows pages earned.
 

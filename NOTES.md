@@ -31,3 +31,8 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
   drains, and the soak rises. The dam stays on the bank; the water leaves by a culvert to a slate headwall at the gully head.
 - For the look stream: the soak is a plain water disc with the marsh water material; reeds round it and some foam at
   the gully foot would sell it.
+
+## Slice 4 — place lines (sound-off story, no actions named)
+- Press alcove: "Old drafts, kept where the winter could not reach." (first time inside the torn alcove)
+- Ashwater soak: "Where the flood was always meant to go." (first time by the soak after the sluice runs)
+- Both once per save (`places` bit, restored quietly with the level). DESIGN-worlds.md level text updated.
