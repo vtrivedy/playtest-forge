@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import { rng } from '../lookdevKit';
-import { inkWash } from '../inkWash';
+import { inkWash, washCourses } from '../inkWash';
 import { inkTreeGeometry } from '../pressScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
@@ -45,8 +45,8 @@ export function buildPress(
 
   const inkMat = winter(0x23252d);
   const ribMat = winter(0xc9c0ac);
-  const paperMat = winter(0xcfc6b2);
-  const paperEdge = winter(0x9c927c);
+  const paperMat = washCourses(winter(0xcfc6b2), -0.16);
+  const paperEdge = washCourses(winter(0x9c927c), -0.16);
   const timber = winter(0x3b2f2a);
   const stone = winter(0x6d6f78);
   const box = (lx0: number, lx1: number, lz0: number, lz1: number, y0: number, y1: number, mat: THREE.Material, parent: THREE.Object3D = solids) => {

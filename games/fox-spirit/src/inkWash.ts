@@ -70,6 +70,16 @@ const WASH_GLSL = /* glsl */ `
   c = mix(c, mix(uWashInk, vec3(0.16, 0.2, 0.3), 0.6) * (0.8 + 0.5 * gran), max(pool * 0.85, dots) * up * uWashA.w);
   // laid courses on standing faces (uWashCourse.x = course height, 0 = off): mortar lines, staggered joints, and each
   // stone its own tone of the wash
+  if (uWashCourse < 0.0) {
+    // pressed leaves: fine uneven page edges stacked up a standing face, each leaf its own paper tone
+    float lh = -uWashCourse;
+    float yy = wp.y / lh + (lkNoise(vec2(along * 0.7, wp.y * 0.3)) - 0.5) * 0.6;
+    float leaf = floor(yy);
+    float fy = fract(yy);
+    float wall = smoothstep(0.6, 0.85, vert);
+    c *= mix(1.0, 0.86 + 0.22 * lkHash(vec2(leaf, 3.0)), wall);
+    c = mix(c, uWashInk, (1.0 - smoothstep(0.0, 0.12, min(fy, 1.0 - fy))) * wall * 0.55);
+  }
   if (uWashCourse > 0.0) {
     float row = floor(wp.y / uWashCourse);
     float run = along / (uWashCourse * 2.3) + row * 0.5;
@@ -120,7 +130,8 @@ export function washDripFrom(m: THREE.MeshToonMaterial, y: number): THREE.MeshTo
   return m;
 }
 
-/** lay a wash material's standing faces in courses of stone this high (m): masonry from the material, not boxes */
+/** lay a wash material's standing faces in courses of stone this high (m): masonry from the material, not boxes;
+ *  a negative height lays pressed page leaves instead (horizontal edges only) */
 export function washCourses(m: THREE.MeshToonMaterial, h: number): THREE.MeshToonMaterial {
   (m.userData.washCourse as { value: number }).value = h;
   m.userData.lk = `${m.userData.lk}|course${h}`;

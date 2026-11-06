@@ -9,7 +9,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { rng } from './lookdevKit';
 import type { OpeningCtx } from './opening/scene';
 import { pressE, pressH, WORLDS } from './opening/worlds';
-import { inkWash } from './inkWash';
+import { inkWash, washCourses } from './inkWash';
 import { paintedBackdrop } from './paperBackdrop';
 import { BRAZIERS, MEMBRANE_A } from './opening/pressLayout';
 
@@ -284,8 +284,8 @@ export function buildPressScenery(ctx: OpeningCtx) {
   const far = new THREE.Mesh(mergeGeometries(farGeos), spireMat);
   root.add(far);
   // ---- page stacks (shot 3): pressed pages stacked like quarry stone in clusters off the relay routes
-  const paperMat = inkWash(0xd9d1bf, { scale: 0.5, tide: 0.5, drip: 0.25 });
-  const edgeMat = inkWash(0x9a8f78, { scale: 0.5, tide: 0.5, drip: 0.25 });
+  const paperMat = washCourses(inkWash(0xd9d1bf, { scale: 0.5, tide: 0.5, drip: 0.25 }), -0.1);
+  const edgeMat = washCourses(inkWash(0x9a8f78, { scale: 0.5, tide: 0.5, drip: 0.25 }), -0.1);
   const stackGeos: { paper: THREE.BufferGeometry[]; edge: THREE.BufferGeometry[]; snow: THREE.BufferGeometry[] } = { paper: [], edge: [], snow: [] };
   const rs = rng(3307);
   for (const [lx, lz] of STACK_SPOTS) {
