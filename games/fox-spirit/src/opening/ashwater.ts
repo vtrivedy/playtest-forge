@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { rng } from '../lookdevKit';
 import { inkWash, washCourses } from '../inkWash';
-import { ashVisualH } from '../ashwaterScenery';
+import { ashVisualH, poleRaftGeometry, sluiceFrameGeometry } from '../ashwaterScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { ash, ASH_ORIGIN, ASH_SPAWN, CISTERN, DAM_T, GULLY, RUNNEL, SOAK, TARN, SECRETS, SHELF, SILL, THICKET, DAM_A2, DAM_A, DAM_B, DAM_C, H, ISLET, LEDGE, MAT_HALF, MATS, PUNT, SEEDWELL, STEP_HALF, STEPS, WATER, WEIR, waterAt } from './ashwaterLayout';
@@ -21,7 +21,7 @@ import { buildAshwaterPuddles } from './ashwaterGround';
 
 const C = {
   moss: new THREE.Color(0x3c493d), peat: new THREE.Color(0x35352f), mud: new THREE.Color(0x3b322b), levee: new THREE.Color(0x74664e), sedge: new THREE.Color(0x505a40), bank: new THREE.Color(0x505e55),
-  water: 0x2a6a74, reed: 0x6f8a3e, reedDry: 0xa08a4e, willow: 0x4f7f6a, pad: 0x5d8f3f, bloom: 0xf2e6c4, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
+  water: 0x4f6268, reed: 0x6f8a3e, reedDry: 0xa08a4e, willow: 0x4f7f6a, pad: 0x5d8f3f, bloom: 0xf2e6c4, slate: 0x6f7c84, timber: 0x4f3d30, mat: 0xb3a565, lantern: 0xffb25a, glow: 0x7fe3d8,
 };
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
 
@@ -80,7 +80,7 @@ export function buildAshwater(
   root.add(buildAshwaterPuddles(geo));
 
   // ---- water: the channel and the pool drop when drained; the pond holds
-  const waterMat = new THREE.MeshStandardMaterial({ color: C.water, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.86, emissive: 0x0d2a2e });
+  const waterMat = new THREE.MeshStandardMaterial({ color: C.water, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.86, emissive: 0x1c2629 });
   const waterMesh = (id: keyof typeof WATER) => {
     const w = WATER[id];
     const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(150, w.x1 - w.x0) + 1.4, w.z1 - w.z0 + 1.4).rotateX(-Math.PI / 2), waterMat);
@@ -192,16 +192,15 @@ export function buildAshwater(
   // the sluice gate the dam chokes: two timber posts and a plank gate on the channel bank behind it
   const sluiceAt = ash(DAM_A.lx, WATER.channel.z0 - 0.2);
   const sluiceY = H(sluiceAt.x, sluiceAt.z);
-  for (const sx of [-1.7, 1.7]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.32, 2.6, 0.32), timber);
-    post.position.set(sluiceAt.x + sx, sluiceY + 0.5, sluiceAt.z);
-    root.add(post);
+  // the bible's frame (ashwaterScenery.sluiceFrameGeometry): posts, overhanging beam, brace, a gate of upright planks
+  const sluice = sluiceFrameGeometry(rng(5150), 3.4, 2.9);
+  const frame = new THREE.Mesh(sluice.frame, timber);
+  const gate = new THREE.Mesh(sluice.gate, marsh(0x6a5440));
+  for (const m of [frame, gate]) {
+    m.position.set(sluiceAt.x, sluiceY, sluiceAt.z);
+    m.castShadow = true;
+    root.add(m);
   }
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.3, 0.34), timber);
-  beam.position.set(sluiceAt.x, sluiceY + 1.8, sluiceAt.z);
-  const gate = new THREE.Mesh(new THREE.BoxGeometry(3.1, 1.1, 0.14), marsh(0x6a5440));
-  gate.position.set(sluiceAt.x, sluiceY - 0.2, sluiceAt.z);
-  root.add(beam, gate);
 
   // ---- where the drained channel goes (DESIGN-sumiro-play.md §3): water running down the sluice gully into the soak
   // in the marsh's low corner. A ribbon draped on the gully bed, its streak texture scrolled downhill by the hot step
@@ -508,7 +507,8 @@ export function buildAshwater(
   // the last ferry: a flat punt moored by the weir's east end; it rides whatever the cistern holds (PUNT)
   const puntAt = ash(PUNT.lx, PUNT.lz);
   const punt = new THREE.Group();
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(PUNT.hx * 2, 0.3, PUNT.hz * 2), timber);
+  // lashed poles, the bible's raft (ashwaterScenery.poleRaftGeometry), on the same footprint
+  const hull = new THREE.Mesh(poleRaftGeometry(rng(5151), PUNT.hx, PUNT.hz, 0.3), timber);
   hull.position.y = -0.05;
   const thwart = new THREE.Mesh(new THREE.BoxGeometry(PUNT.hx * 2, 0.12, 0.16), marsh(0x6a5440));
   thwart.position.set(0, 0.14, 0.4);

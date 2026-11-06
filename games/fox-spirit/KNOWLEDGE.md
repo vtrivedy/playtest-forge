@@ -855,3 +855,26 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
   (Reed's physical acceptance, `world-ashwater-acceptance --press-route`). Changing a Press level means changing
   both, or the acceptance circuit fails on the old route. The lib asserts the anti-bypass facts too (floor draft under
   the shelf, short draft under the ledge).
+
+## Sumiro look — ink as a material (sumiro-look, Nov 6)
+
+- Judge look against the bible from fixed spots, never by memory: `tools/sumiro-look-stills.sh press|ashwater /tmp/x`
+  writes `pairs.png` (bible left, game right). A floating snow skirt and a wrong-colour spire were both invisible in
+  the "it looks better" read and obvious in the pair.
+- Fog lifts ink. With the height-fog formula, exp2 density 0.011 mixes ~35% bright mist into a black spire at 50 m,
+  so "ink" rendered mid-grey. Dark albedo under a strong key also lifts (0.04 linear → grey). `inkWash({ density })`
+  lays dark albedo down as flat ink after lighting (sumi-e is pigment, not shading); keep foreign-world fog low
+  (Press 0.0055) and let distance layering come from paler far geometry and the painted horizon.
+- `THREE.MathUtils.smoothstep(x, min, max)` takes x FIRST (unlike GLSL). `smoothstep(0.16, 0.02, t)` silently
+  painted most of each spire with the snow-skirt pigment. Write `1 - smoothstep(t, a, b)` for a falling edge.
+- Terrain functions climb steeply past the walk mask (Press rim 2.2 m/m, Ashwater 1.6 m/m) into 30–60 m walls that
+  hide any horizon and make the sky read as a circle above a bowl. Draw the ground with a visual height
+  (`pressVisualH`, `ashVisualH`) equal to the terrain wherever E ≤ 3 and falling away beyond; feet, camera and lint
+  keep using the terrain.
+- The islands are far from the shared sky dome's look; a foreign world's horizon is an opaque, depth-writing sphere
+  painted by elevation (`paperBackdrop.ts`) that follows the camera. Transparent rings let other skies show through.
+- Placed props must not shift shared rng streams: press.ts trees now draw their shape from their own rng and burn the
+  exact draws the old crowns used, so books/lamps downstream stay put.
+- Modelled tree clumps in heavy rain fog read as pale lollipops; paint them into the horizon instead.
+- Editing `src/` while a Playwright route runs on the Vite dev server hot-reloads the page ("Execution context was
+  destroyed"); run routes when not editing, or from a pinned worktree.

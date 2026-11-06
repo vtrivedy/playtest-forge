@@ -14,10 +14,11 @@ import { paintedBackdrop } from './paperBackdrop';
 import { BRAZIERS, MEMBRANE_A } from './opening/pressLayout';
 
 const P = WORLDS.press.origin;
-/** page-stack clusters (local to the Press origin): off the brazier relays, the ridge gate, the spawn and the shelf */
+/** page-stack clusters (local to the Press origin): off the brazier relays, the ridge gate, the spawn and the shelf;
+ *  the last two stand in the arrival frame (the bible's foreground stacks) */
 /** puzzle pieces a stack must keep its distance from (local) */
 const CLEAR: ReadonlyArray<readonly [number, number]> = [...BRAZIERS.map((b) => [b.lx, b.lz] as const), [MEMBRANE_A.lx, MEMBRANE_A.lz]];
-const STACK_SPOTS: ReadonlyArray<readonly [number, number]> = [[-31, 23], [27, 21], [-33, 3], [33, 5], [24, 37], [-26, 36]];
+const STACK_SPOTS: ReadonlyArray<readonly [number, number]> = [[-31, 23], [27, 21], [-33, 3], [33, 5], [24, 37], [-26, 36], [17, 34], [-15, 21]];
 const { smoothstep } = THREE.MathUtils;
 
 /**
@@ -382,4 +383,49 @@ export function pageStackGeometry(r: () => number, w: number, d: number, h: numb
   }
   const snow = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(w * 0.52, 0.22, d * 0.52).translate(0, y - 0.02, 0);
   return { paper: mergeGeometries(paper)!, edge: mergeGeometries(edge.length ? edge : [new THREE.BoxGeometry(0.01, 0.01, 0.01)])!, snow };
+}
+
+/**
+ * The membranes' face: the same ink web the rim nets are strung from, drawn radially across a disc, so the puzzle's
+ * membranes read as small pieces of the nets (a crack-through-able web), not a black puddle. Transparent; one shared.
+ */
+let webDisc: THREE.MeshBasicMaterial | null = null;
+export function membraneWebMaterial(): THREE.MeshBasicMaterial {
+  if (webDisc) return webDisc;
+  const S = 512;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const g = cv.getContext('2d')!;
+  const r = rng(6611);
+  const c = S / 2;
+  const spokes = 13;
+  const ang: number[] = [];
+  for (let i = 0; i < spokes; i++) ang.push((i / spokes) * Math.PI * 2 + (r() - 0.5) * 0.25);
+  g.lineCap = 'round';
+  g.strokeStyle = 'rgba(200,206,236,0.9)';
+  for (const a of ang) {
+    g.lineWidth = 3 + r() * 3;
+    g.beginPath();
+    g.moveTo(c, c);
+    g.lineTo(c + Math.cos(a) * c * 0.98, c + Math.sin(a) * c * 0.98);
+    g.stroke();
+  }
+  for (let k = 1; k <= 6; k++) {
+    const rad = (k / 6.4) * c;
+    g.lineWidth = 2 + r() * 2.5;
+    g.beginPath();
+    for (let i = 0; i <= spokes; i++) {
+      const a = ang[i % spokes]!;
+      const rr = rad * (0.9 + r() * 0.2);
+      const x = c + Math.cos(a) * rr;
+      const y = c + Math.sin(a) * rr;
+      if (i === 0) g.moveTo(x, y);
+      else g.quadraticCurveTo(c + Math.cos(a - 0.2) * rr * 0.9, c + Math.sin(a - 0.2) * rr * 0.9, x, y);
+    }
+    if (r() > 0.2) g.stroke();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  webDisc = new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, toneMapped: false });
+  return webDisc;
 }

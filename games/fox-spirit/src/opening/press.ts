@@ -10,8 +10,8 @@
  */
 import * as THREE from 'three';
 import { rng } from '../lookdevKit';
-import { inkWash, washCourses } from '../inkWash';
-import { inkTreeGeometry } from '../pressScenery';
+import { inkWash, washCourses, washDripFrom } from '../inkWash';
+import { inkTreeGeometry, membraneWebMaterial } from '../pressScenery';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressE, pressH } from './worlds';
@@ -44,8 +44,11 @@ export function buildPress(
   root.add(solids);
   ctx.occluders.push(solids);
 
-  const inkMat = winter(0x23252d);
+  // the ridge is dried ink: runs hang from its top lip (the wash's drip from that height)
+  const inkMat = washDripFrom(inkWash(0x46445a, { scale: 0.3, tide: 0.9, drip: 0.95 }), RIDGE_BASE + RIDGE.rise);
   const ribMat = winter(0xc9c0ac);
+  // the ridge's spine ribs sit a value above the ink, not paper-white (pale ribs read as a fence)
+  const spineMat = inkWash(0x77718a, { scale: 0.3, tide: 0.6, drip: 0.5 });
   const paperMat = washCourses(winter(0xcfc6b2), -0.16);
   const paperEdge = washCourses(winter(0x9c927c), -0.16);
   const timber = winter(0x3b2f2a);
@@ -76,7 +79,7 @@ export function buildPress(
     solid(x0, x1, RIDGE.lz - RIDGE.half, RIDGE.lz + RIDGE.half, ridgeTop);
     // pale page ribs down both faces
     for (let x = Math.min(x0, x1) + 1; x < Math.max(x0, x1); x += 2.2) {
-      for (const face of [-1, 1]) box(x - 0.12, x + 0.12, RIDGE.lz + face * (RIDGE.half + 0.02) - 0.04, RIDGE.lz + face * (RIDGE.half + 0.02) + 0.04, RIDGE_BASE - 0.5, ridgeTop - 0.25, ribMat);
+      for (const face of [-1, 1]) box(x - 0.12, x + 0.12, RIDGE.lz + face * (RIDGE.half + 0.02) - 0.04, RIDGE.lz + face * (RIDGE.half + 0.02) + 0.04, RIDGE_BASE - 0.5, ridgeTop - 0.25, spineMat);
     }
   }
   // gateposts and a lintel of folded pages
@@ -103,12 +106,19 @@ export function buildPress(
     g.position.set(at.x, brazierY[i]!, at.z);
     const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.55, 7), stone);
     plinth.position.y = 0.27;
-    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.3, 0.32, 9, 1, true), timber);
-    bowl.position.y = 0.7;
+    // an iron cauldron on three legs (the bible's brazier), sitting on the stone
+    const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.56, 12, 6, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.58), timber);
+    bowl.position.y = 1.1;
+    for (let k = 0; k < 3; k++) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.5, 5), timber);
+      leg.position.set(Math.cos(k * 2.094) * 0.36, 0.8, Math.sin(k * 2.094) * 0.36);
+      leg.rotation.set(Math.sin(k * 2.094) * 0.25, 0, -Math.cos(k * 2.094) * 0.25);
+      g.add(leg);
+    }
     const coalMat = new THREE.MeshStandardMaterial({ color: 0x2b2522, roughness: 0.9, emissive: 0xff7a2a, emissiveIntensity: B.lit ? 1.6 : 0 });
     const coals = new THREE.Mesh(new THREE.IcosahedronGeometry(0.34, 0), coalMat);
     coals.scale.y = 0.45;
-    coals.position.y = 0.8;
+    coals.position.y = 1.12;
     const light = new THREE.PointLight(0xff8a3a, B.lit ? 1.6 : 0, 7, 1.8);
     light.position.y = 1.4;
     g.add(plinth, bowl, coals, light);
@@ -327,6 +337,11 @@ export function buildPress(
     const ring = new THREE.Mesh(new THREE.RingGeometry(r, r + 0.12, 32).rotateX(-Math.PI / 2), rimMat);
     ring.position.y = 0.01;
     g.add(ring);
+    // its face is a piece of the rim nets' ink web (pressScenery.membraneWebMaterial; visual only)
+    const web = new THREE.Mesh(new THREE.CircleGeometry(r * 0.98, 32).rotateX(-Math.PI / 2), membraneWebMaterial());
+    web.position.y = 0.015;
+    web.renderOrder = 1;
+    g.add(web);
     root.add(g);
     return g;
   };
