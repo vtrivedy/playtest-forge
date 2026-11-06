@@ -43,6 +43,11 @@ export const DAM_A2 = { lx: -1.5, lz: -28.5, reach: 3.2 };
  *  dam falls south-west to the soak in the marsh's low corner; both beds sit below the channel's (BED) */
 export const GULLY = { ax: -11, az: -38.4, bx: -21, bz: -47, bed0: -1.3, bed1: -2.0, half: 0.7 };
 export const SOAK = { lx: -22.5, lz: -49.2, r: 3.0, bed: -2.3, low: -2.15, high: -1.6 };
+/** the decoy (DESIGN-sumiro-play.md §5): a tarn perched on a mound east of the landing, brimming behind its own reed
+ *  dam; its runnel falls north INTO the channel. Bursting it shows the rule (water runs downhill) and changes nothing */
+export const TARN = { lx: 13, lz: -40.5, r: 2.4, mound: 4.6, top: 1.35, bed: 0.85, full: 1.15, empty: 0.88 };
+export const DAM_T = { lx: 13, lz: -36.3, reach: 3.2 };
+export const RUNNEL = { ax: 13, az: -37.8, bz: -33.6, bed0: 0.8, bed1: -0.4, half: 0.35 };
 /** the west reach's north bank: a reed thicket the fox cannot climb (box), so the way on is east along the bed */
 export const THICKET = { x0: -66, x1: 0.7, z0: -23.9, z1: -23.2, top: 2.4 };
 export const ISLET = { lx: 23.6, lz: 1.0, r: 2.6 };
@@ -138,6 +143,17 @@ export function H(x: number, z: number): number {
     h = THREE.MathUtils.lerp(h, GULLY.bed0 + (GULLY.bed1 - GULLY.bed0) * t, 1 - smoothstep(d, 0, 2.4));
     const ds = Math.hypot(lx - SOAK.lx, lz - SOAK.lz) - SOAK.r;
     h = THREE.MathUtils.lerp(h, SOAK.bed, 1 - smoothstep(ds, 0, 3.6));
+  }
+  // the tarn's mound, its hollow, and the runnel notched through its north rim down the channel bank
+  {
+    const dm = Math.hypot(lx - TARN.lx, lz - TARN.lz);
+    h = THREE.MathUtils.lerp(h, TARN.top, 1 - smoothstep(dm - TARN.mound, 0, 3));
+    h = THREE.MathUtils.lerp(h, TARN.bed, 1 - smoothstep(dm - TARN.r, -0.3, 0.8));
+    if (lz > RUNNEL.az - 0.5 && lz < RUNNEL.bz + 0.5) {
+      const t = Math.max(0, Math.min(1, (lz - RUNNEL.az) / (RUNNEL.bz - RUNNEL.az)));
+      const bed = RUNNEL.bed0 + (RUNNEL.bed1 - RUNNEL.bed0) * t;
+      h = Math.min(h, THREE.MathUtils.lerp(h, bed, 1 - smoothstep(Math.abs(lx - RUNNEL.ax) - RUNNEL.half, 0, 1.2)));
+    }
   }
   // the weir plateau and the Seedwell ledge (after the water cut, so no bank slope eats the wall): sheer peat walls
   const weir = smoothstep(lz, WEIR.z0 - 0.4, WEIR.z0) * (1 - smoothstep(lx, WEIR.xMax - 0.2, WEIR.xMax + 0.3));

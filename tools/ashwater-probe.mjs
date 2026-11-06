@@ -95,6 +95,15 @@ try {
   await go(0, -31.5, { max: 400 });
   await settle(30);
   log.push(['wade-test', await state()]);
+  // the decoy tarn (DESIGN-sumiro-play.md §5): its dam bursts the same way, but its water runs INTO the channel
+  await go(8.6, -37.6, { max: 600 });
+  await go(14.6, -36.0, { dash: true, dashAt: 2, max: 90, reach: 0.6 });
+  await settle(100);
+  const tarnTry = await state();
+  log.push(['tarn-spilled', tarnTry]);
+  await shot('00b-tarn-spills');
+  if (!tarnTry.ash.tarn || Math.abs(tarnTry.ash.channelY + 0.15) > 0.02) throw Error('tarn dash did not spill, or the channel moved');
+  await go(4, -37.5, { max: 600 });
   await go(-6.5, -35.4);
   await shot('01-dam');
   await go(-12.5, -35.2, { dash: true, dashAt: 2, max: 90, reach: 0.6 });

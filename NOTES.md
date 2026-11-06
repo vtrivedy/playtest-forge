@@ -36,3 +36,13 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
 - Press alcove: "Old drafts, kept where the winter could not reach." (first time inside the torn alcove)
 - Ashwater soak: "Where the flood was always meant to go." (first time by the soak after the sluice runs)
 - Both once per save (`places` bit, restored quietly with the level). DESIGN-worlds.md level text updated.
+
+## Slice 5 — Low Sluice gets a choice: the decoy tarn
+- A tarn perched on a mound east of the landing, behind its own reed dam; its runnel falls INTO the channel. Dashing
+  it spills the tarn and changes nothing ("The tarn spills into the channel."); the sluice dam (gully away, downhill)
+  is the one that drains. ashwater-probe dashes the tarn first and asserts the channel unchanged, then plays on: pass.
+- For the look stream: the runnel ribbon is hard to see from the mound lens; foam where it meets the channel would help.
+
+## Baselines (Nov 6, this branch)
+- check:stuck 1.33 stuck-s / 90 s (budget 4) PASS on 490996f5 (and at slice 1); check:music clean (no audio edits).
+- Reed's fresh-boot acceptances: Ashwater pass (ef7491a1); entry tour + Press route pass (583fd7da + route lib).
