@@ -62,3 +62,6 @@ without dialogue or hint captions, a scripted player proves it). Binding checks:
 - Merged tip (look stream's Press cauldrons/webs and Ashwater sluice frame/punt + my slices): full ashwater-probe pass
   (3/3, tarn, gully, soak, both secrets, 0 errors) and full press-probe pass (3/3, Maple fill 1, 0 errors).
   Evidence: `docs/reviews/sumiro-play/merged-tip/`.
+- check:stuck on the final tip: my run was terminated (exit 143) while Kit's landing gate (`sumiro-land`) ran its own
+  check:stuck; per the steer I did not start a second copy. Russetvale code is untouched by this branch since the
+  490996f5 PASS.
