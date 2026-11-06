@@ -206,11 +206,12 @@ export function buildAshwater(
   streaks.height = 256;
   {
     const g = streaks.getContext('2d')!;
-    g.fillStyle = '#000';
+    // a body of water (grey base: alpha ≈ 0.35) with brighter streaks running in it
+    g.fillStyle = '#5a5a5a';
     g.fillRect(0, 0, 64, 256);
     const rs = rng(8803);
     for (let i = 0; i < 70; i++) {
-      const x = rs() * 64, y = rs() * 256, len = 14 + rs() * 50, a = 0.25 + rs() * 0.6;
+      const x = rs() * 64, y = rs() * 256, len = 14 + rs() * 50, a = 0.45 + rs() * 0.55;
       const grad = g.createLinearGradient(0, y, 0, y + len);
       grad.addColorStop(0, 'rgba(255,255,255,0)');
       grad.addColorStop(0.5, `rgba(255,255,255,${a})`);
@@ -222,7 +223,7 @@ export function buildAshwater(
   const flowTex = new THREE.CanvasTexture(streaks);
   flowTex.wrapS = flowTex.wrapT = THREE.RepeatWrapping;
   // (alphaMap reads green: the canvas is an opaque black → white ramp, Reed :815)
-  const flowMat = new THREE.MeshStandardMaterial({ color: C.water, emissive: 0x9fc4c8, emissiveIntensity: 0.35, emissiveMap: flowTex, alphaMap: flowTex, roughness: 0.1, transparent: true, opacity: 0, depthWrite: false });
+  const flowMat = new THREE.MeshStandardMaterial({ color: C.water, emissive: 0xb8d6d8, emissiveIntensity: 0.55, emissiveMap: flowTex, alphaMap: flowTex, roughness: 0.1, transparent: true, opacity: 0, depthWrite: false });
   // the sluice's culvert runs under the bank (the dam chokes its intake) and comes out at a slate headwall at the
   // gully's head; the water shows from the outlet down
   const outlet = ash(GULLY.ax, GULLY.az + 0.5);

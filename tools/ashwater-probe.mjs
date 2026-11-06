@@ -111,6 +111,7 @@ try {
     window.__gameHooks.advance(0, 1 / 60, true);
   }, [O.x, O.z]);
   await page.screenshot({ path: path.join(out, '01b-gully-runs-staged-lens.png') });
+  if (args.includes('--until-gully')) { await browser.close(); await server.close(); process.exit(0); }
   await page.evaluate(() => {
     const { camera } = window.__opening;
     camera.position.copy(window.__ashSavedCamera.pos);
