@@ -1,0 +1,19 @@
+# agent/sumiro-play — notes (Opus 5.5, Nov 6)
+
+Brief: apply the Sumiro method to PLAY (prototype the verb, shots → playable place, puzzles move the world, story
+without dialogue or hint captions, a scripted player proves it). Binding checks: research-brain
+`knowledge/sumiro-video2game.md` § Checks for agents. Plan: `games/fox-spirit/DESIGN-sumiro-play.md`.
+
+## Slice 1 — the Unpressed Stair (Press, combine)
+- Press combine reworked: relay warmth across the Archive shelf (lit → relay → near brazier), melt the iced membrane,
+  crack it with Inkstep into a SHORT draft, then ride it carrying warmth onto the page pillar: its brazier lights,
+  heat runs the ink seam, and eight pressed page stacks stand from the foot up into a stair to the Press.
+- All five Press `HINT_*` control captions are gone (Vivek banned hint captions); the Press now offers only place
+  lines, like Ashwater.
+- `tla/Press.tla` re-modelled with the pillar/kindle/stair; `PressNoWarmRide.cfg` is the negative control.
+- `tools/press-probe.mjs` plays it with stick/Space/Shift after one staged travel, including a failed try at the
+  ledge from the short draft alone.
+
+## For the look stream (do not edit from PLAY)
+- The pillar, seam and stair are built from the existing Press paper/ink materials in `press.ts`; a lookdev pass on
+  the stacks' "pages swelling apart" and the seam's wet-ink run would help. No scenery files were touched.

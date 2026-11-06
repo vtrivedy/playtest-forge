@@ -3,7 +3,8 @@
  * north → south run, each a physical gate the fox opens with what it has:
  *   White Margin (teach):      carry a brazier's warmth to the ridge's frozen seal → the gate opens → earns Inkstep
  *   Folded Archive (develop):  jump + air-dash over the frozen membrane → it breathes a glide draft → ride up the shelf
- *   Wellspring Press (combine): warm the shelf's iced membrane, then break it → ride to the Press on its ledge
+ *   Wellspring Press (combine): warm the shelf's iced membrane, break it, carry warmth up its short draft to the
+ *                              pillar's brazier → the seam thaws, the pressed stair stands → climb to the Press
  * Pale paper, ink and ice with warm brazier light — the vale's sepia paint does not reach here. This file builds
  * (allocations allowed); every per-frame step lives in press.hot.ts.
  */
@@ -12,7 +13,7 @@ import { RAMP_WORLD, rng } from '../lookdevKit';
 import type { Collider } from '../lookdevPlay';
 import type { OpeningCtx } from './scene';
 import { pressE, pressH } from './worlds';
-import { BRAZIER_REACH, BRAZIERS, DRAFT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, press, RIDGE, RIDGE_BASE, SHELF, SHELF_TOP, THE_PRESS } from './pressLayout';
+import { BRAZIER_REACH, BRAZIERS, DRAFT, HIGH_BRAZIER, DRAFT_B_HEIGHT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PILLAR, PILLAR_TOP, press, RIDGE, RIDGE_BASE, SEAM, SHELF, SHELF_TOP, STAIR, stairStep, THE_PRESS } from './pressLayout';
 import { pressLift, updatePress, type PressRig } from './press.hot';
 
 const LEVEL_IDS = ['teach', 'develop', 'combine'] as const;
@@ -91,10 +92,12 @@ export function buildPress(
   // ---- braziers: iron bowls of embers on stone, the only warm light in the white; the cold ones wait for a flame
   const braziers: THREE.PointLight[] = [];
   const coalsOf: THREE.MeshStandardMaterial[] = [];
-  for (const B of BRAZIERS) {
+  const brazierY = new Float32Array(BRAZIERS.length);
+  for (const [i, B] of BRAZIERS.entries()) {
     const at = press(B.lx, B.lz);
     const g = new THREE.Group();
-    g.position.set(at.x, B.shelf ? SHELF_TOP : pressH(at.x, at.z), at.z);
+    brazierY[i] = B.high ? PILLAR_TOP : B.shelf ? SHELF_TOP : pressH(at.x, at.z);
+    g.position.set(at.x, brazierY[i]!, at.z);
     const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.55, 7), stone);
     plinth.position.y = 0.27;
     const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.3, 0.32, 9, 1, true), timber);
@@ -243,6 +246,60 @@ export function buildPress(
   root.add(thePress);
   colliders.push({ kind: 'box', x: pa.x, z: pa.z, yaw: 0, hx: 1.6, hz: 0.8, top: LEDGE_TOP + 0.5 });
 
+  // ---- the Unpressed Stair (DESIGN-sumiro-play.md): a pillar of pressed pages with a cold brazier on top, an ink seam
+  // from its foot across the shelf, and eight page stacks pressed flat under glazed ink that stand once the seam thaws
+  const pillarLayers = 6;
+  for (let i = 0; i < pillarLayers; i++) {
+    const y0 = SHELF_TOP + (PILLAR.rise * i) / pillarLayers;
+    const y1 = SHELF_TOP + (PILLAR.rise * (i + 1)) / pillarLayers;
+    const j = ((i * 7) % 5) * 0.04 - 0.08;
+    box(PILLAR.lx - PILLAR.half + j, PILLAR.lx + PILLAR.half + j, PILLAR.lz - PILLAR.half - j, PILLAR.lz + PILLAR.half - j, y0, y1 - 0.03, i % 2 ? paperEdge : paperMat);
+  }
+  solid(PILLAR.lx - PILLAR.half, PILLAR.lx + PILLAR.half, PILLAR.lz - PILLAR.half, PILLAR.lz + PILLAR.half, PILLAR_TOP);
+  // the seam: a groove of frozen ink, flush with the shelf (decal — not under the occluder root)
+  const seamMat = new THREE.MeshStandardMaterial({ color: 0x14161f, roughness: 0.08, metalness: 0.25, emissive: 0x6a3a1a, emissiveIntensity: 0.15, transparent: true, opacity: 1 });
+  for (let i = 0; i + 1 < SEAM.length; i++) {
+    const [ax, az] = SEAM[i]!;
+    const [bx, bz] = SEAM[i + 1]!;
+    const len = Math.hypot(bx - ax, bz - az) + 0.5;
+    const c = press((ax + bx) / 2, (az + bz) / 2);
+    const groove = new THREE.Mesh(new THREE.PlaneGeometry(0.5, len).rotateX(-Math.PI / 2), seamMat);
+    groove.position.set(c.x, SHELF_TOP + 0.025, c.z);
+    groove.rotation.y = Math.atan2(bx - ax, bz - az);
+    root.add(groove);
+  }
+  // the stacks: each a sheaf of page layers, slightly out of true, glazed with ink on top; scaled flat while pressed
+  const stacks: THREE.Object3D[] = [];
+  const stackCols: Extract<Collider, { kind: 'box' }>[] = [];
+  const stackTop = new Float32Array(STAIR.n);
+  const glaze = new THREE.MeshStandardMaterial({ color: 0x1b1d27, roughness: 0.1, metalness: 0.2, emissive: 0x23264a, emissiveIntensity: 0.4 });
+  const rs = rng(4471);
+  for (let i = 0; i < STAIR.n; i++) {
+    const st = stairStep(i);
+    stackTop[i] = st.top;
+    const full = st.top - SHELF_TOP;
+    const c = press((STAIR.x0 + STAIR.x1) / 2, (st.z0 + st.z1) / 2);
+    const g = new THREE.Group();
+    g.position.set(c.x, SHELF_TOP, c.z);
+    const n = Math.max(2, Math.round(full / 0.3));
+    for (let k = 0; k < n; k++) {
+      const layer = new THREE.Mesh(new THREE.BoxGeometry(STAIR.x1 - STAIR.x0 - 0.08 + (rs() - 0.5) * 0.12, full / n - 0.025, st.z1 - st.z0 - 0.04), k % 2 ? paperEdge : paperMat);
+      layer.position.set((rs() - 0.5) * 0.1, (full * (k + 0.5)) / n, (rs() - 0.5) * 0.06);
+      layer.rotation.y = (rs() - 0.5) * 0.05;
+      layer.castShadow = true;
+      layer.receiveShadow = true;
+      g.add(layer);
+    }
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(STAIR.x1 - STAIR.x0, 0.04, st.z1 - st.z0 - 0.02), glaze);
+    lid.position.y = full - 0.01;
+    g.add(lid);
+    g.scale.y = STAIR.pressed / full;
+    solids.add(g);
+    stacks.push(g);
+    const col = solid(STAIR.x0, STAIR.x1, st.z0, st.z1, SHELF_TOP + STAIR.pressed);
+    stackCols.push(col);
+  }
+
   // ---- membranes: pools of frozen ink; the shelf's is iced over
   const memMat = new THREE.MeshStandardMaterial({ color: 0x14161f, roughness: 0.05, metalness: 0.3, emissive: 0x2a2a66, emissiveIntensity: 0.6 });
   const rimMat = new THREE.MeshBasicMaterial({ color: 0xa6a9e6, transparent: true, opacity: 0.55 });
@@ -269,18 +326,19 @@ export function buildPress(
   // ink-violet over the snow (additive light vanishes against white)
   const draftMat = new THREE.MeshBasicMaterial({ color: 0x6a6cc0, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide });
   const draftCore = new THREE.MeshBasicMaterial({ color: 0x8f92e0, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide });
-  const drafts = membranes.map((mem) => {
+  const drafts = membranes.map((mem, m) => {
     const g = new THREE.Group();
     g.position.copy(mem.position);
-    const outer = new THREE.Mesh(new THREE.CylinderGeometry(DRAFT.radius * 0.9, DRAFT.radius * 0.7, DRAFT.height, 20, 1, true).translate(0, DRAFT.height / 2, 0), draftMat);
-    const inner = new THREE.Mesh(new THREE.CylinderGeometry(DRAFT.radius * 0.35, DRAFT.radius * 0.45, DRAFT.height * 0.9, 12, 1, true).translate(0, DRAFT.height * 0.45, 0), draftCore);
+    const height = m === 0 ? DRAFT.height : DRAFT_B_HEIGHT;
+    const outer = new THREE.Mesh(new THREE.CylinderGeometry(DRAFT.radius * 0.9, DRAFT.radius * 0.7, height, 20, 1, true).translate(0, height / 2, 0), draftMat);
+    const inner = new THREE.Mesh(new THREE.CylinderGeometry(DRAFT.radius * 0.35, DRAFT.radius * 0.45, height * 0.9, 12, 1, true).translate(0, height * 0.45, 0), draftCore);
     g.add(outer, inner);
     // loose page leaves lifted in the column
     const leafGeo = new THREE.PlaneGeometry(0.22, 0.3);
     for (let i = 0; i < 14; i++) {
       const leaf = new THREE.Mesh(leafGeo, ribMat);
       const a = i * 2.39;
-      leaf.position.set(Math.cos(a) * DRAFT.radius * 0.55, 0.6 + (i / 14) * (DRAFT.height - 1), Math.sin(a) * DRAFT.radius * 0.55);
+      leaf.position.set(Math.cos(a) * DRAFT.radius * 0.55, 0.6 + (i / 14) * (height - 1), Math.sin(a) * DRAFT.radius * 0.55);
       leaf.rotation.set(a, a * 0.7, 0.4);
       g.add(leaf);
     }
@@ -374,7 +432,8 @@ export function buildPress(
   const onShelfTop = (lx: number, lz: number, pad: number) =>
     lz < SHELF.z1 - 3 - pad && lz > SHELF.z0 + 1 + pad && !(lx > LEDGE.x0 - 4 - pad && lx < LEDGE.x1 + 4 + pad) &&
     segD(lx, lz, BRAZIERS[2]!.lx, BRAZIERS[2]!.lz, BRAZIERS[3]!.lx, BRAZIERS[3]!.lz) > 3 + pad &&
-    segD(lx, lz, BRAZIERS[3]!.lx, BRAZIERS[3]!.lz, MEMBRANE_B.lx, MEMBRANE_B.lz) > 3 + pad &&
+    segD(lx, lz, BRAZIERS[3]!.lx, BRAZIERS[3]!.lz, BRAZIERS[4]!.lx, BRAZIERS[4]!.lz) > 3 + pad &&
+    segD(lx, lz, BRAZIERS[2]!.lx, BRAZIERS[2]!.lz, BRAZIERS[4]!.lx, BRAZIERS[4]!.lz) > 2 + pad &&
     Math.hypot(lx - BRAZIERS[2]!.lx, lz - BRAZIERS[2]!.lz) > 4 && Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) > 5 && pressE(press(lx, lz).x, press(lx, lz).z) < -5;
   const clearOf = (lx: number, lz: number, pad: number) => {
     if (Math.abs(lz - RIDGE.lz) < 3 + pad) return false;
@@ -446,8 +505,8 @@ export function buildPress(
   // lantern posts along the relay legs: a warm dot every few metres says "this way" without words
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xffc27a });
   const postMat = winter(0x2a2b31);
-  const [A, A2, B, B2] = BRAZIERS as [typeof BRAZIERS[0], typeof BRAZIERS[0], typeof BRAZIERS[0], typeof BRAZIERS[0]];
-  for (const [ax, az, bx, bz] of [[A.lx, A.lz, A2.lx, A2.lz], [A2.lx, A2.lz, 0, 19], [B.lx, B.lz, B2.lx, B2.lz], [B2.lx, B2.lz, MEMBRANE_B.lx + 1.5, MEMBRANE_B.lz]] as const) {
+  const [A, A2, B, B2, B3] = BRAZIERS as [typeof BRAZIERS[0], typeof BRAZIERS[0], typeof BRAZIERS[0], typeof BRAZIERS[0], typeof BRAZIERS[0]];
+  for (const [ax, az, bx, bz] of [[A.lx, A.lz, A2.lx, A2.lz], [A2.lx, A2.lz, 0, 19], [B.lx, B.lz, B2.lx, B2.lz], [B2.lx, B2.lz, B3.lx, B3.lz]] as const) {
     const n = Math.max(2, Math.floor(Math.hypot(bx - ax, bz - az) / 6));
     for (let k = 1; k < n; k++) {
       const f = k / n;
@@ -479,13 +538,20 @@ export function buildPress(
     fox: ctx.fox.root,
     motion: () => ctx.player?.motion ?? null,
     hasInkstep: opts.hasInkstep,
-    teach: ctx.teach.offer,
     events: {
       arrive: () => say(opts.restored('combine') ? 'The Press keeps its warmth.' : 'Snow keeps the unfinished pages.'),
       warmed: () => ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.08, rate: 0.5 }),
-      kindled: () => {
+      kindled: (i) => {
         ctx.audio.play('soft-paper', { at: ctx.fox.root.position.clone(), gain: 0.12, rate: 0.7 });
-        say('A cold brazier takes the flame.');
+        if (i !== HIGH_BRAZIER) say('A cold brazier takes the flame.');
+      },
+      seam: () => {
+        ctx.audio.cue('millrace-burst');
+        say('The pressed stair remembers its height.');
+      },
+      stood: () => {
+        const top = press((STAIR.x0 + STAIR.x1) / 2, stairStep(STAIR.n - 1).z0);
+        ctx.audio.play('soft-paper', { at: new THREE.Vector3(top.x, LEDGE_TOP, top.z), gain: 0.14, rate: 0.55 });
       },
       thawSeal: () => {
         ctx.audio.cue('millrace-burst');
@@ -499,7 +565,7 @@ export function buildPress(
       coda: () => say('The Warden was the Scribe’s shadow.'),
       complete: (level) => {
         opts.complete(LEVEL_IDS[level]);
-        if (level === 0) say('Inkstep · frozen ink breaks now.');
+        if (level === 0) say('Inkstep. The frozen ink knows you now.');
         if (level === 1) say('The Folded Archive opens.');
         if (level === 2) {
           pressLight.intensity = 2.2;
@@ -529,6 +595,11 @@ export function buildPress(
     warmGlow,
     warmLight,
     braziers,
+    brazierY,
+    seamMat,
+    stacks,
+    stackCols,
+    stackTop,
     coals: coalsOf,
     membranes,
     ice,
@@ -539,7 +610,7 @@ export function buildPress(
     scribeHead: head,
     scribeArm: armR,
     leafMat,
-    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, hint: 0, arrived: 0, coda: -1, leverK: 0 },
+    s: { lit: BRAZIERS.reduce((m, B, i) => (B.lit ? m | (1 << i) : m), 0), wasWarm: 0, warm: 0, sealK: 0, thawed: 0, crackA: -1, crackB: -1, iceK: 0, iced: 1, done: 0, dashWasAir: 0, time: 0, arrived: 0, seam: -1, stood: 0, coda: -1, leverK: 0 },
   };
   // a saved world comes back as it was left, quietly: open seal, breathing drafts, melted ice, lit Press
   if (opts.restored('teach')) {
@@ -547,7 +618,6 @@ export function buildPress(
     rig.s.thawed = 1;
     rig.s.sealK = 1;
     rig.s.done |= 1;
-    rig.s.hint = 1;
     seal.visible = false;
     sealCol.top = seal.userData.base;
   }
@@ -556,7 +626,10 @@ export function buildPress(
     rig.s.done |= 2;
   }
   if (opts.restored('combine')) {
-    rig.s.lit |= 0b1100;
+    rig.s.lit |= 0b111100;
+    // the stair stands as it was left (the hot step's seam run lands every stack at full height on its first frame)
+    rig.s.seam = 60;
+    rig.s.stood = 1;
     rig.s.iced = 0;
     rig.s.iceK = 1;
     rig.s.crackB = 5;
@@ -574,6 +647,7 @@ export function buildPress(
     state: () => ({
       lit: BRAZIERS.map((_, i) => (rig.s.lit & (1 << i)) !== 0),
       warm: +rig.s.warm.toFixed(2), sealOpen: rig.s.sealK >= 1, draftA: rig.s.crackA >= 0, iced: rig.s.iced === 1, draftB: rig.s.crackB >= 0,
+      seam: rig.s.seam >= 0, stair: rig.s.stood === 1, stairTop: +rig.stackCols[STAIR.n - 1]!.top.toFixed(2),
       done: LEVEL_IDS.filter((_, i) => (rig.s.done & (1 << i)) !== 0),
     }),
   };

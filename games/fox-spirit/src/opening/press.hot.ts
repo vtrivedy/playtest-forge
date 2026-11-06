@@ -4,32 +4,36 @@
  *   teach    — warmth carried from a brazier melts the ridge's frozen seal; crossing the gate earns Inkstep
  *   develop  — with Inkstep, an air-dash over the frozen membrane cracks it into a glide draft (it never closes);
  *              standing on the Archive shelf completes the level
- *   combine  — the shelf's membrane is iced: carried warmth melts the ice, then an air-dash cracks it; standing on the
- *              Wellspring ledge completes the world
- * Warmth fades (WARM_S) and is spent on what it melts; both braziers relight it, so nothing can be lost for good.
+ *   combine  — the shelf's membrane is iced: carried warmth melts the ice, then an air-dash cracks it into a short
+ *              draft; warmth carried UP that draft kindles the pillar's brazier, the seam thaws and the pressed stair
+ *              stands; standing on the Wellspring ledge completes the world
+ * Warmth fades (WARM_S) and is spent on what it melts; every lit brazier relights it, so nothing can be lost for good.
+ * No words teach: captions name places and what changed, never an action or a key.
  */
 import type * as THREE from 'three';
 import type { Collider } from '../lookdevPlay';
-import { BRAZIER_REACH, BRAZIERS, BREAK, DRAFT, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PRESS_ORIGIN, RIDGE, SHELF, SHELF_TOP, WARM_S } from './pressLayout';
-
-export const HINT_WARM = 'The seal is frozen ink · carry the brazier’s warmth to it';
-export const HINT_BREAK = 'Inkstep · jump, then Shift-dash over the frozen ink';
-export const HINT_GLIDE = 'Hold Space to ride the draft up';
-export const HINT_RELAY = 'The warmth fades on the way · carry it to the cold braziers first';
-export const HINT_ICE = 'Iced over · bring warmth from the shelf’s brazier first';
+import { BRAZIER_REACH, BRAZIERS, BREAK, DRAFT, DRAFT_B_HEIGHT, HIGH_BRAZIER, LEDGE, LEDGE_TOP, MEMBRANE_A, MEMBRANE_B, PRESS_ORIGIN, RIDGE, SEAM_S, SHELF, SHELF_TOP, STACK, STAIR, WARM_S } from './pressLayout';
 
 export type PressRig = {
   fox: THREE.Object3D;
   motion: () => { readonly grounded: boolean; readonly dashing: boolean } | null;
   hasInkstep: () => boolean;
-  teach: (text: string) => void;
-  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: () => void; thawSeal: () => void; crack: (which: 0 | 1) => void; meltIce: () => void; complete: (level: 0 | 1 | 2) => void };
+  events: { arrive: () => void; coda: () => void; warmed: () => void; kindled: (i: number) => void; thawSeal: () => void; crack: (which: 0 | 1) => void; meltIce: () => void; seam: () => void; stood: () => void; complete: (level: 0 | 1 | 2) => void };
   seal: THREE.Object3D;
   sealCol: Extract<Collider, { kind: 'box' }>;
   /** the fox's carried warmth (glow + light), scaled by `warm` */
   warmGlow: THREE.Object3D;
   warmLight: THREE.PointLight;
   braziers: THREE.PointLight[];
+  /** each brazier's base height (feet must be within 1 m of it to take or give a flame) */
+  brazierY: Float32Array;
+  /** the seam's ink (its material darkens → wets → pales as the heat runs it, by `seamK`) */
+  seamMat: THREE.MeshStandardMaterial;
+  /** the stair's stacks (scaled from pressed to full) and their colliders (tops rise with them) */
+  stacks: THREE.Object3D[];
+  stackCols: Extract<Collider, { kind: 'box' }>[];
+  /** each stack's full top and base */
+  stackTop: Float32Array;
   coals: THREE.MeshStandardMaterial[];
   membranes: THREE.Object3D[];
   ice: THREE.Object3D;
@@ -45,7 +49,8 @@ export type PressRig = {
     /** lit braziers (bit i = BRAZIERS[i]) */ lit: number; wasWarm: number;
     /** carried warmth 0..1 */ warm: number; sealK: number; thawed: number;
     /** per membrane: −1 frozen, ≥ 0 seconds since it cracked */ crackA: number; crackB: number;
-    iceK: number; iced: number; done: number; dashWasAir: number; time: number; hint: number; arrived: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
+    iceK: number; iced: number; done: number; dashWasAir: number; time: number; arrived: number;
+    /** sim seconds since the pillar's brazier lit (−1 before): the seam runs, then the stacks stand */ seam: number; stood: number; /** sim seconds since the Press woke (−1 before, −2 once the coda is said) */ coda: number;
     /** 0 bowed over the shut Press → 1 lever lifted, the Scribe turned to the fox */ leverK: number;
   };
 };
@@ -75,11 +80,15 @@ export function updatePress(rig: PressRig, dt: number): void {
   if (here) {
     for (let i = 0; i < BRAZIERS.length; i++) {
       const B = BRAZIERS[i]!;
-      if (Math.hypot(lx - B.lx, lz - B.lz) > BRAZIER_REACH) continue;
+      if (Math.hypot(lx - B.lx, lz - B.lz) > BRAZIER_REACH || Math.abs(f.y - rig.brazierY[i]!) > 1) continue;
       const bit = 1 << i;
       if ((s.lit & bit) === 0 && s.warm > 0) {
         s.lit |= bit;
-        rig.events.kindled();
+        rig.events.kindled(i);
+        if (i === HIGH_BRAZIER && s.seam < 0) {
+          s.seam = 0;
+          rig.events.seam();
+        }
       }
       if ((s.lit & bit) !== 0) {
         if (s.warm < 0.5) rig.events.warmed();
@@ -88,11 +97,6 @@ export function updatePress(rig: PressRig, dt: number): void {
     }
   }
   s.warm = Math.max(0, s.warm - dt / WARM_S);
-  // warmth that ran out before it melted anything: show the relay once
-  if (s.wasWarm === 1 && s.warm === 0 && (s.done & 4) === 0 && (s.hint & 2) === 0) {
-    s.hint |= 2;
-    rig.teach(HINT_RELAY);
-  }
   s.wasWarm = s.warm > 0 ? 1 : 0;
   const glow = smooth(Math.min(1, s.warm * 3));
   rig.warmGlow.visible = glow > 0.01;
@@ -112,9 +116,6 @@ export function updatePress(rig: PressRig, dt: number): void {
       s.warm = 0;
       s.wasWarm = 0;
       rig.events.thawSeal();
-    } else if (here && lz > RIDGE.lz && lz < RIDGE.lz + 9 && Math.abs(lx) < 8 && (s.hint & 1) === 0) {
-      s.hint |= 1;
-      rig.teach(HINT_WARM);
     }
   }
   if (s.thawed === 1 && s.sealK < 1) {
@@ -128,19 +129,16 @@ export function updatePress(rig: PressRig, dt: number): void {
   if ((s.done & 1) === 0 && s.sealK >= 1 && lz < RIDGE.lz - RIDGE.half - 0.6 && here) {
     s.done |= 1;
     rig.events.complete(0);
-    rig.teach(HINT_BREAK);
   }
 
   // develop: an air-dash over the frozen membrane (Inkstep earned) cracks the draft
   if (s.crackA < 0 && airDash && rig.hasInkstep() && Math.hypot(lx - MEMBRANE_A.lx, lz - MEMBRANE_A.lz) < BREAK.reach && f.y - rig.membranes[0]!.position.y < BREAK.above) {
     s.crackA = 0;
     rig.events.crack(0);
-    rig.teach(HINT_GLIDE);
   }
   if ((s.done & 2) === 0 && (s.done & 1) !== 0 && grounded && lz < SHELF.z1 && lz > SHELF.z0 && f.y > SHELF_TOP - 0.3) {
     s.done |= 2;
     rig.events.complete(1);
-    rig.teach(HINT_ICE);
   }
 
   // combine: warmth melts the ice off the second membrane, then an air-dash cracks it
@@ -149,7 +147,6 @@ export function updatePress(rig: PressRig, dt: number): void {
     s.warm = 0;
     s.wasWarm = 0;
     rig.events.meltIce();
-    rig.teach(HINT_BREAK);
   }
   if (s.iced === 0 && s.iceK < 1) {
     s.iceK = Math.min(1, s.iceK + dt / 1.2);
@@ -159,9 +156,28 @@ export function updatePress(rig: PressRig, dt: number): void {
   if (s.crackB < 0 && s.iced === 0 && airDash && Math.hypot(lx - MEMBRANE_B.lx, lz - MEMBRANE_B.lz) < BREAK.reach && f.y - rig.membranes[1]!.position.y < BREAK.above) {
     s.crackB = 0;
     rig.events.crack(1);
-    rig.teach(HINT_GLIDE);
   }
-  if ((s.done & 4) === 0 && (s.done & 2) !== 0 && grounded && lx > LEDGE.x0 && lx < LEDGE.x1 && lz > LEDGE.z0 && lz < LEDGE.z1 && f.y > LEDGE_TOP - 0.3) {
+  // the seam: heat runs from the pillar's foot to the stair (the ink wets, then pales), then the stacks unpress from
+  // the foot up; a fox standing on one rides it (the collider's top rises under it)
+  if (s.seam >= 0) {
+    s.seam += dt;
+    const run = Math.min(1, s.seam / SEAM_S);
+    rig.seamMat.emissiveIntensity = 0.15 + 1.4 * Math.sin(Math.PI * Math.min(1, run * 1.15)) + 0.25 * run;
+    rig.seamMat.opacity = 1 - 0.55 * smooth((s.seam - SEAM_S) / 1.5);
+    for (let i = 0; i < rig.stacks.length; i++) {
+      const k = smooth((s.seam - SEAM_S - i * STACK.stagger) / STACK.rise);
+      const base = SHELF_TOP;
+      const full = rig.stackTop[i]! - base;
+      const h = STAIR.pressed + (full - STAIR.pressed) * k;
+      rig.stacks[i]!.scale.y = h / full;
+      rig.stackCols[i]!.top = base + h;
+    }
+    if (s.stood === 0 && s.seam > SEAM_S + (rig.stacks.length - 1) * STACK.stagger + STACK.rise) {
+      s.stood = 1;
+      rig.events.stood();
+    }
+  }
+  if ((s.done & 4) === 0 && (s.done & 2) !== 0 && s.stood === 1 && grounded && lx > LEDGE.x0 && lx < LEDGE.x1 && lz > LEDGE.z0 && lz < LEDGE.z1 && f.y > LEDGE_TOP - 0.3) {
     s.done |= 4;
     rig.events.complete(2);
     s.coda = 0;
@@ -215,11 +231,12 @@ export function pressLift(rig: PressRig, x: number, feetY: number, z: number, ou
     if (t < 0.3) continue;
     const mem = rig.membranes[i]!.position;
     const dy = feetY - mem.y;
-    if (dy < -0.6 || dy > DRAFT.height) continue;
+    const height = i === 0 ? DRAFT.height : DRAFT_B_HEIGHT;
+    if (dy < -0.6 || dy > height) continue;
     const d = Math.hypot(x - mem.x, z - mem.z);
     const radialK = 1 - smooth((d - DRAFT.radius * 0.6) / (DRAFT.radius * 0.4 + 0.5));
     if (radialK <= 0) continue;
-    const topK = 1 - smooth((dy - (DRAFT.height - 1.6)) / 1.6);
+    const topK = 1 - smooth((dy - (height - 1.6)) / 1.6);
     const k = Math.min(1, t / 0.9) * radialK * topK;
     if (k > out.k) {
       out.k = k;

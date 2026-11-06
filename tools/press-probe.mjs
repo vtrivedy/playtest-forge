@@ -1,7 +1,9 @@
 // The Scribe's Press, played with stick + Space/Shift only after ONE staged placement (the dev travel hook drops the
 // fox at the Press spawn, as walking through the hub arch does). Beats: brazier → seal → gate → membrane air-dash →
-// draft ride → shelf → brazier → iced membrane → air-dash → draft ride → ledge. Stills + evidence.json.
-//   node tools/press-probe.mjs --out /tmp/press-probe [--port 5214]
+// draft ride → shelf → brazier → relay → near brazier → iced membrane → air-dash → re-warm → ride the short draft
+// carrying warmth onto the pillar (its brazier lights, the seam thaws, the stair stands) → climb → ledge.
+//   node tools/press-probe.mjs --out /tmp/press-probe [--port 5214] [--from shelf]
+// --from shelf (iteration only, not route proof): a saved teach+develop and one teleport onto the Archive shelf.
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 import fs from 'node:fs';
@@ -13,6 +15,7 @@ const arg = (k, d) => {
 };
 const out = path.resolve(arg('out', '/tmp/press-probe'));
 const port = Number(arg('port', 5214));
+const from = arg('from', 'spawn');
 fs.mkdirSync(out, { recursive: true });
 const server = await createServer({ configFile: 'games/fox-spirit/vite.config.ts', server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
 await server.listen();
@@ -21,7 +24,12 @@ const page = await (await browser.newContext({ viewport: { width: 960, height: 5
 page.setDefaultTimeout(600000);
 const evidence = { staging: 'one dev travel("press") at the start; every later action is stick/Space/Shift', beats: [], errors: [] };
 page.on('pageerror', (e) => evidence.errors.push(String(e)));
-await page.goto(`http://127.0.0.1:${port}/?fresh`, { waitUntil: 'domcontentloaded', timeout: 600000 });
+if (from === 'shelf') {
+  await page.goto(`http://127.0.0.1:${port}/?fresh`, { waitUntil: 'domcontentloaded', timeout: 600000 });
+  await page.evaluate(() => localStorage.setItem('russet-vale-worlds-v1', JSON.stringify({ version: 1, worlds: { press: { restored: ['teach', 'develop'], visited: ['teach', 'develop'] } }, secrets: [] })));
+  evidence.staging = 'ITERATION ONLY: saved teach+develop, travel("press"), one teleport onto the Archive shelf';
+}
+await page.goto(`http://127.0.0.1:${port}/${from === 'shelf' ? '' : '?fresh'}`, { waitUntil: 'domcontentloaded', timeout: 600000 });
 await page.waitForFunction(() => window.__gameHooks?.ready === true, null, { timeout: 600000 });
 // Inkstep needs Russetvale's page home only for the hub arch; the Press levels themselves gate on their own progress
 await page.evaluate(() => {
@@ -49,15 +57,17 @@ const walk = (to, o = {}) => page.evaluate(({ to, o }) => {
  *  hold glide straight up until `glideTo[2]`, then drift to [glideTo[0], glideTo[1]] */
 const breakAndRide = (dir, center, glideTo, holdS) => page.evaluate(({ dir, center, glideTo, holdS }) => {
   const h = window.__gameHooks;
-  let s;
-  h.setStick(dir[0] * 0.2, dir[1] * 0.2);
-  h.setKeys(['Space']);
-  s = h.advance(14, 1 / 60, false);
-  h.setKeys(['Space', 'ShiftLeft']);
-  s = h.advance(3, 1 / 60, false);
-  h.setStick(null);
-  h.setKeys([]);
-  s = h.advance(70, 1 / 60, false);
+  let s = h.advance(1, 1 / 60, false);
+  if (dir) {
+    h.setStick(dir[0] * 0.2, dir[1] * 0.2);
+    h.setKeys(['Space']);
+    s = h.advance(14, 1 / 60, false);
+    h.setKeys(['Space', 'ShiftLeft']);
+    s = h.advance(3, 1 / 60, false);
+    h.setStick(null);
+    h.setKeys([]);
+    s = h.advance(70, 1 / 60, false);
+  }
   for (let f = 0; f < 240; f++) {
     const dx = center[0] - s.pos[0], dz = center[1] - s.pos[2], d = Math.hypot(dx, dz);
     if (d < 0.25) break;
@@ -82,6 +92,22 @@ const breakAndRide = (dir, center, glideTo, holdS) => page.evaluate(({ dir, cent
   s = h.advance(20, 1 / 60, false);
   return { ...s, peak };
 }, { dir, center, glideTo, holdS });
+/** a running hop onto world [x, z]: steer there holding Space for the first 14 frames, until landed within 0.4 m */
+const hop = (to) => page.evaluate((to) => {
+  const h = window.__gameHooks;
+  let s = h.state();
+  for (let n = 0; n < 120; n++) {
+    const dx = to[0] - s.pos[0], dz = to[1] - s.pos[2], d = Math.hypot(dx, dz);
+    if (d < 0.4 && s.grounded && n > 14) break;
+    const k = Math.min(1, d / 0.8);
+    h.setStick(d > 0.05 ? (dx / d) * k : 0, d > 0.05 ? (dz / d) * k : 0);
+    h.setKeys(n < 14 ? ['Space'] : []);
+    s = h.advance(1, 1 / 60, false);
+  }
+  h.setStick(null);
+  h.setKeys([]);
+  return h.advance(6, 1 / 60, false);
+}, to);
 const shot = async (name) => {
   const s = await page.evaluate(() => window.__gameHooks.advance(1, 1 / 60, true));
   await page.screenshot({ path: path.join(out, `${name}.jpg`), quality: 85 });
@@ -91,6 +117,11 @@ const shot = async (name) => {
   return s;
 };
 
+let s;
+if (from === 'shelf') {
+  await page.evaluate(() => { const h = window.__gameHooks; h.teleport(-700, 85 - 9, Math.PI); h.advance(60, 1 / 60, false); });
+  s = await shot('05-on-shelf');
+} else {
 await shot('00-spawn');
 // the direct try: lit brazier → seal fades on the way (the puzzle's lesson), then the relay
 await walk(L(-20.6, 27.4), { r: 0.3 });
@@ -109,21 +140,55 @@ await shot('03-through-gate');
 await walk(L(0, -0.2), { r: 0.3 });
 await walk(L(0, -1.0), { r: 0.2, mag: 0.3, max: 2 });
 await shot('04-before-membrane');
-let s = await breakAndRide([0, -1], L(0, -3.6), [...L(0, -9), 7.6], 8);
+s = await breakAndRide([0, -1], L(0, -3.6), [...L(0, -9), 7.6], 8);
 console.log('ride1 peak', s.peak);
-await shot('05-on-shelf');
+s = await shot('05-on-shelf');
+}
+const shelfY = s.pos[1];
+// the direct try first: the near brazier is too far from the lit one (the warmth fades on the way)
 await walk(L(28.6, -10.5), { r: 0.3 });
 await shot('06-brazier-b');
-await walk(L(16, -22.4), { r: 0.3 });
+await walk(L(14, -19.6), { r: 0.3 });
 await shot('06b-relay-b');
-await walk(L(0, -17.2), { r: 0.3 });
+await walk(L(8.4, -11.2), { r: 0.3 });
+await shot('06c-near-brazier');
+await walk(L(5.6, -12.4), { r: 0.3 });
 await page.evaluate(() => window.__gameHooks.advance(80, 1 / 60, false));
 await shot('07-ice-melted');
-await walk(L(0, -14.4), { r: 0.3 });
-await walk(L(0, -16.0), { r: 0.25, mag: 0.4 });
-s = await breakAndRide([0, -1], L(0, -18.6), [...L(0, -24), 12.2], 8);
-console.log('ride2 peak', s.peak);
-await shot('08-ledge');
+// crack it: come round to its north, face south, jump and air-dash over it (Inkstep)
+await walk(L(4, -8.4), { r: 0.3 });
+await walk(L(4, -10.6), { r: 0.2, mag: 0.4 });
+await page.evaluate(() => {
+  const h = window.__gameHooks;
+  h.setStick(0, -0.2); h.setKeys(['Space']); h.advance(14, 1 / 60, false);
+  h.setKeys(['Space', 'ShiftLeft']); h.advance(3, 1 / 60, false);
+  h.setStick(null); h.setKeys([]); h.advance(70, 1 / 60, false);
+});
+await shot('07b-short-draft');
+// the short draft alone: ride it and try for the ledge (falls short — the ledge is out of the column's reach)
+s = await breakAndRide(null, L(4, -13.2), [...L(4, -20.6), shelfY + 4.0], 6);
+evidence.shortDraftTry = { peakAboveShelf: +(s.peak - shelfY).toFixed(2), landedAboveShelf: +(s.pos[1] - shelfY).toFixed(2), pos: s.pos.map((v) => +v.toFixed(2)), ledgeRise: 4.6 };
+console.log('short draft try', JSON.stringify(evidence.shortDraftTry));
+await shot('07c-short-draft-falls-short');
+// warmth up the draft: re-warm at the near brazier, step into the draft, ride, glide onto the pillar
+await walk(L(8.4, -11.2), { r: 0.3 });
+s = await page.evaluate(() => window.__gameHooks.advance(1, 1 / 60, false));
+console.log('warm before ride', s.opening.press.warm);
+s = await breakAndRide(null, L(4, -13.2), [...L(4, -17), shelfY + 3.5], 6);
+console.log('ride to pillar peak above shelf', +(s.peak - shelfY).toFixed(2), 'pos', s.pos.map((v) => +v.toFixed(2)));
+await shot('08-pillar-kindled');
+await page.evaluate(() => window.__gameHooks.advance(150, 1 / 60, false));
+await shot('08b-seam-running');
+await page.evaluate(() => window.__gameHooks.advance(240, 1 / 60, false));
+await shot('08c-stair-stands');
+// down off the pillar's west side, round to the stair's foot, climb south
+await walk(L(0.6, -17.5), { r: 0.4, max: 4 });
+await walk(L(-1.6, -12.6), { r: 0.4 });
+await walk(L(-4.5, -10.4), { r: 0.3 });
+for (let i = 0; i < 8; i++) s = await hop(L(-4.5, -11.2 - (i + 0.5) * 1.225));
+s = await hop(L(-4.5, -22.6));
+console.log('climbed to', s.pos.map((v) => +v.toFixed(2)), 'above shelf', +(s.pos[1] - shelfY).toFixed(2));
+await shot('08d-ledge');
 await page.evaluate(() => { const h = window.__gameHooks; h.setStick(0.6, 0.8); h.advance(40, 1 / 60, false); h.setStick(null); h.advance(60, 1 / 60, false); });
 await shot('09-the-press');
 await page.evaluate(() => { const h = window.__gameHooks; h.setStick(-0.7, -0.7); h.advance(25, 1 / 60, false); h.setStick(null); h.advance(240, 1 / 60, false); });

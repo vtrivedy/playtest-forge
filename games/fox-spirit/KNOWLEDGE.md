@@ -828,3 +828,19 @@ Final recovery proof19:00: actual f844 localproduction60s/4fps240frames + Reedin
 ### Canvas alphaMap ramps — Reed, swarm5
 
 - Three's `alphamap_fragment` reads texture green, not texture alpha. A white Canvas2D gradient varying transparency can leave green near 255 throughout, producing a solid beam despite plausible alpha stops. Chromium samples from Cedar `b2f781c8` reproduce this (green255/252/255 at y16/64/96 while alpha21/82/164). Cedar `f7bc0e0d` uses an opaque black→grey→white ramp; the same samples become green21/81/164, alpha255. Retained source-channel evidence: `docs/reviews/swarm5/reed-payoff/alphaMap-pixels.json`. Pixel-channel correctness alone is not a GPU appearance verdict.
+
+## The Unpressed Stair — a puzzle that moves the world (Opus, agent/sumiro-play)
+
+- Jump apex is ~0.83 m (v 5.0, g 15): any stair the fox climbs needs rises ≤ 0.6 m (0.575 works with a running hop
+  per step). A ledge 4.6 m up is a ride or an 8-step stair, never a jump.
+- Draft crest ≈ column height + 0.2 m (held glide). Size a "short" draft from that: 3.9 m reaches a +3.0 pillar and
+  stays under a +4.6 ledge (measured +4.07). Give each draft its own height; the lift's top falloff must use it too.
+- Brazier triggers were horizontal-only; anything placed high must also gate on feet height (`brazierY`), or it can
+  be lit from the floor beneath.
+- Never put a brazier where the fox lands: on a pillar top it filled the lens. Put it on the far corner, with a post.
+- Air-dash direction follows the fox's facing, not the stick at the jump. Probes must walk the last metres in the
+  dash direction before the jump (a diagonal approach dashed 4 m off the membrane).
+- Rising stacks: scale a group of page layers in y from pressed to full and move its box collider's `top` with it;
+  a grounded fox rides it. Restore = set the seam clock past the end, the hot step lands every stack on frame one.
+- `tools/press-probe.mjs --from shelf` stages a saved teach+develop and teleports onto the shelf: ~4 min per
+  combine iteration instead of ~12. It is iteration only; the fresh route is the proof.

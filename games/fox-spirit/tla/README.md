@@ -6,3 +6,7 @@
 
 Proven able to fail: dropping `settled` from `Kindle` violates `Safe`; making `Advance` wait on the ember violates `EndsOnce`.
 Code mapping: TLA `phase` = `PHASES[rig.s.phase]`; TLA kit `trotting` covers code `drifting` + `trotting`; `card` hidden/showing/done = `rig.s.card` 0/1/2.
+| `Press.tla` | Scribe's Press, three levels incl. the Unpressed Stair (`src/opening/press.hot.ts`, DESIGN-sumiro-play.md) | `tlc -workers 2 -config Press.cfg Press.tla` → 50 distinct states, no error (TypeOK, Caused, Monotone, Finishes) | agent/sumiro-play |
+
+Press negative control: `PressNoWarmRide.cfg` (warmth lost on the short draft ride) violates `Finishes` — the combine
+cannot be solved without carrying warmth up the Inkstep draft.
